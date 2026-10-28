@@ -30,6 +30,8 @@ jobs:
         run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
       - name: Test change classifier
         run: python3 -B -m unittest discover -s scripts/tests
+      - name: Verify finance change review inventory
+        run: python3 -B scripts/generate-finance-change-review-inventory.py --check
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -145,6 +147,7 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib workflow_reads
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::activity_work
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::task_assignees
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::history::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::authoritative::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::private_workflow_reads
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib realtime::
@@ -292,6 +295,9 @@ jobs:
       - name: Runtime reader tenant isolation and retirement proof
         run: spacetime call lumiere-ci-contracts run_ai_spend_recovery_tests --server local -y --no-config
 
+      - name: CRM qualification replay and tenant isolation proof
+        run: spacetime call lumiere-ci-contracts run_crm_relational_fk_test --server local -y --no-config
+
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.
       - name: Verify standalone STDB matches pinned lumiere-contracts release
@@ -381,7 +387,27 @@ jobs:
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
-      - name: Upload work-board browser diagnostics
+      - name: Sales workflow browser regressions
+        id: sales_workflow_ui
+        run: pnpm --dir web test:e2e:sales-workflow
+
+      - name: Upload sales workflow browser diagnostics
+        if: failure() && steps.sales_workflow_ui.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-workflow-browser-diagnostics
+          path: frontend/web/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Reports workflow browser regressions
+        run: pnpm --dir web test:e2e:reports-ui
+
+      - name: Accounting next-action and authoring browser regressions
+        working-directory: frontend/web
+        run: pnpm exec playwright test --config playwright.accounting-ui.config.ts accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts
+
+      - name: Upload frontend browser diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:

@@ -80,7 +80,7 @@ import {
   finalizeUpdateContactParams,
   finalizeUpdateLeadAddressParams,
   finalizeUpdateLeadDetailsParams,
-  finalizeUpdateLeadParams,
+  encodeUpdateLeadParams,
   finalizeUpdateLeadRevenueParams,
   finalizeUpdateOpportunityParams,
   type UpdateContactAddressParams,
@@ -497,7 +497,7 @@ export function useUpdateLead(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, LeadPatch<UpdateLeadParams>>({
     mutationFn: async ({ leadId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_lead", { leadId: toScalarU64(leadId), params: stdbParamsToJson(finalizeUpdateLeadParams(params)) })
+      const { urlPath, init } = stdbBffCommandPost("update_lead", { leadId: toScalarU64(leadId), params: encodeUpdateLeadParams(params) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update lead')
     },

@@ -1,0 +1,17 @@
+{
+  "contact_name": { "none": [] },
+  "title": { "none": [] },
+  "website": { "none": [] },
+  "industry": { "none": [] },
+  "referred_by": { "none": [] },
+  "description": { "none": [] },
+  "street": { "none": [] },
+  "city": { "none": [] },
+  "zip": { "none": [] },
+  "country_code": { "none": [] },
+  "expected_revenue": { "none": [] },
+  "probability": { "none": [] },
+  "stage_id": { "none": [] },
+  "team_id": { "none": [] },
+  "state": { "some": "qualified" }
+}

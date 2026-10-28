@@ -59,7 +59,7 @@ export interface AccountantOverviewData {
   companies?: OverviewCollection
   budgets?: OverviewCollection
 }
-export type OverviewQueueKey = "overdue" | "draft-invoices" | "draft-bills" | "bank-lines" | "unlinked-payments" | "deadlines" | "periods"
+export type OverviewQueueKey = "overdue" | "bills-due" | "draft-invoices" | "draft-bills" | "bank-lines" | "unlinked-payments" | "deadlines" | "periods"
 export interface OverviewActivityMonth {
   startMs: number
   invoices: number
@@ -139,6 +139,11 @@ export function buildAccountantOverview(data: AccountantOverviewData, now = new 
     const due = overviewDueDate(row)
     return due != null && due.getTime() < today.getTime()
   })
+  // UTC calendar days: overdue plus all bills due through seven days from today.
+  const billsDue = bucket(payables, (row) => {
+    const due = overviewDueDate(row)
+    return due != null && due.getTime() < today.getTime() + 8 * 86_400_000
+  })
   const statements = scoped(data.bankStatements, data)
   const statementsById = new Map(statements.rows.map((row) => [id(row.id), row]))
   const bankSource: OverviewCollection = data.bankLines.state.status !== "ready"
@@ -186,7 +191,7 @@ export function buildAccountantOverview(data: AccountantOverviewData, now = new 
     if (month) { if (isType(row, "outinvoice")) month.invoices += 1; else month.bills += 1 }
   }
   const queues: Record<OverviewQueueKey, OverviewCollection> = {
-    overdue, "draft-invoices": draftInvoices, "draft-bills": draftBills, "bank-lines": unmatched,
+    overdue, "bills-due": billsDue, "draft-invoices": draftInvoices, "draft-bills": draftBills, "bank-lines": unmatched,
     "unlinked-payments": unallocatedPayments, deadlines: activeDeadlines, periods: openPeriods,
   }
   return {

@@ -151,7 +151,9 @@ test('hosted invite cookie keeps the bearer secret out of the URL, is authentica
   assert.equal(invite.openHostedInvite(sealed, 1_020_000), token)
   assert.equal(invite.openHostedInvite(sealed, 1_600_001), null)
   assert.equal(invite.openHostedInvite('broken'), null)
-  assert.equal(invite.openHostedInvite(sealed.slice(0, -2) + 'xx', 1_020_000), null)
+  const tampered = Buffer.from(sealed, 'base64url')
+  tampered[tampered.length - 1] ^= 1
+  assert.equal(invite.openHostedInvite(tampered.toString('base64url'), 1_020_000), null)
   const other = loadSource(source, { ...deps }, settings('another-password-with-at-least-32-chars'))
   assert.equal(other.openHostedInvite(sealed, 1_020_000), null)
   assert.equal(invite.hostedInviteCookieName(), '__Host-lumiere-invite')

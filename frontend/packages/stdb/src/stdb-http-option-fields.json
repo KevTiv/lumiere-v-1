@@ -629,6 +629,13 @@
   "AiReducerAllowlist": [
     "metadata"
   ],
+  "AiRunBudgetPark": [
+    "schedule_id",
+    "resume_trigger",
+    "resolution",
+    "resume_requested_at",
+    "resolved_at"
+  ],
   "AiRunEffect": [
     "provider_reference",
     "detail"
@@ -648,6 +655,9 @@
     "answer_json",
     "answered_at_version",
     "answered_by"
+  ],
+  "AiRunQueuedInput": [
+    "promoted_run_id"
   ],
   "AiRunReview": [
     "rationale"
@@ -6477,7 +6487,8 @@
     "expected_revenue",
     "probability",
     "stage_id",
-    "team_id"
+    "team_id",
+    "state"
   ],
   "UpdateLeadSourceParams": [
     "name",

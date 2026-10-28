@@ -18,10 +18,11 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
   },
   crm: {
     workspaces: [
+      ["myWork", ["my-activities"]],
       ["overview", ["dashboard"]],
       ["pipeline", ["leads", "opportunities", "opportunity-lines"]],
       ["contacts", ["contacts", "contact-segments", "duplicates"]],
-      ["activities", ["my-activities", "activities"]],
+      ["activities", ["activities"]],
     ],
     overflow: [["configuration", ["contact-tags", "contact-categories", "attribution", "pipeline-admin"]]],
   },
@@ -37,10 +38,10 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
     workspaces: [
       ["overview", ["dashboard", "owner-reports"]],
       ["financial", ["reports", "statements", "trial-balance", "vat-report"]],
-      ["analytics", ["dashboards", "dashboard-widgets", "pivot-explorer", "analytics-metrics", "query-builder"]],
+      ["analytics", ["dashboards", "pivot-explorer"]],
       ["schedules", ["scheduled-reports"]],
     ],
-    overflow: [["configuration", ["report-templates"]]],
+    overflow: [["configuration", ["report-templates", "dashboard-widgets", "analytics-metrics"]], ["analysis", ["query-builder"]]],
   },
   expenses: {
     workspaces: [
@@ -55,7 +56,9 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
 
 export function businessWorkspaceNavigation(module: BusinessWorkspaceModule, t: TFunction): ModuleWorkspaceNav {
   const groups = (items: readonly Group[]) => items.map(([id, tabIds]) => ({
-    id, label: t(`modules.workspaces.${id}`), tabIds,
+    id, label: module === "reports" && ["overview", "financial", "analytics", "schedules", "configuration", "analysis"].includes(id)
+      ? t(`reports.workspace.${({ overview: "run", financial: "saved", analytics: "dashboards", schedules: "schedules", configuration: "authoring", analysis: "analysis" } as Record<string, string>)[id]}`)
+      : t(`modules.workspaces.${id}`), tabIds,
   }))
   return {
     label: t("modules.workspaces.label"),

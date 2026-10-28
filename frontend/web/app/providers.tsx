@@ -4,7 +4,8 @@ import { NavigationGuardProvider } from "@lumiere/ui"
 
 import { QueryClient, QueryClientProvider, useQueryClient, useQuery } from "@tanstack/react-query"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import { I18nProvider, useTranslation } from "@lumiere/i18n"
+import { I18nProvider, useTranslation, normalizeLanguage, formattingLocale, defaultLanguage } from "@lumiere/i18n"
+import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
   CurrencyFormatProvider,
   RBACProvider,
@@ -38,7 +39,19 @@ import { DocumentTemplateProvider } from "./document-template-provider"
 /** Amounts and numbers follow the language the user picked. */
 function CurrencyLocaleBridge({ children }: { children: React.ReactNode }) {
   const { i18n } = useTranslation()
-  return <CurrencyFormatProvider locale={i18n.language}>{children}</CurrencyFormatProvider>
+  return <CurrencyFormatProvider locale={formattingLocale(i18n.language)}>{children}</CurrencyFormatProvider>
+}
+
+/** Restore canonical account preferences on sign-in and after a successful profile save. */
+function ProfileLanguageBridge() {
+  const { identity, organizationId } = useErpSession()
+  const signedIn = Boolean(identity && identity !== "unknown" && organizationId)
+  const { data: profile } = useCurrentUserProfile(signedIn)
+  const { i18n } = useTranslation()
+  useEffect(() => {
+    void i18n.changeLanguage(signedIn ? normalizeLanguage(profile?.language) : defaultLanguage)
+  }, [i18n, signedIn, profile?.language])
+  return null
 }
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
@@ -237,6 +250,7 @@ export function Providers({
                   organizationId={organizationId}
                   companyIds={companyIds}
                 >
+                  <ProfileLanguageBridge />
                   <AuthorityExpiryRefresh
                     expiresAtMicros={authorityExpiresAtMicros}
                     onUnavailable={markAuthorityUnavailable}

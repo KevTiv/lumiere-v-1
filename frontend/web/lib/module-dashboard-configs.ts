@@ -670,7 +670,7 @@ export const salesDashboard: DashboardConfig = {
           data: {
             columns: 4,
             actions: [
-              { id: "create_sale_order", label: "New Sale Order", icon: "file", color: "blue" },
+              { id: "create_sale_order", label: "New quotation", icon: "file", color: "blue" },
               { id: "create_pricelist", label: "New Pricelist", icon: "settings", color: "purple" },
               { id: "new_delivery", label: "New Delivery", icon: "package", color: "green" },
               { id: "view_pipeline", label: "View Pipeline", icon: "trending", color: "teal" },
@@ -797,7 +797,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
-  defaultTab: "dashboard",
+  defaultTab: "orders",
   tabs: [
     {
       id: "dashboard",
@@ -807,18 +807,18 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "ops",
-      label: t("sales.tabs.ops", { defaultValue: "Ops" }),
+      label: t("sales.tabs.ops", { defaultValue: "Needs attention" }),
       type: "custom" as const,
     },
     {
       id: "orders",
-      label: "Orders",
+      label: t("sales.workspace.quotationsAndOrders", { defaultValue: "Quotations & orders" }),
       type: "entity",
       entityConfig: saleOrdersTableConfig(t, {
         formatSaleOrderDisplayName: saleOrderPrimaryLabel,
       }),
       createForm: newSaleOrderForm(t),
-      createLabel: "New Order",
+      createLabel: t("sales.workspace.newQuotation", { defaultValue: "New quotation" }),
       createAction: "createSaleOrder",
       createPermission: { resource: "sale_order", action: "create" },
     },
@@ -2786,6 +2786,19 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Subscriptions",
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
+  workspaceNav: {
+    workspaces: [
+      { id: "overview", label: t("subscriptions.workflow.overview"), tabIds: ["dashboard"] },
+      { id: "contracts", label: t("subscriptions.workflow.contracts"), tabIds: ["subscriptions", "plans"] },
+      { id: "billing", label: t("subscriptions.workflow.billing"), tabIds: ["due-to-bill", "past-due", "payment-intents"] },
+    ],
+    overflowLabel: t("subscriptions.workflow.advanced"),
+    overflow: [
+      { id: "contract-details", label: t("subscriptions.workflow.contractDetails"), tabIds: ["lines", "amendments", "bundles", "entitlements"] },
+      { id: "usage", label: t("subscriptions.workflow.usage"), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers"] },
+      { id: "revenue", label: t("subscriptions.workflow.revenue"), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
+    ],
+  },
   tabGroups: [
     { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "bundles", "entitlements"] },
     { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
@@ -2894,6 +2907,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSubscriptionPlanForm(t),
       createLabel: "New Plan",
       createAction: "createPlan",
+      createPermission: { resource: "subscription_plan", action: "create" },
     },
     {
       id: "lines",

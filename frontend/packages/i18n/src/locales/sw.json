@@ -1,0 +1,4876 @@
+{
+  "recordChanges": {
+    "fields": {
+      "name": "Maelezo",
+      "debit": "Debiti",
+      "credit": "Krediti",
+      "balance": "Salio"
+    }
+  },
+  "moduleInsights": {
+    "overview": "Muhtasari",
+    "previous": "Kipindi kilichopita",
+    "month": "Mwezi",
+    "state": "Hali",
+    "states": {
+      "draft": "Rasimu",
+      "sent": "Imetumwa",
+      "sale": "Imethibitishwa",
+      "done": "Imekamilika",
+      "cancelled": "Imeghairiwa",
+      "open": "Wazi",
+      "purchase": "Imethibitishwa",
+      "submitted": "Imewasilishwa",
+      "approved": "Imeidhinishwa",
+      "posted": "Imepostiwa",
+      "refused": "Imekataliwa",
+      "generated": "Imetengenezwa",
+      "exported": "Imehamishwa",
+      "archived": "Imehifadhiwa kwenye kumbukumbu"
+    },
+    "workspaces": {
+      "ops": "Shughuli",
+      "operations": "Shughuli",
+      "deliveries": "Uwasilishaji",
+      "commission-plans": "Mipango ya kamisheni",
+      "leads": "Wateja watarajiwa",
+      "activities": "Shughuli",
+      "contacts": "Wawasiliani",
+      "requisitions": "Mikataba ya ununuzi",
+      "vendors": "Wasambazaji",
+      "lines": "Safu za oda",
+      "trial-balance": "Mizania ya majaribio",
+      "scheduled-reports": "Ripoti zilizopangwa"
+    }
+  },
+  "workspaceShell": {
+    "preferences": "Mapendeleo ya eneo la kazi",
+    "preferencesDescription": "Rekebisha eneo hili la kazi likufae.",
+    "appearance": "Mwonekano",
+    "contentWidth": "Upana wa maudhui",
+    "centered": "Katikati",
+    "fullWidth": "Upana wote",
+    "navigation": "Urambazaji",
+    "expanded": "Imepanuliwa",
+    "compact": "Imebanwa",
+    "comfortable": "Nafasi kubwa",
+    "density": "Msongamano wa jedwali",
+    "light": "Mwanga",
+    "dark": "Giza",
+    "system": "Mfumo",
+    "toggleNavigation": "Onyesha au ficha urambazaji",
+    "closeNavigation": "Funga urambazaji",
+    "expandNavigation": "Panua urambazaji",
+    "collapseNavigation": "Bana urambazaji",
+    "search": "Tafuta moduli na rekodi"
+  },
+  "common": {
+    "select": {
+      "search": "Tafuta chaguo…",
+      "options": "Chaguo",
+      "noMatches": "Hakuna chaguo zinazolingana"
+    },
+    "save": "Hifadhi",
+    "cancel": "Ghairi",
+    "edit": "Hariri",
+    "delete": "Futa",
+    "confirm": "Thibitisha",
+    "confirmAction": "Thibitisha kitendo",
+    "loading": "Inapakia…",
+    "search": "Tafuta",
+    "export": "Hamisha",
+    "refresh": "Onyesha upya",
+    "settings": "Mipangilio",
+    "back": "Rudi",
+    "next": "Endelea",
+    "actionCompleted": "{{action}} imekamilika",
+    "active": "Inatumika",
+    "inactive": "Haitumiki",
+    "none": "Hakuna",
+    "close": "Funga",
+    "submit": "Wasilisha",
+    "create": "Unda",
+    "notes": "Maelezo",
+    "metadata": "Metadata",
+    "saving": "Inahifadhi…",
+    "reset": "Weka upya",
+    "yes": "Ndiyo",
+    "no": "Hapana",
+    "error": {
+      "title": "Hitilafu",
+      "generic": "Hitilafu imetokea. Jaribu tena."
+    },
+    "success": "Imefanikiwa",
+    "warning": "Onyo",
+    "noData": "Hakuna data",
+    "noOrganization": {
+      "title": "Hakuna shirika lililochaguliwa",
+      "description": "Lazima uwe mwanachama wa shirika kutumia eneo hili. Kamilisha usajili au umwombe msimamizi akualike.",
+      "goToOnboarding": "Nenda kwenye usajili"
+    },
+    "lookup": {
+      "noJournals": "Hakuna majarida. Unda majarida kwanza kwenye mipangilio ya uhasibu.",
+      "noPartners": "Bado hakuna wateja. Ongeza wawasiliani katika CRM kwanza.",
+      "noPricelists": "Hakuna orodha za bei. Unda orodha ya bei kwanza.",
+      "noVendors": "Bado hakuna wasambazaji. Weka wawasiliani kama wasambazaji katika CRM au ongeza taarifa zao.",
+      "noProducts": "Hakuna bidhaa kwenye katalogi. Unda bidhaa kwanza.",
+      "noUoms": "Hakuna vipimo. Sanidi vipimo vya shirika lako kwanza.",
+      "noSaleOrders": "Hakuna oda za mauzo. Unda oda iliyothibitishwa kwanza.",
+      "noSubscriptionPlans": "Hakuna mipango ya usajili. Unda mpango kwanza.",
+      "noAccounts": "Hakuna akaunti za leja kuu. Weka mpangilio wa akaunti kwanza.",
+      "noAnalyticAccounts": "Hakuna akaunti za uchanganuzi. Unda akaunti ya uchanganuzi kwanza.",
+      "noEmployees": "Hakuna wafanyakazi. Ongeza wafanyakazi katika rasilimali watu kwanza.",
+      "noProjects": "Hakuna miradi. Unda mradi kwanza.",
+      "noTasks": "Hakuna kazi. Unda kazi kwanza.",
+      "noWarehouses": "Hakuna maghala. Unda ghala katika hesabu ya bidhaa kwanza.",
+      "noStockMoves": "Hakuna aina za shughuli au maeneo yaliyopatikana. Unda miondoko au kiasi cha bidhaa kwanza.",
+      "noCategories": "Hakuna kategoria za bidhaa. Unda kategoria katika mipangilio ya hesabu ya bidhaa kwanza.",
+      "noTeams": "Hakuna timu za msaada. Sanidi timu kwanza.",
+      "noStages": "Hakuna hatua zilizowekwa. Sanidi hatua za dawati la msaada kwanza.",
+      "noBoms": "Hakuna orodha za vifaa. Unda orodha ya vifaa kwanza.",
+      "noTaskStages": "Bado hakuna hatua za kazi. Unda kazi yenye hatua au uache hatua wazi.",
+      "noLeaveTypes": "Hakuna aina za likizo zilizosanidiwa. Unda aina za likizo kwanza.",
+      "noDepartments": "Hakuna idara. Unda idara kwanza.",
+      "noPayrollStructures": "Hakuna miundo ya mishahara. Unda miundo ya mishahara kwanza."
+    },
+    "validation": {
+      "required": "Sehemu hii inahitajika",
+      "minLength": "Lazima iwe na angalau herufi {{min}}",
+      "maxLength": "Isizidi herufi {{max}}",
+      "min": "Thamani ya chini ni {{min}}",
+      "max": "Thamani ya juu ni {{max}}",
+      "invalidFormat": "Umbizo si sahihi",
+      "invalidEmail": "Anwani ya barua pepe si sahihi",
+      "invalidUrl": "Anwani ya tovuti si sahihi",
+      "invalidNumber": "Weka nambari"
+    },
+    "form": {
+      "unavailableSelection": "Chaguo halipatikani: {{value}}",
+      "multiSelect": {
+        "placeholder": "Ongeza…",
+        "search": "Tafuta…",
+        "empty": "Hakuna vinavyolingana",
+        "remove": "Ondoa {{value}}"
+      }
+    },
+    "formPreview": {
+      "label": "Hakiki"
+    },
+    "formSubmit": {
+      "busy": "Subiri, ombi lingine bado linaendelea.",
+      "validationFailed": "Sahihisha sehemu zilizoonyeshwa kisha ujaribu tena.",
+      "noHandler": "Fomu hii haijaunganishwa kuhifadhi. Wasiliana na huduma ya msaada.",
+      "failed": "Imeshindwa kuwasilisha",
+      "saved": "Imehifadhiwa."
+    },
+    "paramsMapper": {
+      "periodNotFound": "Hakuna kipindi cha fedha chenye jina hilo.",
+      "invalidConsolidationAccount": "Imeshindwa kuandaa vigezo vya akaunti ya ujumuishaji. Angalia sehemu zinazohitajika.",
+      "invalidConsolidationJournal": "Imeshindwa kuandaa vigezo vya jarida la ujumuishaji. Angalia sehemu zinazohitajika.",
+      "invalidEliminationEntry": "Imeshindwa kuandaa vigezo vya ingizo la kuondoa miamala baina ya kampuni. Angalia sehemu zinazohitajika.",
+      "invalidTrialBalanceEntry": "Imeshindwa kuandaa vigezo vya ingizo la mizania ya majaribio. Angalia sehemu zinazohitajika.",
+      "invalidCompany": "Imeshindwa kuandaa vigezo vya kampuni. Angalia sehemu zinazohitajika.",
+      "invalidWhatsappAccount": "Imeshindwa kuandaa vigezo vya akaunti ya WhatsApp. Angalia sehemu zinazohitajika.",
+      "invalidSkill": "Imeshindwa kuandaa vigezo vya ujuzi. Angalia sehemu zinazohitajika.",
+      "invalidAgent": "Imeshindwa kuandaa vigezo vya wakala. Angalia sehemu zinazohitajika.",
+      "invalidTeamMember": "Imeshindwa kuandaa vigezo vya mwanatimu. Angalia sehemu zinazohitajika.",
+      "invalidInsight": "Imeshindwa kuandaa vigezo vya uchanganuzi. Angalia sehemu zinazohitajika.",
+      "invalidProductivityLog": "Imeshindwa kuandaa vigezo vya kumbukumbu ya tija. Angalia sehemu zinazohitajika.",
+      "invalidCustomField": "Imeshindwa kuandaa vigezo vya sehemu maalumu. Angalia sehemu zinazohitajika.",
+      "invalidAiActionDraft": "Imeshindwa kuandaa vigezo vya rasimu ya kitendo cha AI.",
+      "invalidAiChatSession": "Imeshindwa kuandaa vigezo vya kipindi cha mazungumzo ya AI.",
+      "invalidIotAction": "Imeshindwa kuandaa vigezo vya kitendo cha IoT."
+    },
+    "csvImport": {
+      "description": "Chagua faili ya CSV ya UTF-8. Vichwa lazima vilingane na kiolezo cha SpacetimeDB.",
+      "submit": "Ingiza",
+      "fileLabel": "Faili ya CSV"
+    },
+    "importAssistant": {
+      "description": "Pakia CSV, kagua ulinganishaji wa safu wima uliopendekezwa na AI, hakiki safu zilizobadilishwa, kisha ziingize katika ERP.",
+      "stepUpload": "Pakia",
+      "stepMap": "Linganisha safu wima",
+      "stepPreview": "Hakiki",
+      "uploadHint": "Chagua faili ya CSV ya UTF-8 ili kuanza.",
+      "structureSummary": "Safu wima {{columns}} · safu za data {{rows}} zimepatikana",
+      "safetyPassed": "CSV imepita ukaguzi wa usalama wa kivinjari",
+      "analyze": "Changanua safu wima",
+      "analyzing": "Inachanganua…",
+      "preview": "Hakiki uingizaji",
+      "previewing": "Inaandaa hakikisho…",
+      "confirmImport": "Thibitisha uingizaji",
+      "sourceColumn": "Safu wima chanzo",
+      "targetField": "Sehemu ya ERP",
+      "confidence": "Uhakika",
+      "skipColumn": "Ruka safu wima",
+      "unmappedTargets": "Sehemu za ERP zinazohitajika bado hazijalinganishwa: {{fields}}",
+      "validationErrors": "Hitilafu {{count}} za uthibitishaji katika hakikisho",
+      "previewClean": "Hakikisho linafaa kwa safu {{count}}",
+      "row": "Safu",
+      "field": "Sehemu",
+      "message": "Ujumbe",
+      "targetEntity": "Aina ya rekodi lengwa",
+      "stepDone": "Hali ya uingizaji",
+      "jobPending": "Inasubiri hali ya kazi ya kuingiza…",
+      "jobNotFound": "Uingizaji umeanza. Hali itaonekana hapa SpacetimeDB itakapomaliza uchakataji.",
+      "jobStatusTitle": "Kazi ya kuingiza",
+      "jobTotal": "Jumla ya safu",
+      "jobImported": "Imeingizwa",
+      "jobErrors": "Hitilafu",
+      "downloadErrors": "Pakua ripoti ya hitilafu (CSV)",
+      "savedTemplateLabel": "Kiolezo cha ulinganishaji kilichohifadhiwa",
+      "savedTemplatePlaceholder": "Chagua kiolezo kilichohifadhiwa (si lazima)",
+      "noSavedTemplate": "Hakuna kiolezo kilichohifadhiwa",
+      "templateUses": "matumizi",
+      "deleteTemplate": "Futa kiolezo",
+      "saveTemplateLabel": "Hifadhi ulinganishaji huu kwa uingizaji ujao",
+      "saveTemplatePlaceholder": "Jina la kiolezo",
+      "saveTemplate": "Hifadhi kiolezo",
+      "savingTemplate": "Inahifadhi…",
+      "templateSaved": "Kiolezo cha ulinganishaji kimehifadhiwa",
+      "templateDeleted": "Kiolezo cha ulinganishaji kimefutwa",
+      "bundleModeHint": "CSV hii inaonekana kuwa na oda zenye safu za bidhaa. Linganisha sehemu za vichwa kwanza, kisha sehemu za safu.",
+      "lineMappingTitle": "Safu wima za safu za oda",
+      "linePreviewTitle": "Hakikisho la safu",
+      "bundleActive": "kichwa na safu",
+      "bundleLinkRequired": "Linganisha safu wima ya kumbukumbu ya oda (client_order_ref) kabla ya kuingiza oda pamoja na safu zake.",
+      "retryFailedRows": "Jaribu tena safu {{count}} zilizoshindwa",
+      "retrySessionHint": "Inajaribu tena safu {{count}} zilizoshindwa katika uingizaji uliopita.",
+      "jobHistoryTitle": "Kazi za kuingiza za hivi karibuni",
+      "rollbackImport": "Tendua uingizaji",
+      "rollbackComplete": "Uingizaji huu umetenduliwa.",
+      "rollbackFailed": "Imeshindwa kutendua",
+      "abandonedDraftsTitle": "Rasimu za maingizo zilizoingizwa na kuachwa",
+      "parentPhaseOnly": "Hatua ya kichwa pekee",
+      "cleanupEmptyDrafts": "Ondoa rasimu tupu",
+      "cleanupRefused": "Usafishaji umekataliwa: {{message}}",
+      "cleanupConfirmTitle": "Uondoe rasimu tupu zilizoingizwa?",
+      "cleanupConfirmAction": "Ondoa rasimu",
+      "abandonedDraftsDescription": "Uingizaji huu uliunda vichwa vya maingizo lakini haukukamilisha safu zake. Usafishaji huondoa rasimu tupu ambazo hazijabadilishwa pekee. Seva hukataa maingizo yenye safu au shughuli za uhasibu.",
+      "cleanupConfirmDescription": "Kazi ya kuingiza #{{jobId}} itakaguliwa tena kabla ya usafishaji. Rasimu zake za awali zilizo tupu pekee zinaweza kuondolewa. Ingizo lolote lililobadilishwa, kupostiwa, kulindwa, kulipwa au lisilo tupu husimamisha usafishaji wote."
+    },
+    "audit": "Ukaguzi",
+    "overview": "Muhtasari",
+    "remove": "Ondoa",
+    "entityView": {
+      "mixedCurrencies": "Kikundi hiki kina sarafu tofauti, kwa hiyo jumla moja haionyeshwi.",
+      "inlineEdit": {
+        "edit": "Hariri {{label}}",
+        "saved": "{{label}} imesasishwa",
+        "undo": "Tendua",
+        "undone": "Mabadiliko ya {{label}} yametenduliwa",
+        "notSaved": "{{label}} haijahifadhiwa",
+        "saveHint": "Bonyeza {{shortcut}} kuhifadhi, Esc kughairi"
+      },
+      "board": "Ubao",
+      "emptyColumn": "Hakuna rekodi",
+      "table": "Jedwali",
+      "toggleLabel": "Badilisha mwonekano",
+      "boardSearch": "Tafuta kadi",
+      "list": "Orodha",
+      "otherColumn": "Nyingine",
+      "pivot": "Muhtasari",
+      "pivotChartTitle": "{{measure}} kwa kikundi",
+      "pivotColumnsBy": "Safu wima",
+      "pivotCount": "Idadi",
+      "pivotEmpty": "Haijawekwa",
+      "pivotGroupBy": "Panga kwa",
+      "pivotMixedCurrencies": "Rekodi hizi zinatumia sarafu zaidi ya moja ({{currencies}}). Jumla zinaongeza kiasi kama kilivyo bila kubadilisha sarafu.",
+      "pivotNoData": "Hakuna rekodi za kufupisha",
+      "pivotNone": "Hakuna",
+      "pivotTotal": "Jumla",
+      "pivotExportCsv": "Hamisha CSV",
+      "export": "Hamisha",
+      "exportTruncated": "Uhamishaji unaishia kwenye safu {{max}} za kwanza",
+      "exportDone": "Safu {{count}} zimehamishwa",
+      "exportDone_one": "Safu {{count}} imehamishwa",
+      "exportDone_other": "Safu {{count}} zimehamishwa",
+      "firstTime": {
+        "readOnly": "Una ruhusa ya kusoma pekee. Mwombe msimamizi aongeze rekodi ya kwanza.",
+        "title": "Bado hakuna rekodi"
+      },
+      "noResults": {
+        "clear": "Ondoa vichujio",
+        "description": "Jaribu utafutaji mwingine au uondoe vichujio.",
+        "title": "Hakuna rekodi zinazolingana"
+      }
+    },
+    "retry": "Jaribu tena",
+    "recordsDenied": "Huna ruhusa ya kufikia rekodi hizi.",
+    "recordsPartial": "Baadhi ya rekodi hazikuweza kuonyeshwa upya. Rekodi zinazoonyeshwa zinaweza kuwa za zamani.",
+    "recordsUnavailable": "Imeshindwa kupakia rekodi.",
+    "discardChanges": {
+      "navigate": "Una mabadiliko ambayo hayajahifadhiwa. Yatapotea ukiondoka kwenye ukurasa huu.",
+      "description": "Una mabadiliko ambayo hayajahifadhiwa. Yatapotea ukifunga fomu hii.",
+      "discard": "Acha mabadiliko",
+      "keep": "Endelea kuhariri",
+      "title": "Uache mabadiliko?"
+    },
+    "formDraft": {
+      "restored": "Mabadiliko yasiyohifadhiwa ya {{time}} yamerejeshwa",
+      "discard": "Futa rasimu"
+    },
+    "loadFailed": "Imeshindwa kupakia orodha hii",
+    "loadFailedHint": "Jaribu tena baada ya muda mfupi.",
+    "csvImportDialog": {
+      "checkResult": "Angalia matokeo",
+      "correctedFileNotice": "Wasilisha faili iliyosahihishwa kama uwasilishaji mpya. Kujaribu tena kumbukumbu hii kunahifadhi matokeo yake ya awali.",
+      "downloadTemplate": "Pakua kiolezo",
+      "errorsRestricted": "Ruhusa zako hazijumuishi maelezo yote ya hitilafu za safu.",
+      "exactResult": "Matokeo ya uwasilishaji wa faili hii",
+      "failure": "Uingizaji umeshindwa",
+      "fileLabel": "Faili ya CSV",
+      "spreadsheetFileLabel": "Faili ya CSV au Excel",
+      "historyEmpty": "Bado hakuna kazi za kuingiza zinazolingana. Historia inaonyeshwa upya kidirisha hiki kikiwa wazi.",
+      "importAnotherFile": "Ingiza faili nyingine",
+      "loadingErrors": "Inapakia hitilafu za safu…",
+      "missingColumns": "Safu wima zinazohitajika hazipo: {{columns}}",
+      "noRows": "Faili ina kichwa lakini haina safu za data.",
+      "outcomeUnknown": "Matokeo ya uingizaji hayajathibitishwa",
+      "outcomeUnknownDescription": "Seva imekubali {{file}}, lakini haikurudisha kazi mahususi ya kuingiza. Kagua historia kabla ya kujaribu tena.",
+      "refreshHistory": "Onyesha historia upya",
+      "requestReference": "Kumbukumbu ya uwasilishaji: {{requestId}}",
+      "retrySameSubmission": "Jaribu tena uwasilishaji huu",
+      "rowCount": "Safu {{count}} zimepatikana",
+      "rowError": "Safu {{row}}: {{message}}",
+      "scopeChanged": "Shirika au kampuni inayotumika imebadilika. Rudi kwenye muktadha wa awali ili kuangalia uwasilishaji huu.",
+      "selectJob": "Kazi ya kuingiza",
+      "selectJobPrompt": "Chagua kazi ya kukagua",
+      "submit": "Ingiza",
+      "success": "Uingizaji umewasilishwa",
+      "successDescription": "Safu {{count}} kutoka {{file}} zimetumwa. Safu zinazokataliwa na seva zimeorodheshwa kwenye historia ya kazi ya kuingiza.",
+      "unknownColumns": "Safu wima hizi hazitumiki na zitapuuzwa: {{columns}}",
+      "viewJob": "Angalia kazi ya kuingiza",
+      "historyFailed": "Imeshindwa kupakia historia au hitilafu za safu. Onyesha upya ili kujaribu tena. Faili huenda tayari imeingizwa; usiiwasilishe tena ili kuangalia.",
+      "historyLimit": "Historia ina hadi kazi 100 na hitilafu za safu 500 za hivi karibuni katika shirika. Baadhi ya hitilafu huenda hazipatikani tena hapa.",
+      "historyNotice": "Faili imewasilishwa. Historia ya hivi karibuni ya shirika inaweza kuwa na uingizaji wa watumiaji wengine. Chagua kazi ili kukagua matokeo yake; kazi haziunganishwi kiotomatiki na faili hii.",
+      "manualResultNotice": "Uingizaji huu unatumia uteuzi wa historia kwa mkono. Matokeo yake bado hayawezi kuunganishwa kiotomatiki na faili hii.",
+      "recoveryNotice": "Seva huenda tayari imeingiza faili hii. Kujaribu tena kunahifadhi kumbukumbu ileile na hakuwezi kuunda uingizaji wa pili. Epuka kuanza uwasilishaji mpya hadi matokeo haya yajulikane."
+    },
+    "moduleNavigation": {
+      "overview": "Muhtasari",
+      "area": "Eneo la kazi"
+    }
+  },
+  "navigation": {
+    "overview": "Muhtasari",
+    "sales": "Mauzo",
+    "inventory": "Hesabu ya bidhaa",
+    "customers": "Wateja",
+    "analytics": "Uchanganuzi",
+    "settings": "Mipangilio"
+  },
+  "nav": {
+    "overview": "Muhtasari",
+    "tasks": "Kazi yangu",
+    "forensics": "Uchunguzi",
+    "trackers": "Vifuatiliaji",
+    "accounting": "Uhasibu",
+    "sales": "Mauzo",
+    "crm": "CRM",
+    "purchasing": "Ununuzi",
+    "reports": "Ripoti",
+    "subscriptions": "Usajili",
+    "expenses": "Matumizi",
+    "inventory": "Hesabu ya bidhaa",
+    "distributor": "Msambazaji",
+    "pos": "Sehemu ya mauzo",
+    "manufacturing": "Uzalishaji",
+    "map": "Ramani",
+    "fleet": "Magari",
+    "helpdesk": "Dawati la msaada",
+    "workflows": "Mtiririko wa kazi",
+    "documents": "Nyaraka",
+    "proposals": "Mapendekezo",
+    "calendar": "Kalenda",
+    "messages": "Ujumbe",
+    "hr": "Rasilimali watu",
+    "projects": "Miradi",
+    "iot": "IoT",
+    "settings": "Mipangilio",
+    "journal": "Jarida",
+    "notebook": "Daftari",
+    "aiAssistant": "Msaidizi wa AI",
+    "noRole": "Hakuna jukumu",
+    "signOut": "Ondoka",
+    "signedIn": "Umeingia",
+    "erpSystem": "Lumiere ERP",
+    "companySwitcher": {
+      "switchCompany": "Badilisha kampuni",
+      "current": "Inatumika",
+      "selectCompany": "Chagua kampuni",
+      "singleCompany": "Kampuni",
+      "loading": "Inapakia kampuni…"
+    },
+    "groups": {
+      "analytics": "Uchanganuzi",
+      "finance": "Fedha",
+      "operations": "Shughuli",
+      "productivity": "Tija",
+      "people": "Watu",
+      "system": "Mfumo"
+    }
+  },
+  "dashboard": {
+    "title": "Dashibodi",
+    "erpSystem": "Lumiere ERP",
+    "sales": {
+      "table": {
+        "product": "Bidhaa",
+        "sales": "Mauzo",
+        "revenue": "Mapato"
+      }
+    }
+  },
+  "accounting": {
+    "applyPayment": {
+      "title": "Tumia malipo yaliyopo"
+    },
+    "workflowGuide": {
+      "amountDue": "Kiasi kinachodaiwa",
+      "applyPayment": "Tumia malipo yaliyopo",
+      "vendor": "Msambazaji",
+      "customer": "Mteja"
+    },
+    "insights": {
+      "title": "Muhtasari wa fedha",
+      "daysValue": "Siku {{count}}",
+      "previous": "Kipindi kilichopita",
+      "invoices": "Ankara",
+      "planned": "Imepangwa",
+      "actual": "Halisi",
+      "daysOverdue": "Siku za kuchelewa",
+      "month": "Mwezi",
+      "retry": "Jaribu tena"
+    },
+    "overview": {
+      "deadlines": "Makataa ya kodi",
+      "loading": "Inapakia…",
+      "retry": "Jaribu tena",
+      "receivables": "Madeni ya wateja",
+      "payables": "Madeni kwa wasambazaji",
+      "title": "Uhasibu",
+      "currency": "Sarafu",
+      "activityInvoices": "Ankara za wateja",
+      "activityBills": "Ankara za wasambazaji",
+      "activityMonth": "Mwezi",
+      "newJournalEntry": "Ingizo la uhasibu",
+      "newBill": "Ankara mpya ya msambazaji",
+      "newInvoice": "Ankara mpya",
+      "attention": "Vinavyohitaji kuangaliwa",
+      "due": "Tarehe ya mwisho",
+      "unpaid": "Haijalipwa"
+    },
+    "manualInvoice": {
+      "invoiceTitle": "Ankara",
+      "billTitle": "Ankara ya msambazaji"
+    },
+    "workspaces": {
+      "overview": "Muhtasari",
+      "receivables": "Madeni ya wateja",
+      "payables": "Madeni kwa wasambazaji",
+      "taxSetup": "Kodi"
+    },
+    "title": "Uhasibu",
+    "dashboard": {
+      "accountsReceivable": "Madeni ya wateja",
+      "accountsPayable": "Madeni kwa wasambazaji",
+      "revenue": "Mapato"
+    },
+    "accounts": {
+      "title": "Mpangilio wa akaunti",
+      "code": "Msimbo",
+      "name": "Jina",
+      "type": "Aina",
+      "balance": "Salio",
+      "active": "Inatumika",
+      "status": "Hali",
+      "actions": "Vitendo",
+      "all": "Zote",
+      "badges": {
+        "bank": "Benki",
+        "deprecated": "Imepitwa na wakati",
+        "active": "Inatumika"
+      },
+      "coasTab": "Akaunti",
+      "rowActions": {
+        "edit": "Hariri akaunti"
+      },
+      "edit": {
+        "deprecated": "Imepitwa na wakati",
+        "note": "Dokezo",
+        "reconcile": "Ruhusu ulinganishaji",
+        "unchanged": "Hakuna cha kubadilisha."
+      }
+    },
+    "glDrilldown": {
+      "title": "{{code}} — {{name}}",
+      "moveDetail": "Ingizo la uhasibu",
+      "columns": {
+        "date": "Tarehe",
+        "move": "Ingizo",
+        "partner": "Mshirika",
+        "debit": "Debiti",
+        "credit": "Krediti"
+      }
+    },
+    "periodClose": {
+      "title": "Orodha ya kufunga mwezi",
+      "status": {
+        "done": "Imekamilika",
+        "pending": "Inasubiri"
+      },
+      "steps": {
+        "fiscalCalendar": {
+          "title": "Kalenda ya fedha imesanidiwa"
+        },
+        "bankRecon": {
+          "title": "Ulinganishaji wa benki umekaguliwa"
+        },
+        "draftMoves": {
+          "title": "Rasimu za maingizo zimeshughulikiwa"
+        },
+        "trialBalance": {
+          "title": "Mizania ya majaribio imetengenezwa"
+        },
+        "vatReport": {
+          "title": "Ripoti ya VAT imetengenezwa"
+        },
+        "closePeriod": {
+          "title": "Funga kipindi cha uhasibu"
+        }
+      },
+      "review": {
+        "company": "Kampuni",
+        "title": "Kagua kipindi hiki",
+        "date": "Tarehe (UTC)"
+      }
+    },
+    "chartStructure": {
+      "colName": "Jina",
+      "colDeprecated": "Imepitwa na wakati",
+      "colLevel": "Kiwango",
+      "colParent": "Mzazi"
+    },
+    "journalEntries": {
+      "title": "Maingizo ya uhasibu",
+      "ref": "Kumbukumbu",
+      "date": "Tarehe",
+      "journal": "Jarida",
+      "state": "Hali",
+      "total": "Jumla",
+      "type": "Aina",
+      "partner": "Mshirika",
+      "untaxed": "Bila kodi",
+      "residual": "Salio linalodaiwa",
+      "payment": "Malipo",
+      "postEntry": "Posti",
+      "cancelEntry": "Ghairi",
+      "recalculateInvoiceTotals": "Hesabu jumla upya",
+      "states": {
+        "cancelled": "Imeghairiwa",
+        "draft": "Rasimu",
+        "posted": "Imepostiwa"
+      },
+      "types": {
+        "entry": "Ingizo la uhasibu",
+        "inInvoice": "Ankara ya msambazaji",
+        "outRefund": "Hati ya mkopo"
+      }
+    },
+    "invoices": {
+      "title": "Ankara",
+      "creditNote": "Hati ya mkopo",
+      "total": "Jumla",
+      "amountDue": "Kiasi kinachodaiwa",
+      "documentPreview": "Hakiki hati",
+      "vendor": "Msambazaji",
+      "ar": "Ankara za wateja",
+      "ap": "Ankara za wasambazaji",
+      "dueDate": "Tarehe ya mwisho",
+      "paymentState": "Malipo",
+      "partner": "Mshirika",
+      "amount": "Kiasi cha fedha",
+      "customer": "Mteja",
+      "dates": "Tarehe",
+      "totalAmount": "Jumla ya fedha",
+      "daysRemaining": "Siku {{count}}",
+      "invoiceActions": {
+        "downloadPDF": "Pakua PDF",
+        "send": "Tuma",
+        "download": "Pakua",
+        "recordPayment": "Rekodi malipo",
+        "postDraft": "Posti",
+        "recalculateTotals": "Hesabu jumla upya",
+        "createCreditNote": "Unda hati ya mkopo",
+        "recalculate": "Hesabu jumla upya",
+        "registerPayment": "Rekodi malipo"
+      },
+      "recordSheet": {
+        "actionsTab": "Vitendo"
+      },
+      "attachments": "Viambatisho",
+      "preview": "Hakiki",
+      "discussion": "Majadiliano",
+      "draftName": "Rasimu",
+      "moreActions": "Zaidi",
+      "purchaseOrder": "Oda ya ununuzi",
+      "saleOrder": "Oda ya mauzo",
+      "payment": "Malipo",
+      "paymentStates": {
+        "paid": "Imelipwa",
+        "partial": "Sehemu",
+        "unpaid": "Haijalipwa"
+      }
+    },
+    "bills": {
+      "title": "Ankara za wasambazaji (madeni)",
+      "vendor": "Msambazaji",
+      "billActions": {
+        "download": "Pakua",
+        "recalculateTotals": "Hesabu jumla upya"
+      }
+    },
+    "worklists": {
+      "openStatus": "Wazi",
+      "unavailable": "Haipatikani",
+      "currency": "Sarafu",
+      "columns": "Safu wima",
+      "exportCsv": "Hamisha CSV",
+      "actions": "Vitendo",
+      "partner": "Mshirika",
+      "documentType": "Aina ya hati"
+    },
+    "taxes": {
+      "title": "Kodi",
+      "rate": "Kiwango",
+      "taxUse": "Aina",
+      "actions": {
+        "active": "Inatumika"
+      }
+    },
+    "taxGroups": {
+      "title": "Vikundi vya kodi",
+      "columns": {
+        "name": "Jina",
+        "sequence": "Mfuatano",
+        "taxPayableAccountId": "Akaunti ya madeni kwa wasambazaji",
+        "taxReceivableAccountId": "Akaunti ya madeni ya wateja",
+        "company": "Kampuni"
+      },
+      "filters": {
+        "name": "Jina"
+      },
+      "actions": {
+        "newTaxGroup": "Kikundi kipya cha kodi",
+        "new": "Kikundi kipya cha kodi"
+      },
+      "form": {
+        "none": "Hakuna"
+      }
+    },
+    "taxJurisdictions": {
+      "title": "Mamlaka za kodi",
+      "columns": {
+        "name": "Jina",
+        "code": "Msimbo",
+        "countryCode": "Nchi",
+        "stateCode": "Hali",
+        "city": "Jiji",
+        "isActive": "Inatumika",
+        "status": "Hali"
+      },
+      "filters": {
+        "countryCode": "Nchi",
+        "stateCode": "Hali",
+        "isActive": "Hali"
+      },
+      "actions": {
+        "newJurisdiction": "Mamlaka mpya",
+        "new": "Mamlaka mpya"
+      },
+      "active": "Inatumika",
+      "inactive": "Haitumiki"
+    },
+    "taxSchedules": {
+      "title": "Ratiba za kodi",
+      "searchPlaceholder": "Tafuta ratiba…",
+      "columns": {
+        "name": "Jina",
+        "description": "Maelezo",
+        "jurisdictionId": "Mamlaka",
+        "taxIds": "Kodi",
+        "isActive": "Inatumika",
+        "company": "Kampuni",
+        "jurisdiction": "Mamlaka",
+        "status": "Hali",
+        "taxes": "Kodi"
+      },
+      "filters": {
+        "jurisdictionId": "Mamlaka",
+        "isActive": "Hali"
+      },
+      "actions": {
+        "newSchedule": "Ratiba mpya",
+        "new": "Ratiba mpya"
+      },
+      "active": "Inatumika",
+      "form": {
+        "none": "Hakuna"
+      },
+      "inactive": "Haitumiki"
+    },
+    "taxDeadlines": {
+      "title": "Makataa ya kodi",
+      "columns": {
+        "title": "Kichwa",
+        "deadlineType": "Aina",
+        "dueDate": "Tarehe ya mwisho",
+        "status": "Hali",
+        "companyId": "Kampuni",
+        "reminderDaysBefore": "Vikumbusho",
+        "description": "Maelezo"
+      },
+      "filters": {
+        "deadlineType": "Aina",
+        "status": "Hali",
+        "companyId": "Kampuni"
+      },
+      "deadlineTypes": {
+        "Filing": "Uwasilishaji wa kodi",
+        "Payment": "Malipo",
+        "Registration": "Usajili",
+        "Report": "Ripoti",
+        "Renewal": "Kuhuisha"
+      },
+      "statuses": {
+        "pending": "Inasubiri",
+        "completed": "Imekamilika",
+        "overdue": "Vimechelewa"
+      },
+      "actions": {
+        "newDeadline": "Tarehe mpya ya mwisho",
+        "completeSelected": "Kamilisha zilizochaguliwa",
+        "deleteSelected": "Futa zilizochaguliwa",
+        "complete": "Weka imekamilika",
+        "done": "{{action}} imekamilika",
+        "failed": "{{action}} imeshindwa",
+        "new": "Tarehe mpya ya mwisho"
+      },
+      "reminders": {
+        "sentAt": "Imetumwa",
+        "status": "Hali",
+        "tab": "Vikumbusho"
+      },
+      "form": {
+        "company": "Kampuni (si lazima)",
+        "type": "Aina",
+        "types": {
+          "Filing": "Uwasilishaji wa kodi",
+          "Payment": "Malipo",
+          "Registration": "Usajili",
+          "Report": "Ripoti",
+          "Renewal": "Kuhuisha"
+        }
+      }
+    },
+    "budgets": {
+      "title": "Bajeti",
+      "planned": "Imepangwa",
+      "practical": "Halisi",
+      "variance": "Tofauti %",
+      "cancelSelected": "Ghairi zilizochaguliwa",
+      "workspace": {
+        "listTitle": "Bajeti",
+        "colName": "Jina",
+        "confirm": "Thibitisha",
+        "validate": "Thibitisha",
+        "markDone": "Weka imekamilika",
+        "colAnalytic": "Akaunti ya uchanganuzi",
+        "actions": "Vitendo",
+        "postCode": "Msimbo",
+        "postDescription": "Maelezo",
+        "active": "Inatumika",
+        "newLine": "Safu mpya"
+      }
+    },
+    "fxRevaluation": {
+      "realizedAction": "Posti tofauti za ubadilishaji zilizopatikana",
+      "colCurrency": "Sarafu",
+      "colMove": "Ingizo la uhasibu",
+      "colReference": "Kumbukumbu",
+      "form": {
+        "title": "Tathmini upya sarafu za kigeni",
+        "sections": {
+          "main": "Vigezo"
+        },
+        "fields": {
+          "journalId": "Jarida",
+          "reference": "Kumbukumbu (si lazima)"
+        }
+      },
+      "batchForm": {
+        "title": "Tathmini upya sarafu za kigeni kwa kundi",
+        "sections": {
+          "main": "Vigezo"
+        }
+      },
+      "realizedForm": {
+        "title": "Posti tofauti za ubadilishaji zilizopatikana",
+        "submitLabel": "Posti tofauti za ubadilishaji zilizopatikana",
+        "fields": {
+          "paymentId": "Malipo",
+          "invoiceMoveId": "Ankara",
+          "date": "Tarehe"
+        }
+      }
+    },
+    "creditControl": {
+      "writeOffAction": "Kufuta deni lisilolipika",
+      "colPartner": "Mshirika",
+      "colLimit": "Kikomo cha mkopo",
+      "colNotes": "Maelezo",
+      "form": {
+        "title": "Weka udhibiti wa mkopo wa mshirika",
+        "submitLabel": "Hifadhi",
+        "sections": {
+          "main": "Krediti"
+        },
+        "fields": {
+          "partnerId": "Mshirika",
+          "creditLimit": "Kikomo cha mkopo",
+          "notes": "Maelezo"
+        }
+      },
+      "writeOffForm": {
+        "title": "Kufuta deni lisilolipika",
+        "fields": {
+          "amount": "Kiasi cha fedha",
+          "receivableAccountId": "Akaunti ya madeni ya wateja",
+          "date": "Tarehe"
+        }
+      }
+    },
+    "amortization": {
+      "createAction": "Ratiba mpya",
+      "schedulesTitle": "Ratiba",
+      "searchSchedules": "Tafuta ratiba…",
+      "searchLines": "Tafuta safu…",
+      "colKind": "Aina",
+      "colDescription": "Maelezo",
+      "colTotal": "Jumla",
+      "colState": "Hali",
+      "colSchedule": "Ratiba",
+      "colSequence": "Mfuatano",
+      "colAmount": "Kiasi cha fedha",
+      "period": {
+        "month": "Kila mwezi",
+        "year": "Kila mwaka"
+      },
+      "form": {
+        "title": "Unda ratiba ya ugawaji wa gharama",
+        "sections": {
+          "main": "Ratiba"
+        },
+        "fields": {
+          "scheduleKind": "Aina",
+          "description": "Maelezo",
+          "totalAmount": "Jumla ya fedha",
+          "currencyId": "Sarafu",
+          "startDate": "Mwanzo",
+          "endDate": "Mwisho"
+        }
+      }
+    },
+    "consolidation": {
+      "accounts": {
+        "title": "Akaunti za ujumuishaji",
+        "newAccount": "Akaunti mpya",
+        "editAccount": "Hariri akaunti",
+        "colCode": "Msimbo",
+        "colName": "Jina",
+        "colType": "Aina",
+        "colRate": "Kiwango",
+        "colActive": "Inatumika"
+      },
+      "journals": {
+        "title": "Majarida ya ujumuishaji",
+        "newJournal": "Jarida jipya",
+        "colName": "Jina",
+        "colPeriod": "Kipindi",
+        "colState": "Hali",
+        "colDebit": "Debiti",
+        "colCredit": "Krediti",
+        "validate": "Thibitisha"
+      },
+      "elimination": {
+        "title": "Maingizo ya kuondoa miamala baina ya kampuni",
+        "colName": "Jina",
+        "colAccount": "Akaunti",
+        "colType": "Aina",
+        "colDebit": "Debiti",
+        "colCredit": "Krediti"
+      },
+      "forms": {
+        "newAccount": {
+          "fields": {
+            "name": "Jina",
+            "code": "Msimbo wa akaunti",
+            "currencyId": "ID ya sarafu"
+          }
+        },
+        "newJournal": {
+          "fields": {
+            "periodId": "Kipindi",
+            "currencyId": "ID ya sarafu"
+          }
+        },
+        "newElimination": {
+          "fields": {
+            "journalId": "ID ya jarida",
+            "name": "Maelezo",
+            "accountCode": "Msimbo wa akaunti",
+            "debit": "Debiti",
+            "credit": "Krediti",
+            "currencyId": "ID ya sarafu",
+            "reference": "Kumbukumbu"
+          }
+        }
+      },
+      "accountTypes": {
+        "equity": "Mtaji",
+        "income": "Mapato",
+        "expense": "Gharama"
+      },
+      "eliminationMethods": {
+        "partial": "Sehemu"
+      },
+      "eliminationTypes": {
+        "other": "Nyingine"
+      },
+      "rates": {
+        "company": "Kampuni",
+        "currency": "Sarafu",
+        "period": "Kipindi",
+        "rate": "Kiwango",
+        "title": "Viwango vya ubadilishaji vya kampuni",
+        "type": "Aina"
+      }
+    },
+    "states": {
+      "draft": "Rasimu",
+      "posted": "Imepostiwa",
+      "cancelled": "Imeghairiwa",
+      "paid": "Imelipwa",
+      "partial": "Sehemu",
+      "notPaid": "Haijalipwa",
+      "sent": "Imetumwa",
+      "overdue": "Vimechelewa",
+      "pending": "Inasubiri",
+      "approved": "Imeidhinishwa"
+    },
+    "nav": {
+      "overview": "Muhtasari",
+      "accounts": "Mpangilio wa akaunti",
+      "journalEntries": "Maingizo ya uhasibu",
+      "customerInvoices": "Ankara za wateja",
+      "vendorBills": "Ankara za wasambazaji",
+      "taxes": "Kodi",
+      "budgets": "Bajeti"
+    },
+    "tabs": {
+      "analyticAccounts": "Akaunti za uchanganuzi",
+      "analyticLines": "Safu za uchanganuzi",
+      "analyticDistribution": "Modeli za ugawaji",
+      "reconciliationWidgets": "Ulinganishaji",
+      "fiscalYears": "Miaka ya fedha",
+      "accountPeriods": "Vipindi",
+      "taxGroups": "Vikundi vya kodi",
+      "taxJurisdictions": "Mamlaka",
+      "taxSchedules": "Ratiba",
+      "taxDeadlines": "Makataa",
+      "payments": "Malipo",
+      "operationalPayments": "Shughuli za malipo",
+      "paymentTerms": "Masharti ya malipo",
+      "paymentTermLines": "Safu za masharti",
+      "journals": "Majarida",
+      "journalEntries": "Maingizo ya uhasibu",
+      "moveLines": "Safu za uhasibu"
+    },
+    "entities": {
+      "bankStatements": {
+        "title": "Taarifa za benki",
+        "columns": {
+          "name": "Kumbukumbu",
+          "journalId": "Jarida",
+          "state": "Hali",
+          "date": "Tarehe",
+          "balanceStart": "Salio la mwanzo",
+          "lineIds": "Safu"
+        },
+        "filters": {
+          "state": {
+            "label": "Hali",
+            "options": {
+              "Open": "Wazi",
+              "Posted": "Imepostiwa",
+              "Confirm": "Imethibitishwa"
+            }
+          }
+        },
+        "states": {
+          "Open": "Wazi",
+          "Posted": "Imepostiwa",
+          "Confirm": "Imethibitishwa"
+        }
+      },
+      "reconciliationWidgets": {
+        "title": "Wijeti za ulinganishaji",
+        "columns": {
+          "accountId": "Akaunti",
+          "partnerId": "Mshirika",
+          "moveLineIds": "ID za safu za uhasibu"
+        }
+      },
+      "analyticLines": {
+        "title": "Safu za uchanganuzi",
+        "searchPlaceholder": "Tafuta safu…",
+        "columns": {
+          "name": "Lebo",
+          "accountId": "Akaunti ya uchanganuzi",
+          "amount": "Kiasi cha fedha",
+          "date": "Tarehe"
+        }
+      },
+      "analyticDistributionModels": {
+        "title": "Modeli za ugawaji wa uchanganuzi",
+        "columns": {
+          "name": "Jina",
+          "isActive": "Inatumika"
+        }
+      },
+      "fixedAssets": {
+        "title": "Mali za kudumu",
+        "columns": {
+          "active": "Inatumika",
+          "state": "Hali"
+        },
+        "filters": {
+          "state": {
+            "label": "Hali",
+            "options": {
+              "Draft": "Rasimu",
+              "Open": "Inaendelea",
+              "Close": "Imefungwa"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Rasimu",
+          "Open": "Inaendelea",
+          "Close": "Imefungwa"
+        },
+        "actions": {
+          "deleteSelected": "Futa zilizochaguliwa"
+        },
+        "form": {
+          "code": "Msimbo",
+          "currency": "Sarafu",
+          "name": "Jina",
+          "none": "Hakuna",
+          "typePurchase": "Ununuzi",
+          "typeSale": "Mauzo"
+        }
+      },
+      "depreciationSchedule": {
+        "title": "Ratiba ya uchakavu",
+        "columns": {
+          "date": "Tarehe",
+          "name": "Lebo",
+          "amount": "Kiasi cha fedha",
+          "movePosted": "Imepostiwa"
+        }
+      },
+      "payments": {
+        "title": "Malipo",
+        "columns": {
+          "name": "Kumbukumbu",
+          "amount": "Kiasi cha fedha",
+          "state": "Hali",
+          "partnerId": "Mshirika",
+          "journalId": "Jarida",
+          "currencyId": "Sarafu"
+        },
+        "filters": {
+          "state": {
+            "label": "Hali",
+            "options": {
+              "NotPaid": "Rasimu",
+              "Paid": "Imepostiwa",
+              "Reversed": "Imeghairiwa"
+            }
+          }
+        },
+        "states": {
+          "NotPaid": "Rasimu",
+          "Paid": "Imepostiwa",
+          "Reversed": "Imeghairiwa"
+        },
+        "actions": {
+          "cancelSelected": "Ghairi zilizochaguliwa"
+        }
+      },
+      "paymentTerms": {
+        "title": "Masharti ya malipo",
+        "columns": {
+          "name": "Jina",
+          "isActive": "Inatumika",
+          "note": "Dokezo"
+        },
+        "actions": {
+          "deleteSelected": "Futa zilizochaguliwa",
+          "addLine": "Ongeza safu"
+        }
+      },
+      "journals": {
+        "title": "Majarida",
+        "columns": {
+          "code": "Msimbo",
+          "name": "Jina",
+          "type": "Aina",
+          "active": "Inatumika"
+        }
+      },
+      "moveLines": {
+        "title": "Safu za maingizo ya uhasibu",
+        "columns": {
+          "moveId": "Ingizo",
+          "accountId": "Akaunti",
+          "name": "Lebo",
+          "debit": "Debiti",
+          "credit": "Krediti"
+        },
+        "actions": {
+          "deleteSelected": "Futa zilizochaguliwa"
+        }
+      },
+      "intercompanyRules": {
+        "title": "Kanuni za miamala baina ya kampuni",
+        "columns": {
+          "ruleType": "Aina",
+          "isActive": "Inatumika"
+        },
+        "filters": {
+          "ruleType": {
+            "label": "Aina",
+            "options": {
+              "Sale": "Mauzo",
+              "Purchase": "Ununuzi",
+              "Transfer": "Uhamisho",
+              "Service": "Huduma"
+            }
+          },
+          "isActive": {
+            "label": "Hali",
+            "options": {
+              "true": "Inatumika",
+              "false": "Haitumiki"
+            }
+          }
+        },
+        "states": {
+          "Sale": "Mauzo",
+          "Purchase": "Ununuzi",
+          "Transfer": "Uhamisho",
+          "Service": "Huduma"
+        },
+        "actions": {
+          "deleteSelected": "Futa zilizochaguliwa"
+        }
+      },
+      "intercompanyTransactions": {
+        "title": "Miamala baina ya kampuni",
+        "columns": {
+          "originDocumentModel": "Aina ya hati",
+          "amount": "Kiasi cha fedha",
+          "currencyId": "Sarafu",
+          "transactionType": "Aina",
+          "state": "Hali"
+        },
+        "filters": {
+          "state": {
+            "label": "Hali",
+            "options": {
+              "Draft": "Rasimu",
+              "Pending": "Inasubiri",
+              "Approved": "Imeidhinishwa",
+              "Completed": "Imekamilika",
+              "Error": "Hitilafu",
+              "Cancelled": "Imeghairiwa"
+            }
+          },
+          "transactionType": {
+            "label": "Aina",
+            "options": {
+              "Sale": "Mauzo",
+              "Purchase": "Ununuzi",
+              "Transfer": "Uhamisho",
+              "Service": "Huduma"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Rasimu",
+          "Pending": "Inasubiri",
+          "Approved": "Imeidhinishwa",
+          "Completed": "Imekamilika",
+          "Error": "Hitilafu",
+          "Cancelled": "Imeghairiwa"
+        },
+        "actions": {
+          "completeSelected": "Kamilisha zilizochaguliwa",
+          "cancelSelected": "Ghairi zilizochaguliwa"
+        }
+      },
+      "fiscalYears": {
+        "title": "Miaka ya fedha",
+        "columns": {
+          "name": "Jina",
+          "dateFrom": "Mwanzo",
+          "dateTo": "Mwisho",
+          "state": "Hali",
+          "type": "Aina"
+        },
+        "filters": {
+          "state": {
+            "label": "Hali",
+            "options": {
+              "Draft": "Rasimu",
+              "Running": "Inaendelea",
+              "Closed": "Imefungwa",
+              "Locked": "Imefungwa"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Rasimu",
+          "Running": "Inaendelea",
+          "Closed": "Imefungwa",
+          "Locked": "Imefungwa"
+        }
+      },
+      "accountPeriods": {
+        "title": "Vipindi",
+        "columns": {
+          "name": "Jina",
+          "code": "Msimbo",
+          "fiscalYear": "Mwaka wa fedha",
+          "dateFrom": "Mwanzo",
+          "dateTo": "Mwisho",
+          "state": "Hali"
+        },
+        "filters": {
+          "state": {
+            "label": "Hali",
+            "options": {
+              "Draft": "Rasimu",
+              "Open": "Wazi",
+              "Closed": "Imefungwa"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Rasimu",
+          "Open": "Wazi",
+          "Closed": "Imefungwa"
+        },
+        "actions": {
+          "closeSelected": "Funga kipindi"
+        }
+      }
+    },
+    "forms": {
+      "operationalPaymentAccount": {
+        "provider": "Mtoa huduma",
+        "currency": "Sarafu",
+        "bank": "Benki"
+      },
+      "operationalPaymentTransaction": {
+        "customer": "Mteja",
+        "supplier": "Msambazaji",
+        "partner": "Mshirika",
+        "currency": "Sarafu"
+      },
+      "reverseOperationalPayment": {
+        "reason": "Sababu"
+      },
+      "operationalPaymentFee": {
+        "company": "Kampuni",
+        "customer": "Mteja",
+        "supplier": "Msambazaji"
+      },
+      "bankStatementImport": {
+        "currency": "Sarafu",
+        "openingBalance": "Salio la mwanzo",
+        "csvData": "Data ya CSV"
+      },
+      "newInvoice": {
+        "title": "Ankara mpya",
+        "fields": {
+          "journal": "Jarida",
+          "journalPlaceholder": "Chagua jarida",
+          "dueDate": "Tarehe ya mwisho",
+          "ref": "Kumbukumbu",
+          "notes": "Maelezo"
+        },
+        "columns": {
+          "description": "Maelezo",
+          "qty": "Kiasi",
+          "unitPrice": "Bei kwa kipimo",
+          "discountPercent": "Punguzo %",
+          "total": "Jumla"
+        },
+        "summary": {
+          "subtotal": "Jumla ndogo",
+          "tax": "Kodi",
+          "total": "Jumla"
+        }
+      },
+      "newBill": {
+        "fields": {
+          "journal": "Jarida",
+          "journalPlaceholder": "Chagua jarida",
+          "dueDate": "Tarehe ya mwisho",
+          "ref": "Kumbukumbu",
+          "notes": "Maelezo"
+        }
+      },
+      "newJournalEntry": {
+        "title": "Ingizo jipya la uhasibu",
+        "addLine": "Ongeza safu",
+        "refOptional": "Kumbukumbu (si lazima)",
+        "fields": {
+          "journal": "Jarida",
+          "journalPlaceholder": "Chagua jarida",
+          "ref": "Kumbukumbu",
+          "notes": "Maelezo"
+        },
+        "columns": {
+          "description": "Maelezo",
+          "debit": "Debiti",
+          "credit": "Krediti"
+        }
+      },
+      "newAccount": {
+        "title": "Akaunti mpya",
+        "fields": {
+          "code": "Msimbo wa akaunti",
+          "reconcile": "Ruhusu ulinganishaji",
+          "notes": "Maelezo",
+          "openingBalance": "Salio la mwanzo",
+          "options": {
+            "equity": "Mtaji",
+            "income": "Mapato",
+            "expense": "Gharama"
+          }
+        }
+      },
+      "newTax": {
+        "title": "Kodi mpya",
+        "fields": {
+          "description": "Maelezo",
+          "options": {
+            "sale": "Mauzo",
+            "purchase": "Ununuzi",
+            "none": "Hakuna"
+          }
+        }
+      },
+      "newBudget": {
+        "title": "Bajeti mpya",
+        "fields": {
+          "dateFrom": "Tarehe ya kuanza",
+          "dateTo": "Tarehe ya mwisho",
+          "description": "Maelezo"
+        }
+      },
+      "fiscalYear": {
+        "title": "Mwaka mpya wa fedha",
+        "submitEditLabel": "Hifadhi mabadiliko",
+        "sections": {
+          "main": "Mwaka wa fedha"
+        },
+        "fields": {
+          "name": "Jina",
+          "dateFrom": "Mwanzo",
+          "dateTo": "Mwisho",
+          "notes": "Maelezo",
+          "notesPlaceholder": "Si lazima",
+          "metadata": "Metadata"
+        }
+      },
+      "accountPeriod": {
+        "title": "Kipindi kipya",
+        "submitEditLabel": "Hifadhi mabadiliko",
+        "sections": {
+          "main": "Kipindi"
+        },
+        "fields": {
+          "name": "Jina",
+          "code": "Msimbo",
+          "fiscalYearId": "Mwaka wa fedha",
+          "dateFrom": "Mwanzo",
+          "dateTo": "Mwisho",
+          "notes": "Maelezo",
+          "notesPlaceholder": "Si lazima"
+        }
+      },
+      "budgetPost": {
+        "fields": {
+          "name": "Jina",
+          "code": "Msimbo",
+          "description": "Maelezo",
+          "accountIds": "Akaunti",
+          "isActive": "Inatumika"
+        }
+      },
+      "accountAccountType": {
+        "sections": {
+          "main": "Aina"
+        },
+        "fields": {
+          "name": "Jina",
+          "isDeprecated": "Imepitwa na wakati",
+          "metadata": "Metadata"
+        }
+      },
+      "accountGroup": {
+        "fields": {
+          "name": "Jina",
+          "level": "Kiwango",
+          "metadata": "Metadata"
+        }
+      },
+      "createCreditNote": {
+        "title": "Unda hati ya mkopo",
+        "submitLabel": "Unda hati ya mkopo",
+        "fields": {
+          "reason": "Sababu"
+        }
+      },
+      "recordPayment": {
+        "title": "Rekodi malipo",
+        "submitLabel": "Rekodi malipo",
+        "sections": {
+          "payment": "Malipo"
+        },
+        "fields": {
+          "amount": "Kiasi cha fedha"
+        }
+      },
+      "newAccountPayment": {
+        "title": "Malipo mapya",
+        "sections": {
+          "main": "Malipo"
+        },
+        "fields": {
+          "partnerTypeCustomer": "Mteja",
+          "partnerTypeSupplier": "Msambazaji",
+          "partnerId": "ID ya mshirika",
+          "amount": "Kiasi cha fedha",
+          "currencyId": "ID ya sarafu",
+          "journalId": "Jarida"
+        }
+      },
+      "newPaymentTerm": {
+        "title": "Masharti mapya ya malipo",
+        "fields": {
+          "name": "Jina",
+          "note": "Dokezo"
+        }
+      },
+      "newPaymentTermLine": {
+        "submitLabel": "Ongeza safu",
+        "sections": {
+          "main": "Safu"
+        },
+        "fields": {
+          "sequence": "Mfuatano"
+        }
+      },
+      "editPaymentTermLine": {
+        "sections": {
+          "main": "Safu"
+        }
+      },
+      "newAccountJournal": {
+        "title": "Jarida jipya",
+        "sections": {
+          "main": "Jarida"
+        },
+        "fields": {
+          "name": "Jina",
+          "code": "Msimbo",
+          "type": "Aina",
+          "typeSale": "Mauzo",
+          "typePurchase": "Ununuzi",
+          "typeBank": "Benki",
+          "active": "Inatumika"
+        }
+      },
+      "editAccountJournal": {
+        "submitLabel": "Hifadhi mabadiliko",
+        "sections": {
+          "main": "Jarida"
+        }
+      },
+      "addAccountMoveLine": {
+        "submitLabel": "Ongeza safu",
+        "sections": {
+          "line": "Safu"
+        },
+        "fields": {
+          "moveId": "Ingizo la uhasibu",
+          "accountId": "Akaunti",
+          "name": "Lebo",
+          "debit": "Debiti",
+          "credit": "Krediti"
+        }
+      },
+      "editAccountMoveLine": {
+        "submitLabel": "Hifadhi mabadiliko",
+        "sections": {
+          "line": "Safu"
+        }
+      },
+      "newDepreciationLine": {
+        "submitLabel": "Ongeza safu",
+        "fields": {
+          "name": "Lebo",
+          "amount": "Kiasi cha fedha"
+        }
+      },
+      "newIntercompanyRule": {
+        "sections": {
+          "main": "Kanuni"
+        },
+        "fields": {
+          "ruleType": "Aina",
+          "isActive": "Inatumika",
+          "journalId": "Jarida"
+        }
+      },
+      "editIntercompanyRule": {
+        "submitLabel": "Hifadhi mabadiliko",
+        "sections": {
+          "main": "Kanuni"
+        },
+        "fields": {
+          "sequence": "Mfuatano",
+          "notes": "Maelezo"
+        }
+      },
+      "newIntercompanyTransaction": {
+        "fields": {
+          "originDocumentModel": "Aina ya hati",
+          "originDocumentModels": {
+            "accountMove": "Ingizo la uhasibu",
+            "saleOrder": "Oda ya mauzo"
+          },
+          "transactionType": "Aina",
+          "amount": "Kiasi cha fedha",
+          "currencyId": "ID ya sarafu",
+          "notes": "Maelezo"
+        }
+      },
+      "markIntercompanyTransactionError": {
+        "sections": {
+          "main": "Hitilafu"
+        }
+      },
+      "newCurrencyRate": {
+        "title": "Kiwango kipya cha ubadilishaji",
+        "sections": {
+          "main": "Kiwango"
+        },
+        "fields": {
+          "rate": "Kiwango"
+        }
+      },
+      "reconcilePaymentInvoice": {
+        "submitLabel": "Linganisha"
+      },
+      "analyticAccount": {
+        "createTitle": "Akaunti mpya ya uchanganuzi",
+        "sections": {
+          "main": "Akaunti"
+        },
+        "fields": {
+          "name": "Jina",
+          "code": "Msimbo",
+          "currencyId": "ID ya sarafu",
+          "active": "Inatumika",
+          "accountActive": "Inatumika"
+        }
+      },
+      "analyticLine": {
+        "createTitle": "Safu mpya ya uchanganuzi",
+        "sections": {
+          "main": "Safu"
+        },
+        "fields": {
+          "name": "Lebo",
+          "accountId": "Akaunti ya uchanganuzi",
+          "amount": "Kiasi cha fedha",
+          "unitAmount": "Kiasi kwa kipimo",
+          "date": "Tarehe",
+          "description": "Maelezo"
+        }
+      },
+      "analyticDistribution": {
+        "createTitle": "Modeli mpya ya ugawaji",
+        "sections": {
+          "main": "Modeli"
+        },
+        "fields": {
+          "name": "Jina",
+          "isActive": "Inatumika"
+        }
+      },
+      "bankStatementLine": {
+        "submitLabel": "Ongeza safu",
+        "sections": {
+          "main": "Safu"
+        },
+        "fields": {
+          "date": "Tarehe",
+          "amount": "Kiasi cha fedha",
+          "partnerId": "ID ya mshirika"
+        }
+      },
+      "reconciliationWidget": {
+        "fields": {
+          "partnerId": "ID ya mshirika",
+          "partnerIdPlaceholder": "Si lazima",
+          "moveLineIds": "ID za safu za uhasibu"
+        },
+        "picker": {
+          "modeBank": "Benki",
+          "partner": "Mshirika"
+        }
+      }
+    },
+    "bankStatementDetail": {
+      "title": "Taarifa ya benki",
+      "linesHeading": "Safu",
+      "addLineButton": "Ongeza safu",
+      "candidateType": "Aina",
+      "candidateAmount": "Kiasi cha fedha",
+      "reconcileWithCandidate": "Linganisha",
+      "manualMoveLineIds": "ID za safu za uhasibu"
+    },
+    "fiscalYears": {
+      "title": "Miaka ya fedha",
+      "columns": {
+        "name": "Jina",
+        "dateFrom": "Tarehe ya kuanza",
+        "dateTo": "Tarehe ya mwisho",
+        "state": "Hali"
+      }
+    },
+    "accountPeriods": {
+      "title": "Vipindi vya uhasibu",
+      "columns": {
+        "name": "Jina",
+        "dateFrom": "Tarehe ya kuanza",
+        "dateTo": "Tarehe ya mwisho",
+        "state": "Hali"
+      }
+    },
+    "reconciliation": {
+      "title": "Ulinganishaji"
+    },
+    "fixedAssets": {
+      "title": "Mali za kudumu",
+      "columns": {
+        "depreciationMethod": "Njia",
+        "state": "Hali"
+      }
+    },
+    "actions": {
+      "closeFiscalYear": "Funga mwaka wa fedha",
+      "closePeriod": "Funga kipindi",
+      "depreciate": "Hesabu uchakavu",
+      "dispose": "Ondoa mali",
+      "newAccount": "Akaunti mpya",
+      "newAccountPeriod": "Kipindi kipya",
+      "newAnalyticAccount": "Akaunti mpya ya uchanganuzi",
+      "newAnalyticDistribution": "Modeli mpya ya ugawaji",
+      "newAnalyticLine": "Safu mpya ya uchanganuzi",
+      "newBill": "Ankara mpya ya msambazaji",
+      "newBudget": "Bajeti mpya",
+      "newCurrencyRate": "Kiwango kipya cha ubadilishaji",
+      "newEntry": "Ingizo jipya la uhasibu",
+      "newFiscalYear": "Mwaka mpya wa fedha",
+      "newInvoice": "Ankara mpya",
+      "newPayment": "Malipo mapya",
+      "newPaymentTerm": "Masharti mapya ya malipo",
+      "newPaymentTermLine": "Ongeza safu ya awamu ya malipo",
+      "newJournal": "Jarida jipya",
+      "addMoveLine": "Ongeza safu",
+      "newReconciliationWidget": "Wijeti mpya",
+      "newTax": "Kodi mpya",
+      "newTaxDeadline": "Tarehe mpya ya mwisho",
+      "newTaxGroup": "Kikundi kipya cha kodi",
+      "newTaxJurisdiction": "Mamlaka mpya",
+      "newTaxSchedule": "Ratiba mpya",
+      "post": "Posti",
+      "postStatement": "Posti taarifa ya benki",
+      "reconcile": "Linganisha",
+      "registerPayment": "Rekodi malipo",
+      "reopenPeriod": "Fungua tena kipindi"
+    },
+    "fiscalSetup": {
+      "title": "Msaidizi wa usanidi wa fedha",
+      "fields": {
+        "dateFrom": "Tarehe ya kuanza",
+        "dateTo": "Tarehe ya mwisho"
+      }
+    },
+    "bankStatementImportLines": {
+      "description": "Maelezo",
+      "reference": "Kumbukumbu",
+      "row": "Safu"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Sarafu",
+        "editTab": "Hariri",
+        "reference": "Kumbukumbu"
+      }
+    },
+    "billCorrection": {
+      "price": "Bei kwa kipimo"
+    },
+    "importReview": {
+      "title": "Jumla za udhibiti za chanzo",
+      "fields": {
+        "opening_balance": "Salio la mwanzo",
+        "debit": "Debiti",
+        "credit": "Krediti"
+      }
+    },
+    "billIntake": {
+      "title": "Ukaguzi wa ankara zilizopokelewa"
+    },
+    "billDocuments": {
+      "title": "Nyaraka na risiti za wasambazaji"
+    },
+    "authoring": {
+      "account": "Akaunti",
+      "amount": "Kiasi cha fedha",
+      "credit": "Krediti",
+      "customer": "Mteja",
+      "debit": "Debiti",
+      "description": "Maelezo",
+      "documentPreview": "Hakiki hati",
+      "dueDate": "Tarehe ya mwisho",
+      "invoice": "Ankara",
+      "paymentTerms": "Masharti ya malipo",
+      "quantity": "Kiasi",
+      "tax": "Kodi",
+      "total": "Jumla",
+      "unitPrice": "Bei kwa kipimo",
+      "vendor": "Msambazaji"
+    },
+    "assetSchedule": {
+      "title": "Ratiba ya uchakavu iliyohifadhiwa",
+      "date": "Tarehe (UTC)"
+    },
+    "workflowTools": {
+      "amount": "Kiasi cha fedha",
+      "opening": "Salio la mwanzo",
+      "row": "Safu",
+      "date": "Tarehe"
+    },
+    "navigation": {
+      "receivables": "Madeni ya wateja",
+      "payables": "Madeni kwa wasambazaji"
+    }
+  },
+  "crm": {
+    "attribution": {
+      "title": "Uhusishaji wa UTM",
+      "nameLabel": "Jina"
+    },
+    "chatter": {
+      "logActivity": "Panga shughuli",
+      "activitySummary": "Muhtasari",
+      "activityType": "Aina",
+      "activityDeadline": "Tarehe ya mwisho",
+      "activityNote": "Maelezo",
+      "scheduleActivity": "Panga shughuli",
+      "activityDone": "Imekamilika",
+      "activityPlanned": "Imepangwa",
+      "markDone": "Weka imekamilika",
+      "activityTypes": {
+        "email": "Barua pepe"
+      },
+      "removeAttachment": "Ondoa"
+    },
+    "leads": {
+      "title": "Wateja watarajiwa",
+      "columns": {
+        "contactName": "Jina",
+        "partnerName": "Kampuni",
+        "emailFrom": "Barua pepe",
+        "phone": "Simu",
+        "state": "Hali",
+        "expectedRevenue": "Mapato yanayotarajiwa",
+        "createDate": "Imeundwa"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali"
+        }
+      }
+    },
+    "opportunities": {
+      "title": "Fursa",
+      "board": {
+        "viewTable": "Jedwali"
+      },
+      "columns": {
+        "name": "Fursa",
+        "priority": "Kipaumbele",
+        "expectedRevenue": "Mapato yanayotarajiwa"
+      },
+      "states": {
+        "Low": "Chini",
+        "Medium": "Wastani",
+        "High": "Juu"
+      }
+    },
+    "opportunityLines": {
+      "tabLabel": "Safu za fursa",
+      "title": "Safu za fursa",
+      "columns": {
+        "opportunityId": "Fursa",
+        "quantity": "Kiasi",
+        "priceUnit": "Bei kwa kipimo",
+        "priceSubtotal": "Jumla ndogo",
+        "discount": "Punguzo %"
+      }
+    },
+    "contacts": {
+      "title": "Wawasiliani",
+      "columns": {
+        "name": "Jina",
+        "companyName": "Kampuni",
+        "email": "Barua pepe",
+        "phone": "Simu",
+        "isCompany": "Aina",
+        "city": "Jiji",
+        "countryId": "Nchi"
+      }
+    },
+    "activities": {
+      "title": "Shughuli",
+      "columns": {
+        "summary": "Muhtasari",
+        "activityType": "Aina",
+        "activityTypeId": "Aina",
+        "state": "Hali",
+        "dateDeadline": "Tarehe ya mwisho",
+        "isDone": "Imekamilika"
+      },
+      "states": {
+        "planned": "Imepangwa",
+        "done": "Imekamilika"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "planned": "Imepangwa",
+            "done": "Imekamilika"
+          }
+        }
+      }
+    },
+    "actions": {
+      "newOpportunityLine": "Safu mpya",
+      "markComplete": "Weka imekamilika",
+      "editOpportunity": "Hariri",
+      "editLeadAddress": "Hariri anwani",
+      "editContactAddress": "Hariri anwani"
+    },
+    "duplicates": {
+      "title": "Wawasiliani waliorudiwa"
+    },
+    "contactTags": {
+      "tabLabel": "Lebo za wawasiliani",
+      "title": "Lebo za wawasiliani",
+      "columns": {
+        "name": "Jina",
+        "color": "Rangi",
+        "description": "Maelezo"
+      }
+    },
+    "contactCategories": {
+      "tabLabel": "Kategoria za wawasiliani",
+      "createLabel": "Kategoria mpya",
+      "title": "Kategoria za wawasiliani",
+      "columns": {
+        "name": "Jina",
+        "color": "Rangi",
+        "parentId": "Mzazi",
+        "isActive": "Inatumika"
+      }
+    },
+    "contactSegments": {
+      "tabLabel": "Makundi ya wawasiliani",
+      "title": "Makundi ya wawasiliani",
+      "columns": {
+        "name": "Jina",
+        "isActive": "Inatumika",
+        "description": "Maelezo"
+      }
+    },
+    "forms": {
+      "newLead": {
+        "sections": {
+          "notes": "Maelezo"
+        },
+        "fields": {
+          "contactName": "Jina la mwasiliani",
+          "partnerName": "Kampuni",
+          "emailFrom": "Barua pepe",
+          "phone": "Simu",
+          "expectedRevenue": "Mapato yanayotarajiwa",
+          "state": "Hali",
+          "description": "Maelezo"
+        }
+      },
+      "newOpportunity": {
+        "sections": {
+          "opportunity": "Fursa"
+        },
+        "fields": {
+          "stage": "Hatua ya mauzo",
+          "expectedRevenue": "Mapato yanayotarajiwa",
+          "priority": "Kipaumbele",
+          "options": {
+            "Low": "Chini",
+            "Medium": "Wastani",
+            "High": "Juu"
+          },
+          "color": "Rangi",
+          "description": "Maelezo"
+        }
+      },
+      "changeStage": {
+        "fields": {
+          "stage": "Hatua ya mauzo"
+        }
+      },
+      "editOpportunity": {
+        "submit": "Hifadhi mabadiliko",
+        "sections": {
+          "opportunity": "Fursa"
+        },
+        "fields": {
+          "expectedRevenue": "Mapato yanayotarajiwa",
+          "stage": "Hatua ya mauzo",
+          "description": "Maelezo"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "newContact": {
+        "sections": {
+          "address": "Anwani"
+        },
+        "fields": {
+          "email": "Barua pepe",
+          "phone": "Simu",
+          "city": "Jiji",
+          "color": "Rangi",
+          "description": "Maelezo"
+        }
+      },
+      "newContactCategory": {
+        "sections": {
+          "category": "Kategoria"
+        },
+        "fields": {
+          "name": "Jina",
+          "color": "Rangi",
+          "isActive": "Inatumika"
+        }
+      },
+      "editContactCategory": {
+        "submit": "Hifadhi mabadiliko",
+        "sections": {
+          "category": "Kategoria"
+        },
+        "fields": {
+          "name": "Jina",
+          "color": "Rangi",
+          "isActive": "Inatumika"
+        }
+      },
+      "contactIdentity": {
+        "save": "Hifadhi mabadiliko",
+        "fields": {
+          "kind": "Aina"
+        },
+        "states": {
+          "pending": "Inasubiri"
+        }
+      },
+      "endContactRole": {
+        "fields": {
+          "reason": "Sababu"
+        }
+      },
+      "newActivity": {
+        "fields": {
+          "summary": "Muhtasari",
+          "dateDeadline": "Tarehe ya mwisho",
+          "note": "Maelezo"
+        },
+        "submit": "Panga shughuli"
+      },
+      "convertToSaleOrder": {
+        "fields": {
+          "pricelist": "Orodha ya bei",
+          "warehouse": "Ghala"
+        }
+      },
+      "addOpportunityLine": {
+        "sections": {
+          "opportunity": "Fursa",
+          "product": "Bidhaa na bei"
+        },
+        "fields": {
+          "productId": "Bidhaa",
+          "productPlaceholder": "Chagua bidhaa…",
+          "uomId": "Kipimo",
+          "quantity": "Kiasi",
+          "priceUnit": "Bei kwa kipimo",
+          "discount": "Punguzo %",
+          "sequence": "Mfuatano",
+          "name": "Maelezo",
+          "taxIds": "Kodi"
+        }
+      },
+      "assignCategory": {
+        "sections": {
+          "category": "Kategoria"
+        },
+        "fields": {
+          "categoryId": "Kategoria"
+        }
+      },
+      "newContactTag": {
+        "fields": {
+          "name": "Jina",
+          "color": "Rangi",
+          "description": "Maelezo"
+        }
+      },
+      "newContactSegment": {
+        "fields": {
+          "name": "Jina",
+          "isActive": "Inatumika",
+          "description": "Maelezo"
+        }
+      },
+      "editContact": {
+        "submit": "Hifadhi mabadiliko",
+        "fields": {
+          "name": "Jina",
+          "email": "Barua pepe",
+          "phone": "Simu",
+          "isCustomer": "Mteja",
+          "isVendor": "Msambazaji"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "editContactAddress": {
+        "title": "Hariri anwani",
+        "sections": {
+          "address": "Anwani"
+        },
+        "fields": {
+          "city": "Jiji"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "editContactBusiness": {
+        "submit": "Hifadhi mabadiliko",
+        "fields": {
+          "industry": "Sekta"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "editContactDetails": {
+        "submit": "Hifadhi mabadiliko",
+        "sections": {
+          "details": "Maelezo ya kina"
+        },
+        "fields": {
+          "firstName": "Jina la kwanza",
+          "lastName": "Jina la ukoo",
+          "website": "Tovuti",
+          "color": "Rangi",
+          "description": "Maelezo"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "editLeadDetails": {
+        "submit": "Hifadhi mabadiliko",
+        "sections": {
+          "details": "Maelezo ya kina"
+        },
+        "fields": {
+          "contactName": "Jina la mwasiliani",
+          "website": "Tovuti",
+          "industry": "Sekta",
+          "description": "Maelezo"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "editLeadAddress": {
+        "sections": {
+          "address": "Anwani"
+        },
+        "fields": {
+          "city": "Jiji"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      },
+      "editLeadRevenue": {
+        "submit": "Hifadhi mabadiliko",
+        "sections": {
+          "revenue": "Mapato"
+        },
+        "fields": {
+          "expectedRevenue": "Mapato yanayotarajiwa"
+        },
+        "validation": {
+          "noChanges": "Badilisha angalau sehemu moja kabla ya kuhifadhi."
+        }
+      }
+    },
+    "consent": {
+      "title": "Historia ya ridhaa",
+      "save": "Hifadhi",
+      "loading": "Inapakia…"
+    },
+    "relationships": {
+      "tabLabel": "Mahusiano",
+      "title": "Mahusiano",
+      "noParent": "Hakuna",
+      "type": "Aina",
+      "save": "Hifadhi",
+      "loading": "Inapakia…",
+      "active": "Inatumika",
+      "end": "Mwisho"
+    },
+    "admin": {
+      "stageName": "Jina",
+      "sourceName": "Jina",
+      "lostReasonName": "Jina",
+      "ruleName": "Jina",
+      "active": "Inatumika"
+    },
+    "countryPacks": {
+      "title": "Vifurushi vya nchi"
+    },
+    "scoring": {
+      "title": "Alama za mteja mtarajiwa"
+    },
+    "inbox": {
+      "tabLabel": "Kikasha",
+      "title": "Kikasha cha WhatsApp",
+      "close": "Funga"
+    },
+    "relIntel": {
+      "title": "Uchanganuzi wa mahusiano",
+      "relationships": "Mahusiano"
+    },
+    "myActivities": {
+      "overdue": "Vimechelewa"
+    },
+    "kpi": {
+      "expectedRevenue": "Mapato yanayotarajiwa"
+    }
+  },
+  "purchasing": {
+    "handoffs": {
+      "title": "Mapokezi na ankara za wasambazaji",
+      "receipt": "Risiti",
+      "bill": "Ankara ya msambazaji"
+    },
+    "purchaseOrders": {
+      "title": "Oda za ununuzi",
+      "columns": {
+        "name": "Kumbukumbu",
+        "partnerId": "Msambazaji",
+        "state": "Hali",
+        "amountUntaxed": "Jumla ndogo",
+        "amountTotal": "Jumla",
+        "receiptStatus": "Risiti",
+        "fulfillment": "Utekelezaji"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "Draft": "Rasimu",
+            "Sent": "Imetumwa",
+            "ToApprove": "Inasubiri kuidhinishwa",
+            "Approved": "Oda ya ununuzi",
+            "Done": "Imekamilika",
+            "Cancelled": "Imeghairiwa"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "Sent": "Imetumwa",
+        "ToApprove": "Inasubiri kuidhinishwa",
+        "Approved": "Oda ya ununuzi",
+        "Done": "Imekamilika",
+        "Cancelled": "Imeghairiwa",
+        "Purchase": "Oda ya ununuzi"
+      },
+      "fulfillment": {
+        "standard": "Kawaida"
+      }
+    },
+    "orderLines": {
+      "title": "Safu za oda",
+      "columns": {
+        "productId": "Bidhaa",
+        "priceUnit": "Bei kwa kipimo",
+        "priceSubtotal": "Jumla ndogo",
+        "state": "Hali"
+      },
+      "matchStatus": {
+        "pending": "Inasubiri",
+        "unavailable": "Haipatikani"
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "Confirmed": "Imethibitishwa",
+        "Done": "Imekamilika",
+        "Cancelled": "Imeghairiwa"
+      },
+      "recovery": {
+        "title": "Urejeshaji wa kiasi"
+      }
+    },
+    "rfqs": {
+      "title": "Maombi ya bei",
+      "columns": {
+        "name": "Ombi la bei",
+        "state": "Hali",
+        "purchaseOrderId": "Oda ya ununuzi",
+        "notes": "Maelezo"
+      }
+    },
+    "rfqBids": {
+      "title": "Zabuni za bei",
+      "columns": {
+        "rfqId": "Ombi la bei",
+        "partnerId": "Msambazaji",
+        "priceUnit": "Bei kwa kipimo",
+        "amountTotal": "Jumla",
+        "state": "Hali"
+      }
+    },
+    "purchaseAgreements": {
+      "title": "Mikataba ya ununuzi",
+      "columns": {
+        "origin": "Hati chanzo",
+        "vendorId": "Msambazaji",
+        "state": "Hali"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "Draft": "Rasimu",
+            "Sent": "Imetumwa",
+            "InProgress": "Inaendelea",
+            "Approved": "Imeidhinishwa",
+            "Cancelled": "Imeghairiwa",
+            "Closed": "Imefungwa"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "Sent": "Imetumwa",
+        "InProgress": "Inaendelea",
+        "Approved": "Imeidhinishwa",
+        "Cancelled": "Imeghairiwa",
+        "Closed": "Imefungwa"
+      }
+    },
+    "blanketOrders": {
+      "tab": "Oda za jumla"
+    },
+    "vendors": {
+      "title": "Wasambazaji",
+      "columns": {
+        "email": "Barua pepe",
+        "phone": "Simu",
+        "city": "Jiji",
+        "countryId": "Nchi"
+      }
+    },
+    "landedCosts": {
+      "title": "Gharama za kufikisha bidhaa",
+      "columns": {
+        "name": "Jina",
+        "state": "Hali",
+        "amountTotal": "Jumla",
+        "vendorBillId": "Ankara ya msambazaji"
+      }
+    },
+    "supplierIntakes": {
+      "title": "Maombi ya wasambazaji",
+      "columns": {
+        "reference": "Kumbukumbu",
+        "state": "Hali",
+        "companyName": "Kampuni",
+        "email": "Barua pepe"
+      }
+    },
+    "tabs": {
+      "partnerBanks": "Akaunti za benki za wasambazaji",
+      "createPartnerBank": "Akaunti mpya ya benki"
+    },
+    "partnerBanks": {
+      "title": "Akaunti za benki za wasambazaji",
+      "columns": {
+        "id": "ID",
+        "partnerId": "Mshirika",
+        "account": "Akaunti",
+        "active": "Inatumika"
+      }
+    },
+    "actions": {
+      "sendSelected": "Tuma",
+      "confirmSelected": "Thibitisha",
+      "cancelSelected": "Ghairi",
+      "recalculateTotals": "Hesabu jumla upya",
+      "submitSelected": "Wasilisha",
+      "approveSelected": "Idhinisha",
+      "closeSelected": "Funga",
+      "cancelRequisitions": "Ghairi",
+      "postSelected": "Posti",
+      "rejectSelected": "Kataa"
+    },
+    "landedCostDetail": {
+      "title": "Safu za gharama za kufikisha bidhaa",
+      "amountTotal": "Jumla ya fedha",
+      "state": "Hali",
+      "addLine": "Ongeza safu",
+      "lines": "Safu"
+    },
+    "forms": {
+      "newPartnerBank": {
+        "sections": {
+          "main": "Akaunti"
+        }
+      },
+      "editPartnerBank": {
+        "sections": {
+          "main": "Akaunti"
+        },
+        "fields": {
+          "active": "Inatumika"
+        }
+      },
+      "newPurchaseOrder": {
+        "sections": {
+          "vendor": "Msambazaji",
+          "schedule": "Ratiba"
+        },
+        "fields": {
+          "partnerId": "Msambazaji",
+          "paymentTermId": "Masharti ya malipo",
+          "origin": "Hati chanzo",
+          "notes": "Maelezo"
+        }
+      },
+      "newPurchaseRequisition": {
+        "sections": {
+          "dates": "Tarehe"
+        },
+        "fields": {
+          "vendorId": "Msambazaji",
+          "departmentId": "Idara",
+          "origin": "Hati chanzo",
+          "description": "Maelezo",
+          "productId": "Bidhaa",
+          "quantity": "Kiasi"
+        }
+      },
+      "editPurchaseOrderLine": {
+        "sections": {
+          "line": "Safu"
+        },
+        "fields": {
+          "lineId": "Safu",
+          "productId": "Bidhaa",
+          "productPlaceholder": "Chagua bidhaa…",
+          "uomId": "Kipimo",
+          "quantity": "Kiasi",
+          "priceUnit": "Bei kwa kipimo"
+        }
+      },
+      "addPurchaseOrderLine": {
+        "sections": {
+          "order": "Oda ya ununuzi",
+          "product": "Bidhaa na bei"
+        },
+        "fields": {
+          "productId": "Bidhaa",
+          "productPlaceholder": "Chagua bidhaa…",
+          "uomId": "Kipimo",
+          "quantity": "Kiasi",
+          "priceUnit": "Bei kwa kipimo"
+        }
+      },
+      "receivePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Safu ya oda"
+        }
+      },
+      "invoicePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Safu ya oda"
+        }
+      },
+      "newLandedCost": {
+        "sections": {
+          "main": "Maelezo ya kina"
+        },
+        "fields": {
+          "currencyId": "ID ya sarafu",
+          "amountTotal": "Jumla ya fedha",
+          "date": "Tarehe",
+          "description": "Maelezo"
+        },
+        "targetMoves": {
+          "receipt": "Risiti",
+          "posted": "Imepostiwa"
+        }
+      },
+      "editLandedCost": {
+        "sections": {
+          "main": "Maelezo ya kina"
+        },
+        "fields": {
+          "landedCostId": "Gharama ya kufikisha bidhaa",
+          "currencyId": "ID ya sarafu",
+          "amountTotal": "Jumla ya fedha",
+          "date": "Tarehe",
+          "description": "Maelezo"
+        }
+      },
+      "landedCostLine": {
+        "sections": {
+          "landedCost": "Gharama ya kufikisha bidhaa"
+        },
+        "fields": {
+          "landedCostId": "Gharama ya kufikisha bidhaa",
+          "productPlaceholder": "Chagua bidhaa…",
+          "currencyId": "ID ya sarafu"
+        }
+      },
+      "newSupplierIntake": {
+        "fields": {
+          "contactName": "Jina la mwasiliani",
+          "email": "Barua pepe",
+          "phone": "Simu",
+          "industry": "Sekta",
+          "website": "Tovuti",
+          "notes": "Maelezo"
+        }
+      },
+      "editSupplierIntake": {
+        "sections": {
+          "main": "Maelezo ya kina"
+        },
+        "fields": {
+          "contactName": "Jina la mwasiliani",
+          "email": "Barua pepe",
+          "phone": "Simu",
+          "notes": "Maelezo"
+        }
+      },
+      "createBillFromOrder": {
+        "sections": {
+          "accounting": "Uhasibu"
+        },
+        "fields": {
+          "payableAccountId": "Akaunti ya madeni kwa wasambazaji"
+        }
+      },
+      "editPurchaseOrder": {
+        "fields": {
+          "orderId": "Oda ya ununuzi"
+        }
+      },
+      "common": {
+        "cancel": "Ghairi",
+        "none": "Hakuna",
+        "saving": "Inahifadhi…"
+      },
+      "fields": {
+        "expenseAccount": "Akaunti ya gharama",
+        "journal": "Jarida",
+        "notes": "Maelezo",
+        "payableAccount": "Akaunti ya madeni kwa wasambazaji",
+        "product": "Bidhaa",
+        "purchaseOrder": "Oda ya ununuzi",
+        "quantity": "Kiasi",
+        "returnReason": "Sababu ya kurejesha",
+        "rfq": "Ombi la bei",
+        "unitPrice": "Bei kwa kipimo",
+        "uom": "Kipimo",
+        "vendor": "Msambazaji"
+      },
+      "refinement": {
+        "pricelist": "Orodha ya bei na sarafu"
+      }
+    },
+    "ops": {
+      "approve": "Idhinisha",
+      "delegationReason": "Sababu",
+      "prompt": {
+        "contractName": "Jina la mkataba",
+        "creditJournalId": "ID ya jarida",
+        "currencyId": "ID ya sarafu",
+        "idempotencyKey": "Ufunguo wa kutorudia kitendo",
+        "intentProvider": "Mtoa huduma",
+        "intentStatus": "Hali",
+        "intentType": "Aina ya nia ya malipo",
+        "partnerId": "ID ya mshirika",
+        "productId": "ID ya bidhaa",
+        "returnProductId": "ID ya bidhaa",
+        "returnQty": "Kiasi",
+        "rfqProductId": "ID ya bidhaa",
+        "rfqQty": "Kiasi"
+      },
+      "recordIntentResult": "Rekodi matokeo ya muunganisho",
+      "reject": "Kataa",
+      "recordIntegrationResult": "Rekodi matokeo ya muunganisho"
+    },
+    "purchaseReturns": {
+      "title": "Marejesho ya ununuzi",
+      "filters": {
+        "state": {
+          "label": "Hali"
+        }
+      },
+      "states": {
+        "draft": "Rasimu",
+        "confirmed": "Imethibitishwa"
+      },
+      "columns": {
+        "name": "Kumbukumbu",
+        "purchaseOrderId": "Oda ya ununuzi",
+        "partnerId": "Msambazaji",
+        "state": "Hali",
+        "returnReason": "Sababu ya kurejesha",
+        "pickingId": "Risiti",
+        "createDate": "Imeundwa"
+      }
+    },
+    "operationsTab": "Shughuli",
+    "order": {
+      "attachments": "Viambatisho",
+      "bills": "Ankara za wasambazaji",
+      "discussion": "Majadiliano",
+      "receipts": "Risiti",
+      "status": {
+        "cancelled": "Imeghairiwa",
+        "done": "Imekamilika",
+        "purchase": "Oda ya ununuzi",
+        "rfq": "Ombi la bei",
+        "toApprove": "Inasubiri kuidhinishwa"
+      },
+      "moreActions": "Zaidi"
+    },
+    "requisition": {
+      "addLine": {
+        "quantity": "Kiasi",
+        "title": "Ongeza safu ya ombi",
+        "uom": "Kipimo"
+      }
+    },
+    "kpi": {
+      "rfqs": "Maombi ya bei"
+    },
+    "blanket": {
+      "actions": {
+        "addLine": "Ongeza safu",
+        "cancel": "Ghairi",
+        "remove": "Ondoa"
+      },
+      "states": {
+        "draft": "Rasimu"
+      },
+      "fallback": {
+        "draft": "Rasimu",
+        "product": "Bidhaa {{id}}"
+      },
+      "fields": {
+        "currency": "Sarafu",
+        "end": "Mwisho",
+        "name": "Jina",
+        "quantity": "Kiasi",
+        "start": "Mwanzo",
+        "unitPrice": "Bei kwa kipimo",
+        "vendor": "Msambazaji"
+      },
+      "release": {
+        "title": "Toa oda ya ununuzi kutoka agizo la jumla"
+      },
+      "title": "Oda za jumla"
+    },
+    "configuration": {
+      "actions": {
+        "saving": "Inahifadhi…"
+      },
+      "fields": {
+        "contractName": "Jina la mkataba",
+        "delegationReason": "Sababu",
+        "endDate": "Tarehe ya mwisho",
+        "idempotencyKey": "Ufunguo wa kutorudia kitendo",
+        "intentType": "Aina ya nia ya malipo",
+        "product": "Bidhaa",
+        "provider": "Mtoa huduma",
+        "purchaseOrder": "Oda ya ununuzi",
+        "rate": "Kiwango",
+        "reason": "Sababu",
+        "startDate": "Tarehe ya kuanza",
+        "vendor": "Msambazaji",
+        "warehouse": "Ghala"
+      },
+      "none": "Hakuna",
+      "risk": {
+        "high": "Juu",
+        "low": "Chini",
+        "medium": "Wastani"
+      },
+      "title": "Usanidi wa ununuzi"
+    }
+  },
+  "erpWorkflow": {
+    "applied": "Imekamilika",
+    "retry": "Jaribu tena",
+    "confirm": {
+      "confirm": "Thibitisha"
+    }
+  },
+  "sales": {
+    "order": {
+      "attachments": "Viambatisho",
+      "deliveries": "Uwasilishaji",
+      "discussion": "Majadiliano",
+      "invoices": "Ankara",
+      "moreActions": "Zaidi",
+      "status": {
+        "cancelled": "Imeghairiwa",
+        "locked": "Imefungwa",
+        "sale": "Oda ya mauzo",
+        "toApprove": "Inasubiri kuidhinishwa"
+      },
+      "options": {
+        "description": "Maelezo",
+        "discount": "Punguzo %",
+        "priceUnit": "Bei kwa kipimo",
+        "product": "Bidhaa",
+        "quantity": "Kiasi",
+        "subtotal": "Jumla ndogo"
+      }
+    },
+    "dashboard": {
+      "widgets": {
+        "revenue": "Mapato"
+      }
+    },
+    "ops": {
+      "cancelSelected": "Ghairi zilizochaguliwa",
+      "journal": "Jarida",
+      "expenseAccount": "Akaunti ya gharama",
+      "payableAccount": "Akaunti ya madeni kwa wasambazaji",
+      "lines": "Safu",
+      "approve": "Idhinisha",
+      "prompt": {
+        "contractName": "Jina la mkataba",
+        "idempotencyKey": "Ufunguo wa kutorudia kitendo",
+        "intentProvider": "Mtoa huduma",
+        "intentStatus": "Hali",
+        "intentType": "Aina ya nia ya malipo",
+        "partnerId": "ID ya mshirika"
+      },
+      "recordIntegrationResult": "Rekodi matokeo ya muunganisho",
+      "reject": "Kataa"
+    },
+    "salesOrders": {
+      "title": "Oda za mauzo",
+      "columns": {
+        "state": "Hali",
+        "amountTotal": "Jumla",
+        "invoiceStatus": "Ankara",
+        "deliveryCount": "Uwasilishaji",
+        "deliverySummary": "Uwasilishaji",
+        "paymentSummary": "Malipo",
+        "partnerName": "Mteja"
+      },
+      "cashSummary": {
+        "invoice": {
+          "posted": "Imetolewa ankara"
+        },
+        "payment": {
+          "unpaid": "Haijalipwa",
+          "paid": "Imelipwa"
+        }
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "Draft": "Rasimu",
+            "Sent": "Imetumwa",
+            "ToApprove": "Inasubiri kuidhinishwa",
+            "Sale": "Imethibitishwa",
+            "Done": "Imekamilika",
+            "Cancel": "Imeghairiwa"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "Sent": "Imetumwa",
+        "ToApprove": "Inasubiri kuidhinishwa",
+        "Sale": "Imethibitishwa",
+        "Done": "Imekamilika",
+        "Cancel": "Imeghairiwa"
+      },
+      "invoiceStates": {
+        "InvoicedPartially": "Sehemu",
+        "Invoiced": "Imetolewa ankara"
+      }
+    },
+    "orderLines": {
+      "title": "Safu za oda",
+      "columns": {
+        "qtyInvoiced": "Imetolewa ankara",
+        "priceUnit": "Bei kwa kipimo",
+        "priceSubtotal": "Jumla ndogo",
+        "discount": "Punguzo %",
+        "description": "Maelezo"
+      },
+      "add": "Ongeza safu",
+      "addLine": "Ongeza safu",
+      "discountPercent": "Punguzo %",
+      "product": "Bidhaa",
+      "productFallback": "Bidhaa {{id}}",
+      "quantity": "Kiasi",
+      "subtotal": "Jumla ndogo",
+      "taxes": "Kodi",
+      "total": "Jumla",
+      "unitPrice": "Bei kwa kipimo",
+      "untaxed": "Bila kodi"
+    },
+    "pricelistItems": {
+      "title": "Kanuni za orodha ya bei",
+      "tabLabel": "Kanuni za orodha ya bei",
+      "columns": {
+        "pricelistId": "Orodha ya bei",
+        "sequence": "Mfuatano",
+        "productId": "Bidhaa",
+        "fixedPrice": "Bei maalumu"
+      }
+    },
+    "pricelists": {
+      "title": "Orodha za bei",
+      "columns": {
+        "name": "Jina",
+        "currencyId": "Sarafu",
+        "active": "Inatumika"
+      }
+    },
+    "deliveries": {
+      "title": "Uwasilishaji",
+      "columns": {
+        "state": "Hali",
+        "scheduledDate": "Imepangwa"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "Draft": "Rasimu",
+            "InProgress": "Inaendelea",
+            "Done": "Imekamilika",
+            "Cancel": "Imeghairiwa"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "InProgress": "Inaendelea",
+        "Done": "Imekamilika",
+        "Cancel": "Imeghairiwa"
+      }
+    },
+    "fulfillment": {
+      "title": "Utekelezaji wa oda"
+    },
+    "returns": {
+      "title": "Marejesho / RMA"
+    },
+    "returnOrders": {
+      "title": "Marejesho / RMA",
+      "columns": {
+        "state": "Hali",
+        "partnerId": "Mteja",
+        "creditMoveId": "Hati ya mkopo",
+        "returnReason": "Sababu"
+      },
+      "states": {
+        "draft": "Rasimu",
+        "confirmed": "Imethibitishwa",
+        "cancelled": "Imeghairiwa"
+      },
+      "actions": {
+        "confirm": "Thibitisha",
+        "cancel": "Ghairi",
+        "createCreditNote": "Unda hati ya mkopo"
+      }
+    },
+    "returnOrderLines": {
+      "title": "Safu za marejesho",
+      "columns": {
+        "productId": "Bidhaa",
+        "quantity": "Kiasi",
+        "priceUnit": "Bei kwa kipimo"
+      }
+    },
+    "tabs": {
+      "invoices": "Ankara",
+      "fulfillment": "Utekelezaji",
+      "returns": "Marejesho / RMA",
+      "deliveryPriceRules": "Kanuni za bei za usafirishaji",
+      "createDeliveryPriceRule": "Kanuni mpya ya bei",
+      "deliveryCarriers": "Wasafirishaji",
+      "createDeliveryCarrier": "Msafirishaji mpya",
+      "shippingMethods": "Njia za usafirishaji",
+      "createShippingMethod": "Njia mpya",
+      "posPaymentMethods": "Malipo ya POS",
+      "createPaymentMethod": "Njia mpya ya malipo",
+      "loyaltyPrograms": "Programu za uaminifu wa wateja",
+      "createLoyaltyProgram": "Programu mpya",
+      "loyaltyCards": "Kadi za uaminifu",
+      "createLoyaltyCard": "Kadi mpya",
+      "ops": "Shughuli",
+      "commissionPlans": "Mipango ya kamisheni"
+    },
+    "deliveryPriceRules": {
+      "title": "Kanuni za bei za uwasilishaji",
+      "columns": {
+        "id": "ID"
+      }
+    },
+    "deliveryCarriers": {
+      "title": "Wasafirishaji wa bidhaa",
+      "columns": {
+        "name": "Jina",
+        "deliveryType": "Aina",
+        "active": "Inatumika",
+        "currencyId": "Sarafu",
+        "productId": "Bidhaa"
+      }
+    },
+    "shippingMethods": {
+      "title": "Njia za usafirishaji",
+      "columns": {
+        "name": "Jina",
+        "provider": "Mtoa huduma",
+        "deliveryType": "Aina",
+        "active": "Inatumika",
+        "fixedPrice": "Bei maalumu"
+      }
+    },
+    "posPaymentMethods": {
+      "title": "Njia za malipo za POS",
+      "columns": {
+        "name": "Jina",
+        "sequence": "Mfuatano",
+        "active": "Inatumika"
+      }
+    },
+    "loyaltyPrograms": {
+      "title": "Programu za uaminifu wa wateja",
+      "columns": {
+        "name": "Jina",
+        "currencyId": "Sarafu",
+        "programType": "Aina",
+        "isActive": "Inatumika"
+      }
+    },
+    "loyaltyCards": {
+      "title": "Kadi za uaminifu",
+      "columns": {
+        "code": "Msimbo",
+        "partnerId": "Mshirika",
+        "currencyId": "Sarafu",
+        "isActive": "Inatumika"
+      }
+    },
+    "forms": {
+      "newSaleOrder": {
+        "sections": {
+          "customer": "Mteja",
+          "notes": "Maelezo"
+        },
+        "fields": {
+          "partnerId": "Mteja",
+          "pricelistId": "Orodha ya bei",
+          "warehouseId": "Ghala",
+          "paymentTermId": "Masharti ya malipo",
+          "note": "Maelezo",
+          "invoicePolicy": "Sera ya ankara"
+        }
+      },
+      "newPricelist": {
+        "fields": {
+          "currencyId": "Sarafu"
+        }
+      },
+      "newPricelistItem": {
+        "fields": {
+          "pricelistId": "Orodha ya bei",
+          "appliedOnProduct": "Bidhaa",
+          "computeFixed": "Bei maalumu",
+          "productId": "ID ya bidhaa",
+          "fixedPrice": "Bei maalumu",
+          "priceDiscount": "Punguzo %",
+          "sequence": "Mfuatano"
+        }
+      },
+      "newReturnOrder": {
+        "fields": {
+          "partnerId": "Mteja",
+          "returnReason": "Sababu ya kurejesha"
+        }
+      },
+      "addReturnOrderLine": {
+        "sections": {
+          "product": "Bidhaa"
+        },
+        "fields": {
+          "productId": "Bidhaa",
+          "uomId": "Kipimo",
+          "quantity": "Kiasi",
+          "priceUnit": "Bei kwa kipimo"
+        }
+      },
+      "newDeliveryPriceRule": {
+        "sections": {
+          "main": "Kanuni"
+        }
+      },
+      "newDeliveryCarrier": {
+        "fields": {
+          "name": "Jina",
+          "currencyId": "ID ya sarafu",
+          "invoicePolicy": "Sera ya ankara",
+          "amount": "Kiasi cha fedha"
+        }
+      },
+      "newShippingMethod": {
+        "sections": {
+          "main": "Njia"
+        },
+        "fields": {
+          "name": "Jina",
+          "provider": "Mtoa huduma",
+          "productId": "ID ya bidhaa",
+          "invoicePolicy": "Sera ya ankara",
+          "fixedPrice": "Bei maalumu",
+          "amount": "Kiasi cha fedha"
+        }
+      },
+      "newPosPaymentMethod": {
+        "fields": {
+          "name": "Jina",
+          "paymentMethodType": "Aina",
+          "sequence": "Mfuatano",
+          "journalId": "ID ya jarida"
+        }
+      },
+      "newLoyaltyProgram": {
+        "fields": {
+          "name": "Jina",
+          "currencyId": "ID ya sarafu",
+          "dateTo": "Tarehe ya mwisho"
+        }
+      },
+      "createInvoiceFromOrder": {
+        "sections": {
+          "accounting": "Uhasibu"
+        },
+        "fields": {
+          "receivableAccountId": "Akaunti ya madeni ya wateja"
+        }
+      },
+      "addSaleOrderLine": {
+        "sections": {
+          "product": "Bidhaa na bei"
+        },
+        "fields": {
+          "productId": "Bidhaa",
+          "productPlaceholder": "Chagua bidhaa…",
+          "uomId": "Kipimo",
+          "quantity": "Kiasi",
+          "priceUnit": "Bei kwa kipimo",
+          "discount": "Punguzo %",
+          "sequence": "Mfuatano",
+          "name": "Maelezo",
+          "taxIds": "Kodi"
+        }
+      },
+      "editSaleOrderLine": {
+        "sections": {
+          "line": "Safu ya oda"
+        },
+        "fields": {
+          "lineId": "Safu ya oda"
+        }
+      },
+      "partialDelivery": {
+        "sections": {
+          "moveLines": "Safu za uhasibu"
+        }
+      },
+      "editSaleOrder": {
+        "submitLabel": "Hifadhi"
+      },
+      "refinement": {
+        "pricelist": "Orodha ya bei na sarafu",
+        "delivery": "Uwasilishaji",
+        "uom": "Kipimo"
+      }
+    },
+    "actions": {
+      "confirmSelected": "Thibitisha",
+      "recalculateTotals": "Hesabu jumla upya",
+      "newSaleOrderLine": "Safu mpya",
+      "deletePricelists": "Futa",
+      "startBatches": "Mwanzo",
+      "completeBatches": "Kamilisha",
+      "downloadPdf": "Pakua PDF"
+    },
+    "commissionPlans": {
+      "active": "Inatumika",
+      "name": "Mpango",
+      "partner": "Mshirika"
+    },
+    "quotationDocument": {
+      "title": "Hati ya makadirio ya bei",
+      "download": "Pakua PDF",
+      "close": "Funga"
+    }
+  },
+  "calendar": {
+    "activitiesTab": "Shughuli",
+    "dashboard": {
+      "confirmed": "Imethibitishwa"
+    },
+    "events": {
+      "title": "Matukio ya kalenda",
+      "columns": {
+        "start": "Mwanzo",
+        "stop": "Mwisho",
+        "state": "Hali"
+      },
+      "filters": {
+        "state": "Hali",
+        "stateOptions": {
+          "draft": "Rasimu",
+          "confirmed": "Imethibitishwa",
+          "cancelled": "Imeghairiwa"
+        }
+      },
+      "states": {
+        "draft": "Rasimu",
+        "confirmed": "Imethibitishwa",
+        "cancelled": "Imeghairiwa"
+      }
+    },
+    "forms": {
+      "newEvent": {
+        "fields": {
+          "description": "Maelezo"
+        }
+      }
+    },
+    "eventDetail": {
+      "edit": "Hariri",
+      "delete": "Futa",
+      "closeAria": "Funga",
+      "open": "Wazi",
+      "moreActions": "Zaidi"
+    },
+    "page": {
+      "discussion": "Majadiliano"
+    }
+  },
+  "documents": {
+    "designer": {
+      "draft": "Rasimu",
+      "save": "Hifadhi kiolezo",
+      "starterContent": {
+        "quotationDate": "Tarehe",
+        "quotationSubtotal": "Jumla ndogo",
+        "quotationTax": "Kodi",
+        "quotationTotal": "Jumla"
+      },
+      "saveChanges": "Hifadhi mabadiliko",
+      "status": "Hali",
+      "inactive": "Haitumiki"
+    },
+    "documents": {
+      "title": "Nyaraka",
+      "columns": {
+        "name": "Jina",
+        "mimetype": "Aina",
+        "createDate": "Imeundwa",
+        "description": "Maelezo"
+      },
+      "filters": {
+        "isDeleted": {
+          "label": "Hali",
+          "options": {
+            "false": "Inatumika"
+          }
+        }
+      }
+    },
+    "knowledgeBase": {
+      "title": "Hazina ya maarifa",
+      "columns": {
+        "name": "Kichwa",
+        "description": "Maelezo",
+        "createDate": "Imeundwa"
+      },
+      "filters": {
+        "isPublished": {
+          "options": {
+            "false": "Rasimu"
+          }
+        }
+      }
+    },
+    "knowledgeCategories": {
+      "title": "Kategoria za maarifa",
+      "columns": {
+        "name": "Jina",
+        "description": "Maelezo",
+        "sequence": "Mfuatano",
+        "createDate": "Imeundwa"
+      }
+    },
+    "folders": {
+      "title": "Folda za nyaraka",
+      "columns": {
+        "name": "Jina",
+        "documentCount": "Nyaraka",
+        "createDate": "Imeundwa"
+      }
+    },
+    "tabs": {
+      "processing": "Kazi za uchakataji",
+      "insights": "Uchanganuzi wa AI",
+      "categories": "Kategoria",
+      "folders": "Folda",
+      "newCategory": "Kategoria mpya",
+      "newFolder": "Folda mpya"
+    },
+    "processing": {
+      "title": "Kazi za kuchakata nyaraka",
+      "columns": {
+        "id": "ID",
+        "documentType": "Aina ya hati",
+        "status": "Hali",
+        "approved": "Imeidhinishwa",
+        "confidence": "Uhakika",
+        "modelUsed": "Modeli",
+        "created": "Imeundwa"
+      },
+      "filters": {
+        "isApproved": {
+          "label": "Imeidhinishwa",
+          "options": {
+            "yes": "Ndiyo",
+            "no": "Hapana"
+          }
+        }
+      }
+    },
+    "insights": {
+      "title": "Uchanganuzi wa AI",
+      "columns": {
+        "title": "Kichwa",
+        "generatedAt": "Imetengenezwa"
+      },
+      "filters": {
+        "dismissed": {
+          "options": {
+            "open": "Wazi"
+          }
+        },
+        "isAcknowledged": {
+          "options": {
+            "yes": "Ndiyo",
+            "no": "Hapana"
+          }
+        }
+      }
+    },
+    "forms": {
+      "newDocument": {
+        "fields": {
+          "description": "Maelezo",
+          "resModelNone": "Hakuna",
+          "fiscalKindNone": "Hakuna"
+        }
+      },
+      "newArticle": {
+        "fields": {
+          "description": "Maelezo"
+        }
+      },
+      "newKnowledgeArticle": {
+        "fields": {
+          "description": "Maelezo"
+        }
+      },
+      "newCategory": {
+        "title": "Kategoria mpya",
+        "sections": {
+          "category": "Kategoria"
+        },
+        "fields": {
+          "name": "Jina",
+          "description": "Maelezo",
+          "sequence": "Mfuatano",
+          "color": "Rangi"
+        }
+      },
+      "newFolder": {
+        "title": "Folda mpya",
+        "fields": {
+          "name": "Jina",
+          "description": "Maelezo",
+          "sequence": "Mfuatano"
+        }
+      },
+      "newProcessingJob": {
+        "fields": {
+          "documentType": "Aina ya hati"
+        }
+      },
+      "recordTypes": {
+        "expense": "Gharama",
+        "purchaseOrder": "Oda ya ununuzi",
+        "salesOrder": "Oda ya mauzo"
+      }
+    },
+    "page": {
+      "delete": "Futa",
+      "discussion": "Majadiliano",
+      "edit": "Hariri",
+      "locked": "Imefungwa",
+      "holdReason": "Sababu",
+      "refSystem": "Mfumo",
+      "signatureCompleted": "Imekamilika",
+      "signatureStatus": "Hali",
+      "signatureProvider": "Mtoa huduma"
+    },
+    "knowledgeActions": {
+      "done": "{{action}} imekamilika",
+      "failed": "{{action}} imeshindwa"
+    },
+    "browser": {
+      "folders": "Folda",
+      "newFolder": "Folda mpya",
+      "upload": "Pakia",
+      "name": "Jina",
+      "viewTable": "Jedwali"
+    },
+    "studio": {
+      "undo": "Tendua",
+      "color": "Rangi",
+      "none": "Hakuna",
+      "light": "Mwanga",
+      "blockLabels": {
+        "table": "Jedwali"
+      },
+      "fields": {
+        "quotation_currency": "Sarafu",
+        "quotation_subtotal": "Jumla ndogo",
+        "quotation_tax": "Kodi",
+        "quotation_total": "Jumla"
+      },
+      "all": "Zote"
+    },
+    "templatePicker": {
+      "retry": "Jaribu tena",
+      "kind": {
+        "list": "Orodha",
+        "table": "Jedwali",
+        "code": "Msimbo"
+      }
+    }
+  },
+  "subscriptions": {
+    "subscriptions": {
+      "title": "Usajili",
+      "columns": {
+        "name": "Kumbukumbu",
+        "code": "Msimbo",
+        "description": "Maelezo",
+        "partnerId": "Mteja",
+        "productId": "Mpango",
+        "state": "Hali",
+        "dateStart": "Tarehe ya kuanza",
+        "dateEnd": "Tarehe ya mwisho"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "draft": "Rasimu",
+            "active": "Inatumika",
+            "closed": "Imefungwa",
+            "Draft": "Rasimu",
+            "Open": "Inatumika",
+            "Pending": "Inasubiri",
+            "Close": "Imefungwa",
+            "Cancelled": "Imeghairiwa"
+          }
+        }
+      },
+      "states": {
+        "draft": "Rasimu",
+        "active": "Inatumika",
+        "closed": "Imefungwa",
+        "Draft": "Rasimu",
+        "Open": "Inatumika",
+        "Pending": "Inasubiri",
+        "Close": "Imefungwa",
+        "Cancelled": "Imeghairiwa"
+      }
+    },
+    "plans": {
+      "title": "Mipango ya usajili",
+      "columns": {
+        "code": "Msimbo",
+        "productId": "Bidhaa",
+        "active": "Inatumika"
+      },
+      "actions": {
+        "failed": "{{action}} imeshindwa"
+      },
+      "bundle": {
+        "plan": "Mpango"
+      },
+      "edit": {
+        "description": "Maelezo",
+        "paymentMode": "Njia ya malipo",
+        "unchanged": "Hakuna cha kubadilisha."
+      }
+    },
+    "deferredSchedules": {
+      "title": "Ratiba za mapato yaliyoahirishwa",
+      "searchPlaceholder": "Tafuta ratiba…",
+      "columns": {
+        "id": "ID",
+        "description": "Maelezo",
+        "state": "Hali",
+        "totalAmount": "Jumla",
+        "startDate": "Mwanzo",
+        "endDate": "Mwisho"
+      }
+    },
+    "deferredLines": {
+      "title": "Safu za mapato yaliyoahirishwa",
+      "searchPlaceholder": "Tafuta safu…",
+      "columns": {
+        "id": "ID",
+        "scheduleId": "Ratiba",
+        "sequence": "Mfuatano",
+        "amount": "Kiasi cha fedha",
+        "recognized": "Imepostiwa"
+      }
+    },
+    "recognitionRules": {
+      "title": "Kanuni za utambuzi wa mapato",
+      "columns": {
+        "id": "ID",
+        "description": "Maelezo",
+        "priority": "Kipaumbele",
+        "isActive": "Inatumika",
+        "recognitionMethod": "Njia",
+        "recognitionPeriod": "Kipindi"
+      }
+    },
+    "actions": {
+      "generateInvoice": "Tengeneza ankara",
+      "cancel": "Ghairi usajili",
+      "payInvoice": "Rekodi malipo"
+    },
+    "forms": {
+      "newSubscription": {
+        "fields": {
+          "state": "Hali",
+          "saleOrderId": "Oda ya mauzo",
+          "partnerId": "Mteja",
+          "productId": "Mpango",
+          "productPlaceholder": "ID ya bidhaa",
+          "code": "Kumbukumbu",
+          "description": "Maelezo",
+          "dateStart": "Tarehe ya kuanza",
+          "options": {
+            "recurring": {
+              "monthly": "Kila mwezi",
+              "yearly": "Kila mwaka"
+            },
+            "state": {
+              "draft": "Rasimu",
+              "open": "Wazi",
+              "pending": "Inasubiri"
+            }
+          }
+        },
+        "startingValues": {
+          "draft": "Rasimu"
+        }
+      },
+      "newPlan": {
+        "fields": {
+          "pricelistId": "Orodha ya bei na sarafu",
+          "description": "Maelezo",
+          "productId": "Bidhaa",
+          "productPlaceholder": "ID ya bidhaa",
+          "options": {
+            "month": "Mwezi",
+            "monthly": "Kila mwezi",
+            "yearly": "Kila mwaka"
+          }
+        }
+      },
+      "deferredSchedule": {
+        "sections": {
+          "main": "Ratiba"
+        },
+        "fields": {
+          "description": "Maelezo",
+          "journalId": "Jarida",
+          "currencyId": "ID ya sarafu",
+          "startDate": "Tarehe ya kuanza",
+          "endDate": "Tarehe ya mwisho",
+          "state": "Hali",
+          "notes": "Maelezo"
+        },
+        "options": {
+          "monthly": "Kila mwezi",
+          "stateDraft": "Rasimu",
+          "stateRunning": "Inaendelea"
+        }
+      },
+      "recognitionRule": {
+        "sections": {
+          "main": "Kanuni"
+        },
+        "fields": {
+          "description": "Maelezo",
+          "idListPlaceholder": "Ongeza…",
+          "recognitionMethod": "Njia",
+          "recognitionPeriod": "Kipindi",
+          "isActive": "Inatumika",
+          "notes": "Maelezo"
+        }
+      },
+      "closeSubscription": {
+        "sections": {
+          "main": "Maelezo ya kina"
+        },
+        "fields": {
+          "notes": "Maelezo"
+        }
+      },
+      "generateInvoice": {
+        "title": "Tengeneza ankara",
+        "sections": {
+          "main": "Ankara"
+        },
+        "fields": {
+          "incomeAccountId": "Akaunti ya mapato",
+          "journalId": "Jarida",
+          "receivableAccountId": "Akaunti ya madeni ya wateja"
+        }
+      },
+      "recognizeLine": {
+        "sections": {
+          "main": "Ingizo la uhasibu"
+        }
+      },
+      "importPlanCsv": {
+        "sections": {
+          "main": "Data ya CSV"
+        }
+      },
+      "importSubscriptionCsv": {
+        "sections": {
+          "main": "Data ya CSV"
+        }
+      },
+      "amend": {
+        "fields": {
+          "amendmentType": "Aina",
+          "incomeAccountId": "Akaunti ya mapato",
+          "journalId": "Jarida",
+          "lineId": "Safu",
+          "notes": "Maelezo",
+          "receivableAccountId": "Akaunti ya madeni ya wateja"
+        }
+      },
+      "cancel": {
+        "fields": {
+          "notes": "Maelezo"
+        },
+        "sections": {
+          "main": "Ghairi"
+        },
+        "title": "Ghairi usajili"
+      },
+      "commitment": {
+        "fields": {
+          "active": "Inatumika"
+        }
+      },
+      "ingestUsage": {
+        "fields": {
+          "quantity": "Kiasi"
+        }
+      },
+      "payInvoice": {
+        "fields": {
+          "invoiceMoveId": "Ankara",
+          "receivableAccountId": "Akaunti ya madeni ya wateja"
+        },
+        "sections": {
+          "main": "Malipo"
+        },
+        "title": "Rekodi malipo"
+      },
+      "priceTier": {
+        "fields": {
+          "planId": "Mpango",
+          "sequence": "Mfuatano",
+          "unitPrice": "Bei kwa kipimo"
+        }
+      },
+      "renew": {
+        "fields": {
+          "notes": "Maelezo"
+        },
+        "sections": {
+          "main": "Kuhuisha"
+        }
+      }
+    },
+    "amendments": {
+      "columns": {
+        "amendmentType": "Aina",
+        "creditNoteMoveId": "Hati ya mkopo",
+        "notes": "Maelezo",
+        "subscriptionId": "Usajili"
+      },
+      "tabLabel": "Marekebisho",
+      "title": "Marekebisho"
+    },
+    "dueToBill": {
+      "tabLabel": "Zinazohitaji ankara",
+      "title": "Zinazohitaji ankara"
+    },
+    "entitlements": {
+      "tabLabel": "Haki za matumizi",
+      "title": "Haki za matumizi"
+    },
+    "lines": {
+      "columns": {
+        "name": "Maelezo",
+        "priceSubtotal": "Jumla ndogo",
+        "priceUnit": "Bei kwa kipimo",
+        "qty": "Kiasi",
+        "subscriptionId": "Usajili"
+      },
+      "searchPlaceholder": "Tafuta safu…",
+      "tabLabel": "Safu",
+      "title": "Safu za usajili"
+    },
+    "pastDue": {
+      "tabLabel": "Imechelewa",
+      "title": "Imechelewa"
+    },
+    "paymentIntents": {
+      "tabLabel": "Nia za malipo",
+      "title": "Nia za malipo"
+    },
+    "priceTiers": {
+      "tabLabel": "Viwango vya bei",
+      "title": "Viwango vya bei"
+    },
+    "ratingBacklog": {
+      "tabLabel": "Matukio yanayosubiri kukadiriwa",
+      "title": "Matukio yanayosubiri kukadiriwa"
+    },
+    "usageCharges": {
+      "tabLabel": "Gharama za matumizi",
+      "title": "Gharama za matumizi"
+    },
+    "usageEvents": {
+      "tabLabel": "Matukio ya matumizi",
+      "title": "Matukio ya matumizi"
+    },
+    "page": {
+      "attachments": "Viambatisho",
+      "discussion": "Majadiliano",
+      "moreActions": "Zaidi"
+    },
+    "paymentIntent": {
+      "amount": "Kiasi cha fedha",
+      "currency": "Sarafu",
+      "intentType": "Aina ya nia ya malipo"
+    },
+    "bundles": {
+      "columns": {
+        "active": "Inatumika",
+        "code": "Msimbo",
+        "name": "Jina",
+        "plan": "Mpango"
+      },
+      "tabLabel": "Vifurushi",
+      "title": "Vifurushi"
+    },
+    "workflow": {
+      "overview": "Muhtasari",
+      "needsAttention": "Vinavyohitaji kuangaliwa",
+      "queues": {
+        "drafts": {
+          "title": "Rasimu za kuanzisha"
+        },
+        "due": {
+          "title": "Zinazohitaji kutolewa ankara"
+        },
+        "overdue": {
+          "title": "Malipo yaliyochelewa"
+        },
+        "paused": {
+          "title": "Utoaji wa ankara uliositishwa"
+        }
+      },
+      "steps": {
+        "order": "Oda ya mauzo",
+        "plan": "Mpango"
+      },
+      "back": "Rudi",
+      "starts": "Tarehe ya kuanza",
+      "contract": "Usajili",
+      "invoice": "Ankara",
+      "credit": "Hati ya mkopo",
+      "pastDueDays": "Siku za kuchelewa",
+      "labels": {
+        "generate-invoice": "Tengeneza ankara",
+        "pay-invoice": "Rekodi malipo",
+        "cancel": "Ghairi usajili"
+      }
+    }
+  },
+  "expenses": {
+    "dashboard": {
+      "approved": "Imeidhinishwa",
+      "totalAmount": "Jumla ya fedha"
+    },
+    "expenses": {
+      "title": "Matumizi",
+      "columns": {
+        "name": "Maelezo",
+        "employeeId": "Mfanyakazi",
+        "date": "Tarehe",
+        "totalAmount": "Kiasi cha fedha",
+        "quantity": "Kiasi",
+        "state": "Hali",
+        "sheetId": "Ripoti"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "Draft": "Rasimu",
+            "Submitted": "Imewasilishwa",
+            "Approved": "Imeidhinishwa",
+            "Posted": "Imepostiwa",
+            "Done": "Imekamilika",
+            "Refused": "Imekataliwa"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "Submitted": "Imewasilishwa",
+        "Approved": "Imeidhinishwa",
+        "Posted": "Imepostiwa",
+        "Done": "Imekamilika",
+        "Refused": "Imekataliwa"
+      }
+    },
+    "expenseReports": {
+      "title": "Ripoti za matumizi",
+      "columns": {
+        "name": "Jina la ripoti",
+        "employeeId": "Mfanyakazi",
+        "state": "Hali",
+        "createDate": "Imewasilishwa",
+        "totalAmount": "Jumla ya fedha",
+        "createdAt": "Imeundwa"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "Draft": "Rasimu",
+            "Submitted": "Imewasilishwa",
+            "Approved": "Imeidhinishwa",
+            "Posted": "Imepostiwa",
+            "Done": "Imekamilika",
+            "Refused": "Imekataliwa"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Rasimu",
+        "Submitted": "Imewasilishwa",
+        "Approved": "Imeidhinishwa",
+        "Posted": "Imepostiwa",
+        "Done": "Imekamilika",
+        "Refused": "Imekataliwa"
+      }
+    },
+    "workflow": {
+      "expenseTitle": "Gharama",
+      "actionsTitle": "Vitendo",
+      "approveReport": "Idhinisha",
+      "timelineState": "Hali"
+    },
+    "capture": {
+      "title": "Ukamataji wa risiti",
+      "retry": "Jaribu tena",
+      "discard": "Acha mabadiliko"
+    },
+    "tabs": {
+      "inbox": "Kikasha"
+    },
+    "inbox": {
+      "title": "Kikasha cha hali maalumu",
+      "toApprove": "Inasubiri kuidhinishwa"
+    },
+    "ops": {
+      "title": "Shughuli za matumizi (kadi na kikasha)",
+      "amount": "Kiasi cha fedha",
+      "currencyId": "ID ya sarafu"
+    },
+    "admin": {
+      "title": "Malipo ya awali, hali maalumu na udanganyifu",
+      "amount": "Kiasi cha fedha",
+      "currencyId": "ID ya sarafu",
+      "journalId": "ID ya jarida",
+      "residual": "Salio linalodaiwa",
+      "approve": "Idhinisha",
+      "reject": "Kataa"
+    },
+    "forms": {
+      "newExpense": {
+        "fields": {
+          "pricelistId": "Orodha ya bei na sarafu",
+          "pricelistPlaceholder": "Chagua orodha ya bei",
+          "name": "Maelezo",
+          "description": "Maelezo ya kina",
+          "date": "Tarehe",
+          "totalAmount": "Kiasi kwa kipimo",
+          "quantity": "Kiasi",
+          "employeeId": "Mfanyakazi",
+          "employeePlaceholder": "Chagua mfanyakazi",
+          "productId": "Kategoria",
+          "productPlaceholder": "ID ya bidhaa",
+          "paymentMode": "Njia ya malipo",
+          "lineKindStandard": "Ununuzi"
+        }
+      },
+      "newExpenseSheet": {
+        "sections": {
+          "sheetDetails": "Maelezo ya ripoti"
+        },
+        "fields": {
+          "pricelistId": "Orodha ya bei",
+          "pricelistPlaceholder": "Chagua orodha ya bei",
+          "name": "Jina la ripoti",
+          "employeeId": "Mfanyakazi",
+          "employeePlaceholder": "Chagua mfanyakazi"
+        }
+      },
+      "newExpenseReport": {
+        "sections": {
+          "reportDetails": "Maelezo ya ripoti"
+        },
+        "fields": {
+          "pricelistId": "Orodha ya bei na sarafu",
+          "pricelistPlaceholder": "Chagua orodha ya bei",
+          "name": "Jina la ripoti",
+          "employeeId": "Mfanyakazi",
+          "employeePlaceholder": "Chagua mfanyakazi",
+          "notes": "Maelezo"
+        }
+      },
+      "editExpense": {
+        "sections": {
+          "details": "Maelezo ya kina"
+        },
+        "fields": {
+          "name": "Maelezo",
+          "unitAmount": "Kiasi kwa kipimo",
+          "quantity": "Kiasi",
+          "productId": "Kategoria",
+          "paymentMode": "Njia ya malipo",
+          "description": "Maelezo"
+        }
+      },
+      "addToReport": {
+        "sections": {
+          "sheet": "Ripoti"
+        }
+      },
+      "postReport": {
+        "sections": {
+          "accounts": "Uhasibu"
+        },
+        "fields": {
+          "journalId": "Jarida",
+          "defaultExpenseAccountId": "Akaunti ya gharama"
+        }
+      },
+      "reimburseReport": {
+        "sections": {
+          "accounts": "Malipo"
+        },
+        "fields": {
+          "journalId": "Jarida"
+        }
+      },
+      "upsertMileageRate": {
+        "fields": {
+          "name": "Jina",
+          "currencyId": "ID ya sarafu",
+          "active": "Inatumika"
+        }
+      },
+      "upsertPerDiemRate": {
+        "fields": {
+          "name": "Jina",
+          "currencyId": "ID ya sarafu",
+          "active": "Inatumika"
+        }
+      },
+      "projectRebill": {
+        "fields": {
+          "journalId": "Jarida",
+          "receivableAccountId": "Akaunti ya madeni ya wateja",
+          "incomeAccountId": "Akaunti ya mapato"
+        }
+      },
+      "capture": {
+        "project": "Mradi",
+        "taxes": "Kodi",
+        "unitAmount": "Kiasi kwa kipimo"
+      }
+    },
+    "operationsTab": "Shughuli",
+    "page": {
+      "discussion": "Majadiliano"
+    }
+  },
+  "messages": {
+    "dashboard": {
+      "notifications": "Arifa"
+    },
+    "messages": {
+      "title": "Ujumbe",
+      "filters": {
+        "messageType": {
+          "label": "Aina",
+          "options": {
+            "email": "Barua pepe"
+          }
+        }
+      },
+      "columns": {
+        "body": "Ujumbe",
+        "model": "Modeli",
+        "messageType": "Aina",
+        "date": "Tarehe"
+      },
+      "states": {
+        "email": "Barua pepe"
+      }
+    },
+    "followers": {
+      "title": "Wafuatiliaji",
+      "columns": {
+        "resModel": "Modeli",
+        "partnerId": "Mshirika"
+      }
+    },
+    "forms": {
+      "newMessage": {
+        "sections": {
+          "message": "Ujumbe"
+        },
+        "fields": {
+          "options": {
+            "email": "Barua pepe"
+          }
+        }
+      },
+      "messageTemplate": {
+        "name": "Jina la kiolezo"
+      },
+      "invoiceReminder": {
+        "invoices": "Ankara"
+      },
+      "recordChoice": {
+        "invoice": "Ankara",
+        "bill": "Ankara ya msambazaji",
+        "creditNote": "Hati ya mkopo",
+        "journalEntry": "Ingizo la uhasibu"
+      }
+    },
+    "notifications": {
+      "tabLabel": "Arifa zangu",
+      "title": "Arifa zangu"
+    },
+    "page": {
+      "openReply": "Wazi"
+    }
+  },
+  "tasks": {
+    "page": {
+      "title": "Kazi"
+    },
+    "board": {
+      "stats": {
+        "total": "Jumla",
+        "inProgress": "Inaendelea",
+        "done": "Imekamilika",
+        "overdue": "Vimechelewa"
+      },
+      "columns": {
+        "InProgress": "Inaendelea",
+        "Approved": "Imeidhinishwa",
+        "Done": "Imekamilika",
+        "Cancelled": "Imeghairiwa"
+      },
+      "tableView": "Jedwali"
+    },
+    "create": {
+      "title": "Unda kazi mpya"
+    },
+    "detail": {
+      "notSet": "Haijawekwa"
+    },
+    "fields": {
+      "description": "Maelezo",
+      "dueDate": "Tarehe ya mwisho",
+      "priority": "Kipaumbele",
+      "status": "Hali",
+      "title": "Kichwa",
+      "type": "Aina"
+    },
+    "priorities": {
+      "high": "Juu",
+      "low": "Chini",
+      "medium": "Wastani"
+    },
+    "sprint": {
+      "statuses": {
+        "active": "Inatumika",
+        "completed": "Imekamilika"
+      }
+    },
+    "stats": {
+      "completed": "Imekamilika"
+    },
+    "statuses": {
+      "done": "Imekamilika",
+      "in-progress": "Inaendelea"
+    },
+    "types": {
+      "task": "Kazi"
+    }
+  },
+  "overview": {
+    "page": {
+      "title": "Muhtasari",
+      "description": "Biashara yako kwa ufupi"
+    },
+    "dashboard": {
+      "keyMetrics": "Vipimo muhimu",
+      "sections": {
+        "attention": "Vinavyohitaji kuangaliwa",
+        "pipeline": "Fursa zinazoendelea",
+        "trends": "Mienendo"
+      },
+      "stats": {
+        "openSalesOrders": "Oda za mauzo zinazoendelea",
+        "openPurchaseOrders": "Oda za ununuzi zinazoendelea",
+        "accountsReceivable": "Madeni ya wateja",
+        "accountsPayable": "Madeni kwa wasambazaji",
+        "lowStockAlerts": "Tahadhari za bidhaa chache",
+        "openTasks": "Kazi za mradi zinazoendelea",
+        "activeProjects": "Miradi inayoendelea",
+        "pendingAiDrafts": "Rasimu za AI zinazosubiri"
+      },
+      "actions": {
+        "sales": "Mauzo",
+        "accounting": "Uhasibu",
+        "crm": "CRM",
+        "inventory": "Hesabu ya bidhaa",
+        "aiDrafts": "Uidhinishaji wa AI",
+        "projects": "Miradi"
+      },
+      "widgets": {
+        "upcomingTasks": "Makataa ya kazi yanayokaribia",
+        "lowStock": "Bidhaa chache au zimeisha",
+        "openPurchaseOrders": "Oda za ununuzi zinazoendelea",
+        "salesTrend": "Mauzo yaliyothibitishwa (miezi 6)",
+        "pipelineMix": "Fursa zinazoendelea"
+      },
+      "overdue": "Vimechelewa",
+      "tables": {
+        "task": "Kazi",
+        "project": "Mradi",
+        "due": "Tarehe ya mwisho",
+        "status": "Hali",
+        "sku": "SKU",
+        "product": "Bidhaa",
+        "qty": "Kiasi",
+        "reference": "Kumbukumbu",
+        "vendor": "Msambazaji",
+        "amount": "Kiasi cha fedha"
+      }
+    }
+  },
+  "settings": {
+    "page": {
+      "title": "Mipangilio",
+      "description": "Dhibiti akaunti yako na mipangilio ya mfumo"
+    },
+    "import": {
+      "file": "Faili ya CSV au Excel",
+      "analyzing": "Inachanganua…",
+      "preview": "Hakiki uingizaji",
+      "previewErrors": "Hitilafu",
+      "run": "Ingiza",
+      "row": "Safu",
+      "saveTemplate": "Hifadhi kiolezo",
+      "templateName": "Jina la kiolezo",
+      "deleteTemplate": "Futa kiolezo",
+      "status": "Hali",
+      "importedRows": "Imeingizwa",
+      "errorRows": "Hitilafu"
+    },
+    "backToSettings": "Rudi kwenye mipangilio",
+    "adminAccess": "Ruhusa ya msimamizi",
+    "configure": "Sanidi",
+    "restricted": "Baadhi ya mipangilio imezuiliwa. Wasiliana na msimamizi kupata ruhusa.",
+    "formConfig": {
+      "title": "Usanidi wa fomu",
+      "reset": "Weka upya",
+      "saveChanges": "Hifadhi mabadiliko",
+      "preview": {
+        "submitHidden": "Hakiki"
+      },
+      "refresh": "Onyesha upya",
+      "fieldDialog": {
+        "label": "Lebo",
+        "type": "Aina",
+        "enabled": "Imewezeshwa",
+        "fieldTypes": {
+          "Date": "Tarehe"
+        }
+      },
+      "fieldCard": {
+        "system": "Mfumo",
+        "edit": "Hariri",
+        "delete": "Futa"
+      }
+    },
+    "ai": {
+      "title": "AI",
+      "description": "Maelezo",
+      "active": "Inatumika",
+      "inactive": "Haitumiki",
+      "edit": "Hariri",
+      "insightTitleField": "Kichwa",
+      "insightDescriptionField": "Maelezo",
+      "name": "Jina",
+      "provider": "Mtoa huduma",
+      "model": "Modeli",
+      "optional": "Si lazima",
+      "create": "Unda",
+      "allowlistEnabled": "Imewezeshwa"
+    },
+    "auditLog": {
+      "filter": "Chuja",
+      "exportCsv": "Hamisha CSV"
+    },
+    "users": {
+      "fullName": "Jina kamili",
+      "email": "Barua pepe",
+      "department": "Idara",
+      "status": "Hali",
+      "statuses": {
+        "active": "Inatumika",
+        "inactive": "Haitumiki",
+        "pending": "Inasubiri"
+      },
+      "saveChanges": "Hifadhi mabadiliko"
+    },
+    "roles": {
+      "system": "Mfumo",
+      "edit": "Hariri",
+      "color": "Rangi",
+      "roleDescription": "Maelezo",
+      "saveChanges": "Hifadhi mabadiliko",
+      "sod": {
+        "description": "Maelezo",
+        "inactive": "Haitumiki"
+      }
+    },
+    "adminOps": {
+      "reference": {
+        "countryName": "Jina",
+        "currencyName": "Jina"
+      }
+    },
+    "profile": {
+      "personalInfo": "Taarifa binafsi",
+      "personalInfoDesc": "Sasisha taarifa zako binafsi",
+      "changeAvatar": "Badilisha picha ya wasifu",
+      "avatarHint": "JPG, PNG au GIF. Isizidi MB 2.",
+      "fullName": "Jina kamili",
+      "email": "Barua pepe",
+      "department": "Idara",
+      "timezone": "Ukanda wa saa",
+      "timezones": {
+        "pacific": "Saa za Pasifiki (UTC-8)",
+        "eastern": "Saa za Mashariki (UTC-5)",
+        "utc": "UTC",
+        "centralEuropean": "Saa za Ulaya ya Kati (UTC+1)"
+      },
+      "saveChanges": "Hifadhi mabadiliko",
+      "saveSuccess": "Wasifu umesasishwa",
+      "saveError": "Imeshindwa kusasisha wasifu",
+      "managedByProvider": "Mtoa huduma wa kuingia anadhibiti picha na nenosiri lako.",
+      "notificationsUnavailable": "Mapendeleo ya arifa bado hayapatikani.",
+      "security": "Usalama",
+      "securityDesc": "Dhibiti nenosiri na mipangilio ya usalama",
+      "currentPassword": "Nenosiri la sasa",
+      "newPassword": "Nenosiri jipya",
+      "confirmPassword": "Thibitisha nenosiri",
+      "updatePassword": "Badilisha nenosiri",
+      "emailNotifications": "Arifa za barua pepe",
+      "emailNotificationsDesc": "Chagua taarifa unazopokea kwa barua pepe",
+      "emailItems": {
+        "orders": {
+          "label": "Oda mpya",
+          "description": "Pata arifa oda mpya zinapowekwa"
+        },
+        "inventory": {
+          "label": "Tahadhari za bidhaa chache",
+          "description": "Pata tahadhari bidhaa zinapopungua"
+        },
+        "reports": {
+          "label": "Ripoti za kila wiki",
+          "description": "Pokea muhtasari wa utendaji kila wiki"
+        },
+        "security": {
+          "label": "Tahadhari za usalama",
+          "description": "Arifa muhimu za usalama"
+        }
+      },
+      "inAppNotifications": "Arifa ndani ya programu",
+      "inAppNotificationsDesc": "Sanidi arifa za dashibodi",
+      "inAppItems": {
+        "push": {
+          "label": "Arifa za push",
+          "description": "Arifa za push za kivinjari"
+        },
+        "sound": {
+          "label": "Sauti",
+          "description": "Cheza sauti kwa arifa mpya"
+        },
+        "badge": {
+          "label": "Idadi ya arifa",
+          "description": "Onyesha idadi isiyosomwa kwenye ikoni"
+        }
+      },
+      "theme": "Mandhari",
+      "themeDesc": "Chagua mandhari ya rangi unayopenda",
+      "themes": {
+        "light": "Mwanga",
+        "dark": "Giza",
+        "system": "Mfumo"
+      },
+      "palette": "Rangi",
+      "paletteDesc": "Rangi za msisitizo na chati. Mistral hutumia beige, nyekundu na machungwa.",
+      "palettes": {
+        "default": "Mistral",
+        "ocean": "Bahari"
+      },
+      "shell": "Mandharinyuma ya mpangilio",
+      "shellDesc": "Mwonekano wa mandharinyuma ya programu",
+      "shells": {
+        "default": "Kawaida",
+        "cssArt": "Sanaa ya mandharinyuma"
+      },
+      "dashboardLayout": "Mpangilio wa dashibodi",
+      "dashboardLayoutDesc": "Rekebisha dashibodi yako",
+      "layout": {
+        "compactMode": {
+          "label": "Hali ya kubana",
+          "description": "Punguza nafasi kati ya vipengele"
+        },
+        "sidebarCollapsed": {
+          "label": "Upau wa pembeni uliobanwa",
+          "description": "Anza na upau wa pembeni uliobanwa"
+        },
+        "showQuickActions": {
+          "label": "Onyesha vitendo vya haraka",
+          "description": "Onyesha vitufe vya vitendo vya haraka kwenye dashibodi"
+        }
+      },
+      "accessibility": "Ufikivu",
+      "accessibilityDesc": "Rekebisha chaguo za ufikivu",
+      "a11y": {
+        "reduceMotion": {
+          "label": "Punguza miondoko",
+          "description": "Punguza uhuishaji"
+        },
+        "highContrast": {
+          "label": "Utofauti mkubwa wa rangi",
+          "description": "Ongeza utofauti wa rangi"
+        }
+      },
+      "language": "Lugha ya kuonyesha",
+      "languageHint": "Lugha itatumika baada ya kuhifadhi wasifu na itafuata akaunti yako kwenye vifaa vingine.",
+      "loanwords": "Maneno ya mkopo ya Kinyarwanda",
+      "loanwordsHint": "Chagua Kifaransa au Kiingereza kwa maneno ya kiufundi ya mkopo na maandishi ambayo bado hayajatafsiriwa.",
+      "swahiliLoanwordsHint": "Kiswahili hutumia Kiingereza kwa maneno ya kiufundi ya mkopo na maandishi ambayo bado hayajatafsiriwa.",
+      "loading": "Inapakia wasifu wako…",
+      "firstName": "Jina la kwanza",
+      "lastName": "Jina la ukoo",
+      "emailVerificationHint": "Kubadilisha barua pepe kunahitaji uthibitishaji wa mtoa huduma wa utambulisho na idhini ya msimamizi.",
+      "loadError": "Imeshindwa kupakia wasifu wako. Pakia ukurasa upya ili kujaribu tena.",
+      "securityProviderHint": "Mtoa huduma wako wa utambulisho anadhibiti nenosiri na usalama wa kuingia.",
+      "manageSecurity": "Dhibiti usalama wa kuingia"
+    },
+    "customFields": {
+      "title": "Sehemu zangu maalumu",
+      "saveChanges": "Hifadhi mabadiliko"
+    },
+    "formConfigSettings": {
+      "title": "Usanidi wa fomu",
+      "saveChanges": "Hifadhi mabadiliko",
+      "system": "Mfumo",
+      "edit": "Hariri",
+      "delete": "Futa",
+      "dialog": {
+        "label": "Lebo",
+        "type": "Aina",
+        "fieldDescription": "Maelezo",
+        "options": "Chaguo"
+      }
+    },
+    "organization": {
+      "title": "Shirika",
+      "description": "Maelezo",
+      "address": "Anwani",
+      "city": "Jiji",
+      "country": "Nchi",
+      "email": "Barua pepe",
+      "phone": "Simu",
+      "website": "Tovuti",
+      "company": {
+        "selectLabel": "Kampuni"
+      },
+      "countryPacks": {
+        "enabled": "Imewezeshwa",
+        "disabled": "Imezimwa"
+      },
+      "privacy": {
+        "classificationName": "Jina",
+        "delegatedAdminCompany": "Kampuni"
+      }
+    },
+    "groups": {
+      "account": "Akaunti",
+      "organization": "Shirika",
+      "data": "Data na miunganisho",
+      "platform": "Jukwaa"
+    },
+    "sections": {
+      "profile": {
+        "title": "Wasifu",
+        "description": "Dhibiti taarifa na mapendeleo yako binafsi"
+      },
+      "notifications": {
+        "title": "Arifa",
+        "description": "Sanidi jinsi na wakati wa kupokea arifa"
+      },
+      "appearance": {
+        "title": "Mwonekano",
+        "description": "Rekebisha mwonekano wa dashibodi yako"
+      },
+      "custom-fields": {
+        "title": "Sehemu zangu maalumu",
+        "description": "Ongeza sehemu za ufuatiliaji binafsi kwenye jarida lako"
+      },
+      "users": {
+        "title": "Usimamizi wa watumiaji",
+        "description": "Ongeza, hariri na dhibiti akaunti za watumiaji"
+      },
+      "roles": {
+        "title": "Majukumu na ruhusa",
+        "description": "Sanidi majukumu na sera za ufikiaji"
+      },
+      "sso": {
+        "title": "SSO",
+        "description": "Hali ya kuingia mara moja na kuunganisha akaunti ya WorkOS"
+      },
+      "form-config": {
+        "title": "Usanidi wa fomu",
+        "description": "Sanidi sehemu za jarida na ripoti ya uchunguzi"
+      },
+      "audit": {
+        "title": "Kumbukumbu za ukaguzi",
+        "description": "Angalia shughuli za mfumo na matukio ya usalama"
+      },
+      "organization": {
+        "title": "Shirika",
+        "description": "Dhibiti mipangilio ya shirika"
+      },
+      "ai": {
+        "title": "AI",
+        "description": "Wakala, wasifu wa timu, uchanganuzi na gharama za matumizi"
+      },
+      "my-profile": {
+        "title": "Wasifu wangu",
+        "description": "Jina lako, lugha na ukanda wa saa."
+      }
+    }
+  },
+  "reports": {
+    "moduleTitle": "Ripoti",
+    "states": {
+      "draft": "Rasimu",
+      "generated": "Imetengenezwa",
+      "exported": "Imehamishwa",
+      "archived": "Imehifadhiwa kwenye kumbukumbu"
+    },
+    "dashboard": {
+      "kpiTitle": "Vipimo muhimu",
+      "quickActions": {
+        "generate": "Tengeneza ripoti",
+        "scheduleReport": "Panga ripoti",
+        "newMetric": "Kipimo kipya",
+        "newWidget": "Wijeti mpya"
+      },
+      "kpis": {
+        "generated": "Imetengenezwa",
+        "exported": "Imehamishwa",
+        "scheduled": "Imepangwa",
+        "metrics": "Vipimo"
+      }
+    },
+    "tabs": {
+      "dashboard": "Dashibodi",
+      "financialReports": "Ripoti za fedha",
+      "trialBalance": "Mizania ya majaribio",
+      "reportTemplates": "Violezo vya ripoti",
+      "scheduledReports": "Imepangwa",
+      "analyticsMetrics": "Vipimo",
+      "dashboards": "Dashibodi",
+      "dashboardWidgets": "Wijeti",
+      "pivotExplorer": "Kichanganuzi cha pivot",
+      "vatReport": "Ripoti ya VAT",
+      "queryBuilder": "Kijenzi cha query",
+      "ownerReports": "Ripoti za mmiliki",
+      "statements": "Taarifa za fedha"
+    },
+    "queryBuilder": {
+      "title": "Kijenzi cha query cha kujihudumia",
+      "widgetTypes": {
+        "chart": "Chati",
+        "table": "Jedwali"
+      },
+      "aggregation": "Ujumlishaji",
+      "groupBy": "Panga kwa",
+      "filters": "Vichujio",
+      "sortNone": "Hakuna"
+    },
+    "ownerReports": {
+      "title": "Ripoti za mmiliki",
+      "companyLabel": "Kampuni",
+      "dateLabel": "Tarehe",
+      "timezoneLabel": "Ukanda wa saa",
+      "previewButton": "Hakiki",
+      "availability": {
+        "preview": "Hakiki",
+        "planned": "Imepangwa"
+      },
+      "scope": {
+        "company": "Kampuni",
+        "timezone": "Ukanda wa saa"
+      },
+      "totals": {
+        "receipts": "Risiti"
+      },
+      "sections": {
+        "sales": "Mauzo",
+        "receipts": "Risiti"
+      },
+      "columns": {
+        "tax": "Kodi",
+        "total": "Jumla"
+      },
+      "stockAlerts": {
+        "productId": "Bidhaa {{id}}"
+      }
+    },
+    "createButton": {
+      "generateReport": "Tengeneza ripoti",
+      "scheduleReport": "Panga ripoti",
+      "newMetric": "Kipimo kipya"
+    },
+    "financialReports": {
+      "title": "Ripoti za fedha",
+      "columns": {
+        "name": "Jina",
+        "state": "Hali",
+        "generatedAt": "Imetengenezwa"
+      },
+      "filters": {
+        "state": {
+          "label": "Hali",
+          "options": {
+            "draft": "Rasimu",
+            "generated": "Imetengenezwa",
+            "exported": "Imehamishwa",
+            "archived": "Imehifadhiwa kwenye kumbukumbu"
+          }
+        }
+      },
+      "states": {
+        "draft": "Rasimu",
+        "generated": "Imetengenezwa",
+        "exported": "Imehamishwa",
+        "archived": "Imehifadhiwa kwenye kumbukumbu"
+      }
+    },
+    "trialBalance": {
+      "title": "Mizania ya majaribio",
+      "searchPlaceholder": "Tafuta akaunti…",
+      "columns": {
+        "accountCode": "Msimbo",
+        "accountName": "Akaunti"
+      }
+    },
+    "reportTemplates": {
+      "title": "Violezo vya ripoti",
+      "columns": {
+        "name": "Jina",
+        "model": "Modeli",
+        "isActive": "Inatumika"
+      }
+    },
+    "scheduledReports": {
+      "title": "Ripoti zilizopangwa",
+      "searchPlaceholder": "Tafuta ratiba…",
+      "columns": {
+        "name": "Jina",
+        "isActive": "Inatumika"
+      }
+    },
+    "analyticsMetrics": {
+      "title": "Vipimo vya uchanganuzi",
+      "columns": {
+        "name": "Jina",
+        "category": "Kategoria",
+        "metricType": "Aina",
+        "model": "Modeli",
+        "aggregation": "Ujumlishaji",
+        "isActive": "Inatumika"
+      }
+    },
+    "dashboards": {
+      "title": "Dashibodi",
+      "columns": {
+        "name": "Jina",
+        "description": "Maelezo",
+        "createDate": "Imeundwa"
+      }
+    },
+    "dashboardWidgets": {
+      "title": "Wijeti za dashibodi",
+      "columns": {
+        "name": "Jina",
+        "model": "Modeli",
+        "width": "Upana",
+        "isActive": "Inatumika"
+      }
+    },
+    "actions": {
+      "exportCsv": "Hamisha CSV",
+      "delete": "Futa",
+      "newWidget": "Wijeti mpya"
+    },
+    "forms": {
+      "generateReport": {
+        "title": "Tengeneza ripoti",
+        "sections": {
+          "comparison": "Ulinganisho"
+        },
+        "fields": {
+          "name": "Jina la ripoti",
+          "reportTypes": {
+            "trialBalance": "Mizania ya majaribio"
+          },
+          "comparisonMode": "Ulinganisho",
+          "comparisonOptions": {
+            "none": "Hakuna",
+            "previousPeriod": "Kipindi kilichopita"
+          },
+          "currencyId": "ID ya sarafu"
+        },
+        "submit": "Tengeneza ripoti"
+      },
+      "reportTemplate": {
+        "fields": {
+          "name": "Jina",
+          "model": "Modeli",
+          "isActive": "Inatumika"
+        }
+      },
+      "scheduledReport": {
+        "title": "Panga ripoti",
+        "sections": {
+          "timing": "Ratiba"
+        },
+        "fields": {
+          "model": "Modeli",
+          "isActive": "Inatumika"
+        },
+        "frequencies": {
+          "monthly": "Kila mwezi"
+        }
+      },
+      "analyticsMetric": {
+        "title": "Kipimo kipya",
+        "fields": {
+          "name": "Jina",
+          "category": "Kategoria",
+          "model": "Modeli",
+          "field": "Sehemu",
+          "aggregation": "Ujumlishaji",
+          "isActive": "Inatumika"
+        }
+      },
+      "trialBalanceEntry": {
+        "fields": {
+          "accountCode": "Msimbo wa akaunti",
+          "currencyId": "ID ya sarafu",
+          "level": "Kiwango"
+        }
+      },
+      "dashboard": {
+        "fields": {
+          "description": "Maelezo"
+        }
+      },
+      "dashboardWidget": {
+        "fields": {
+          "types": {
+            "chart": "Chati"
+          }
+        },
+        "types": {
+          "chart": "Chati"
+        }
+      },
+      "addWidgetToDashboard": {
+        "fields": {
+          "width": "Upana"
+        }
+      },
+      "updateWidgetLayout": {
+        "fields": {
+          "width": "Upana"
+        }
+      },
+      "updateFinancialReport": {
+        "sections": {
+          "update": "Maelezo ya ripoti"
+        },
+        "fields": {
+          "name": "Jina la ripoti"
+        }
+      },
+      "reportSource": {
+        "company": "Kampuni (si lazima)"
+      }
+    },
+    "pivot": {
+      "title": "Kichanganuzi cha pivot",
+      "none": "Hakuna"
+    },
+    "vat": {
+      "title": "Rejesho la VAT la Umoja wa Ulaya",
+      "name": "Jina la ripoti",
+      "columns": {
+        "name": "Jina",
+        "state": "Hali",
+        "actions": "Vitendo"
+      }
+    },
+    "statements": {
+      "columns": {
+        "amount": "Kiasi cha fedha",
+        "comparison": "Ulinganisho",
+        "line": "Safu",
+        "variancePercent": "Tofauti %"
+      },
+      "exportCsv": "Hamisha CSV",
+      "report": "Ripoti"
+    },
+    "periodContext": {
+      "title": "Ukaguzi wa ripoti za kufunga kipindi"
+    },
+    "authoring": {
+      "account": "Akaunti",
+      "balance": "Salio",
+      "credit": "Krediti",
+      "currency": "Sarafu",
+      "debit": "Debiti",
+      "delivery": "Uwasilishaji",
+      "equity": "Mtaji",
+      "expenses": "Matumizi",
+      "income": "Mapato",
+      "metric": {
+        "company": "Kampuni",
+        "sum": "Jumla"
+      },
+      "payments": "Malipo",
+      "preview": "Hakiki",
+      "status": "Hali"
+    }
+  },
+  "auth": {
+    "appName": "Lumiere ERP",
+    "forms": {
+      "newRole": {
+        "fields": {
+          "description": "Maelezo"
+        }
+      },
+      "updateRole": {
+        "fields": {
+          "isActive": "Inatumika"
+        }
+      },
+      "newAuditRule": {
+        "fields": {
+          "isActive": "Inatumika"
+        },
+        "resourceTypes": {
+          "invoice": "Ankara",
+          "product": "Bidhaa"
+        },
+        "actionTypes": {
+          "create": "Unda",
+          "delete": "Futa",
+          "export": "Hamisha"
+        },
+        "severities": {
+          "warning": "Onyo",
+          "error": "Hitilafu"
+        }
+      },
+      "updateUserPassword": {
+        "title": "Badilisha nenosiri",
+        "fields": {
+          "newPassword": "Nenosiri jipya"
+        }
+      }
+    },
+    "fields": {
+      "email": "Barua pepe",
+      "newPassword": "Nenosiri jipya",
+      "confirmPassword": "Thibitisha nenosiri"
+    },
+    "errors": {
+      "generic": "Hitilafu imetokea. Jaribu tena."
+    },
+    "onboarding": {
+      "timezone": "Ukanda wa saa",
+      "currency": "Sarafu"
+    }
+  },
+  "modules": {
+    "workspaces": {
+      "overview": "Muhtasari",
+      "fulfillment": "Utekelezaji",
+      "contacts": "Wawasiliani",
+      "activities": "Shughuli",
+      "financial": "Ripoti za fedha",
+      "analytics": "Uchanganuzi",
+      "schedules": "Ratiba",
+      "expenses": "Matumizi",
+      "expenseReports": "Ripoti za matumizi",
+      "operations": "Shughuli"
+    },
+    "tabGroups": {
+      "close": "Funga",
+      "fulfillment": "Utekelezaji",
+      "people": "Watu",
+      "revenue": "Mapato",
+      "subscriptions": "Usajili",
+      "warehouse": "Ghala"
+    }
+  },
+  "notifications": {
+    "bell": {
+      "label": "Arifa"
+    }
+  },
+  "recordHeader": {
+    "note": "Dokezo",
+    "name": "Jina"
+  },
+  "ui": {
+    "journal": {
+      "filter": "Chuja",
+      "other": "Nyingine",
+      "priorities": {
+        "high": "Juu",
+        "low": "Chini"
+      },
+      "status": "Hali",
+      "statuses": {
+        "active": "Inatumika",
+        "archived": "Imehifadhiwa kwenye kumbukumbu"
+      },
+      "type": "Aina"
+    },
+    "notebook": {
+      "title": "Daftari"
+    }
+  },
+  "workspace": {
+    "myWork": "Kazi yangu",
+    "widgets": {
+      "calendar": "Kalenda"
+    }
+  },
+  "financeReview": {
+    "currency": "Sarafu",
+    "receipt": "Risiti",
+    "employee": "Mfanyakazi",
+    "comfortable": "Nafasi kubwa",
+    "compact": "Imebanwa",
+    "sourceTitle": "Hati chanzo"
+  },
+  "workBoard": {
+    "title": "Kazi yangu",
+    "tab": "Kazi",
+    "finance": "Fedha",
+    "mine": "Nimepewa",
+    "board": "Ubao",
+    "list": "Orodha",
+    "team": "Timu",
+    "refresh": "Onyesha upya",
+    "statusLabel": "Hali",
+    "mineBadge": "Nimepewa",
+    "loadMore": "Pakia zaidi",
+    "saving": "Inahifadhi…",
+    "module": {
+      "purchasing": "Ununuzi",
+      "sales": "Mauzo",
+      "accounting": "Uhasibu",
+      "expenses": "Matumizi"
+    },
+    "status": {
+      "Open": "Wazi",
+      "Claimed": "Imechukuliwa",
+      "Approved": "Imeidhinishwa",
+      "Completed": "Imekamilika",
+      "Rejected": "Imekataliwa",
+      "Invalidated": "Imebatilishwa",
+      "Cancelled": "Imeghairiwa"
+    },
+    "action": {
+      "claim": "Chukua kazi",
+      "approve": "Idhinisha",
+      "reject": "Kataa",
+      "complete": "Kamilisha"
+    }
+  }
+}

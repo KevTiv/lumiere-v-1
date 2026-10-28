@@ -8,7 +8,8 @@ rough sizing (S/M/L), not commitments.
 
 **Plan revision:** 2026-09-21. AIH-13–19 add evidence and intellectual
 provenance requirements; AIH-20–24 add interactive execution/recovery to base
-gates; AIH-25/26 are later specialist/extension admission.
+gates; AIH-25/26 are later specialist/extension admission; AIH-27/28 come from
+the T3 Orchestrator V2 adoption review (2026-10-27).
 
 For post-H5 work, this issue list is interpreted through
 `governed-intelligence-program-architecture.md`,
@@ -931,6 +932,41 @@ remain default-deny until the existing audited grant reducer explicitly provisio
 them. Still open: timeout policy, fine-grained dependency scheduling (a required
 question currently blocks the run), and live authenticated restart/reconnect E2E.
 
+**Addition (2026-10-27, T3 V2 adoption §7.1):** add a server-side follow-up
+queue beside steering. Enqueue/edit/reorder/withdraw are idempotent reducers;
+promotion happens only at a fully settled boundary, starts a new checked
+continuation, and re-authorizes the author's current grants. Acceptance: queued
+items survive restart, promote exactly once, never interrupt a running turn, and
+never inherit a previous turn's approval.
+
+**Follow-up queue status (2026-10-27) — source slice implemented; not released,
+not E2E-verified.** The module now has a private durable `ai_run_queued_input`
+record and the reducers `enqueue_ai_run_follow_up`, `edit_ai_run_follow_up`,
+`reorder_ai_run_follow_up`, `withdraw_ai_run_follow_up` and
+`promote_ai_run_follow_up` (`spacetimedb/src/ai/run_followup_queue.rs`). The
+author is `ctx.sender()`; idempotency is payload- and author-bound through the
+lifecycle event table; edit/reorder/withdraw are author-only with revision
+checks. Queue maintenance never writes the run row or the lifecycle state, so a
+queued item cannot interrupt a turn. Promotion is allowed only for the queue head
+of a run whose status is `completed` (not `agent_settled`) with no open required
+question and no unreconciled effect, and only while the author's current
+`ai.run.lifecycle` grant is still present (resolved in the module from the
+author's effective roles, mirroring the api-server). It creates a child
+continuation in the existing `fork_pending_authority` state, so scope, budget and
+approval are reacquired and nothing is inherited. No run status or lifecycle
+state was added. The gateway lifecycle route gained five intents (issued with the
+acting user's own token) and a redacted `queuedInputs` projection that never
+selects the payload or author. Verified by unit tests only (pure decision logic
+plus a structural no-write guard); the full `spacetimedb` crate could not be
+compiled in the build sandbox (out of memory), so the module was type-checked
+and tested in an isolated crate containing the real files. Still open: the
+contracts release containing the new table/reducers, the pin bump and
+regeneration (reducer contract, reducer names, storage policy, reconstruction
+apply, PostgreSQL ledger, operation ids/history), switching the gateway calls
+from `ReducerCall::from_name` to `reducer_call!`, the executor consuming the
+promoted payload when the child run starts, the BFF/UI surface, the `superseded`
+status (defined, not yet produced), and live restart/E2E for fixtures 10 and 11.
+
 ---
 
 ### AIH-21 — Structured diagnostics and bounded repair
@@ -1073,6 +1109,36 @@ materialization (compare currently certifies the two continuations only), and
 public grant provisioning. The lifecycle reducers are published and pinned in
 the immutable `lumiere-contracts` v0.3.51 release.
 
+**Addition (2026-10-27, T3 V2 adoption §7.2):** spend-admission denial parks
+the run as `budget_parked` with its reason and expected reset time instead of
+ending it. A scheduled reducer records a resume intent at reset; the gateway
+re-runs full admission before continuing. Acceptance: parking only at a step
+boundary with no dispatched or uncertain effect; resume happens once; provider
+rate limits use the same state with a maximum park duration; parked runs are
+shown separately from failed runs.
+
+**Status of the §7.2 addition — persisted foundation; parking disabled.**
+The integration includes private budget-park/scheduled-intent tables and typed,
+compile-time checked reducer calls, with denied browser exposure and a separate
+default-deny `ai.run.budget.resolve` grant. Parking refuses dispatched/uncertain
+effects and held reservations. Scheduled firing only records an intent.
+
+`ParkPolicy::from_env()` keeps `resume_dispatch_available` false in this build:
+budget exhaustion and provider 429 errors follow the existing terminal failure
+path without writing a park. Environment variables cannot enable parking. The
+reactor is not spawned and there is no production `ContinuationDispatcher`.
+Admission requires a wired consumer, a reviewed background credential policy,
+current authority/spend checks and native restart/resume acceptance. Pure
+state-machine tests exercise an explicitly enabled test policy; a regression
+asserts the production policy never reaches a park write.
+
+The combined release baseline is Finance's v0.3.153: its published migration 27
+is preserved verbatim. The harness tables are added as migration 28; the normal
+contracts workflow owns the fresh combined release and pin. The v0.3.152 archive
+is unchanged in publication history and is not an upgrade baseline for this
+lineage. A database that applied its conflicting migration 27 fails the existing
+checksum check; no automatic checksum substitution or ledger rewriting is added.
+
 ---
 
 ### AIH-25 — Bounded specialist delegation
@@ -1089,6 +1155,14 @@ widen permissions. Cancellation prevents new descendant work and reconciles
 in-flight outcomes. Child findings preserve sources; model review cannot approve
 its own work as a human reviewer. Capability stays disabled until M8 passes.
 
+**Addition (2026-10-27, T3 V2 adoption §7.4):** acceptance also covers
+(1) overrides can only narrow a child's ceiling; (2) no run can steer, message
+or promote queued input into a run with broader capabilities, scope or budget;
+(3) no run in a lineage can satisfy an approval request raised within that
+lineage; (4) a child may use a different authorized provider instance only
+within the same organization, region and budget; (5) child output integrates as
+a typed, evidence-bearing result through the durable event boundary.
+
 ---
 
 ### AIH-26 — Typed lifecycle extension admission
@@ -1104,6 +1178,47 @@ revalidate transformed calls and preserve effective configuration in run history
 fixtures produce deterministic recorded outcomes. Optional failures degrade
 visibly; required checks fail closed. Trusted context and permissions cannot be
 overridden. Extension execution stays disabled until M9 passes.
+
+---
+
+### AIH-27 — Scheduled and event-triggered governed runs
+
+**Plan ref:** `ai-harness-t3-control-plane-adoption.md` §7.3. **Depends on:**
+H5c, H6 pilot admission, AIH-20. **Size:** M
+
+Add an `AiRunSchedule` record and trigger events so programs such as
+`daily_briefing`, `low_stock`, `insights_scan` and finance review start through
+the normal governed run pipeline. A scheduled reducer (SpacetimeDB scheduled
+table, `ScheduleAt::Time`, re-armed after each run) records only a run-start
+intent; provider/tool I/O happens in the gateway reactor after commit. Runs act
+as a dedicated service binding with an Investigate/Design/Draft ceiling and a
+per-run and per-period budget envelope. Event triggers record their source
+watermark; inbound webhooks authenticate at the API layer and carry no
+authority into the run.
+
+**Acceptance:** a schedule with a revoked service binding or exhausted period
+budget starts no run and records the denial. Overlap follows the declared
+skip/queue/coalesce policy. Scheduled runs can create answers, reports and
+action drafts but no approved consequential effect. Disabling a schedule stops
+new runs without disturbing in-flight settlement.
+
+---
+
+### AIH-28 — Outside-agent MCP surface (deferred until after P1)
+
+**Plan ref:** `ai-harness-t3-control-plane-adoption.md` §7.6. **Depends on:**
+P1 admission, AIH-2, H5d. **Size:** L
+
+Expose governed ERP read tools and action-draft creation to external agents
+over MCP. Every tool maps 1:1 to a generated capability and passes the same
+policy engine, data-scope resolver, privacy guard and spend admission as an
+internal run. Sessions are short-lived, revocable and bound to a human
+principal; each call is recorded as a run naming the external client.
+
+**Acceptance:** an MCP client cannot reach a capability its principal lacks,
+cannot approve a draft, and loses access immediately on revocation. Calls are
+indistinguishable from internal runs in audit, spend and evidence records apart
+from the client identity. Stays disabled until separately admitted.
 
 ---
 
@@ -1129,3 +1244,4 @@ overridden. Extension execution stays disabled until M9 passes.
 9. AIH-19 on one flagged pilot → AIH-6 bounded wider migration
 10. AIH-10 → AIH-11 → optional AIH-12
 11. AIH-25 and AIH-26 as separately admitted later capabilities after full M6
+12. AIH-27 after the H6 pilot is admitted; AIH-28 only after P1

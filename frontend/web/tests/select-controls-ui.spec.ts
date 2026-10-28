@@ -1,8 +1,32 @@
 import { expect, test } from "@playwright/test"
+import { chooseSelectOptionByValue, chooseSelectOptionByLabel } from "./e2e/helpers-legacy"
 
 for (const width of [320, 1440]) {
   test.describe(`${width}px shared select controls`, () => {
     test.use({ viewport: { width, height: 900 }, hasTouch: width < 768 })
+    test("account options receive pointer clicks above a scrolling posting form", async ({ page }) => {
+      await page.goto("/select-controls")
+      await page.getByRole("button", { name: "Open posting form" }).click()
+      await chooseSelectOptionByLabel(page, "journalId", "Account 01")
+      await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", "Account 13")
+      await chooseSelectOptionByLabel(page, "payableAccountId", "Account 02")
+      await expect(page.getByTestId("form-field-journalId")).toContainText("Account 01")
+      await expect(page.getByTestId("form-field-defaultExpenseAccountId")).toContainText("Account 13")
+      await expect(page.getByTestId("form-field-payableAccountId")).toContainText("Account 02")
+      await expect(page.getByTestId("form-modal-post-expense-report")).toBeVisible()
+    })
+    test("record selection preserves exact ids and settles before the next picker opens", async ({ page }) => {
+      await page.setViewportSize({ width, height: 600 })
+      await page.goto("/select-controls")
+      await page.getByRole("button", { name: "Open select dialog" }).click()
+      await chooseSelectOptionByValue(page, "record", "90071992547409932")
+      await expect(page.getByTestId("record-value")).toHaveText("90071992547409932")
+      await chooseSelectOptionByLabel(page, "record", "Record 40")
+      await expect(page.getByTestId("record-value")).toHaveText("40")
+      await chooseSelectOptionByValue(page, "record", "90071992547409931")
+      await expect(page.getByTestId("record-value")).toHaveText("90071992547409931")
+      await expect(page.getByRole("dialog", { name: "Account selectors" })).toBeVisible()
+    })
     test("search starts at 15, retains selection and supports keyboard input inside a dialog", async ({
       page,
     }, testInfo) => {

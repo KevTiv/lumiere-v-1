@@ -33,7 +33,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
         {
           id: "emailFrom",
           name: "emailFrom",
-          type: "text",
+          type: "email",
           label: t("crm.forms.newLead.fields.emailFrom"),
           placeholder: t("crm.forms.newLead.fields.emailFromPlaceholder"),
           // width: "1/2",
@@ -50,6 +50,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
     },
     {
       id: "lead-details",
+      collapsible: true,
       title: t("crm.forms.newLead.sections.details", { defaultValue: "Qualification and value" }),
       description: t("crm.forms.newLead.qualificationHint", { defaultValue: "Use the current qualification state and your estimate of the potential sale." }),
       fields: [
@@ -58,11 +59,10 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
           name: "state",
           type: "select",
           label: t("crm.forms.newLead.fields.state"),
-          defaultValue: "qualified",
+          defaultValue: "new",
           options: [
             { value: "new", label: t("crm.leads.states.New") },
             { value: "qualified", label: t("crm.leads.states.Qualified") },
-            { value: "won", label: t("crm.leads.states.Won") },
             { value: "lost", label: t("crm.leads.states.Lost") },
           ],
           width: "full",
@@ -87,6 +87,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
     },
     {
       id: "lead-notes",
+      collapsible: true,
       title: t("crm.forms.newLead.sections.notes", { defaultValue: "Notes" }),
       fields: [
         {
@@ -154,6 +155,7 @@ export const newOpportunityForm = (
     },
     {
       id: "opp-value",
+      collapsible: true,
       title: t("crm.forms.newOpportunity.sections.value", { defaultValue: "Value and expected close" }),
       fields: [
         {
@@ -183,6 +185,7 @@ export const newOpportunityForm = (
     },
     {
       id: "opp-follow-up",
+      collapsible: true,
       title: t("crm.forms.newOpportunity.sections.followUp", { defaultValue: "Follow-up and notes" }),
       fields: [
         {
@@ -399,6 +402,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
     },
     {
       id: "contact-address",
+      collapsible: true,
       title: t("crm.forms.newContact.sections.address", { defaultValue: "Address" }),
       fields: [
         {
@@ -419,6 +423,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
     },
     {
       id: "contact-notes",
+      collapsible: true,
       title: t("crm.forms.newContact.sections.notes", { defaultValue: "Notes and appearance" }),
       fields: [
         {
@@ -452,6 +457,8 @@ export const convertLeadForm = (
     stageOptions.length > 0
       ? {
           id: "opportunityStageId",
+          visibleWhen: { field: "createOpportunity", equals: "true" },
+          required: true,
           name: "opportunityStageId",
           type: "select",
           label: t("crm.forms.convertLead.fields.opportunityStage"),
@@ -460,6 +467,8 @@ export const convertLeadForm = (
         }
       : {
           id: "opportunityStageId",
+          visibleWhen: { field: "createOpportunity", equals: "true" },
+          required: true,
           name: "opportunityStageId",
           type: "select",
           label: t("crm.forms.convertLead.fields.opportunityStage"),
@@ -483,6 +492,7 @@ export const convertLeadForm = (
             name: "createContact",
             type: "checkbox",
             label: t("crm.forms.convertLead.fields.createContact"),
+            defaultValue: true,
             width: "full",
           },
           {
@@ -490,6 +500,7 @@ export const convertLeadForm = (
             name: "createOpportunity",
             type: "checkbox",
             label: t("crm.forms.convertLead.fields.createOpportunity"),
+            defaultValue: true,
             width: "full",
           },
           stageField,
@@ -579,7 +590,7 @@ export const addContactToSegmentForm = (t: TFunction): FormConfig => ({
   ],
 })
 
-export const newActivityForm = (t: TFunction): FormConfig => ({
+export const newActivityForm = (t: TFunction, activityTypes?: OpportunityStageOption[]): FormConfig => ({
   id: "new-activity",
   title: t("crm.forms.newActivity.title"),
   description: t("crm.forms.newActivity.description"),
@@ -599,19 +610,19 @@ export const newActivityForm = (t: TFunction): FormConfig => ({
           width: "full",
         },
         {
-          id: "activityType",
-          name: "activityType",
+          id: activityTypes === undefined ? "activityType" : "activityTypeId",
+          name: activityTypes === undefined ? "activityType" : "activityTypeId",
           type: "select",
           label: t("crm.forms.newActivity.fields.activityType"),
           required: true,
-          defaultValue: "todo",
+          defaultValue: activityTypes?.[0]?.value ?? (activityTypes === undefined ? "todo" : undefined),
           width: "1/2",
-          options: [
+          options: activityTypes === undefined ? [
             { value: "call", label: t("crm.chatter.activityTypes.call") },
             { value: "email", label: t("crm.chatter.activityTypes.email") },
             { value: "meeting", label: t("crm.chatter.activityTypes.meeting") },
             { value: "todo", label: t("crm.chatter.activityTypes.todo") },
-          ],
+          ] : activityTypes.length ? activityTypes : [{ value: "", label: t("crm.workflow.reasons.activityTypeRequired"), disabled: true }],
         },
         {
           id: "dateDeadline",

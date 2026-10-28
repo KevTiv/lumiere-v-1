@@ -2346,6 +2346,10 @@
       "name": "done_stock_package",
       "shape_fingerprint": "sha256:14c476d5624be09774f4d6e764811082aa1f9108b722b54ad5d3d8e7f0b4b6bc"
     },
+    "erp.edit_ai_run_follow_up": {
+      "name": "edit_ai_run_follow_up",
+      "shape_fingerprint": "sha256:64eb14124505dc48c3e1c31775ee649134326cda04a8238d94e8e6155280f363"
+    },
     "erp.end_contact_relationship": {
       "name": "end_contact_relationship",
       "shape_fingerprint": "sha256:4a66ee08ce016f3323c715c112f94d4e4f34918d9f3d4f10b618124f64020940"
@@ -2357,6 +2361,10 @@
     "erp.end_user_session": {
       "name": "end_user_session",
       "shape_fingerprint": "sha256:afa0fb15e35e9943b9960f45608ef0a9077c744a7f4004aa27c4ffbe5f6c5d8c"
+    },
+    "erp.enqueue_ai_run_follow_up": {
+      "name": "enqueue_ai_run_follow_up",
+      "shape_fingerprint": "sha256:d553c040e3ea3f07b464fe07c3307a1669845bd0f40225f0a2a037ec2e42b561"
     },
     "erp.enqueue_job": {
       "name": "enqueue_job",
@@ -2477,6 +2485,10 @@
     "erp.finish_workorder": {
       "name": "finish_workorder",
       "shape_fingerprint": "sha256:18f7642243d30cdffbefdd49a4cd8d0a942003c320c20eb53c6a5941e8853005"
+    },
+    "erp.fire_ai_run_budget_resume": {
+      "name": "fire_ai_run_budget_resume",
+      "shape_fingerprint": "sha256:b454456b2228605fe8ebff11aa6cd595112f3c4faef3261a7a1310ba0d4fc2e2"
     },
     "erp.fire_workflow_timer": {
       "name": "fire_workflow_timer",
@@ -2978,6 +2990,10 @@
       "name": "pack_stock_picking",
       "shape_fingerprint": "sha256:6e36a229cdc5f8ccbb24f639f85c683a789d6e3c61079d5950caa1ae04306e58"
     },
+    "erp.park_ai_run_for_budget": {
+      "name": "park_ai_run_for_budget",
+      "shape_fingerprint": "sha256:7bf9d68eeba8965c73d2f26453165ce9b9cd1f8f549ac38d320494063d6e7421"
+    },
     "erp.pass_quality_check": {
       "name": "pass_quality_check",
       "shape_fingerprint": "sha256:4752d0fe4807c845f4a4ec23ad19becf110b3f565f61699aea942accdcd9c5c3"
@@ -3069,6 +3085,10 @@
     "erp.promote_ai_decision_pattern": {
       "name": "promote_ai_decision_pattern",
       "shape_fingerprint": "sha256:bc64da8a8a6cd23414674bdf47b1fc64e2cea6ede4d0febc2793d419763adca2"
+    },
+    "erp.promote_ai_run_follow_up": {
+      "name": "promote_ai_run_follow_up",
+      "shape_fingerprint": "sha256:b95c3ac15fda0b1354e9ed087367c2d4cfabac74066cfb5d8ec8ff1b2196c58d"
     },
     "erp.promote_ai_skill_version": {
       "name": "promote_ai_skill_version",
@@ -3538,6 +3558,10 @@
       "name": "reopen_timesheets",
       "shape_fingerprint": "sha256:6022fba6368213a7266c4450bea6ea37bc6f2bc8715f8f399d42451624daa8f7"
     },
+    "erp.reorder_ai_run_follow_up": {
+      "name": "reorder_ai_run_follow_up",
+      "shape_fingerprint": "sha256:0e0c922768fa943f833ab3e556e66a428801c7e9becc4bd478a39097b2602031"
+    },
     "erp.reorder_proposal_line_items": {
       "name": "reorder_proposal_line_items",
       "shape_fingerprint": "sha256:d91065a5c7ddc9380cef987450925cb17f4d3b2173205393b3559176f824fbaf"
@@ -3593,6 +3617,10 @@
     "erp.resolve_ai_evidence_dependency": {
       "name": "resolve_ai_evidence_dependency",
       "shape_fingerprint": "sha256:4ebbec7da0acd9856f646fb0865d4cfe40f7fcd16e966834fa3027606c0b5e7b"
+    },
+    "erp.resolve_ai_run_budget_park": {
+      "name": "resolve_ai_run_budget_park",
+      "shape_fingerprint": "sha256:f3b4021e4b0b729f309f0857cf71e0df1c298236e8c4cf9b6ac2d910729aafb9"
     },
     "erp.resolve_inventory_audit_violation": {
       "name": "resolve_inventory_audit_violation",
@@ -5906,6 +5934,10 @@
       "name": "waive_tax_deadline",
       "shape_fingerprint": "sha256:afcf1f854de5d53f61d7eca90987530732ccdd3cb8a8c23e1e4b69838ee43479"
     },
+    "erp.withdraw_ai_run_follow_up": {
+      "name": "withdraw_ai_run_follow_up",
+      "shape_fingerprint": "sha256:4cf1bc1450a22faa8da20a6f465c1c6f96b93bb515924e8948e7749ba199cb8b"
+    },
     "erp.worker_heartbeat": {
       "name": "worker_heartbeat",
       "shape_fingerprint": "sha256:b192a5557467ea6de4ffd2ec0059353d4f7747eb94d58665d87f37816a31d2a0"
@@ -6200,6 +6232,14 @@
       "current_operations_fingerprint": "sha256:ade4f01bbf43ed4ee316a6e036771c6c446797a4e7ca43e3f26ed3d8c622d653",
       "operation_count": 1476,
       "reason": "release on top of v0.3.148: add ai_artifact_component_read, ai_capability_execution_read, ai_evidence_claim_read, ai_evidence_contribution_read, ai_evidence_decision_read, ai_evidence_dependency_read, ai_evidence_passage_read, ai_evidence_source_change_read, ai_evidence_source_read, ai_evidence_source_version_read, ai_knowledge_entry_read, ai_knowledge_entry_version_read, ai_knowledge_review_read; change the shape of ai_provider_attempt_read, ai_spend_budget_read, ai_spend_price_snapshot_read, ai_spend_reservation_read, helpdesk_related_record_read"
+    },
+    {
+      "previous_release": "v0.3.153",
+      "previous_ir_sha256": "sha256:67952055f3769039412fc817c3e7ee4a155909dbda1554d6c6d6071c0b6a2ef2",
+      "previous_operations_fingerprint": "sha256:ade4f01bbf43ed4ee316a6e036771c6c446797a4e7ca43e3f26ed3d8c622d653",
+      "current_operations_fingerprint": "sha256:eebf34b06e570a36bbb01d8c5036eea9a9561e4cf6d726afbe28badeaad143c8",
+      "operation_count": 1484,
+      "reason": "release on top of v0.3.153: add edit_ai_run_follow_up, enqueue_ai_run_follow_up, fire_ai_run_budget_resume, park_ai_run_for_budget, promote_ai_run_follow_up, reorder_ai_run_follow_up, resolve_ai_run_budget_park, withdraw_ai_run_follow_up; change the shape of none"
     }
   ]
 }

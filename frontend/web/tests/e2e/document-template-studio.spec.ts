@@ -8,6 +8,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
+  revealFormSection,
   reloadSettled,
   scalarQueryId,
   selectEntityRowById,
@@ -155,6 +156,7 @@ async function reloadContactDescription(page: Page, contact: ContactRow): Promis
 }
 
 async function openTemplatePicker(page: Page, modal: Locator, search: string) {
+  await revealFormSection(modal.getByTestId("form-field-description"))
   await modal.getByRole("button", { name: "Insert text template", exact: true }).click()
   await page.getByRole("searchbox", { name: "Search text templates", exact: true }).fill(search)
 }

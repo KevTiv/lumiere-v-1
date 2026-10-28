@@ -467,6 +467,7 @@ pub(crate) fn crm_resource(resource: &str) -> bool {
             | "contact-relationships"
             | "contact-duplicate-candidates"
             | "assignment-rules"
+            | "activity-types"
             | "activities"
             | "calendar-events"
             | "utm-campaigns"

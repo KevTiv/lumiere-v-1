@@ -21,6 +21,7 @@ pub mod auth;
 /// | messaging        | MailMessage · MailFollower                          |
 /// | utm              | UtmCampaign · UtmMedium · UtmSource                 |
 pub mod billing;
+pub mod business_changes;
 pub mod cold_tier;
 pub mod cold_tier_identity;
 mod country_catalog;

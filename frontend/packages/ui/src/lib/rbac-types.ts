@@ -41,6 +41,7 @@ export type KnownResource =
   | "admin:roles"
   | "admin:permissions"
   | "admin:audit-log"
+  | "business_history"
   | "admin:organization"
 
 /** Known resources plus arbitrary backend permission resource strings. */

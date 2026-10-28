@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { ModuleDataState } from '@lumiere/ui/lib/module-data-state'
 import { useErpSession } from '@lumiere/erp-session'
 import { useTranslation } from '@lumiere/i18n'
 import {
@@ -117,6 +118,7 @@ export function mergeCommissionRateIntoMetadata(
 }
 
 export interface SalesOpsPanelProps {
+  queueStates?: Partial<Record<SalesOpsQueueId, ModuleDataState>>
   activeQueue: SalesOpsQueueId
   onQueueChange: (queue: SalesOpsQueueId) => void
   orders: Record<string, unknown>[]
@@ -164,6 +166,7 @@ export interface SalesOpsPanelProps {
 }
 
 export function SalesOpsPanel({
+  queueStates,
   activeQueue,
   onQueueChange,
   orders,
@@ -439,14 +442,25 @@ export function SalesOpsPanel({
     })
 
   const { askForm, formDialog } = useFormDialog()
+  const queueState = queueStates?.[activeQueue]
+  const queueReady = queueState == null || queueState.status === 'ready'
+  useEffect(() => {
+    if (!queueReady) {
+      setSettleOpen(false)
+      setSelectedCommissionIds([])
+      setSelectedAccrueOrderIds([])
+    }
+  }, [queueReady, activeQueue])
 
   return (
     <div className="flex flex-col gap-4 p-4" data-testid="sales-ops-panel">
       {formDialog}
-      <div className="flex flex-wrap gap-2">
-        {QUEUE_IDS.map((id) => (
+      <div><h2 className="text-lg font-semibold">{t('sales.workspace.needsAttention', { defaultValue: 'Needs attention' })}</h2><p className="mt-1 text-sm text-muted-foreground">{t('sales.workspace.attentionHelp', { defaultValue: 'Choose a queue, select a record, then review the available actions.' })}</p></div>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('sales.workspace.attentionQueues', { defaultValue: 'Sales attention queues' })}>
+        {QUEUE_IDS.filter((id) => queueStates?.[id]?.status !== 'denied' || id === activeQueue).map((id) => (
           <Button
             key={id}
+            aria-pressed={activeQueue === id}
             size="sm"
             variant={activeQueue === id ? 'default' : 'outline'}
             onClick={() => {
@@ -462,148 +476,6 @@ export function SalesOpsPanel({
         ))}
       </div>
 
-      <div
-        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-        data-testid="sales-ops-promise-atp"
-      >
-        <div>
-          <h3 className="text-sm font-medium">Multi-WH promise ATP</h3>
-          <p className="text-xs text-muted-foreground">
-            Refresh commitment / line schedule from warehouse network + lead days.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!operatingCompanyId || refreshPromise.isPending}
-          data-testid="sales-ops-refresh-promise"
-          onClick={async () => {
-            const values = await askForm({
-              title: 'Refresh promise dates',
-              fields: [
-                {
-                  id: 'orderId',
-                  name: 'orderId',
-                  label: 'Sale order',
-                  type: 'select',
-                  required: true,
-                  searchable: true,
-                  options: recordOptions(orders, (order) =>
-                    String(order.reference ?? order.name ?? `#${rowId(order)}`),
-                    rowId,
-                  ),
-                },
-              ],
-            })
-            const orderId = formText(values?.orderId)
-            if (orderId == null) return
-            try {
-              setActionError(null)
-              await refreshPromise.mutateAsync(orderId)
-            } catch (e) {
-              setActionError(e instanceof Error ? e.message : String(e))
-            }
-          }}
-        >
-          {refreshPromise.isPending ? 'Refreshing…' : 'Refresh promise dates'}
-        </Button>
-      </div>
-
-      <div
-        className="space-y-2 rounded-md border p-3"
-        data-testid="sales-ops-advanced-oms"
-      >
-        <h3 className="text-sm font-medium">
-          {t('sales.ops.advancedTitle', {
-            defaultValue: 'Advanced OMS',
-          })}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {t('sales.ops.advancedHelp', {
-            defaultValue:
-              'Create commission plans, contracts, and fiscal/carrier intents (no list subscriptions yet).',
-          })}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onCreateCommissionPlan}
-            data-testid="sales-ops-create-commission-plan"
-            onClick={() => void runAdvanced(onCreateCommissionPlan)}
-          >
-            {t('sales.ops.createCommissionPlan', {
-              defaultValue: 'Create commission plan',
-            })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onCreateCommissionPlanSplit}
-            data-testid="sales-ops-create-commission-split"
-            onClick={() => void runAdvanced(onCreateCommissionPlanSplit)}
-          >
-            {t('sales.ops.createCommissionSplit', {
-              defaultValue: 'Add plan split',
-            })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onCreateSaleContract}
-            data-testid="sales-ops-create-contract"
-            onClick={() => void runAdvanced(onCreateSaleContract)}
-          >
-            {t('sales.ops.createContract', {
-              defaultValue: 'Create contract',
-            })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onCreateCpqConstraint}
-            data-testid="sales-ops-create-cpq-constraint"
-            onClick={() => void runAdvanced(onCreateCpqConstraint)}
-          >
-            {t('sales.ops.createCpqConstraint', {
-              defaultValue: 'Create CPQ constraint',
-            })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onCreateIntegrationIntent}
-            data-testid="sales-ops-create-integration-intent"
-            onClick={() => void runAdvanced(onCreateIntegrationIntent)}
-          >
-            {t('sales.ops.createIntegrationIntent', {
-              defaultValue: 'Create fiscal/carrier intent',
-            })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onRecordIntegrationResult}
-            data-testid="sales-ops-record-integration-result"
-            onClick={() => void runAdvanced(onRecordIntegrationResult)}
-          >
-            {t('sales.ops.recordIntegrationResult', {
-              defaultValue: 'Record integration result',
-            })}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={advancedPending || !onScheduleSlaEscalation}
-            data-testid="sales-ops-schedule-sla"
-            onClick={() => void runAdvanced(onScheduleSlaEscalation)}
-          >
-            {t('sales.ops.scheduleSla', {
-              defaultValue: 'Schedule SLA escalation',
-            })}
-          </Button>
-        </div>
-      </div>
 
       {actionError && (
         <p className="text-sm text-destructive" data-testid="sales-ops-action-error">
@@ -611,7 +483,13 @@ export function SalesOpsPanel({
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {!queueReady && <div role="status" className="space-y-3 rounded-lg border p-4 text-sm text-muted-foreground" data-testid="sales-ops-source-notice">
+        <p>{queueState?.status === 'denied'
+          ? t('sales.workspace.queueDenied', { defaultValue: 'Your role does not have access to this queue. Choose another queue.' })
+          : t('sales.workspace.queueUnavailable', { defaultValue: 'This queue is unavailable. Wait for loading to finish or try again.' })}</p>
+        {queueState && 'onRetry' in queueState && queueState.onRetry && <Button variant="outline" onClick={queueState.onRetry}>{t('common.retry')}</Button>}
+      </div>}
+      {queueReady && <div className="grid gap-4 lg:grid-cols-2">
         <div className="min-h-[240px] space-y-2">
           <h3 className="text-sm font-medium">
             {queueLabel(activeQueue)} ({queueRows.length})
@@ -1057,6 +935,153 @@ export function SalesOpsPanel({
           )}
         </div>
       </div>
+
+      }
+      <details className="rounded-lg border p-4" data-testid="sales-ops-tools"><summary className="cursor-pointer text-sm font-medium">{t('sales.workspace.specialistTools', { defaultValue: 'Specialist sales tools' })}</summary><div className="mt-4 space-y-4">
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+        data-testid="sales-ops-promise-atp"
+      >
+        <div>
+          <h3 className="text-sm font-medium">Delivery promise dates</h3>
+          <p className="text-xs text-muted-foreground">
+            Refresh promised dates using warehouse availability and lead times.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!operatingCompanyId || refreshPromise.isPending}
+          data-testid="sales-ops-refresh-promise"
+          onClick={async () => {
+            const values = await askForm({
+              title: 'Refresh promise dates',
+              fields: [
+                {
+                  id: 'orderId',
+                  name: 'orderId',
+                  label: 'Sale order',
+                  type: 'select',
+                  required: true,
+                  searchable: true,
+                  options: recordOptions(orders, (order) =>
+                    String(order.reference ?? order.name ?? `#${rowId(order)}`),
+                    rowId,
+                  ),
+                },
+              ],
+            })
+            const orderId = formText(values?.orderId)
+            if (orderId == null) return
+            try {
+              setActionError(null)
+              await refreshPromise.mutateAsync(orderId)
+            } catch (e) {
+              setActionError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        >
+          {refreshPromise.isPending ? 'Refreshing…' : 'Refresh promise dates'}
+        </Button>
+      </div>
+
+      <div
+        className="space-y-2 rounded-md border p-3"
+        data-testid="sales-ops-advanced-oms"
+      >
+        <h3 className="text-sm font-medium">
+          {t('sales.ops.advancedTitle', {
+            defaultValue: 'Advanced OMS',
+          })}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {t('sales.ops.advancedHelp', {
+            defaultValue:
+              'Create commission plans, contracts, and fiscal/carrier intents (no list subscriptions yet).',
+          })}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateCommissionPlan}
+            data-testid="sales-ops-create-commission-plan"
+            onClick={() => void runAdvanced(onCreateCommissionPlan)}
+          >
+            {t('sales.ops.createCommissionPlan', {
+              defaultValue: 'Create commission plan',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateCommissionPlanSplit}
+            data-testid="sales-ops-create-commission-split"
+            onClick={() => void runAdvanced(onCreateCommissionPlanSplit)}
+          >
+            {t('sales.ops.createCommissionSplit', {
+              defaultValue: 'Add plan split',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateSaleContract}
+            data-testid="sales-ops-create-contract"
+            onClick={() => void runAdvanced(onCreateSaleContract)}
+          >
+            {t('sales.ops.createContract', {
+              defaultValue: 'Create contract',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateCpqConstraint}
+            data-testid="sales-ops-create-cpq-constraint"
+            onClick={() => void runAdvanced(onCreateCpqConstraint)}
+          >
+            {t('sales.ops.createCpqConstraint', {
+              defaultValue: 'Create CPQ constraint',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onCreateIntegrationIntent}
+            data-testid="sales-ops-create-integration-intent"
+            onClick={() => void runAdvanced(onCreateIntegrationIntent)}
+          >
+            {t('sales.ops.createIntegrationIntent', {
+              defaultValue: 'Create fiscal/carrier intent',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onRecordIntegrationResult}
+            data-testid="sales-ops-record-integration-result"
+            onClick={() => void runAdvanced(onRecordIntegrationResult)}
+          >
+            {t('sales.ops.recordIntegrationResult', {
+              defaultValue: 'Record integration result',
+            })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={advancedPending || !onScheduleSlaEscalation}
+            data-testid="sales-ops-schedule-sla"
+            onClick={() => void runAdvanced(onScheduleSlaEscalation)}
+          >
+            {t('sales.ops.scheduleSla', {
+              defaultValue: 'Schedule SLA escalation',
+            })}
+          </Button>
+        </div>
+      </div>
+
+      </div></details>
 
       {settleOpen && (
         <FormModal

@@ -629,6 +629,13 @@
   "AiReducerAllowlist": {
     "metadata": "string"
   },
+  "AiRunBudgetPark": {
+    "schedule_id": "u64",
+    "resume_trigger": "string",
+    "resolution": "string",
+    "resume_requested_at": "timestamp",
+    "resolved_at": "timestamp"
+  },
   "AiRunEffect": {
     "provider_reference": "string",
     "detail": "string"
@@ -648,6 +655,9 @@
     "answer_json": "string",
     "answered_at_version": "u64",
     "answered_by": "identity"
+  },
+  "AiRunQueuedInput": {
+    "promoted_run_id": "u64"
   },
   "AiRunReview": {
     "rationale": "string"
@@ -6477,7 +6487,8 @@
     "expected_revenue": "f64",
     "probability": "f64",
     "stage_id": "option<u64>",
-    "team_id": "option<u64>"
+    "team_id": "option<u64>",
+    "state": "string"
   },
   "UpdateLeadSourceParams": {
     "name": "string",
