@@ -18,10 +18,11 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
   },
   crm: {
     workspaces: [
+      ["myWork", ["my-activities"]],
       ["overview", ["dashboard"]],
       ["pipeline", ["leads", "opportunities", "opportunity-lines"]],
       ["contacts", ["contacts", "contact-segments", "duplicates"]],
-      ["activities", ["my-activities", "activities"]],
+      ["activities", ["activities"]],
     ],
     overflow: [["configuration", ["contact-tags", "contact-categories", "attribution", "pipeline-admin"]]],
   },

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { describe, it } from "node:test"
 
 import {
   finalizeCreateLeadParams,
+  encodeUpdateLeadParams,
   finalizeCreateOpportunityParams,
   finalizeCreateContactParams,
   finalizeUpdateContactAddressParams,
@@ -171,6 +173,15 @@ describe("finalizeUpdateLeadRevenueParams", () => {
 })
 
 describe("finalizeUpdateLeadParams", () => {
+  it("matches the qualification payload decoded by the Rust reducer", () => {
+    const expected = JSON.parse(readFileSync(new URL("../../../../../spacetimedb/tests/fixtures/crm-lead-qualification-patch.json", import.meta.url), "utf8"))
+    assert.deepEqual(encodeUpdateLeadParams({ state: "qualified" }), expected)
+    const edit = encodeUpdateLeadParams({ city: "Lyon", street: null })
+    assert.deepEqual(edit.city, { some: { some: "Lyon" } })
+    assert.deepEqual(edit.street, { some: { none: [] } })
+    assert.deepEqual(edit.title, { none: [] })
+    assert.deepEqual(edit.state, { none: [] })
+  })
   it("omits untouched fields instead of nulling them (CRM-RI-003)", () => {
     // Regression test: editing only `title` must never clear sibling fields
     // like `website` — the bug this reducer/hook pair was built to fix.

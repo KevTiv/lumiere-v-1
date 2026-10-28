@@ -471,9 +471,17 @@ export async function openTabAndCancelCreate(
   await expectNoAppError(page)
 }
 
+/** Reveal optional form sections through their visible disclosure controls. */
+async function revealFormSection(field: Locator) {
+  for (const section of await field.locator("xpath=ancestor::details").all()) {
+    if (await section.getAttribute("open") === null) await section.locator(":scope > summary").click()
+  }
+}
+
 export async function fillField(scope: Page | Locator, name: string, value: string) {
   const field = scope.getByTestId(`form-field-${name}`)
   await expect(field, `Missing form field "${name}" in the active form`).toHaveCount(1, { timeout: 15_000 })
+  await revealFormSection(field)
   // Textarea retains its test id on the native form bridge. User input belongs
   // in the visible editor inside that same panel, including within a dialog.
   if (
@@ -495,6 +503,7 @@ export async function chooseFirstOption(page: Page, name: string) {
 
 /** Pick the first non-disabled select option (skips empty placeholders). */
 export async function chooseFirstEnabledOption(page: Page, name: string) {
+  await revealFormSection(page.getByTestId(`form-field-${name}`))
   await page.getByTestId(`form-field-${name}`).click()
   const listbox = page.locator('[role="listbox"]:visible')
   await expect
@@ -772,6 +781,7 @@ export async function chooseSelectOptionByValue(
 ) {
   const v = String(value)
   const field = page.getByTestId(`form-field-${name}`)
+  await revealFormSection(field)
   const nativeOptions = field.locator(
     'xpath=following-sibling::select[@aria-hidden="true"][1]/option',
   )
@@ -811,6 +821,7 @@ export async function chooseSelectOptionByLabel(
       ? new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
       : label
   const field = page.getByTestId(`form-field-${name}`)
+  await revealFormSection(field)
   const listbox = page.locator('[role="listbox"]:visible')
   const option = listbox.getByRole("option", { name: optionName }).first()
 

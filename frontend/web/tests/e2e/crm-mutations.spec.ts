@@ -14,9 +14,57 @@ import {
   submitForm,
   waitForEntityActionEnabled,
   acceptEntityActionConfirm,
+  chooseFirstEnabledOption,
+  gotoModule,
+  selectModuleTab,
 } from "./helpers"
 
 test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () => {
+  test("creates a new enquiry, qualifies it on the record, converts it, and schedules a follow-up", async ({ page }) => {
+    test.setTimeout(180_000)
+    const leadName = smokeName("guided-lead")
+    const followUp = `${leadName} follow-up`
+    await gotoModule(page, "/crm", "crm")
+    await expect(page.getByTestId("crm-my-work")).toBeVisible()
+    await page.getByTestId("crm-my-work").getByRole("button", { name: "New lead", exact: true }).click()
+    await fillField(page, "contactName", leadName)
+    await fillField(page, "emailFrom", `${leadName}@example.test`)
+    await submitForm(page, "new-lead")
+
+    await selectModuleTab(page, "crm", "leads")
+    await page.getByText(leadName, { exact: true }).first().click()
+    const leadSheet = page.getByRole("dialog", { name: leadName, exact: true })
+    await expect(leadSheet.getByRole("button", { name: "Qualify lead", exact: true })).toBeEnabled()
+    await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "update_lead") && res.ok()),
+      leadSheet.getByRole("button", { name: "Qualify lead", exact: true }).click(),
+    ])
+    await leadSheet.getByRole("button", { name: "Convert lead", exact: true }).click()
+    await expect(page.getByTestId("form-modal-convert-lead")).toBeVisible()
+    await chooseFirstEnabledOption(page, "opportunityStageId")
+    await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "convert_lead_to_customer") && res.ok()),
+      submitForm(page, "convert-lead"),
+    ])
+    await page.keyboard.press("Escape")
+    await selectModuleTab(page, "crm", "opportunities")
+    const opportunityName = `${leadName} - Opportunity`
+    await page.getByText(opportunityName, { exact: true }).first().click()
+    const opportunitySheet = page.getByRole("dialog", { name: opportunityName, exact: true })
+    await opportunitySheet.getByRole("button", { name: "Schedule follow-up", exact: true }).click()
+    await fillField(page, "summary", followUp)
+    await chooseFirstEnabledOption(page, "activityTypeId")
+    await fillField(page, "dateDeadline", new Date(Date.now() + 86_400_000).toISOString().slice(0, 10))
+    await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "create_activity") && res.ok()),
+      submitForm(page, "new-activity"),
+    ])
+    await page.keyboard.press("Escape")
+    await gotoModule(page, "/crm", "crm")
+    await expect(page.getByTestId("crm-my-work").getByText(followUp, { exact: true })).toBeVisible()
+    await expectNoAppError(page)
+  })
+
   test("updates a contact via edit-contact and update_contact reducer", async ({ page }) => {
     test.setTimeout(120_000)
 

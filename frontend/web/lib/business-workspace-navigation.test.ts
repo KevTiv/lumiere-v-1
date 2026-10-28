@@ -16,7 +16,7 @@ for (const module of ["sales", "crm", "purchasing", "reports", "expenses"] as Bu
     const ids = groups.flatMap((group) => group.tabIds)
     assert.equal(new Set(ids).size, ids.length)
     assert.ok(config.workspaces.length <= 5)
-    assert.equal(config.workspaces[0]?.label, "Overview")
+    assert.equal(config.workspaces[0]?.label, module === "crm" ? "My Work" : "Overview")
     for (const group of groups) assert.ok(!group.label.startsWith("modules."), group.label)
     const tabs: ModuleTab[] = [...ids, "future-extension"].map((id) => ({ id, label: id, type: "custom" }))
     const result = resolveWorkspaceNavigation(tabs, config)
@@ -37,7 +37,7 @@ test("runtime activity views join CRM while base-only installs retain a valid la
   const config = businessWorkspaceNavigation("crm", i18n.t)
   const tab = (id: string): ModuleTab => ({ id, label: id, type: "custom" })
   assert.equal(resolveWorkspaceNavigation([tab("activities")], config).workspaces[0]?.tabs[0]?.id, "activities")
-  assert.deepEqual(resolveWorkspaceNavigation([tab("activities"), tab("my-activities")], config).workspaces[0]?.tabs.map((item) => item.id), ["my-activities", "activities"])
+  assert.deepEqual(resolveWorkspaceNavigation([tab("activities"), tab("my-activities")], config).workspaces.flatMap((group) => group.tabs.map((item) => item.id)), ["my-activities", "activities"])
 })
 
 test("Expenses operations land on the implemented operational panel, not the legacy Inbox", () => {

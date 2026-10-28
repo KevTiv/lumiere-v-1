@@ -1,6 +1,22 @@
-import { recordPageHref } from '@/lib/record-page-href'
+import { recordPageHref } from '../../../lib/record-page-href'
 
 type Row = Record<string, unknown>
+
+/** Fields used by the personal activity queue, including legacy query spelling. */
+export interface ActivityWorkRow {
+  id?: unknown
+  state?: unknown
+  isDone?: boolean
+  is_done?: boolean
+  assignedTo?: unknown
+  assigned_to?: unknown
+  userId?: unknown
+  user_id?: unknown
+  dateDeadline?: unknown
+  date_deadline?: unknown
+  deletedAt?: unknown
+  deleted_at?: unknown
+}
 
 /** Lowercase hex of an identity cell (hex string, `{ __identity__ }`, or an object with toHexString/toHex). */
 export function identityKey(value: unknown): string {
@@ -32,8 +48,8 @@ export function deadlineMs(value: unknown): number | null {
   return Number.isFinite(micros) && micros > 0 ? micros / 1000 : null
 }
 
-function isDone(row: Row): boolean {
-  return row.isDone === true || String(row.state ?? '').toLowerCase() === 'done'
+function isDone(row: ActivityWorkRow): boolean {
+  return row.isDone === true || row.is_done === true || String(row.state ?? '').toLowerCase() === 'done'
 }
 
 /**
@@ -41,7 +57,7 @@ function isDone(row: Row): boolean {
  * (the backend sets `userId` to the creator and `assignedTo` to the assignee). Done and deleted
  * rows are left out; sorted by deadline, undated last.
  */
-export function myOpenActivities(rows: ReadonlyArray<Row>, identity: string | null | undefined): Row[] {
+export function myOpenActivities<T extends ActivityWorkRow>(rows: ReadonlyArray<T>, identity: string | null | undefined): T[] {
   const me = identityKey(identity)
   if (!me) return []
   return rows
@@ -60,7 +76,7 @@ export function myOpenActivities(rows: ReadonlyArray<Row>, identity: string | nu
     })
 }
 
-function deadlineIsDeleted(row: Row): boolean {
+function deadlineIsDeleted(row: ActivityWorkRow): boolean {
   return deadlineMs(row.deletedAt ?? row.deleted_at) != null
 }
 
