@@ -11772,7 +11772,7 @@
       }
     },
     "operationsTab": "Operations",
-    "operationsTabDescription": "Receipt capture queue, card statements and expense settings",
+    "operationsTabDescription": "Capture receipts and review retained expense saves",
     "page": {
       "backToReports": "Back to expense reports",
       "discussion": "Discussion",
@@ -11785,6 +11785,34 @@
     "inlineEdit": {
       "nameRequired": "An expense needs a description",
       "quantityInvalid": "Quantity must be above 0"
+    },
+    "workflowUi": {
+      "selectRecord": "Select a record",
+      "noRecords": "No matching records available.",
+      "capture": "Receipt capture",
+      "reconciliation": "Card reconciliation",
+      "settings": "Expense settings",
+      "createReport": "Create report",
+      "reviewReport": "Review report",
+      "attachReceipt": "Attach receipt",
+      "expense": "Expense",
+      "statement": "Card statement line",
+      "employee": "Employee",
+      "currency": "Currency",
+      "journal": "Journal",
+      "cashAccount": "Cash account",
+      "advanceAccount": "Advance account",
+      "advance": "Advance",
+      "report": "Expense report",
+      "amountUnavailable": "Amount unavailable",
+      "reportCurrencyMismatch": "Use the same employee and currency as this expense. Your entries have been retained.",
+      "selectionUnavailable": "A selected record is no longer available. Choose an available record before continuing.",
+      "submitEffect": "Sends this report for approval. It does not post accounting entries or record a reimbursement.",
+      "approveEffect": "Approves this report. Posting to accounting is a separate action.",
+      "refuseEffect": "Refuses this report with your reason and returns its expenses to draft for correction.",
+      "unmatchTitle": "Unmatch an existing statement line",
+      "unmatchHint": "Enter the exact matched statement line ID. The current statement lookup provides unmatched lines only.",
+      "reconciliationHint": "Match corporate card statement lines to expenses by name, amount and currency."
     }
   },
   "workflows": {

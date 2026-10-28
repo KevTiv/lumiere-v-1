@@ -47,8 +47,9 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
       ["overview", ["dashboard"]],
       ["expenses", ["expenses"]],
       ["expenseReports", ["expense-sheets"]],
-      ["operations", ["operations", "inbox"]],
+      ["operations", ["inbox", "operations", "card-reconciliation"]],
     ],
+    overflow: [["configuration", ["expense-settings"]]],
   },
 }
 

@@ -45,7 +45,11 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
     await expect(page.getByTestId("expenses-capture-submit")).toBeVisible()
     await expect(page.getByTestId("expenses-capture-flush")).toBeVisible()
+    await expect(page.getByTestId("expenses-ops-panel")).toHaveCount(0)
+    await openExpensesTab(page, "card-reconciliation")
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
+    await openExpensesTab(page, "inbox")
+    await expect(page.getByTestId("expenses-inbox-panel")).toBeVisible()
     await expectNoAppError(page)
 
     await openExpensesTab(page, "expense-sheets")
@@ -82,7 +86,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   })
 
   test("ops FX fee + allocations form from expense row @p0", async ({ page }) => {
-    await gotoModule(page, "/expenses?tab=operations", "expenses")
+    await gotoModule(page, "/expenses?tab=card-reconciliation", "expenses")
     // Wave D/E ops surface: FX fee on statement create (post advance covered in domain tests).
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     await expect(page.getByTestId("expenses-ops-amount")).toBeVisible()
@@ -149,6 +153,23 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     // Click the row containing the new Draft expense (ModuleView may wrap cells).
     await page.getByText(name).first().click()
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 15_000 })
+    // Create a report without losing the expense we were attaching. Cancel also returns here.
+    await page.getByRole("button", { name: "Add to report", exact: true }).click()
+    await page.getByTestId("expense-create-report-continuation").click()
+    await expect(page.getByTestId("form-modal-new-expense-sheet")).toBeVisible()
+    await page.getByRole("button", { name: "Cancel", exact: true }).click()
+    await expect(page.getByTestId("form-modal-add-expense-to-report")).toBeVisible()
+    await page.getByTestId("expense-create-report-continuation").click()
+    const reportName = smokeName("report-for-alloc")
+    await fillField(page, "name", reportName)
+    await chooseSelectOptionByLabel(page, "pricelistId", /USD/)
+    await submitForm(page, "new-expense-sheet")
+    await expect(page.getByTestId("form-modal-add-expense-to-report")).toBeVisible()
+    await page.getByTestId("form-field-sheetId").click()
+    await expect(page.getByRole("option", { name: reportName, exact: true })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await page.getByRole("button", { name: "Cancel", exact: true }).click()
+    await page.getByText(name, { exact: true }).first().click()
     const allocBtn = page.getByRole("button", { name: "Split allocations" })
     await expect(allocBtn).toBeVisible({ timeout: 15_000 })
     await allocBtn.click()
@@ -201,12 +222,14 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   })
 
   test("ops panel can create card statement line @expenses", async ({ page }) => {
-    await gotoModule(page, "/expenses?tab=operations", "expenses")
+    await gotoModule(page, "/expenses?tab=card-reconciliation", "expenses")
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     const ref = smokeName("stmt")
     await page.getByTestId("expenses-ops-external-ref").fill(ref)
     await page.getByTestId("expenses-ops-amount").fill("33")
     await page.getByPlaceholder("FX fee").fill("1.25")
+    await page.getByTestId("expenses-ops-currency").click()
+    await page.getByRole("option", { name: /USD/ }).first().click()
     await page.getByTestId("expenses-ops-create-statement").click()
     await expect(page.getByTestId("expenses-ops-status")).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId("expenses-ops-status")).not.toContainText(/error|failed|invalid/i)

@@ -40,8 +40,10 @@ test("runtime activity views join CRM while base-only installs retain a valid la
   assert.deepEqual(resolveWorkspaceNavigation([tab("activities"), tab("my-activities")], config).workspaces[0]?.tabs.map((item) => item.id), ["my-activities", "activities"])
 })
 
-test("Expenses operations land on the implemented operational panel, not the legacy Inbox", () => {
+test("Expenses operations land on the connected Inbox and keep specialist settings separate", () => {
   const config = businessWorkspaceNavigation("expenses", i18n.t)
   const operations = config.workspaces.find((group) => group.id === "operations")
-  assert.equal(operations?.tabIds[0], "operations")
+  assert.equal(operations?.tabIds[0], "inbox")
+  assert.ok(operations?.tabIds.includes("card-reconciliation"))
+  assert.ok(config.overflow?.some(group => group.tabIds.includes("expense-settings")))
 })

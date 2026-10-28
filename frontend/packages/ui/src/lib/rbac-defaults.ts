@@ -25,6 +25,7 @@ const KNOWN_ACTIONS = new Set<Action>([
   "manage",
   "write",
   "admin",
+  "approve",
   "post",
   "reconcile",
   "reverse",
