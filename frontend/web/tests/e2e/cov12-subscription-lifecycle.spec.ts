@@ -10,6 +10,7 @@ import {
   fetchSalesInvoiceJournalLabel,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  chooseSelectOptionByValue,
   fetchSaleOrderSelectLabel,
   fillField,
   gotoModule,
@@ -117,6 +118,29 @@ async function labelByCode(page: Page, resource: string, code: string) {
   return name ? `${code} — ${name}` : code
 }
 
+async function createSubscriptionThroughUi(page: Page, saleOrderLabel: string, code: string) {
+  await page.getByTestId("module-create-subscriptions-subscriptions").click()
+  const dialog = page.getByTestId("subscription-create-dialog")
+  await expect(dialog).toBeVisible()
+  await chooseSelectOptionByLabel(page, "saleOrderId", saleOrderLabel)
+  await page.getByTestId("form-submit-subscription-create-order").click()
+  await chooseFirstEnabledOption(page, "planId")
+  await page.getByTestId("form-submit-subscription-create-plan").click()
+  await fillField(page, "dateStart", isoDate(0))
+  await page.getByTestId("form-submit-subscription-create-billing").click()
+  await fillField(page, "code", code)
+  const [created] = await Promise.all([
+    page.waitForResponse(
+      (response) => matchesOperationResponse(response, "create_subscription_from_sale_order"),
+      { timeout: 45_000 },
+    ),
+    page.getByTestId("form-submit-subscription-create-review").click(),
+  ])
+  expect(created.ok(), await created.text()).toBe(true)
+  await expect(dialog).toBeHidden()
+  return created
+}
+
 /** Sale order → subscription → activate → generate the period invoice, all in the UI. */
 async function provisionBilledSubscription(page: Page, label: string) {
   const saleOrderId = await createDraftSaleOrder(page, smokeName(`${label}-so`))
@@ -131,29 +155,19 @@ async function provisionBilledSubscription(page: Page, label: string) {
   await gotoModule(page, "/subscriptions", "subscriptions")
   await selectModuleTab(page, "subscriptions", "subscriptions")
   const code = smokeName(label).toUpperCase().slice(0, 40)
-  await page.getByTestId("module-create-subscriptions-subscriptions").click()
-  await chooseSelectOptionByLabel(page, "saleOrderId", saleOrderLabel)
-  await chooseFirstEnabledOption(page, "planId")
-  await fillField(page, "code", code)
-  await fillField(page, "dateStart", isoDate(0))
-  await Promise.all([
-    page.waitForResponse(
-      (response) => matchesOperationResponse(response, "create_subscription_from_sale_order"),
-      { timeout: 45_000 },
-    ),
-    submitForm(page, "new-subscription"),
-  ])
+  await createSubscriptionThroughUi(page, saleOrderLabel, code)
   const subscriptionId = scalarQueryId(
     (await rows(page, "subscriptions")).find((row) => row.code === code)?.id,
   )
   if (subscriptionId == null) throw new Error("created subscription not found")
   const activate = await openSubscriptionAction(page, subscriptionId, "activate-sub")
+  await activate.click()
   await Promise.all([
     page.waitForResponse(
       (response) => matchesOperationResponse(response, "activate_subscription"),
       { timeout: 45_000 },
     ),
-    activate.click(),
+    submitForm(page, "subscription-activate"),
   ])
   await expect.poll(() => subscriptionSnapshot(page, subscriptionId)).toMatchObject({ state: "active" })
   const lines = await linesOf(page, subscriptionId)
@@ -193,7 +207,7 @@ async function provisionBilledSubscription(page: Page, label: string) {
   }
 }
 
-async function cancelThroughUi(page: Page, subscriptionId: number, creditNote: boolean) {
+async function cancelThroughUi(page: Page, subscriptionId: number, creditNote: boolean, invoiceMoveId?: number) {
   const cancelAction = await openSubscriptionAction(page, subscriptionId, "cancel-sub")
   await cancelAction.click()
   await expect(page.getByTestId("form-modal-cancel-subscription")).toBeVisible({
@@ -201,6 +215,10 @@ async function cancelThroughUi(page: Page, subscriptionId: number, creditNote: b
   })
   const box = page.getByTestId("form-field-createCreditNote")
   if (((await box.getAttribute("aria-checked")) === "true") !== creditNote) await box.click()
+  if (creditNote) {
+    expect(invoiceMoveId).toBeDefined()
+    await chooseSelectOptionByValue(page, "invoiceMoveId", invoiceMoveId!)
+  }
   const [cancelled] = await Promise.all([
     page.waitForResponse(
       (response) => matchesOperationResponse(response, "cancel_subscription"),
@@ -235,26 +253,7 @@ test.describe(
 
       // --- create (draft) through the operator form -----------------------
       const code = smokeName("cov12-life").toUpperCase().slice(0, 40)
-      await page.getByTestId("module-create-subscriptions-subscriptions").click()
-      await expect(
-        page.getByTestId("form-modal-new-subscription"),
-      ).toBeVisible({ timeout: 15_000 })
-      await chooseSelectOptionByLabel(page, "saleOrderId", saleOrderLabel)
-      await chooseFirstEnabledOption(page, "planId")
-      await fillField(page, "code", code)
-      await fillField(page, "dateStart", isoDate(0))
-      const [created] = await Promise.all([
-        page.waitForResponse(
-          (response) =>
-            matchesOperationResponse(
-              response,
-              "create_subscription_from_sale_order",
-            ),
-          { timeout: 45_000 },
-        ),
-        submitForm(page, "new-subscription"),
-      ])
-      expect(created.ok(), await created.text()).toBe(true)
+      await createSubscriptionThroughUi(page, saleOrderLabel, code)
 
       const subscription = (await rows(page, "subscriptions")).find(
         (row) => String(row.code ?? "") === code,
@@ -278,13 +277,14 @@ test.describe(
         subscriptionId,
         "activate-sub",
       )
+      await activate.click()
       const [activated] = await Promise.all([
         page.waitForResponse(
           (response) =>
             matchesOperationResponse(response, "activate_subscription"),
           { timeout: 45_000 },
         ),
-        activate.click(),
+        submitForm(page, "subscription-activate"),
       ])
       expect(activated.ok(), await activated.text()).toBe(true)
       await expect
@@ -321,6 +321,8 @@ test.describe(
         .click()
       await chooseFirstEnabledOption(page, "lineId")
       await fillField(page, "newQuantity", String(newQuantity))
+      const prorate = page.getByTestId("form-field-prorate")
+      if ((await prorate.getAttribute("aria-checked")) === "true") await prorate.click()
       const amendmentsBefore = await amendmentsOf(page, subscriptionId)
       const [amended] = await Promise.all([
         page.waitForResponse(
@@ -521,7 +523,7 @@ test.describe(
       const refundsBefore = (await rows(page, "account-moves")).filter(
         (row) => tagged(field(row, "moveType", "move_type")) === "OutRefund",
       ).length
-      await cancelThroughUi(page, subscriptionId, true)
+      await cancelThroughUi(page, subscriptionId, true, invoiceMoveId)
       const cancelRow = (await amendmentsOf(page, subscriptionId)).find(
         (row) => String(field(row, "amendmentType", "amendment_type")) === "cancel",
       )

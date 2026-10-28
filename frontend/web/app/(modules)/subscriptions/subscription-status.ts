@@ -1,7 +1,7 @@
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** Lower-cased state of an enum cell (`{ tag }`, `{ Active: [] }`) or plain string. */
-export function subscriptionStateOf(row: Record<string, unknown>): string {
+export function subscriptionStateOf(row: { state?: unknown }): string {
   const value = row.state;
   if (typeof value === 'string') return value.toLowerCase();
   if (value && typeof value === 'object' && !Array.isArray(value)) {

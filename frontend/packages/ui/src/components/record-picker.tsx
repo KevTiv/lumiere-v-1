@@ -60,10 +60,10 @@ export function RecordPicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
+        id={id}
         disabled={disabled}
         render={
           <Button
-            id={id}
             type="button"
             variant="outline"
             role="combobox"

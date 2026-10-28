@@ -501,11 +501,35 @@ export async function chooseFirstOption(page: Page, name: string) {
   await chooseFirstEnabledOption(page, name)
 }
 
+/** Scope to this trigger's popup, including while another popup is animating closed. */
+async function openSelectListbox(page: Page, trigger: Locator) {
+  await revealFormSection(trigger)
+  await expect(trigger).toBeVisible({ timeout: 15_000 })
+  // Radix hides background controls from the accessibility tree while open.
+  // Resolve its popup before opening so role-based trigger locators remain usable.
+  let contentId = await trigger.getAttribute("aria-controls")
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click()
+  if (!contentId) {
+    await expect(trigger).toHaveAttribute("aria-controls", /.+/)
+    contentId = await trigger.getAttribute("aria-controls")
+  }
+  if (!contentId) throw new Error("select trigger has no controlled popup")
+  const content = `[id=${JSON.stringify(contentId)}]`
+  const listbox = page.locator(`${content}[role="listbox"], ${content} [role="listbox"]`)
+  await expect(listbox).toBeVisible()
+  return listbox
+}
+
+async function selectOption(trigger: Locator, listbox: Locator, option: Locator) {
+  await option.click({ timeout: 15_000 })
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+  await expect(listbox).toBeHidden()
+}
+
 /** Pick the first non-disabled select option (skips empty placeholders). */
 export async function chooseFirstEnabledOption(page: Page, name: string) {
-  await revealFormSection(page.getByTestId(`form-field-${name}`))
-  await page.getByTestId(`form-field-${name}`).click()
-  const listbox = page.locator('[role="listbox"]:visible')
+  const field = page.getByTestId(`form-field-${name}`)
+  const listbox = await openSelectListbox(page, field)
   await expect
     .poll(async () => listbox.getByRole("option", { disabled: false }).count(), {
       timeout: 30_000,
@@ -525,7 +549,7 @@ export async function chooseFirstEnabledOption(page: Page, name: string) {
     const isPlaceholderLabel = /^(?:—|-|select(?:\.\.\.)?)$/i.test(label)
     const hasConcreteValue = Boolean(value?.trim() && !value.startsWith("__lumiere_empty__:"))
     if (hasConcreteValue || (label !== "" && !isPlaceholderLabel)) {
-      await option.click()
+      await selectOption(field, listbox, option)
       return
     }
   }
@@ -779,9 +803,7 @@ export async function chooseSelectOptionByValue(
   name: string,
   value: string | number | bigint,
 ) {
-  const field = page.getByTestId(`form-field-${name}`)
-  await revealFormSection(field)
-  await chooseSelectOptionByTriggerValue(page, field, value)
+  await chooseSelectOptionByTriggerValue(page, page.getByTestId(`form-field-${name}`), value)
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
@@ -797,85 +819,35 @@ export async function chooseSelectOptionByLabel(
       ? new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
       : label
   const field = page.getByTestId(`form-field-${name}`)
-  await revealFormSection(field)
-  const listbox = page.locator('[role="listbox"]:visible')
+  const listbox = await openSelectListbox(page, field)
   const option = listbox.getByRole("option", { name: optionName }).first()
-
-  await expect
-    .poll(
-      async () => {
-        // Keep an open Radix selector open while its async options load.
-        // Clicking the trigger again closes the selector and can leave its
-        // overlay intercepting the next poll attempt.
-        if (!(await listbox.isVisible().catch(() => false))) {
-          await field.click()
-        }
-        if (!(await listbox.isVisible().catch(() => false))) return 0
-        return await option.count()
-      },
-      { timeout: optionTimeoutMs },
-    )
-    .toBeGreaterThan(0)
-
-  const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
-  if (await search.isVisible()) {
-    // Use the picker's search before selecting an item far down a long list.
-    await search.fill((await option.innerText()).trim())
-  }
-  await option.click({ timeout: 15_000 })
-  await expect(listbox).toBeHidden()
+  await expect(option).toBeVisible({ timeout: optionTimeoutMs })
+  const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
+  if (await search.isVisible()) await search.fill((await option.innerText()).trim())
+  await selectOption(field, listbox, option)
 }
 
-/** Both shared selectors expose their exact stored value as `data-value`. */
+/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
 export async function chooseSelectOptionByTriggerValue(
   page: Page,
   trigger: Locator,
   value: string | number | bigint,
 ) {
-  const listbox = page.locator('[role="listbox"]:visible')
+  const listbox = await openSelectListbox(page, trigger)
   const storedValue = String(value)
   const option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
-
-  await expect
-    .poll(
-      async () => {
-        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
-        const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
-        if (await search.isVisible()) {
-          const query = `#${storedValue}`
-          if (await search.inputValue() !== query) await search.fill(query)
-        }
-        const count = await option.count()
-        if (count === 0) await page.keyboard.press("Escape")
-        return count
-      },
-      { timeout: 30_000 },
-    )
-    .toBeGreaterThan(0)
-
-  await option.click({ timeout: 15_000 })
-  await expect(listbox).toBeHidden()
+  const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
+  if (await search.isVisible()) await search.fill(`#${storedValue}`)
+  await expect(option).toHaveCount(1, { timeout: 30_000 })
+  await selectOption(trigger, listbox, option)
 }
 
 /** Pick the first real option of a shared Select located by its trigger. */
 export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Locator) {
-  const listbox = page.locator('[role="listbox"]:visible')
+  const listbox = await openSelectListbox(page, trigger)
   const option = listbox.getByRole("option", { disabled: false }).first()
-
-  await expect
-    .poll(
-      async () => {
-        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
-        const count = await option.count()
-        if (count === 0) await page.keyboard.press("Escape")
-        return count
-      },
-      { timeout: 30_000 },
-    )
-    .toBeGreaterThan(0)
-
-  await option.click({ timeout: 15_000 })
-  await expect(listbox).toBeHidden()
+  await expect(option).toBeVisible({ timeout: 30_000 })
+  await selectOption(trigger, listbox, option)
 }
 
 export async function submitForm(page: Page, formId: string) {
@@ -3072,7 +3044,8 @@ export async function seedPublishableWorkflowDraft(
   ])
 
   const workflowId = await fetchWorkflowIdByKey(page, workflowKey)
-  let { versionId, draftRevision: rev } = await fetchDraftWorkflowVersionId(page, workflowId)
+  const { versionId, draftRevision } = await fetchDraftWorkflowVersionId(page, workflowId)
+  let rev = draftRevision
 
   for (const node of [
     { nodeKey: "start", name: "Start", kind: { tag: "Start" }, sequence: 1 },

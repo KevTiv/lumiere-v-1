@@ -3,3 +3,4 @@
 @source "../../../app/(modules)/accounting";
 
 body { margin: 0; }
+@source "../../../app/(modules)/subscriptions";
