@@ -1,6 +1,6 @@
 # Alpha contextual assistant implementation status
 
-Date: 2026-10-28. Implementation is in the working tree based on `48aa5912ec007be1996e4561411b9179899ae745`. This is local implementation evidence, not a deployed release or completed Alpha admission.
+Date: 2026-10-28. Initial implementation and backend/module checks used baseline `48aa5912ec007be1996e4561411b9179899ae745`. The PR branch incorporates main through `021aa272160dbbf6b35c46933c097fe1d3ae9630`, retaining its centralized auth, productivity, language settings, and contracts pin. This is local implementation evidence, not a deployed release or completed Alpha admission.
 
 Owning scope: [Alpha contextual ERP assistant and help documents](../plans/alpha-assistant-help-artifacts-plan.md), AIH-29.
 
@@ -16,7 +16,7 @@ Owning scope: [Alpha contextual ERP assistant and help documents](../plans/alpha
 - Saved guides appear in the module-filtered library and as exact-revision related references in later chat responses. Chat metadata stores pointers, not cached guide bodies or trusted labels.
 - Markdown rejects raw active HTML; HTML uses sanitization, no inline styles or external resources, a restrictive CSP, and a scriptless sandbox. Read and save grant no financial action authority.
 
-## Local evidence
+## Initial local evidence
 
 | Check | Result and scope |
 | --- | --- |
@@ -47,12 +47,18 @@ LUMIERE_ENABLE_DEV_REDUCERS=1 CARGO_BUILD_JOBS=1 cargo rustc --locked --offline 
 
 This is a development-only test artifact, not a production module. Its SHA-256 is `7ec9ba75e822078a0ddf8d10696422351174c49a7f84d0708d5efff8a9733e3e`. An earlier local artifact lacked the required development admission flag and correctly rejected fixture organization creation; the corrected artifact passed the lifecycle test. The tests did not relax production founder admission.
 
+## PR integration checks
+
+After incorporating main through `021aa272`, the focused viewer/chat suite passed all 22 tests and the Chromium fixture passed all six scenarios. Both Node helper test files passed. A frozen offline install with the pinned pnpm 10.31.0 completed; duplicate JSON, translation-key, locale/interpolation, Kinyarwanda override, and vendored `0.3.157` checks passed. Diff whitespace checks passed and change classification requires every validation lane.
+
+The initial backend/module results above predate the main integration. Hosted CI and regeneration from the integrated source remain required; a draft PR does not establish those results.
+
 ## Remaining admission work
 
-1. Review and release matching generated contracts, module, durable schema artifacts, and application revision through the existing release workflow. The immutable deployed contracts pin remains `0.3.154`; the new staging IR is a dirty working-tree candidate, not a released contract package. New source contracts and migration 0029 must be included in the matching release before merge/deployment admission.
+1. Review and release matching generated contracts, module, durable schema artifacts, and application revision through the existing release workflow. Main advanced the consumer pin from the initial implementation's `0.3.154` to `0.3.157`; neither release includes these new guide contracts. The initial staging IR is an unreleased candidate. Regenerate from the integrated source and include the new contracts and migration 0029 in a matching release before merge/deployment admission.
 2. Exercise authenticated save/reload/new-conversation retrieval against the integrated ERP stack, including denied access, company changes, stale edits, and restart/reconnect. UI fixtures, API wire tests, and direct gateway fixtures do not replace that evidence.
 3. All saved revisions currently remain drafts. Independent verification/promotion, source-change invalidation, and a KnowledgeArticle-revision adapter into the existing evidence graph remain separate work. Automatic discovery returns related references; explicit user document questions quote reauthorized text as unverified input. Neither path makes a saved draft independent evidence for generated business facts.
 4. Language/workflow/product-version applicability needs a trusted compatibility source and accepted filtering. Returned version metadata alone is not proof of compatibility.
 5. A dedicated contextual `Explain this error` control on admitted ERP forms remains to be wired through the existing owner. Contextual chat and existing draft/action-review paths are reused; this slice does not certify every record-entry/recovery journey.
 
-No provider completion, production provisioning, merge, public publication, or deployment is recorded here.
+No provider completion, production provisioning, feature merge into main, or deployment is recorded here.
