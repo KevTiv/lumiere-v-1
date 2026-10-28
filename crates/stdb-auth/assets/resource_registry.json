@@ -329,7 +329,12 @@
       "state",
       "is_done",
       "activity_type_id",
-      "date_deadline"
+      "date_deadline",
+      "user_id",
+      "assigned_to",
+      "res_model",
+      "res_id",
+      "deleted_at"
     ],
     "mandatory": [
       "id",
