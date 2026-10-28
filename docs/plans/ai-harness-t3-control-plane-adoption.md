@@ -641,3 +641,17 @@ plus the regenerated reducer contract; hosted CI must validate the final v0.3.15
 pin. The PostgreSQL 18 Finance-to-harness upgrade regression passed, preserving
 exact rows, previous migration records and replay. The older v13 matrix expected
 list must remain sorted when adding the three harness relations.
+
+
+### Final-pin acceptance
+
+At `4e7dd7ff2a1c4f7d69e51ad5eeece6f20b1daf44`, the complete hosted
+[CI run 40656628589](https://github.com/KevTiv/lumiere-v-1/actions/runs/40656628589)
+passed, including Rust/gateway, C3/C4/C5, native module/tests, frontend checks and
+contracts drift. All ten local PostgreSQL compatibility tests also passed with
+the final v0.3.154 pin, using the same serial setting as CI. The disposable local
+database was removed after verification.
+
+The base change selected only edited browser specs. PR #291 therefore carries
+`e2e:full` to require the complete sharded P0 lane for the final acceptance head.
+The targeted run does not establish that full-P0 gate.
