@@ -6,9 +6,9 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
   test("selects a visible option by its exact stored value", async ({ page }) => {
     await page.setContent(`
       <div>
-        <button data-testid="form-field-partnerId" type="button">Select...</button>
+        <button data-testid="form-field-partnerId" type="button" role="combobox" aria-expanded="false" aria-controls="customer-options">Select...</button>
       </div>
-      <div role="listbox" hidden>
+      <div id="customer-options" role="listbox" hidden>
         <div role="option" data-value="217">Converted Customer</div>
         <div role="option" data-value="223">Converted Customer</div>
       </div>
@@ -18,6 +18,7 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
     const convertedCustomer = page.locator('[role="option"][data-value="223"]')
     await field.evaluate((trigger) => {
       trigger.addEventListener("click", () => {
+        trigger.setAttribute("aria-expanded", "true")
         document.querySelector('[role="listbox"]')?.removeAttribute("hidden")
       })
     })
@@ -25,6 +26,7 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
       option.addEventListener("click", () => {
         const trigger = document.querySelector('[data-testid="form-field-partnerId"]')
         if (trigger) trigger.textContent = option.textContent
+        trigger?.setAttribute("aria-expanded", "false")
         trigger?.setAttribute("data-selected-value", option.getAttribute("data-value") ?? "")
         option.closest('[role="listbox"]')?.setAttribute("hidden", "")
       })
@@ -41,13 +43,13 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
   test("selects a visible Radix option through its hidden native value", async ({ page }) => {
     await page.setContent(`
       <div>
-        <button data-testid="form-field-partnerId" type="button">Select...</button>
+        <button data-testid="form-field-partnerId" type="button" role="combobox" aria-expanded="false" aria-controls="legacy-options">Select...</button>
         <select aria-hidden="true" tabindex="-1">
           <option value="217">Acme Corporation</option>
           <option value="223">Converted Customer</option>
         </select>
       </div>
-      <div role="listbox" hidden>
+      <div id="legacy-options" role="listbox" hidden>
         <div role="option">Acme Corporation</div>
         <div role="option">Converted Customer</div>
       </div>
@@ -59,6 +61,7 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
     })
     await field.evaluate((trigger) => {
       trigger.addEventListener("click", () => {
+        trigger.setAttribute("aria-expanded", "true")
         document.querySelector('[role="listbox"]')?.removeAttribute("hidden")
       })
     })
@@ -66,6 +69,7 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
       option.addEventListener("click", () => {
         const trigger = document.querySelector('[data-testid="form-field-partnerId"]')
         if (trigger) trigger.textContent = option.textContent
+        trigger?.setAttribute("aria-expanded", "false")
         document.querySelector('[role="listbox"]')?.setAttribute("hidden", "")
       })
     })

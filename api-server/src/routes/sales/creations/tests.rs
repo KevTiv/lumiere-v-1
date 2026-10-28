@@ -6,6 +6,7 @@ const RECEIPT: &str = "01234567-89ab-4cde-8f01-23456789abcd";
 fn access() -> FieldAccessContext {
     FieldAccessContext {
         organization_id: 7,
+        role_id: 9,
         identity_hex: ACTOR.into(),
         role_permissions: vec!["sale_order:read".into()],
         ..Default::default()
@@ -99,7 +100,7 @@ fn receipt_must_be_a_uuid() {
 fn ordinary_order_reads_keep_metadata_hidden_even_when_other_fields_are_selected() {
     let mut actor = access();
     actor.field_permissions.push(serde_json::from_value(json!({
-        "organizationId":7, "resource":"sale-orders", "action":"read", "allowedFields":["state"],
+        "organizationId":7, "roleId":9, "resource":"sale-orders", "action":"read", "allowedFields":["state"],
     })).unwrap());
     for fields in [None, Some(&access()), Some(&actor)] {
         let columns = stdb_auth::resolve_http_sql_columns("sale-orders", fields).unwrap();
@@ -163,19 +164,25 @@ async fn authenticated_http_lookup_checks_membership_and_returns_no_internal_fie
         } else {
             panic!("unexpected SQL: {sql}");
         };
-        let columns: Vec<_> = sql
+        let selected = sql
             .strip_prefix("SELECT ")
             .unwrap()
             .split_once(" FROM ")
             .unwrap()
-            .0
-            .split(", ")
-            .collect();
+            .0;
+        let columns: Vec<String> = if selected == "*" {
+            rows.first()
+                .and_then(Value::as_object)
+                .map(|row| row.keys().cloned().collect())
+                .unwrap_or_default()
+        } else {
+            selected.split(", ").map(str::to_owned).collect()
+        };
         (
             [("spacetime-identity", ACTOR)],
             Json(json!([{
                 "schema":{"elements":columns.iter().map(|name| json!({"name":{"some":name}})).collect::<Vec<_>>()},
-                "rows":rows.iter().map(|row| columns.iter().map(|name| row[*name].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()
+                "rows":rows.iter().map(|row| columns.iter().map(|name| row[name].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()
             }])),
         )
     }

@@ -50,6 +50,8 @@ export interface RecordPageProps {
   actions?: ReactNode
   /** Related-record buttons, e.g. a `SmartButtons` row, shown under the title. */
   smartButtons?: ReactNode
+  /** Task guidance that remains visible when switching record views. */
+  guidance?: ReactNode
   navigation?: RecordPageNavigation
   tabs: ReadonlyArray<RecordPageTab>
   activeTab: string
@@ -72,6 +74,7 @@ export function RecordPage({
   statusBar,
   actions,
   smartButtons,
+  guidance,
   navigation,
   tabs,
   activeTab,
@@ -133,6 +136,8 @@ export function RecordPage({
         {smartButtons}
         {statusBar}
       </header>
+
+      {guidance}
 
       <Tabs value={activeTab} onValueChange={(tabId) => onTabChange(String(tabId))} className="flex min-w-0 flex-col">
         <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">

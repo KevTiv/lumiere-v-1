@@ -87,3 +87,17 @@ export function reconcilablePaymentMoves(moves: readonly Row[], invoice: Row): R
     return residual == null || Number(residual) > 0;
   });
 }
+
+/** Read only exact, same-company payment links; never infer a link from payment status. */
+export function linkedPaymentsForInvoice<T extends Row>(payments: readonly T[], move: Row): T[] {
+  const company = companyOf(move);
+  const kind = invoiceKind(move);
+  if (!company || (kind !== 'invoice' && kind !== 'bill') || move.id == null) return [];
+  return payments.filter((payment) => {
+    if (companyOf(payment) !== company) return false;
+    const ids = kind === 'bill'
+      ? payment.reconciledBillIds ?? payment.reconciled_bill_ids
+      : payment.reconciledInvoiceIds ?? payment.reconciled_invoice_ids;
+    return Array.isArray(ids) && ids.some((id) => String(id) === String(move.id));
+  });
+}

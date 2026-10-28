@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { canReconcilePayment, reconcilablePaymentMoves, canResetMove, canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
+import { linkedPaymentsForInvoice, canReconcilePayment, reconcilablePaymentMoves, canResetMove, canCancelMove, canEditMoveLines, canRecomputeInvoiceTotals, canRegisterPayment, paymentOptionLabel, registrablePayments } from './invoice-actions';
 
 const tag = (value: string) => ({ tag: value });
 
@@ -72,4 +72,20 @@ test('reconcilable payment moves are posted entries of the same company and part
   assert.deepEqual(ids([entry({ amountResidual: 0 })]), []);
   assert.deepEqual(ids([entry({ moveType: tag('OutInvoice') })]), []);
   assert.deepEqual(ids([entry({ id: 1 })]), []);
+});
+
+
+test('linked payments use exact document relations and company scope without inferring links from Paid', () => {
+  const invoice = { id: '9007199254740993', companyId: 7n, moveType: 'OutInvoice' };
+  const payments = [
+    { id: 1, companyId: 7n, reconciledInvoiceIds: [9007199254740993n] },
+    { id: 2, companyId: 8n, reconciledInvoiceIds: [9007199254740993n] },
+    { id: 3, companyId: 7n, reconciledBillIds: [9007199254740993n] },
+    { id: 4, state: 'Paid', reconciledInvoiceIds: [9007199254740993n] },
+    { id: 5, companyId: 7n, state: 'Paid' },
+    { id: 6, company_id: '7', reconciled_invoice_ids: ['9007199254740993'] },
+  ];
+  assert.deepEqual(linkedPaymentsForInvoice(payments, invoice).map((row) => row.id), [1, 6]);
+  assert.deepEqual(linkedPaymentsForInvoice(payments, { ...invoice, moveType: 'InInvoice' }).map((row) => row.id), [3]);
+  assert.deepEqual(linkedPaymentsForInvoice(payments, { ...invoice, companyId: undefined }), []);
 });

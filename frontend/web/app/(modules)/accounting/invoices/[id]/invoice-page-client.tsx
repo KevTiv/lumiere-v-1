@@ -10,7 +10,7 @@ import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { CreditCard, Download, ListOrdered, Mail, MoreHorizontal, Printer, ShoppingCart } from 'lucide-react';
+import { Download, ListOrdered, Mail, MoreHorizontal, Printer, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import { useInvoicePersonalization } from '@lumiere/query-hooks/hooks/invoice-personalization';
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
@@ -70,13 +70,14 @@ import { ModuleDataNotice } from '../../../../../../packages/ui/src/pages/module
 import { mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
-import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
+import { WorkflowError, variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
 import { buildAccountLabelMap, buildSourceDocumentLabelMap } from '@lumiere/stdb/read-models';
 import {
   useAccountAccounts,
   useAddAccountMoveLine,
   useAccountMoveLines,
   useAccountMoves,
+  useAccountPayments,
   useCancelAccountMove,
   useComputeInvoiceTotals,
   useCreateCreditNoteFromInvoice,
@@ -115,8 +116,10 @@ import {
   canReconcilePayment,
   canRegisterPayment,
   reconcilablePaymentMoves,
+  linkedPaymentsForInvoice,
 } from '../../invoice-actions';
 import { invoiceKind, invoiceStatus } from '../../invoice-status';
+import { InvoiceWorkflowGuide } from '@lumiere/ui/accounting-components/invoice-workflow-guide';
 import { RegisterPaymentOnInvoiceDialog } from '../../register-payment-on-invoice-dialog';
 import { invoiceDocumentLines, invoiceRecordAmount, invoiceRecordCurrency, invoiceRecordLines, resolveInvoiceRecord, sameCompany } from './invoice-record';
 import { InvoiceEmailReviewDialog } from '../../../../../../packages/ui/src/accounting-components/invoice-email-review-dialog';
@@ -131,7 +134,7 @@ interface InvoicePageClientProps {
 type Row = Record<string, unknown>;
 type WorkflowAction = AnyWorkflowAction<RowValueMap>;
 
-const TAB_IDS = ['overview', 'lines', 'discussion', 'changes', 'audit'] as const;
+const TAB_IDS = ['overview', 'preview', 'lines', 'payments', 'discussion', 'changes', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 /** Which accounting list a kind of document belongs to, and what to call it. */
@@ -170,7 +173,7 @@ function InvoicePageLoaded({
   operatingCompanyId,
   companyAvailable,
 }: InvoicePageClientProps & { organizationId: number; operatingCompanyId: bigint; companyAvailable: boolean }) {
-  useModuleSubscription(['account-moves', 'account-move-lines', 'account-accounts', 'sale-orders', 'purchase-orders', 'purchase-order-lines', 'companies', 'currencies']);
+  useModuleSubscription(['account-payments', 'account-moves', 'account-move-lines', 'account-accounts', 'sale-orders', 'purchase-orders', 'purchase-order-lines', 'companies', 'currencies']);
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
@@ -189,6 +192,7 @@ function InvoicePageLoaded({
   const { confirm: confirmReset, dialog: resetDialog } = useConfirmDialog();
 
   const movesRead = moduleCollection(useAccountMoves(orgId, { enabled: true }));
+  const paymentsRead = moduleCollection(useAccountPayments(orgId, { enabled: true }));
   const linesRead = moduleCollection(useAccountMoveLines(orgId, { enabled: true }));
   const accountsRead = moduleCollection(useAccountAccounts(orgId, { enabled: true }));
   const salesRead = moduleCollection(useSaleOrders(orgId));
@@ -232,6 +236,8 @@ function InvoicePageLoaded({
     { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify },
   );
 
+  const [nextStepUnconfirmed, setNextStepUnconfirmed] = useState(false);
+  const [nextStepError, setNextStepError] = useState<string | null>(null);
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -330,6 +336,8 @@ function InvoicePageLoaded({
     () => buildSourceDocumentLabelMap([...(moves as unknown as Row[]), ...(saleOrders as unknown as Row[])]),
     [moves, saleOrders],
   );
+
+  useEffect(() => { setNextStepError(null); setNextStepUnconfirmed(false); }, [moveId, operatingCompanyId]);
 
   const requestedTab = searchParams.get('tab');
   const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
@@ -431,6 +439,19 @@ function InvoicePageLoaded({
     ...action,
     blockedReason: () => draftContentError || 'Invoice settings must be available before posting. Refresh and review the current document.',
   } : action);
+  const isCommercialDocument = kind === 'invoice' || kind === 'bill';
+  const documentReady = movesRead.state.status === 'ready';
+  const writeAllowed = checkPermission('account_move', 'write').allowed;
+  const paymentAllowed = writeAllowed && checkPermission('account_payment', 'write').allowed;
+  const postAction = postingActions.find((action) => action.canPresent(record));
+  const postBlockedReason = nextStepUnconfirmed
+    ? t('accounting.workflowGuide.unconfirmed', { defaultValue: 'The posting result is unconfirmed. Refresh the saved record before continuing.' })
+    : !writeAllowed
+    ? t('accounting.workflowGuide.postDenied', { defaultValue: 'You need permission to post accounting documents. Ask your accounting administrator.' })
+    : !documentReady || linesRead.state.status !== 'ready' || accountsRead.state.status !== 'ready'
+      ? t('accounting.workflowGuide.postReadRequired', { defaultValue: 'Line items and accounting references must finish loading successfully before posting.' })
+      : postAction?.blockedReason?.(record);
+  const linkedPayments = paymentsRead.state.status === 'ready' ? linkedPaymentsForInvoice(paymentsRead.rows, move) : [];
   const currency = invoiceRecordCurrency(move, currenciesRead.rows);
   const money = (value: unknown) => formatInvoiceMoney(invoiceRecordAmount(value), currency);
   const dateLabel = (value: unknown) => formatTimestampLike(value)?.toLocaleDateString(undefined, { dateStyle: 'medium', timeZone: 'UTC' }) ?? '—';
@@ -769,19 +790,13 @@ function InvoicePageLoaded({
         }
         actions={
           <>
-            {canRegisterPayment(move, kind) ? (
-              <Button size="sm" disabled={workflow.isPending} onClick={() => setRegisterOpen(true)} data-testid="invoice-action-register-payment">
-                <CreditCard className="mr-1 h-4 w-4" />
-                {t('accounting.invoices.invoiceActions.registerPayment', { defaultValue: 'Register payment' })}
-              </Button>
-            ) : null}
-            <RecordWorkflowActions
+            {kind !== 'invoice' && kind !== 'bill' ? <RecordWorkflowActions
               actions={postingActions}
               record={record}
               onRun={(action, row) => { if (outgoingDraft && !draftReady) return; void action.execute(action.prepare?.(row)).catch(() => undefined); }}
               primaryActionIds={new Set(['accounting.invoice.post'])}
               pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
-            />
+            /> : null}
             {kind === 'invoice' || kind === 'creditNote' ? <Button variant="outline" className="min-h-11" onClick={openEmailReview} disabled={!emailReview && !canQueueEmail} data-testid="invoice-action-send-email"><Mail className="mr-2 size-4" />Review email</Button> : null}
             <Button
               variant="outline"
@@ -823,6 +838,32 @@ function InvoicePageLoaded({
             ) : null}
           </>
         }
+        guidance={isCommercialDocument ? <InvoiceWorkflowGuide
+          stage={!documentReady ? 'unavailable' : isDraft ? 'draft' : state === 'Cancelled' || state === 'Cancel' ? 'cancelled'
+            : state !== 'Posted' || residual == null ? 'unavailable' : status.current === 'Paid' && residual === 0 ? 'paid' : 'posted'}
+          isBill={kind === 'bill'}
+          amountDue={money(residual)}
+          onReviewLines={() => setActiveTab('lines')}
+          paymentsHref="/accounting?tab=payments"
+          onViewPayments={() => setActiveTab('payments')}
+          error={nextStepError}
+          onRefresh={() => window.location.reload()}
+          primaryAction={documentReady && isDraft && postAction ? {
+            label: kind === 'bill' ? t('accounting.workflowGuide.postBill', { defaultValue: 'Post bill' }) : t('accounting.workflowGuide.postInvoice', { defaultValue: 'Post invoice' }),
+            blockedReason: postBlockedReason,
+            pending: workflow.isPending,
+            onClick: () => {
+              if (postBlockedReason || workflow.isPending) return;
+              setNextStepError(null);
+              void postAction.execute(postAction.prepare?.(record)).catch((error: unknown) => { setNextStepError(error instanceof Error ? error.message : String(error)); if (error instanceof WorkflowError && error.needsReadback) setNextStepUnconfirmed(true); });
+            },
+          } : documentReady && canRegisterPayment(move, kind) ? {
+            label: t('accounting.workflowGuide.applyPayment', { defaultValue: 'Apply existing payment' }),
+            blockedReason: paymentAllowed ? undefined : t('accounting.workflowGuide.paymentDenied', { defaultValue: 'You need permission to apply payments. Ask your accounting administrator.' }),
+            pending: workflow.isPending,
+            onClick: () => setRegisterOpen(true),
+          } : undefined}
+        /> : null}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         tabs={[
@@ -895,6 +936,24 @@ function InvoicePageLoaded({
               </div>
             ),
           },
+          ...(isCommercialDocument ? [{
+            id: 'payments',
+            label: t('accounting.workflowGuide.linkedPayments', { defaultValue: 'Linked payments' }),
+            content: (
+              <section className="space-y-3 rounded-xl border bg-card p-4" aria-label={t('accounting.workflowGuide.linkedPayments', { defaultValue: 'Linked payments' })}>
+                <h2 className="text-sm font-semibold">{t('accounting.workflowGuide.linkedPayments', { defaultValue: 'Linked payments' })}</h2>
+                <ModuleDataNotice state={paymentsRead.state} />
+                {paymentsRead.state.status === 'loading' ? <p role="status" className="text-sm text-muted-foreground">{t('accounting.workflowGuide.loadingPayments', { defaultValue: 'Loading linked payments…' })}</p> : null}
+                {paymentsRead.state.status === 'ready' ? linkedPayments.length ? (
+                  <ul className="divide-y">{linkedPayments.map((payment) => <li key={String(payment.id)}>
+                    <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline" href={`/accounting?tab=payments&filter=${encodeURIComponent(`id:${String(payment.id)}`)}`}>
+                      {String(payment.name || payment.ref || `#${payment.id}`)}
+                    </Link>
+                  </li>)}</ul>
+                ) : <p className="text-sm text-muted-foreground">{t('accounting.workflowGuide.noLinkedPayments', { defaultValue: 'No payment links are available for this document. Review Payments or bank matching if a payment was recorded elsewhere.' })}</p> : null}
+              </section>
+            ),
+          }] : []),
           {
             id: 'discussion',
             label: t('accounting.invoices.discussion', { defaultValue: 'Discussion' }),
@@ -958,6 +1017,7 @@ function InvoicePageLoaded({
           isBill={kind === 'bill'}
           registerPayment={workflow.registerPayment}
           isPending={workflow.isPending}
+          canApply={documentReady && paymentAllowed}
           onClose={() => setRegisterOpen(false)}
         />
       ) : null}

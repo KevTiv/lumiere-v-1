@@ -2786,6 +2786,19 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Subscriptions",
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
+  workspaceNav: {
+    workspaces: [
+      { id: "overview", label: t("subscriptions.workflow.overview"), tabIds: ["dashboard"] },
+      { id: "contracts", label: t("subscriptions.workflow.contracts"), tabIds: ["subscriptions", "plans"] },
+      { id: "billing", label: t("subscriptions.workflow.billing"), tabIds: ["due-to-bill", "past-due", "payment-intents"] },
+    ],
+    overflowLabel: t("subscriptions.workflow.advanced"),
+    overflow: [
+      { id: "contract-details", label: t("subscriptions.workflow.contractDetails"), tabIds: ["lines", "amendments", "bundles", "entitlements"] },
+      { id: "usage", label: t("subscriptions.workflow.usage"), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers"] },
+      { id: "revenue", label: t("subscriptions.workflow.revenue"), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
+    ],
+  },
   tabGroups: [
     { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "bundles", "entitlements"] },
     { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
@@ -2894,6 +2907,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSubscriptionPlanForm(t),
       createLabel: "New Plan",
       createAction: "createPlan",
+      createPermission: { resource: "subscription_plan", action: "create" },
     },
     {
       id: "lines",

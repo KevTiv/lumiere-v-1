@@ -133,7 +133,7 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
       for (const [key, value] of current.searchParams) {
         if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
       }
-      // A module's default may be Orders or Inbox rather than Dashboard.
+      // A module may default to Orders or Inbox.
       target.searchParams.set("tab", tabId)
       await page.goto(target.toString())
       await currentModuleView(page, moduleId)
@@ -494,22 +494,34 @@ export async function chooseFirstOption(page: Page, name: string) {
   await chooseFirstEnabledOption(page, name)
 }
 
-/** A closing popup can remain visible briefly; it must not supply the next field's options. */
-async function openSelectListbox(page: Page, trigger: Locator): Promise<Locator> {
-  const listbox = page.locator('[role="listbox"]:visible')
-  const expanded = await trigger.getAttribute("aria-expanded")
-  const visible = await listbox.isVisible().catch(() => false)
-  if (expanded === "false" || (expanded == null && !visible)) {
-    await expect(listbox).toBeHidden()
-    await trigger.click()
+/** Scope to this trigger's popup, including while another popup is animating closed. */
+async function openSelectListbox(page: Page, trigger: Locator) {
+  await expect(trigger).toBeVisible({ timeout: 15_000 })
+  // Radix hides background controls from the accessibility tree while open.
+  // Resolve its popup before opening so role-based trigger locators remain usable.
+  let contentId = await trigger.getAttribute("aria-controls")
+  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click()
+  if (!contentId) {
+    await expect(trigger).toHaveAttribute("aria-controls", /.+/)
+    contentId = await trigger.getAttribute("aria-controls")
   }
-  await expect(listbox).toBeVisible({ timeout: 15_000 })
+  if (!contentId) throw new Error("select trigger has no controlled popup")
+  const content = `[id=${JSON.stringify(contentId)}]`
+  const listbox = page.locator(`${content}[role="listbox"], ${content} [role="listbox"]`)
+  await expect(listbox).toBeVisible()
   return listbox
+}
+
+async function selectOption(trigger: Locator, listbox: Locator, option: Locator) {
+  await option.click({ timeout: 15_000 })
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+  await expect(listbox).toBeHidden()
 }
 
 /** Pick the first non-disabled select option (skips empty placeholders). */
 export async function chooseFirstEnabledOption(page: Page, name: string) {
-  const listbox = await openSelectListbox(page, page.getByTestId(`form-field-${name}`))
+  const field = page.getByTestId(`form-field-${name}`)
+  const listbox = await openSelectListbox(page, field)
   await expect
     .poll(async () => listbox.getByRole("option", { disabled: false }).count(), {
       timeout: 30_000,
@@ -529,8 +541,7 @@ export async function chooseFirstEnabledOption(page: Page, name: string) {
     const isPlaceholderLabel = /^(?:—|-|select(?:\.\.\.)?)$/i.test(label)
     const hasConcreteValue = Boolean(value?.trim() && !value.startsWith("__lumiere_empty__:"))
     if (hasConcreteValue || (label !== "" && !isPlaceholderLabel)) {
-      await option.click()
-      await expect(listbox).toBeHidden()
+      await selectOption(field, listbox, option)
       return
     }
   }
@@ -784,8 +795,7 @@ export async function chooseSelectOptionByValue(
   name: string,
   value: string | number | bigint,
 ) {
-  const field = page.getByTestId(`form-field-${name}`)
-  await chooseSelectOptionByTriggerValue(page, field, value)
+  await chooseSelectOptionByTriggerValue(page, page.getByTestId(`form-field-${name}`), value)
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
@@ -803,23 +813,13 @@ export async function chooseSelectOptionByLabel(
   const field = page.getByTestId(`form-field-${name}`)
   const listbox = await openSelectListbox(page, field)
   const option = listbox.getByRole("option", { name: optionName }).first()
-
-  await expect
-    .poll(
-      async () => {
-        return await option.count()
-      },
-      { timeout: optionTimeoutMs },
-    )
-    .toBeGreaterThan(0)
-
-  const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
+  await expect(option).toBeVisible({ timeout: optionTimeoutMs })
+  const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
   if (await search.isVisible()) await search.fill((await option.innerText()).trim())
-  await option.click({ timeout: 15_000 })
-  await expect(listbox).toBeHidden()
+  await selectOption(field, listbox, option)
 }
 
-/** Exact IDs stay distinct even when two records have the same visible label. */
+/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
 export async function chooseSelectOptionByTriggerValue(
   page: Page,
   trigger: Locator,
@@ -827,50 +827,26 @@ export async function chooseSelectOptionByTriggerValue(
 ) {
   const listbox = await openSelectListbox(page, trigger)
   const storedValue = String(value)
-  const selectorValue = JSON.stringify(storedValue)
-  let option = listbox.locator(`[role="option"][data-value=${selectorValue}], [role="option"][data-record-value=${selectorValue}]`)
-
-  await expect
-    .poll(
-      async () => {
-        const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
-        if (await search.isVisible()) {
-          const query = `#${storedValue}`
-          if (await search.inputValue() !== query) await search.fill(query)
-        }
-        if (await option.count()) return await option.count()
-        // Older Radix markup supplies a native select; RecordPicker does not.
-        const label = await trigger.locator('xpath=following-sibling::select[@aria-hidden="true"][1]/option')
-          .evaluateAll((options, expectedValue) => options.find((item) => (item as HTMLOptionElement).value === expectedValue)?.textContent?.trim() ?? "", String(value))
-        if (label) option = listbox.getByRole("option", { name: label, exact: true })
-        return await option.count()
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(1)
-
+  let option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
+  const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
+  if (await search.isVisible()) await search.fill(`#${storedValue}`)
+  // Retain compatibility with the older native-select markup.
+  if (await option.count() === 0) {
+    const label = await trigger.locator('xpath=following-sibling::select[@aria-hidden="true"][1]/option')
+      .evaluateAll((options, expected) => options.find((item) => (item as HTMLOptionElement).value === expected)?.textContent?.trim() ?? "", storedValue)
+    if (label) option = listbox.getByRole("option", { name: label, exact: true })
+  }
+  await expect(option).toHaveCount(1, { timeout: 30_000 })
   await expect(option).toBeEnabled()
-  await option.click({ timeout: 15_000 })
-  await expect(listbox).toBeHidden()
+  await selectOption(trigger, listbox, option)
 }
 
 /** Pick the first real option of a shared Select located by its trigger. */
 export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Locator) {
   const listbox = await openSelectListbox(page, trigger)
   const option = listbox.getByRole("option", { disabled: false }).first()
-
-  await expect
-    .poll(
-      async () => {
-        const count = await option.count()
-        return count
-      },
-      { timeout: 30_000 },
-    )
-    .toBeGreaterThan(0)
-
-  await option.click()
-  await expect(listbox).toBeHidden()
+  await expect(option).toBeVisible({ timeout: 30_000 })
+  await selectOption(trigger, listbox, option)
 }
 
 export async function submitForm(page: Page, formId: string) {
@@ -3067,7 +3043,8 @@ export async function seedPublishableWorkflowDraft(
   ])
 
   const workflowId = await fetchWorkflowIdByKey(page, workflowKey)
-  let { versionId, draftRevision: rev } = await fetchDraftWorkflowVersionId(page, workflowId)
+  const { versionId, draftRevision } = await fetchDraftWorkflowVersionId(page, workflowId)
+  let rev = draftRevision
 
   for (const node of [
     { nodeKey: "start", name: "Start", kind: { tag: "Start" }, sequence: 1 },
