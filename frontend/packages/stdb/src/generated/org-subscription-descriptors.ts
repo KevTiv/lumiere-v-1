@@ -94,6 +94,16 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "activity-types": {
+    "table": "activity_type",
+    "predicates": [],
+    "order_by": [
+      {
+        "field": "sequence",
+        "direction": "asc"
+      }
+    ]
+  },
   "adjustment-reasons": {
     "table": "adjustment_reason",
     "predicates": [],

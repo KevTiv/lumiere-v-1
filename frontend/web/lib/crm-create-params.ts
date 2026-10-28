@@ -150,11 +150,7 @@ export function toCreateActivityParams(
   // rejected server-side, so we drop it here rather than sending a value that
   // cannot persist.
   const resModel = optionalTrimmedString(formData.resModel)?.toLowerCase()
-  const resIdRaw = formData.resId
-  const resIdNum =
-    resIdRaw != null && String(resIdRaw).trim() !== "" && Number.isFinite(Number(resIdRaw)) && Number(resIdRaw) > 0
-      ? BigInt(String(resIdRaw))
-      : undefined
+  const resIdNum = parseU64Field(formData.resId)
 
   const targetTag: CrmActivityTarget["tag"] | undefined =
     resModel === "contact"
@@ -166,7 +162,7 @@ export function toCreateActivityParams(
           : undefined
 
   const target =
-    targetTag != null && resIdNum != null
+    targetTag != null && resIdNum != null && resIdNum > 0n
       ? { tag: targetTag, value: resIdNum }
       : undefined
 
@@ -182,10 +178,11 @@ export function toCreateActivityParams(
 export function toConvertLeadParams(formData: Record<string, unknown>): ConvertLeadParams | null {
   const createContact = Boolean(formData.createContact)
   const createOpportunity = Boolean(formData.createOpportunity)
+  if (!createContact && !createOpportunity) return null
   let opportunityStageId: ConvertLeadParams["opportunityStageId"]
   if (createOpportunity) {
     const sid = parseU64Field(formData.opportunityStageId)
-    if (sid === null) return null
+    if (sid === null || sid === 0n) return null
     opportunityStageId = sid
   } else {
     opportunityStageId = undefined

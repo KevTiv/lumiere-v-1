@@ -555,6 +555,35 @@ export function ModularForm({
           ? (Icons as Record<string, unknown>)[section.icon] as React.ComponentType<{ className?: string }> | undefined
           : undefined
 
+        const fields = (
+          <div className="grid min-w-0 grid-cols-12 gap-x-4 gap-y-5 [&>div]:min-w-0">
+            {visibleSectionFields(section.fields, values).map((field) => (
+              <FormFieldRenderer
+                key={field.id}
+                field={field}
+                values={values}
+                value={values[field.name]}
+                onChange={(value) => handleChange(field.name, value)}
+                error={errors[field.name]}
+                aiSuggestion={aiAppliedFields[field.name]}
+              />
+            ))}
+          </div>
+        )
+
+        if (section.collapsible) return (
+          <details key={section.id} open={section.fields.some((field) => errors[field.name]) || undefined}
+            className="rounded-lg border border-border p-4">
+            <summary className="cursor-pointer text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+              {section.title}
+            </summary>
+            <div className="pt-4">
+              {section.description && <p className="mb-4 text-sm text-muted-foreground">{section.description}</p>}
+              {fields}
+            </div>
+          </details>
+        )
+
         return (
           <div key={section.id}>
             {idx > 0 && <Separator className="mb-6" />}
@@ -580,19 +609,7 @@ export function ModularForm({
                   </div>
                 </div>
               )}
-              <div className="grid min-w-0 grid-cols-12 gap-x-4 gap-y-5 [&>div]:min-w-0">
-                {visibleSectionFields(section.fields, values).map((field) => (
-                  <FormFieldRenderer
-                    key={field.id}
-                    field={field}
-                    values={values}
-                    value={values[field.name]}
-                    onChange={(value) => handleChange(field.name, value)}
-                    error={errors[field.name]}
-                    aiSuggestion={aiAppliedFields[field.name]}
-                  />
-                ))}
-              </div>
+              {fields}
             </div>
           </div>
         )

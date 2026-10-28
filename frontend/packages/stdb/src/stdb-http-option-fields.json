@@ -6487,7 +6487,8 @@
     "expected_revenue",
     "probability",
     "stage_id",
-    "team_id"
+    "team_id",
+    "state"
   ],
   "UpdateLeadSourceParams": [
     "name",

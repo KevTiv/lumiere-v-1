@@ -472,9 +472,17 @@ export async function openTabAndCancelCreate(
   await expectNoAppError(page)
 }
 
+/** Reveal optional form sections through their visible disclosure controls. */
+export async function revealFormSection(field: Locator) {
+  for (const section of await field.locator("xpath=ancestor::details").all()) {
+    if (await section.getAttribute("open") === null) await section.locator(":scope > summary").click()
+  }
+}
+
 export async function fillField(scope: Page | Locator, name: string, value: string) {
   const field = scope.getByTestId(`form-field-${name}`)
   await expect(field, `Missing form field "${name}" in the active form`).toHaveCount(1, { timeout: 15_000 })
+  await revealFormSection(field)
   // Textarea retains its test id on the native form bridge. User input belongs
   // in the visible editor inside that same panel, including within a dialog.
   if (
@@ -496,6 +504,7 @@ export async function chooseFirstOption(page: Page, name: string) {
 
 /** Scope to this trigger's popup, including while another popup is animating closed. */
 async function openSelectListbox(page: Page, trigger: Locator) {
+  await revealFormSection(trigger)
   await expect(trigger).toBeVisible({ timeout: 15_000 })
   // Radix hides background controls from the accessibility tree while open.
   // Resolve its popup before opening so role-based trigger locators remain usable.

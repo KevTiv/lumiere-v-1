@@ -3938,7 +3938,7 @@
       }
     },
     "actions": {
-      "convertToCustomer": "Convert to customer",
+      "convertToCustomer": "Convert lead",
       "convertToSaleOrder": "Convert to sale order",
       "newOpportunityLine": "New line",
       "convertLeadQualifiedOnly": "Only leads in Qualified status can be converted.",
@@ -4028,7 +4028,7 @@
     "forms": {
       "newLead": {
         "title": "New Lead",
-        "description": "Capture a new incoming lead",
+        "description": "Capture an enquiry first. Qualify it when it is ready, then convert it into a contact and opportunity.",
         "sections": {
           "contact": "Contact and company",
           "details": "Qualification and value",
@@ -4249,7 +4249,7 @@
       },
       "newActivity": {
         "title": "New Activity",
-        "description": "Schedule a call, meeting, or task",
+        "description": "Choose an activity type, add a summary, and set a follow-up date.",
         "sections": {
           "activityDetails": "Activity Details"
         },
@@ -4264,8 +4264,8 @@
         "submit": "Schedule activity"
       },
       "convertLead": {
-        "title": "Convert lead",
-        "description": "Create a contact and/or pipeline opportunity from this qualified lead.",
+        "title": "Convert qualified lead",
+        "description": "Choose what to create from this enquiry. The lead will be marked Converted. Creating a sales order is a separate step on the opportunity.",
         "sections": {
           "options": "Conversion"
         },
@@ -4676,6 +4676,88 @@
       "expectedRevenue": "Expected revenue",
       "open": "Open opportunities",
       "overdue": "Past deadline"
+    },
+    "workflow": {
+      "nextActions": "Next actions",
+      "newLead": "New lead",
+      "lifecycle": "New enquiry → Qualified lead → Opportunity → Won or Lost. Contacts hold relationship details; sales orders are created from opportunities.",
+      "stage": "Stage: {{stage}}",
+      "chooseConversionResult": "Choose a contact, an opportunity, or both before converting.",
+      "openOpportunities": "View opportunities",
+      "openContacts": "View contacts",
+      "viewLeads": "View leads",
+      "viewActivities": "View activities",
+      "recordKinds": {
+        "lead": "Lead",
+        "opportunity": "Opportunity",
+        "contact": "Contact"
+      },
+      "status": {
+        "open": "Open opportunity",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "actions": {
+        "qualify": "Qualify lead",
+        "convertLead": "Convert lead",
+        "changeStage": "Move stage",
+        "won": "Mark won",
+        "lost": "Mark lost",
+        "createOrder": "Create sales order",
+        "followUp": "Schedule follow-up",
+        "edit": "Edit details"
+      },
+      "reasons": {
+        "sourceUnavailable": "Records are not ready. Refresh or retry the list before making changes.",
+        "permissionRequired": "Your role does not allow this action. Ask an administrator for access.",
+        "conversionPermissionRequired": "Creating a contact and opportunity requires access to create both records.",
+        "saving": "Saving changes. Wait for confirmation before taking another action.",
+        "companyRequired": "Select an operating company to work with deals.",
+        "stagesRequired": "Pipeline stages must load and include an active stage. Retry or open Pipeline setup.",
+        "wonStageRequired": "Configure exactly one Won stage and make sure it is active in Pipeline setup.",
+        "lostReasonRequired": "Load or configure a loss reason in Pipeline setup before marking a deal lost.",
+        "customerRequired": "Use Edit details to link a customer before creating a sales order.",
+        "orderSetupRequired": "Sales order creation needs loaded price lists, warehouses, and a Won pipeline stage. Check Sales, Inventory, and Pipeline setup.",
+        "activityTypeRequired": "An active activity type must be available before scheduling. Ask an administrator to configure one or retry loading the list."
+      },
+      "feedback": {
+        "qualified": "Lead qualified. You can now convert it.",
+        "won": "Opportunity marked won.",
+        "lost": "Opportunity marked lost.",
+        "stageChanged": "Pipeline stage updated.",
+        "scheduled": "Follow-up scheduled.",
+        "converted": "Lead converted. Your selected records are ready.",
+        "saved": "Changes saved.",
+        "failed": "Could not complete the action",
+        "activityCompleted": "Activity completed.",
+        "activityFailed": "Could not complete the activity",
+        "leadCreated": "Lead saved. Qualify it or schedule a follow-up next.",
+        "opportunityCreated": "Opportunity saved. Schedule a follow-up to keep it moving.",
+        "contactCreated": "Contact saved.",
+        "created": "Record saved."
+      }
+    },
+    "myWork": {
+      "title": "My Work",
+      "description": "Start with overdue follow-ups, then today’s activities and your deals needing attention.",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "deals": "My deals needing attention",
+      "dealsHint": "Your open deals in the selected company with an overdue close date or no open follow-up.",
+      "recordUnavailable": "The linked record is unavailable. Check access or retry its list.",
+      "empty": {
+        "overdue": "No overdue follow-ups.",
+        "today": "Nothing scheduled for today. Open a lead or deal to schedule a follow-up.",
+        "upcoming": "No upcoming follow-ups.",
+        "deals": "Your deals have no outstanding follow-up gaps."
+      },
+      "source": {
+        "loading": "Loading your work…",
+        "denied": "You do not have access to this list.",
+        "error": "This list could not load. Retry to see your work.",
+        "partial": "This list is out of date. Retry before taking action."
+      }
     }
   },
   "iot": {
@@ -15980,7 +16062,8 @@
       "schedules": "Schedules",
       "expenses": "Expenses",
       "expenseReports": "Expense reports",
-      "operations": "Operations"
+      "operations": "Operations",
+      "myWork": "My Work"
     },
     "tabGroups": {
       "banking": "Banking",

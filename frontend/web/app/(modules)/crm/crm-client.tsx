@@ -21,7 +21,11 @@ import { ContactPaymentsAndMessagesPanel } from "./contact-payments-and-messages
 import { ContactConsentPanel } from "./contact-consent-panel"
 import { ContactRelationshipsPanel } from "./contact-relationships-panel"
 import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
-import { MyActivitiesPanel } from "./my-activities-panel"
+import { CrmMyWorkPanel } from "./crm-my-work-panel"
+import { CrmRecordActions } from "./crm-record-actions"
+import { EntityRecordSheet } from "@lumiere/ui/entity-views/entity-record-sheet"
+import { crmWorkflowActions, crmLeadState, crmOpportunityClosed, crmOpportunityStatus, type CrmRecordKind, type CrmActionContext, type CrmActionId } from "./crm-workflow"
+import { useQuery } from "@tanstack/react-query"
 import { CrmPipelineAdminPanel } from "./crm-pipeline-admin-panel"
 import { CrmCountryPackPanel } from "./crm-country-pack-panel"
 import { LeadScorePanel } from "./lead-score-panel"
@@ -131,6 +135,7 @@ import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/
 import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
 import { EntityLabelsProvider, labelsFromOptions } from "@lumiere/ui"
 import type { EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityRow } from "@lumiere/ui/lib/entity-view-types"
 import { entityTableConfigFromView } from "@lumiere/ui/lib/entity-view-types"
 import {
   DEFAULT_KANBAN_COLUMN_COLORS,
@@ -209,7 +214,8 @@ type CrmClientLoadedProps = Omit<CrmClientProps, "organizationId"> & {
 
 type WorkflowModal =
   | { kind: "convertLead"; form: FormConfig; leadId: bigint }
-  | { kind: "convertOpp"; form: FormConfig; opportunityId: bigint }
+  | { kind: "convertOpp"; form: FormConfig; opportunityId: bigint; companyId: bigint }
+  | { kind: "scheduleActivity"; form: FormConfig; targetKind: CrmRecordKind; targetId: bigint }
   | { kind: "assignTag"; form: FormConfig; contactId: bigint }
   | { kind: "assignCategory"; form: FormConfig; contactId: bigint }
   | { kind: "addSegment"; form: FormConfig; contactId: bigint }
@@ -295,11 +301,11 @@ function scalarFieldString(value: unknown): string {
 }
 
 function leadStateRaw(row: Record<string, unknown>): string {
-  return scalarFieldString(row.state ?? row.State)
+  return crmLeadState(row)
 }
 
 function oppIsClosed(row: Record<string, unknown>): boolean {
-  return row.isWon === true || row.is_won === true || row.isLost === true || row.is_lost === true
+  return crmOpportunityClosed(row)
 }
 
 function recordTimestampMs(row: Record<string, unknown>): number {
@@ -362,7 +368,7 @@ function CrmClientLoaded({
   useCrmModuleSubscription()
   const { t } = useTranslation()
   const router = useRouter()
-  const { currentUser } = useRBAC()
+  const { currentUser, checkPermission } = useRBAC()
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const ownerLabelMap = useIdentityLabelMap(organizationId)
@@ -420,6 +426,7 @@ function CrmClientLoaded({
   }
 
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [focusedRecord, setFocusedRecord] = useState<{ kind: CrmRecordKind; id: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [workflowSubmitError, setWorkflowSubmitError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
@@ -448,9 +455,21 @@ function CrmClientLoaded({
   const activities = activitiesRead.rows
   const opportunityStagesQuery = useOpportunityStages(orgId)
   const { rows: opportunityStages } = moduleCollection(opportunityStagesQuery)
-  const { data: leadLostReasons = [] } = useLeadLostReasons(orgId)
-  const { data: pricelists = [] } = usePricelists(orgId)
-  const { data: warehouses = [] } = useWarehouses(orgId)
+  const lostReasonsQuery = useLeadLostReasons(orgId)
+  const { rows: leadLostReasons } = moduleCollection(lostReasonsQuery)
+  const pricelistsQuery = usePricelists(orgId)
+  const { rows: pricelists } = moduleCollection(pricelistsQuery)
+  const warehousesQuery = useWarehouses(orgId)
+  const { rows: warehouses } = moduleCollection(warehousesQuery)
+  const activityTypesQuery = useQuery({
+    queryKey: ["activity-types", organizationId],
+    queryFn: () => fetchQueryList("/api/query/activity-types", "Could not load activity types"),
+    staleTime: 60_000,
+  })
+  const activityTypeOptions = useMemo(() => moduleCollection(activityTypesQuery).rows
+    .filter((row) => row.isActive === true)
+    .map((row) => ({ value: String(row.id), label: String(row.name) })), [activityTypesQuery.data, activityTypesQuery.isError, activityTypesQuery.isLoading])
+  const activityForm = useMemo(() => newActivityForm(t, activityTypeOptions), [t, activityTypeOptions])
   const { data: products = [] } = useProducts(orgId)
   const { data: uoms = [] } = useUoms(orgId)
   const { data: accountTaxes = [] } = useAccountTaxes(orgId)
@@ -458,6 +477,7 @@ function CrmClientLoaded({
   const opportunityStageOptions = useMemo(
     () =>
       [...opportunityStages]
+        .filter((stage) => stage.isActive !== false)
         .sort(
           (a, b) =>
             Number((a as Record<string, unknown>).sequence ?? 0) -
@@ -534,6 +554,7 @@ function CrmClientLoaded({
   // (same fallback convention as contactTagSelectOptions/contactSegmentSelectOptions).
   const lostReasonSelectOptions = useMemo(() => {
     const fromApi = (leadLostReasons as Record<string, unknown>[])
+      .filter((row) => row.isActive !== false && row.is_active !== false)
       .map((r) => ({ value: String(r.id ?? ""), label: String(r.name ?? r.id ?? "") }))
       .filter((o) => o.value !== "")
     if (fromApi.length > 0) return fromApi
@@ -546,16 +567,17 @@ function CrmClientLoaded({
   )
 
   const wonStageId = useMemo(() => {
-    const stage = opportunityStages.find(
+    const matches = opportunityStages.filter(
       (s) => (s as Record<string, unknown>).isWon === true,
-    ) as Record<string, unknown> | undefined
-    if (!stage?.id) return null
+    )
+    const stage = (matches.length === 1 ? matches[0] : undefined) as Record<string, unknown> | undefined
+    if (!stage?.id || stage.isActive !== true) return null
     return BigInt(String(stage.id))
   }, [opportunityStages])
 
   const lostStageId = useMemo(() => {
     const stage = opportunityStages.find(
-      (s) => String((s as Record<string, unknown>).name ?? "") === "Lost",
+      (s) => { const row = s as Record<string, unknown>; return String(row.name ?? "") === "Lost" && row.isActive !== false },
     ) as Record<string, unknown> | undefined
     if (!stage?.id) return null
     return BigInt(String(stage.id))
@@ -567,8 +589,9 @@ function CrmClientLoaded({
         const row = o as Record<string, unknown>
         const stageId = String(row.stageId ?? row.stage_id ?? "")
         return {
-          ...row,
+          ...o,
           stageName: stageById.get(stageId) ?? "—",
+          workflowStatus: crmOpportunityStatus(row),
           partnerName: contactNamesForLists.get(String(row.partnerId ?? row.partner_id ?? "")),
           contactName: contactNamesForLists.get(String(row.contactId ?? row.contact_id ?? "")),
         }
@@ -716,7 +739,7 @@ function CrmClientLoaded({
       const row = rows[0]
       if (!row) return
       if (leadStateRaw(row) !== "qualified") {
-        window.alert(t("crm.actions.convertLeadQualifiedOnly"))
+        showWorkflowToast({ kind: "info", title: t("crm.actions.convertLeadQualifiedOnly") })
         return
       }
       const leadId = rowIdBigInt(row)
@@ -731,13 +754,13 @@ function CrmClientLoaded({
       if (!row) return
       const pid = partnerId(row)
       if (pid == null || pid === "") {
-        window.alert(t("crm.actions.convertOppNeedsPartner"))
+        showWorkflowToast({ kind: "info", title: t("crm.actions.convertOppNeedsPartner") })
         return
       }
       const opportunityId = rowIdBigInt(row)
-      setWorkflowModal({ kind: "convertOpp", opportunityId, form: buildConvertOppForm() })
+      setWorkflowModal({ kind: "convertOpp", opportunityId, companyId: rowCompanyId(row, operatingCompanyId), form: buildConvertOppForm() })
     },
-    [t, buildConvertOppForm],
+    [t, buildConvertOppForm, operatingCompanyId],
   )
 
   const openAssignTagModal = useCallback(
@@ -784,7 +807,7 @@ function CrmClientLoaded({
       const row = rows[0]
       if (!row) return
       if (oppIsClosed(row)) {
-        window.alert(t("crm.actions.alreadyClosed"))
+        showWorkflowToast({ kind: "info", title: t("crm.actions.alreadyClosed") })
         return
       }
       let base = changeOpportunityStageForm(t, opportunityStageOptions)
@@ -945,7 +968,7 @@ function CrmClientLoaded({
       const row = rows[0]
       if (!row) return
       if (oppIsClosed(row)) {
-        window.alert(t("crm.actions.alreadyClosed"))
+        showWorkflowToast({ kind: "info", title: t("crm.actions.alreadyClosed") })
         return
       }
       // CRM-RI-011: lifecycle is a validated transition, not a raw flag. The
@@ -955,15 +978,12 @@ function CrmClientLoaded({
         desiredState: { tag: "Won" },
       }
       if (wonStageId != null) params.stageId = wonStageId
-      try {
-        await updateOpportunity.mutateAsync({
-          opportunityId: rowIdBigInt(row),
-          companyId: rowCompanyId(row, operatingCompanyId),
-          params,
-        })
-      } catch (e) {
-        window.alert(e instanceof Error ? e.message : "Action failed")
-      }
+      await updateOpportunity.mutateAsync({
+        opportunityId: rowIdBigInt(row),
+        companyId: rowCompanyId(row, operatingCompanyId),
+        params,
+      })
+      showWorkflowToast({ kind: "success", title: t("crm.workflow.feedback.won") })
     },
     [t, wonStageId, updateOpportunity, operatingCompanyId],
   )
@@ -973,7 +993,7 @@ function CrmClientLoaded({
       const row = rows[0]
       if (!row) return
       if (oppIsClosed(row)) {
-        window.alert(t("crm.actions.alreadyClosed"))
+        showWorkflowToast({ kind: "info", title: t("crm.actions.alreadyClosed") })
         return
       }
       // CRM-RI-011: the backend now requires a valid lost reason before an
@@ -1000,17 +1020,8 @@ function CrmClientLoaded({
       companyId: bigint
       stageId: bigint
     }) => {
-      try {
-        await updateOpportunity.mutateAsync({
-          opportunityId,
-          companyId,
-          params: { stageId },
-        })
-      } catch (e) {
-        window.alert(
-          e instanceof Error ? e.message : t("crm.opportunities.board.moveFailed"),
-        )
-      }
+      await updateOpportunity.mutateAsync({ opportunityId, companyId, params: { stageId } })
+      showWorkflowToast({ kind: "success", title: t("crm.workflow.feedback.stageChanged") })
     },
     [t, updateOpportunity],
   )
@@ -1146,9 +1157,81 @@ function CrmClientLoaded({
     [t, updateOpportunityAsync, operatingCompanyId],
   )
 
+  const isFormMutationPending =
+    createLead.isPending ||
+    createOpportunity.isPending ||
+    createOpportunityLine.isPending ||
+    createContact.isPending ||
+    createActivity.isPending ||
+    convertLead.isPending ||
+    convertOppToOrder.isPending ||
+    updateOpportunity.isPending ||
+    assignTag.isPending ||
+    addContactCategories.isPending ||
+    createContactCategory.isPending ||
+    addToSegment.isPending ||
+    createContactTag.isPending ||
+    createContactSegment.isPending ||
+    updateContact.isPending ||
+    updateContactAddress.isPending ||
+    updateContactBusiness.isPending ||
+    updateContactDetails.isPending ||
+    updateLead.isPending ||
+    csvImports.importContact.isPending ||
+    csvImports.importLead.isPending ||
+    csvImports.importOpportunity.isPending
+
+  const recordActionContext = useCallback((kind: CrmRecordKind): CrmActionContext => ({
+    ready: (kind === "lead" ? leadsRead.state.status : kind === "opportunity" ? opportunitiesRead.state.status : contactsRead.state.status) === "ready",
+    canWrite: checkPermission(kind, "write").allowed,
+    canCreateActivity: checkPermission("activity", "create").allowed,
+    canConvertLead: checkPermission("contact", "create").allowed && checkPermission("opportunity", "create").allowed,
+    busy: isFormMutationPending,
+    companyReady: operatingCompanyId !== 0n,
+    stagesReady: moduleQueryState(opportunityStagesQuery).status === "ready" && opportunityStageOptions.length > 0,
+    wonStageReady: moduleQueryState(opportunityStagesQuery).status === "ready" && wonStageId != null,
+    lostReasonsReady: moduleQueryState(lostReasonsQuery).status === "ready" && lostReasonSelectOptions.some((option) => option.value !== ""),
+    orderSetupReady: moduleQueryState(pricelistsQuery).status === "ready" && moduleQueryState(warehousesQuery).status === "ready"
+      && pricelistSelectOptions.length > 0 && warehouseSelectOptions.length > 0 && wonStageId != null,
+    activityTypesReady: activitiesRead.state.status === "ready" && moduleQueryState(activityTypesQuery).status === "ready" && activityTypeOptions.length > 0,
+  }), [leadsRead.state.status, opportunitiesRead.state.status, contactsRead.state.status, checkPermission, isFormMutationPending,
+    operatingCompanyId, opportunityStagesQuery, opportunityStageOptions.length, wonStageId, lostReasonsQuery, lostReasonSelectOptions,
+    pricelistsQuery, warehousesQuery, pricelistSelectOptions.length, warehouseSelectOptions.length, activitiesRead.state.status, activityTypesQuery, activityTypeOptions.length])
+
+  const handleRecordAction = useCallback(async (kind: CrmRecordKind, action: CrmActionId, row: EntityRow) => {
+    const availability = crmWorkflowActions(kind, row, recordActionContext(kind)).find((item) => item.id === action)
+    if (!availability || availability.reason) {
+      showWorkflowToast({ kind: "info", title: t(`crm.workflow.reasons.${availability?.reason ?? "sourceUnavailable"}`) })
+      return
+    }
+    phCapture("crm_record_action", { organization_id: organizationId, record_kind: kind, action })
+    try {
+      if (action === "qualify") {
+        await updateLead.mutateAsync({ leadId: rowIdBigInt(row), params: { state: "qualified" } })
+        showWorkflowToast({ kind: "success", title: t("crm.workflow.feedback.qualified") })
+      } else if (action === "convertLead") openConvertLeadModal([row])
+      else if (action === "changeStage") openChangeStageModal([row])
+      else if (action === "won") await markOpportunityWon([row])
+      else if (action === "lost") await markOpportunityLost([row])
+      else if (action === "createOrder") openConvertOppModal([row])
+      else if (action === "followUp") setWorkflowModal({ kind: "scheduleActivity", targetKind: kind, targetId: rowIdBigInt(row), form: activityForm })
+      else if (kind === "lead") openEditLeadDetailsModal([row])
+      else if (kind === "opportunity") openEditOpportunityModal([row])
+      else openEditContactModal([row])
+    } catch (error) {
+      showWorkflowToast({ kind: "error", title: t("crm.workflow.feedback.failed"), description: error instanceof Error ? error.message : String(error) })
+    }
+  }, [recordActionContext, t, organizationId, updateLead, openConvertLeadModal, openChangeStageModal, markOpportunityWon,
+    markOpportunityLost, openConvertOppModal, activityForm, openEditLeadDetailsModal, openEditOpportunityModal, openEditContactModal])
+
+  const renderRecordActions = useCallback((kind: CrmRecordKind, row: EntityRow) => (
+    <CrmRecordActions kind={kind} record={row} context={recordActionContext(kind)} onAction={(action, record) => handleRecordAction(kind, action, record)} />
+  ), [recordActionContext, handleRecordAction])
+
   const leadRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "contactName",
+      actions: (record) => renderRecordActions("lead", record),
       statusKey: "state",
       statusBadgeVariants: {
         new: "secondary",
@@ -1200,18 +1283,17 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId, leadDetail],
+    [t, organizationId, leadDetail, renderRecordActions],
   )
 
   const opportunityRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "name",
-      statusKey: "priority",
-      statusBadgeVariants: { Low: "secondary", Medium: "outline", High: "default" },
+      actions: (record) => renderRecordActions("opportunity", record),
+      statusKey: "workflowStatus",
+      statusBadgeVariants: { open: "info", won: "success", lost: "destructive" },
       statusBadgeLabels: {
-        Low: t("crm.opportunities.states.Low"),
-        Medium: t("crm.opportunities.states.Medium"),
-        High: t("crm.opportunities.states.High"),
+        open: t("crm.workflow.status.open"), won: t("crm.workflow.status.won"), lost: t("crm.workflow.status.lost"),
       },
       detailConfig: opportunityDetail,
       auditTableName: "opportunity",
@@ -1238,12 +1320,13 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId, opportunityDetail],
+    [t, organizationId, opportunityDetail, renderRecordActions],
   )
 
   const contactRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "name",
+      actions: (record) => renderRecordActions("contact", record),
       detailConfig: contactDetailConfig(t),
       auditTableName: "contact",
       discussion: {},
@@ -1320,11 +1403,18 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId, operatingCompanyId],
+    [t, organizationId, operatingCompanyId, renderRecordActions],
   )
 
   const moduleConfig = useMemo((): ModuleConfig => {
     const base = crmModuleConfig(t)
+
+    const workflowTableAction = (kind: CrmRecordKind, action: CrmActionId): Pick<EntityAction, "permission" | "isApplicable" | "onClick"> => ({
+      permission: { resource: kind, action: "write" },
+      isApplicable: (rows) => rows.length === 1 && crmWorkflowActions(kind, rows[0]!, recordActionContext(kind))
+        .some((item) => item.id === action && !item.reason),
+      onClick: async (rows) => { if (rows[0]) await handleRecordAction(kind, action, rows[0]) },
+    })
 
     const leadsCfg = leadsTableConfig(t)
     const oppCfg = opportunitiesTableConfig(t, { ownerLabelMap })
@@ -1364,11 +1454,18 @@ function CrmClientLoaded({
             onClick: openEditLeadRevenueModal,
           },
           {
+            id: "qualify-lead",
+            label: t("crm.workflow.actions.qualify"),
+            permission: { resource: "lead", action: "write" },
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && crmLeadState(rows[0]!) === "new",
+            onClick: async (rows) => { if (rows[0]) await handleRecordAction("lead", "qualify", rows[0]) },
+          },
+          {
             id: "convert-lead",
             label: t("crm.actions.convertToCustomer"),
             requiresSelection: true,
-            isApplicable: (rows) => rows.every((row) => leadStateRaw(row) === "qualified"),
-            onClick: openConvertLeadModal,
+            ...workflowTableAction("lead", "convertLead"),
           },
           {
             id: "delete-lead",
@@ -1419,33 +1516,26 @@ function CrmClientLoaded({
                       id: "change-stage",
                       label: t("crm.actions.changeStage"),
                       requiresSelection: true,
-                      isApplicable: (rows) => rows.every((row) => !oppIsClosed(row)),
-                      onClick: openChangeStageModal,
+                      ...workflowTableAction("opportunity", "changeStage"),
                     },
                     {
                       id: "mark-won",
                       label: t("crm.actions.markWon"),
                       requiresSelection: true,
-                      isApplicable: (rows) => rows.every((row) => !oppIsClosed(row)),
-                      onClick: async (rows) => {
-                        await markOpportunityWon(rows)
-                      },
+                      ...workflowTableAction("opportunity", "won"),
                     },
                     {
                       id: "mark-lost",
                       label: t("crm.actions.markLost"),
                       requiresSelection: true,
-                      isApplicable: (rows) => rows.every((row) => !oppIsClosed(row)),
                       variant: "destructive",
-                      onClick: async (rows) => {
-                        await markOpportunityLost(rows)
-                      },
+                      ...workflowTableAction("opportunity", "lost"),
                     },
                     {
                       id: "convert-opp-order",
                       label: t("crm.actions.convertToSaleOrder"),
                       requiresSelection: true,
-                      onClick: openConvertOppModal,
+                      ...workflowTableAction("opportunity", "createOrder"),
                     },
                   ],
                 },
@@ -1647,7 +1737,7 @@ function CrmClientLoaded({
               const row = rows[0]
               if (!row) return
               if (row.isDone === true || String(row.state ?? "").toLowerCase() === "done") {
-                window.alert(t("crm.actions.alreadyComplete"))
+                showWorkflowToast({ kind: "info", title: t("crm.actions.alreadyComplete") })
                 return
               }
               await completeActivity.mutateAsync(rowIdBigInt(row))
@@ -1790,12 +1880,13 @@ function CrmClientLoaded({
           recordSheet: contactRecordSheet,
         }
       }
-      if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity }
+      if (tab.id === "activities") return { ...tab, entityConfig: activitiesEntity, createForm: activityForm, createPermission: { resource: "activity", action: "create" as const } }
       return tab
     })
 
     return {
       ...base,
+      defaultTab: "my-activities",
       tabs: [
         ...coreTabs,
         {
@@ -1833,9 +1924,15 @@ function CrmClientLoaded({
         },
         {
           id: "my-activities",
-          label: t("crm.myActivities.tabLabel", { defaultValue: "My activities" }),
+          label: t("crm.myWork.title"),
+          description: t("crm.myWork.description"),
           type: "custom" as const,
-          customContent: <MyActivitiesPanel organizationId={organizationId} />,
+          customContent: <CrmMyWorkPanel organizationId={organizationId} companyId={operatingCompanyId}
+            activities={activitiesRead} opportunities={{ rows: enrichedOpportunities, state: opportunitiesRead.state }}
+            leads={leadsRead} contacts={contactsRead} canComplete={checkPermission("activity", "write").allowed}
+            canCreateLead={checkPermission("lead", "create").allowed}
+            onCreateLead={() => setQuickActionForm({ form: newLeadForm(t), action: "createLead" })}
+            onOpenRecord={(kind, id) => setFocusedRecord({ kind, id })} />,
         },
         {
           id: "pipeline-admin",
@@ -1867,6 +1964,8 @@ function CrmClientLoaded({
       ],
     }
   }, [
+    activitiesRead.state.status, opportunitiesRead.state.status, leadsRead.state.status, contactsRead.state.status,
+    activities, enrichedOpportunities, leads, contacts, checkPermission, activityForm, handleRecordAction, recordActionContext,
     operatingCompanyId,
     contacts,
     t,
@@ -2239,20 +2338,33 @@ function CrmClientLoaded({
     createOpportunityLine: "opportunity-lines",
   }
   const csvTabs: Record<CrmCsvImportKind, CrmTab> = { contact: "contacts", lead: "leads", opportunity: "opportunities" }
-  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const quickActionUsable = quickActionForm == null || (tabUsable(actionTabs[quickActionForm.action]) && (quickActionForm.action !== "createActivity" || (moduleQueryState(activityTypesQuery).status === "ready" && activityTypeOptions.length > 0)))
   const quickActionDenied = quickActionForm != null && dataState[actionTabs[quickActionForm.action]]?.status === "denied"
-  const workflowUsable = workflowModal == null || tabUsable(
-    "leadId" in workflowModal ? "leads" : "opportunityId" in workflowModal ? "opportunities" : "contacts",
-  )
+  const workflowTab: CrmTab | undefined = workflowModal == null ? undefined : workflowModal.kind === "scheduleActivity"
+    ? workflowModal.targetKind === "lead" ? "leads" : workflowModal.targetKind === "opportunity" ? "opportunities" : "contacts"
+    : "leadId" in workflowModal ? "leads" : "opportunityId" in workflowModal ? "opportunities" : "contacts"
+  const workflowSourceState = workflowTab ? dataState[workflowTab] : undefined
+  const workflowContext = recordActionContext(workflowModal?.kind === "scheduleActivity" ? workflowModal.targetKind : workflowTab === "leads" ? "lead" : workflowTab === "opportunities" ? "opportunity" : "contact")
+  const workflowUnavailableReason = workflowSourceState?.status !== "ready" ? "sourceUnavailable"
+    : (workflowModal?.kind === "scheduleActivity" ? !workflowContext.canCreateActivity : !workflowContext.canWrite) ? "permissionRequired"
+    : workflowModal?.kind === "scheduleActivity" && !workflowContext.activityTypesReady ? "activityTypeRequired"
+    : (workflowModal?.kind === "convertLead" || workflowModal?.kind === "changeStage") && !workflowContext.stagesReady ? "stagesRequired"
+    : workflowModal?.kind === "convertOpp" && !workflowContext.orderSetupReady ? "orderSetupRequired"
+    : workflowModal?.kind === "markOppLost" && !workflowContext.lostReasonsReady ? "lostReasonRequired" : undefined
+  const workflowUsable = workflowModal == null || workflowUnavailableReason == null
+
+  const workflowDenied = workflowSourceState?.status === "denied" || (workflowModal?.kind === "scheduleActivity" &&
+    (activitiesRead.state.status === "denied" || moduleQueryState(activityTypesQuery).status === "denied"))
+
   const csvSourceState = csvKind == null ? undefined : dataState[csvTabs[csvKind]]
   // Prompted category dialogs act on selected contacts and their categories.
   const promptsUsable = tabUsable("contacts") && tabUsable("contact-categories")
   useEffect(() => {
     // Creation drafts stay mounted on a source error; denied access closes them.
     if (quickActionDenied) setQuickActionForm(null)
-    if (!workflowUsable) setWorkflowModal(null)
+    if (workflowDenied) setWorkflowModal(null)
     if (!promptsUsable) cancelForm()
-  }, [quickActionDenied, workflowUsable, promptsUsable, cancelForm])
+  }, [quickActionDenied, workflowDenied, promptsUsable, cancelForm])
 
   const handleFormSubmit = async (
     _tabId: string,
@@ -2284,6 +2396,7 @@ function CrmClientLoaded({
         await createContact.mutateAsync(p)
       }
     } else if (action === "createActivity") {
+      if (moduleQueryState(activityTypesQuery).status !== "ready" || activityTypeOptions.length === 0) throw new Error(t("crm.workflow.reasons.activityTypeRequired"))
       const p = toCreateActivityParams(formData)
       if (!p) throw new Error(t("crm.forms.validation.createActivity", { defaultValue: "Enter an activity summary and a valid due date." }))
       if (p) await createActivity.mutateAsync(p)
@@ -2317,38 +2430,30 @@ function CrmClientLoaded({
     } else {
       throw new Error(t("crm.forms.unsupportedAction", { defaultValue: "This form action is unavailable. Close and reopen the form before trying again." }))
     }
+    const feedback = action === "createLead" ? "leadCreated" : action === "createOpportunity" ? "opportunityCreated" : action === "createContact" ? "contactCreated" : action === "createActivity" ? "scheduled" : "created"
+    const resultTab = ["createLead", "createOpportunity", "createContact", "createActivity"].includes(action) ? actionTabs[action] : undefined
+    showWorkflowToast({ kind: "success", title: t(`crm.workflow.feedback.${feedback}`),
+      ...(resultTab ? { action: {
+        label: t(action === "createLead" ? "crm.workflow.viewLeads" : action === "createOpportunity" ? "crm.workflow.openOpportunities" : action === "createContact" ? "crm.workflow.openContacts" : "crm.workflow.viewActivities"),
+        onClick: () => router.push(buildModuleTabHref("crm", resultTab, undefined, "my-activities")),
+      } } : {}),
+    })
   }
 
-  const isFormMutationPending =
-    createLead.isPending ||
-    createOpportunity.isPending ||
-    createOpportunityLine.isPending ||
-    createContact.isPending ||
-    createActivity.isPending ||
-    convertLead.isPending ||
-    convertOppToOrder.isPending ||
-    updateOpportunity.isPending ||
-    assignTag.isPending ||
-    addContactCategories.isPending ||
-    createContactCategory.isPending ||
-    addToSegment.isPending ||
-    createContactTag.isPending ||
-    createContactSegment.isPending ||
-    updateContact.isPending ||
-    updateContactAddress.isPending ||
-    updateContactBusiness.isPending ||
-    updateContactDetails.isPending ||
-    updateLead.isPending ||
-    csvImports.importContact.isPending ||
-    csvImports.importLead.isPending ||
-    csvImports.importOpportunity.isPending
+
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowModal) return
     if (!workflowUsable) throw new Error("Required data is unavailable. Refresh and try again.")
     setWorkflowSubmitError(null)
     try {
-      if (workflowModal.kind === "convertLead") {
+      if (workflowModal.kind === "scheduleActivity") {
+        const p = toCreateActivityParams({ ...formData, resModel: workflowModal.targetKind, resId: workflowModal.targetId.toString() })
+        if (!p) throw new Error(t("crm.forms.validation.createActivity"))
+        await createActivity.mutateAsync(p)
+        phCapture("crm_follow_up_scheduled", { organization_id: organizationId, record_kind: workflowModal.targetKind })
+      } else if (workflowModal.kind === "convertLead") {
+        if (!formData.createContact && !formData.createOpportunity) throw new Error(t("crm.workflow.chooseConversionResult"))
         const p = toConvertLeadParams({
           ...formData,
           companyId:
@@ -2365,7 +2470,7 @@ function CrmClientLoaded({
         await convertOppToOrder.mutateAsync({
           opportunityId: workflowModal.opportunityId,
           params: p,
-          companyId: operatingCompanyId ?? undefined,
+          companyId: workflowModal.companyId,
         })
         phCapture("opportunity_converted_to_order", { organization_id: organizationId })
       } else if (workflowModal.kind === "assignTag") {
@@ -2531,6 +2636,17 @@ function CrmClientLoaded({
           })
         }
       }
+      if (workflowModal.kind !== "convertOpp") showWorkflowToast({
+        kind: "success",
+        title: t(workflowModal.kind === "scheduleActivity" ? "crm.workflow.feedback.scheduled"
+          : workflowModal.kind === "convertLead" ? "crm.workflow.feedback.converted"
+          : workflowModal.kind === "changeStage" ? "crm.workflow.feedback.stageChanged"
+          : workflowModal.kind === "markOppLost" ? "crm.workflow.feedback.lost" : "crm.workflow.feedback.saved"),
+        ...(workflowModal.kind === "convertLead" ? {
+          action: { label: t(formData.createOpportunity ? "crm.workflow.openOpportunities" : "crm.workflow.openContacts"),
+            onClick: () => router.push(formData.createOpportunity ? "/crm?tab=opportunities" : "/crm?tab=contacts") },
+        } : {}),
+      })
       setWorkflowModal(null)
     } catch (e) {
       setWorkflowSubmitError(e instanceof Error ? e.message : "Action failed")
@@ -2542,51 +2658,31 @@ function CrmClientLoaded({
     if (!workflowModal) return closedWorkflowFormConfig
     if (workflowModal.kind === "convertLead") return buildConvertLeadForm()
     if (workflowModal.kind === "convertOpp") return buildConvertOppForm()
+    if (workflowModal.kind === "scheduleActivity") return activityForm
+    if (workflowModal.kind === "changeStage") return mergeSelectOptionsByFieldName(workflowModal.form, "stageId", opportunityStageOptions)
+    if (workflowModal.kind === "markOppLost") return mergeSelectOptionsByFieldName(workflowModal.form, "lostReasonId", lostReasonSelectOptions)
     return workflowModal.form
-  }, [workflowModal, buildConvertLeadForm, buildConvertOppForm])
+  }, [workflowModal, buildConvertLeadForm, buildConvertOppForm, activityForm, opportunityStageOptions, lostReasonSelectOptions])
 
   // Drafts of record edits are kept per record so one lead's notes never reopen on another.
   const workflowDraftKey =
     workflowModal == null
       ? undefined
+      : workflowModal.kind === "scheduleActivity"
+        ? `follow-up-${workflowModal.targetKind}-${workflowModal.targetId}`
       : "leadId" in workflowModal
         ? `lead-${workflowModal.leadId.toString()}`
         : "opportunityId" in workflowModal
           ? `opportunity-${workflowModal.opportunityId.toString()}`
           : `contact-${workflowModal.contactId.toString()}`
 
-  const workflowModalKey =
-    workflowModal == null
-      ? "closed"
-      : workflowModal.kind === "convertLead"
-        ? `cl-${workflowModal.leadId.toString()}-s${opportunityStageOptions.length}`
-        : workflowModal.kind === "convertOpp"
-          ? `co-${workflowModal.opportunityId.toString()}-p${pricelistSelectOptions.length}-w${warehouseSelectOptions.length}`
-          : workflowModal.kind === "assignTag"
-            ? `at-${workflowModal.contactId.toString()}`
-            : workflowModal.kind === "assignCategory"
-              ? `ac-${workflowModal.contactId.toString()}`
-            : workflowModal.kind === "changeStage"
-              ? `cs-${workflowModal.opportunityId.toString()}`
-              : workflowModal.kind === "editOpportunity"
-                ? `eo-${workflowModal.opportunityId.toString()}`
-                : workflowModal.kind === "markOppLost"
-                  ? `mol-${workflowModal.opportunityId.toString()}-r${lostReasonSelectOptions.length}`
-                  : workflowModal.kind === "editContact"
-                  ? `ec-${workflowModal.contactId.toString()}`
-                  : workflowModal.kind === "editContactAddress"
-                    ? `eca-${workflowModal.contactId.toString()}`
-                    : workflowModal.kind === "editContactBusiness"
-                      ? `ecb-${workflowModal.contactId.toString()}`
-                      : workflowModal.kind === "editContactDetails"
-                        ? `ecd-${workflowModal.contactId.toString()}`
-                        : workflowModal.kind === "editLeadDetails"
-                          ? `eld-${workflowModal.leadId.toString()}`
-                          : workflowModal.kind === "editLeadAddress"
-                            ? `ela-${workflowModal.leadId.toString()}`
-                            : workflowModal.kind === "editLeadRevenue"
-                              ? `elr-${workflowModal.leadId.toString()}`
-                : `as-${workflowModal.contactId.toString()}`
+  // Source retries update options without remounting the form or losing the user's entries.
+  const workflowModalKey = workflowModal == null ? "closed" : `${workflowModal.kind}-${workflowDraftKey}`
+
+  const focusedSource = focusedRecord?.kind === "lead" ? leadsRead : focusedRecord?.kind === "opportunity"
+    ? { rows: enrichedOpportunities, state: opportunitiesRead.state } : contactsRead
+  const focusedLiveRecord = focusedRecord && focusedSource.state.status === "ready"
+    ? focusedSource.rows.find((row) => String(row.id) === focusedRecord.id) ?? null : null
 
   const dataLoading = useMemo(
     () => ({
@@ -2599,6 +2695,8 @@ function CrmClientLoaded({
 
   return (
     <EntityLabelsProvider value={entityLabels}>
+      {focusedRecord && <EntityRecordSheet open={focusedLiveRecord != null} onOpenChange={(open) => !open && setFocusedRecord(null)}
+        record={focusedLiveRecord} config={focusedRecord.kind === "lead" ? leadRecordSheet : focusedRecord.kind === "opportunity" ? opportunityRecordSheet : contactRecordSheet} />}
       <ModuleView
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
@@ -2609,6 +2707,7 @@ function CrmClientLoaded({
         entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
+        showSubmitSuccessToast={false}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
         dashboardTimeRange={dashboardTimeRange}
@@ -2622,7 +2721,7 @@ function CrmClientLoaded({
       <RuntimeFormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        staticConfig={quickActionForm?.action === "createOpportunity" ? newOpportunityForm(t, opportunityStageOptions) : quickActionForm?.form ?? newLeadForm(t)}
+        staticConfig={quickActionForm?.action === "createOpportunity" ? newOpportunityForm(t, opportunityStageOptions) : quickActionForm?.action === "createActivity" ? activityForm : quickActionForm?.form ?? newLeadForm(t)}
         submissionDisabled={!quickActionUsable || (quickActionForm?.action === "createOpportunity" && moduleQueryState(opportunityStagesQuery).status !== "ready")}
         formLeadingActions={!quickActionUsable || quickActionForm?.action === "createOpportunity" ? <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" onClick={() => {
@@ -2630,6 +2729,7 @@ function CrmClientLoaded({
             const state = tab ? dataState[tab] : undefined
             if (state && "onRetry" in state) state.onRetry?.()
             if (quickActionForm?.action === "createOpportunity") void opportunityStagesQuery.refetch()
+            if (quickActionForm?.action === "createActivity") void activityTypesQuery.refetch()
           }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
           {quickActionForm?.action === "createOpportunity" ? <a className="text-sm text-primary underline" href="/crm?tab=pipeline-admin">{t("crm.forms.openPipelineSetup", { defaultValue: "Open Pipeline setup" })}</a> : null}
         </div> : undefined}
@@ -2639,6 +2739,7 @@ function CrmClientLoaded({
         roleId={runtimeRoleId}
         preferStdbVisibility
         isPending={isFormMutationPending}
+        showSubmitSuccessToast={false}
         onSubmit={async (formData) => {
           if (quickActionForm) {
             await handleFormSubmit("dashboard", quickActionForm.action, formData)
@@ -2649,7 +2750,22 @@ function CrmClientLoaded({
       {promptsUsable && formDialog}
       <RuntimeFormModal
         key={workflowModalKey}
-        open={workflowModal !== null && workflowUsable}
+        open={workflowModal !== null}
+        submissionDisabled={!workflowUsable}
+        formLeadingActions={!workflowUsable ? <Button type="button" variant="outline" onClick={() => {
+          if (workflowSourceState && "onRetry" in workflowSourceState) workflowSourceState.onRetry?.()
+          if (workflowModal?.kind === "scheduleActivity") {
+            if ("onRetry" in activitiesRead.state) activitiesRead.state.onRetry?.()
+            void activityTypesQuery.refetch()
+          }
+          if (workflowModal?.kind === "convertLead" || workflowModal?.kind === "changeStage") void opportunityStagesQuery.refetch()
+          if (workflowModal?.kind === "markOppLost") void lostReasonsQuery.refetch()
+          if (workflowModal?.kind === "convertOpp") {
+            void pricelistsQuery.refetch()
+            void warehousesQuery.refetch()
+            void opportunityStagesQuery.refetch()
+          }
+        }}>{t("common.retry")}</Button> : undefined}
         onOpenChange={(open) => {
           if (!open) {
             setWorkflowModal(null)
@@ -2662,7 +2778,8 @@ function CrmClientLoaded({
         roleId={runtimeRoleId}
         preferStdbVisibility
         isPending={isFormMutationPending}
-        submitError={workflowSubmitError}
+        showSubmitSuccessToast={false}
+        submitError={!workflowUsable ? t(`crm.workflow.reasons.${workflowUnavailableReason}`) : workflowSubmitError}
         draftKey={workflowDraftKey}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)

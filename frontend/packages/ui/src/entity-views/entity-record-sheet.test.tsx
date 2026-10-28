@@ -29,6 +29,14 @@ function open(config: EntityRecordSheetConfig, record: Record<string, unknown> =
 }
 
 describe("EntityRecordSheet discussion", () => {
+  it("renders actions with the current record and refreshes them after a transition", () => {
+    const config = { ...base, actions: (record: Record<string, unknown>) => <button>{record.state === "new" ? "Qualify lead" : "Convert lead"}</button> }
+    const { rerender } = open(config, { id: 12, name: "Lead", state: "new" })
+    expect(screen.getByRole("button", { name: "Qualify lead" })).toBeTruthy()
+    rerender(<EntityRecordSheet open onOpenChange={() => {}} config={config} record={{ id: 12, name: "Lead", state: "qualified" }} />)
+    expect(screen.queryByRole("button", { name: "Qualify lead" })).toBeNull()
+    expect(screen.getByRole("button", { name: "Convert lead" })).toBeTruthy()
+  })
   it("has no Discussion tab unless the config asks for one", () => {
     open(base)
     expect(screen.queryByTestId("entity-record-sheet-tab-discussion")).toBeNull()

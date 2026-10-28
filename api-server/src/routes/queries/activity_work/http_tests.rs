@@ -4,7 +4,7 @@ use crate::session::ApiSession;
 use crate::trusted_context::RESOURCE_QUERY_OPERATION_ID;
 use axum::{extract::State, http::HeaderMap, routing::post, Router};
 use std::sync::{Arc, Mutex};
-use stdb_auth::FieldAccessContext;
+use stdb_auth::{FieldAccessContext, FieldPermissionLike};
 
 struct Fixture {
     rows: Vec<Value>,
@@ -148,12 +148,21 @@ async fn server() -> Server {
 }
 
 fn context(server: &Server, grants: &[&str]) -> TrustedOperationContext {
+    context_with_fields(server, grants, vec![])
+}
+
+fn context_with_fields(
+    server: &Server,
+    grants: &[&str],
+    field_permissions: Vec<FieldPermissionLike>,
+) -> TrustedOperationContext {
     let access = FieldAccessContext {
         organization_id: 42,
         identity_hex: "cd".repeat(32),
         role_id: 2,
         role_ids: vec![2],
         role_permissions: grants.iter().map(|s| (*s).into()).collect(),
+        field_permissions,
         ..FieldAccessContext::default()
     };
     TrustedOperationContext::from_session(
@@ -195,7 +204,8 @@ async fn manual_reader_paginates_all_statuses_and_omits_missing_sources() {
         .unwrap();
     assert_eq!(first.rows[0]["id"], "1");
     assert_eq!(first.rows[0]["workActions"], json!(["complete"]));
-    assert!(first.rows[0].get("assignedTo").is_none());
+    assert_eq!(first.rows[0]["assignedTo"], "cd".repeat(32));
+    assert!(first.rows[0].get("note").is_none());
     assert!(first.rows[0].get("metadata").is_none());
     let second = read_activity_work(
         &server.owner,
@@ -223,6 +233,32 @@ async fn manual_reader_paginates_all_statuses_and_omits_missing_sources() {
         .unwrap()
         .iter()
         .any(|(token, sql)| token == "Bearer actor-token" && sql.contains("FROM purchase_order")));
+}
+
+#[tokio::test]
+async fn explicit_field_selection_hides_assignee_and_private_content() {
+    let server = server().await;
+    let context = context_with_fields(
+        &server,
+        &["activity:read", "purchase_order:read"],
+        vec![FieldPermissionLike {
+            id: None,
+            organization_id: Some(42),
+            role_id: Some(2),
+            resource: "activities".into(),
+            action: "read".into(),
+            allowed_fields: vec!["summary".into(), "state".into(), "is_done".into()],
+            subject_user_hex: None,
+            subject_role_id: None,
+        }],
+    );
+    let page = read_activity_work(&server.owner, &context, request(None, "eligible", None))
+        .await
+        .unwrap();
+    assert_eq!(page.rows[0]["summary"], "Follow-up 1");
+    for field in ["assignedTo", "userId", "note", "metadata"] {
+        assert!(page.rows[0].get(field).is_none(), "unexpected {field}");
+    }
 }
 
 #[tokio::test]
