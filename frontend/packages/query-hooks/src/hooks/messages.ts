@@ -9,7 +9,7 @@ import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, Create
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
-import { resolvePostedMessageEffect } from "./mail-message-post"
+import { resolvePostedMessageEffect, UnconfirmedPostedMessageError, type PostedMessageExpectation } from "./mail-message-post"
 import type { CanonicalRecordRef } from "./operation-effect"
 import { useStdbQuery } from "./stdb"
 
@@ -30,9 +30,10 @@ export type PostMessageInput = {
 export function useMailMessages(
   organizationId: bigint,
   initialData?: MailMessage[],
+  scopeKey?: string,
 ) {
   return useQuery({
-    queryKey: ['mail-messages', rqBigIntKey(organizationId)],
+    queryKey: scopeKey ? ['mail-messages', rqBigIntKey(organizationId), scopeKey] : ['mail-messages', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mail-messages', 'Failed to fetch messages'),
     staleTime: 30_000,
     initialData,
@@ -113,16 +114,26 @@ export function usePostMessage(organizationId: bigint) {
     mutationFn: async ({ model, resId, body, parentId, attachmentIds, idempotencyKey }) => {
       const key = idempotencyKey ?? newCorrelationId()
       const { urlPath, init } = stdbBffCommandPost("post_message", { model: model, resId: toScalarU64(resId), body: body, parentId: parentId != null ? toScalarU64(parentId) : null, attachmentIds: attachmentIds.map((id) => toScalarU64(id)), idempotencyKey: key })
-      const r = await apiFetch(urlPath, init)
+      let r: Response
+      try { r = await apiFetch(urlPath, init) }
+      catch { throw new UnconfirmedPostedMessageError() }
+      if (r.status >= 500) throw new UnconfirmedPostedMessageError()
       if (!r.ok) throw new Error('Failed to post message')
-      const rows = await fetchQueryList('/api/query/mail-messages', 'Failed to read posted message')
-      const effect = resolvePostedMessageEffect(rows, organizationId, { idempotencyKey: key, model, resId: toScalarU64(resId) })
-      if (!effect) throw new Error('Message did not read back after posting')
-      return effect
+      try {
+        const effect = await confirmPostedMessage(organizationId, { idempotencyKey: key, model, resId: toScalarU64(resId) })
+        if (effect) return effect
+      } catch { /* Dispatch was acknowledged; failed evidence reads cannot justify another POST. */ }
+      throw new UnconfirmedPostedMessageError()
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['mail-messages', rqBigIntKey(organizationId)] }),
   })
+}
+
+/** Exact, cache-independent reconciliation. This function never dispatches a command. */
+export async function confirmPostedMessage(organizationId: bigint, expected: PostedMessageExpectation): Promise<CanonicalRecordRef | null> {
+  const rows = await fetchQueryList('/api/query/mail-messages', 'Failed to read posted message')
+  return resolvePostedMessageEffect(rows, organizationId, expected)
 }
 
 export function useMarkNotificationRead(organizationId: bigint) {
@@ -156,9 +167,10 @@ export function useMarkAllNotificationsRead(organizationId: bigint) {
 export function useMailFollowers(
   organizationId: bigint,
   initialData?: MailFollower[],
+  scopeKey?: string,
 ) {
   return useQuery({
-    queryKey: ['mail-followers', rqBigIntKey(organizationId)],
+    queryKey: scopeKey ? ['mail-followers', rqBigIntKey(organizationId), scopeKey] : ['mail-followers', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/mail-followers', 'Failed to fetch followers'),
     staleTime: 30_000,
     initialData,

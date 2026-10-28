@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
@@ -25,6 +25,7 @@ import {
   type WorkActivityRow,
 } from "@lumiere/query-hooks/hooks/work-activities"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
+import { groupActivityDeadlines } from "./activity-deadline-groups"
 
 export function WorkActivitiesContent({
   scope,
@@ -43,6 +44,11 @@ export function WorkActivitiesContent({
 }) {
   const { t } = useTranslation()
   const query = useWorkActivities(scope, online)
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(timer)
+  }, [])
   const complete = useCompleteWorkActivity(scope)
   const [review, setReview] = useState<WorkActivityRow | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +76,15 @@ export function WorkActivitiesContent({
           ),
     [query.data, query.isError],
   )
+  const deadlineGroups = useMemo(() => groupActivityDeadlines(rows, now), [rows, now])
+  const groupLabels = {
+    overdue: t("workspace.dailyWork.overdue", { defaultValue: "Overdue" }),
+    today: t("workspace.dailyWork.today", { defaultValue: "Today" }),
+    upcoming: t("workspace.dailyWork.upcoming", { defaultValue: "Upcoming" }),
+    undated: t("workspace.dailyWork.undated", { defaultValue: "No due date" }),
+    unavailable: t("workspace.dailyWork.deadlineUnavailable", { defaultValue: "Due date unavailable" }),
+    completed: t("workspace.dailyWork.completed", { defaultValue: "Completed" }),
+  }
   const teams = useMemo(
     () =>
       Array.from(
@@ -285,15 +300,21 @@ export function WorkActivitiesContent({
                   <tr className="border-b bg-muted/40">
                     <th className="p-3">{t("workBoard.followUp")}</th>
                     <th className="p-3">{t("workBoard.scope")}</th>
+                    <th className="p-3">{t("workspace.dailyWork.due", { defaultValue: "Due" })}</th>
                     <th className="p-3">{t("workBoard.statusLabel")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {deadlineGroups.map((group) => <Fragment key={group.id}>
+                    <tr className="border-b bg-muted/20">
+                      <th scope="rowgroup" colSpan={4} className="px-3 py-2 text-xs font-semibold">{groupLabels[group.id]} <span className="font-normal text-muted-foreground">({group.rows.length})</span></th>
+                    </tr>
+                    {group.rows.map((row) => (
                     <tr key={row.id} className="border-b last:border-0">
                       <td className="p-3">
                         <button
-                          className="text-left font-medium underline-offset-4 hover:underline"
+                          type="button"
+                          className="min-h-11 text-left font-medium underline-offset-4 hover:underline"
                           onClick={() => openReview(row)}
                         >
                           {title(row)}
@@ -305,13 +326,14 @@ export function WorkActivitiesContent({
                       <td className="p-3">
                         {t(`workBoard.module.${row.workModule}`)}
                       </td>
+                      <td className="p-3 whitespace-nowrap">{row.dateDeadline || (row.dateDeadline === undefined ? groupLabels.unavailable : groupLabels.undated)}</td>
                       <td className="p-3">
                         {row.isDone
                           ? t("workBoard.status.Completed")
                           : t("workBoard.status.Open")}
                       </td>
                     </tr>
-                  ))}
+                  ))}</Fragment>)}
                 </tbody>
               </table>
             </div>

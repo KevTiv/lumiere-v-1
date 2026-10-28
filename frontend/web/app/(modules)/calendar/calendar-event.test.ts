@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { calendarEventHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
+import { calendarEventForView, calendarEventHref, calendarReturnHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
 
 const t = (_key: string, options?: Record<string, unknown>) => String(options?.defaultValue ?? _key);
 
@@ -75,4 +75,36 @@ test('event edits reject a reversed range and keep the accepted equal-time all-d
   const allDay = updateCalendarEventParams({ name: 'Company day', start: '2026-10-06T00:00', stop: '2026-10-06T00:00', allday: true });
   assert.equal(allDay?.allday, true);
   assert.equal(allDay?.start, allDay?.stop);
+});
+
+test('calendar projection preserves all-day, wrapped timestamps and cancelled enum state', () => {
+  const start = BigInt(Date.UTC(2026, 9, 28, 9) * 1000);
+  const projected = calendarEventForView({ id: 7n, name: 'Review', start: { microsSinceUnixEpoch: start }, stop: { microsSinceUnixEpoch: start + 3_600_000_000n }, allday: true, state: { tag: 'Cancelled' }, privacy: 'confidential' });
+  assert.equal(projected?.status, 'cancelled');
+  assert.equal(projected?.allDay, true);
+  assert.equal(projected?.startTime.getTime(), Number(start) / 1000);
+  assert.equal(projected?.visibility, 'private');
+  assert.equal(calendarEventForView({ id: 8, start: 'invalid', stop: start }), null);
+  assert.equal(calendarEventForView({ id: 8, stop: start }), null);
+});
+
+test('editing a local datetime preserves the original instant outside UTC', () => {
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'Europe/Amsterdam';
+  try {
+    const instant = Date.UTC(2026, 6, 15, 14, 30);
+    const input = eventInputValue(instant * 1000);
+    assert.equal(input, '2026-07-15T16:30');
+    assert.equal(new Date(input).getTime(), instant);
+  } finally {
+    process.env.TZ = previousTimezone;
+  }
+});
+
+test('return navigation accepts calendar state only', () => {
+  const source = '/calendar?tab=calendar&calendarView=agenda&calendarDate=2026-10-28&calendarEvent=7';
+  assert.equal(calendarReturnHref(source), source);
+  for (const value of ['https://example.com', '//example.com/calendar', '/calendar/events/7', '/calendar\\evil', null]) {
+    assert.equal(calendarReturnHref(value), '/calendar?tab=calendar');
+  }
 });

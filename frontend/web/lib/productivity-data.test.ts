@@ -61,5 +61,8 @@ test('recent notes run newest first', () => {
   ]);
   assert.deepEqual(notes.map((n) => n.title), ['New', 'Old']);
   assert.equal(notes[0]!.excerpt, 'Fresh');
+  const noteUrl = new URL(notes[0]!.href!, 'https://lumiere.invalid');
+  assert.equal(noteUrl.searchParams.get('tab'), 'knowledge-base');
+  assert.equal(noteUrl.searchParams.get('filter'), 'id:2');
   assert.ok(isTaskDone({ state: 'Cancelled', isClosed: false }));
 });
