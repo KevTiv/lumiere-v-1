@@ -71,10 +71,11 @@ test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
     await expectNoAppError(page)
   })
 
-  test("sales dashboard quick action opens new sale order form", async ({ page }) => {
+  test("sales dashboard quick action opens a draft quotation", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
     await selectModuleTab(page, "sales", "dashboard")
 
+    await expect(page.getByTestId("quick-action-create_sale_order")).toHaveText("New quotation")
     await page.getByTestId("quick-action-create_sale_order").click()
     await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
 

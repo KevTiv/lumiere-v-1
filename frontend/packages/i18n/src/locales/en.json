@@ -8298,7 +8298,7 @@
       "createLoyaltyProgram": "New program",
       "loyaltyCards": "Loyalty cards",
       "createLoyaltyCard": "New card",
-      "ops": "Ops",
+      "ops": "Needs attention",
       "commissionPlans": "Commission plans"
     },
     "deliveryPriceRules": {
@@ -8379,8 +8379,8 @@
     },
     "forms": {
       "newSaleOrder": {
-        "title": "New Sale Order",
-        "description": "Create a new sales order",
+        "title": "New quotation",
+        "description": "Save a draft quotation, then add products.",
         "sections": {
           "customer": "Customer",
           "orderDetails": "Order Details",
@@ -8853,6 +8853,82 @@
       "unavailable": "This quotation or company is no longer available.",
       "generationError": "The PDF could not be confirmed. Check Documents before trying again.",
       "readOnly": "You can preview this quotation. Saving a PDF requires permission to read and create documents."
+    },
+    "workspace": {
+      "queueDenied": "Your role does not have access to this queue. Choose another queue.",
+      "queueUnavailable": "This queue is unavailable. Wait for loading to finish or try again.",
+      "productsRequired": "Add at least one product before continuing.",
+      "unlockRequired": "Unlock this order before continuing.",
+      "newQuotation": "New quotation",
+      "quotationsAndOrders": "Quotations & orders",
+      "needsAttention": "Needs attention",
+      "attentionHelp": "Choose a queue, select a record, then review the available actions.",
+      "attentionQueues": "Sales attention queues",
+      "specialistTools": "Specialist sales tools",
+      "nextStep": "Next step",
+      "products": "Products",
+      "linkedRecords": "Deliveries, invoices and payments",
+      "orderDetails": "Order details",
+      "orderReadFailed": "The order could not be loaded. Refresh to try again.",
+      "linesReadFailed": "Order lines are unavailable. Wait for loading to finish or refresh to try again.",
+      "handoffsUnavailable": "Linked records are unavailable. Wait for loading to finish or refresh to try again.",
+      "amountUnavailable": "Unavailable",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "savedAddProducts": "Draft quotation saved. Add products below to continue.",
+      "savedOpenQuotation": "Quotation saved. Open it from Quotations & orders to add products.",
+      "confirmHelp": "Confirming checks stock availability and credit rules, and may request approval. Review the products, prices and delivery details before continuing.",
+      "steps": {
+        "add-products": {
+          "title": "Add products to this quotation",
+          "description": "Choose products and quantities, then review prices and totals before sending.",
+          "action": "Add products"
+        },
+        "send": {
+          "title": "Review and send the quotation",
+          "description": "Check products, prices and delivery details before marking the quotation as sent."
+        },
+        "accept": {
+          "title": "Record the customer’s acceptance",
+          "description": "Record who accepted the quotation, then confirm the order."
+        },
+        "confirm": {
+          "title": "Confirm the sales order",
+          "description": "Confirmation checks availability and credit rules. An approval may be required."
+        },
+        "approval": {
+          "title": "Awaiting approval",
+          "description": "Review the approval request before continuing with this order.",
+          "action": "View approvals"
+        },
+        "invoice": {
+          "title": "Create the customer invoice",
+          "description": "Review the quantities to invoice and the required accounting choices."
+        },
+        "delivery": {
+          "title": "Complete delivery before invoicing",
+          "description": "This order invoices delivered quantities. Open its delivery to continue.",
+          "action": "View deliveries"
+        },
+        "review": {
+          "title": "Review deliveries and invoices",
+          "description": "Follow the linked records for delivery progress, invoice status and payments.",
+          "action": "View linked records"
+        },
+        "cancelled": {
+          "title": "This order is cancelled",
+          "description": "Review its history and linked records for earlier activity."
+        },
+        "locked": {
+          "title": "This order is locked",
+          "description": "Unlock the order before making changes, if your role permits it."
+        },
+        "unavailable": {
+          "title": "Order lines are unavailable",
+          "description": "Wait for loading to finish or refresh before continuing."
+        }
+      }
     }
   },
   "manufacturing": {

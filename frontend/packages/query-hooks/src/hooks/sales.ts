@@ -46,6 +46,7 @@ import type {
 } from "@lumiere/stdb/types"
 
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
+import { createdSaleOrderId, withSaleOrderReceipt } from './sales-create-receipt'
 import { invalidateQueryResources } from "./workflow"
 import {
   ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
@@ -273,18 +274,29 @@ export function useSaleCommissionsPending(organizationId: bigint, initialData?: 
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
+export async function createSaleOrderDraftCommand(params: CreateSaleOrderParams, organizationId: bigint, companyId?: bigint): Promise<{ orderId?: string }> {
+  const receipt = crypto.randomUUID()
+  const json = stdbParamsToJson(
+    withCompanyScope({ ...params, metadata: withSaleOrderReceipt(params.metadata, receipt) }, companyId),
+    "CreateSaleOrderParams",
+  )
+  const { urlPath, init } = stdbBffCommandPost("create_sale_order", { params: json })
+  const r = await apiFetch(urlPath, init)
+  if (!r.ok) throw await salesReducerError(r, 'Failed to create quotation')
+  // A read failure after an acknowledged save must not invite another create.
+  try {
+    const rows = await fetchQueryList('/api/query/sale-orders', 'Failed to read saved quotation')
+    return { orderId: companyId == null ? undefined : createdSaleOrderId(rows, receipt, organizationId, companyId) }
+  } catch {
+    return {}
+  }
+}
+
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, CreateSaleOrderParams>({
-    mutationFn: async (params) => {
-      const json = stdbParamsToJson(
-        withCompanyScope(params as Record<string, unknown>, companyId),
-        "CreateSaleOrderParams",
-      )
-      const { urlPath, init } = stdbBffCommandPost("create_sale_order", { params: json })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create sale order')
-    },
+  return useMutation<{ orderId?: string }, Error, CreateSaleOrderParams>({
+    retry: false,
+    mutationFn: (params) => createSaleOrderDraftCommand(params, organizationId, companyId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] }),
   })
 }
