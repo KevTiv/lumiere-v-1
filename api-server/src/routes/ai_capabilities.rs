@@ -11,7 +11,6 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_auth::identity_sql_literal;
@@ -21,13 +20,8 @@ use crate::{
     state::AppState, trusted_context::TrustedOperationContext, web_session::stdb_identity_hex_hint,
 };
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CapabilityGrant {
-    pub(crate) capability_key: String,
-    pub(crate) max_rows: u64,
-    pub(crate) max_bytes: u64,
-}
+pub(crate) use lumiere_auth_context::CapabilityGrant;
+use lumiere_auth_context::CapabilityGrantEnvelope;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -124,15 +118,15 @@ fn capability_response(
     authority: Option<CompanyGrantAuthority<'_>>,
 ) -> Value {
     match authority {
-        Some(authority) => json!({
-            "organizationId": authority.organization_id,
-            "companyId": authority.company_id,
-            "actorIdentity": authority.actor_identity,
-            "knowledgeTeamRefs": authority.knowledge_team_refs,
-            "placementGeneration": authority.placement_generation,
-            "policySnapshotHash": authority.policy_snapshot_hash,
-            "capabilityGrantsHash": authority.capability_grants_hash,
-            "grants": grants,
+        Some(authority) => json!(CapabilityGrantEnvelope {
+            organization_id: authority.organization_id,
+            company_id: authority.company_id,
+            actor_identity: authority.actor_identity.to_string(),
+            knowledge_team_refs: authority.knowledge_team_refs,
+            placement_generation: Some(authority.placement_generation),
+            policy_snapshot_hash: Some(authority.policy_snapshot_hash),
+            capability_grants_hash: Some(authority.capability_grants_hash),
+            grants,
         }),
         // Preserve the established generated-read contract for callers that
         // do not request the AIH-16 company-bound authorization envelope.

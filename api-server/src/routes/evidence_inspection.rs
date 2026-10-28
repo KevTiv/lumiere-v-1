@@ -6,6 +6,9 @@
 //! but only after this boundary resolves an active, exact
 //! `ai.evidence.inspect` role grant for the acting user.
 
+use lumiere_auth_context::ActorContext;
+#[cfg(test)]
+use lumiere_auth_context::ACTOR_TOKEN_HEADER;
 use std::{sync::Arc, time::Duration};
 
 use axum::{
@@ -31,10 +34,6 @@ use crate::{
 
 const INSPECT_CAPABILITY: &str = "ai.evidence.inspect";
 const GATEWAY_SECRET_HEADER: &str = "x-lumiere-gateway-secret";
-const ACTOR_IDENTITY_HEADER: &str = "x-lumiere-actor-identity";
-const ACTOR_TOKEN_HEADER: &str = "x-lumiere-actor-token";
-const ORGANIZATION_HEADER: &str = "x-lumiere-organization-id";
-const COMPANY_HEADER: &str = "x-lumiere-company-id";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -357,10 +356,16 @@ async fn forward_evidence_read(
         .post(format!("{}{gateway_path}", state.config.ai_gateway_url))
         .timeout(Duration::from_secs(15))
         .header(GATEWAY_SECRET_HEADER, gateway_secret()?)
-        .header(ACTOR_IDENTITY_HEADER, context.actor_identity())
-        .header(ACTOR_TOKEN_HEADER, api_token)
-        .header(ORGANIZATION_HEADER, organization_id.to_string())
-        .header(COMPANY_HEADER, company_id.to_string())
+        .headers(
+            ActorContext::new(
+                context.actor_identity(),
+                api_token,
+                organization_id,
+                company_id,
+            )
+            .and_then(|actor| actor.headers())
+            .map_err(|_| ApiError::Unauthorized)?,
+        )
         .json(&gateway_body)
         .send()
         .await

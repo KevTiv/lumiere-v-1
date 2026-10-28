@@ -74,7 +74,7 @@ pub(super) async fn profile_update(
         .ok_or(ApiError::NotFound("User profile not found".into()))?;
     let platform_id = profile.get::<_, String>("platform_user_id");
     let platform_id = PlatformId::new(platform_id).map_err(ApiError::internal)?;
-    if state.config.workos_client_id.is_some() && body.email.is_some() {
+    if state.config.workos_auth.is_some() && body.email.is_some() {
         return Err(ApiError::BadRequest("Email changes require WorkOS verification and updated alpha approval; contact your administrator".into()));
     }
     if body

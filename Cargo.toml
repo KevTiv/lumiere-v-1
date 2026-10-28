@@ -8,6 +8,7 @@ members = [
     "crates/stdb-config",
     "crates/stdb-client",
     "crates/stdb-auth",
+    "crates/auth-context",
     "crates/presentation-core",
     "crates/policy-core",
     "crates/finance-review-core",
@@ -52,6 +53,7 @@ dashmap = "6"
 stdb-config = { path = "crates/stdb-config" }
 stdb-client = { path = "crates/stdb-client" }
 stdb-auth = { path = "crates/stdb-auth" }
+lumiere-auth-context = { path = "crates/auth-context" }
 lumiere-finance-review-core = { path = "crates/finance-review-core" }
 lumiere-presentation-core = { path = "crates/presentation-core" }
 

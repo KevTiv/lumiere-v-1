@@ -74,13 +74,7 @@ struct ToolDescriptor {
     input_schema: Value,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub(crate) struct GeneratedReadGrant {
-    pub capability_key: String,
-    pub max_rows: u64,
-    pub max_bytes: u64,
-}
+pub(crate) use lumiere_auth_context::CapabilityGrant as GeneratedReadGrant;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PreparedGeneratedRead {

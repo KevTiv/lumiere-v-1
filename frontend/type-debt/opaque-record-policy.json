@@ -39,7 +39,6 @@
     "packages/stdb/src/stdb-params-json.ts",
     "web/app/api/**",
     "web/lib/api-session.ts",
-    "web/lib/stdb-auth-server.ts",
     "web/lib/stdb-token-identity.ts"
   ]
 }

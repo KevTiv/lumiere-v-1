@@ -5,7 +5,6 @@
 //! session, field-permission, organization and company checks.
 
 use anyhow::{bail, ensure, Context, Result};
-use serde::Deserialize;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -24,20 +23,6 @@ use crate::providers::llm::ToolCallRequest;
 use crate::state::AppState;
 
 const ACTOR_GRANT_TIMEOUT: Duration = Duration::from_secs(5);
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct GrantEnvelope {
-    organization_id: u64,
-    company_id: u64,
-    actor_identity: String,
-    #[serde(default)]
-    _knowledge_team_refs: Vec<String>,
-    placement_generation: u64,
-    policy_snapshot_hash: String,
-    capability_grants_hash: String,
-    grants: Vec<GeneratedReadGrant>,
-}
 
 pub(crate) struct ActorGrantSnapshot {
     pub authorization_generation: AuthorizationGeneration,
@@ -95,36 +80,25 @@ async fn resolve_actor_grants_for_scope_with_timeout(
     actor: &ActorCredentials,
     timeout: Duration,
 ) -> Result<ActorGrantSnapshot> {
-    let response = http
-        .get(format!("{api_base}/v1/ai/capability-grants"))
-        .query(&[("companyId", company_id)])
-        .bearer_auth(actor.stdb_token.trim())
-        .header("x-stdb-identity", actor.identity_hex.trim())
-        .timeout(timeout)
-        .send()
-        .await
-        .context("resolve generated capability grants")?;
-    if !response.status().is_success() {
-        bail!(
-            "generated capability grants were denied or unavailable ({})",
-            response.status()
-        );
-    }
-    let envelope: GrantEnvelope = response
-        .json()
-        .await
-        .context("generated capability grants returned invalid JSON")?;
-    ensure!(
-        envelope.organization_id == organization_id
-            && envelope.company_id == company_id
-            && envelope.actor_identity == actor.identity_hex.trim(),
-        "generated capability grant envelope scope mismatch"
-    );
+    let context = lumiere_auth_context::ActorContext::new(
+        &actor.identity_hex,
+        &actor.stdb_token,
+        organization_id,
+        company_id,
+    )?;
+    let envelope =
+        lumiere_auth_context::fetch_capability_grants(http, api_base, &context, timeout).await?;
     Ok(ActorGrantSnapshot {
         authorization_generation: AuthorizationGeneration::new(
-            envelope.placement_generation,
-            envelope.policy_snapshot_hash,
-            envelope.capability_grants_hash,
+            envelope
+                .placement_generation
+                .context("missing placement generation")?,
+            envelope
+                .policy_snapshot_hash
+                .context("missing policy snapshot hash")?,
+            envelope
+                .capability_grants_hash
+                .context("missing capability grants hash")?,
         )
         .context("generated capability authorization generation is invalid")?,
         grants: envelope.grants,
@@ -385,7 +359,7 @@ mod tests {
             .await
             .expect("grant service");
         });
-        let actor = ActorCredentials::new("actor-token", "actor").expect("actor");
+        let actor = ActorCredentials::new("actor-token", "a".repeat(64)).expect("actor");
 
         let result = resolve_actor_grants_for_scope_with_timeout(
             &reqwest::Client::new(),
