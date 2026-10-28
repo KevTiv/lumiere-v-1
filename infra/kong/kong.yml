@@ -93,6 +93,23 @@ services:
           fault_tolerant: false
           policy: local
 
+  - name: api-history
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/history
+    routes:
+      - name: api-history
+        methods: [GET]
+        paths:
+          - /api/history
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 240
+          hour: 3000
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
+
   - name: api-call
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/call
     routes:

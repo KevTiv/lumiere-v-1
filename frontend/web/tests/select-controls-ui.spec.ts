@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { chooseSelectOptionByLabel, chooseSelectOptionByValue } from "./e2e/helpers"
+import { chooseSelectOptionByValue, chooseSelectOptionByLabel } from "./e2e/helpers-legacy"
 
 for (const width of [320, 1440]) {
   test.describe(`${width}px shared select controls`, () => {
@@ -12,26 +12,20 @@ for (const width of [320, 1440]) {
       await chooseSelectOptionByLabel(page, "payableAccountId", "Account 02")
       await expect(page.getByTestId("form-field-journalId")).toContainText("Account 01")
       await expect(page.getByTestId("form-field-defaultExpenseAccountId")).toContainText("Account 13")
-      const field = page.getByTestId("form-field-payableAccountId")
-      await expect(field).toContainText("Account 02")
+      await expect(page.getByTestId("form-field-payableAccountId")).toContainText("Account 02")
       await expect(page.getByTestId("form-modal-post-expense-report")).toBeVisible()
     })
-    test("record picker options receive pointer clicks above their parent dialog", async ({ page }) => {
+    test("record selection preserves exact ids and settles before the next picker opens", async ({ page }) => {
+      await page.setViewportSize({ width, height: 600 })
       await page.goto("/select-controls")
       await page.getByRole("button", { name: "Open select dialog" }).click()
-      const field = page.getByTestId("form-field-exactRecord")
-      await field.click()
-      await page.getByRole("option", { name: "Account 02", exact: true }).click()
-      await expect(field).toContainText("Account 02")
-      await expect(page.getByTestId("record-value")).toHaveText("02")
+      await chooseSelectOptionByValue(page, "record", "90071992547409932")
+      await expect(page.getByTestId("record-value")).toHaveText("90071992547409932")
+      await chooseSelectOptionByLabel(page, "record", "Record 40")
+      await expect(page.getByTestId("record-value")).toHaveText("40")
+      await chooseSelectOptionByValue(page, "record", "90071992547409931")
+      await expect(page.getByTestId("record-value")).toHaveText("90071992547409931")
       await expect(page.getByRole("dialog", { name: "Account selectors" })).toBeVisible()
-    })
-    test("the exact-value helper selects a searchable record without a native select", async ({ page }) => {
-      await page.goto("/select-controls")
-      await page.getByRole("button", { name: "Open select dialog" }).click()
-      await chooseSelectOptionByValue(page, "exactRecord", "9007199254740993")
-      await expect(page.getByTestId("form-field-exactRecord")).toContainText("Same customer")
-      await expect(page.getByTestId("record-value")).toHaveText("9007199254740993")
     })
     test("search starts at 15, retains selection and supports keyboard input inside a dialog", async ({
       page,

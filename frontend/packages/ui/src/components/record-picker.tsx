@@ -71,8 +71,6 @@ export function RecordPicker({
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
             data-testid={testId}
-            data-record-picker=""
-            data-record-value={value}
             className={cn(
               "w-full justify-between font-normal",
               !selected && "text-muted-foreground",
@@ -92,9 +90,8 @@ export function RecordPicker({
             {options.map((option) => (
               <CommandItem
                 key={option.value}
-                data-record-value={option.value}
-                // cmdk filters on this text: the name, plus the id so a record can be found by it.
-                value={`${option.label} #${option.value}`}
+                value={option.value}
+                keywords={[option.label, `#${option.value}`]}
                 disabled={option.disabled}
                 onSelect={() => {
                   onChange(option.value)

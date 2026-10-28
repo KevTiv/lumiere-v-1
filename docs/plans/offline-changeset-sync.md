@@ -484,6 +484,12 @@ Realtime events are wake-up hints, not the synchronization ledger. The durable p
 
 ChangeSets provide the Git/PR-like workflow discussed for offline operations.
 
+The [Finance alpha change history and review plan](finance-alpha-change-review-plan.md)
+defines an online-first delivery of these review semantics for Accounting, Sales,
+CRM, Purchasing, Reports, Subscriptions and Expenses. Its server ChangeSet and
+review/apply contracts are intended for later offline capture/push reuse; the
+finance-alpha feature does not depend on SQLite or offline-client rollout.
+
 A server-side ChangeSet/action should preserve enough information to review intent against current canonical state:
 
 ```text

@@ -5,6 +5,7 @@ import { parseQueryListResponse } from "@lumiere/api-client"
 import {
   addCustomFormFieldViaSettings,
   deleteCustomFormFieldViaSettings,
+  dismissBlockingDialogs,
   expectNoAppError,
   fillField,
   openEntityCreate,
@@ -42,7 +43,7 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
     await expectNoAppError(page)
   })
 
-  test("retains unsupported custom values without partially creating a CRM lead", async ({ page }) => {
+  test("retains unsupported custom fields on CRM create without dispatching or creating a lead", async ({ page }) => {
     test.setTimeout(180_000)
 
     const { fieldSlug, fieldLabel, fieldId } = customFieldFixture("e2e_eav")
@@ -60,25 +61,31 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
 
     const creates: string[] = []
     page.on("request", (request) => {
-      if (matchesOperationResponse(request, "create_lead")) creates.push(request.url())
+      if (request.method() === "POST" && matchesOperationResponse(request, "create_lead")) {
+        creates.push(request.url())
+      }
     })
     await page.getByTestId("form-submit-new-lead").click()
-    const form = page.getByTestId("form-modal-new-lead")
-    await expect(form).toContainText("Saving custom fields during creation is not available yet.")
-    await expect(page.getByTestId("form-field-contactName")).toHaveValue(leadName)
-    await expect(page.getByTestId(`form-field-${fieldId}`)).toHaveValue(customValue)
-    expect(creates, "unsupported custom values must be rejected before create dispatch").toEqual([])
-
+    const modal = page.getByTestId("form-modal-new-lead")
+    await expect(modal.getByRole("alert")).toContainText(
+      "Saving custom fields during creation is not available yet",
+    )
+    await expect(modal.getByTestId("form-field-contactName")).toHaveValue(leadName)
+    await expect(modal.getByTestId(`form-field-${fieldId}`)).toHaveValue(customValue)
+    expect(creates).toEqual([])
     const leads = await page.request.get("/api/query/leads")
     expect(leads.ok()).toBe(true)
-    expect(parseQueryListResponse(await leads.json()).filter((row) => row.name === leadName || row.contactName === leadName || row.contact_name === leadName)).toHaveLength(0)
-    const values = await page.request.get("/api/query/record-custom-field-values")
-    expect(values.ok()).toBe(true)
-    expect(parseQueryListResponse(await values.json()).filter((row) => String(row.fieldKey ?? row.field_key) === fieldId)).toHaveLength(0)
-
-    await form.getByRole("button", { name: "Cancel", exact: true }).click()
-    await page.getByRole("alertdialog").getByRole("button", { name: "Discard", exact: true }).click()
-    await expect(form).toBeHidden()
+    expect(parseQueryListResponse(await leads.json()).some(
+      (row) => [row.contactName, row.contact_name, row.name].some((value) => value === leadName),
+    )).toBe(false)
+    const customFields = await page.request.get("/api/query/record-custom-field-values")
+    expect(customFields.ok()).toBe(true)
+    expect(parseQueryListResponse(await customFields.json()).some(
+      (row) => String(row.fieldKey ?? row.field_key ?? "") === fieldId,
+    )).toBe(false)
+    expect(creates).toEqual([])
+    await dismissBlockingDialogs(page)
+    await expect(modal).toBeHidden()
 
     await deleteCustomFormFieldViaSettings(page, fieldId)
     await expectNoAppError(page)

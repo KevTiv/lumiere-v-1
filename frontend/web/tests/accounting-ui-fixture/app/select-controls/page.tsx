@@ -61,17 +61,6 @@ function SelectControls() {
             <DialogHeader>
               <DialogTitle>Account selectors</DialogTitle>
             </DialogHeader>
-            <RecordPicker
-              data-testid="form-field-exactRecord"
-              value={record}
-              onChange={setRecord}
-              options={[...options,
-                { value: "9007199254740992", label: "Same customer" },
-                { value: "9007199254740993", label: "Same customer" },
-              ]}
-              placeholder="Choose an exact record"
-            />
-            <p>Review the selected account before saving this form.</p>
             <Select value={single} onValueChange={setSingle}>
               <SelectTrigger aria-label="Fourteen accounts">
                 <SelectValue />
@@ -107,6 +96,16 @@ function SelectControls() {
               options={options}
               placeholder="Add accounts"
               unavailableLabel={(value) => `Unavailable: ${value}`}
+            />
+            <RecordPicker
+              data-testid="form-field-record"
+              value={record}
+              onChange={setRecord}
+              options={[
+                ...Array.from({ length: 40 }, (_, i) => ({ value: String(i + 1), label: `Record ${i + 1}` })),
+                { value: "90071992547409931", label: "Shared account label" },
+                { value: "90071992547409932", label: "Shared account label" },
+              ]}
             />
           </DialogContent>
         </Dialog>

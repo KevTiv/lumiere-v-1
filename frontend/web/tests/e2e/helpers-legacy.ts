@@ -784,48 +784,13 @@ export async function fetchVendorPartnerIdByName(page: Page, name: string): Prom
   return id
 }
 
-/** Pick an exact stored value in either a searchable record picker or a Radix select. */
+/** Pick a shared Select or searchable RecordPicker by its exact stored value. */
 export async function chooseSelectOptionByValue(
   page: Page,
   name: string,
   value: string | number | bigint,
 ) {
-  const v = String(value)
-  const field = page.getByTestId(`form-field-${name}`)
-  await expect(field).toBeVisible({ timeout: 15_000 })
-  if (await field.getAttribute("data-record-picker") !== null) {
-    const listbox = await openSelectListbox(page, field)
-    const option = listbox.locator(
-      `[role="option"][data-record-value=${JSON.stringify(v)}]`,
-    )
-    await expect(option).toHaveCount(1, { timeout: 30_000 })
-    await expect(option).toBeEnabled()
-    await selectOption(field, listbox, option)
-    await expect(field).toHaveAttribute("data-record-value", v)
-    return
-  }
-  const nativeOptions = field.locator(
-    'xpath=following-sibling::select[@aria-hidden="true"][1]/option',
-  )
-  let optionLabel = ""
-
-  await expect
-    .poll(
-      async () => {
-        optionLabel = await nativeOptions.evaluateAll((options, expectedValue) => {
-          const match = options.find(
-            (option) => (option as HTMLOptionElement).value === expectedValue,
-          )
-          return match?.textContent?.trim() ?? ""
-        }, v)
-        return optionLabel
-      },
-      { timeout: 30_000 },
-    )
-    .not.toBe("")
-
-  const listbox = await openSelectListbox(page, field)
-  await selectOption(field, listbox, listbox.getByRole("option", { name: optionLabel, exact: true }))
+  await chooseSelectOptionByTriggerValue(page, page.getByTestId(`form-field-${name}`), value)
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
@@ -844,6 +809,8 @@ export async function chooseSelectOptionByLabel(
   const listbox = await openSelectListbox(page, field)
   const option = listbox.getByRole("option", { name: optionName }).first()
   await expect(option).toBeVisible({ timeout: optionTimeoutMs })
+  const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
+  if (await search.isVisible()) await search.fill((await option.innerText()).trim())
   await selectOption(field, listbox, option)
 }
 
@@ -854,7 +821,10 @@ export async function chooseSelectOptionByTriggerValue(
   value: string | number | bigint,
 ) {
   const listbox = await openSelectListbox(page, trigger)
-  const option = listbox.locator(`[role="option"][data-value="${String(value)}"]`)
+  const storedValue = String(value)
+  const option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
+  const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
+  if (await search.isVisible()) await search.fill(`#${storedValue}`)
   await expect(option).toHaveCount(1, { timeout: 30_000 })
   await selectOption(trigger, listbox, option)
 }

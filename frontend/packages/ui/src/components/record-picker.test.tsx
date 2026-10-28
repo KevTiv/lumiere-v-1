@@ -67,6 +67,7 @@ describe("RecordPicker", () => {
     fireEvent.change(await screen.findByPlaceholderText("Search..."), { target: { value: "International" } })
     const option = await screen.findByRole("option", { name: label })
     expect(option.textContent).toContain(label)
+    expect(option.getAttribute("data-value")).toBe(id)
     fireEvent.click(option)
     expect(onChange).toHaveBeenCalledWith(id)
   })
