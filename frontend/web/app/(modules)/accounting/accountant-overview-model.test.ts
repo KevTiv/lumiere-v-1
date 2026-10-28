@@ -173,3 +173,20 @@ test("activity distinguishes an empty successful period from unavailable or unda
   assert.equal(undated.state.status, "partial")
   assert.deepEqual(undated.months, [])
 })
+
+
+test("bills due queue contains only open company bills overdue or due through the next seven UTC days", () => {
+  const bill = (id: number, date: string, extra: OverviewRow = {}) => move(id, { moveType: "InInvoice", invoiceDateDue: date, ...extra })
+  const result = buildAccountantOverview(data({ moves: read([
+    bill(1, "2026-10-01"), bill(2, "2026-10-15"), bill(3, "2026-10-23T23:59:59Z"),
+    bill(4, "2026-10-24"), bill(5, "2026-10-15", { amountResidual: 0 }),
+    bill(6, "2026-10-15", { companyId: 8 }), bill(7, "2026-10-15", { state: "Draft" }),
+    bill(8, "2026-10-15", { moveType: "OutInvoice" }), bill(9, "2026-10-15", { invoiceDateDue: undefined }),
+  ]) }), NOW)
+  assert.equal(result.queues["bills-due"].state.status, "ready")
+  assert.deepEqual(result.queues["bills-due"].rows.map((row) => row.id), [1, 2, 3])
+  const denied = buildAccountantOverview(data({ moves: { rows: [bill(1, "2026-10-01")], state: { status: "denied" } } }), NOW)
+  assert.equal(denied.queues["bills-due"].state.status, "denied")
+  const redacted = buildAccountantOverview(data({ moves: read([bill(10, "2026-10-15", { amountResidual: undefined })]) }), NOW)
+  assert.equal(redacted.queues["bills-due"].state.status, "partial")
+})
