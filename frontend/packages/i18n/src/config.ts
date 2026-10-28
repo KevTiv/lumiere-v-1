@@ -4,14 +4,23 @@ import i18next from "i18next"
 import { initReactI18next } from "react-i18next"
 import en from "./locales/en.json"
 import templatePtBr from "./locales/pt-BR-templates.json"
+import fr from "./locales/fr.json"
+import rw from "./locales/rw.json"
+import rwEnglish from "./locales/rw-x-en.json"
+import sw from "./locales/sw.json"
+import { defaultLanguage, fallbackLanguages } from "./languages"
+export { defaultLanguage } from "./languages"
+export type { SupportedLanguage } from "./languages"
 
-export type SupportedLanguage = "en" | "pt-BR"
-
-export const defaultLanguage: SupportedLanguage = "en"
-
-/** Template creation/reuse has a pt-BR pack; other chrome retains its English fallback. */
+/** Partial packs use i18next fallback so coverage remains measurable. */
 export const resources = {
   en: { translation: en },
+  fr: { translation: fr },
+  rw: { translation: rw },
+  // French-derived loanwords are the base Kinyarwanda wording.
+  "rw-x-fr": { translation: rw },
+  "rw-x-en": { translation: rwEnglish },
+  sw: { translation: sw },
   "pt-BR": {
     translation: {
       ...en,
@@ -44,11 +53,14 @@ export const resources = {
       },
     },
   },
-} satisfies Record<SupportedLanguage, { translation: typeof en }>
+}
 
 i18next.use(initReactI18next).init({
   lng: defaultLanguage,
-  fallbackLng: defaultLanguage,
+  fallbackLng: fallbackLanguages,
+  supportedLngs: Object.keys(resources),
+  // Resolve rw-x-fr / rw-x-en before the shared Kinyarwanda pack.
+  load: "all",
   resources,
   interpolation: {
     escapeValue: false,

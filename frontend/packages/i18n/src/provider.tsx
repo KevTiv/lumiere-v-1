@@ -1,6 +1,9 @@
-import type { ComponentType, ReactNode } from "react"
-import { I18nextProvider } from "react-i18next"
+"use client"
+
+import { useEffect, type ComponentType, type ReactNode } from "react"
+import { I18nextProvider, useTranslation } from "react-i18next"
 import { i18n } from "./config"
+import { languagePreference, normalizeLanguage } from "./languages"
 
 /** react-i18next FC return type vs React 19 JSX — bridge until upstream aligns. */
 const I18nextProviderCompat = I18nextProvider as ComponentType<{
@@ -14,8 +17,13 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ children, language }: I18nProviderProps) {
-  if (language && i18n.language !== language) {
-    i18n.changeLanguage(language)
-  }
+  const { i18n: activeI18n } = useTranslation()
+  useEffect(() => {
+    if (language) void i18n.changeLanguage(normalizeLanguage(language))
+  }, [language])
+  useEffect(() => {
+    document.documentElement.lang = languagePreference(activeI18n.language).language
+    document.documentElement.dir = "ltr"
+  }, [activeI18n.language])
   return <I18nextProviderCompat i18n={i18n}>{children}</I18nextProviderCompat>
 }
