@@ -771,7 +771,7 @@ export function useCreateUserInvite(organizationId: bigint) {
   })
 }
 
-export function useUpdateUserProfile(organizationId: bigint) {
+export function useUpdateUserProfile(_organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
@@ -792,7 +792,9 @@ export function useUpdateUserProfile(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to update user profile')
     },
     onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
+      // Display preferences do not change roles, permissions or admission.
+      // Refresh the account profile without fanning out authority requests.
+      await qc.invalidateQueries({ queryKey: ['current-user-profile'] })
     },
   })
 }
