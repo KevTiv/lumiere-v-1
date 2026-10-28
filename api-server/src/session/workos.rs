@@ -536,25 +536,57 @@ pub async fn resolve_session(
         ));
     };
     let organization_id = org_id(member).ok_or(ApiError::Unauthorized)?;
-    // Reconcile previously committed profile changes before hydrating this tenant.
-    crate::routes::auth::profile::flush_profile_projection(
+    // This projection copies display fields only. A temporarily unavailable
+    // projection must not turn a saved language preference into a login outage.
+    // Canonical identity/admission was verified above; authorization is still
+    // resolved independently from the active ERP profile, membership and roles.
+    let projection_result = crate::routes::auth::profile::flush_profile_projection(
         state,
         &binding.platform_user_id,
         &binding.identity_hex,
         organization_id,
     )
-    .await?;
-    let field_access =
-        load_field_access_context(&state.stdb, &binding.identity_hex, organization_id)
-            .await
-            .map_err(ApiError::Internal)?
-            .ok_or(ApiError::Unauthorized)?;
-    Ok(Some(ApiSession {
+    .await;
+    let field_access_result =
+        load_field_access_context(&state.stdb, &binding.identity_hex, organization_id).await;
+    complete_verified_session(
+        binding,
+        organization_id,
+        projection_result,
+        field_access_result,
+    )
+    .map(Some)
+}
+
+fn complete_verified_session(
+    binding: VerifiedBinding,
+    organization_id: u64,
+    projection_result: Result<(), ApiError>,
+    field_access_result: Result<Option<stdb_auth::FieldAccessContext>, String>,
+) -> Result<ApiSession, ApiError> {
+    if let Err(error) = projection_result {
+        // flush_profile_projection leaves its durable outbox row intact on
+        // failure. Log the cause, which would otherwise be a silent 4xx retry.
+        tracing::warn!(
+            organization_id,
+            error = ?error,
+            "profile display projection deferred; retaining pending synchronization"
+        );
+    }
+    let field_access = field_access_result
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::Unauthorized)?;
+    if field_access.organization_id != organization_id
+        || field_access.identity_hex != binding.identity_hex
+    {
+        return Err(ApiError::Unauthorized);
+    }
+    Ok(ApiSession {
         stdb_token: binding.stdb_token,
         identity_hex: binding.identity_hex,
         organization_id: Some(organization_id),
         field_access: Some(field_access),
-    }))
+    })
 }
 
 fn may_bootstrap_without_membership(
@@ -571,6 +603,91 @@ mod tests {
     use jsonwebtoken::{encode, EncodingKey, Header};
     use rsa::{pkcs8::EncodePrivateKey, traits::PublicKeyParts, RsaPrivateKey};
     use serde_json::json;
+
+    fn verified_profile_session() -> (VerifiedBinding, stdb_auth::FieldAccessContext) {
+        let identity = "ab".repeat(32);
+        (
+            VerifiedBinding {
+                platform_user_id: PlatformId::new("usr_profile_language_test").unwrap(),
+                email: "verified@example.test".into(),
+                identity_hex: identity.clone(),
+                stdb_token: "verified-actor-token".into(),
+                organization_id: Some(1),
+            },
+            stdb_auth::FieldAccessContext {
+                organization_id: 1,
+                role_id: 7,
+                role_name: "Bookkeeper".into(),
+                is_superuser: false,
+                role_permissions: vec!["accounting:read".into()],
+                identity_hex: identity,
+                field_permissions: vec![],
+                role_ids: vec![7],
+                org_permissions: vec![],
+            },
+        )
+    }
+
+    #[test]
+    fn pending_language_projection_does_not_block_verified_workos_session() {
+        for projection in [
+            Ok(()),
+            Err(ApiError::Unavailable("profile storage unavailable".into())),
+            Err(ApiError::Unprocessable(
+                "profile projection rejected".into(),
+            )),
+        ] {
+            let (binding, access) = verified_profile_session();
+            let session = complete_verified_session(binding, 1, projection, Ok(Some(access)))
+                .expect("display synchronization is independent of authentication");
+            assert_eq!(session.identity_hex, "ab".repeat(32));
+            assert_eq!(session.stdb_token, "verified-actor-token");
+            assert_eq!(session.organization_id, Some(1));
+            let access = session.field_access.expect("verified authorization");
+            assert!(!access.is_superuser);
+            assert_eq!(access.role_ids, vec![7]);
+            assert_eq!(access.role_permissions, vec!["accounting:read"]);
+        }
+    }
+
+    #[test]
+    fn deferred_profile_projection_cannot_bypass_unavailable_or_denied_authorization() {
+        for access in [Ok(None), Err("authorization query unavailable".into())] {
+            let (binding, _) = verified_profile_session();
+            assert!(complete_verified_session(
+                binding,
+                1,
+                Err(ApiError::Unprocessable(
+                    "profile projection rejected".into()
+                )),
+                access,
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn deferred_profile_projection_cannot_rebind_identity_or_organization() {
+        for wrong_identity in [false, true] {
+            let (binding, mut access) = verified_profile_session();
+            if wrong_identity {
+                access.identity_hex = "cd".repeat(32);
+            } else {
+                access.organization_id = 2;
+            }
+            assert!(matches!(
+                complete_verified_session(
+                    binding,
+                    1,
+                    Err(ApiError::Unprocessable(
+                        "profile projection rejected".into()
+                    )),
+                    Ok(Some(access)),
+                ),
+                Err(ApiError::Unauthorized)
+            ));
+        }
+    }
 
     fn test_signing_key() -> &'static (EncodingKey, JwkSet) {
         static KEY: std::sync::OnceLock<(EncodingKey, JwkSet)> = std::sync::OnceLock::new();
