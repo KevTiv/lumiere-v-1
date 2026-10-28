@@ -6,6 +6,7 @@
   "configurationRegion": "europe-west4",
   "services": [
     { "name": "Postgres", "role": "database" },
+    { "name": "kong-postgres", "role": "gateway-database" },
     {
       "name": "qdrant",
       "role": "vector-store",
@@ -203,6 +204,23 @@
       }
     },
     { "name": "web", "role": "web" },
-    { "name": "api-gateway", "role": "edge" }
+    {
+      "name": "api-gateway",
+      "role": "edge",
+      "maxReplicas": 1,
+      "requiredVariables": {
+        "LUMIERE_ENV": { "kind": "exact", "value": "production" },
+        "KONG_DATABASE": { "kind": "exact", "value": "postgres" },
+        "KONG_PG_HOST": { "kind": "exact", "value": "kong-postgres.railway.internal" },
+        "KONG_PG_DATABASE": { "kind": "exact", "value": "lumiere_kong" },
+        "KONG_PG_USER": { "kind": "exact", "value": "lumiere_kong" },
+        "KONG_PG_PASSWORD": { "kind": "secret" },
+        "KONG_TRUSTED_IPS": { "kind": "non-placeholder" },
+        "REDIS_UPSTREAM_HOST": { "kind": "empty" },
+        "REDIS_UPSTREAM_PORT": { "kind": "empty" },
+        "REDIS_UPSTREAM_USERNAME": { "kind": "empty" },
+        "REDIS_UPSTREAM_PASSWORD": { "kind": "empty" }
+      }
+    }
   ]
 }
