@@ -46,8 +46,12 @@ for (const width of [320, 390, 768, 1440]) {
       sharedNavClass = className
       const links = nav.getByRole("link")
       expect(await links.count()).toBeLessThanOrEqual(7)
-      if (module !== "uncurated") await expect(links.first()).toHaveText("Overview")
-      for (const link of await links.all()) {
+      if (module !== "uncurated") await expect(links.first()).toHaveText(module === "reports" ? "Run a report" : "Overview")
+      // Responsive navigation can move links after the active workspace changes.
+      // Keep each destination's identity rather than a live nth-link locator.
+      const linkIds = await links.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-testid")!))
+      for (const linkId of linkIds) {
+        const link = nav.getByTestId(linkId)
         expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44)
         const destination = new URL((await link.getAttribute("href"))!, page.url()).href
         await link.click()

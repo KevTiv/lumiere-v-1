@@ -77,7 +77,7 @@ describe("Report task sections", () => {
     expect(fields(form).find((field) => field.name === "reportType")?.defaultValue).toBe("trialBalance")
     expect(fields(form).find((field) => field.name === "comparisonMode")?.defaultValue).toBe("none")
     expect(fields(form).find((field) => field.name === "targetMove")?.defaultValue).toBeUndefined()
-    expect(fields(form).filter((field) => field.required).map((field) => field.name).sort()).toEqual(["dateFrom", "dateTo", "name", "reportType"])
+    expect(fields(form).filter((field) => field.required).map((field) => field.name).sort()).toEqual(["currencyId", "dateFrom", "dateTo", "name", "reportType"])
     expect(form.submitLabel).toBe("Generate report")
   })
 

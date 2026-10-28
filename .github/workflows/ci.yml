@@ -387,6 +387,9 @@ jobs:
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
+      - name: Reports workflow browser regressions
+        run: pnpm --dir web test:e2e:reports-ui
+
       - name: Accounting next-action and authoring browser regressions
         working-directory: frontend/web
         run: pnpm exec playwright test --config playwright.accounting-ui.config.ts accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts
