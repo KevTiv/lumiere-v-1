@@ -94,6 +94,45 @@ subsequent relevant branch/main runs before claiming performance improvements.
 These items are not complete. Do not infer artifact sharing, measured speedups,
 full-suite success, or a finished god-file refactor from this batch.
 
+## 28 October 2026: dependency-cache correctness wave
+
+This follow-up addresses a measured cache-completeness problem within DX6.
+It does not complete the remaining profile, linker, compiler-cache or runner
+capacity work, and does not claim a measured speedup.
+
+- Split native root-workspace and standalone WASM dependency snapshots into
+  new namespaces; retain compiler, runner-image, flags and dependency keys.
+- Align native Rust CI with the E2E builder on Ubuntu 24.04.
+- Restore E2E dependency snapshots only when the corresponding executable cache
+  misses and compilation will run; publish only after a successful owning job.
+- Keep the existing immediate saves of validated API binaries and WASM modules.
+- Add workflow regressions for executable hits, failure/cancellation policy,
+  target isolation, platform sharing and the early executable-save boundary.
+- Extend the read-only measurement report to compare actual native compilation
+  with exact/fallback/missed dependency-cache lookups.
+
+The audit examined 33 completed CI/E2E jobs from the afternoon of 28 October.
+Ten of eleven successful API compilation steps rebuilt the same 398 third-party
+crate/version pairs, including eight exact dependency-cache hits. The original
+cache was published at 12:01 Amsterdam time by a main job cancelled during WASM
+compilation, before native API compilation ran. The
+[cache-seeding job](https://github.com/KevTiv/lumiere-v-1/actions/runs/40676386750/job/122775877515)
+and [later exact-hit API build](https://github.com/KevTiv/lumiere-v-1/actions/runs/40696260551/job/122844585238)
+provide the baseline evidence.
+
+Acceptance requires the focused regression suite and workflow validation, then
+hosted observations of a cold snapshot and a matching-environment warm build.
+Application-only edits must still rebuild and validate application binaries;
+compiler, target, profile, features or dependency changes retain Cargo's
+normal invalidation. Cache inventory alone does not establish eviction.
+
+Local verification: all 183 script regressions passed, including 17 measurement
+tests and five workflow-cache policy tests. Actionlint 1.7.12 passed for both
+changed workflows (ShellCheck disabled). Replaying filtered real build logs
+reproduced 398 third-party compilations after an incomplete exact hit and zero
+after a usable hit. Independent review found no remaining actionable issues.
+Hosted cache publication and cold/warm timings remain pending.
+
 ## Next coordinator session
 
 Inspect HEAD/worktree/CI first. Delegate disjoint files; reserve shared wiring,
