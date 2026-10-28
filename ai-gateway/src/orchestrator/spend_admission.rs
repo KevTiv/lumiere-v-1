@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use stdb_client::StdbClient;
 
+use super::budget_park::{AdmittedBinding, BudgetBlocked};
 use crate::ai_spend::{
     self, allowance, billing_period, request_key, AcceptAttemptRequest, Allowance, AttemptResult,
     PriceSnapshot, ProviderAttempt, ProviderRecoveryAction, ReconcileAttemptRequest,
@@ -781,6 +782,14 @@ impl<'a> SpendAdmittedLlm<'a> {
         })
     }
 
+    fn admitted_binding(&self) -> AdmittedBinding {
+        AdmittedBinding {
+            agent_id: self.binding.agent_id,
+            provider: self.binding.provider.clone(),
+            model: self.binding.model.clone(),
+        }
+    }
+
     async fn admit(&self, req: &LlmRequest, key: &str) -> Result<Reservation> {
         let b = &self.binding;
         if req.provider != b.provider || req.model != b.model {
@@ -820,6 +829,26 @@ impl<'a> SpendAdmittedLlm<'a> {
             b.agent_max_tokens,
             b.context_window,
         )?;
+        // A denial caused by the budget window is typed so the run can park
+        // until the window resets instead of ending. Nothing is reserved or
+        // dispatched at this point.
+        let needed = super::budget_park::required_units(&snapshot, &allowance)?;
+        let blocked = || {
+            anyhow::Error::new(BudgetBlocked {
+                window_resets_at: super::budget_park::next_window_start((self.clock)()),
+                required_units: needed,
+                allowance,
+            })
+            .context(self.admitted_binding())
+        };
+        if budget
+            .settled_units
+            .saturating_add(budget.outstanding_units)
+            .saturating_add(needed)
+            > budget.limit_units
+        {
+            return Err(blocked());
+        }
         let request = ReserveRequest {
             organization_id: b.organization_id,
             company_id: b.company_id,
@@ -833,7 +862,14 @@ impl<'a> SpendAdmittedLlm<'a> {
             price_snapshot_id: snapshot.id,
             allowance,
         };
-        self.ledger.reserve(&request).await?;
+        if let Err(error) = self.ledger.reserve(&request).await {
+            // Lost a race for the last headroom: same typed denial.
+            return Err(if format!("{error:#}").contains("budget exhausted") {
+                blocked()
+            } else {
+                error
+            });
+        }
         let reservation = self
             .ledger
             .reservation(b.organization_id, b.run_id, key)
@@ -944,7 +980,9 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
                         .await
                         .context("could not settle definite provider rejection; retry denied")
                         .map_err(UnresolvedProviderAttempt)?;
-                    return Err(error.context("provider rejection recorded and zero usage settled"));
+                    return Err(error
+                        .context("provider rejection recorded and zero usage settled")
+                        .context(self.admitted_binding()));
                 }
                 // The provider may have run, so the outcome is unknown rather
                 // than failed, and the reservation stays reserved.
@@ -1196,6 +1234,8 @@ pub(crate) mod tests {
     pub(crate) struct FakeLedger {
         has_budget: bool,
         has_snapshot: bool,
+        /// Overrides the default 1_000_000-unit budget limit.
+        budget_limit: Option<u64>,
         /// Models a reader that sees an attempt recovered as already dispatched.
         accepts_as_dispatched: bool,
         reservations: Mutex<Vec<Reservation>>,
@@ -1216,6 +1256,11 @@ pub(crate) mod tests {
                 has_snapshot: true,
                 ..Self::default()
             }
+        }
+
+        pub(crate) fn with_budget_limit(mut self, limit: u64) -> Self {
+            self.budget_limit = Some(limit);
+            self
         }
 
         fn attempt(&self, key: &str) -> ProviderAttempt {
@@ -1239,7 +1284,7 @@ pub(crate) mod tests {
             Ok(self.has_budget.then(|| SpendBudget {
                 id: 1,
                 currency: "EUR".into(),
-                limit_units: 1_000_000,
+                limit_units: self.budget_limit.unwrap_or(1_000_000),
                 settled_units: 0,
                 outstanding_units: 0,
             }))
@@ -1720,6 +1765,27 @@ pub(crate) mod tests {
             .unwrap_err()
             .is::<UnresolvedProviderAttempt>());
         assert_eq!(ledger.writes(), vec!["reserve", "accept", "dispatch"]);
+    }
+
+    #[tokio::test]
+    async fn exhausted_budget_window_is_a_typed_denial_before_anything_is_reserved() {
+        let provider = Provider::new(Ok(response(10, 5)));
+        let ledger = FakeLedger::configured().with_budget_limit(1);
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        let blocked = error
+            .downcast_ref::<BudgetBlocked>()
+            .expect("typed budget denial");
+        // The fixed clock is 2026-09-13; budgets are per UTC calendar month.
+        assert_eq!(
+            blocked.window_resets_at,
+            Utc.with_ymd_and_hms(2026, 10, 1, 0, 0, 0).unwrap()
+        );
+        assert!(blocked.required_units > 1);
+        assert_eq!(provider.calls(), 0);
+        assert!(ledger.writes().is_empty());
     }
 
     #[tokio::test]

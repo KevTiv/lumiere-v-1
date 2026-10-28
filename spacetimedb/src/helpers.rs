@@ -198,6 +198,15 @@ pub struct AuditLogParams {
 /// - `ip_address`  — not available in SpacetimeDB 2.0.1 WASM sandbox; always None
 /// - `user_agent`  — not available in SpacetimeDB 2.0.1 WASM sandbox; always None
 pub fn write_audit_log_v2(ctx: &ReducerContext, organization_id: u64, params: AuditLogParams) {
+    write_audit_log_v2_returning(ctx, organization_id, params);
+}
+
+/// Return the exact inserted audit row for trusted evidence/commit linkage.
+pub(crate) fn write_audit_log_v2_returning(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: AuditLogParams,
+) -> AuditLog {
     let session_id = ctx.connection_id().map(|c| c.to_u128() as u64);
     ctx.db.audit_log().insert(AuditLog {
         id: 0,
@@ -215,7 +224,7 @@ pub fn write_audit_log_v2(ctx: &ReducerContext, organization_id: u64, params: Au
         user_agent: None,
         timestamp: ctx.timestamp,
         metadata: params.metadata,
-    });
+    })
 }
 
 /// Insert a structured audit log entry.

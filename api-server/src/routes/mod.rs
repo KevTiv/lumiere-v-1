@@ -14,6 +14,7 @@ mod documents;
 mod evidence_inspection;
 mod finance_reviews;
 pub(crate) mod health;
+mod history;
 mod import;
 mod inventory;
 mod mail;
@@ -51,6 +52,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(crm::router())
         .merge(sales::router())
         .merge(accounting::router())
+        .merge(history::router())
         .merge(documents::router())
         .merge(mail::router())
         .merge(messaging::router())

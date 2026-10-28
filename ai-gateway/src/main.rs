@@ -211,6 +211,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/skills/finance/:skill",
             post(routes::harness_skills::post_finance_review),
         )
+        .route(
+            "/v1/harness/descriptor",
+            get(routes::harness_descriptor::get_descriptor),
+        )
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
@@ -331,6 +335,50 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn descriptor_route_requires_the_gateway_secret() {
+        let state = routes::harness_descriptor::test_support::state(
+            routes::harness_descriptor::test_support::config(),
+        )
+        .await;
+        let app = Router::new()
+            .route(
+                "/v1/harness/descriptor",
+                get(routes::harness_descriptor::get_descriptor),
+            )
+            .route_layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_gateway_secret,
+            ))
+            .with_state(state);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!(
+            "http://{}/v1/harness/descriptor",
+            listener.local_addr().unwrap()
+        );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let client = reqwest::Client::new();
+        let missing = client.get(&url).send().await.unwrap();
+        assert_eq!(missing.status(), reqwest::StatusCode::UNAUTHORIZED);
+        let wrong = client
+            .get(&url)
+            .header("x-lumiere-gateway-secret", "wrong")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(wrong.status(), reqwest::StatusCode::UNAUTHORIZED);
+        // Correct secret but no acting-user context: still denied by the route.
+        let no_actor = client
+            .get(&url)
+            .header("x-lumiere-gateway-secret", "gateway-secret")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(no_actor.status(), reqwest::StatusCode::FORBIDDEN);
+    }
 
     #[test]
     fn semantic_index_startup_failure_is_non_fatal() {

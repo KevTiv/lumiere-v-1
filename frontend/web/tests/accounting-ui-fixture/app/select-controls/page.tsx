@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@lumiere/ui/components/select"
 import { MultiRecordPicker } from "@lumiere/ui/components/multi-record-picker"
+import { RecordPicker } from "@lumiere/ui/components/record-picker"
 
 const options = Array.from({ length: 15 }, (_, index) => ({
   value: String(index + 1).padStart(2, "0"),
@@ -25,6 +26,7 @@ export default function SelectControlsFixture() {
   const [open, setOpen] = useState(false)
   const [single, setSingle] = useState("02")
   const [multiple, setMultiple] = useState(["02", "14", "missing"])
+  const [record, setRecord] = useState("")
   return (
     <I18nProvider language="en">
       <main className="mx-auto max-w-xl space-y-6 p-4">
@@ -32,6 +34,7 @@ export default function SelectControlsFixture() {
         <Button onClick={() => setOpen(true)}>Open select dialog</Button>
         <output data-testid="single-value">{single}</output>
         <output data-testid="multiple-value">{multiple.join(",")}</output>
+        <output data-testid="record-value">{record}</output>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
@@ -72,6 +75,16 @@ export default function SelectControlsFixture() {
               options={options}
               placeholder="Add accounts"
               unavailableLabel={(value) => `Unavailable: ${value}`}
+            />
+            <RecordPicker
+              data-testid="form-field-record"
+              value={record}
+              onChange={setRecord}
+              options={[
+                ...Array.from({ length: 40 }, (_, i) => ({ value: String(i + 1), label: `Record ${i + 1}` })),
+                { value: "90071992547409931", label: "Shared account label" },
+                { value: "90071992547409932", label: "Shared account label" },
+              ]}
             />
           </DialogContent>
         </Dialog>

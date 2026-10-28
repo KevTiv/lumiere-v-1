@@ -2374,6 +2374,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "edit_ai_run_follow_up",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; author identity, continuation and capability authority are server-validated"
+    },
+    {
       "name": "end_contact_relationship",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -2388,6 +2393,11 @@
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site",
       "unscoped_reason": "the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative"
+    },
+    {
+      "name": "enqueue_ai_run_follow_up",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; author identity, continuation and capability authority are server-validated"
     },
     {
       "name": "error_intercompany_transaction",
@@ -3020,6 +3030,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "park_ai_run_for_budget",
+      "exposure": "denied",
+      "reason": "trusted gateway only; budget denial classification and safe-boundary checks are server-controlled"
+    },
+    {
       "name": "pass_quality_check",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3123,6 +3138,11 @@
       "name": "project_user_profile",
       "exposure": "denied",
       "reason": "trusted API-server platform-control projection only; organization and identity are server-derived"
+    },
+    {
+      "name": "promote_ai_run_follow_up",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; author identity, continuation and capability authority are server-validated"
     },
     {
       "name": "promote_ai_skill_version",
@@ -3475,6 +3495,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "reorder_ai_run_follow_up",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; author identity, continuation and capability authority are server-validated"
+    },
+    {
       "name": "reorder_proposal_line_items",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3523,6 +3548,11 @@
       "name": "reset_leave_to_draft",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "resolve_ai_run_budget_park",
+      "exposure": "denied",
+      "reason": "trusted gateway only; requires the dedicated ai.run.budget.resolve grant and a checked continuation"
     },
     {
       "name": "resolve_inventory_exception",
@@ -5009,6 +5039,11 @@
       "name": "run_ai_spend_recovery_tests",
       "exposure": "denied",
       "reason": "isolated persisted spend recovery proof; never exposed through the session BFF"
+    },
+    {
+      "name": "withdraw_ai_run_follow_up",
+      "exposure": "denied",
+      "reason": "trusted lifecycle gateway only; author identity, continuation and capability authority are server-validated"
     }
   ]
 }

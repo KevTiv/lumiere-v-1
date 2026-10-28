@@ -324,6 +324,15 @@ pub fn test_owner_capability_provisioning(ctx: &ReducerContext) -> Result<(), St
         }
     }
 
+    if grants
+        .iter()
+        .any(|grant| grant.capability_key == "ai.run.budget.resolve" || grant.capability_key == "*")
+    {
+        return Err(
+            "AI-CG-005 owner baseline must not include budget resolve or wildcards".to_string(),
+        );
+    }
+
     let ordinary_role_id = seed_role(ctx, fixture.organization_id, "AI-CG-005 Ordinary")?;
     let ordinary_role = ctx
         .db

@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest"
 
-import { actionsMatch, buildRbacUserFromServer, mapBackendRoleToRole, parsePermissionString } from "./rbac-defaults"
+import { actionsMatch, buildRbacUserFromServer, defaultPolicies, defaultRoles, mapBackendRoleToRole, parsePermissionString, resourceGroups } from "./rbac-defaults"
 import type { Role } from "./rbac-types"
 
 describe("RBAC action vocabulary", () => {
+  it("offers explicit read-only business history permission without assigning it to default roles", () => {
+    expect(resourceGroups.flatMap((group) => group.resources).filter((resource) => resource.resource === "business_history")).toEqual([
+      { resource: "business_history", label: "Business change history", actions: ["read"] },
+    ])
+    expect(defaultRoles.flatMap((role) => role.permissions).filter((rule) => rule.resource === "business_history")).toEqual([])
+    expect(defaultPolicies.filter((rule) => rule.resource === "business_history")).toEqual([])
+    expect(parsePermissionString("business_history:read")).toEqual({ resource: "business_history", action: "read" })
+  })
+
   it("parses the server admin action without replacing it with manage", () => {
     expect(parsePermissionString("tax:deadlines:admin")).toEqual({
       resource: "tax:deadlines",

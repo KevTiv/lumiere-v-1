@@ -337,6 +337,8 @@ export * from "./lib/module-url-filters";
 export * from "./pages/erp-command-palette";
 
 export * from "./entity-views/record-audit-tab";
+export * from "./entity-views/record-change-history";
+export * from "./entity-views/account-move-changes";
 export * from "./lib/audit-log-utils";
 export * from "./lib/identity-label";
 export * from "./hooks/use-identity-label-map";

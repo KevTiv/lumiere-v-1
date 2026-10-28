@@ -28,6 +28,7 @@ import {
   FormModal,
   MissingOrganization,
   RecordAuditTab,
+  AccountMoveChanges,
   RecordChatter,
   RecordPage,
   RecordWorkflowActions,
@@ -133,7 +134,7 @@ interface InvoicePageClientProps {
 type Row = Record<string, unknown>;
 type WorkflowAction = AnyWorkflowAction<RowValueMap>;
 
-const TAB_IDS = ['overview', 'preview', 'lines', 'payments', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'preview', 'lines', 'payments', 'discussion', 'changes', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 /** Which accounting list a kind of document belongs to, and what to call it. */
@@ -604,6 +605,7 @@ function InvoicePageLoaded({
 
   // Lines of a draft are editable; the totals are recomputed through the same command as "Recalculate totals".
   const refreshTotals = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['account-move-history', String(organizationId)] });
     if (canRecomputeInvoiceTotals(kind)) await computeTotals.mutateAsync(moveId);
   };
   const fieldsOf = (config: FormConfig) => config.sections.flatMap((section) => section.fields);
@@ -971,6 +973,11 @@ function InvoicePageLoaded({
                 />
               </div>
             ),
+          },
+          {
+            id: 'changes',
+            label: t('recordChanges.title'),
+            content: <AccountMoveChanges organizationId={organizationId} companyId={operatingCompanyId} recordId={moveId} />,
           },
           {
             id: 'audit',
