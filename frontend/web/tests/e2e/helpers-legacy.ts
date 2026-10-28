@@ -496,10 +496,14 @@ export async function chooseFirstOption(page: Page, name: string) {
 /** Scope to this trigger's popup, including while another popup is animating closed. */
 async function openSelectListbox(page: Page, trigger: Locator) {
   await expect(trigger).toBeVisible({ timeout: 15_000 })
+  // Radix hides background controls from the accessibility tree while open.
+  // Resolve its popup before opening so role-based trigger locators remain usable.
+  let contentId = await trigger.getAttribute("aria-controls")
   if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click()
-  await expect(trigger).toHaveAttribute("aria-expanded", "true")
-  await expect(trigger).toHaveAttribute("aria-controls", /.+/)
-  const contentId = await trigger.getAttribute("aria-controls")
+  if (!contentId) {
+    await expect(trigger).toHaveAttribute("aria-controls", /.+/)
+    contentId = await trigger.getAttribute("aria-controls")
+  }
   if (!contentId) throw new Error("select trigger has no controlled popup")
   const content = `[id=${JSON.stringify(contentId)}]`
   const listbox = page.locator(`${content}[role="listbox"], ${content} [role="listbox"]`)
