@@ -28,6 +28,79 @@ async fn postgres_finance_history_migration_and_projection_recovery() -> Result<
     Ok(())
 }
 
+#[tokio::test]
+async fn postgres_finance_27_to_harness_28_preserves_history() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!("skipping harness upgrade proof (set C4_TEST_PG=1 to run)");
+        return Ok(());
+    }
+    let base = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin = admin_pool(&base)?;
+    create_database(&admin, &database, &base.user).await?;
+    let mut config = base;
+    config.database.clone_from(&database);
+    let pool = pg_pool::build_pool(&config)?;
+    let result = exercise_harness_upgrade(&pool).await;
+    drop(pool);
+    let cleanup = drop_database(&admin, &database).await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
+async fn exercise_harness_upgrade(pool: &Pool) -> Result<()> {
+    let index = MIGRATIONS
+        .iter()
+        .position(|m| m.version == 28)
+        .context("harness migration is present")?;
+    ensure!(MIGRATIONS[index - 1].version == 27);
+    ensure!(MIGRATIONS[index - 1].name == "finance_business_change_history");
+    ensure!(MIGRATIONS[index].name == "ai_harness_v2_projection");
+    apply_migration_prefix(pool, index).await?;
+    let before = applied_migration_history(pool).await?;
+    let manifest = history_manifest()?;
+    let changes = vec![history_change(
+        8001,
+        1,
+        0,
+        history_row(8001, 9_007_199_254_740_993, "20.50"),
+    )?];
+    let commit = history_commit(8001, 1, &changes);
+    ensure!(apply_commit(pool, &manifest, &commit, &changes).await? == ProjectionResult::Applied);
+    let row_before: String = pool.get().await?.query_one(
+        "SELECT row_to_json(business_change)::TEXT FROM business_change WHERE organization_id=8001", &[]
+    ).await?.get(0);
+    for table in [
+        "ai_run_budget_park",
+        "ai_run_budget_resume_job",
+        "ai_run_queued_input",
+    ] {
+        ensure!(!relation_exists(pool, table).await?);
+    }
+    ensure_schema(pool).await?;
+    let after = applied_migration_history(pool).await?;
+    ensure!(&after[..before.len()] == before.as_slice());
+    for table in [
+        "ai_run_budget_park",
+        "ai_run_budget_resume_job",
+        "ai_run_queued_input",
+    ] {
+        ensure!(relation_exists(pool, table).await?);
+    }
+    let row_after: String = pool.get().await?.query_one(
+        "SELECT row_to_json(business_change)::TEXT FROM business_change WHERE organization_id=8001", &[]
+    ).await?.get(0);
+    ensure!(row_before == row_after);
+    ensure!(watermark(pool, 8001).await? == Some("1".into()));
+    ensure!(
+        apply_commit(pool, &manifest, &commit, &changes).await? == ProjectionResult::AlreadyApplied
+    );
+    ensure_schema(pool).await?;
+    ensure!(applied_migration_history(pool).await? == after);
+    Ok(())
+}
+
 fn history_manifest() -> Result<String> {
     // Local source validation may precede the immutable contracts release.
     // Only an explicitly supplied real codegen output may replace the current

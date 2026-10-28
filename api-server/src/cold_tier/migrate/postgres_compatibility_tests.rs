@@ -173,6 +173,9 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     // Startup upgrades the frozen v13 prefix through the whole current catalog,
     // including migration 27's history parent and all sixteen hash partitions.
     let expected_new_tables = [
+        "ai_run_budget_park",
+        "ai_run_budget_resume_job",
+        "ai_run_queued_input",
         "bank_statement_settlement_attempt",
         "bank_statement_settlement_reversal",
         "business_change",

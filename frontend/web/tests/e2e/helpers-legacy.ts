@@ -764,38 +764,14 @@ export async function fetchVendorPartnerIdByName(page: Page, name: string): Prom
   return id
 }
 
-/** Pick a Radix select option by its stored value (not visible label). */
+/** Pick a shared Select or searchable RecordPicker by its exact stored value. */
 export async function chooseSelectOptionByValue(
   page: Page,
   name: string,
   value: string | number | bigint,
 ) {
-  const v = String(value)
   const field = page.getByTestId(`form-field-${name}`)
-  const nativeOptions = field.locator(
-    'xpath=following-sibling::select[@aria-hidden="true"][1]/option',
-  )
-  let optionLabel = ""
-
-  await expect
-    .poll(
-      async () => {
-        optionLabel = await nativeOptions.evaluateAll((options, expectedValue) => {
-          const match = options.find(
-            (option) => (option as HTMLOptionElement).value === expectedValue,
-          )
-          return match?.textContent?.trim() ?? ""
-        }, v)
-        return optionLabel
-      },
-      { timeout: 30_000 },
-    )
-    .not.toBe("")
-
-  await field.click()
-  const listbox = page.locator('[role="listbox"]:visible')
-  await expect(listbox).toBeVisible({ timeout: 15_000 })
-  await listbox.getByRole("option", { name: optionLabel, exact: true }).click()
+  await chooseSelectOptionByTriggerValue(page, field, value)
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */
@@ -830,22 +806,34 @@ export async function chooseSelectOptionByLabel(
     )
     .toBeGreaterThan(0)
 
-  await option.click()
+  const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
+  if (await search.isVisible()) {
+    // Use the picker's search before selecting an item far down a long list.
+    await search.fill((await option.innerText()).trim())
+  }
+  await option.click({ timeout: 15_000 })
+  await expect(listbox).toBeHidden()
 }
 
-/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
+/** Both shared selectors expose their exact stored value as `data-value`. */
 export async function chooseSelectOptionByTriggerValue(
   page: Page,
   trigger: Locator,
   value: string | number | bigint,
 ) {
   const listbox = page.locator('[role="listbox"]:visible')
-  const option = listbox.locator(`[role="option"][data-value="${String(value)}"]`)
+  const storedValue = String(value)
+  const option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
 
   await expect
     .poll(
       async () => {
         if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
+        if (await search.isVisible()) {
+          const query = `#${storedValue}`
+          if (await search.inputValue() !== query) await search.fill(query)
+        }
         const count = await option.count()
         if (count === 0) await page.keyboard.press("Escape")
         return count
@@ -854,7 +842,8 @@ export async function chooseSelectOptionByTriggerValue(
     )
     .toBeGreaterThan(0)
 
-  await option.click()
+  await option.click({ timeout: 15_000 })
+  await expect(listbox).toBeHidden()
 }
 
 /** Pick the first real option of a shared Select located by its trigger. */
@@ -874,7 +863,8 @@ export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Loca
     )
     .toBeGreaterThan(0)
 
-  await option.click()
+  await option.click({ timeout: 15_000 })
+  await expect(listbox).toBeHidden()
 }
 
 export async function submitForm(page: Page, formId: string) {

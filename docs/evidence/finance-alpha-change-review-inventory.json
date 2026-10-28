@@ -22,11 +22,11 @@
   "inputs": [
     {
       "path": "lumiere-codegen/contract-operation-ids.json",
-      "sha256": "a890248f1924104ca9113c522a7d37bb3f9cacedfe59a708cf78c97a3ad485c6"
+      "sha256": "8bc4ef0b380a9b224afad405b8a4a8ef008d49a28af2833c771a71a041e425d4"
     },
     {
       "path": "lumiere-codegen/reducer-exposure.json",
-      "sha256": "fba85d1dc193aeeb3f47cbcd10ff2bee0a2d03253c850288760713306d0f66ff"
+      "sha256": "f5c3abf63ec4be18ee934a90196c10152dae3f359a5a5e4dbd3f919e23e2dc1a"
     },
     {
       "path": "lumiere-codegen/c2-commit-coverage.json",
@@ -46,7 +46,7 @@
     },
     {
       "path": "lumiere-codegen/operation-contracts/people-platform.json",
-      "sha256": "d7af2883482e4524a889cc2157372f516f0d44029bd067287f57c1527fa65509"
+      "sha256": "c864dd7cce2575b43a4d62c795518c08873ee445c5c8bcd55fc47a255920316b"
     },
     {
       "path": "lumiere-codegen/operation-contracts/presentation.json",

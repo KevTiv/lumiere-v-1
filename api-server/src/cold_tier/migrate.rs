@@ -287,6 +287,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0027_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 28,
+        name: "ai_harness_v2_projection",
+        change_set: 17,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0028_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

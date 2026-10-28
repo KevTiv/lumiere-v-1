@@ -12591,7 +12591,8 @@
         "completed": "Completed",
         "cancelled": "Cancelled",
         "failed": "Failed",
-        "agentSettled": "Agent settled"
+        "agentSettled": "Agent settled",
+        "budgetParked": "Paused: budget limit"
       },
       "questionStatuses": {
         "open": "Open",
@@ -15716,6 +15717,7 @@
       "status": {
         "agentSettled": "Agent settled",
         "awaitingApproval": "Awaiting approval",
+        "budgetParked": "Paused: budget limit",
         "cancelled": "Cancelled",
         "completed": "Completed",
         "failed": "Failed",

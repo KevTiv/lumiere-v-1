@@ -5,21 +5,21 @@
     "ir_version": 2,
     "ir_path": "ir/lumiere-contract-ir-v2.json",
     "pin_path": "ir/PIN.json",
-    "artifact_sha256": "67952055f3769039412fc817c3e7ee4a155909dbda1554d6c6d6071c0b6a2ef2",
-    "schema_hash": "sha256:daa521ba7f4eb0deab42adcad5ca5503607cc7111af832f68afaad9a9adba028",
-    "source_commit": "8cb12fc09d838282d7b76e8e4ac5b793ccd5e041",
+    "artifact_sha256": "66517adc19dff33ee922c44a7c9b98a2210bd17ac30ec6d8aff58f29a541816e",
+    "schema_hash": "sha256:77bd0a158a9561241700c261d2f35836ce7cd08a0c0cfe130315423f6cb71d70",
+    "source_commit": "d7e9909e519366d53862500bb2cae7c6ddc9fd04",
     "source_repository": "https://github.com/KevTiv/lumiere-v-1"
   },
   "lumiere_contracts": {
     "package": "lumiere-contracts",
-    "version": "0.3.153",
-    "tag": "v0.3.153",
-    "revision": "dea7c7d05ce48a83eb4fc75f767df1096f7e2571",
+    "version": "0.3.154",
+    "tag": "v0.3.154",
+    "revision": "e5f9e7955a0c25474a33f75ab24af8d767d74c40",
     "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:3ff53fc3434e2ed221656d7ead7c125894da0a5bd644390c03a525ab2e35137f"
+    "checksum": "sha256:3b1413ac006cddd41d77fc891bc0f1bbd80747600f4b185ab1a4bfc73b986ea3"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -35,8 +35,8 @@
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-    "application_catalog_version": 27,
-    "application_catalog_checksum": "sha256:df9dd8e07fc5bc81203690f52d6e6778161296c85205457fec224c173dafe1f4"
+    "application_catalog_version": 28,
+    "application_catalog_checksum": "sha256:e10300de17d486bc2a2135a11ac6f9bbdd92c054c637b2b4f9316bbd8609e058"
   },
   "services": {
     "api_server": {
@@ -51,7 +51,7 @@
   "minimum_client_contract": {
     "version": "ir-v2",
     "ir_version": 2,
-    "generated_contract_release": "0.3.153"
+    "generated_contract_release": "0.3.154"
   },
   "deployment": {
     "config_generation": 7,

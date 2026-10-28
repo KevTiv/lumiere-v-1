@@ -1761,6 +1761,16 @@
       },
       "evidence": "spacetimedb/src/analytics/reports.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
+    "edit_ai_run_follow_up": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_followup_queue.rs: edit payload, expected revision and author are payload-bound and replay checked"
+    },
     "end_user_session": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -1770,6 +1780,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/core/users.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "enqueue_ai_run_follow_up": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_followup_queue.rs: payload and author are bound to an idempotency key before durable insertion"
     },
     "enqueue_job": {
       "semantic_kind": "internal",
@@ -1870,6 +1890,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/data_ops/import_mapping_templates.rs: body inserts or appends a new effect without a replay guard"
+    },
+    "fire_ai_run_budget_resume": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/budget_park.rs: scheduled-only reducer; replay is ignored by the park generation and status guard"
     },
     "fire_workflow_timer": {
       "semantic_kind": "command",
@@ -2781,6 +2811,16 @@
       },
       "evidence": "spacetimedb/src/hr/contracts.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "park_ai_run_for_budget": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/budget_park.rs: park request, checked continuation and generation are payload-bound to an idempotency key"
+    },
     "post_internal_note": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -2840,6 +2880,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/decision_precedent.rs: only reviewed to promoted is permitted after re-validating eligibility evidence and shadow conformance"
+    },
+    "promote_ai_run_follow_up": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_followup_queue.rs: promotion, child run key and caller are payload-bound; the author's current grant is rechecked"
     },
     "promote_ai_skill_version": {
       "semantic_kind": "command",
@@ -3361,6 +3411,16 @@
       },
       "evidence": "spacetimedb/src/core/queue.rs: body inserts or appends a new effect without a replay guard"
     },
+    "reorder_ai_run_follow_up": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_followup_queue.rs: reorder request, expected revision and author are payload-bound and replay checked"
+    },
     "repair_cancelled_workflow_tasks": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3440,6 +3500,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/evidence_dependency.rs: a valid dependency, an invalid reaffirmation and a required-edge acknowledgement are rejected"
+    },
+    "resolve_ai_run_budget_park": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/budget_park.rs: resolution outcome, park generation and checked continuation are payload-bound; caller needs the ai.run.budget.resolve grant"
     },
     "resubmit_workflow_human_task": {
       "semantic_kind": "command",
@@ -5810,6 +5880,16 @@
         "version": 1
       },
       "evidence": "validate_c_0_organization_ownership_backfill: IR schema/exposure is locked as an operator-only migration hook; no reducer definition is present, so classification fails closed"
+    },
+    "withdraw_ai_run_follow_up": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_followup_queue.rs: withdraw request, expected revision and author are payload-bound and replay checked"
     },
     "worker_heartbeat": {
       "semantic_kind": "internal",
