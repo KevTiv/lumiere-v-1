@@ -44,6 +44,24 @@ jobs:
           bash scripts/tests/test-railway-stack-release.sh
           bash scripts/tests/test-railway-production-preflight.sh
 
+  sandbox-controller:
+    name: JavaScript sandbox controller
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: sandbox-controller/package-lock.json
+      - name: Install pinned sandbox dependencies
+        working-directory: sandbox-controller
+        run: npm ci --ignore-scripts
+      - name: Test broker, lifecycle recovery, and actual JavaScript execution
+        working-directory: sandbox-controller
+        run: npm test
+
   stdb-check:
     name: SpacetimeDB check
     needs: scope
@@ -528,13 +546,14 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [scope, stdb-check, rust, contracts-drift, frontend, frontend-typecheck, owner-report-pdf, playwright-compile]
+    needs: [scope, sandbox-controller, stdb-check, rust, contracts-drift, frontend, frontend-typecheck, owner-report-pdf, playwright-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Require scope and scheduled validations to pass
         run: |
           test "${{ needs.scope.result }}" = success
           test "${{ needs.scope.outputs.valid }}" = true
+          test "${{ needs.sandbox-controller.result }}" = success
           for pair in \
             "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.stdb-check.result }}" \
             "run_rust:${{ needs.scope.outputs.run_rust }}:${{ needs.rust.result }}" \
