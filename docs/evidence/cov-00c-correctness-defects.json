@@ -169,6 +169,12 @@
         {
           "path": "docs/evidence/cov-00d-lifecycle-evidence.json",
           "markers": ["operator_evidence_mode", "api-driven-transition", "partial-operator-transition"]
+        },
+        {
+          "path": "frontend/web/tests/e2e/accounting-change-history.spec.ts",
+          "role": "partial-operator-transition",
+          "claim": "Authored Accounting draft-line UI edit and history readback. Direct BFF calls only prepare observer authority, change field/source/history permissions, or inject an untrusted raw audit event; they do not perform the line edit under test. Browser discovery is not runtime acceptance or broader Accounting certification.",
+          "markers": ["entity-action-move-line-edit", "edit-account-move-line", "record-change-before", "record-change-after", "log_audit_event", "grant_field_permission", "update_role"]
         }
       ]
     },
@@ -265,6 +271,7 @@
     ],
     "operator_bypass_files": [
       "frontend/web/tests/e2e/account-deprecation-readback.spec.ts",
+      "frontend/web/tests/e2e/accounting-change-history.spec.ts",
       "frontend/web/tests/e2e/ai-human-review-provenance.spec.ts",
       "frontend/web/tests/e2e/ai-rag-evidence-access.spec.ts",
       "frontend/web/tests/e2e/analytics-lifecycle.spec.ts",

@@ -3547,6 +3547,37 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "business_change",
+      "module": "core",
+      "rationale": "Private append-only reducer-authored before/after evidence; current business owners remain authoritative for changes and source access.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:finance-alpha/history/always-hot/until-exact-durable-finalization-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
       "table": "calendar_event",
       "module": "workflow",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
