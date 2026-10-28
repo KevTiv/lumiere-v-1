@@ -45,6 +45,19 @@ function Harness({ initial = "", onChange = vi.fn() }: { initial?: string; onCha
 const open = () => fireEvent.click(screen.getByTestId("partner"))
 
 describe("RecordPicker", () => {
+  it("registers a caller-provided field id with its popup", async () => {
+    render(<RecordPicker id="customer-field" value="" onChange={vi.fn()} options={options} data-testid="partner" />)
+    open()
+    const trigger = screen.getByTestId("partner")
+    await screen.findByRole("listbox")
+    await waitFor(() => {
+      const popupId = trigger.getAttribute("aria-controls")
+      expect(popupId).toBeTruthy()
+      expect(document.getElementById(popupId!)?.contains(screen.getByRole("listbox"))).toBe(true)
+    })
+    expect(trigger.id).toBe("customer-field")
+  })
+
   it("keeps the full long record label searchable and returns its exact id", async () => {
     const onChange = vi.fn()
     const label = `International customer ${"unbroken".repeat(30)}`

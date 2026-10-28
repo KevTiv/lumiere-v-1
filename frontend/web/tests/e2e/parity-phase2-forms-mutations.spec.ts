@@ -6,11 +6,9 @@ import {
   addCustomFormFieldViaSettings,
   deleteCustomFormFieldViaSettings,
   expectNoAppError,
-  fetchLeadIdByName,
   fillField,
   openEntityCreate,
   smokeName,
-  submitForm,
 } from "./helpers"
 
 function customFieldFixture(smokePrefix: string) {
@@ -44,7 +42,7 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
     await expectNoAppError(page)
   })
 
-  test("persists custom field value to EAV on CRM lead create", async ({ page }) => {
+  test("retains unsupported custom values without partially creating a CRM lead", async ({ page }) => {
     test.setTimeout(180_000)
 
     const { fieldSlug, fieldLabel, fieldId } = customFieldFixture("e2e_eav")
@@ -60,40 +58,27 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
     // Custom fields use fieldId as the ModularForm name
     await fillField(page, fieldId, customValue)
 
-    const [createRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => matchesOperationResponse(res, "create_lead") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      submitForm(page, "new-lead"),
-    ])
-    expect(createRes.ok()).toBe(true)
-    await expect(page.getByText(leadName).first()).toBeVisible({ timeout: 30_000 })
+    const creates: string[] = []
+    page.on("request", (request) => {
+      if (matchesOperationResponse(request, "create_lead")) creates.push(request.url())
+    })
+    await page.getByTestId("form-submit-new-lead").click()
+    const form = page.getByTestId("form-modal-new-lead")
+    await expect(form).toContainText("Saving custom fields during creation is not available yet.")
+    await expect(page.getByTestId("form-field-contactName")).toHaveValue(leadName)
+    await expect(page.getByTestId(`form-field-${fieldId}`)).toHaveValue(customValue)
+    expect(creates, "unsupported custom values must be rejected before create dispatch").toEqual([])
 
-    const leadId = await fetchLeadIdByName(page, leadName)
+    const leads = await page.request.get("/api/query/leads")
+    expect(leads.ok()).toBe(true)
+    expect(parseQueryListResponse(await leads.json()).filter((row) => row.name === leadName || row.contactName === leadName || row.contact_name === leadName)).toHaveLength(0)
+    const values = await page.request.get("/api/query/record-custom-field-values")
+    expect(values.ok()).toBe(true)
+    expect(parseQueryListResponse(await values.json()).filter((row) => String(row.fieldKey ?? row.field_key) === fieldId)).toHaveLength(0)
 
-    await expect
-      .poll(
-        async () => {
-          const res = await page.request.get("/api/query/record-custom-field-values")
-          if (!res.ok()) return false
-          const rows = parseQueryListResponse(await res.json())
-          return rows.some((row) => {
-            const model = String(row.model ?? "")
-            const recordId = String(row.recordId ?? row.record_id ?? "")
-            const key = String(row.fieldKey ?? row.field_key ?? "")
-            const valueJson = String(row.valueJson ?? row.value_json ?? "")
-            return (
-              model === "crm_lead" &&
-              recordId === String(leadId) &&
-              key === fieldId &&
-              valueJson.includes(customValue)
-            )
-          })
-        },
-        { timeout: 45_000 },
-      )
-      .toBeTruthy()
+    await form.getByRole("button", { name: "Cancel", exact: true }).click()
+    await page.getByRole("alertdialog").getByRole("button", { name: "Discard", exact: true }).click()
+    await expect(form).toBeHidden()
 
     await deleteCustomFormFieldViaSettings(page, fieldId)
     await expectNoAppError(page)
