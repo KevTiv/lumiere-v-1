@@ -23,6 +23,7 @@ import {
   StatusBar,
   buildModuleTabHref,
   useFormDialog,
+  useCurrencyFormat,
 } from '@lumiere/ui';
 import {
   AlertDialog,
@@ -45,6 +46,8 @@ import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   isSaleOrderConfirmed,
+  isSaleOrderLocked,
+  presentableActions,
   saleOrderState,
   type AnyWorkflowAction,
   type RowValueMap,
@@ -94,6 +97,9 @@ import { buildReturnParams, canCreateReturn, returnQtyFieldId, returnableLines }
 import { saleOrderStatusBar } from '../../sale-order-status';
 import { parseCommissionRatePercent } from '../../sales-ops-panel';
 import { optionRowsForOrder } from '../../commission-plans';
+import { saleOrderNextStep, nextStepActionIds } from '../../sale-order-next-step';
+import { SaleOrderNextAction, SaleOrderWorkspace } from '../../sale-order-workspace';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 
 interface SaleOrderPageClientProps {
   orderId: string;
@@ -111,12 +117,6 @@ type WorkflowAction = AnyWorkflowAction<RowValueMap>;
 const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set([
   'sales.order.create-invoice',
   'sales.order.update',
-]);
-
-const PRIMARY_ACTION_IDS: ReadonlySet<string> = new Set([
-  'sales.order.confirm',
-  'sales.order.send-quotation',
-  'sales.order.create-invoice',
 ]);
 
 const TAB_IDS = ['overview', 'lines', 'options', 'handoffs', 'discussion', 'audit'] as const;
@@ -139,6 +139,7 @@ function SaleOrderPageLoaded({
 }: SaleOrderPageClientProps & { organizationId: number }) {
   useSalesModuleSubscription();
   const { t } = useTranslation();
+  const { locale } = useCurrencyFormat();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -146,14 +147,22 @@ function SaleOrderPageLoaded({
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
-  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
-  const { data: orderLines = [] } = useSaleOrderLines(orgId, initialOrderLines);
-  const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
-  const { data: accountMoves = [] } = useAccountMoves(orgId);
-  const { data: accountPayments = [] } = useAccountPayments(orgId);
-  const { data: returnOrders = [] } = useReturnOrders(orgId);
+  const ordersQuery = useSaleOrders(orgId, initialOrders);
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery;
+  const linesQuery = useSaleOrderLines(orgId, initialOrderLines);
+  const { data: orderLines = [] } = linesQuery;
+  const stockPickingsQuery = useStockPickings(orgId, initialStockPickings);
+  const stockPickings = stockPickingsQuery.isSuccess && !stockPickingsQuery.isError ? stockPickingsQuery.data ?? [] : [];
+  const accountMovesQuery = useAccountMoves(orgId);
+  const accountMoves = accountMovesQuery.isSuccess && !accountMovesQuery.isError ? accountMovesQuery.data ?? [] : [];
+  const accountPaymentsQuery = useAccountPayments(orgId);
+  const accountPayments = accountPaymentsQuery.isSuccess && !accountPaymentsQuery.isError ? accountPaymentsQuery.data ?? [] : [];
+  const returnOrdersQuery = useReturnOrders(orgId);
+  const returnOrders = returnOrdersQuery.isSuccess && !returnOrdersQuery.isError ? returnOrdersQuery.data ?? [] : [];
   const { data: contacts = [] } = useContacts(orgId, initialContacts);
-  const { data: productRows = [] } = useProducts(orgId);
+  const productRowsQuery = useProducts(orgId);
+  const productRows = productRowsQuery.isSuccess && !productRowsQuery.isError ? productRowsQuery.data ?? [] : [];
+  const currenciesQuery = useCurrencies();
   const orderOptionsQuery = useSaleOrderOptions(orgId);
 
   const applySalePromotion = useApplySalePromotion(orgId);
@@ -162,6 +171,7 @@ function SaleOrderPageLoaded({
   const applyOmnichannelAllocation = useApplyOmnichannelAllocation(orgId, operatingCompanyId);
   const createDocument = useCreateDocument(orgId, operatingCompanyId);
 
+  const [transitionError, setTransitionError] = useState<string>();
   const workflowSurface = useWorkflowSurface({ organizationId });
   const saleOrderWorkflow = useSaleOrderWorkflow(
     orgId,
@@ -182,6 +192,8 @@ function SaleOrderPageLoaded({
       record: workflowSurface.record,
       notify: (notice: TransitionNotice) => {
         if (notice.kind === 'error' && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return;
+        if (notice.kind === 'error') setTransitionError(notice.error?.message);
+        else setTransitionError(undefined);
         workflowSurface.notify(notice);
         if (notice.kind === 'success' && notice.transitionId === 'sales.order.confirm') {
           phCapture('sale_order_confirmed', { organization_id: organizationId });
@@ -302,6 +314,7 @@ function SaleOrderPageLoaded({
 
   const runWorkflowAction = useCallback(
     async (action: WorkflowAction, record: RowValueMap) => {
+      setTransitionError(undefined);
       switch (action.id) {
         case 'sales.order.create-invoice':
           setDialog('invoice');
@@ -329,7 +342,7 @@ function SaleOrderPageLoaded({
           return;
         }
       }
-      if (action.kind === 'destructive' || action.kind === 'confirm') {
+      if (action.kind === 'destructive' || action.kind === 'confirm' || action.id === 'sales.order.confirm') {
         setPendingConfirm(action);
         return;
       }
@@ -337,6 +350,10 @@ function SaleOrderPageLoaded({
     },
     [askForm, orderId, saleOrderWorkflow, t],
   );
+
+  if (ordersQuery.isError) {
+    return <div role="alert" className="space-y-3 p-4"><p>{t('sales.workspace.orderReadFailed', { defaultValue: 'The order could not be loaded. Refresh to try again.' })}</p><Button variant="outline" onClick={() => void ordersQuery.refetch()}>{t('common.retry', { defaultValue: 'Retry' })}</Button></div>;
+  }
 
   if (!order) {
     if (ordersLoading) {
@@ -375,7 +392,7 @@ function SaleOrderPageLoaded({
     String(order.partnerName ?? order.partner_name ?? '').trim() ||
     (partnerId != null ? (partnerLabelById.get(String(partnerId)) ?? '') : '');
   const status = saleOrderStatusBar(order, t);
-  const editable = state === 'Draft' || state === 'Sent';
+  const editable = (state === 'Draft' || state === 'Sent') && !isSaleOrderLocked(record) && linesQuery.isSuccess;
   const rate = parseCommissionRatePercent(order);
   const handoffs = orderHandoffs(
     BigInt(orderId),
@@ -547,6 +564,79 @@ function SaleOrderPageLoaded({
     },
   ].filter((action) => action.show);
 
+  const linesReady = linesQuery.isSuccess && !linesQuery.isError;
+  const linesUnavailable = t('sales.workspace.linesReadFailed', { defaultValue: 'Order lines are unavailable. Wait for loading to finish or refresh to try again.' });
+  const step = saleOrderNextStep(record, lines, linesReady);
+  const recommendedActionId = nextStepActionIds[step];
+  const recordActions = headerActions.map((action) => ({ ...action, blockedReason: (row: RowValueMap) => {
+    if (['sales.order.confirm', 'sales.order.send-quotation'].includes(action.id) && linesReady && lines.length === 0) return t('sales.workspace.productsRequired', { defaultValue: 'Add at least one product before continuing.' });
+    if (isSaleOrderLocked(row) && ['sales.order.confirm', 'sales.order.send-quotation', 'sales.order.accept-quotation'].includes(action.id)) return t('sales.workspace.unlockRequired', { defaultValue: 'Unlock this order before continuing.' });
+    return action.blockedReason?.(row);
+  } }));
+  const recommendedAction = linesReady || step === 'locked' ? presentableActions(recordActions, record).find((action) => action.id === recommendedActionId) : undefined;
+  const blockedReason = recommendedAction?.blockedReason?.(record);
+  const continueStep = recommendedAction
+    ? () => void runWorkflowAction(recommendedAction, record)
+    : step === 'add-products' ? () => setActiveTab('lines')
+    : step === 'approval' ? () => router.push('/approvals')
+    : step === 'delivery' || step === 'review' ? () => setActiveTab('handoffs')
+    : undefined;
+  const nextAction = <SaleOrderNextAction step={step} actionLabel={recommendedAction?.label}
+    blockedReason={blockedReason} error={transitionError} pending={saleOrderWorkflow.isPending} onContinue={continueStep} />;
+  const lineGrid = !linesReady ? <p role="status" className="text-sm text-muted-foreground">{linesUnavailable}</p> : (
+    <SaleOrderLineGrid
+      lines={lines}
+      products={gridProducts}
+      editable={editable}
+      onUpdateLine={async (lineId, patch) => {
+        const params = toUpdateSaleOrderLineParams(patch as Record<string, unknown>);
+        if (!params) throw new Error('Enter a valid quantity, price or discount.');
+        await lineWorkflow.update.execute({ lineId, params });
+      }}
+      onCreateLine={async (line) => {
+        const params = toCreateSaleOrderLineParams({
+          productId: line.productId,
+          uomId: line.uomId,
+          quantity: line.quantity,
+          priceUnit: line.priceUnit,
+          discount: line.discount,
+        });
+        if (!params) throw new Error('Choose a product and a quantity above zero.');
+        await lineWorkflow.create.execute({ orderId, params });
+      }}
+      onDeleteLine={async (lineId) => {
+        await lineWorkflow.remove.execute(lineId);
+      }}
+    />
+  );
+  const handoffQueries = [stockPickingsQuery, accountMovesQuery, accountPaymentsQuery, returnOrdersQuery];
+  const handoffLinks = handoffQueries.some((query) => !query.isSuccess || query.isError)
+    ? <p role="status" className="text-sm text-muted-foreground">{t('sales.workspace.handoffsUnavailable', { defaultValue: 'Linked records are unavailable. Wait for loading to finish or refresh to try again.' })}</p>
+    : <div data-testid="sale-order-handoffs"><OrderHandoffLinks testIdPrefix="sale-order-handoff" handoffs={handoffs} /></div>;
+  const currencyId = order.currencyId ?? order.currency_id;
+  const currency = currenciesQuery.data?.find((row) => String(row.id) === String(currencyId));
+  const code = currenciesQuery.isSuccess && typeof currency?.code === 'string' ? currency.code : undefined;
+  const money = (raw: unknown): string => {
+    if (raw == null || raw === '' || !Number.isFinite(Number(raw)) || !code) return t('sales.workspace.amountUnavailable', { defaultValue: 'Unavailable' });
+    try { return new Intl.NumberFormat(locale, { style: 'currency', currency: code }).format(Number(raw)); }
+    catch { return t('sales.workspace.amountUnavailable', { defaultValue: 'Unavailable' }); }
+  };
+  const detailConfig = saleOrderDetailWithPartners(t, partnerLabelById);
+  const workspaceDetailConfig = {
+    ...detailConfig,
+    sections: detailConfig.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => field.type === 'currency'
+        ? { ...field, render: (_value: unknown, row: OrderRow) => money(row[field.key]) }
+        : field),
+    })),
+  };
+  const totals = [
+    { label: t('sales.workspace.subtotal', { defaultValue: 'Subtotal' }), value: money(order.amountUntaxed ?? order.amount_untaxed) },
+    { label: t('sales.workspace.tax', { defaultValue: 'Tax' }), value: money(order.amountTax ?? order.amount_tax) },
+    { label: t('sales.workspace.total', { defaultValue: 'Total' }), value: money(order.amountTotal ?? order.amount_total) },
+  ];
+
   return (
     <>
       <RecordPage
@@ -561,6 +651,7 @@ function SaleOrderPageLoaded({
         statusBar={<StatusBar steps={status.steps} current={status.current} terminal={status.terminal} />}
         navigation={navigation}
         smartButtons={
+          <div className="space-y-4">
           <SmartButtons
             testIdPrefix="sale-order"
             buttons={[
@@ -597,14 +688,15 @@ function SaleOrderPageLoaded({
               },
             ]}
           />
+          {nextAction}
+          </div>
         }
         actions={
           <>
             <RecordWorkflowActions
-              actions={headerActions}
+              actions={recordActions.filter((action) => action.id !== recommendedAction?.id && (linesReady || !['sales.order.confirm', 'sales.order.send-quotation', 'sales.order.create-invoice', 'sales.order.accept-quotation'].includes(action.id)))}
               record={record}
               onRun={(action, row) => void runWorkflowAction(action, row)}
-              primaryActionIds={PRIMARY_ACTION_IDS}
               pendingActionIds={
                 saleOrderWorkflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined
               }
@@ -643,37 +735,18 @@ function SaleOrderPageLoaded({
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
             content: (
-              <EntityDetail config={saleOrderDetailWithPartners(t, partnerLabelById)} data={order} />
+              <SaleOrderWorkspace nextAction={null} totals={totals} lines={lineGrid} handoffs={handoffLinks}
+                details={<EntityDetail config={workspaceDetailConfig} data={order} />} />
             ),
           },
           {
             id: 'lines',
             label: t('sales.orderLines.title'),
             content: (
-              <SaleOrderLineGrid
-                lines={lines}
-                products={gridProducts}
-                editable={editable}
-                onUpdateLine={async (lineId, patch) => {
-                  const params = toUpdateSaleOrderLineParams(patch as Record<string, unknown>);
-                  if (!params) throw new Error('Enter a valid quantity, price or discount.');
-                  await lineWorkflow.update.execute({ lineId, params });
-                }}
-                onCreateLine={async (line) => {
-                  const params = toCreateSaleOrderLineParams({
-                    productId: line.productId,
-                    uomId: line.uomId,
-                    quantity: line.quantity,
-                    priceUnit: line.priceUnit,
-                    discount: line.discount,
-                  });
-                  if (!params) throw new Error('Choose a product and a quantity above zero.');
-                  await lineWorkflow.create.execute({ orderId, params });
-                }}
-                onDeleteLine={async (lineId) => {
-                  await lineWorkflow.remove.execute(lineId);
-                }}
-              />
+              <div className="space-y-3">
+                {searchParams.get('created') === '1' && <p role="status" className="text-sm text-muted-foreground">{t('sales.workspace.savedAddProducts', { defaultValue: 'Draft quotation saved. Add products below to continue.' })}</p>}
+                {lineGrid}
+              </div>
             ),
           },
           {
@@ -704,14 +777,7 @@ function SaleOrderPageLoaded({
           {
             id: 'handoffs',
             label: t('sales.order.handoffs', { defaultValue: 'Deliveries & invoices' }),
-            content: (
-              <div data-testid="sale-order-handoffs">
-                <OrderHandoffLinks
-                  testIdPrefix="sale-order-handoff"
-                  handoffs={handoffs}
-                />
-              </div>
-            ),
+            content: handoffLinks,
           },
           {
             id: 'discussion',
@@ -764,7 +830,9 @@ function SaleOrderPageLoaded({
         <AlertDialogContent data-testid="sale-order-action-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle>{pendingConfirm?.label}</AlertDialogTitle>
-            <AlertDialogDescription>{t('erpWorkflow.confirm.description')}</AlertDialogDescription>
+            <AlertDialogDescription>{pendingConfirm?.id === 'sales.order.confirm'
+              ? t('sales.workspace.confirmHelp', { defaultValue: 'Confirming checks stock availability and credit rules, and may request approval. Review the products, prices and delivery details before continuing.' })
+              : t('erpWorkflow.confirm.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>

@@ -133,7 +133,8 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
       for (const [key, value] of current.searchParams) {
         if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
       }
-      if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+      // A module may default to Orders or Inbox.
+      target.searchParams.set("tab", tabId)
       await page.goto(target.toString())
       await currentModuleView(page, moduleId)
     }
@@ -835,10 +836,17 @@ export async function chooseSelectOptionByTriggerValue(
 ) {
   const listbox = await openSelectListbox(page, trigger)
   const storedValue = String(value)
-  const option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
+  let option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
   const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
   if (await search.isVisible()) await search.fill(`#${storedValue}`)
+  // Retain compatibility with the older native-select markup.
+  if (await option.count() === 0) {
+    const label = await trigger.locator('xpath=following-sibling::select[@aria-hidden="true"][1]/option')
+      .evaluateAll((options, expected) => options.find((item) => (item as HTMLOptionElement).value === expected)?.textContent?.trim() ?? "", storedValue)
+    if (label) option = listbox.getByRole("option", { name: label, exact: true })
+  }
   await expect(option).toHaveCount(1, { timeout: 30_000 })
+  await expect(option).toBeEnabled()
   await selectOption(trigger, listbox, option)
 }
 
@@ -950,7 +958,7 @@ export async function openSaleOrderPage(page: Page, orderId: number | string) {
 /** Start "Create invoice" from a sale order's page and wait for its form. */
 export async function openCreateInvoiceFromOrder(page: Page, orderId: number | string) {
   await openSaleOrderPage(page, orderId)
-  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice").first()
+  const action = page.getByTestId("sale-order-page").getByRole("button", { name: /^Create invoice/ }).first()
   await expect(action).toBeEnabled({ timeout: 30_000 })
   await action.click()
   await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({ timeout: 15_000 })

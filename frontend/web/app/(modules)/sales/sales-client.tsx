@@ -457,12 +457,15 @@ function SalesClientLoaded({
   const accountMovesRead = moduleCollection(useAccountMoves(orgId));
   const accountMoves = accountMovesRead.rows;
   const { data: accountPayments = [] } = useAccountPayments(orgId);
-  const { data: accountJournals = [] } = useAccountJournals(orgId);
-  const { data: accountAccounts = [] } = useAccountAccounts(orgId);
+  const accountJournalsRead = moduleCollection(useAccountJournals(orgId));
+  const accountJournals = accountJournalsRead.rows;
+  const accountAccountsRead = moduleCollection(useAccountAccounts(orgId));
+  const accountAccounts = accountAccountsRead.rows;
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: accountTaxes = [] } = useAccountTaxes(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
-  const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
+  const partnerCreditHoldsRead = moduleCollection(usePartnerCreditHolds(orgId));
+  const partnerCreditHolds = partnerCreditHoldsRead.rows;
   const currenciesQuery = useCurrencies();
   const { data: currencies = [] } = currenciesQuery;
   const stockPickingsRead = moduleCollection(useStockPickings(orgId, initialStockPickings));
@@ -721,6 +724,7 @@ function SalesClientLoaded({
     await scheduleSalesSlaEscalation.mutateAsync({ delaySecs });
   };
 
+  const [savedQuotationNotice, setSavedQuotationNotice] = useState(false);
   const createSaleOrder = useCreateSaleOrder(orgId, operatingCompanyId);
   const createPricelist = useCreatePricelist(orgId);
   const createPricelistItem = useCreatePricelistItem(orgId);
@@ -2239,6 +2243,16 @@ function SalesClientLoaded({
               type: 'custom' as const,
               customContent: (
                 <SalesOpsPanel
+                  queueStates={{
+                    to_approve: saleOrdersToApproveRead.state,
+                    sent_quotes: ordersRead.state,
+                    credit_holds: partnerCreditHoldsRead.state,
+                    open_deliveries: stockPickingsRead.state,
+                    returns_receive: returnOrdersRead.state,
+                    commissions_to_accrue: mergeModuleStates([ordersRead.state, saleCommissionsRead.state]),
+                    commissions_accrued: mergeModuleStates([saleCommissionsPendingRead.state, accountJournalsRead.state, accountAccountsRead.state]),
+                    commissions_settled: saleCommissionsRead.state,
+                  }}
                   activeQueue={opsQueue}
                   onQueueChange={(queue: SalesOpsQueueId) =>
                     navigateToSalesTab('ops', { queue })
@@ -2406,6 +2420,9 @@ function SalesClientLoaded({
       recordSalesIntegrationResult,
       scheduleSalesSlaEscalation,
       saleOrderLineWorkflow.remove,
+      saleOrdersToApproveRead.state, ordersRead.state, partnerCreditHoldsRead.state,
+      stockPickingsRead.state, returnOrdersRead.state, saleCommissionsRead.state,
+      saleCommissionsPendingRead.state, accountJournalsRead.state, accountAccountsRead.state,
     ],
   );
 
@@ -2546,8 +2563,13 @@ function SalesClientLoaded({
       if (orderNeedsCustomFieldSave(p.metadata)) {
         throw new Error(t('sales.forms.refinement.customFieldsBlocked', { defaultValue: 'Custom fields cannot be saved together with this quotation yet. No quotation was created. Your entries have been retained.' }));
       }
-      await createSaleOrder.mutateAsync(p);
+      const saved = await createSaleOrder.mutateAsync(p);
       phCapture('sale_order_created', { organization_id: organizationId });
+      if (saved.orderId) router.push(`/sales/orders/${saved.orderId}?tab=lines&created=1`);
+      else {
+        setSavedQuotationNotice(true);
+        navigateToSalesTab('orders');
+      }
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData, operatingCompanyId);
       if (!p) throw invalidInput();
@@ -2645,6 +2667,7 @@ function SalesClientLoaded({
 
   return (
     <EntityLabelsProvider value={entityLabels}>
+      {savedQuotationNotice && <p role="status" className="mx-4 mb-3 rounded-lg border p-4 text-sm">{t('sales.workspace.savedOpenQuotation', { defaultValue: 'Quotation saved. Open it from Quotations & orders to add products.' })}</p>}
       <ModuleWorkView
         organizationId={organizationId}
         config={config}
