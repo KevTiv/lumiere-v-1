@@ -472,7 +472,7 @@ export async function openTabAndCancelCreate(
 }
 
 /** Reveal optional form sections through their visible disclosure controls. */
-async function revealFormSection(field: Locator) {
+export async function revealFormSection(field: Locator) {
   for (const section of await field.locator("xpath=ancestor::details").all()) {
     if (await section.getAttribute("open") === null) await section.locator(":scope > summary").click()
   }
@@ -773,7 +773,7 @@ export async function fetchVendorPartnerIdByName(page: Page, name: string): Prom
   return id
 }
 
-/** Pick a Radix select option by its stored value (not visible label). */
+/** Pick an exact stored value through the visible shared Select or RecordPicker. */
 export async function chooseSelectOptionByValue(
   page: Page,
   name: string,
@@ -782,30 +782,23 @@ export async function chooseSelectOptionByValue(
   const v = String(value)
   const field = page.getByTestId(`form-field-${name}`)
   await revealFormSection(field)
-  const nativeOptions = field.locator(
-    'xpath=following-sibling::select[@aria-hidden="true"][1]/option',
-  )
-  let optionLabel = ""
-
-  await expect
-    .poll(
-      async () => {
-        optionLabel = await nativeOptions.evaluateAll((options, expectedValue) => {
-          const match = options.find(
-            (option) => (option as HTMLOptionElement).value === expectedValue,
-          )
-          return match?.textContent?.trim() ?? ""
-        }, v)
-        return optionLabel
-      },
-      { timeout: 30_000 },
-    )
-    .not.toBe("")
-
   await field.click()
   const listbox = page.locator('[role="listbox"]:visible')
   await expect(listbox).toBeVisible({ timeout: 15_000 })
-  await listbox.getByRole("option", { name: optionLabel, exact: true }).click()
+  let option: Locator | undefined
+  await expect
+    .poll(
+      async () => {
+        for (const candidate of await listbox.getByRole("option").all()) {
+          const storedValue = await candidate.getAttribute("data-option-value") ?? await candidate.getAttribute("data-value")
+          if (storedValue === v) { option = candidate; return true }
+        }
+        return false
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  await option!.click()
 }
 
 /** Pick a select option by visible label text (Radix Select shows labels, not raw ids). */

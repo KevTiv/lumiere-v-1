@@ -1,8 +1,16 @@
 import { expect, test } from "@playwright/test"
+import { chooseSelectOptionByValue } from "./e2e/helpers"
 
 for (const width of [320, 1440]) {
   test.describe(`${width}px shared select controls`, () => {
     test.use({ viewport: { width, height: 900 }, hasTouch: width < 768 })
+    test("record options are clickable above a modal and resolve exact IDs with duplicate labels", async ({ page }) => {
+      await page.goto("/select-controls")
+      await page.getByRole("button", { name: "Open select dialog" }).click()
+      await chooseSelectOptionByValue(page, "partnerId", "customer-b")
+      await expect(page.getByTestId("record-value")).toHaveText("customer-b")
+      await expect(page.getByTestId("form-field-partnerId")).toContainText("Customer")
+    })
     test("search starts at 15, retains selection and supports keyboard input inside a dialog", async ({
       page,
     }, testInfo) => {

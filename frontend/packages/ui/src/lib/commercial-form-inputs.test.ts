@@ -9,11 +9,12 @@ void i18n.init({ lng: "en", resources: { en: { translation: {} } }, initImmediat
 const fields = (config: FormConfig) => config.sections.flatMap((section) => section.fields)
 
 describe("CRM task forms", () => {
-  it("keeps the qualified lead default and contact constraints while separating notes", () => {
+  it("starts enquiries as new and keeps contact constraints while separating optional notes", () => {
     const form = newLeadForm(i18n.t)
     expect(form.sections[0]?.fields.map((field) => field.name)).toEqual(["contactName", "partnerName", "emailFrom", "phone"])
     expect(fields(form).find((field) => field.name === "contactName")?.required).toBe(true)
-    expect(fields(form).find((field) => field.name === "state")?.defaultValue).toBe("qualified")
+    expect(fields(form).find((field) => field.name === "state")?.defaultValue).toBe("new")
+    expect(form.sections.at(-1)?.collapsible).toBe(true)
     expect(form.sections.at(-1)?.fields.map((field) => field.name)).toEqual(["description"])
   })
 

@@ -337,6 +337,23 @@
     ],
     "table": "activity"
   },
+  "activity-types": {
+    "aliases": [
+      "activity-types",
+      "activity_type"
+    ],
+    "default_restricted": [
+      "name",
+      "category",
+      "sequence",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "activity_type"
+  },
   "adjustment-reasons": {
     "aliases": [
       "adjustment-reasons",

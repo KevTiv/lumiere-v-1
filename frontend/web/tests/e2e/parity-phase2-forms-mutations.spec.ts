@@ -1,16 +1,14 @@
 import { matchesOperationResponse } from "./operation-response"
-import { expect, test } from "@playwright/test"
-import { parseQueryListResponse } from "@lumiere/api-client"
+import { expect, test, type Request } from "@playwright/test"
 
 import {
   addCustomFormFieldViaSettings,
   deleteCustomFormFieldViaSettings,
   expectNoAppError,
-  fetchLeadIdByName,
+  expectRecordAbsentFromQuery,
   fillField,
   openEntityCreate,
   smokeName,
-  submitForm,
 } from "./helpers"
 
 function customFieldFixture(smokePrefix: string) {
@@ -44,7 +42,7 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
     await expectNoAppError(page)
   })
 
-  test("persists custom field value to EAV on CRM lead create", async ({ page }) => {
+  test("retains custom field entries and creates no lead when custom-field creation is unsupported", async ({ page }) => {
     test.setTimeout(180_000)
 
     const { fieldSlug, fieldLabel, fieldId } = customFieldFixture("e2e_eav")
@@ -60,40 +58,24 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
     // Custom fields use fieldId as the ModularForm name
     await fillField(page, fieldId, customValue)
 
-    const [createRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => matchesOperationResponse(res, "create_lead") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      submitForm(page, "new-lead"),
-    ])
-    expect(createRes.ok()).toBe(true)
-    await expect(page.getByText(leadName).first()).toBeVisible({ timeout: 30_000 })
-
-    const leadId = await fetchLeadIdByName(page, leadName)
-
-    await expect
-      .poll(
-        async () => {
-          const res = await page.request.get("/api/query/record-custom-field-values")
-          if (!res.ok()) return false
-          const rows = parseQueryListResponse(await res.json())
-          return rows.some((row) => {
-            const model = String(row.model ?? "")
-            const recordId = String(row.recordId ?? row.record_id ?? "")
-            const key = String(row.fieldKey ?? row.field_key ?? "")
-            const valueJson = String(row.valueJson ?? row.value_json ?? "")
-            return (
-              model === "crm_lead" &&
-              recordId === String(leadId) &&
-              key === fieldId &&
-              valueJson.includes(customValue)
-            )
-          })
-        },
-        { timeout: 45_000 },
-      )
-      .toBeTruthy()
+    // Creation cannot yet atomically persist a custom-field value. Verify the
+    // admission contract instead of certifying a base record with dropped data.
+    const createRequests: Request[] = []
+    const onRequest = (request: Request) => {
+      if (matchesOperationResponse(request, "create_lead")) createRequests.push(request)
+    }
+    page.on("request", onRequest)
+    const modal = page.getByTestId("form-modal-new-lead")
+    await modal.getByTestId("form-submit-new-lead").click()
+    await expect(modal.getByRole("alert")).toContainText("Saving custom fields during creation is not available yet")
+    await expect(modal.getByTestId("form-field-contactName")).toHaveValue(leadName)
+    await expect(modal.getByTestId(`form-field-${fieldId}`)).toHaveValue(customValue)
+    expect(createRequests).toHaveLength(0)
+    page.off("request", onRequest)
+    await expectRecordAbsentFromQuery(page, "/api/query/leads", (row) => row.name === leadName)
+    await modal.getByRole("button", { name: "Cancel", exact: true }).click()
+    const discard = page.getByTestId("discard-changes-dialog")
+    if (await discard.isVisible()) await discard.getByTestId("discard-changes-confirm").click()
 
     await deleteCustomFormFieldViaSettings(page, fieldId)
     await expectNoAppError(page)

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@lumiere/ui/components/select"
 import { MultiRecordPicker } from "@lumiere/ui/components/multi-record-picker"
+import { RecordPicker } from "@lumiere/ui/components/record-picker"
 
 const options = Array.from({ length: 15 }, (_, index) => ({
   value: String(index + 1).padStart(2, "0"),
@@ -25,6 +26,7 @@ export default function SelectControlsFixture() {
   const [open, setOpen] = useState(false)
   const [single, setSingle] = useState("02")
   const [multiple, setMultiple] = useState(["02", "14", "missing"])
+  const [partner, setPartner] = useState("")
   return (
     <I18nProvider language="en">
       <main className="mx-auto max-w-xl space-y-6 p-4">
@@ -32,11 +34,15 @@ export default function SelectControlsFixture() {
         <Button onClick={() => setOpen(true)}>Open select dialog</Button>
         <output data-testid="single-value">{single}</output>
         <output data-testid="multiple-value">{multiple.join(",")}</output>
+        <output data-testid="record-value">{partner}</output>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Account selectors</DialogTitle>
             </DialogHeader>
+            <RecordPicker data-testid="form-field-partnerId" value={partner} onChange={setPartner}
+              options={[{ value: "customer-a", label: "Customer" }, { value: "customer-b", label: "Customer" }]}
+              placeholder="Choose customer" />
             <Select value={single} onValueChange={setSingle}>
               <SelectTrigger aria-label="Fourteen accounts">
                 <SelectValue />
