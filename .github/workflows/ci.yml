@@ -242,6 +242,10 @@ jobs:
     needs: scope
     if: needs.scope.outputs.run_contracts == 'true'
     uses: ./.github/workflows/build-contracts-module.yml
+    with:
+      # Drift validation checks out github.sha (the PR merge commit), so the
+      # compiled module must include the same base-branch contract changes.
+      source_ref: ${{ github.sha }}
 
   contracts-drift:
     name: Contracts drift
