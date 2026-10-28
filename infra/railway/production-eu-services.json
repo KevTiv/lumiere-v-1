@@ -139,7 +139,7 @@
     },
     { "name": "projection-worker", "role": "projection", "runtimeBinary": "projection-worker" },
     { "name": "workflow-worker", "role": "workflow", "runtimeBinary": "workflow-worker" },
-    { "name": "owner-report-worker", "role": "owner-report", "runtimeBinary": "owner-report-worker" },
+    { "name": "owner-report-worker", "role": "owner-report", "runtimeBinary": "owner-report-worker", "required": false, "featureGate": "RAILWAY_ENABLE_OWNER_REPORTS" },
     {
       "name": "expense-integration-worker",
       "required": false,

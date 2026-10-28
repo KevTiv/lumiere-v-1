@@ -21,8 +21,8 @@ on:
         default: europe-west4-drams3a
         type: string
       rust_runtime_image:
-        description: Immutable shared Rust image (ghcr.io/...@sha256:...)
-        required: true
+        description: Immutable shared Rust image (defaults to release SHA tag)
+        required: false
         type: string
       enable_ai:
         description: Promote the optional AI gateway (disabled for the initial release)
@@ -34,10 +34,46 @@ on:
         required: true
         default: false
         type: boolean
+      enable_owner_reports:
+        description: Activate the provisioned owner-report worker
+        required: true
+        default: false
+        type: boolean
       edge_readiness_url:
         description: Public API-gateway URL to probe after cutover (required for production)
         required: false
         type: string
+
+  workflow_call:
+    inputs:
+      release_sha:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      expected_region:
+        default: europe-west4-drams3a
+        type: string
+      rust_runtime_image:
+        default: ''
+        type: string
+      enable_ai:
+        default: false
+        type: boolean
+      enable_integrations:
+        default: false
+        type: boolean
+      enable_owner_reports:
+        default: false
+        type: boolean
+      edge_readiness_url:
+        default: ''
+        type: string
+      require_current_main:
+        description: Refuse an obsolete automatic release before mutating production
+        default: false
+        type: boolean
 
 concurrency:
   group: railway-stack-${{ inputs.environment }}
@@ -68,6 +104,7 @@ jobs:
       RUST_RUNTIME_IMAGE: ${{ inputs.rust_runtime_image }}
       RAILWAY_ENABLE_AI: ${{ inputs.enable_ai }}
       RAILWAY_ENABLE_INTEGRATIONS: ${{ inputs.enable_integrations }}
+      RAILWAY_ENABLE_OWNER_REPORTS: ${{ inputs.enable_owner_reports }}
       API_READINESS_URL: ${{ secrets.RAILWAY_API_READINESS_URL }}
       AI_READINESS_URL: ${{ secrets.RAILWAY_AI_READINESS_URL }}
       CHROMIUM_READINESS_URL: ${{ secrets.RAILWAY_CHROMIUM_READINESS_URL }}
@@ -92,7 +129,7 @@ jobs:
             echo "expected_region contains unsupported characters" >&2
             exit 1
           }
-          [[ "$RUST_RUNTIME_IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || {
+          [[ -z "$RUST_RUNTIME_IMAGE" || "$RUST_RUNTIME_IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || {
             echo "rust_runtime_image must be an immutable lowercase GHCR digest" >&2
             exit 1
           }
@@ -126,6 +163,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           if [[ "$RAILWAY_ENVIRONMENT" == production ]]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            if [[ '${{ inputs.require_current_main }}' == true && "$RELEASE_SHA" != "$(git rev-parse origin/main)" ]]; then
+              echo "A newer main revision superseded this automatic release; refusing to roll production back" >&2
+              exit 1
+            fi
             git merge-base --is-ancestor HEAD origin/main || {
               echo "Production releases must be main or an ancestor of main" >&2
               exit 1
@@ -135,22 +176,11 @@ jobs:
       - name: Install pinned Railway CLI
         run: npm install --global "@railway/cli@$RAILWAY_CLI_VERSION"
 
-      - name: Gate anonymous runtime image pull
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Gate anonymous release image pulls and revisions
         shell: bash
-        run: |
-          set -euo pipefail
-          docker pull --quiet "$RUST_RUNTIME_IMAGE" >/dev/null || {
-            echo "The shared runtime image is not anonymously readable by Railway." >&2
-            echo "Publish the GHCR package before promotion and make the package public." >&2
-            exit 1
-          }
-          image_revision="$(docker image inspect \
-            --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
-            "$RUST_RUNTIME_IMAGE")"
-          [[ "$image_revision" == "$RELEASE_SHA" ]] || {
-            echo "Runtime image revision $image_revision does not match release $RELEASE_SHA" >&2
-            exit 1
-          }
+        run: bash scripts/railway-release-images.sh
 
       - name: Verify Railway access and context
         shell: bash
@@ -183,7 +213,7 @@ jobs:
 
       - name: Phase 2 — publish and verify SpacetimeDB module
         shell: bash
-        run: bash scripts/railway-stack-release.sh publish-stdb spacetimedb-publisher
+        run: bash scripts/railway-stack-release.sh promote-publisher spacetimedb-publisher
 
       - name: Phase 3 — apply PostgreSQL storage migrations from shared runtime image
         shell: bash
@@ -191,7 +221,7 @@ jobs:
 
       - name: Phase 4 — deploy Chromium worker
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy chromium-worker
+        run: bash scripts/railway-stack-release.sh promote-image chromium-worker "$CHROMIUM_IMAGE"
 
       - name: Phase 4 gate — Chromium readiness
         if: env.CHROMIUM_READINESS_URL != ''
@@ -228,15 +258,20 @@ jobs:
 
       - name: Phase 8 — deploy workflow and owner-report workers from shared runtime image
         shell: bash
-        run: bash scripts/railway-stack-release.sh redeploy-source workflow-worker owner-report-worker
+        run: bash scripts/railway-stack-release.sh redeploy-source workflow-worker
+
+      - name: Phase 8 — deploy provisioned owner-report worker
+        if: inputs.enable_owner_reports
+        shell: bash
+        run: bash scripts/railway-stack-release.sh redeploy-source owner-report-worker
 
       - name: Phase 8 gate — workflow and owner-report readiness
-        if: env.WORKFLOW_READINESS_URL != '' || env.OWNER_REPORT_READINESS_URL != ''
+        if: env.WORKFLOW_READINESS_URL != '' || (inputs.enable_owner_reports && env.OWNER_REPORT_READINESS_URL != '')
         shell: bash
         run: |
           set -euo pipefail
           probes=()
-          [[ -z "$OWNER_REPORT_READINESS_URL" ]] || probes+=("owner-report=$OWNER_REPORT_READINESS_URL")
+          [[ "$RAILWAY_ENABLE_OWNER_REPORTS" != true || -z "$OWNER_REPORT_READINESS_URL" ]] || probes+=("owner-report=$OWNER_REPORT_READINESS_URL")
           [[ -z "$WORKFLOW_READINESS_URL" ]] || probes+=("workflow=$WORKFLOW_READINESS_URL")
           bash scripts/railway-stack-release.sh probe "${probes[@]}"
 
@@ -259,7 +294,7 @@ jobs:
 
       - name: Phase 10 — deploy web
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy web
+        run: bash scripts/railway-stack-release.sh promote-image web "$WEB_IMAGE"
 
       - name: Phase 10 gate — web readiness
         if: env.WEB_READINESS_URL != ''
@@ -268,7 +303,7 @@ jobs:
 
       - name: Phase 11 — deploy API gateway last
         shell: bash
-        run: bash scripts/railway-stack-release.sh deploy api-gateway
+        run: bash scripts/railway-stack-release.sh promote-image api-gateway "$API_GATEWAY_IMAGE"
 
       - name: Phase 11 gate — public edge readiness
         if: env.EDGE_READINESS_URL != ''

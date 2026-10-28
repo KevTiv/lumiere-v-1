@@ -17,6 +17,10 @@ Commands:
   deploy SERVICE...      Deploy the same immutable release root concurrently.
   redeploy-source SERVICE...
                          Atomically switch each service to the immutable runtime image.
+  promote-image SERVICE IMAGE
+                         Switch one service to a verified immutable image.
+  promote-publisher SERVICE
+                         Switch publisher image and require its completion marker.
   probe NAME=URL...      Probe HTTP readiness endpoints concurrently.
   publish-stdb SERVICE  Deploy the one-shot publisher and verify its completion marker.
   migrate-storage SERVICE
@@ -243,6 +247,14 @@ deploy_one() {
 redeploy_source_one() {
   local service="$1"
   : "${RUST_RUNTIME_IMAGE:?RUST_RUNTIME_IMAGE is required}"
+  promote_image_one "$service" "$RUST_RUNTIME_IMAGE"
+}
+
+promote_image_one() {
+  local service="$1"
+  local image="$2"
+  [[ "$image" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] \
+    || die "promote-image requires an immutable GHCR digest"
   local before_ids service_id
   if ! service_id="$(resolve_service_id "$service")"; then
     dump_diagnostics "$service"
@@ -257,7 +269,7 @@ redeploy_source_one() {
   local source_patch edit_result
   source_patch="$(jq -cn \
     --arg service_id "$service_id" \
-    --arg image "$RUST_RUNTIME_IMAGE" \
+    --arg image "$image" \
     '{services: {($service_id): {source: {
       image: $image,
       repo: null,
@@ -266,12 +278,12 @@ redeploy_source_one() {
       upstreamUrl: null
     }}}}')"
 
-  echo "[railway-release] $service: switching source to immutable runtime image"
+  echo "[railway-release] $service: switching source to immutable release image"
   if ! edit_result="$(printf '%s\n' "$source_patch" | timeout "$UPLOAD_TIMEOUT_SECONDS" \
     railway environment edit \
       --project "$RAILWAY_PROJECT_ID" \
       --environment "$RAILWAY_ENVIRONMENT" \
-      --message "promote shared Rust runtime ($service)" \
+      --message "promote release image ($service)" \
       --json)"; then
     dump_diagnostics "$service"
     return 1
@@ -312,8 +324,8 @@ redeploy_source_one() {
 
   local observed_image
   observed_image="$(deployment_image "$service" "$deployment_id")"
-  if [[ "$observed_image" != "$RUST_RUNTIME_IMAGE" ]]; then
-    echo "[railway-release] $service: expected image $RUST_RUNTIME_IMAGE, observed ${observed_image:-<empty>}" >&2
+  if [[ "$observed_image" != "$image" ]]; then
+    echo "[railway-release] $service: expected image $image, observed ${observed_image:-<empty>}" >&2
     dump_diagnostics "$service" "$deployment_id"
     return 1
   fi
@@ -444,6 +456,17 @@ redeploy_storage() {
     "$deployment_id"
 }
 
+promote_publisher() {
+  local service="$1"
+  : "${STDB_PUBLISHER_IMAGE:?STDB_PUBLISHER_IMAGE is required}"
+  promote_image_one "$service" "$STDB_PUBLISHER_IMAGE"
+  local deployment_id
+  deployment_id="$(deployment_list "$service" | jq -r '.[0].id // empty')"
+  [[ -n "$deployment_id" ]] || die "$service has no publisher deployment"
+  wait_for_log_marker "$service" \
+    'SpacetimeDB publish and schema verification passed' "$deployment_id"
+}
+
 main() {
   require_base_environment
   local command="${1:-}"
@@ -459,7 +482,19 @@ main() {
       run_parallel deploy_one "$@"
       ;;
     redeploy-source)
-      run_parallel redeploy_source_one "$@"
+      (( $# > 0 )) || die "redeploy-source requires at least one service"
+      # Source edits commit environment patches; serialize those writes.
+      for service in "$@"; do
+        redeploy_source_one "$service"
+      done
+      ;;
+    promote-image)
+      [[ $# -eq 2 ]] || die "promote-image requires one service and image"
+      promote_image_one "$1" "$2"
+      ;;
+    promote-publisher)
+      [[ $# -eq 1 ]] || die "promote-publisher requires one publisher service"
+      promote_publisher "$1"
       ;;
     probe)
       require_command curl

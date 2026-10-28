@@ -8,7 +8,7 @@ on:
         required: true
         type: string
 concurrency:
-  group: railway-web-production
+  group: railway-stack-production
   cancel-in-progress: false
 
 permissions:
