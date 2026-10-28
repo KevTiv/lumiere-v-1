@@ -3,6 +3,7 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 import {
   fetchSessionOrganizationId,
   fillField,
+  chooseSelectOptionByValue,
   gotoModule,
   scalarQueryId,
   signIn,
@@ -73,6 +74,7 @@ test.describe("COV-19 exact message post", { tag: ["@p0", "@cov19"] }, () => {
     await gotoModule(page, "/messages", "messages")
     await page.getByTestId("quick-action-new_message").click()
     await expect(page.getByTestId("form-modal-new-mail-message")).toBeVisible()
+    await chooseSelectOptionByValue(page, "recordLinkMode", "custom")
     await page.getByTestId("form-field-model").fill(model)
     await page.getByTestId("form-field-resId").fill(String(resId))
     await fillField(page, "body", body)
