@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   FormModal,
@@ -19,6 +19,7 @@ import {
   useSubscriptions,
   useSubscriptionBillingRuns,
   useSubscriptionLines,
+  useSubscriptionPlans,
   useActivateSubscription,
   useCloseSubscription,
   useGenerateSubscriptionInvoice,
@@ -46,36 +47,22 @@ import {
   buildIngestSubscriptionUsageEventParams,
   buildSetSubscriptionCommitmentParams,
 } from "@/lib/subscriptions-revenue-params"
-import { accountJournalRowsToSelectOptions, accountAccountRowsToSelectOptions, accountMoveRowsToSelectOptions } from "@/lib/form-lookup"
-import type { SubscriptionActionId } from "./subscription-actions"
+import { accountJournalRowsToSelectOptions, accountAccountRowsToSelectOptions, accountMoveRowsToSelectOptions, paymentJournalRowsToSelectOptions } from "@/lib/form-lookup"
+import { type SubscriptionActionId, isSubscriptionActionApplicableOnPage } from "./subscription-actions"
+import type { FormConfig, FormValues } from '@lumiere/ui/lib/form-types'
+import { Button } from '@lumiere/ui/components/button'
+import { useRBAC } from '@lumiere/ui'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings'
+import { mergeModuleStates, moduleQueryState } from '@lumiere/ui/lib/module-data-state'
+import { inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, workflowTag, subscriptionActionPermissions } from './subscription-workflow'
+import { subscriptionStateOf } from './subscription-status'
+import { SubscriptionActionPreview } from './subscription-action-preview'
 
-/** Actions that open a form dialog before calling the reducer. */
-export type SubscriptionDialogAction =
-  | "close"
-  | "generate-invoice"
-  | "pay-invoice"
-  | "amend"
-  | "renew"
-  | "cancel"
-  | "ingest-usage"
-  | "set-commitment"
-
-/** Actions that call the reducer straight away. */
-export type SubscriptionDirectAction = Exclude<SubscriptionActionId, SubscriptionDialogAction>
-
-const DIALOG_ACTIONS: readonly string[] = [
-  "close",
-  "generate-invoice",
-  "pay-invoice",
-  "amend",
-  "renew",
-  "cancel",
-  "ingest-usage",
-  "set-commitment",
-]
-
+export type SubscriptionDialogAction = SubscriptionActionId;
 export function isSubscriptionDialogAction(id: string): id is SubscriptionDialogAction {
-  return DIALOG_ACTIONS.includes(id)
+  return ['activate', 'pause', 'resume', 'close', 'generate-invoice', 'pay-invoice', 'amend', 'renew', 'cancel', 'ingest-usage', 'rate-usage', 'set-commitment', 'record-failure', 'advance-dunning', 'refresh-flags'].includes(id);
 }
 
 /**
@@ -84,39 +71,41 @@ export function isSubscriptionDialogAction(id: string): id is SubscriptionDialog
  */
 export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint, enabled = true) {
   const { t } = useTranslation()
-  const dialogLabels: Record<SubscriptionDialogAction, string> = {
-    close: t("subscriptions.actions.close"),
-    "generate-invoice": t("subscriptions.actions.generateInvoice"),
-    "pay-invoice": t("subscriptions.actions.payInvoice", { defaultValue: "Apply payment" }),
-    amend: t("subscriptions.actions.amend", { defaultValue: "Amend" }),
-    renew: t("subscriptions.actions.renew", { defaultValue: "Renew" }),
-    cancel: t("subscriptions.actions.cancel", { defaultValue: "Cancel + credit" }),
-    "ingest-usage": t("subscriptions.actions.ingestUsage", { defaultValue: "Ingest usage" }),
-    "set-commitment": t("subscriptions.actions.setCommitment", { defaultValue: "Set commitment" }),
-  }
-  const mutationOptions = (action: SubscriptionDialogAction) => ({
-    onSuccess: () =>
-      showWorkflowToast({
-        kind: "success",
-        title: t("common.actionCompleted", { action: dialogLabels[action] }),
-        description: "",
-      }),
-    onError: (error: Error) =>
-      showWorkflowToast({ kind: "error", title: t("common.error.title"), description: error.message }),
-  })
-  const [target, setTarget] = useState<{ action: SubscriptionDialogAction; id: number } | null>(null)
-  const targetFor = (action: SubscriptionDialogAction) => (enabled && target?.action === action ? target.id : null)
+  const router = useRouter()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const [target, setTarget] = useState<{ action: SubscriptionActionId; id: bigint } | null>(null)
   const close = () => setTarget(null)
-  useEffect(() => {
-    if (!enabled) setTarget(null)
+  useEffect(() => { setTarget(null) }, [orgId, operatingCompanyId, enabled])
+  const subscriptionsQuery = useSubscriptions(orgId)
+  const runsQuery = useSubscriptionBillingRuns(orgId)
+  const linesQuery = useSubscriptionLines(orgId)
+  const plansQuery = useSubscriptionPlans(orgId)
+  const journalsQuery = useAccountJournals(orgId)
+  const accountsQuery = useAccountAccounts(orgId)
+  const movesQuery = useAccountMoves(orgId)
+  const { data: currencies = [] } = useCurrencies()
+  const scope = { organizationId: orgId, companyId: operatingCompanyId }
+  const subscription = (subscriptionsQuery.data ?? []).find((row) => String(row.id) === String(target?.id) && inSubscriptionScope(row, scope))
+  const journals = (journalsQuery.data ?? []).filter((row) => inSubscriptionScope(row, scope) && row.active === true)
+  const accounts = (accountsQuery.data ?? []).filter((row) => inSubscriptionScope(row, scope) && row.deprecated === false)
+  const invoices = subscription ? subscriptionInvoices(subscription, runsQuery.data ?? [], movesQuery.data ?? [], scope) : []
+  const lines = (linesQuery.data ?? []).filter((row) => inSubscriptionScope(row, scope) && String(row.subscriptionId) === String(target?.id))
+  const action = target?.action ?? 'activate'
+  const permitted = permissionsReady !== false && subscriptionActionPermissions(action).every(([resource, verb]) => checkPermission(resource, verb).allowed)
+  const sources = [subscriptionsQuery]
+  const needsAccounting = ['generate-invoice', 'pay-invoice', 'amend'].includes(action)
+  const needsInvoices = ['pay-invoice', 'cancel'].includes(action)
+  const sourceState = mergeModuleStates([
+    ...sources.map(moduleQueryState),
+    ...(needsAccounting ? [moduleQueryState(journalsQuery), moduleQueryState(accountsQuery)] : []),
+    ...(needsInvoices ? [moduleQueryState(runsQuery), moduleQueryState(movesQuery)] : []),
+    ...(['activate', 'amend'].includes(action) ? [moduleQueryState(linesQuery)] : []),
+  ])
+  const usable = enabled && permitted && subscription != null && sourceState.status === 'ready'
+    && isSubscriptionActionApplicableOnPage(action, subscriptionStateOf(subscription))
+  const openDialog = useCallback((nextAction: SubscriptionDialogAction, subscriptionId: number | bigint) => {
+    if (enabled) setTarget({ action: nextAction, id: BigInt(subscriptionId) })
   }, [enabled])
-
-  const { data: subscriptions = [] } = useSubscriptions(orgId)
-  const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
-  const { data: subscriptionLines = [] } = useSubscriptionLines(orgId)
-  const { data: journals = [] } = useAccountJournals(orgId)
-  const { data: accounts = [] } = useAccountAccounts(orgId)
-  const { data: accountMoves = [] } = useAccountMoves(orgId)
 
   const activate = useActivateSubscription(orgId, operatingCompanyId)
   const closeSubscription = useCloseSubscription(orgId, operatingCompanyId)
@@ -151,253 +140,92 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
     recordFailure.isPending ||
     refreshFlags.isPending
 
-  /** Run an action that needs no extra input. Rejects with the reducer error. */
-  const runDirect = useCallback(
-    async (action: SubscriptionDirectAction, subscriptionId: bigint): Promise<void> => {
-      if (!enabled) return
-      switch (action) {
-        case "activate":
-          await activate.mutateAsync({ subscriptionId })
-          return
-        case "pause":
-          await pause.mutateAsync({ subscriptionId })
-          return
-        case "resume":
-          await resume.mutateAsync({ subscriptionId })
-          return
-        case "rate-usage":
-          await rateUsage.mutateAsync({ subscriptionId, params: { limit: 100 } })
-          return
-        case "record-failure":
-          await recordFailure.mutateAsync({ subscriptionId, params: { reason: "manual", pastDueDays: 1 } })
-          return
-        case "advance-dunning":
-          await advanceDunning.mutateAsync({ subscriptionId, params: {} })
-          return
-        case "refresh-flags":
-          await refreshFlags.mutateAsync({ subscriptionId })
-          return
+  const journalOptions = accountJournalRowsToSelectOptions(journals.filter((journal) => workflowTag(journal.type) === 'sale'))
+  const paymentJournalOptions = paymentJournalRowsToSelectOptions(journals)
+  const accountOptions = accountAccountRowsToSelectOptions(accounts)
+  const availableInvoices = action === 'pay-invoice' ? invoices.filter((invoice) => (invoiceOutstanding(invoice) ?? 0) > 0)
+    : invoices.filter((invoice) => workflowTag(invoice.state) === 'posted')
+  const forms: Partial<Record<SubscriptionActionId, () => FormConfig>> = {
+    close: () => closeSubscriptionForm(t), 'generate-invoice': () => generateSubscriptionInvoiceForm(t),
+    'pay-invoice': () => paySubscriptionInvoiceForm(t), amend: () => amendSubscriptionForm(t),
+    renew: () => renewSubscriptionForm(t), cancel: () => cancelSubscriptionForm(t),
+    'ingest-usage': () => ingestSubscriptionUsageEventForm(t), 'set-commitment': () => setSubscriptionCommitmentForm(t),
+  }
+  const base = forms[action]?.() ?? { id: `subscription-${action}`, title: t(`subscriptions.workflow.labels.${action}`), sections: [] }
+  const selectedPlan = (moduleQueryState(plansQuery).status === 'ready' ? plansQuery.data ?? [] : []).find((plan) => String(plan.id) === String(subscription?.planId) && inSubscriptionScope(plan, scope))
+  const configuredJournal = journals.find((journal) => String(journal.id) === String(selectedPlan?.journalId) && workflowTag(journal.type) === 'sale')
+  const config = mergeSelectOptionsForFields({
+    ...base, title: t(`subscriptions.workflow.labels.${action}`), submitLabel: t(`subscriptions.workflow.labels.${action}`),
+    sections: base.sections.map((section) => ({ ...section, fields: section.fields.filter((field) => action !== 'pay-invoice' || availableInvoices.some((invoice) => workflowTag(invoice.state) === 'draft') || !['cogsAccountId', 'inventoryAccountId'].includes(field.name)).map((field) => {
+      if (field.name === 'invoiceMoveId') return { ...field, required: action === 'pay-invoice', defaultValue: availableInvoices.length === 1 ? String(availableInvoices[0]!.id) : '' }
+      if (field.name === 'invoiceDate') return { ...field, defaultValue: new Date().toISOString().slice(0, 10) }
+      if (field.name === 'journalId' && action === 'generate-invoice' && configuredJournal) return { ...field, defaultValue: String(configuredJournal.id) }
+      if (field.name === 'createCreditNote') return { ...field, defaultValue: false }
+      return field
+    }) })),
+  } as FormConfig, {
+    journalId: journalOptions, paymentJournalId: paymentJournalOptions,
+    incomeAccountId: accountOptions, receivableAccountId: accountOptions, bankAccountId: accountOptions,
+    cogsAccountId: accountOptions, inventoryAccountId: accountOptions,
+    taxAccountId: [{ value: '', label: '—' }, ...accountOptions],
+    invoiceMoveId: accountMoveRowsToSelectOptions(availableInvoices),
+    lineId: lines.map((line) => ({ value: String(line.id), label: String(line.name ?? line.id) })),
+  })
+  if (action === 'record-failure') config.sections = [{ id: 'failure', fields: [
+    { id: 'reason', name: 'reason', type: 'text', label: t('subscriptions.workflow.failureReason'), required: true },
+    { id: 'pastDueDays', name: 'pastDueDays', type: 'number', label: t('subscriptions.workflow.pastDueDays'), min: 0, step: 1, defaultValue: 1, required: true },
+  ] }]
+
+  const submit = async (values: FormValues) => {
+    if (!usable || !target || !subscription) throw new Error(t('subscriptions.workflow.selectionChanged'))
+    const subscriptionId = target.id
+    switch (action) {
+      case 'activate':
+        if (!lines.length) throw new Error(t('subscriptions.workflow.noLines'))
+        await activate.mutateAsync({ subscriptionId }); break
+      case 'pause': await pause.mutateAsync({ subscriptionId }); break
+      case 'resume': await resume.mutateAsync({ subscriptionId }); break
+      case 'close': await closeSubscription.mutateAsync({ subscriptionId, params: buildCloseSubscriptionParams(values) }); break
+      case 'generate-invoice': await generateInvoice.mutateAsync({ subscriptionId, params: buildGenerateSubscriptionInvoiceParams(values) }); break
+      case 'pay-invoice': {
+        const invoice = availableInvoices.find((row) => String(row.id) === String(values.invoiceMoveId))
+        const outstanding = invoice ? invoiceOutstanding(invoice) : null
+        const amount = values.amount === '' || values.amount == null ? outstanding : Number(values.amount)
+        if (!invoice || outstanding == null || amount == null || !Number.isFinite(amount) || amount <= 0 || amount > outstanding) throw new Error(t('subscriptions.workflow.invalidPayment'))
+        await payInvoice.mutateAsync({ subscriptionId, params: buildPaySubscriptionInvoiceParams(values) }); break
       }
-    },
-    [enabled, activate, pause, resume, rateUsage, recordFailure, advanceDunning, refreshFlags],
-  )
-
-  const openDialog = useCallback(
-    (action: SubscriptionDialogAction, subscriptionId: number | bigint) => {
-      if (enabled) setTarget({ action, id: Number(subscriptionId) })
-    },
-    [enabled],
-  )
-
-  const journalFieldOptions = useMemo(() => {
-    const fromApi = accountJournalRowsToSelectOptions(journals)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noJournals"), disabled: true }]
-  }, [journals, t])
-  const accountFieldOptions = useMemo(() => {
-    const fromApi = accountAccountRowsToSelectOptions(accounts)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [accounts, t])
-
-  const payTargetId = targetFor("pay-invoice")
-  const amendTargetId = targetFor("amend")
-  const cancelTargetId = targetFor("cancel")
-
-  const closeForm = useMemo(() => closeSubscriptionForm(t), [t])
-  const generateForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(generateSubscriptionInvoiceForm(t), {
-        journalId: journalFieldOptions,
-        incomeAccountId: accountFieldOptions,
-        receivableAccountId: accountFieldOptions,
-        taxAccountId: [{ value: "", label: "—" }, ...accountFieldOptions.filter((o) => o.value !== "")],
-      }),
-    [t, journalFieldOptions, accountFieldOptions],
-  )
-  const payInvoiceMoveOptions = useMemo(() => {
-    if (payTargetId == null) return [{ value: "", label: "—", disabled: true }]
-    const ids = new Set(
-      (billingRuns as Record<string, unknown>[])
-        .filter((run) => Number(run.subscriptionId ?? run.subscription_id) === payTargetId)
-        .map((run) => run.invoiceMoveId ?? run.invoice_move_id)
-        .filter((id) => id != null)
-        .map(String),
-    )
-    const moves = (accountMoves as Record<string, unknown>[]).filter((move) => ids.has(String(move.id)))
-    const fromApi = accountMoveRowsToSelectOptions(moves)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
-  }, [payTargetId, billingRuns, accountMoves, t])
-  const payForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(paySubscriptionInvoiceForm(t), {
-        invoiceMoveId: payInvoiceMoveOptions,
-        paymentJournalId: journalFieldOptions,
-        bankAccountId: accountFieldOptions,
-        receivableAccountId: accountFieldOptions,
-        cogsAccountId: accountFieldOptions,
-        inventoryAccountId: accountFieldOptions,
-      }),
-    [t, payInvoiceMoveOptions, journalFieldOptions, accountFieldOptions],
-  )
-  const amendLineOptions = useMemo(() => {
-    if (amendTargetId == null) return [{ value: "", label: "—", disabled: true }]
-    const lines = (subscriptionLines as Record<string, unknown>[]).filter(
-      (l) => Number(l.subscriptionId ?? l.subscription_id) === amendTargetId,
-    )
-    if (lines.length === 0) return [{ value: "", label: "No lines", disabled: true }]
-    return lines.map((l) => ({ value: String(l.id), label: `${l.name ?? "Line"} (#${l.id})` }))
-  }, [amendTargetId, subscriptionLines])
-  const amendForm = useMemo(
-    () =>
-      mergeSelectOptionsForFields(amendSubscriptionForm(t), {
-        lineId: amendLineOptions,
-        journalId: journalFieldOptions,
-        incomeAccountId: accountFieldOptions,
-        receivableAccountId: accountFieldOptions,
-      }),
-    [t, amendLineOptions, journalFieldOptions, accountFieldOptions],
-  )
-  const renewForm = useMemo(() => renewSubscriptionForm(t), [t])
-  const cancelInvoiceOptions = useMemo(() => {
-    if (cancelTargetId == null) return [{ value: "", label: "—" }]
-    const sub = (subscriptions as Record<string, unknown>[]).find((s) => Number(s.id) === cancelTargetId)
-    const ids = (sub?.invoiceIds ?? sub?.invoice_ids ?? []) as unknown[]
-    const idSet = new Set(ids.map((id) => String(id)))
-    const moves = (accountMoves as Record<string, unknown>[]).filter((m) => idSet.has(String(m.id)))
-    const fromApi = accountMoveRowsToSelectOptions(moves)
-    return [{ value: "", label: "—" }, ...fromApi.filter((o) => o.value !== "")]
-  }, [cancelTargetId, subscriptions, accountMoves])
-  const cancelForm = useMemo(
-    () => mergeSelectOptionsForFields(cancelSubscriptionForm(t), { invoiceMoveId: cancelInvoiceOptions }),
-    [t, cancelInvoiceOptions],
-  )
-  const ingestForm = useMemo(() => ingestSubscriptionUsageEventForm(t), [t])
-  const commitmentForm = useMemo(() => setSubscriptionCommitmentForm(t), [t])
-
-  const dialogs: ReactNode = (
-    <>
-      <FormModal
-        open={targetFor("close") !== null}
-        onOpenChange={(open) => !open && close()}
-        config={closeForm}
-        onSubmit={(formData) => {
-          const id = targetFor("close")
-          if (id == null) return
-          closeSubscription.mutate(
-            { subscriptionId: BigInt(id), params: buildCloseSubscriptionParams(formData) },
-            mutationOptions("close"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={targetFor("generate-invoice") !== null}
-        onOpenChange={(open) => !open && close()}
-        config={generateForm}
-        onSubmit={(formData) => {
-          const id = targetFor("generate-invoice")
-          if (id == null) return
-          if (!formData.incomeAccountId || !formData.receivableAccountId) return
-          generateInvoice.mutate(
-            { subscriptionId: BigInt(id), params: buildGenerateSubscriptionInvoiceParams(formData) },
-            mutationOptions("generate-invoice"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={payTargetId !== null}
-        onOpenChange={(open) => !open && close()}
-        config={payForm}
-        onSubmit={(formData) => {
-          if (payTargetId == null) return
-          if (
-            !formData.invoiceMoveId ||
-            !formData.paymentJournalId ||
-            !formData.bankAccountId ||
-            !formData.receivableAccountId
-          ) {
-            return
-          }
-          payInvoice.mutate(
-            { subscriptionId: BigInt(payTargetId), params: buildPaySubscriptionInvoiceParams(formData) },
-            mutationOptions("pay-invoice"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={amendTargetId !== null}
-        onOpenChange={(open) => !open && close()}
-        config={amendForm}
-        onSubmit={(formData) => {
-          if (amendTargetId == null || !formData.lineId) return
-          amend.mutate(
-            { subscriptionId: BigInt(amendTargetId), params: buildAmendSubscriptionParams(formData) },
-            mutationOptions("amend"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={targetFor("renew") !== null}
-        onOpenChange={(open) => !open && close()}
-        config={renewForm}
-        onSubmit={(formData) => {
-          const id = targetFor("renew")
-          if (id == null) return
-          renew.mutate(
-            { subscriptionId: BigInt(id), params: buildRenewSubscriptionParams(formData) },
-            mutationOptions("renew"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={cancelTargetId !== null}
-        onOpenChange={(open) => !open && close()}
-        config={cancelForm}
-        onSubmit={(formData) => {
-          if (cancelTargetId == null) return
-          cancel.mutate(
-            { subscriptionId: BigInt(cancelTargetId), params: buildCancelSubscriptionParams(formData) },
-            mutationOptions("cancel"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={targetFor("ingest-usage") !== null}
-        onOpenChange={(open) => !open && close()}
-        config={ingestForm}
-        onSubmit={(formData) => {
-          const id = targetFor("ingest-usage")
-          if (id == null || !formData.eventId) return
-          ingestUsage.mutate(
-            { subscriptionId: BigInt(id), params: buildIngestSubscriptionUsageEventParams(formData) },
-            mutationOptions("ingest-usage"),
-          )
-          close()
-        }}
-      />
-      <FormModal
-        open={targetFor("set-commitment") !== null}
-        onOpenChange={(open) => !open && close()}
-        config={commitmentForm}
-        onSubmit={(formData) => {
-          const id = targetFor("set-commitment")
-          if (id == null) return
-          setCommitment.mutate(
-            { subscriptionId: BigInt(id), params: buildSetSubscriptionCommitmentParams(formData) },
-            mutationOptions("set-commitment"),
-          )
-          close()
-        }}
-      />
-    </>
-  )
-
-  return { dialogs, openDialog, runDirect, pending }
+      case 'amend':
+        if (!lines.some((line) => String(line.id) === String(values.lineId))) throw new Error(t('subscriptions.workflow.selectionChanged'))
+        await amend.mutateAsync({ subscriptionId, params: buildAmendSubscriptionParams(values) }); break
+      case 'renew': await renew.mutateAsync({ subscriptionId, params: buildRenewSubscriptionParams(values) }); break
+      case 'cancel':
+        if (values.createCreditNote === true && !availableInvoices.some((invoice) => String(invoice.id) === String(values.invoiceMoveId))) throw new Error(t('subscriptions.workflow.chooseCreditInvoice'))
+        await cancel.mutateAsync({ subscriptionId, params: buildCancelSubscriptionParams(values) }); break
+      case 'ingest-usage': await ingestUsage.mutateAsync({ subscriptionId, params: buildIngestSubscriptionUsageEventParams(values) }); break
+      case 'rate-usage': await rateUsage.mutateAsync({ subscriptionId, params: { limit: 100 } }); break
+      case 'set-commitment': await setCommitment.mutateAsync({ subscriptionId, params: buildSetSubscriptionCommitmentParams(values) }); break
+      case 'record-failure': await recordFailure.mutateAsync({ subscriptionId, params: { reason: String(values.reason), pastDueDays: Number(values.pastDueDays) } }); break
+      case 'advance-dunning': await advanceDunning.mutateAsync({ subscriptionId, params: {} }); break
+      case 'refresh-flags': await refreshFlags.mutateAsync({ subscriptionId }); break
+    }
+    showWorkflowToast({ kind: 'success', title: t(`subscriptions.workflow.completed.${action}`), action: {
+      label: t('subscriptions.workflow.viewSubscription'), onClick: () => router.push(`/subscriptions/${subscriptionId}?tab=${['generate-invoice', 'pay-invoice'].includes(action) ? 'billing' : 'overview'}`),
+    } })
+  }
+  const missingAccounting = usable && needsAccounting && (accounts.length === 0 || (action === 'pay-invoice' ? paymentJournalOptions.length === 0 : journalOptions.length === 0))
+  const blocked = missingAccounting || !usable || (action === 'activate' && !lines.length) || (action === 'pay-invoice' && availableInvoices.length === 0)
+  const retrySources = () => {
+    for (const query of [subscriptionsQuery, runsQuery, linesQuery, journalsQuery, accountsQuery, movesQuery]) void query.refetch()
+  }
+  const dialogs: ReactNode = target && <FormModal key={`${orgId}:${operatingCompanyId}:${target.id}:${action}`}
+    open onOpenChange={(open) => { if (!open) close() }} config={config} isPending={pending} submissionDisabled={blocked}
+    showSubmitSuccessToast={false} draft={false}
+    submitError={blocked ? t(missingAccounting ? 'subscriptions.workflow.accountingSetup' : !permitted ? 'subscriptions.workflow.source.denied' : sourceState.status !== 'ready' ? `subscriptions.workflow.source.${sourceState.status}` : action === 'activate' && !lines.length ? 'subscriptions.workflow.noLines' : action === 'pay-invoice' ? 'subscriptions.workflow.noUnpaidInvoices' : 'subscriptions.workflow.selectionChanged') : null}
+    formLeadingActions={missingAccounting ? <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="outline" render={<Link href="/accounting?tab=accounts" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t('subscriptions.workflow.openAccounting')}</Button>
+      <Button type="button" variant="outline" onClick={retrySources}>{t('common.retry')}</Button>
+    </div> : sourceState.status !== 'ready' ? <Button type="button" variant="outline" onClick={retrySources}>{t('common.retry')}</Button> : undefined}
+    renderPreview={(values) => usable && subscription ? <SubscriptionActionPreview action={action} subscription={subscription} values={values} invoices={availableInvoices} lines={lines} currencies={currencies} /> : null}
+    onSubmit={submit} />
+  return { dialogs, openDialog, pending }
 }
