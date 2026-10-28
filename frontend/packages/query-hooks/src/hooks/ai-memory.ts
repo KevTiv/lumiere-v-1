@@ -48,6 +48,24 @@ export type AiRagSource = {
   fetched_at?: string
 }
 
+export interface AiGuideReference {
+  guideId: string
+  revision: number
+}
+
+/** Authorized saved-document references, distinct from evidence for live ERP facts. */
+export interface AiRelatedGuide extends AiGuideReference {
+  title: string
+  module: string
+  workflow?: string
+  companyId: string
+  language?: string
+  reviewState: 'draft' | 'verified' | 'needs_review' | 'superseded'
+  updatedAt?: string
+  contentHash?: string
+  productVersion?: string
+}
+
 export type AiChatSessionRow = {
   id: number | string
   organizationId?: number
@@ -251,6 +269,7 @@ export function useAiMemoryRag() {
       include_types?: string[]
       limit?: number
       ui_context?: AiUiContext
+      guide_refs?: AiGuideReference[]
     }) => {
       const r = await apiFetch("/api/ai/rag", {
         method: "POST",
@@ -261,12 +280,15 @@ export function useAiMemoryRag() {
           ...(args.include_types?.length ? { include_types: args.include_types } : {}),
           ...(args.limit != null ? { limit: args.limit } : {}),
           ...(args.ui_context ? { ui_context: args.ui_context } : {}),
+          ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
         }),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
       return (await r.json()) as {
         answer: string
         sources: AiRagSource[]
+        related_guides?: AiRelatedGuide[]
+        guide_retrieval_degraded?: boolean
         run_id?: number
         agent_id?: number
         provider?: string

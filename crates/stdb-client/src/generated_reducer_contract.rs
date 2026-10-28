@@ -4751,10 +4751,10 @@ const PARAMS_1077: &[ReducerParam] = &[
 const PARAMS_1078: &[ReducerParam] = &[
 ];
 const PARAMS_1079: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1080: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1081: &[ReducerParam] = &[
 ];
@@ -4857,12 +4857,12 @@ const PARAMS_1129: &[ReducerParam] = &[
 const PARAMS_1130: &[ReducerParam] = &[
 ];
 const PARAMS_1131: &[ReducerParam] = &[
-    ReducerParam { name: "job", kind: ScalarKind::Composite, ref_target: Some("SalesSlaEscalationJob") },
 ];
 const PARAMS_1132: &[ReducerParam] = &[
-    ReducerParam { name: "job", kind: ScalarKind::Composite, ref_target: Some("ReplenishmentRunJob") },
+    ReducerParam { name: "job", kind: ScalarKind::Composite, ref_target: Some("SalesSlaEscalationJob") },
 ];
 const PARAMS_1133: &[ReducerParam] = &[
+    ReducerParam { name: "job", kind: ScalarKind::Composite, ref_target: Some("ReplenishmentRunJob") },
 ];
 const PARAMS_1134: &[ReducerParam] = &[
 ];
@@ -4877,10 +4877,10 @@ const PARAMS_1138: &[ReducerParam] = &[
 const PARAMS_1139: &[ReducerParam] = &[
 ];
 const PARAMS_1140: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1141: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1142: &[ReducerParam] = &[
 ];
@@ -4901,39 +4901,59 @@ const PARAMS_1149: &[ReducerParam] = &[
 const PARAMS_1150: &[ReducerParam] = &[
 ];
 const PARAMS_1151: &[ReducerParam] = &[
+];
+const PARAMS_1152: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "template_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SaveImportMappingTemplateParams") },
 ];
-const PARAMS_1152: &[ReducerParam] = &[
+const PARAMS_1153: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "guide_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+    ReducerParam { name: "expected_revision", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+    ReducerParam { name: "request_key", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "draft_key", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "title", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "module", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "workflow", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "markdown", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "html", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "language", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "workflow_version", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "sources_json", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "origin_message_id", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "origin_run_id", kind: ScalarKind::OptionalString, ref_target: None },
+];
+const PARAMS_1154: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_revision", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "definition_json", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1153: &[ReducerParam] = &[
+const PARAMS_1155: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "message", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1154: &[ReducerParam] = &[
+const PARAMS_1156: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ScheduleDocumentRetentionPurgeParams") },
 ];
-const PARAMS_1155: &[ReducerParam] = &[
+const PARAMS_1157: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1156: &[ReducerParam] = &[
+const PARAMS_1158: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "delay_secs", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1157: &[ReducerParam] = &[
+const PARAMS_1159: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1158: &[ReducerParam] = &[
+const PARAMS_1160: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "mo_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4941,7 +4961,7 @@ const PARAMS_1158: &[ReducerParam] = &[
     ReducerParam { name: "quantity", kind: ScalarKind::Float, ref_target: None },
     ReducerParam { name: "request_id", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1159: &[ReducerParam] = &[
+const PARAMS_1161: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "mo_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4950,7 +4970,7 @@ const PARAMS_1159: &[ReducerParam] = &[
     ReducerParam { name: "quantity", kind: ScalarKind::Float, ref_target: None },
     ReducerParam { name: "request_id", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1160: &[ReducerParam] = &[
+const PARAMS_1162: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "mo_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4959,51 +4979,51 @@ const PARAMS_1160: &[ReducerParam] = &[
     ReducerParam { name: "quantity", kind: ScalarKind::Float, ref_target: None },
     ReducerParam { name: "request_id", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1161: &[ReducerParam] = &[
-];
-const PARAMS_1162: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SeedHrCountryPackOverlaysParams") },
-];
 const PARAMS_1163: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1164: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SeedPackHolidaysParams") },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SeedHrCountryPackOverlaysParams") },
 ];
 const PARAMS_1165: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SeedStatutoryExpenseMileageRatesParams") },
 ];
 const PARAMS_1166: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SeedPackHolidaysParams") },
 ];
 const PARAMS_1167: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SeedStatutoryExpenseMileageRatesParams") },
 ];
 const PARAMS_1168: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1169: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1170: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1169: &[ReducerParam] = &[
+const PARAMS_1171: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetAiAgentRunWaitStateParams") },
 ];
-const PARAMS_1170: &[ReducerParam] = &[
+const PARAMS_1172: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "profile_name", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "profile_version", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1171: &[ReducerParam] = &[
+const PARAMS_1173: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "role_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "capability_key", kind: ScalarKind::String, ref_target: None },
@@ -5011,52 +5031,40 @@ const PARAMS_1171: &[ReducerParam] = &[
     ReducerParam { name: "max_bytes", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1172: &[ReducerParam] = &[
+const PARAMS_1174: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "case_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "outcome_json", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1173: &[ReducerParam] = &[
+const PARAMS_1175: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "case_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1174: &[ReducerParam] = &[
+const PARAMS_1176: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "case_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1175: &[ReducerParam] = &[
+const PARAMS_1177: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "pattern_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "note", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1176: &[ReducerParam] = &[
+const PARAMS_1178: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "decision_type_name", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "decision_type_version", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1177: &[ReducerParam] = &[
+const PARAMS_1179: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "passage_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
-];
-const PARAMS_1178: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "event_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
-    ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
-];
-const PARAMS_1179: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "event_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
-    ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
 ];
 const PARAMS_1180: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5066,130 +5074,142 @@ const PARAMS_1180: &[ReducerParam] = &[
 ];
 const PARAMS_1181: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "event_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
+];
+const PARAMS_1182: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "event_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
+];
+const PARAMS_1183: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "policy_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1182: &[ReducerParam] = &[
+const PARAMS_1184: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "state", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1183: &[ReducerParam] = &[
+const PARAMS_1185: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "profile_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1184: &[ReducerParam] = &[
+const PARAMS_1186: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "allowlist_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "enabled", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1185: &[ReducerParam] = &[
+const PARAMS_1187: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "skill_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1186: &[ReducerParam] = &[
+const PARAMS_1188: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1187: &[ReducerParam] = &[
+const PARAMS_1189: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "article_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetArticlePublishedParams") },
 ];
-const PARAMS_1188: &[ReducerParam] = &[
+const PARAMS_1190: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "asset_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1189: &[ReducerParam] = &[
+const PARAMS_1191: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "billing_account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1190: &[ReducerParam] = &[
+const PARAMS_1192: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "bom_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "operation_ids", kind: ScalarKind::Composite, ref_target: None },
 ];
-const PARAMS_1191: &[ReducerParam] = &[
+const PARAMS_1193: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetCommodityPriceIndexParams") },
 ];
-const PARAMS_1192: &[ReducerParam] = &[
+const PARAMS_1194: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetCompanyCountryPackParams") },
 ];
-const PARAMS_1193: &[ReducerParam] = &[
+const PARAMS_1195: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetCompanyVerticalPackParams") },
 ];
-const PARAMS_1194: &[ReducerParam] = &[
+const PARAMS_1196: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetConsolidationCompanyRateParams") },
 ];
-const PARAMS_1195: &[ReducerParam] = &[
+const PARAMS_1197: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "contact_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "channel", kind: ScalarKind::Composite, ref_target: Some("MessageChannel") },
     ReducerParam { name: "opted_in", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1196: &[ReducerParam] = &[
+const PARAMS_1198: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "segment_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetContactSegmentRulesParams") },
 ];
-const PARAMS_1197: &[ReducerParam] = &[
+const PARAMS_1199: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "document_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetDocumentRetentionParams") },
 ];
-const PARAMS_1198: &[ReducerParam] = &[
+const PARAMS_1200: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expense_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetExpenseAllocationsParams") },
 ];
-const PARAMS_1199: &[ReducerParam] = &[
+const PARAMS_1201: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expense_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetExpenseFraudHoldParams") },
 ];
-const PARAMS_1200: &[ReducerParam] = &[
+const PARAMS_1202: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "field_row_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetFormFieldLabelParams") },
 ];
-const PARAMS_1201: &[ReducerParam] = &[
+const PARAMS_1203: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "configuration_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CreateRoleConfigParams") },
 ];
-const PARAMS_1202: &[ReducerParam] = &[
+const PARAMS_1204: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "connection_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetDriveConflictPolicyParams") },
 ];
-const PARAMS_1203: &[ReducerParam] = &[
+const PARAMS_1205: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "ticket_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetHelpdeskRelatedRecordParams") },
 ];
-const PARAMS_1204: &[ReducerParam] = &[
+const PARAMS_1206: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1205: &[ReducerParam] = &[
+const PARAMS_1207: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "device_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "sensor_type", kind: ScalarKind::String, ref_target: None },
@@ -5197,204 +5217,200 @@ const PARAMS_1205: &[ReducerParam] = &[
     ReducerParam { name: "max_value", kind: ScalarKind::OptionalFloat, ref_target: None },
     ReducerParam { name: "severity", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1206: &[ReducerParam] = &[
+const PARAMS_1208: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "user_identity", kind: ScalarKind::Composite, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetMemberAccessParams") },
 ];
-const PARAMS_1207: &[ReducerParam] = &[
+const PARAMS_1209: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "project_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1208: &[ReducerParam] = &[
+const PARAMS_1210: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetPurchaseApprovalDelegateParams") },
 ];
-const PARAMS_1209: &[ReducerParam] = &[
+const PARAMS_1211: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetRecordCustomFieldValuesParams") },
 ];
-const PARAMS_1210: &[ReducerParam] = &[
+const PARAMS_1212: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "subscription_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetSubscriptionCommitmentParams") },
 ];
-const PARAMS_1211: &[ReducerParam] = &[
+const PARAMS_1213: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "task_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "parent_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
 ];
-const PARAMS_1212: &[ReducerParam] = &[
+const PARAMS_1214: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetVendorRiskFlagParams") },
 ];
-const PARAMS_1213: &[ReducerParam] = &[
+const PARAMS_1215: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1214: &[ReducerParam] = &[
+const PARAMS_1216: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetWorkflowCandidateGroupMemberParams") },
 ];
-const PARAMS_1215: &[ReducerParam] = &[
+const PARAMS_1217: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "plan_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "active", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1216: &[ReducerParam] = &[
+const PARAMS_1218: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SettleAiSpendParams") },
 ];
-const PARAMS_1217: &[ReducerParam] = &[
+const PARAMS_1219: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SettleSaleCommissionsParams") },
 ];
-const PARAMS_1218: &[ReducerParam] = &[
+const PARAMS_1220: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetupFiscalCalendarParams") },
 ];
-const PARAMS_1219: &[ReducerParam] = &[
+const PARAMS_1221: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "dashboard_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateDashboardShareParams") },
 ];
-const PARAMS_1220: &[ReducerParam] = &[
+const PARAMS_1222: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SignalWorkflowParams") },
 ];
-const PARAMS_1221: &[ReducerParam] = &[
+const PARAMS_1223: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workflow_version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SimulateWorkflowParams") },
 ];
-const PARAMS_1222: &[ReducerParam] = &[
+const PARAMS_1224: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "alert_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "description", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1223: &[ReducerParam] = &[
+const PARAMS_1225: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workflow_version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StageAiWorkflowNodeProvenanceParams") },
 ];
-const PARAMS_1224: &[ReducerParam] = &[
+const PARAMS_1226: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "journal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "currency_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StageBankStatementImportParams") },
 ];
-const PARAMS_1225: &[ReducerParam] = &[
+const PARAMS_1227: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "cycle_count_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1226: &[ReducerParam] = &[
+const PARAMS_1228: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "mo_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1227: &[ReducerParam] = &[
+const PARAMS_1229: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "employee_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1228: &[ReducerParam] = &[
+const PARAMS_1230: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "batch_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1229: &[ReducerParam] = &[
+const PARAMS_1231: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "check_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1230: &[ReducerParam] = &[
+const PARAMS_1232: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StartTimesheetTimerParams") },
 ];
-const PARAMS_1231: &[ReducerParam] = &[
+const PARAMS_1233: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StartWorkflowParams") },
 ];
-const PARAMS_1232: &[ReducerParam] = &[
+const PARAMS_1234: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workorder_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1233: &[ReducerParam] = &[
+const PARAMS_1235: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SteerAiRunParams") },
 ];
-const PARAMS_1234: &[ReducerParam] = &[
+const PARAMS_1236: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "timesheet_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1235: &[ReducerParam] = &[
+const PARAMS_1237: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expense_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "sheet_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1236: &[ReducerParam] = &[
+const PARAMS_1238: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "sheet_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1237: &[ReducerParam] = &[
+const PARAMS_1239: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "leave_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1238: &[ReducerParam] = &[
+const PARAMS_1240: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "review_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SubmitPerformanceReviewParams") },
 ];
-const PARAMS_1239: &[ReducerParam] = &[
+const PARAMS_1241: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "requisition_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1240: &[ReducerParam] = &[
+const PARAMS_1242: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SubmitSupplierIntakeParams") },
 ];
-const PARAMS_1241: &[ReducerParam] = &[
+const PARAMS_1243: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "res_model", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "res_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "subtypes", kind: ScalarKind::Composite, ref_target: None },
 ];
-const PARAMS_1242: &[ReducerParam] = &[
+const PARAMS_1244: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SyncExternalFileToDocumentParams") },
 ];
-const PARAMS_1243: &[ReducerParam] = &[
+const PARAMS_1245: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "hub_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "detected", kind: ScalarKind::Composite, ref_target: None },
 ];
-const PARAMS_1244: &[ReducerParam] = &[
-];
-const PARAMS_1245: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "device_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-];
 const PARAMS_1246: &[ReducerParam] = &[
 ];
 const PARAMS_1247: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "device_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1248: &[ReducerParam] = &[
 ];
@@ -5411,374 +5427,378 @@ const PARAMS_1253: &[ReducerParam] = &[
 const PARAMS_1254: &[ReducerParam] = &[
 ];
 const PARAMS_1255: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "project_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1256: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "team_member_skill_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1257: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "workcenter_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "project_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1258: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "team_member_skill_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1259: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "workcenter_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1260: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "enrollment_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1259: &[ReducerParam] = &[
+const PARAMS_1261: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "device_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1260: &[ReducerParam] = &[
+const PARAMS_1262: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "document_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1261: &[ReducerParam] = &[
+const PARAMS_1263: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "article_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1262: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-];
-const PARAMS_1263: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-];
 const PARAMS_1264: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1265: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1266: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "entry_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1265: &[ReducerParam] = &[
+const PARAMS_1267: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "statement_line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UnmatchExpenseCardStatementLineParams") },
 ];
-const PARAMS_1266: &[ReducerParam] = &[
+const PARAMS_1268: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UnreconcileAccountBankStatementLineParams") },
 ];
-const PARAMS_1267: &[ReducerParam] = &[
+const PARAMS_1269: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "payment_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1268: &[ReducerParam] = &[
+const PARAMS_1270: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "picking_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CompanyScopeParams") },
 ];
-const PARAMS_1269: &[ReducerParam] = &[
+const PARAMS_1271: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "quant_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StockQuantUnreserveParams") },
 ];
-const PARAMS_1270: &[ReducerParam] = &[
+const PARAMS_1272: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "res_model", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "res_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1271: &[ReducerParam] = &[
+const PARAMS_1273: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountAccountParams") },
 ];
-const PARAMS_1272: &[ReducerParam] = &[
+const PARAMS_1274: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "type_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountAccountTypeParams") },
 ];
-const PARAMS_1273: &[ReducerParam] = &[
+const PARAMS_1275: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "asset_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountAssetParams") },
 ];
-const PARAMS_1274: &[ReducerParam] = &[
+const PARAMS_1276: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "statement_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountBankStatementParams") },
 ];
-const PARAMS_1275: &[ReducerParam] = &[
+const PARAMS_1277: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountBankStatementLineParams") },
 ];
-const PARAMS_1276: &[ReducerParam] = &[
+const PARAMS_1278: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "group_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountGroupParams") },
 ];
-const PARAMS_1277: &[ReducerParam] = &[
+const PARAMS_1279: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "journal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountJournalParams") },
 ];
-const PARAMS_1278: &[ReducerParam] = &[
+const PARAMS_1280: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountMoveLineParams") },
 ];
-const PARAMS_1279: &[ReducerParam] = &[
+const PARAMS_1281: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "period_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountPeriodParams") },
 ];
-const PARAMS_1280: &[ReducerParam] = &[
+const PARAMS_1282: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "widget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountReconciliationWidgetParams") },
 ];
-const PARAMS_1281: &[ReducerParam] = &[
+const PARAMS_1283: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "tax_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountTaxParams") },
 ];
-const PARAMS_1282: &[ReducerParam] = &[
+const PARAMS_1284: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "group_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAccountTaxGroupParams") },
 ];
-const PARAMS_1283: &[ReducerParam] = &[
+const PARAMS_1285: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "draft_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAiActionDraftParamsParams") },
 ];
-const PARAMS_1284: &[ReducerParam] = &[
+const PARAMS_1286: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAiAgentParams") },
 ];
-const PARAMS_1285: &[ReducerParam] = &[
+const PARAMS_1287: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "session_key", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAiChatSessionTitleParams") },
 ];
-const PARAMS_1286: &[ReducerParam] = &[
+const PARAMS_1288: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "allowlist_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAiReducerAllowlistParams") },
 ];
-const PARAMS_1287: &[ReducerParam] = &[
+const PARAMS_1289: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAnalyticAccountParams") },
 ];
-const PARAMS_1288: &[ReducerParam] = &[
+const PARAMS_1290: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "model_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAnalyticDistributionModelParams") },
 ];
-const PARAMS_1289: &[ReducerParam] = &[
+const PARAMS_1291: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAnalyticLineParams") },
 ];
-const PARAMS_1290: &[ReducerParam] = &[
+const PARAMS_1292: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAssignmentRuleParams") },
 ];
-const PARAMS_1291: &[ReducerParam] = &[
+const PARAMS_1293: &[ReducerParam] = &[
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAuditRuleParams") },
 ];
-const PARAMS_1292: &[ReducerParam] = &[
+const PARAMS_1294: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "nomenclature_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateBarcodeNomenclatureParams") },
 ];
-const PARAMS_1293: &[ReducerParam] = &[
+const PARAMS_1295: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateBarcodeRuleParams") },
 ];
-const PARAMS_1294: &[ReducerParam] = &[
+const PARAMS_1296: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "billing_account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateBillingAccountParams") },
 ];
-const PARAMS_1295: &[ReducerParam] = &[
+const PARAMS_1297: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "bom_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateBomParams") },
 ];
-const PARAMS_1296: &[ReducerParam] = &[
+const PARAMS_1298: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCrossoveredBudgetLineParams") },
 ];
-const PARAMS_1297: &[ReducerParam] = &[
+const PARAMS_1299: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateBudgetLineActualsParams") },
 ];
-const PARAMS_1298: &[ReducerParam] = &[
+const PARAMS_1300: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "post_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateBudgetPostParams") },
 ];
-const PARAMS_1299: &[ReducerParam] = &[
+const PARAMS_1301: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "event_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCalendarEventParams") },
 ];
-const PARAMS_1300: &[ReducerParam] = &[
+const PARAMS_1302: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCompanyParams") },
 ];
-const PARAMS_1301: &[ReducerParam] = &[
+const PARAMS_1303: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCompanyAddressParams") },
 ];
-const PARAMS_1302: &[ReducerParam] = &[
+const PARAMS_1304: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCompanyBusinessParams") },
 ];
-const PARAMS_1303: &[ReducerParam] = &[
+const PARAMS_1305: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCompanyHierarchyParams") },
 ];
-const PARAMS_1304: &[ReducerParam] = &[
+const PARAMS_1306: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateConsolidationAccountParams") },
 ];
-const PARAMS_1305: &[ReducerParam] = &[
+const PARAMS_1307: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "contact_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContactCoreParams") },
 ];
-const PARAMS_1306: &[ReducerParam] = &[
+const PARAMS_1308: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "contact_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContactAddressParams") },
 ];
-const PARAMS_1307: &[ReducerParam] = &[
+const PARAMS_1309: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "contact_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContactBusinessParams") },
 ];
-const PARAMS_1308: &[ReducerParam] = &[
+const PARAMS_1310: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "category_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContactCategoryParams") },
 ];
-const PARAMS_1309: &[ReducerParam] = &[
+const PARAMS_1311: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "contact_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContactDetailsParams") },
 ];
-const PARAMS_1310: &[ReducerParam] = &[
+const PARAMS_1312: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "identity_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContactIdentityParams") },
 ];
-const PARAMS_1311: &[ReducerParam] = &[
+const PARAMS_1313: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "contact_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "parent_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
 ];
-const PARAMS_1312: &[ReducerParam] = &[
+const PARAMS_1314: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "contract_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateContractParams") },
 ];
-const PARAMS_1313: &[ReducerParam] = &[
+const PARAMS_1315: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "conversation_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCrmConversationParams") },
 ];
-const PARAMS_1314: &[ReducerParam] = &[
+const PARAMS_1316: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "budget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateCrossoveredBudgetParams") },
 ];
-const PARAMS_1315: &[ReducerParam] = &[
+const PARAMS_1317: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "department_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateDepartmentParams") },
 ];
-const PARAMS_1316: &[ReducerParam] = &[
+const PARAMS_1318: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "device_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1317: &[ReducerParam] = &[
+const PARAMS_1319: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "document_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateDocumentParams") },
 ];
-const PARAMS_1318: &[ReducerParam] = &[
+const PARAMS_1320: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "folder_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateDocumentFolderParams") },
 ];
-const PARAMS_1319: &[ReducerParam] = &[
+const PARAMS_1321: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "document_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "user_name", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1320: &[ReducerParam] = &[
+const PARAMS_1322: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "template_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateDocumentTemplateParams") },
 ];
-const PARAMS_1321: &[ReducerParam] = &[
+const PARAMS_1323: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "employee_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateEmployeeParams") },
 ];
-const PARAMS_1322: &[ReducerParam] = &[
+const PARAMS_1324: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expense_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateExpenseParams") },
 ];
-const PARAMS_1323: &[ReducerParam] = &[
+const PARAMS_1325: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateFinancialReportParams") },
 ];
-const PARAMS_1324: &[ReducerParam] = &[
+const PARAMS_1326: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "fiscal_year_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateFiscalYearParams") },
 ];
-const PARAMS_1325: &[ReducerParam] = &[
+const PARAMS_1327: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "vehicle_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateFleetVehicleParams") },
 ];
-const PARAMS_1326: &[ReducerParam] = &[
+const PARAMS_1328: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "vehicle_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateFleetVehicleDetailsParams") },
 ];
-const PARAMS_1327: &[ReducerParam] = &[
+const PARAMS_1329: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "configuration_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "field_id", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateFormFieldParams") },
 ];
-const PARAMS_1328: &[ReducerParam] = &[
+const PARAMS_1330: &[ReducerParam] = &[
     ReducerParam { name: "connection_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "name", kind: ScalarKind::OptionalString, ref_target: None },
@@ -5793,43 +5813,43 @@ const PARAMS_1328: &[ReducerParam] = &[
     ReducerParam { name: "sync_direction", kind: ScalarKind::Composite, ref_target: Some("SyncDirection") },
     ReducerParam { name: "sync_frequency_minutes", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
 ];
-const PARAMS_1329: &[ReducerParam] = &[
+const PARAMS_1331: &[ReducerParam] = &[
     ReducerParam { name: "connection_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "credentials_reference", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1330: &[ReducerParam] = &[
+const PARAMS_1332: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "applicant_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateHrApplicantParams") },
 ];
-const PARAMS_1331: &[ReducerParam] = &[
+const PARAMS_1333: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "employee_skill_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateHrEmployeeSkillParams") },
 ];
-const PARAMS_1332: &[ReducerParam] = &[
+const PARAMS_1334: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "assignment_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateHrGlobalAssignmentParams") },
 ];
-const PARAMS_1333: &[ReducerParam] = &[
+const PARAMS_1335: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "skill_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateHrSkillParams") },
 ];
-const PARAMS_1334: &[ReducerParam] = &[
+const PARAMS_1336: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "hub_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "ip_address", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "firmware_version", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "connectivity_quality", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1335: &[ReducerParam] = &[
+const PARAMS_1337: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "integration_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "integration_type", kind: ScalarKind::Composite, ref_target: Some("IntegrationType") },
@@ -5837,146 +5857,146 @@ const PARAMS_1335: &[ReducerParam] = &[
     ReducerParam { name: "sync_status", kind: ScalarKind::Composite, ref_target: Some("SyncStatus") },
     ReducerParam { name: "error_message", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1336: &[ReducerParam] = &[
+const PARAMS_1338: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateIntercompanyRuleParams") },
 ];
-const PARAMS_1337: &[ReducerParam] = &[
+const PARAMS_1339: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "job_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateJobPositionParams") },
 ];
-const PARAMS_1338: &[ReducerParam] = &[
+const PARAMS_1340: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "article_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateKnowledgeArticleParams") },
 ];
-const PARAMS_1339: &[ReducerParam] = &[
+const PARAMS_1341: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "article_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "user_name", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1340: &[ReducerParam] = &[
+const PARAMS_1342: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "category_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateKnowledgeCategoryParams") },
 ];
-const PARAMS_1341: &[ReducerParam] = &[
+const PARAMS_1343: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "landed_cost_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLandedCostParams") },
 ];
-const PARAMS_1342: &[ReducerParam] = &[
+const PARAMS_1344: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "lead_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeadParams") },
 ];
-const PARAMS_1343: &[ReducerParam] = &[
+const PARAMS_1345: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "lead_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeadAddressParams") },
 ];
-const PARAMS_1344: &[ReducerParam] = &[
+const PARAMS_1346: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "lead_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeadDetailsParams") },
 ];
-const PARAMS_1345: &[ReducerParam] = &[
+const PARAMS_1347: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "lost_reason_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeadLostReasonParams") },
 ];
-const PARAMS_1346: &[ReducerParam] = &[
+const PARAMS_1348: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "lead_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeadRevenueParams") },
 ];
-const PARAMS_1347: &[ReducerParam] = &[
+const PARAMS_1349: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "source_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeadSourceParams") },
 ];
-const PARAMS_1348: &[ReducerParam] = &[
+const PARAMS_1350: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "leave_type_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateLeaveTypeParams") },
 ];
-const PARAMS_1349: &[ReducerParam] = &[
+const PARAMS_1351: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "template_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateMailTemplateParams") },
 ];
-const PARAMS_1350: &[ReducerParam] = &[
+const PARAMS_1352: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "mo_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateManufacturingOrderParams") },
 ];
-const PARAMS_1351: &[ReducerParam] = &[
+const PARAMS_1353: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "template_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateMessageTemplateParams") },
 ];
-const PARAMS_1352: &[ReducerParam] = &[
+const PARAMS_1354: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "metric_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateMetricValuesParams") },
 ];
-const PARAMS_1353: &[ReducerParam] = &[
+const PARAMS_1355: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "opportunity_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateOpportunityParams") },
 ];
-const PARAMS_1354: &[ReducerParam] = &[
+const PARAMS_1356: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "opportunity_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1355: &[ReducerParam] = &[
+const PARAMS_1357: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "stage_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateOpportunityStageParams") },
 ];
-const PARAMS_1356: &[ReducerParam] = &[
+const PARAMS_1358: &[ReducerParam] = &[
     ReducerParam { name: "user_org_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateOrgMemberDetailsParams") },
 ];
-const PARAMS_1357: &[ReducerParam] = &[
+const PARAMS_1359: &[ReducerParam] = &[
     ReducerParam { name: "user_org_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "role_name", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1358: &[ReducerParam] = &[
+const PARAMS_1360: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateOrganizationParams") },
 ];
-const PARAMS_1359: &[ReducerParam] = &[
+const PARAMS_1361: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateOwnerReportScheduleParams") },
 ];
-const PARAMS_1360: &[ReducerParam] = &[
+const PARAMS_1362: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "bank_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdatePartnerBankParams") },
 ];
-const PARAMS_1361: &[ReducerParam] = &[
+const PARAMS_1363: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdatePaymentAccountParams") },
 ];
-const PARAMS_1362: &[ReducerParam] = &[
+const PARAMS_1364: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "term_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "name", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "note", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::OptionalBool, ref_target: None },
 ];
-const PARAMS_1363: &[ReducerParam] = &[
+const PARAMS_1365: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "value", kind: ScalarKind::Composite, ref_target: Some("PaymentTermValue") },
@@ -5986,26 +6006,26 @@ const PARAMS_1363: &[ReducerParam] = &[
     ReducerParam { name: "days_after_end_of_month", kind: ScalarKind::OptionalBool, ref_target: None },
     ReducerParam { name: "sequence", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
 ];
-const PARAMS_1364: &[ReducerParam] = &[
+const PARAMS_1366: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "transaction_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdatePaymentTransactionParams") },
 ];
-const PARAMS_1365: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-];
-const PARAMS_1366: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-];
 const PARAMS_1367: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1368: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1369: &[ReducerParam] = &[
     ReducerParam { name: "terminal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "daily_revenue", kind: ScalarKind::Float, ref_target: None },
     ReducerParam { name: "open_orders", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1368: &[ReducerParam] = &[
+const PARAMS_1370: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "pricelist_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "name", kind: ScalarKind::OptionalString, ref_target: None },
@@ -6013,401 +6033,401 @@ const PARAMS_1368: &[ReducerParam] = &[
     ReducerParam { name: "discount_policy", kind: ScalarKind::Composite, ref_target: Some("DiscountPolicy") },
     ReducerParam { name: "is_active", kind: ScalarKind::OptionalBool, ref_target: None },
 ];
-const PARAMS_1369: &[ReducerParam] = &[
+const PARAMS_1371: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "product_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductParams") },
 ];
-const PARAMS_1370: &[ReducerParam] = &[
+const PARAMS_1372: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "category_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductCategoryParams") },
 ];
-const PARAMS_1371: &[ReducerParam] = &[
+const PARAMS_1373: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "product_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductInventoryDataParams") },
 ];
-const PARAMS_1372: &[ReducerParam] = &[
+const PARAMS_1374: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "packaging_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductPackagingParams") },
 ];
-const PARAMS_1373: &[ReducerParam] = &[
+const PARAMS_1375: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "product_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductPricingParams") },
 ];
-const PARAMS_1374: &[ReducerParam] = &[
+const PARAMS_1376: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "supplier_info_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductSupplierInfoParams") },
 ];
-const PARAMS_1375: &[ReducerParam] = &[
+const PARAMS_1377: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "variant_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProductVariantParams") },
 ];
-const PARAMS_1376: &[ReducerParam] = &[
+const PARAMS_1378: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "project_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProjectParams") },
 ];
-const PARAMS_1377: &[ReducerParam] = &[
+const PARAMS_1379: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "milestone_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProjectMilestoneParams") },
 ];
-const PARAMS_1378: &[ReducerParam] = &[
+const PARAMS_1380: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rate_card_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProjectRateCardParams") },
 ];
-const PARAMS_1379: &[ReducerParam] = &[
+const PARAMS_1381: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProjectRateCardLineParams") },
 ];
-const PARAMS_1380: &[ReducerParam] = &[
+const PARAMS_1382: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProposalParams") },
 ];
-const PARAMS_1381: &[ReducerParam] = &[
+const PARAMS_1383: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_item_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProposalLineItemParams") },
 ];
-const PARAMS_1382: &[ReducerParam] = &[
+const PARAMS_1384: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "section_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "user_name", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1383: &[ReducerParam] = &[
+const PARAMS_1385: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "doc_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateProposalSourceDocParams") },
 ];
-const PARAMS_1384: &[ReducerParam] = &[
+const PARAMS_1386: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "status", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1385: &[ReducerParam] = &[
+const PARAMS_1387: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "holiday_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdatePublicHolidayParams") },
 ];
-const PARAMS_1386: &[ReducerParam] = &[
+const PARAMS_1388: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdatePurchaseOrderParams") },
 ];
-const PARAMS_1387: &[ReducerParam] = &[
+const PARAMS_1389: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdatePurchaseOrderLineParams") },
 ];
-const PARAMS_1388: &[ReducerParam] = &[
+const PARAMS_1390: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "reason_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateQualityAlertReasonParams") },
 ];
-const PARAMS_1389: &[ReducerParam] = &[
+const PARAMS_1391: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "point_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateQualityPointParams") },
 ];
-const PARAMS_1390: &[ReducerParam] = &[
+const PARAMS_1392: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "team_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateQualityTeamParams") },
 ];
-const PARAMS_1391: &[ReducerParam] = &[
+const PARAMS_1393: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "template_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateReportTemplateParams") },
 ];
-const PARAMS_1392: &[ReducerParam] = &[
+const PARAMS_1394: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "allocation_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateResourceAllocationParams") },
 ];
-const PARAMS_1393: &[ReducerParam] = &[
+const PARAMS_1395: &[ReducerParam] = &[
     ReducerParam { name: "role_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateRoleParams") },
 ];
-const PARAMS_1394: &[ReducerParam] = &[
+const PARAMS_1396: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSaleOrderParams") },
 ];
-const PARAMS_1395: &[ReducerParam] = &[
+const PARAMS_1397: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSaleOrderLineParams") },
 ];
-const PARAMS_1396: &[ReducerParam] = &[
+const PARAMS_1398: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "option_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSaleOrderOptionParams") },
 ];
-const PARAMS_1397: &[ReducerParam] = &[
+const PARAMS_1399: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "saved_report_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSavedReportParams") },
 ];
-const PARAMS_1398: &[ReducerParam] = &[
+const PARAMS_1400: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSodConflictRuleParams") },
 ];
-const PARAMS_1399: &[ReducerParam] = &[
+const PARAMS_1401: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "statutory_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStatutoryIdParams") },
 ];
-const PARAMS_1400: &[ReducerParam] = &[
+const PARAMS_1402: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "inventory_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "new_state", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1401: &[ReducerParam] = &[
+const PARAMS_1403: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "location_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockLocationParams") },
 ];
-const PARAMS_1402: &[ReducerParam] = &[
+const PARAMS_1404: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "picking_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockPickingParams") },
 ];
-const PARAMS_1403: &[ReducerParam] = &[
+const PARAMS_1405: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "lot_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockProductionLotParams") },
 ];
-const PARAMS_1404: &[ReducerParam] = &[
+const PARAMS_1406: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "serial_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockProductionSerialParams") },
 ];
-const PARAMS_1405: &[ReducerParam] = &[
+const PARAMS_1407: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "quant_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockQuantQuantityParams") },
 ];
-const PARAMS_1406: &[ReducerParam] = &[
+const PARAMS_1408: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "route_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockRouteParams") },
 ];
-const PARAMS_1407: &[ReducerParam] = &[
+const PARAMS_1409: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateStockRuleParams") },
 ];
-const PARAMS_1408: &[ReducerParam] = &[
+const PARAMS_1410: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "plan_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSubscriptionPlanParams") },
 ];
-const PARAMS_1409: &[ReducerParam] = &[
+const PARAMS_1411: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "intake_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateSupplierIntakeParams") },
 ];
-const PARAMS_1410: &[ReducerParam] = &[
+const PARAMS_1412: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "task_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateTaskParams") },
 ];
-const PARAMS_1411: &[ReducerParam] = &[
+const PARAMS_1413: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "task_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "state", kind: ScalarKind::Composite, ref_target: Some("TaskState") },
 ];
-const PARAMS_1412: &[ReducerParam] = &[
+const PARAMS_1414: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "deadline_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateTaxDeadlineParams") },
 ];
-const PARAMS_1413: &[ReducerParam] = &[
+const PARAMS_1415: &[ReducerParam] = &[
     ReducerParam { name: "job", kind: ScalarKind::Composite, ref_target: Some("TaxDeadlineStatusJob") },
 ];
-const PARAMS_1414: &[ReducerParam] = &[
+const PARAMS_1416: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "jurisdiction_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateTaxJurisdictionParams") },
 ];
-const PARAMS_1415: &[ReducerParam] = &[
+const PARAMS_1417: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "schedule_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateTaxScheduleParams") },
 ];
-const PARAMS_1416: &[ReducerParam] = &[
+const PARAMS_1418: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "ticket_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateTicketParams") },
 ];
-const PARAMS_1417: &[ReducerParam] = &[
+const PARAMS_1419: &[ReducerParam] = &[
     ReducerParam { name: "email", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "email_verified", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1418: &[ReducerParam] = &[
+const PARAMS_1420: &[ReducerParam] = &[
     ReducerParam { name: "user_org_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
     ReducerParam { name: "is_default", kind: ScalarKind::Bool, ref_target: None },
 ];
-const PARAMS_1419: &[ReducerParam] = &[
+const PARAMS_1421: &[ReducerParam] = &[
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateUserProfileParams") },
 ];
-const PARAMS_1420: &[ReducerParam] = &[
+const PARAMS_1422: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "campaign_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateUtmCampaignParams") },
 ];
-const PARAMS_1421: &[ReducerParam] = &[
+const PARAMS_1423: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "medium_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateUtmMediumParams") },
 ];
-const PARAMS_1422: &[ReducerParam] = &[
+const PARAMS_1424: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "source_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateUtmSourceParams") },
 ];
-const PARAMS_1423: &[ReducerParam] = &[
+const PARAMS_1425: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "vehicle_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateVehiclePositionParams") },
 ];
-const PARAMS_1424: &[ReducerParam] = &[
+const PARAMS_1426: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "warehouse_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWarehouseParams") },
 ];
-const PARAMS_1425: &[ReducerParam] = &[
+const PARAMS_1427: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "zone_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWarehouse3DZoneParams") },
 ];
-const PARAMS_1426: &[ReducerParam] = &[
+const PARAMS_1428: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "task_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "new_status", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1427: &[ReducerParam] = &[
+const PARAMS_1429: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWhatsAppBusinessAccountParams") },
 ];
-const PARAMS_1428: &[ReducerParam] = &[
+const PARAMS_1430: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWhatsAppCredentialsParams") },
 ];
-const PARAMS_1429: &[ReducerParam] = &[
+const PARAMS_1431: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "quality_score", kind: ScalarKind::String, ref_target: None },
 ];
-const PARAMS_1430: &[ReducerParam] = &[
+const PARAMS_1432: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWhatsAppVerificationParams") },
 ];
-const PARAMS_1431: &[ReducerParam] = &[
+const PARAMS_1433: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "widget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWidgetLayoutParams") },
 ];
-const PARAMS_1432: &[ReducerParam] = &[
+const PARAMS_1434: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workcenter_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWorkcenterParams") },
 ];
-const PARAMS_1433: &[ReducerParam] = &[
+const PARAMS_1435: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workflow_version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWorkflowDraftParams") },
 ];
-const PARAMS_1434: &[ReducerParam] = &[
+const PARAMS_1436: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "calendar_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateWorkingCalendarParams") },
 ];
-const PARAMS_1435: &[ReducerParam] = &[
+const PARAMS_1437: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertAiSkillParams") },
 ];
-const PARAMS_1436: &[ReducerParam] = &[
+const PARAMS_1438: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertAiSkillConfigParams") },
 ];
-const PARAMS_1437: &[ReducerParam] = &[
+const PARAMS_1439: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rate_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertExpenseMileageRateParams") },
 ];
-const PARAMS_1438: &[ReducerParam] = &[
+const PARAMS_1440: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "rate_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertExpensePerDiemRateParams") },
 ];
-const PARAMS_1439: &[ReducerParam] = &[
+const PARAMS_1441: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertExpensePolicyParams") },
 ];
-const PARAMS_1440: &[ReducerParam] = &[
+const PARAMS_1442: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertOrganizationSettingsParams") },
 ];
-const PARAMS_1441: &[ReducerParam] = &[
+const PARAMS_1443: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertPartnerCreditControlParams") },
 ];
-const PARAMS_1442: &[ReducerParam] = &[
+const PARAMS_1444: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "requirement_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertProposalComplianceRequirementParams") },
 ];
-const PARAMS_1443: &[ReducerParam] = &[
+const PARAMS_1445: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertProposalProcurementScoreParams") },
 ];
-const PARAMS_1444: &[ReducerParam] = &[
+const PARAMS_1446: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "proposal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6415,22 +6435,22 @@ const PARAMS_1444: &[ReducerParam] = &[
     ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertProposalSectionParams") },
 ];
-const PARAMS_1445: &[ReducerParam] = &[
+const PARAMS_1447: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertSearchEmbeddingParams") },
 ];
-const PARAMS_1446: &[ReducerParam] = &[
+const PARAMS_1448: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertSubscriptionPriceIndexParams") },
 ];
-const PARAMS_1447: &[ReducerParam] = &[
+const PARAMS_1449: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertVendorScorecardParams") },
 ];
-const PARAMS_1448: &[ReducerParam] = &[
+const PARAMS_1450: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "warehouse_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "latitude", kind: ScalarKind::Float, ref_target: None },
@@ -6440,73 +6460,73 @@ const PARAMS_1448: &[ReducerParam] = &[
     ReducerParam { name: "country_code", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "manager_name", kind: ScalarKind::OptionalString, ref_target: None },
 ];
-const PARAMS_1449: &[ReducerParam] = &[
+const PARAMS_1451: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workflow_version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertWorkflowEdgeParams") },
 ];
-const PARAMS_1450: &[ReducerParam] = &[
+const PARAMS_1452: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "workflow_version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpsertWorkflowNodeParams") },
 ];
-const PARAMS_1451: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "serial_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-];
-const PARAMS_1452: &[ReducerParam] = &[
-];
 const PARAMS_1453: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "budget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "serial_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1454: &[ReducerParam] = &[
 ];
 const PARAMS_1455: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "journal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "budget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_1456: &[ReducerParam] = &[
+];
+const PARAMS_1457: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "journal_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_1458: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "cycle_count_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1457: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "picking_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CompanyScopeParams") },
-];
-const PARAMS_1458: &[ReducerParam] = &[
-    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "picking_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
-    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CompanyScopeParams") },
-];
 const PARAMS_1459: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "picking_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CompanyScopeParams") },
+];
+const PARAMS_1460: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "picking_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CompanyScopeParams") },
+];
+const PARAMS_1461: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ValidateTimesheetsParams") },
 ];
-const PARAMS_1460: &[ReducerParam] = &[
+const PARAMS_1462: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "identity_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "requested_state", kind: ScalarKind::Composite, ref_target: Some("ContactVerificationState") },
 ];
-const PARAMS_1461: &[ReducerParam] = &[
+const PARAMS_1463: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "transaction_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1462: &[ReducerParam] = &[
+const PARAMS_1464: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "deadline_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
-const PARAMS_1463: &[ReducerParam] = &[
+const PARAMS_1465: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("WithdrawAiRunFollowUpParams") },
 ];
-const PARAMS_1464: &[ReducerParam] = &[
+const PARAMS_1466: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "worker_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
@@ -7572,411 +7592,413 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "run_inventory_warehouse_sync_test", contract_operation_id: "erp.run_inventory_warehouse_sync_test", params: PARAMS_1057, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_inventory_wave_release_test", contract_operation_id: "erp.run_inventory_wave_release_test", params: PARAMS_1058, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_iot_relational_integrity_test", contract_operation_id: "erp.run_iot_relational_integrity_test", params: PARAMS_1059, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_actual_cost_valuation_test", contract_operation_id: "erp.run_manufacturing_actual_cost_valuation_test", params: PARAMS_1060, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_bom_byproduct_output_exact_effect_test", contract_operation_id: "erp.run_manufacturing_bom_byproduct_output_exact_effect_test", params: PARAMS_1061, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_bom_routing_lifecycle_test", contract_operation_id: "erp.run_manufacturing_bom_routing_lifecycle_test", params: PARAMS_1062, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_bom_to_close_domain_lifecycle_test", contract_operation_id: "erp.run_manufacturing_bom_to_close_domain_lifecycle_test", params: PARAMS_1063, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_consume_materials_cross_org_component_test", contract_operation_id: "erp.run_manufacturing_consume_materials_cross_org_component_test", params: PARAMS_1064, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_consume_materials_exact_effect_test", contract_operation_id: "erp.run_manufacturing_consume_materials_exact_effect_test", params: PARAMS_1065, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_cost_configuration_scope_test", contract_operation_id: "erp.run_manufacturing_cost_configuration_scope_test", params: PARAMS_1066, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_finished_output_scrap_exact_effect_test", contract_operation_id: "erp.run_manufacturing_finished_output_scrap_exact_effect_test", params: PARAMS_1067, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_loss_category_create_test", contract_operation_id: "erp.run_manufacturing_loss_category_create_test", params: PARAMS_1068, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_loss_category_invalid_category_test", contract_operation_id: "erp.run_manufacturing_loss_category_invalid_category_test", params: PARAMS_1069, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_production_close_exact_effect_test", contract_operation_id: "erp.run_manufacturing_production_close_exact_effect_test", params: PARAMS_1070, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_productivity_relational_integrity_test", contract_operation_id: "erp.run_manufacturing_productivity_relational_integrity_test", params: PARAMS_1071, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_tracked_output_test", contract_operation_id: "erp.run_manufacturing_tracked_output_test", params: PARAMS_1072, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_workcenter_create_test", contract_operation_id: "erp.run_manufacturing_workcenter_create_test", params: PARAMS_1073, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_workcenter_cross_org_test", contract_operation_id: "erp.run_manufacturing_workcenter_cross_org_test", params: PARAMS_1074, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_workcenter_test", contract_operation_id: "erp.run_manufacturing_workcenter_test", params: PARAMS_1075, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_workorder_execution_exact_effect_test", contract_operation_id: "erp.run_manufacturing_workorder_execution_exact_effect_test", params: PARAMS_1076, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_workorder_quality_gate_test", contract_operation_id: "erp.run_manufacturing_workorder_quality_gate_test", params: PARAMS_1077, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_manufacturing_workorder_workcenter_integrity_test", contract_operation_id: "erp.run_manufacturing_workorder_workcenter_integrity_test", params: PARAMS_1078, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_owner_report_schedule", contract_operation_id: "erp.run_owner_report_schedule", params: PARAMS_1079, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_pos_order_finalize_test", contract_operation_id: "erp.run_pos_order_finalize_test", params: PARAMS_1080, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_presentation_draft_tests", contract_operation_id: "erp.run_presentation_draft_tests", params: PARAMS_1081, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_projects_wave_a_test", contract_operation_id: "erp.run_projects_wave_a_test", params: PARAMS_1082, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_projects_wave_c_test", contract_operation_id: "erp.run_projects_wave_c_test", params: PARAMS_1083, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_projects_wave_d_test", contract_operation_id: "erp.run_projects_wave_d_test", params: PARAMS_1084, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_projects_wave_e_test", contract_operation_id: "erp.run_projects_wave_e_test", params: PARAMS_1085, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_projects_wave_f_test", contract_operation_id: "erp.run_projects_wave_f_test", params: PARAMS_1086, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_proposals_convert_integrity_test", contract_operation_id: "erp.run_proposals_convert_integrity_test", params: PARAMS_1087, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_proposals_wave_a_test", contract_operation_id: "erp.run_proposals_wave_a_test", params: PARAMS_1088, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_proposals_wave_d_test", contract_operation_id: "erp.run_proposals_wave_d_test", params: PARAMS_1089, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_bill_balanced_test", contract_operation_id: "erp.run_purchasing_bill_balanced_test", params: PARAMS_1090, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_company_isolation_test", contract_operation_id: "erp.run_purchasing_company_isolation_test", params: PARAMS_1091, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_incoming_picking_test", contract_operation_id: "erp.run_purchasing_incoming_picking_test", params: PARAMS_1092, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_keyed_operations_test", contract_operation_id: "erp.run_purchasing_keyed_operations_test", params: PARAMS_1093, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_lot_receive_test", contract_operation_id: "erp.run_purchasing_lot_receive_test", params: PARAMS_1094, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_0_containment_test", contract_operation_id: "erp.run_purchasing_phase_0_containment_test", params: PARAMS_1095, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_0_fixture_test", contract_operation_id: "erp.run_purchasing_phase_0_fixture_test", params: PARAMS_1096, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_1_landed_costs_test", contract_operation_id: "erp.run_purchasing_phase_1_landed_costs_test", params: PARAMS_1097, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_1_purchase_orders_test", contract_operation_id: "erp.run_purchasing_phase_1_purchase_orders_test", params: PARAMS_1098, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_1_relational_integrity_test", contract_operation_id: "erp.run_purchasing_phase_1_relational_integrity_test", params: PARAMS_1099, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_1_returns_advanced_test", contract_operation_id: "erp.run_purchasing_phase_1_returns_advanced_test", params: PARAMS_1100, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_phase_2_blanket_release_test", contract_operation_id: "erp.run_purchasing_phase_2_blanket_release_test", params: PARAMS_1101, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_wave_c_smoke_test", contract_operation_id: "erp.run_purchasing_wave_c_smoke_test", params: PARAMS_1102, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_purchasing_wave_e_test", contract_operation_id: "erp.run_purchasing_wave_e_test", params: PARAMS_1103, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_queue_foundation_tests", contract_operation_id: "erp.run_queue_foundation_tests", params: PARAMS_1104, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_atp_shortfall_test", contract_operation_id: "erp.run_sales_atp_shortfall_test", params: PARAMS_1105, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_backorder_test", contract_operation_id: "erp.run_sales_backorder_test", params: PARAMS_1106, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_cancel_cross_org_rejected_test", contract_operation_id: "erp.run_sales_cancel_cross_org_rejected_test", params: PARAMS_1107, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_cancel_done_rejected_test", contract_operation_id: "erp.run_sales_cancel_done_rejected_test", params: PARAMS_1108, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_cancel_invoiced_rejected_test", contract_operation_id: "erp.run_sales_cancel_invoiced_rejected_test", params: PARAMS_1109, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_cancel_nonexistent_rejected_test", contract_operation_id: "erp.run_sales_cancel_nonexistent_rejected_test", params: PARAMS_1110, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_commission_accrue_test", contract_operation_id: "erp.run_sales_commission_accrue_test", params: PARAMS_1111, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_commission_clawback_test", contract_operation_id: "erp.run_sales_commission_clawback_test", params: PARAMS_1112, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_commission_settle_test", contract_operation_id: "erp.run_sales_commission_settle_test", params: PARAMS_1113, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_company_isolation_test", contract_operation_id: "erp.run_sales_company_isolation_test", params: PARAMS_1114, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_credit_hold_test", contract_operation_id: "erp.run_sales_credit_hold_test", params: PARAMS_1115, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_dropship_confirm_test", contract_operation_id: "erp.run_sales_dropship_confirm_test", params: PARAMS_1116, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_exchange_from_return_test", contract_operation_id: "erp.run_sales_exchange_from_return_test", params: PARAMS_1117, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_fiscal_remap_test", contract_operation_id: "erp.run_sales_fiscal_remap_test", params: PARAMS_1118, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_fx_fail_closed_test", contract_operation_id: "erp.run_sales_fx_fail_closed_test", params: PARAMS_1119, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_ghost_product_fail_closed_test", contract_operation_id: "erp.run_sales_ghost_product_fail_closed_test", params: PARAMS_1120, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_line_update_delete_test", contract_operation_id: "erp.run_sales_line_update_delete_test", params: PARAMS_1121, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_lock_blocks_update_test", contract_operation_id: "erp.run_sales_lock_blocks_update_test", params: PARAMS_1122, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_oms_extensions_test", contract_operation_id: "erp.run_sales_oms_extensions_test", params: PARAMS_1123, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_order_cancel_test", contract_operation_id: "erp.run_sales_order_cancel_test", params: PARAMS_1124, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_order_delivery_test", contract_operation_id: "erp.run_sales_order_delivery_test", params: PARAMS_1125, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_order_invoice_test", contract_operation_id: "erp.run_sales_order_invoice_test", params: PARAMS_1126, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_order_update_test", contract_operation_id: "erp.run_sales_order_update_test", params: PARAMS_1127, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_pricelist_apply_test", contract_operation_id: "erp.run_sales_pricelist_apply_test", params: PARAMS_1128, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_pricelist_company_scope_test", contract_operation_id: "erp.run_sales_pricelist_company_scope_test", params: PARAMS_1129, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_send_quotation_test", contract_operation_id: "erp.run_sales_send_quotation_test", params: PARAMS_1130, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_sales_sla_escalation", contract_operation_id: "erp.run_sales_sla_escalation", params: PARAMS_1131, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_scheduled_replenishment", contract_operation_id: "erp.run_scheduled_replenishment", params: PARAMS_1132, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_subscription_plan_test", contract_operation_id: "erp.run_subscription_plan_test", params: PARAMS_1133, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_subscriptions_wave_a_test", contract_operation_id: "erp.run_subscriptions_wave_a_test", params: PARAMS_1134, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_subscriptions_wave_b_test", contract_operation_id: "erp.run_subscriptions_wave_b_test", params: PARAMS_1135, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_subscriptions_wave_c_test", contract_operation_id: "erp.run_subscriptions_wave_c_test", params: PARAMS_1136, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_subscriptions_wave_d_test", contract_operation_id: "erp.run_subscriptions_wave_d_test", params: PARAMS_1137, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_subscriptions_wave_e_test", contract_operation_id: "erp.run_subscriptions_wave_e_test", params: PARAMS_1138, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_tenant_isolation_tests", contract_operation_id: "erp.run_tenant_isolation_tests", params: PARAMS_1139, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_traceability_report", contract_operation_id: "erp.run_traceability_report", params: PARAMS_1140, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_action_registry_tests", contract_operation_id: "erp.run_workflow_action_registry_tests", params: PARAMS_1141, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_authorization_tests", contract_operation_id: "erp.run_workflow_authorization_tests", params: PARAMS_1142, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_definition_test", contract_operation_id: "erp.run_workflow_definition_test", params: PARAMS_1143, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_delivery_tests", contract_operation_id: "erp.run_workflow_delivery_tests", params: PARAMS_1144, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_evaluator_simulation_tests", contract_operation_id: "erp.run_workflow_evaluator_simulation_tests", params: PARAMS_1145, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_human_task_tests", contract_operation_id: "erp.run_workflow_human_task_tests", params: PARAMS_1146, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_migration_tests", contract_operation_id: "erp.run_workflow_migration_tests", params: PARAMS_1147, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_provenance_tests", contract_operation_id: "erp.run_workflow_provenance_tests", params: PARAMS_1148, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_runtime_tests", contract_operation_id: "erp.run_workflow_runtime_tests", params: PARAMS_1149, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "run_workflow_subject_snapshot_tests", contract_operation_id: "erp.run_workflow_subject_snapshot_tests", params: PARAMS_1150, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "save_import_mapping_template", contract_operation_id: "erp.save_import_mapping_template", params: PARAMS_1151, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "save_presentation_module", contract_operation_id: "erp.save_presentation_module", params: PARAMS_1152, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "save_proposal_version", contract_operation_id: "erp.save_proposal_version", params: PARAMS_1153, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "schedule_document_retention_purge", contract_operation_id: "erp.schedule_document_retention_purge", params: PARAMS_1154, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "schedule_replenishment_run", contract_operation_id: "erp.schedule_replenishment_run", params: PARAMS_1155, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "schedule_sales_sla_escalation", contract_operation_id: "erp.schedule_sales_sla_escalation", params: PARAMS_1156, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "schedule_tax_deadline_updates", contract_operation_id: "erp.schedule_tax_deadline_updates", params: PARAMS_1157, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "scrap_finished_manufacturing_output", contract_operation_id: "erp.scrap_finished_manufacturing_output", params: PARAMS_1158, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "scrap_manufacturing_material", contract_operation_id: "erp.scrap_manufacturing_material", params: PARAMS_1159, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "scrap_tracked_manufacturing_output", contract_operation_id: "erp.scrap_tracked_manufacturing_output", params: PARAMS_1160, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "seed_dev_data", contract_operation_id: "erp.seed_dev_data", params: PARAMS_1161, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "seed_hr_country_pack_overlays", contract_operation_id: "erp.seed_hr_country_pack_overlays", params: PARAMS_1162, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "seed_organization_form_configs", contract_operation_id: "erp.seed_organization_form_configs", params: PARAMS_1163, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "seed_pack_holidays", contract_operation_id: "erp.seed_pack_holidays", params: PARAMS_1164, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "seed_statutory_expense_mileage_rates", contract_operation_id: "erp.seed_statutory_expense_mileage_rates", params: PARAMS_1165, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "send_purchase_order", contract_operation_id: "erp.send_purchase_order", params: PARAMS_1166, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "send_sale_order_quotation", contract_operation_id: "erp.send_sale_order_quotation", params: PARAMS_1167, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_agent_active", contract_operation_id: "erp.set_ai_agent_active", params: PARAMS_1168, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_agent_run_wait_state", contract_operation_id: "erp.set_ai_agent_run_wait_state", params: PARAMS_1169, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_ai_calibration_profile_active", contract_operation_id: "erp.set_ai_calibration_profile_active", params: PARAMS_1170, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_capability_role_grant", contract_operation_id: "erp.set_ai_capability_role_grant", params: PARAMS_1171, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_decision_case_outcome", contract_operation_id: "erp.set_ai_decision_case_outcome", params: PARAMS_1172, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_decision_case_status", contract_operation_id: "erp.set_ai_decision_case_status", params: PARAMS_1173, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_decision_case_verification", contract_operation_id: "erp.set_ai_decision_case_verification", params: PARAMS_1174, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_decision_pattern_status", contract_operation_id: "erp.set_ai_decision_pattern_status", params: PARAMS_1175, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_decision_type_active", contract_operation_id: "erp.set_ai_decision_type_active", params: PARAMS_1176, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_evidence_passage_status", contract_operation_id: "erp.set_ai_evidence_passage_status", params: PARAMS_1177, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_ai_intelligence_event_acceptance", contract_operation_id: "erp.set_ai_intelligence_event_acceptance", params: PARAMS_1178, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_intelligence_event_escalation", contract_operation_id: "erp.set_ai_intelligence_event_escalation", params: PARAMS_1179, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_intelligence_event_verification", contract_operation_id: "erp.set_ai_intelligence_event_verification", params: PARAMS_1180, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_intelligence_policy_active", contract_operation_id: "erp.set_ai_intelligence_policy_active", params: PARAMS_1181, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_knowledge_entry_version_state", contract_operation_id: "erp.set_ai_knowledge_entry_version_state", params: PARAMS_1182, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_ai_model_profile_active", contract_operation_id: "erp.set_ai_model_profile_active", params: PARAMS_1183, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_reducer_allowlist_enabled", contract_operation_id: "erp.set_ai_reducer_allowlist_enabled", params: PARAMS_1184, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_ai_skill_active", contract_operation_id: "erp.set_ai_skill_active", params: PARAMS_1185, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_analytic_account_active", contract_operation_id: "erp.set_analytic_account_active", params: PARAMS_1186, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_article_published", contract_operation_id: "erp.set_article_published", params: PARAMS_1187, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_asset_active", contract_operation_id: "erp.set_asset_active", params: PARAMS_1188, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_billing_status", contract_operation_id: "erp.set_billing_status", params: PARAMS_1189, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_bom_operations", contract_operation_id: "erp.set_bom_operations", params: PARAMS_1190, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_commodity_price_index", contract_operation_id: "erp.set_commodity_price_index", params: PARAMS_1191, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_company_country_pack", contract_operation_id: "erp.set_company_country_pack", params: PARAMS_1192, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_company_vertical_pack", contract_operation_id: "erp.set_company_vertical_pack", params: PARAMS_1193, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
-    ReducerContract { name: "set_consolidation_company_rate", contract_operation_id: "erp.set_consolidation_company_rate", params: PARAMS_1194, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_contact_communication_preference", contract_operation_id: "erp.set_contact_communication_preference", params: PARAMS_1195, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_contact_segment_rules", contract_operation_id: "erp.set_contact_segment_rules", params: PARAMS_1196, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_document_retention", contract_operation_id: "erp.set_document_retention", params: PARAMS_1197, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_expense_allocations", contract_operation_id: "erp.set_expense_allocations", params: PARAMS_1198, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_expense_fraud_hold", contract_operation_id: "erp.set_expense_fraud_hold", params: PARAMS_1199, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_form_field_label", contract_operation_id: "erp.set_form_field_label", params: PARAMS_1200, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_form_role_config", contract_operation_id: "erp.set_form_role_config", params: PARAMS_1201, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_google_drive_conflict_policy", contract_operation_id: "erp.set_google_drive_conflict_policy", params: PARAMS_1202, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_helpdesk_related_record", contract_operation_id: "erp.set_helpdesk_related_record", params: PARAMS_1203, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_intercompany_rule_active", contract_operation_id: "erp.set_intercompany_rule_active", params: PARAMS_1204, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_iot_threshold", contract_operation_id: "erp.set_iot_threshold", params: PARAMS_1205, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_member_access", contract_operation_id: "erp.set_member_access", params: PARAMS_1206, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_project_active", contract_operation_id: "erp.set_project_active", params: PARAMS_1207, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_purchase_approval_delegate", contract_operation_id: "erp.set_purchase_approval_delegate", params: PARAMS_1208, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_record_custom_field_values", contract_operation_id: "erp.set_record_custom_field_values", params: PARAMS_1209, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_subscription_commitment", contract_operation_id: "erp.set_subscription_commitment", params: PARAMS_1210, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_task_parent", contract_operation_id: "erp.set_task_parent", params: PARAMS_1211, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_vendor_risk_flag", contract_operation_id: "erp.set_vendor_risk_flag", params: PARAMS_1212, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_whatsapp_primary_account", contract_operation_id: "erp.set_whatsapp_primary_account", params: PARAMS_1213, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "set_workflow_candidate_group_member", contract_operation_id: "erp.set_workflow_candidate_group_member", params: PARAMS_1214, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "set_workflow_migration_plan_active", contract_operation_id: "erp.set_workflow_migration_plan_active", params: PARAMS_1215, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "settle_ai_spend", contract_operation_id: "erp.settle_ai_spend", params: PARAMS_1216, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "settle_sale_commissions", contract_operation_id: "erp.settle_sale_commissions", params: PARAMS_1217, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "setup_fiscal_calendar", contract_operation_id: "erp.setup_fiscal_calendar", params: PARAMS_1218, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "share_dashboard", contract_operation_id: "erp.share_dashboard", params: PARAMS_1219, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "signal_workflow", contract_operation_id: "erp.signal_workflow", params: PARAMS_1220, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "simulate_workflow", contract_operation_id: "erp.simulate_workflow", params: PARAMS_1221, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "solve_quality_alert", contract_operation_id: "erp.solve_quality_alert", params: PARAMS_1222, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "stage_ai_workflow_node_provenance", contract_operation_id: "erp.stage_ai_workflow_node_provenance", params: PARAMS_1223, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "stage_bank_statement_import", contract_operation_id: "erp.stage_bank_statement_import", params: PARAMS_1224, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "start_cycle_count_session", contract_operation_id: "erp.start_cycle_count_session", params: PARAMS_1225, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "start_manufacturing_order", contract_operation_id: "erp.start_manufacturing_order", params: PARAMS_1226, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "start_offboarding", contract_operation_id: "erp.start_offboarding", params: PARAMS_1227, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "start_picking_batch", contract_operation_id: "erp.start_picking_batch", params: PARAMS_1228, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "start_quality_check", contract_operation_id: "erp.start_quality_check", params: PARAMS_1229, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "start_timesheet_timer", contract_operation_id: "erp.start_timesheet_timer", params: PARAMS_1230, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "start_workflow", contract_operation_id: "erp.start_workflow", params: PARAMS_1231, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "start_workorder", contract_operation_id: "erp.start_workorder", params: PARAMS_1232, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "steer_ai_run", contract_operation_id: "erp.steer_ai_run", params: PARAMS_1233, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "stop_timesheet_timer", contract_operation_id: "erp.stop_timesheet_timer", params: PARAMS_1234, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "submit_expense", contract_operation_id: "erp.submit_expense", params: PARAMS_1235, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "submit_expense_sheet", contract_operation_id: "erp.submit_expense_sheet", params: PARAMS_1236, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "submit_leave", contract_operation_id: "erp.submit_leave", params: PARAMS_1237, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "submit_performance_review", contract_operation_id: "erp.submit_performance_review", params: PARAMS_1238, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "submit_purchase_requisition", contract_operation_id: "erp.submit_purchase_requisition", params: PARAMS_1239, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "submit_supplier_intake", contract_operation_id: "erp.submit_supplier_intake", params: PARAMS_1240, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "subscribe_to_record", contract_operation_id: "erp.subscribe_to_record", params: PARAMS_1241, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "sync_external_file_to_document", contract_operation_id: "erp.sync_external_file_to_document", params: PARAMS_1242, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "sync_hub_devices", contract_operation_id: "erp.sync_hub_devices", params: PARAMS_1243, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_bootstrap_new_tenant_records_complete_commit", contract_operation_id: "erp.test_bootstrap_new_tenant_records_complete_commit", params: PARAMS_1244, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_iot_device", contract_operation_id: "erp.test_iot_device", params: PARAMS_1245, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_pos_order_finalize_deletes_on_version_match", contract_operation_id: "erp.test_pos_order_finalize_deletes_on_version_match", params: PARAMS_1246, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_pos_order_finalize_is_idempotent_when_already_gone", contract_operation_id: "erp.test_pos_order_finalize_is_idempotent_when_already_gone", params: PARAMS_1247, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_pos_order_finalize_refuses_before_terminal_window", contract_operation_id: "erp.test_pos_order_finalize_refuses_before_terminal_window", params: PARAMS_1248, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch", contract_operation_id: "erp.test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch", params: PARAMS_1249, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_pos_order_finalize_refuses_on_version_mismatch", contract_operation_id: "erp.test_pos_order_finalize_refuses_on_version_mismatch", params: PARAMS_1250, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_pos_order_finalize_rejects_unregistered_caller", contract_operation_id: "erp.test_pos_order_finalize_rejects_unregistered_caller", params: PARAMS_1251, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_queue_job_edge_cases", contract_operation_id: "erp.test_queue_job_edge_cases", params: PARAMS_1252, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_queue_system", contract_operation_id: "erp.test_queue_system", params: PARAMS_1253, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "test_worker_edge_cases", contract_operation_id: "erp.test_worker_edge_cases", params: PARAMS_1254, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "toggle_project_favorite", contract_operation_id: "erp.toggle_project_favorite", params: PARAMS_1255, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unassign_team_member_skill", contract_operation_id: "erp.unassign_team_member_skill", params: PARAMS_1256, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unblock_workcenter", contract_operation_id: "erp.unblock_workcenter", params: PARAMS_1257, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unenroll_benefit_enrollment", contract_operation_id: "erp.unenroll_benefit_enrollment", params: PARAMS_1258, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "unlink_device", contract_operation_id: "erp.unlink_device", params: PARAMS_1259, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unlock_document", contract_operation_id: "erp.unlock_document", params: PARAMS_1260, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unlock_knowledge_article", contract_operation_id: "erp.unlock_knowledge_article", params: PARAMS_1261, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unlock_purchase_order", contract_operation_id: "erp.unlock_purchase_order", params: PARAMS_1262, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unlock_sale_order", contract_operation_id: "erp.unlock_sale_order", params: PARAMS_1263, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unmatch_elimination_entry", contract_operation_id: "erp.unmatch_elimination_entry", params: PARAMS_1264, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unmatch_expense_card_statement_line", contract_operation_id: "erp.unmatch_expense_card_statement_line", params: PARAMS_1265, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unreconciled_account_bank_statement_line", contract_operation_id: "erp.unreconciled_account_bank_statement_line", params: PARAMS_1266, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "unregister_payment_allocations", contract_operation_id: "erp.unregister_payment_allocations", params: PARAMS_1267, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unreserve_stock_picking", contract_operation_id: "erp.unreserve_stock_picking", params: PARAMS_1268, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unreserve_stock_quant", contract_operation_id: "erp.unreserve_stock_quant", params: PARAMS_1269, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "unsubscribe_from_record", contract_operation_id: "erp.unsubscribe_from_record", params: PARAMS_1270, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_account_account", contract_operation_id: "erp.update_account_account", params: PARAMS_1271, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_account_account_type", contract_operation_id: "erp.update_account_account_type", params: PARAMS_1272, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_account_asset", contract_operation_id: "erp.update_account_asset", params: PARAMS_1273, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_account_bank_statement", contract_operation_id: "erp.update_account_bank_statement", params: PARAMS_1274, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_account_bank_statement_line", contract_operation_id: "erp.update_account_bank_statement_line", params: PARAMS_1275, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_account_group", contract_operation_id: "erp.update_account_group", params: PARAMS_1276, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_account_journal", contract_operation_id: "erp.update_account_journal", params: PARAMS_1277, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_account_move_line", contract_operation_id: "erp.update_account_move_line", params: PARAMS_1278, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_account_period", contract_operation_id: "erp.update_account_period", params: PARAMS_1279, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_account_reconciliation_widget", contract_operation_id: "erp.update_account_reconciliation_widget", params: PARAMS_1280, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_account_tax", contract_operation_id: "erp.update_account_tax", params: PARAMS_1281, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_account_tax_group", contract_operation_id: "erp.update_account_tax_group", params: PARAMS_1282, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_ai_action_draft_params", contract_operation_id: "erp.update_ai_action_draft_params", params: PARAMS_1283, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_ai_agent", contract_operation_id: "erp.update_ai_agent", params: PARAMS_1284, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_ai_chat_session_title", contract_operation_id: "erp.update_ai_chat_session_title", params: PARAMS_1285, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_ai_reducer_allowlist", contract_operation_id: "erp.update_ai_reducer_allowlist", params: PARAMS_1286, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_analytic_account", contract_operation_id: "erp.update_analytic_account", params: PARAMS_1287, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_analytic_distribution_model", contract_operation_id: "erp.update_analytic_distribution_model", params: PARAMS_1288, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_analytic_line", contract_operation_id: "erp.update_analytic_line", params: PARAMS_1289, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_assignment_rule", contract_operation_id: "erp.update_assignment_rule", params: PARAMS_1290, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_audit_rule", contract_operation_id: "erp.update_audit_rule", params: PARAMS_1291, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
-    ReducerContract { name: "update_barcode_nomenclature", contract_operation_id: "erp.update_barcode_nomenclature", params: PARAMS_1292, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_barcode_rule", contract_operation_id: "erp.update_barcode_rule", params: PARAMS_1293, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_billing_account", contract_operation_id: "erp.update_billing_account", params: PARAMS_1294, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_bom", contract_operation_id: "erp.update_bom", params: PARAMS_1295, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_budget_line", contract_operation_id: "erp.update_budget_line", params: PARAMS_1296, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_budget_line_actuals", contract_operation_id: "erp.update_budget_line_actuals", params: PARAMS_1297, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_budget_post", contract_operation_id: "erp.update_budget_post", params: PARAMS_1298, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_calendar_event", contract_operation_id: "erp.update_calendar_event", params: PARAMS_1299, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_company", contract_operation_id: "erp.update_company", params: PARAMS_1300, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
-    ReducerContract { name: "update_company_address", contract_operation_id: "erp.update_company_address", params: PARAMS_1301, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
-    ReducerContract { name: "update_company_business", contract_operation_id: "erp.update_company_business", params: PARAMS_1302, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
-    ReducerContract { name: "update_company_hierarchy", contract_operation_id: "erp.update_company_hierarchy", params: PARAMS_1303, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
-    ReducerContract { name: "update_consolidation_account", contract_operation_id: "erp.update_consolidation_account", params: PARAMS_1304, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact", contract_operation_id: "erp.update_contact", params: PARAMS_1305, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact_address", contract_operation_id: "erp.update_contact_address", params: PARAMS_1306, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact_business", contract_operation_id: "erp.update_contact_business", params: PARAMS_1307, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact_category", contract_operation_id: "erp.update_contact_category", params: PARAMS_1308, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact_details", contract_operation_id: "erp.update_contact_details", params: PARAMS_1309, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact_identity", contract_operation_id: "erp.update_contact_identity", params: PARAMS_1310, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_contact_parent", contract_operation_id: "erp.update_contact_parent", params: PARAMS_1311, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_contract", contract_operation_id: "erp.update_contract", params: PARAMS_1312, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_crm_conversation", contract_operation_id: "erp.update_crm_conversation", params: PARAMS_1313, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_crossovered_budget", contract_operation_id: "erp.update_crossovered_budget", params: PARAMS_1314, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_department", contract_operation_id: "erp.update_department", params: PARAMS_1315, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_device_status", contract_operation_id: "erp.update_device_status", params: PARAMS_1316, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_document", contract_operation_id: "erp.update_document", params: PARAMS_1317, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_document_folder", contract_operation_id: "erp.update_document_folder", params: PARAMS_1318, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_document_presence", contract_operation_id: "erp.update_document_presence", params: PARAMS_1319, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_document_template", contract_operation_id: "erp.update_document_template", params: PARAMS_1320, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_employee", contract_operation_id: "erp.update_employee", params: PARAMS_1321, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_expense", contract_operation_id: "erp.update_expense", params: PARAMS_1322, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_financial_report", contract_operation_id: "erp.update_financial_report", params: PARAMS_1323, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_fiscal_year", contract_operation_id: "erp.update_fiscal_year", params: PARAMS_1324, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_fleet_vehicle", contract_operation_id: "erp.update_fleet_vehicle", params: PARAMS_1325, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_fleet_vehicle_details", contract_operation_id: "erp.update_fleet_vehicle_details", params: PARAMS_1326, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_form_field", contract_operation_id: "erp.update_form_field", params: PARAMS_1327, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_google_drive_connection", contract_operation_id: "erp.update_google_drive_connection", params: PARAMS_1328, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(1), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_google_drive_credentials", contract_operation_id: "erp.update_google_drive_credentials", params: PARAMS_1329, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(1), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_hr_applicant", contract_operation_id: "erp.update_hr_applicant", params: PARAMS_1330, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_hr_employee_skill", contract_operation_id: "erp.update_hr_employee_skill", params: PARAMS_1331, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_hr_global_assignment", contract_operation_id: "erp.update_hr_global_assignment", params: PARAMS_1332, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_hr_skill", contract_operation_id: "erp.update_hr_skill", params: PARAMS_1333, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_hub_heartbeat", contract_operation_id: "erp.update_hub_heartbeat", params: PARAMS_1334, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_integration_status", contract_operation_id: "erp.update_integration_status", params: PARAMS_1335, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_intercompany_rule", contract_operation_id: "erp.update_intercompany_rule", params: PARAMS_1336, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_job_position", contract_operation_id: "erp.update_job_position", params: PARAMS_1337, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_knowledge_article", contract_operation_id: "erp.update_knowledge_article", params: PARAMS_1338, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_knowledge_article_presence", contract_operation_id: "erp.update_knowledge_article_presence", params: PARAMS_1339, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_knowledge_category", contract_operation_id: "erp.update_knowledge_category", params: PARAMS_1340, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_landed_cost", contract_operation_id: "erp.update_landed_cost", params: PARAMS_1341, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_lead", contract_operation_id: "erp.update_lead", params: PARAMS_1342, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_lead_address", contract_operation_id: "erp.update_lead_address", params: PARAMS_1343, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_lead_details", contract_operation_id: "erp.update_lead_details", params: PARAMS_1344, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_lead_lost_reason", contract_operation_id: "erp.update_lead_lost_reason", params: PARAMS_1345, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_lead_revenue", contract_operation_id: "erp.update_lead_revenue", params: PARAMS_1346, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_lead_source", contract_operation_id: "erp.update_lead_source", params: PARAMS_1347, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_leave_type", contract_operation_id: "erp.update_leave_type", params: PARAMS_1348, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_mail_template", contract_operation_id: "erp.update_mail_template", params: PARAMS_1349, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_manufacturing_order", contract_operation_id: "erp.update_manufacturing_order", params: PARAMS_1350, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_message_template", contract_operation_id: "erp.update_message_template", params: PARAMS_1351, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_metric_values", contract_operation_id: "erp.update_metric_values", params: PARAMS_1352, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_opportunity", contract_operation_id: "erp.update_opportunity", params: PARAMS_1353, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_opportunity_presence", contract_operation_id: "erp.update_opportunity_presence", params: PARAMS_1354, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_opportunity_stage", contract_operation_id: "erp.update_opportunity_stage", params: PARAMS_1355, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_org_member_details", contract_operation_id: "erp.update_org_member_details", params: PARAMS_1356, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
-    ReducerContract { name: "update_org_member_role", contract_operation_id: "erp.update_org_member_role", params: PARAMS_1357, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
-    ReducerContract { name: "update_organization", contract_operation_id: "erp.update_organization", params: PARAMS_1358, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_owner_report_schedule", contract_operation_id: "erp.update_owner_report_schedule", params: PARAMS_1359, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_partner_bank", contract_operation_id: "erp.update_partner_bank", params: PARAMS_1360, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_payment_account", contract_operation_id: "erp.update_payment_account", params: PARAMS_1361, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_payment_term", contract_operation_id: "erp.update_payment_term", params: PARAMS_1362, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_payment_term_line", contract_operation_id: "erp.update_payment_term_line", params: PARAMS_1363, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_payment_transaction", contract_operation_id: "erp.update_payment_transaction", params: PARAMS_1364, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_po_invoice_status", contract_operation_id: "erp.update_po_invoice_status", params: PARAMS_1365, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_po_receipt_status", contract_operation_id: "erp.update_po_receipt_status", params: PARAMS_1366, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_pos_terminal", contract_operation_id: "erp.update_pos_terminal", params: PARAMS_1367, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
-    ReducerContract { name: "update_pricelist", contract_operation_id: "erp.update_pricelist", params: PARAMS_1368, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product", contract_operation_id: "erp.update_product", params: PARAMS_1369, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product_category", contract_operation_id: "erp.update_product_category", params: PARAMS_1370, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product_inventory_data", contract_operation_id: "erp.update_product_inventory_data", params: PARAMS_1371, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product_packaging", contract_operation_id: "erp.update_product_packaging", params: PARAMS_1372, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product_pricing", contract_operation_id: "erp.update_product_pricing", params: PARAMS_1373, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product_supplier_info", contract_operation_id: "erp.update_product_supplier_info", params: PARAMS_1374, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_product_variant", contract_operation_id: "erp.update_product_variant", params: PARAMS_1375, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_project", contract_operation_id: "erp.update_project", params: PARAMS_1376, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_project_milestone", contract_operation_id: "erp.update_project_milestone", params: PARAMS_1377, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_project_rate_card", contract_operation_id: "erp.update_project_rate_card", params: PARAMS_1378, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_project_rate_card_line", contract_operation_id: "erp.update_project_rate_card_line", params: PARAMS_1379, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_proposal", contract_operation_id: "erp.update_proposal", params: PARAMS_1380, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_proposal_line_item", contract_operation_id: "erp.update_proposal_line_item", params: PARAMS_1381, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_proposal_presence", contract_operation_id: "erp.update_proposal_presence", params: PARAMS_1382, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_proposal_source_doc", contract_operation_id: "erp.update_proposal_source_doc", params: PARAMS_1383, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_proposal_status", contract_operation_id: "erp.update_proposal_status", params: PARAMS_1384, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_public_holiday", contract_operation_id: "erp.update_public_holiday", params: PARAMS_1385, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_purchase_order", contract_operation_id: "erp.update_purchase_order", params: PARAMS_1386, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_purchase_order_line", contract_operation_id: "erp.update_purchase_order_line", params: PARAMS_1387, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_quality_alert_reason", contract_operation_id: "erp.update_quality_alert_reason", params: PARAMS_1388, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_quality_point", contract_operation_id: "erp.update_quality_point", params: PARAMS_1389, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_quality_team", contract_operation_id: "erp.update_quality_team", params: PARAMS_1390, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_report_template", contract_operation_id: "erp.update_report_template", params: PARAMS_1391, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_resource_allocation", contract_operation_id: "erp.update_resource_allocation", params: PARAMS_1392, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_role", contract_operation_id: "erp.update_role", params: PARAMS_1393, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
-    ReducerContract { name: "update_sale_order", contract_operation_id: "erp.update_sale_order", params: PARAMS_1394, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_sale_order_line", contract_operation_id: "erp.update_sale_order_line", params: PARAMS_1395, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_sale_order_option", contract_operation_id: "erp.update_sale_order_option", params: PARAMS_1396, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_saved_report", contract_operation_id: "erp.update_saved_report", params: PARAMS_1397, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_sod_conflict_rule", contract_operation_id: "erp.update_sod_conflict_rule", params: PARAMS_1398, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_statutory_id", contract_operation_id: "erp.update_statutory_id", params: PARAMS_1399, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_stock_inventory_state", contract_operation_id: "erp.update_stock_inventory_state", params: PARAMS_1400, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_location", contract_operation_id: "erp.update_stock_location", params: PARAMS_1401, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_picking", contract_operation_id: "erp.update_stock_picking", params: PARAMS_1402, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_production_lot", contract_operation_id: "erp.update_stock_production_lot", params: PARAMS_1403, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_production_serial", contract_operation_id: "erp.update_stock_production_serial", params: PARAMS_1404, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_quant_quantity", contract_operation_id: "erp.update_stock_quant_quantity", params: PARAMS_1405, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_route", contract_operation_id: "erp.update_stock_route", params: PARAMS_1406, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_stock_rule", contract_operation_id: "erp.update_stock_rule", params: PARAMS_1407, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_subscription_plan", contract_operation_id: "erp.update_subscription_plan", params: PARAMS_1408, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_supplier_intake", contract_operation_id: "erp.update_supplier_intake", params: PARAMS_1409, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_task", contract_operation_id: "erp.update_task", params: PARAMS_1410, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_task_state", contract_operation_id: "erp.update_task_state", params: PARAMS_1411, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_tax_deadline", contract_operation_id: "erp.update_tax_deadline", params: PARAMS_1412, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_tax_deadlines", contract_operation_id: "erp.update_tax_deadlines", params: PARAMS_1413, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_tax_jurisdiction", contract_operation_id: "erp.update_tax_jurisdiction", params: PARAMS_1414, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_tax_schedule", contract_operation_id: "erp.update_tax_schedule", params: PARAMS_1415, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_ticket", contract_operation_id: "erp.update_ticket", params: PARAMS_1416, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_user_email", contract_operation_id: "erp.update_user_email", params: PARAMS_1417, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_user_organization_status", contract_operation_id: "erp.update_user_organization_status", params: PARAMS_1418, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
-    ReducerContract { name: "update_user_profile", contract_operation_id: "erp.update_user_profile", params: PARAMS_1419, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_utm_campaign", contract_operation_id: "erp.update_utm_campaign", params: PARAMS_1420, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_utm_medium", contract_operation_id: "erp.update_utm_medium", params: PARAMS_1421, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_utm_source", contract_operation_id: "erp.update_utm_source", params: PARAMS_1422, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_vehicle_position", contract_operation_id: "erp.update_vehicle_position", params: PARAMS_1423, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_warehouse", contract_operation_id: "erp.update_warehouse", params: PARAMS_1424, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_warehouse_3_d_zone", contract_operation_id: "erp.update_warehouse_3_d_zone", params: PARAMS_1425, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_warehouse_task_status", contract_operation_id: "erp.update_warehouse_task_status", params: PARAMS_1426, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_whatsapp_business_account", contract_operation_id: "erp.update_whatsapp_business_account", params: PARAMS_1427, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_whatsapp_credentials", contract_operation_id: "erp.update_whatsapp_credentials", params: PARAMS_1428, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_whatsapp_quality_score", contract_operation_id: "erp.update_whatsapp_quality_score", params: PARAMS_1429, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_whatsapp_verification_status", contract_operation_id: "erp.update_whatsapp_verification_status", params: PARAMS_1430, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_widget_layout", contract_operation_id: "erp.update_widget_layout", params: PARAMS_1431, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "update_workcenter", contract_operation_id: "erp.update_workcenter", params: PARAMS_1432, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_workflow_draft", contract_operation_id: "erp.update_workflow_draft", params: PARAMS_1433, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_working_calendar", contract_operation_id: "erp.update_working_calendar", params: PARAMS_1434, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_ai_skill", contract_operation_id: "erp.upsert_ai_skill", params: PARAMS_1435, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_ai_skill_config", contract_operation_id: "erp.upsert_ai_skill_config", params: PARAMS_1436, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_expense_mileage_rate", contract_operation_id: "erp.upsert_expense_mileage_rate", params: PARAMS_1437, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_expense_per_diem_rate", contract_operation_id: "erp.upsert_expense_per_diem_rate", params: PARAMS_1438, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_expense_policy", contract_operation_id: "erp.upsert_expense_policy", params: PARAMS_1439, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_organization_settings", contract_operation_id: "erp.upsert_organization_settings", params: PARAMS_1440, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_partner_credit_control", contract_operation_id: "erp.upsert_partner_credit_control", params: PARAMS_1441, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_proposal_compliance_requirement", contract_operation_id: "erp.upsert_proposal_compliance_requirement", params: PARAMS_1442, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_proposal_procurement_score", contract_operation_id: "erp.upsert_proposal_procurement_score", params: PARAMS_1443, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_proposal_section", contract_operation_id: "erp.upsert_proposal_section", params: PARAMS_1444, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_search_embedding", contract_operation_id: "erp.upsert_search_embedding", params: PARAMS_1445, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_subscription_price_index", contract_operation_id: "erp.upsert_subscription_price_index", params: PARAMS_1446, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_vendor_scorecard", contract_operation_id: "erp.upsert_vendor_scorecard", params: PARAMS_1447, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "upsert_warehouse_geo", contract_operation_id: "erp.upsert_warehouse_geo", params: PARAMS_1448, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_workflow_edge", contract_operation_id: "erp.upsert_workflow_edge", params: PARAMS_1449, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "upsert_workflow_node", contract_operation_id: "erp.upsert_workflow_node", params: PARAMS_1450, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "use_serial", contract_operation_id: "erp.use_serial", params: PARAMS_1451, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_accounting_ownership_backfill", contract_operation_id: "erp.validate_accounting_ownership_backfill", params: PARAMS_1452, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_budget", contract_operation_id: "erp.validate_budget", params: PARAMS_1453, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_c_0_organization_ownership_backfill", contract_operation_id: "erp.validate_c0_organization_ownership_backfill", params: PARAMS_1454, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_consolidation", contract_operation_id: "erp.validate_consolidation", params: PARAMS_1455, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_cycle_count", contract_operation_id: "erp.validate_cycle_count", params: PARAMS_1456, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "validate_stock_picking", contract_operation_id: "erp.validate_stock_picking", params: PARAMS_1457, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_stock_picking_backorder", contract_operation_id: "erp.validate_stock_picking_backorder", params: PARAMS_1458, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "validate_timesheets", contract_operation_id: "erp.validate_timesheets", params: PARAMS_1459, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "verify_contact_identity", contract_operation_id: "erp.verify_contact_identity", params: PARAMS_1460, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "void_payment_transaction", contract_operation_id: "erp.void_payment_transaction", params: PARAMS_1461, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "waive_tax_deadline", contract_operation_id: "erp.waive_tax_deadline", params: PARAMS_1462, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "withdraw_ai_run_follow_up", contract_operation_id: "erp.withdraw_ai_run_follow_up", params: PARAMS_1463, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
-    ReducerContract { name: "worker_heartbeat", contract_operation_id: "erp.worker_heartbeat", params: PARAMS_1464, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_knowledge_guide_tests", contract_operation_id: "erp.run_knowledge_guide_tests", params: PARAMS_1060, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_actual_cost_valuation_test", contract_operation_id: "erp.run_manufacturing_actual_cost_valuation_test", params: PARAMS_1061, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_bom_byproduct_output_exact_effect_test", contract_operation_id: "erp.run_manufacturing_bom_byproduct_output_exact_effect_test", params: PARAMS_1062, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_bom_routing_lifecycle_test", contract_operation_id: "erp.run_manufacturing_bom_routing_lifecycle_test", params: PARAMS_1063, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_bom_to_close_domain_lifecycle_test", contract_operation_id: "erp.run_manufacturing_bom_to_close_domain_lifecycle_test", params: PARAMS_1064, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_consume_materials_cross_org_component_test", contract_operation_id: "erp.run_manufacturing_consume_materials_cross_org_component_test", params: PARAMS_1065, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_consume_materials_exact_effect_test", contract_operation_id: "erp.run_manufacturing_consume_materials_exact_effect_test", params: PARAMS_1066, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_cost_configuration_scope_test", contract_operation_id: "erp.run_manufacturing_cost_configuration_scope_test", params: PARAMS_1067, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_finished_output_scrap_exact_effect_test", contract_operation_id: "erp.run_manufacturing_finished_output_scrap_exact_effect_test", params: PARAMS_1068, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_loss_category_create_test", contract_operation_id: "erp.run_manufacturing_loss_category_create_test", params: PARAMS_1069, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_loss_category_invalid_category_test", contract_operation_id: "erp.run_manufacturing_loss_category_invalid_category_test", params: PARAMS_1070, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_production_close_exact_effect_test", contract_operation_id: "erp.run_manufacturing_production_close_exact_effect_test", params: PARAMS_1071, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_productivity_relational_integrity_test", contract_operation_id: "erp.run_manufacturing_productivity_relational_integrity_test", params: PARAMS_1072, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_tracked_output_test", contract_operation_id: "erp.run_manufacturing_tracked_output_test", params: PARAMS_1073, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_workcenter_create_test", contract_operation_id: "erp.run_manufacturing_workcenter_create_test", params: PARAMS_1074, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_workcenter_cross_org_test", contract_operation_id: "erp.run_manufacturing_workcenter_cross_org_test", params: PARAMS_1075, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_workcenter_test", contract_operation_id: "erp.run_manufacturing_workcenter_test", params: PARAMS_1076, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_workorder_execution_exact_effect_test", contract_operation_id: "erp.run_manufacturing_workorder_execution_exact_effect_test", params: PARAMS_1077, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_workorder_quality_gate_test", contract_operation_id: "erp.run_manufacturing_workorder_quality_gate_test", params: PARAMS_1078, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_manufacturing_workorder_workcenter_integrity_test", contract_operation_id: "erp.run_manufacturing_workorder_workcenter_integrity_test", params: PARAMS_1079, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_owner_report_schedule", contract_operation_id: "erp.run_owner_report_schedule", params: PARAMS_1080, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_pos_order_finalize_test", contract_operation_id: "erp.run_pos_order_finalize_test", params: PARAMS_1081, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_presentation_draft_tests", contract_operation_id: "erp.run_presentation_draft_tests", params: PARAMS_1082, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_projects_wave_a_test", contract_operation_id: "erp.run_projects_wave_a_test", params: PARAMS_1083, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_projects_wave_c_test", contract_operation_id: "erp.run_projects_wave_c_test", params: PARAMS_1084, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_projects_wave_d_test", contract_operation_id: "erp.run_projects_wave_d_test", params: PARAMS_1085, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_projects_wave_e_test", contract_operation_id: "erp.run_projects_wave_e_test", params: PARAMS_1086, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_projects_wave_f_test", contract_operation_id: "erp.run_projects_wave_f_test", params: PARAMS_1087, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_proposals_convert_integrity_test", contract_operation_id: "erp.run_proposals_convert_integrity_test", params: PARAMS_1088, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_proposals_wave_a_test", contract_operation_id: "erp.run_proposals_wave_a_test", params: PARAMS_1089, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_proposals_wave_d_test", contract_operation_id: "erp.run_proposals_wave_d_test", params: PARAMS_1090, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_bill_balanced_test", contract_operation_id: "erp.run_purchasing_bill_balanced_test", params: PARAMS_1091, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_company_isolation_test", contract_operation_id: "erp.run_purchasing_company_isolation_test", params: PARAMS_1092, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_incoming_picking_test", contract_operation_id: "erp.run_purchasing_incoming_picking_test", params: PARAMS_1093, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_keyed_operations_test", contract_operation_id: "erp.run_purchasing_keyed_operations_test", params: PARAMS_1094, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_lot_receive_test", contract_operation_id: "erp.run_purchasing_lot_receive_test", params: PARAMS_1095, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_0_containment_test", contract_operation_id: "erp.run_purchasing_phase_0_containment_test", params: PARAMS_1096, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_0_fixture_test", contract_operation_id: "erp.run_purchasing_phase_0_fixture_test", params: PARAMS_1097, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_1_landed_costs_test", contract_operation_id: "erp.run_purchasing_phase_1_landed_costs_test", params: PARAMS_1098, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_1_purchase_orders_test", contract_operation_id: "erp.run_purchasing_phase_1_purchase_orders_test", params: PARAMS_1099, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_1_relational_integrity_test", contract_operation_id: "erp.run_purchasing_phase_1_relational_integrity_test", params: PARAMS_1100, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_1_returns_advanced_test", contract_operation_id: "erp.run_purchasing_phase_1_returns_advanced_test", params: PARAMS_1101, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_phase_2_blanket_release_test", contract_operation_id: "erp.run_purchasing_phase_2_blanket_release_test", params: PARAMS_1102, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_wave_c_smoke_test", contract_operation_id: "erp.run_purchasing_wave_c_smoke_test", params: PARAMS_1103, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_purchasing_wave_e_test", contract_operation_id: "erp.run_purchasing_wave_e_test", params: PARAMS_1104, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_queue_foundation_tests", contract_operation_id: "erp.run_queue_foundation_tests", params: PARAMS_1105, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_atp_shortfall_test", contract_operation_id: "erp.run_sales_atp_shortfall_test", params: PARAMS_1106, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_backorder_test", contract_operation_id: "erp.run_sales_backorder_test", params: PARAMS_1107, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_cancel_cross_org_rejected_test", contract_operation_id: "erp.run_sales_cancel_cross_org_rejected_test", params: PARAMS_1108, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_cancel_done_rejected_test", contract_operation_id: "erp.run_sales_cancel_done_rejected_test", params: PARAMS_1109, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_cancel_invoiced_rejected_test", contract_operation_id: "erp.run_sales_cancel_invoiced_rejected_test", params: PARAMS_1110, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_cancel_nonexistent_rejected_test", contract_operation_id: "erp.run_sales_cancel_nonexistent_rejected_test", params: PARAMS_1111, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_commission_accrue_test", contract_operation_id: "erp.run_sales_commission_accrue_test", params: PARAMS_1112, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_commission_clawback_test", contract_operation_id: "erp.run_sales_commission_clawback_test", params: PARAMS_1113, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_commission_settle_test", contract_operation_id: "erp.run_sales_commission_settle_test", params: PARAMS_1114, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_company_isolation_test", contract_operation_id: "erp.run_sales_company_isolation_test", params: PARAMS_1115, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_credit_hold_test", contract_operation_id: "erp.run_sales_credit_hold_test", params: PARAMS_1116, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_dropship_confirm_test", contract_operation_id: "erp.run_sales_dropship_confirm_test", params: PARAMS_1117, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_exchange_from_return_test", contract_operation_id: "erp.run_sales_exchange_from_return_test", params: PARAMS_1118, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_fiscal_remap_test", contract_operation_id: "erp.run_sales_fiscal_remap_test", params: PARAMS_1119, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_fx_fail_closed_test", contract_operation_id: "erp.run_sales_fx_fail_closed_test", params: PARAMS_1120, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_ghost_product_fail_closed_test", contract_operation_id: "erp.run_sales_ghost_product_fail_closed_test", params: PARAMS_1121, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_line_update_delete_test", contract_operation_id: "erp.run_sales_line_update_delete_test", params: PARAMS_1122, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_lock_blocks_update_test", contract_operation_id: "erp.run_sales_lock_blocks_update_test", params: PARAMS_1123, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_oms_extensions_test", contract_operation_id: "erp.run_sales_oms_extensions_test", params: PARAMS_1124, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_order_cancel_test", contract_operation_id: "erp.run_sales_order_cancel_test", params: PARAMS_1125, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_order_delivery_test", contract_operation_id: "erp.run_sales_order_delivery_test", params: PARAMS_1126, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_order_invoice_test", contract_operation_id: "erp.run_sales_order_invoice_test", params: PARAMS_1127, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_order_update_test", contract_operation_id: "erp.run_sales_order_update_test", params: PARAMS_1128, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_pricelist_apply_test", contract_operation_id: "erp.run_sales_pricelist_apply_test", params: PARAMS_1129, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_pricelist_company_scope_test", contract_operation_id: "erp.run_sales_pricelist_company_scope_test", params: PARAMS_1130, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_send_quotation_test", contract_operation_id: "erp.run_sales_send_quotation_test", params: PARAMS_1131, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_sales_sla_escalation", contract_operation_id: "erp.run_sales_sla_escalation", params: PARAMS_1132, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_scheduled_replenishment", contract_operation_id: "erp.run_scheduled_replenishment", params: PARAMS_1133, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_subscription_plan_test", contract_operation_id: "erp.run_subscription_plan_test", params: PARAMS_1134, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_subscriptions_wave_a_test", contract_operation_id: "erp.run_subscriptions_wave_a_test", params: PARAMS_1135, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_subscriptions_wave_b_test", contract_operation_id: "erp.run_subscriptions_wave_b_test", params: PARAMS_1136, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_subscriptions_wave_c_test", contract_operation_id: "erp.run_subscriptions_wave_c_test", params: PARAMS_1137, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_subscriptions_wave_d_test", contract_operation_id: "erp.run_subscriptions_wave_d_test", params: PARAMS_1138, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_subscriptions_wave_e_test", contract_operation_id: "erp.run_subscriptions_wave_e_test", params: PARAMS_1139, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_tenant_isolation_tests", contract_operation_id: "erp.run_tenant_isolation_tests", params: PARAMS_1140, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_traceability_report", contract_operation_id: "erp.run_traceability_report", params: PARAMS_1141, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_action_registry_tests", contract_operation_id: "erp.run_workflow_action_registry_tests", params: PARAMS_1142, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_authorization_tests", contract_operation_id: "erp.run_workflow_authorization_tests", params: PARAMS_1143, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_definition_test", contract_operation_id: "erp.run_workflow_definition_test", params: PARAMS_1144, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_delivery_tests", contract_operation_id: "erp.run_workflow_delivery_tests", params: PARAMS_1145, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_evaluator_simulation_tests", contract_operation_id: "erp.run_workflow_evaluator_simulation_tests", params: PARAMS_1146, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_human_task_tests", contract_operation_id: "erp.run_workflow_human_task_tests", params: PARAMS_1147, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_migration_tests", contract_operation_id: "erp.run_workflow_migration_tests", params: PARAMS_1148, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_provenance_tests", contract_operation_id: "erp.run_workflow_provenance_tests", params: PARAMS_1149, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_runtime_tests", contract_operation_id: "erp.run_workflow_runtime_tests", params: PARAMS_1150, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_workflow_subject_snapshot_tests", contract_operation_id: "erp.run_workflow_subject_snapshot_tests", params: PARAMS_1151, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "save_import_mapping_template", contract_operation_id: "erp.save_import_mapping_template", params: PARAMS_1152, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "save_knowledge_guide", contract_operation_id: "erp.save_knowledge_guide", params: PARAMS_1153, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "save_presentation_module", contract_operation_id: "erp.save_presentation_module", params: PARAMS_1154, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "save_proposal_version", contract_operation_id: "erp.save_proposal_version", params: PARAMS_1155, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "schedule_document_retention_purge", contract_operation_id: "erp.schedule_document_retention_purge", params: PARAMS_1156, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "schedule_replenishment_run", contract_operation_id: "erp.schedule_replenishment_run", params: PARAMS_1157, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "schedule_sales_sla_escalation", contract_operation_id: "erp.schedule_sales_sla_escalation", params: PARAMS_1158, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "schedule_tax_deadline_updates", contract_operation_id: "erp.schedule_tax_deadline_updates", params: PARAMS_1159, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "scrap_finished_manufacturing_output", contract_operation_id: "erp.scrap_finished_manufacturing_output", params: PARAMS_1160, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "scrap_manufacturing_material", contract_operation_id: "erp.scrap_manufacturing_material", params: PARAMS_1161, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "scrap_tracked_manufacturing_output", contract_operation_id: "erp.scrap_tracked_manufacturing_output", params: PARAMS_1162, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "seed_dev_data", contract_operation_id: "erp.seed_dev_data", params: PARAMS_1163, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "seed_hr_country_pack_overlays", contract_operation_id: "erp.seed_hr_country_pack_overlays", params: PARAMS_1164, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "seed_organization_form_configs", contract_operation_id: "erp.seed_organization_form_configs", params: PARAMS_1165, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "seed_pack_holidays", contract_operation_id: "erp.seed_pack_holidays", params: PARAMS_1166, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "seed_statutory_expense_mileage_rates", contract_operation_id: "erp.seed_statutory_expense_mileage_rates", params: PARAMS_1167, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "send_purchase_order", contract_operation_id: "erp.send_purchase_order", params: PARAMS_1168, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "send_sale_order_quotation", contract_operation_id: "erp.send_sale_order_quotation", params: PARAMS_1169, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_agent_active", contract_operation_id: "erp.set_ai_agent_active", params: PARAMS_1170, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_agent_run_wait_state", contract_operation_id: "erp.set_ai_agent_run_wait_state", params: PARAMS_1171, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_ai_calibration_profile_active", contract_operation_id: "erp.set_ai_calibration_profile_active", params: PARAMS_1172, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_capability_role_grant", contract_operation_id: "erp.set_ai_capability_role_grant", params: PARAMS_1173, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_decision_case_outcome", contract_operation_id: "erp.set_ai_decision_case_outcome", params: PARAMS_1174, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_decision_case_status", contract_operation_id: "erp.set_ai_decision_case_status", params: PARAMS_1175, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_decision_case_verification", contract_operation_id: "erp.set_ai_decision_case_verification", params: PARAMS_1176, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_decision_pattern_status", contract_operation_id: "erp.set_ai_decision_pattern_status", params: PARAMS_1177, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_decision_type_active", contract_operation_id: "erp.set_ai_decision_type_active", params: PARAMS_1178, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_evidence_passage_status", contract_operation_id: "erp.set_ai_evidence_passage_status", params: PARAMS_1179, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_ai_intelligence_event_acceptance", contract_operation_id: "erp.set_ai_intelligence_event_acceptance", params: PARAMS_1180, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_intelligence_event_escalation", contract_operation_id: "erp.set_ai_intelligence_event_escalation", params: PARAMS_1181, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_intelligence_event_verification", contract_operation_id: "erp.set_ai_intelligence_event_verification", params: PARAMS_1182, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_intelligence_policy_active", contract_operation_id: "erp.set_ai_intelligence_policy_active", params: PARAMS_1183, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_knowledge_entry_version_state", contract_operation_id: "erp.set_ai_knowledge_entry_version_state", params: PARAMS_1184, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_ai_model_profile_active", contract_operation_id: "erp.set_ai_model_profile_active", params: PARAMS_1185, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_reducer_allowlist_enabled", contract_operation_id: "erp.set_ai_reducer_allowlist_enabled", params: PARAMS_1186, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_skill_active", contract_operation_id: "erp.set_ai_skill_active", params: PARAMS_1187, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_analytic_account_active", contract_operation_id: "erp.set_analytic_account_active", params: PARAMS_1188, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_article_published", contract_operation_id: "erp.set_article_published", params: PARAMS_1189, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_asset_active", contract_operation_id: "erp.set_asset_active", params: PARAMS_1190, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_billing_status", contract_operation_id: "erp.set_billing_status", params: PARAMS_1191, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_bom_operations", contract_operation_id: "erp.set_bom_operations", params: PARAMS_1192, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_commodity_price_index", contract_operation_id: "erp.set_commodity_price_index", params: PARAMS_1193, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_company_country_pack", contract_operation_id: "erp.set_company_country_pack", params: PARAMS_1194, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_company_vertical_pack", contract_operation_id: "erp.set_company_vertical_pack", params: PARAMS_1195, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
+    ReducerContract { name: "set_consolidation_company_rate", contract_operation_id: "erp.set_consolidation_company_rate", params: PARAMS_1196, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_contact_communication_preference", contract_operation_id: "erp.set_contact_communication_preference", params: PARAMS_1197, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_contact_segment_rules", contract_operation_id: "erp.set_contact_segment_rules", params: PARAMS_1198, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_document_retention", contract_operation_id: "erp.set_document_retention", params: PARAMS_1199, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_expense_allocations", contract_operation_id: "erp.set_expense_allocations", params: PARAMS_1200, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_expense_fraud_hold", contract_operation_id: "erp.set_expense_fraud_hold", params: PARAMS_1201, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_form_field_label", contract_operation_id: "erp.set_form_field_label", params: PARAMS_1202, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_form_role_config", contract_operation_id: "erp.set_form_role_config", params: PARAMS_1203, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_google_drive_conflict_policy", contract_operation_id: "erp.set_google_drive_conflict_policy", params: PARAMS_1204, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_helpdesk_related_record", contract_operation_id: "erp.set_helpdesk_related_record", params: PARAMS_1205, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_intercompany_rule_active", contract_operation_id: "erp.set_intercompany_rule_active", params: PARAMS_1206, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_iot_threshold", contract_operation_id: "erp.set_iot_threshold", params: PARAMS_1207, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_member_access", contract_operation_id: "erp.set_member_access", params: PARAMS_1208, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_project_active", contract_operation_id: "erp.set_project_active", params: PARAMS_1209, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_purchase_approval_delegate", contract_operation_id: "erp.set_purchase_approval_delegate", params: PARAMS_1210, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_record_custom_field_values", contract_operation_id: "erp.set_record_custom_field_values", params: PARAMS_1211, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_subscription_commitment", contract_operation_id: "erp.set_subscription_commitment", params: PARAMS_1212, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_task_parent", contract_operation_id: "erp.set_task_parent", params: PARAMS_1213, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_vendor_risk_flag", contract_operation_id: "erp.set_vendor_risk_flag", params: PARAMS_1214, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_whatsapp_primary_account", contract_operation_id: "erp.set_whatsapp_primary_account", params: PARAMS_1215, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_workflow_candidate_group_member", contract_operation_id: "erp.set_workflow_candidate_group_member", params: PARAMS_1216, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "set_workflow_migration_plan_active", contract_operation_id: "erp.set_workflow_migration_plan_active", params: PARAMS_1217, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "settle_ai_spend", contract_operation_id: "erp.settle_ai_spend", params: PARAMS_1218, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "settle_sale_commissions", contract_operation_id: "erp.settle_sale_commissions", params: PARAMS_1219, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "setup_fiscal_calendar", contract_operation_id: "erp.setup_fiscal_calendar", params: PARAMS_1220, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "share_dashboard", contract_operation_id: "erp.share_dashboard", params: PARAMS_1221, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "signal_workflow", contract_operation_id: "erp.signal_workflow", params: PARAMS_1222, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "simulate_workflow", contract_operation_id: "erp.simulate_workflow", params: PARAMS_1223, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "solve_quality_alert", contract_operation_id: "erp.solve_quality_alert", params: PARAMS_1224, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "stage_ai_workflow_node_provenance", contract_operation_id: "erp.stage_ai_workflow_node_provenance", params: PARAMS_1225, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "stage_bank_statement_import", contract_operation_id: "erp.stage_bank_statement_import", params: PARAMS_1226, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "start_cycle_count_session", contract_operation_id: "erp.start_cycle_count_session", params: PARAMS_1227, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "start_manufacturing_order", contract_operation_id: "erp.start_manufacturing_order", params: PARAMS_1228, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "start_offboarding", contract_operation_id: "erp.start_offboarding", params: PARAMS_1229, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "start_picking_batch", contract_operation_id: "erp.start_picking_batch", params: PARAMS_1230, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "start_quality_check", contract_operation_id: "erp.start_quality_check", params: PARAMS_1231, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "start_timesheet_timer", contract_operation_id: "erp.start_timesheet_timer", params: PARAMS_1232, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "start_workflow", contract_operation_id: "erp.start_workflow", params: PARAMS_1233, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "start_workorder", contract_operation_id: "erp.start_workorder", params: PARAMS_1234, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "steer_ai_run", contract_operation_id: "erp.steer_ai_run", params: PARAMS_1235, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "stop_timesheet_timer", contract_operation_id: "erp.stop_timesheet_timer", params: PARAMS_1236, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "submit_expense", contract_operation_id: "erp.submit_expense", params: PARAMS_1237, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "submit_expense_sheet", contract_operation_id: "erp.submit_expense_sheet", params: PARAMS_1238, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "submit_leave", contract_operation_id: "erp.submit_leave", params: PARAMS_1239, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "submit_performance_review", contract_operation_id: "erp.submit_performance_review", params: PARAMS_1240, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "submit_purchase_requisition", contract_operation_id: "erp.submit_purchase_requisition", params: PARAMS_1241, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "submit_supplier_intake", contract_operation_id: "erp.submit_supplier_intake", params: PARAMS_1242, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "subscribe_to_record", contract_operation_id: "erp.subscribe_to_record", params: PARAMS_1243, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "sync_external_file_to_document", contract_operation_id: "erp.sync_external_file_to_document", params: PARAMS_1244, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "sync_hub_devices", contract_operation_id: "erp.sync_hub_devices", params: PARAMS_1245, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_bootstrap_new_tenant_records_complete_commit", contract_operation_id: "erp.test_bootstrap_new_tenant_records_complete_commit", params: PARAMS_1246, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_iot_device", contract_operation_id: "erp.test_iot_device", params: PARAMS_1247, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_pos_order_finalize_deletes_on_version_match", contract_operation_id: "erp.test_pos_order_finalize_deletes_on_version_match", params: PARAMS_1248, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_pos_order_finalize_is_idempotent_when_already_gone", contract_operation_id: "erp.test_pos_order_finalize_is_idempotent_when_already_gone", params: PARAMS_1249, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_pos_order_finalize_refuses_before_terminal_window", contract_operation_id: "erp.test_pos_order_finalize_refuses_before_terminal_window", params: PARAMS_1250, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch", contract_operation_id: "erp.test_pos_order_finalize_refuses_on_cold_eligible_at_mismatch", params: PARAMS_1251, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_pos_order_finalize_refuses_on_version_mismatch", contract_operation_id: "erp.test_pos_order_finalize_refuses_on_version_mismatch", params: PARAMS_1252, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_pos_order_finalize_rejects_unregistered_caller", contract_operation_id: "erp.test_pos_order_finalize_rejects_unregistered_caller", params: PARAMS_1253, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_queue_job_edge_cases", contract_operation_id: "erp.test_queue_job_edge_cases", params: PARAMS_1254, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_queue_system", contract_operation_id: "erp.test_queue_system", params: PARAMS_1255, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "test_worker_edge_cases", contract_operation_id: "erp.test_worker_edge_cases", params: PARAMS_1256, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "toggle_project_favorite", contract_operation_id: "erp.toggle_project_favorite", params: PARAMS_1257, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unassign_team_member_skill", contract_operation_id: "erp.unassign_team_member_skill", params: PARAMS_1258, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unblock_workcenter", contract_operation_id: "erp.unblock_workcenter", params: PARAMS_1259, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unenroll_benefit_enrollment", contract_operation_id: "erp.unenroll_benefit_enrollment", params: PARAMS_1260, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "unlink_device", contract_operation_id: "erp.unlink_device", params: PARAMS_1261, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unlock_document", contract_operation_id: "erp.unlock_document", params: PARAMS_1262, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unlock_knowledge_article", contract_operation_id: "erp.unlock_knowledge_article", params: PARAMS_1263, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unlock_purchase_order", contract_operation_id: "erp.unlock_purchase_order", params: PARAMS_1264, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unlock_sale_order", contract_operation_id: "erp.unlock_sale_order", params: PARAMS_1265, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unmatch_elimination_entry", contract_operation_id: "erp.unmatch_elimination_entry", params: PARAMS_1266, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unmatch_expense_card_statement_line", contract_operation_id: "erp.unmatch_expense_card_statement_line", params: PARAMS_1267, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unreconciled_account_bank_statement_line", contract_operation_id: "erp.unreconciled_account_bank_statement_line", params: PARAMS_1268, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "unregister_payment_allocations", contract_operation_id: "erp.unregister_payment_allocations", params: PARAMS_1269, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unreserve_stock_picking", contract_operation_id: "erp.unreserve_stock_picking", params: PARAMS_1270, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unreserve_stock_quant", contract_operation_id: "erp.unreserve_stock_quant", params: PARAMS_1271, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "unsubscribe_from_record", contract_operation_id: "erp.unsubscribe_from_record", params: PARAMS_1272, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_account_account", contract_operation_id: "erp.update_account_account", params: PARAMS_1273, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_account_account_type", contract_operation_id: "erp.update_account_account_type", params: PARAMS_1274, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_account_asset", contract_operation_id: "erp.update_account_asset", params: PARAMS_1275, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_account_bank_statement", contract_operation_id: "erp.update_account_bank_statement", params: PARAMS_1276, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_account_bank_statement_line", contract_operation_id: "erp.update_account_bank_statement_line", params: PARAMS_1277, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_account_group", contract_operation_id: "erp.update_account_group", params: PARAMS_1278, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_account_journal", contract_operation_id: "erp.update_account_journal", params: PARAMS_1279, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_account_move_line", contract_operation_id: "erp.update_account_move_line", params: PARAMS_1280, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_account_period", contract_operation_id: "erp.update_account_period", params: PARAMS_1281, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_account_reconciliation_widget", contract_operation_id: "erp.update_account_reconciliation_widget", params: PARAMS_1282, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_account_tax", contract_operation_id: "erp.update_account_tax", params: PARAMS_1283, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_account_tax_group", contract_operation_id: "erp.update_account_tax_group", params: PARAMS_1284, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_ai_action_draft_params", contract_operation_id: "erp.update_ai_action_draft_params", params: PARAMS_1285, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_ai_agent", contract_operation_id: "erp.update_ai_agent", params: PARAMS_1286, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_ai_chat_session_title", contract_operation_id: "erp.update_ai_chat_session_title", params: PARAMS_1287, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_ai_reducer_allowlist", contract_operation_id: "erp.update_ai_reducer_allowlist", params: PARAMS_1288, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_analytic_account", contract_operation_id: "erp.update_analytic_account", params: PARAMS_1289, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_analytic_distribution_model", contract_operation_id: "erp.update_analytic_distribution_model", params: PARAMS_1290, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_analytic_line", contract_operation_id: "erp.update_analytic_line", params: PARAMS_1291, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_assignment_rule", contract_operation_id: "erp.update_assignment_rule", params: PARAMS_1292, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_audit_rule", contract_operation_id: "erp.update_audit_rule", params: PARAMS_1293, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "update_barcode_nomenclature", contract_operation_id: "erp.update_barcode_nomenclature", params: PARAMS_1294, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_barcode_rule", contract_operation_id: "erp.update_barcode_rule", params: PARAMS_1295, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_billing_account", contract_operation_id: "erp.update_billing_account", params: PARAMS_1296, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_bom", contract_operation_id: "erp.update_bom", params: PARAMS_1297, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_budget_line", contract_operation_id: "erp.update_budget_line", params: PARAMS_1298, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_budget_line_actuals", contract_operation_id: "erp.update_budget_line_actuals", params: PARAMS_1299, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_budget_post", contract_operation_id: "erp.update_budget_post", params: PARAMS_1300, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_calendar_event", contract_operation_id: "erp.update_calendar_event", params: PARAMS_1301, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_company", contract_operation_id: "erp.update_company", params: PARAMS_1302, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
+    ReducerContract { name: "update_company_address", contract_operation_id: "erp.update_company_address", params: PARAMS_1303, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
+    ReducerContract { name: "update_company_business", contract_operation_id: "erp.update_company_business", params: PARAMS_1304, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
+    ReducerContract { name: "update_company_hierarchy", contract_operation_id: "erp.update_company_hierarchy", params: PARAMS_1305, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: Some(0), unscoped_reason: None },
+    ReducerContract { name: "update_consolidation_account", contract_operation_id: "erp.update_consolidation_account", params: PARAMS_1306, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact", contract_operation_id: "erp.update_contact", params: PARAMS_1307, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact_address", contract_operation_id: "erp.update_contact_address", params: PARAMS_1308, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact_business", contract_operation_id: "erp.update_contact_business", params: PARAMS_1309, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact_category", contract_operation_id: "erp.update_contact_category", params: PARAMS_1310, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact_details", contract_operation_id: "erp.update_contact_details", params: PARAMS_1311, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact_identity", contract_operation_id: "erp.update_contact_identity", params: PARAMS_1312, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_contact_parent", contract_operation_id: "erp.update_contact_parent", params: PARAMS_1313, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_contract", contract_operation_id: "erp.update_contract", params: PARAMS_1314, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_crm_conversation", contract_operation_id: "erp.update_crm_conversation", params: PARAMS_1315, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_crossovered_budget", contract_operation_id: "erp.update_crossovered_budget", params: PARAMS_1316, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_department", contract_operation_id: "erp.update_department", params: PARAMS_1317, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_device_status", contract_operation_id: "erp.update_device_status", params: PARAMS_1318, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_document", contract_operation_id: "erp.update_document", params: PARAMS_1319, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_document_folder", contract_operation_id: "erp.update_document_folder", params: PARAMS_1320, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_document_presence", contract_operation_id: "erp.update_document_presence", params: PARAMS_1321, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_document_template", contract_operation_id: "erp.update_document_template", params: PARAMS_1322, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_employee", contract_operation_id: "erp.update_employee", params: PARAMS_1323, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_expense", contract_operation_id: "erp.update_expense", params: PARAMS_1324, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_financial_report", contract_operation_id: "erp.update_financial_report", params: PARAMS_1325, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_fiscal_year", contract_operation_id: "erp.update_fiscal_year", params: PARAMS_1326, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_fleet_vehicle", contract_operation_id: "erp.update_fleet_vehicle", params: PARAMS_1327, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_fleet_vehicle_details", contract_operation_id: "erp.update_fleet_vehicle_details", params: PARAMS_1328, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_form_field", contract_operation_id: "erp.update_form_field", params: PARAMS_1329, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_google_drive_connection", contract_operation_id: "erp.update_google_drive_connection", params: PARAMS_1330, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(1), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_google_drive_credentials", contract_operation_id: "erp.update_google_drive_credentials", params: PARAMS_1331, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(1), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_hr_applicant", contract_operation_id: "erp.update_hr_applicant", params: PARAMS_1332, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_hr_employee_skill", contract_operation_id: "erp.update_hr_employee_skill", params: PARAMS_1333, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_hr_global_assignment", contract_operation_id: "erp.update_hr_global_assignment", params: PARAMS_1334, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_hr_skill", contract_operation_id: "erp.update_hr_skill", params: PARAMS_1335, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_hub_heartbeat", contract_operation_id: "erp.update_hub_heartbeat", params: PARAMS_1336, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_integration_status", contract_operation_id: "erp.update_integration_status", params: PARAMS_1337, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_intercompany_rule", contract_operation_id: "erp.update_intercompany_rule", params: PARAMS_1338, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_job_position", contract_operation_id: "erp.update_job_position", params: PARAMS_1339, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_knowledge_article", contract_operation_id: "erp.update_knowledge_article", params: PARAMS_1340, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_knowledge_article_presence", contract_operation_id: "erp.update_knowledge_article_presence", params: PARAMS_1341, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_knowledge_category", contract_operation_id: "erp.update_knowledge_category", params: PARAMS_1342, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_landed_cost", contract_operation_id: "erp.update_landed_cost", params: PARAMS_1343, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_lead", contract_operation_id: "erp.update_lead", params: PARAMS_1344, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_lead_address", contract_operation_id: "erp.update_lead_address", params: PARAMS_1345, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_lead_details", contract_operation_id: "erp.update_lead_details", params: PARAMS_1346, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_lead_lost_reason", contract_operation_id: "erp.update_lead_lost_reason", params: PARAMS_1347, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_lead_revenue", contract_operation_id: "erp.update_lead_revenue", params: PARAMS_1348, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_lead_source", contract_operation_id: "erp.update_lead_source", params: PARAMS_1349, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_leave_type", contract_operation_id: "erp.update_leave_type", params: PARAMS_1350, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_mail_template", contract_operation_id: "erp.update_mail_template", params: PARAMS_1351, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_manufacturing_order", contract_operation_id: "erp.update_manufacturing_order", params: PARAMS_1352, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_message_template", contract_operation_id: "erp.update_message_template", params: PARAMS_1353, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_metric_values", contract_operation_id: "erp.update_metric_values", params: PARAMS_1354, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_opportunity", contract_operation_id: "erp.update_opportunity", params: PARAMS_1355, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_opportunity_presence", contract_operation_id: "erp.update_opportunity_presence", params: PARAMS_1356, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_opportunity_stage", contract_operation_id: "erp.update_opportunity_stage", params: PARAMS_1357, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_org_member_details", contract_operation_id: "erp.update_org_member_details", params: PARAMS_1358, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "update_org_member_role", contract_operation_id: "erp.update_org_member_role", params: PARAMS_1359, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "update_organization", contract_operation_id: "erp.update_organization", params: PARAMS_1360, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_owner_report_schedule", contract_operation_id: "erp.update_owner_report_schedule", params: PARAMS_1361, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_partner_bank", contract_operation_id: "erp.update_partner_bank", params: PARAMS_1362, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_payment_account", contract_operation_id: "erp.update_payment_account", params: PARAMS_1363, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_payment_term", contract_operation_id: "erp.update_payment_term", params: PARAMS_1364, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_payment_term_line", contract_operation_id: "erp.update_payment_term_line", params: PARAMS_1365, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_payment_transaction", contract_operation_id: "erp.update_payment_transaction", params: PARAMS_1366, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_po_invoice_status", contract_operation_id: "erp.update_po_invoice_status", params: PARAMS_1367, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_po_receipt_status", contract_operation_id: "erp.update_po_receipt_status", params: PARAMS_1368, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_pos_terminal", contract_operation_id: "erp.update_pos_terminal", params: PARAMS_1369, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "update_pricelist", contract_operation_id: "erp.update_pricelist", params: PARAMS_1370, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product", contract_operation_id: "erp.update_product", params: PARAMS_1371, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product_category", contract_operation_id: "erp.update_product_category", params: PARAMS_1372, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product_inventory_data", contract_operation_id: "erp.update_product_inventory_data", params: PARAMS_1373, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product_packaging", contract_operation_id: "erp.update_product_packaging", params: PARAMS_1374, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product_pricing", contract_operation_id: "erp.update_product_pricing", params: PARAMS_1375, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product_supplier_info", contract_operation_id: "erp.update_product_supplier_info", params: PARAMS_1376, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_product_variant", contract_operation_id: "erp.update_product_variant", params: PARAMS_1377, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_project", contract_operation_id: "erp.update_project", params: PARAMS_1378, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_project_milestone", contract_operation_id: "erp.update_project_milestone", params: PARAMS_1379, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_project_rate_card", contract_operation_id: "erp.update_project_rate_card", params: PARAMS_1380, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_project_rate_card_line", contract_operation_id: "erp.update_project_rate_card_line", params: PARAMS_1381, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_proposal", contract_operation_id: "erp.update_proposal", params: PARAMS_1382, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_proposal_line_item", contract_operation_id: "erp.update_proposal_line_item", params: PARAMS_1383, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_proposal_presence", contract_operation_id: "erp.update_proposal_presence", params: PARAMS_1384, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_proposal_source_doc", contract_operation_id: "erp.update_proposal_source_doc", params: PARAMS_1385, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_proposal_status", contract_operation_id: "erp.update_proposal_status", params: PARAMS_1386, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_public_holiday", contract_operation_id: "erp.update_public_holiday", params: PARAMS_1387, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_purchase_order", contract_operation_id: "erp.update_purchase_order", params: PARAMS_1388, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_purchase_order_line", contract_operation_id: "erp.update_purchase_order_line", params: PARAMS_1389, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_quality_alert_reason", contract_operation_id: "erp.update_quality_alert_reason", params: PARAMS_1390, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_quality_point", contract_operation_id: "erp.update_quality_point", params: PARAMS_1391, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_quality_team", contract_operation_id: "erp.update_quality_team", params: PARAMS_1392, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_report_template", contract_operation_id: "erp.update_report_template", params: PARAMS_1393, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_resource_allocation", contract_operation_id: "erp.update_resource_allocation", params: PARAMS_1394, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_role", contract_operation_id: "erp.update_role", params: PARAMS_1395, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "update_sale_order", contract_operation_id: "erp.update_sale_order", params: PARAMS_1396, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_sale_order_line", contract_operation_id: "erp.update_sale_order_line", params: PARAMS_1397, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_sale_order_option", contract_operation_id: "erp.update_sale_order_option", params: PARAMS_1398, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_saved_report", contract_operation_id: "erp.update_saved_report", params: PARAMS_1399, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_sod_conflict_rule", contract_operation_id: "erp.update_sod_conflict_rule", params: PARAMS_1400, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_statutory_id", contract_operation_id: "erp.update_statutory_id", params: PARAMS_1401, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_stock_inventory_state", contract_operation_id: "erp.update_stock_inventory_state", params: PARAMS_1402, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_location", contract_operation_id: "erp.update_stock_location", params: PARAMS_1403, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_picking", contract_operation_id: "erp.update_stock_picking", params: PARAMS_1404, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_production_lot", contract_operation_id: "erp.update_stock_production_lot", params: PARAMS_1405, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_production_serial", contract_operation_id: "erp.update_stock_production_serial", params: PARAMS_1406, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_quant_quantity", contract_operation_id: "erp.update_stock_quant_quantity", params: PARAMS_1407, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_route", contract_operation_id: "erp.update_stock_route", params: PARAMS_1408, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_stock_rule", contract_operation_id: "erp.update_stock_rule", params: PARAMS_1409, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_subscription_plan", contract_operation_id: "erp.update_subscription_plan", params: PARAMS_1410, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_supplier_intake", contract_operation_id: "erp.update_supplier_intake", params: PARAMS_1411, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_task", contract_operation_id: "erp.update_task", params: PARAMS_1412, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_task_state", contract_operation_id: "erp.update_task_state", params: PARAMS_1413, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_tax_deadline", contract_operation_id: "erp.update_tax_deadline", params: PARAMS_1414, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_tax_deadlines", contract_operation_id: "erp.update_tax_deadlines", params: PARAMS_1415, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_tax_jurisdiction", contract_operation_id: "erp.update_tax_jurisdiction", params: PARAMS_1416, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_tax_schedule", contract_operation_id: "erp.update_tax_schedule", params: PARAMS_1417, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_ticket", contract_operation_id: "erp.update_ticket", params: PARAMS_1418, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_user_email", contract_operation_id: "erp.update_user_email", params: PARAMS_1419, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_user_organization_status", contract_operation_id: "erp.update_user_organization_status", params: PARAMS_1420, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
+    ReducerContract { name: "update_user_profile", contract_operation_id: "erp.update_user_profile", params: PARAMS_1421, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_utm_campaign", contract_operation_id: "erp.update_utm_campaign", params: PARAMS_1422, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_utm_medium", contract_operation_id: "erp.update_utm_medium", params: PARAMS_1423, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_utm_source", contract_operation_id: "erp.update_utm_source", params: PARAMS_1424, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_vehicle_position", contract_operation_id: "erp.update_vehicle_position", params: PARAMS_1425, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_warehouse", contract_operation_id: "erp.update_warehouse", params: PARAMS_1426, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_warehouse_3_d_zone", contract_operation_id: "erp.update_warehouse_3_d_zone", params: PARAMS_1427, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_warehouse_task_status", contract_operation_id: "erp.update_warehouse_task_status", params: PARAMS_1428, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_whatsapp_business_account", contract_operation_id: "erp.update_whatsapp_business_account", params: PARAMS_1429, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_whatsapp_credentials", contract_operation_id: "erp.update_whatsapp_credentials", params: PARAMS_1430, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_whatsapp_quality_score", contract_operation_id: "erp.update_whatsapp_quality_score", params: PARAMS_1431, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_whatsapp_verification_status", contract_operation_id: "erp.update_whatsapp_verification_status", params: PARAMS_1432, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_widget_layout", contract_operation_id: "erp.update_widget_layout", params: PARAMS_1433, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_workcenter", contract_operation_id: "erp.update_workcenter", params: PARAMS_1434, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_workflow_draft", contract_operation_id: "erp.update_workflow_draft", params: PARAMS_1435, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "update_working_calendar", contract_operation_id: "erp.update_working_calendar", params: PARAMS_1436, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_ai_skill", contract_operation_id: "erp.upsert_ai_skill", params: PARAMS_1437, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_ai_skill_config", contract_operation_id: "erp.upsert_ai_skill_config", params: PARAMS_1438, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_expense_mileage_rate", contract_operation_id: "erp.upsert_expense_mileage_rate", params: PARAMS_1439, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_expense_per_diem_rate", contract_operation_id: "erp.upsert_expense_per_diem_rate", params: PARAMS_1440, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_expense_policy", contract_operation_id: "erp.upsert_expense_policy", params: PARAMS_1441, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_organization_settings", contract_operation_id: "erp.upsert_organization_settings", params: PARAMS_1442, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_partner_credit_control", contract_operation_id: "erp.upsert_partner_credit_control", params: PARAMS_1443, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_proposal_compliance_requirement", contract_operation_id: "erp.upsert_proposal_compliance_requirement", params: PARAMS_1444, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_proposal_procurement_score", contract_operation_id: "erp.upsert_proposal_procurement_score", params: PARAMS_1445, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_proposal_section", contract_operation_id: "erp.upsert_proposal_section", params: PARAMS_1446, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_search_embedding", contract_operation_id: "erp.upsert_search_embedding", params: PARAMS_1447, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_subscription_price_index", contract_operation_id: "erp.upsert_subscription_price_index", params: PARAMS_1448, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_vendor_scorecard", contract_operation_id: "erp.upsert_vendor_scorecard", params: PARAMS_1449, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "upsert_warehouse_geo", contract_operation_id: "erp.upsert_warehouse_geo", params: PARAMS_1450, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_workflow_edge", contract_operation_id: "erp.upsert_workflow_edge", params: PARAMS_1451, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "upsert_workflow_node", contract_operation_id: "erp.upsert_workflow_node", params: PARAMS_1452, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "use_serial", contract_operation_id: "erp.use_serial", params: PARAMS_1453, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_accounting_ownership_backfill", contract_operation_id: "erp.validate_accounting_ownership_backfill", params: PARAMS_1454, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_budget", contract_operation_id: "erp.validate_budget", params: PARAMS_1455, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_c_0_organization_ownership_backfill", contract_operation_id: "erp.validate_c0_organization_ownership_backfill", params: PARAMS_1456, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_consolidation", contract_operation_id: "erp.validate_consolidation", params: PARAMS_1457, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_cycle_count", contract_operation_id: "erp.validate_cycle_count", params: PARAMS_1458, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "validate_stock_picking", contract_operation_id: "erp.validate_stock_picking", params: PARAMS_1459, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_stock_picking_backorder", contract_operation_id: "erp.validate_stock_picking_backorder", params: PARAMS_1460, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "validate_timesheets", contract_operation_id: "erp.validate_timesheets", params: PARAMS_1461, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "verify_contact_identity", contract_operation_id: "erp.verify_contact_identity", params: PARAMS_1462, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "void_payment_transaction", contract_operation_id: "erp.void_payment_transaction", params: PARAMS_1463, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "waive_tax_deadline", contract_operation_id: "erp.waive_tax_deadline", params: PARAMS_1464, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "withdraw_ai_run_follow_up", contract_operation_id: "erp.withdraw_ai_run_follow_up", params: PARAMS_1465, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "worker_heartbeat", contract_operation_id: "erp.worker_heartbeat", params: PARAMS_1466, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
 ];
 
 pub fn company_scope_paths(reducer_name: &str) -> &'static [CompanyScopePath] {
@@ -9053,6 +9075,7 @@ pub mod reducer_names {
     pub const RUN_INVENTORY_WAREHOUSE_SYNC_TEST: ReducerName = ReducerName::new("run_inventory_warehouse_sync_test");
     pub const RUN_INVENTORY_WAVE_RELEASE_TEST: ReducerName = ReducerName::new("run_inventory_wave_release_test");
     pub const RUN_IOT_RELATIONAL_INTEGRITY_TEST: ReducerName = ReducerName::new("run_iot_relational_integrity_test");
+    pub const RUN_KNOWLEDGE_GUIDE_TESTS: ReducerName = ReducerName::new("run_knowledge_guide_tests");
     pub const RUN_MANUFACTURING_ACTUAL_COST_VALUATION_TEST: ReducerName = ReducerName::new("run_manufacturing_actual_cost_valuation_test");
     pub const RUN_MANUFACTURING_BOM_BYPRODUCT_OUTPUT_EXACT_EFFECT_TEST: ReducerName = ReducerName::new("run_manufacturing_bom_byproduct_output_exact_effect_test");
     pub const RUN_MANUFACTURING_BOM_ROUTING_LIFECYCLE_TEST: ReducerName = ReducerName::new("run_manufacturing_bom_routing_lifecycle_test");
@@ -9145,6 +9168,7 @@ pub mod reducer_names {
     pub const RUN_WORKFLOW_RUNTIME_TESTS: ReducerName = ReducerName::new("run_workflow_runtime_tests");
     pub const RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS: ReducerName = ReducerName::new("run_workflow_subject_snapshot_tests");
     pub const SAVE_IMPORT_MAPPING_TEMPLATE: ReducerName = ReducerName::new("save_import_mapping_template");
+    pub const SAVE_KNOWLEDGE_GUIDE: ReducerName = ReducerName::new("save_knowledge_guide");
     pub const SAVE_PRESENTATION_MODULE: ReducerName = ReducerName::new("save_presentation_module");
     pub const SAVE_PROPOSAL_VERSION: ReducerName = ReducerName::new("save_proposal_version");
     pub const SCHEDULE_DOCUMENT_RETENTION_PURGE: ReducerName = ReducerName::new("schedule_document_retention_purge");
@@ -10522,6 +10546,7 @@ macro_rules! reducer_call {
     ("run_inventory_warehouse_sync_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_INVENTORY_WAREHOUSE_SYNC_TEST, $args) };
     ("run_inventory_wave_release_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_INVENTORY_WAVE_RELEASE_TEST, $args) };
     ("run_iot_relational_integrity_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_IOT_RELATIONAL_INTEGRITY_TEST, $args) };
+    ("run_knowledge_guide_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_KNOWLEDGE_GUIDE_TESTS, $args) };
     ("run_manufacturing_actual_cost_valuation_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_MANUFACTURING_ACTUAL_COST_VALUATION_TEST, $args) };
     ("run_manufacturing_bom_byproduct_output_exact_effect_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_MANUFACTURING_BOM_BYPRODUCT_OUTPUT_EXACT_EFFECT_TEST, $args) };
     ("run_manufacturing_bom_routing_lifecycle_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_MANUFACTURING_BOM_ROUTING_LIFECYCLE_TEST, $args) };
@@ -10614,6 +10639,7 @@ macro_rules! reducer_call {
     ("run_workflow_runtime_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_RUNTIME_TESTS, $args) };
     ("run_workflow_subject_snapshot_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS, $args) };
     ("save_import_mapping_template", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_IMPORT_MAPPING_TEMPLATE, $args) };
+    ("save_knowledge_guide", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_KNOWLEDGE_GUIDE, $args) };
     ("save_presentation_module", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PRESENTATION_MODULE, $args) };
     ("save_proposal_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PROPOSAL_VERSION, $args) };
     ("schedule_document_retention_purge", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SCHEDULE_DOCUMENT_RETENTION_PURGE, $args) };

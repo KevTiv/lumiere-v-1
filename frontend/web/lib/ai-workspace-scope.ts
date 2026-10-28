@@ -22,6 +22,7 @@ export const AI_WORKSPACE_SCOPES: readonly AiWorkspaceScopeOption[] = [
   { value: "module:manufacturing", label: "Manufacturing", group: "Modules", pathname: "/manufacturing" },
   { value: "module:accounting", label: "Accounting", group: "Modules", pathname: "/accounting" },
   { value: "module:expenses", label: "Expenses", group: "Modules", pathname: "/expenses" },
+  { value: "module:subscriptions", label: "Subscriptions", group: "Modules", pathname: "/subscriptions" },
   { value: "module:reports", label: "Reports", group: "Modules", pathname: "/reports", commands: ["reports"] },
   { value: "module:documents", label: "Documents", group: "Modules", pathname: "/documents", commands: ["docs"] },
 ]
