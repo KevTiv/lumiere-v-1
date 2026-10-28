@@ -96,7 +96,6 @@ import type {
   ScheduledReport,
   TrialBalance,
 } from "@lumiere/query-hooks/hooks/reports"
-import { reportStateTag } from "@/lib/reports-create-params"
 import { toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import {
   toCreateAnalyticsMetricPayload,
@@ -119,7 +118,6 @@ import {
 } from "@lumiere/query-hooks/hooks/accounting"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
-import { variantTag } from "@lumiere/erp-workflows"
 import { singleCurrencyId } from "../accounting/accounting-dashboard-charts"
 import { expenseBreakdown, profitAndLossByMonth } from "./finance-dashboard-charts"
 import { useAccountPeriods } from "@lumiere/query-hooks/hooks/accounting/fiscal-periods"
@@ -168,6 +166,13 @@ import { ReportAuthoringPreview } from "./report-authoring-preview"
 import { reportAuthoringKind, enhanceWidgetAuthoringForm } from "./report-authoring-model"
 import { enhanceMetricForm } from "./metric-authoring"
 import { MetricAuthoringPreview } from "./metric-authoring-preview"
+import { EntityView } from "@lumiere/ui/entity-views/entity-view"
+import type { EntityRow } from "@lumiere/ui/lib/entity-view-types"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { ReportStart, ReportResult } from "./report-workspace"
+import { reportWorkspaceHref, scopedReports, selectedReport, reportCanDownload, reportTag } from "./report-workspace-model"
+import { statementKindForReportType } from "@lumiere/query-hooks/hooks/read-ui-rows"
+import { formatStatementAmount } from "./statement-tree"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -216,7 +221,7 @@ function ReportsClientLoaded({
   const searchParams = useSearchParams()
   const periodRequested = searchParams?.get("source") === "period-close"
   const periodContext = useMemo(() => readPeriodReportContext(searchParams ?? new URLSearchParams()), [searchParams])
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string; reportType?: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
   const [editTemplateId, setEditTemplateId] = useState<string | null>(null)
@@ -280,12 +285,20 @@ function ReportsClientLoaded({
 
   const reports = useMemo(
     () =>
-      reportsRaw.filter((report) => !periodRequested || Boolean(validPeriodContext && reportMatchesPeriodContext(report, validPeriodContext))).map((r) => ({
+      scopedReports(reportsRaw, orgId, operatingCompanyId).filter((report) => !periodRequested || Boolean(validPeriodContext && reportMatchesPeriodContext(report, validPeriodContext))).map((r) => ({
         ...r,
-        state: reportStateTag((r as { state?: unknown }).state),
+        state: reportTag(r.state),
       })),
-    [reportsRaw, periodRequested, validPeriodContext],
+    [reportsRaw, periodRequested, validPeriodContext, orgId, operatingCompanyId],
   )
+
+  const openReport = useCallback((id: string) => {
+    router.push(reportWorkspaceHref(searchParams?.toString() ?? "", id), { scroll: false })
+  }, [router, searchParams])
+  const routeReportId = searchParams?.get("report") ?? null
+  const openedReport = selectedReport(reports, routeReportId)
+  const [reportActionError, setReportActionError] = useState<string | null>(null)
+  useEffect(() => setReportActionError(null), [routeReportId, operatingCompanyId, orgId, currentUser?.id])
 
   const createTrialBalanceEntry = useCreateTrialBalanceEntry(orgId, operatingCompanyId)
   const reportActionScope = `${orgId}:${operatingCompanyId}:${currentUser?.id ?? ""}:${periodContext?.periodId ?? "all"}:${periodContext?.reportType ?? "all"}:${periodContext?.dateFrom ?? ""}:${periodContext?.dateTo ?? ""}`
@@ -539,22 +552,32 @@ function ReportsClientLoaded({
   const financialReportsEntityConfig = useMemo((): EntityViewConfig => {
     const base = financialReportsTableConfig(t)
     const view = base.view as EntityTableConfig
+    const columns = view.columns.map((column) => column.key === "name" ? { ...column, render: (_value: unknown, row: EntityRow) => <Button variant="link" className="h-auto max-w-full whitespace-normal p-0 text-left" onClick={(event) => { event.stopPropagation(); openReport(String(row.id)) }}>{String(row.name ?? row.id)}</Button> } : column)
     return {
       ...base,
       view: {
         ...view,
+        columns,
         actions: [
+          {
+            id: "open-report",
+            label: t("reports.workspace.open"),
+            icon: Eye,
+            requiresSelection: true,
+            selection: "single",
+            onClick: (rows) => { if (rows[0]?.id != null) openReport(String(rows[0].id)) },
+          },
           {
             id: "exp-pdf",
             label: t("reports.actions.exportPdf"),
             icon: FileDown,
             requiresSelection: true,
             selection: "multiple",
-            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            isApplicable: (rows) => rows.some(reportCanDownload),
             successMessage: t("common.actionCompleted", { action: t("reports.actions.exportPdf") }),
             onClick: async (rows) => {
               for (const r of rows) {
-                if (String(r.state) === "generated") {
+                if (reportCanDownload(r)) {
                   await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "pdf",
@@ -569,11 +592,11 @@ function ReportsClientLoaded({
             icon: FileSpreadsheet,
             requiresSelection: true,
             selection: "multiple",
-            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            isApplicable: (rows) => rows.some(reportCanDownload),
             successMessage: t("common.actionCompleted", { action: t("reports.actions.exportXlsx") }),
             onClick: async (rows) => {
               for (const r of rows) {
-                if (String(r.state) === "generated") {
+                if (reportCanDownload(r)) {
                   await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "xlsx",
@@ -588,11 +611,11 @@ function ReportsClientLoaded({
             icon: FileText,
             requiresSelection: true,
             selection: "multiple",
-            isApplicable: (rows) => rows.some((row) => String(row.state) === "generated"),
+            isApplicable: (rows) => rows.some(reportCanDownload),
             successMessage: t("common.actionCompleted", { action: t("reports.actions.exportCsv") }),
             onClick: async (rows) => {
               for (const r of rows) {
-                if (String(r.state) === "generated") {
+                if (reportCanDownload(r)) {
                   await exportFinancialReport.mutateAsync({
                     reportId: r.id as string | number | bigint,
                     exportFormat: "csv",
@@ -690,6 +713,7 @@ function ReportsClientLoaded({
     archiveFinancialReport,
     deleteFinancialReport,
     openErpAiChat,
+    openReport,
   ])
 
   const reportTemplatesEntityConfig = useMemo((): EntityViewConfig => {
@@ -876,6 +900,16 @@ function ReportsClientLoaded({
   }, [t])
 
   const { locale } = useCurrencyFormat()
+  const reportOutputConfig = useMemo((): EntityViewConfig => {
+    const base = trialBalancesTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const codes = moduleQueryState(currenciesQuery).status === "ready" ? currencyCodeMap(currencies) : new Map<string, string>()
+    return { ...base, title: t("reports.workspace.accountTotals"), description: t("reports.workspace.outputHint"), view: { ...view, emptyMessage: t("reports.workspace.emptyOutput"), columns: view.columns.map((column) => column.type === "currency" ? {
+      ...column,
+      // Never relabel another currency's amounts with the operating-company default.
+      render: (value, row) => typeof value === "number" ? formatStatementAmount(value, locale, codes.get(String(row.currencyId ?? row.currency_id))) : "—",
+    } : column) } }
+  }, [t, locale, currencies, currenciesQuery])
   const liveSections = useMemo(() => {
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
@@ -1016,7 +1050,21 @@ function ReportsClientLoaded({
     () => ({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
-        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig, createForm: financialReportFormConfig }
+        if (tab.id === "dashboard") return { ...tab, label: t("reports.workspace.catalog") }
+        if (tab.id === "reports") return routeReportId ? { ...tab, type: "custom" as const, customContent: (
+          <ReportResult report={openedReport} sourceState={moduleQueryState(reportsQuery)} actionError={reportActionError}
+            companyLabel={companySelectOptions.find((option) => option.value === String(operatingCompanyId))?.label ?? t("reports.workspace.unknown")}
+            currencyLabel={moduleQueryState(currenciesQuery).status === "ready" ? currencySelectOptions.find((option) => option.value === String(openedReport?.resultCurrencyId ?? openedReport?.currencyId))?.label ?? t("reports.workspace.unknown") : t("reports.workspace.unknown")}
+            onBack={() => router.push(reportWorkspaceHref(searchParams?.toString() ?? ""), { scroll: false })}
+            actions={openedReport && checkPermission("financial_report", "write").allowed ? <>
+              {reportCanDownload(openedReport) && (["pdf", "xlsx", "csv"] as const).map((format) => <Button key={format} variant="outline" disabled={exportFinancialReport.isPending || generateFinancialReport.isPending} onClick={() => { setReportActionError(null); void exportFinancialReport.mutateAsync({ reportId: String(openedReport.id), exportFormat: format }).catch((error: unknown) => setReportActionError(error instanceof Error ? error.message : t("reports.workspace.actionFailed"))) }}>{t(`reports.actions.${format === "pdf" ? "exportPdf" : format === "xlsx" ? "exportXlsx" : "exportCsv"}`)}</Button>)}
+              {reportTag(openedReport.state) !== "archived" && <Button variant="outline" disabled={exportFinancialReport.isPending || generateFinancialReport.isPending} onClick={() => { setReportActionError(null); void generateFinancialReport.mutateAsync(String(openedReport.id)).catch((error: unknown) => setReportActionError(error instanceof Error ? error.message : t("reports.workspace.actionFailed"))) }}>{t("reports.actions.regenerate")}</Button>}
+            </> : null}>
+            {openedReport && statementKindForReportType(openedReport.reportType)
+              ? <StatementsPanel key={String(openedReport.id)} organizationId={orgId} financialReports={[openedReport]} hideSelector currencyCode={moduleQueryState(currenciesQuery).status === "ready" ? currencyCodeMap(currencies).get(String(openedReport.resultCurrencyId ?? openedReport.currencyId)) : undefined} />
+              : <><ModuleDataNotice state={moduleQueryState(trialBalancesQuery)} />{trialBalancesQuery.isLoading && <p role="status">{t("common.loading")}</p>}{moduleQueryState(trialBalancesQuery).status === "ready" && <EntityView config={reportOutputConfig} data={scopedReports(trialBalances, orgId, operatingCompanyId).filter((row) => String(row.reportId) === String(openedReport?.id))} />}</>}
+          </ReportResult>
+        ) } : { ...tab, entityConfig: financialReportsEntityConfig, createForm: financialReportFormConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
         if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig, createForm: analyticsMetricFormConfig }
@@ -1132,7 +1180,8 @@ function ReportsClientLoaded({
       companies,
       operatingCompanyId,
       orgId,
-      t
+      t,
+      routeReportId, openedReport, companySelectOptions, currencySelectOptions, router, searchParams, checkPermission, exportFinancialReport, generateFinancialReport, trialBalancesQuery, currenciesQuery, reportOutputConfig, reportActionError
     ],
   )
 
@@ -1167,8 +1216,10 @@ function ReportsClientLoaded({
       : action === "createDashboardWidget" ? dashboardWidgetsQuery : null
     if (source && moduleQueryState(source).status !== "ready") throw new Error(t("reports.forms.sourceUnavailable", { defaultValue: "Required report records could not be verified. Retry their source list before saving. Your entries are retained." }))
     if (action === "createReport" || action === "generateReport") {
+      if (moduleQueryState(currenciesQuery).status !== "ready") throw new Error(t("reports.workspace.currencyUnavailable"))
       if (periodRequested && (!validPeriodContext || validPeriodContext.reportType !== "trial-balance")) throw new Error("The selected period report context is not ready for trial balance generation")
-      await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(validPeriodContext ? applyPeriodReportFormContext(formData, validPeriodContext) : formData))
+      const created = await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(validPeriodContext ? applyPeriodReportFormContext(formData, validPeriodContext) : formData))
+      if (reportActionLive.current.scope === reportActionScope && reportActionLive.current.allowed) openReport(created.id)
     } else if (action === "createReportTemplate") {
       await createReportTemplate.mutateAsync(toCreateReportTemplatePayload(formData))
     } else if (action === "createScheduledReport") {
@@ -1216,7 +1267,7 @@ function ReportsClientLoaded({
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
-  const quickActionConfig = quickActionForm?.action === "createReport" || quickActionForm?.action === "generateReport" ? financialReportFormConfig
+  const quickActionConfig = quickActionForm?.action === "createReport" || quickActionForm?.action === "generateReport" ? mergeFieldDefaultValues(financialReportFormConfig, validPeriodContext ? periodReportFormDefaults(validPeriodContext) : { reportType: quickActionForm?.reportType ?? "trialBalance" })
     : quickActionForm?.action === "createReportTemplate" ? reportTemplateFormConfig
     : quickActionForm?.action === "createScheduledReport" ? scheduledReportFormConfig
     : quickActionForm?.action === "createAnalyticsMetric" ? analyticsMetricFormConfig
@@ -1224,7 +1275,7 @@ function ReportsClientLoaded({
   const quickActionSource = quickActionForm?.action === "createReportTemplate" ? moduleQueryState(reportTemplatesQuery)
     : quickActionForm?.action === "createScheduledReport" ? mergeModuleStates([moduleQueryState(scheduledReportsQuery), moduleQueryState(reportTemplatesQuery)])
     : quickActionForm?.action === "createAnalyticsMetric" ? moduleQueryState(analyticsMetricsQuery)
-    : moduleQueryState(reportsQuery)
+    : mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(currenciesQuery)])
   const quickActionBlocked = quickActionForm != null && quickActionSource.status !== "ready"
 
   // The actor is part of ModuleView's scope key. Mounting its interactive state
@@ -1240,7 +1291,7 @@ function ReportsClientLoaded({
       <ModuleView
         key={reportActionScope}
         config={config}
-        dashboardContent={<ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reportsRaw, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
+        dashboardContent={<ReportStart reportTypes={validPeriodContext ? ["trialBalance"] : undefined} canGenerate={Boolean(operatingCompanyId && currentUser?.id && checkPermission("financial_report", "create").allowed && checkPermission("financial_report", "write").allowed)} sourceState={moduleQueryState(reportsQuery)} onGenerate={(reportType) => setQuickActionForm({ form: financialReportFormConfig, action: "generateReport", reportType })}><details><summary className="cursor-pointer py-3 text-sm font-medium">{t("reports.workspace.overview")}</summary><ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reports, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections.filter((section) => section.id !== "rep-quick-actions-section")} /></details></ReportStart>}
         data={data}
         dataState={{ reports: moduleQueryState(reportsQuery), "trial-balance": mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(trialBalancesQuery)]), "vat-report": moduleQueryState(reportsQuery), "report-templates": moduleQueryState(reportTemplatesQuery), "scheduled-reports": moduleQueryState(scheduledReportsQuery), "analytics-metrics": moduleQueryState(analyticsMetricsQuery), dashboards: moduleQueryState(dashboardsQuery), "dashboard-widgets": moduleQueryState(dashboardWidgetsQuery) }}
         onFormSubmit={handleFormSubmit}

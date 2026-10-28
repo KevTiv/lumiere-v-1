@@ -27,3 +27,11 @@ does not prove that every corresponding backend collection is available.
 
 For the focused navigation and shared-template regression checks, run
 `node node_modules/@playwright/test/cli.js test --config playwright.workspace-navigation.config.ts`.
+
+The `/reports-workspace` route renders the production report catalog, result
+summary and generation form with synthetic scoped records. Session storage
+models reopening after reload; it does not establish an ERP saved effect.
+Run `pnpm test:e2e:reports-ui` for the focused generation, rejection recovery,
+reopening, source-state, locked-period catalog and reader checks at mobile and
+desktop widths. `?before=1` is a labelled snapshot of the prior overview
+composition for visual comparison, not a capture of the deployed Alpha.

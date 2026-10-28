@@ -384,6 +384,9 @@ jobs:
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
+      - name: Reports workflow browser regressions
+        run: pnpm --dir web test:e2e:reports-ui
+
       - name: Upload work-board browser diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

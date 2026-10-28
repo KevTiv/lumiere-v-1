@@ -40,6 +40,8 @@ import {
 type StatementsPanelProps = {
   organizationId: bigint
   financialReports: Record<string, unknown>[]
+  hideSelector?: boolean
+  currencyCode?: string
 }
 
 const EMPTY_SET: ReadonlySet<string> = new Set()
@@ -49,7 +51,7 @@ function reportIdOf(row: Record<string, unknown>): string {
   return typeof v === "bigint" || typeof v === "number" || typeof v === "string" ? String(v) : ""
 }
 
-export function StatementsPanel({ organizationId, financialReports }: StatementsPanelProps) {
+export function StatementsPanel({ organizationId, financialReports, hideSelector = false, currencyCode }: StatementsPanelProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
 
@@ -84,14 +86,14 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
   }, [selected])
 
   const rows: StatementDisplayRow[] = useMemo(() => {
-    if (!selected) return []
+    if (!selected || query.isLoading || query.isError) return []
     const lines = (query.data ?? []).filter((l) => l.reportId === selected.id)
     return buildStatementRows(lines, (name) =>
       t("reports.statements.subtotal", { defaultValue: "Total {{name}}", name }),
     )
-  }, [query.data, selected, t])
+  }, [query.data, query.isLoading, query.isError, selected, t])
 
-  const currency = resolveCurrencyCode(selected?.row.currency ?? selected?.row.currencyCode ?? selected?.row.currency_code)
+  const currency = resolveCurrencyCode(currencyCode ?? selected?.row.currency ?? selected?.row.currencyCode ?? selected?.row.currency_code)
 
   // Collapsed groups are remembered per report so switching reports starts fully expanded.
   const [collapsedByReport, setCollapsedByReport] = useState<Record<string, ReadonlySet<string>>>({})
@@ -149,7 +151,7 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3 print:hidden">
-        <div className="min-w-60 flex-1 space-y-1">
+        {!hideSelector && <div className="min-w-0 flex-1 space-y-1 sm:min-w-60">
           <label htmlFor="statement-report" className="text-sm font-medium">
             {t("reports.statements.report", { defaultValue: "Report" })}
           </label>
@@ -165,8 +167,8 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <Button
+        </div>}
+        {!hideSelector && <Button
           type="button"
           variant="outline"
           disabled={rows.length === 0}
@@ -174,7 +176,7 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
         >
           <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden />
           {t("reports.statements.exportCsv", { defaultValue: "Export CSV" })}
-        </Button>
+        </Button>}
         <Button
           type="button"
           variant="outline"
@@ -185,10 +187,10 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
             ? t("reports.statements.expandAll", { defaultValue: "Expand all" })
             : t("reports.statements.collapseAll", { defaultValue: "Collapse all" })}
         </Button>
-        <Button type="button" variant="outline" disabled={rows.length === 0} onClick={() => window.print()}>
+        {!hideSelector && <Button type="button" variant="outline" disabled={rows.length === 0} onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" aria-hidden />
           {t("reports.statements.print", { defaultValue: "Print / PDF" })}
-        </Button>
+        </Button>}
       </div>
 
       {selected ? (
@@ -206,11 +208,12 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
           {query.error instanceof Error && query.error.message
             ? query.error.message
             : t("reports.statements.loadError", { defaultValue: "Could not load statement lines." })}
+          <Button variant="outline" className="ml-3" onClick={() => { void query.refetch() }}>{t("common.retry")}</Button>
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
           {t("reports.statements.empty", {
-            defaultValue: "This report has no statement lines. Generate the report to populate it.",
+            defaultValue: "This report has no saved statement lines. Check its period and accounting basis before regenerating.",
           })}
         </div>
       ) : (
