@@ -11,7 +11,7 @@ import { expect, test, type Page } from "@playwright/test"
 
 import {
   selectModuleTab,
-  expectRowActionsOffered,
+  activeTabEntityTable,
   callReducerBff,
   callReducerOwner,
   callReducerBffResult,
@@ -26,7 +26,6 @@ import {
   gotoModule,
   isoDate,
   scalarQueryId,
-  selectEntityRowById,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -36,6 +35,21 @@ const none = { none: [] as [] }
 
 async function openExpensesTab(page: Page, tabId: string) {
   await selectModuleTab(page, "expenses", tabId)
+}
+
+/** Report rows open their page; checkbox selection is the toolbar action context. */
+async function selectExpenseReport(page: Page, id: number | string) {
+  const table = activeTabEntityTable(page)
+  await expect(table).toBeVisible()
+  const selected = table.locator('[data-testid^="entity-select-row-"][aria-checked="true"]')
+  const selectedCount = await selected.count()
+  for (let index = 0; index < selectedCount; index += 1) await selected.first().click()
+  const checkbox = table.getByTestId(`entity-select-row-${id}`)
+  await expect(checkbox).toBeVisible({ timeout: 30_000 })
+  await checkbox.click()
+  await expect(checkbox).toBeChecked()
+  await expect(table.getByTestId(`entity-row-${id}`)).toHaveAttribute("data-state", "selected")
+  await expect(page).toHaveURL(/\/expenses(?:\?[^#]*)?$/)
 }
 
 test.describe("Expenses wave lifecycle e2e @expenses", () => {
@@ -53,7 +67,19 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expectNoAppError(page)
 
     await openExpensesTab(page, "expense-sheets")
-    await expectRowActionsOffered(page, ["submit-sheets", "post-sheets", "reimburse-sheets"])
+    const firstReport = activeTabEntityTable(page).locator('[data-testid^="entity-row-"]').first()
+    await expect(firstReport).toBeVisible()
+    const reportId = (await firstReport.getAttribute("data-testid"))!.replace("entity-row-", "")
+    expect(reportId).toMatch(/^\d+$/)
+    // Opening a row should navigate; selecting its checkbox should stay on the list.
+    await firstReport.click()
+    await expect(page).toHaveURL(new RegExp(`/expenses/reports/${reportId}(?:\\?.*)?$`))
+    await expect(page.getByTestId("expense-report-title")).toBeVisible()
+    await gotoModule(page, "/expenses?tab=expense-sheets", "expenses")
+    await selectExpenseReport(page, reportId)
+    for (const actionId of ["submit-sheets", "post-sheets", "reimburse-sheets"]) {
+      await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
+    }
     await expectNoAppError(page)
   })
 
@@ -404,7 +430,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     if (/Approved/i.test(seedState)) {
       await gotoModule(page, "/expenses", "expenses")
       await openExpensesTab(page, "expense-sheets")
-      await selectEntityRowById(page, postSheetId)
+      await selectExpenseReport(page, postSheetId)
       await page.getByTestId("entity-action-post-sheets").click()
       await expect(page.getByTestId("form-modal-post-expense-report")).toBeVisible({ timeout: 15_000 })
 
@@ -458,7 +484,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
     await gotoModule(page, "/expenses", "expenses")
     await openExpensesTab(page, "expense-sheets")
-    await selectEntityRowById(page, postSheetId)
+    await selectExpenseReport(page, postSheetId)
     await page.getByTestId("entity-action-reimburse-sheets").click()
     await expect(page.getByTestId("form-modal-reimburse-expense-report")).toBeVisible({
       timeout: 15_000,

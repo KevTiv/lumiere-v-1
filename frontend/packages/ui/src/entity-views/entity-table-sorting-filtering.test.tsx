@@ -186,6 +186,21 @@ describe("EntityTable selection on the engine", () => {
     expect(screen.queryByText("1 selected")).toBeNull()
   })
 
+  it("keeps record opening separate from checkbox selection when row selection is disabled", () => {
+    const open = vi.fn()
+    renderTable({ ...withAction, rowSelectionToggleOnClick: false }, rows, { onRowClick: open })
+
+    fireEvent.click(screen.getByTestId("entity-row-3"))
+    expect(open).toHaveBeenCalledWith(rows[2])
+    expect(screen.queryByTestId("entity-selection-actions")).toBeNull()
+
+    open.mockClear()
+    fireEvent.click(screen.getByTestId("entity-select-row-3"))
+    expect(open).not.toHaveBeenCalled()
+    expect(screen.getByText("1 selected")).toBeTruthy()
+    expect(screen.getByTestId("entity-action-close")).toBeTruthy()
+  })
+
   it("selects the whole page from the header and counts it", () => {
     renderTable(withAction)
 
