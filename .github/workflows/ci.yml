@@ -384,6 +384,19 @@ jobs:
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
+      - name: Sales workflow browser regressions
+        id: sales_workflow_ui
+        run: pnpm --dir web test:e2e:sales-workflow
+
+      - name: Upload sales workflow browser diagnostics
+        if: failure() && steps.sales_workflow_ui.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-workflow-browser-diagnostics
+          path: frontend/web/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
 

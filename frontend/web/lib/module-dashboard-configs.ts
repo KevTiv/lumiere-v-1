@@ -670,7 +670,7 @@ export const salesDashboard: DashboardConfig = {
           data: {
             columns: 4,
             actions: [
-              { id: "create_sale_order", label: "New Sale Order", icon: "file", color: "blue" },
+              { id: "create_sale_order", label: "New quotation", icon: "file", color: "blue" },
               { id: "create_pricelist", label: "New Pricelist", icon: "settings", color: "purple" },
               { id: "new_delivery", label: "New Delivery", icon: "package", color: "green" },
               { id: "view_pipeline", label: "View Pipeline", icon: "trending", color: "teal" },
@@ -797,7 +797,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
-  defaultTab: "dashboard",
+  defaultTab: "orders",
   tabs: [
     {
       id: "dashboard",
@@ -807,18 +807,18 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "ops",
-      label: t("sales.tabs.ops", { defaultValue: "Ops" }),
+      label: t("sales.tabs.ops", { defaultValue: "Needs attention" }),
       type: "custom" as const,
     },
     {
       id: "orders",
-      label: "Orders",
+      label: t("sales.workspace.quotationsAndOrders", { defaultValue: "Quotations & orders" }),
       type: "entity",
       entityConfig: saleOrdersTableConfig(t, {
         formatSaleOrderDisplayName: saleOrderPrimaryLabel,
       }),
       createForm: newSaleOrderForm(t),
-      createLabel: "New Order",
+      createLabel: t("sales.workspace.newQuotation", { defaultValue: "New quotation" }),
       createAction: "createSaleOrder",
       createPermission: { resource: "sale_order", action: "create" },
     },
