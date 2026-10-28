@@ -187,7 +187,7 @@ export function useCreateFinancialReportFlow(organizationId: bigint, companyId?:
   const qc = useQueryClient()
   const attempts = useRef(new Map<string, { requestId: string; before: { id?: unknown }[]; generatedDispatched: boolean }>())
   const inFlight = useRef(new Set<string>())
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<{ id: string }, Error, Record<string, unknown>>({
     retry: false,
     mutationFn: async (formData) => {
       const params = toCreateFinancialReportParams(formData)
@@ -225,7 +225,7 @@ export function useCreateFinancialReportFlow(organizationId: bigint, companyId?:
           'Report was created but could not be resolved; refresh and generate manually if needed.',
         )
       }
-      if (financialReportReady(created)) { attempts.current.delete(attemptKey); return }
+      if (financialReportReady(created)) { attempts.current.delete(attemptKey); return { id: String(created.id) } }
       if (attempt.generatedDispatched) throw new Error(`Report #${String(created.id)} generation remains unverified. Refresh and review this report; generation was not sent again.`)
       if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Report scope or permissions changed before generation")
       attempt.generatedDispatched = true
@@ -240,6 +240,7 @@ export function useCreateFinancialReportFlow(organizationId: bigint, companyId?:
       const exact = resolveFinancialReportCreation(attempt.before, generated, { organizationId, companyId: company }, params, attempt.requestId)
       if (!exact || parseStrictU64(exact.id) !== parseStrictU64(created.id) || !financialReportReady(exact)) throw new Error(`Report #${String(created.id)} generation is unverified. Refresh Reports before continuing.`)
       attempts.current.delete(attemptKey)
+      return { id: String(exact.id) }
       } finally { inFlight.current.delete(attemptKey) }
     },
     onSettled: async () => {
@@ -274,18 +275,31 @@ export function useExportFinancialReport(organizationId: bigint, companyId?: big
     { reportId: string | number | bigint; exportFormat: 'pdf' | 'xlsx' | 'csv' }
   >({
     mutationFn: async ({ reportId, exportFormat }) => {
-      const { urlPath, init } = stdbBffCommandPost("export_financial_report", {
-        companyId: requireOperatingCompany(companyId),
-        reportId,
-        params: stdbParamsToJson({ exportFormat }),
-      })
+      const id = parseStrictU64(reportId)
+      if (!id || id > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("This report identity cannot be exported exactly")
+      const company = requireOperatingCompany(companyId)
+      const rows: readonly FinancialReportArchiveProjection[] = await fetchQueryList('/api/query/financial-reports', 'Failed to verify report for export')
+      const matches = rows.filter((row) => parseStrictU64(row.id) === id)
+      const report = matches.length === 1 ? matches[0] : null
+      if (!report || parseStrictU64(report.organizationId ?? report.organization_id) !== organizationId || parseStrictU64(report.companyId ?? report.company_id) !== company) throw new Error("This report is unavailable in the selected company")
+      const state = financialReportState(report.state)
+      if (state !== "generated" && state !== "exported") throw new Error("Generate this report before downloading it")
+      // Export registration is a lifecycle operation. Already-exported reports
+      // download through the existing read endpoint without replaying that write.
+      if (state === "generated") {
+        const { urlPath, init } = stdbBffCommandPost("export_financial_report", {
+          companyId: company,
+          reportId,
+          params: stdbParamsToJson({ exportFormat }),
+        })
 
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to export report')
+        const r = await apiFetch(urlPath, init)
+        if (!r.ok) throw new Error('Failed to export report')
+      }
       await downloadDocumentExport(
         exportFormat,
         "financial-report",
-        Number(reportId),
+        Number(id),
         `financial_report_${reportId}.${exportFormat === "pdf" ? "pdf" : exportFormat}`,
       )
     },

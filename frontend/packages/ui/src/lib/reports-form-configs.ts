@@ -92,6 +92,7 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
           name: "currencyId",
           type: "select",
           label: t("reports.forms.generateReport.fields.currencyId"),
+          required: true,
           placeholder: t("reports.forms.generateReport.fields.currencyIdPlaceholder"),
           width: "1/2",
           options: emptySelect,

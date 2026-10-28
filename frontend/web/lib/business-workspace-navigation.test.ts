@@ -16,7 +16,7 @@ for (const module of ["sales", "crm", "purchasing", "reports", "expenses"] as Bu
     const ids = groups.flatMap((group) => group.tabIds)
     assert.equal(new Set(ids).size, ids.length)
     assert.ok(config.workspaces.length <= 5)
-    assert.equal(config.workspaces[0]?.label, "Overview")
+    assert.equal(config.workspaces[0]?.label, module === "reports" ? "Run a report" : "Overview")
     for (const group of groups) assert.ok(!group.label.startsWith("modules."), group.label)
     const tabs: ModuleTab[] = [...ids, "future-extension"].map((id) => ({ id, label: id, type: "custom" }))
     const result = resolveWorkspaceNavigation(tabs, config)
