@@ -1,10 +1,72 @@
 //! Identity and access-control resource reads.
 
+use super::company_scope::accounting_read_permission_resource;
 use super::row_values::sort_rows_by_id_desc;
+use super::{documents, hr};
 use crate::error::ApiError;
 use serde_json::Value;
-use stdb_auth::{identity_sql_literal, resolve_http_sql_columns, FieldAccessContext};
+use stdb_auth::{
+    has_resource_read_permission, identity_sql_literal, registry_get, resolve_http_sql_columns,
+    FieldAccessContext,
+};
 use stdb_client::StdbClient;
+
+pub(super) fn require_ui_child_read_permission(
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<(), ApiError> {
+    let allowed = match resource {
+        "hr-leave-allocations" | "hr-offboarding-checklists" | "hr-statutory-ids" => {
+            hr::has_hr_child_read_permission(field_access, resource)
+        }
+        "document-signature-requests" | "document-legal-holds" | "document-external-refs" => {
+            documents::has_document_read_permission(field_access)
+        }
+        resource if crate::workflow_reads::is_private_workflow_resource(resource) => {
+            // Match the owner-read route's canonical workflow permission. Private
+            // projections are not registry entries and have no independent role grant.
+            let permission_resource = if registry_get(resource).is_some() {
+                resource
+            } else {
+                "workflows"
+            };
+            field_access.is_some_and(|access| {
+                !stdb_auth::resource_read_denied(access, permission_resource)
+                    && (has_resource_read_permission(Some(access), permission_resource)
+                        || access.role_permissions.iter().any(|permission| {
+                            permission == "module:workflows:read"
+                                || permission == "module:workflows:*"
+                        }))
+            })
+        }
+        _ => {
+            stdb_auth::session_read_resource(resource)
+                || has_resource_read_permission(field_access, resource)
+                || accounting_read_permission_resource(resource)
+                    .is_some_and(|parent| has_resource_read_permission(field_access, parent))
+        }
+    };
+    let context_matches = field_access.is_some_and(|access| {
+        organization_id > 0
+            && access.organization_id == organization_id
+            && identity_sql_literal(identity_hex)
+                .ok()
+                .is_some_and(|identity| {
+                    identity_sql_literal(&access.identity_hex).ok().as_ref() == Some(&identity)
+                })
+    });
+    if !allowed
+        || !context_matches
+        || field_access.is_some_and(|a| stdb_auth::resource_read_denied(a, resource))
+    {
+        return Err(ApiError::Forbidden(format!(
+            "Read permission denied for resource '{resource}'"
+        )));
+    }
+    Ok(())
+}
 
 pub(crate) async fn read_roles(
     client: &StdbClient,

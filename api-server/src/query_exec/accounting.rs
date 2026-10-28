@@ -1,7 +1,10 @@
 //! Accounting reads with their existing organization and parent-company scope checks.
 
-use super::company_scope::{accounting_read_permission_resource, company_ids_for_organization};
-use super::row_values::{row_not_soft_deleted, row_u64};
+use super::company_scope::{
+    accounting_read_permission_resource, company_ids_for_organization,
+    optional_company_accounting_resource,
+};
+use super::row_values::{row_company_matches, row_not_soft_deleted, row_u64};
 use crate::error::ApiError;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -10,6 +13,25 @@ use stdb_auth::{
     select_company_scoped_sql, select_org_scoped_sql, FieldAccessContext,
 };
 use stdb_client::StdbClient;
+
+pub(super) fn filter_accounting_company_rows(
+    resource: &str,
+    company_id: u64,
+    rows: &mut Vec<Value>,
+) {
+    // saved-reports is company-filtered in SQL, but its current restricted
+    // projection intentionally omits company_id. Other accounting resources
+    // retain the defense-in-depth row check because they project the field.
+    if resource != "saved-reports" {
+        rows.retain(|row| {
+            row_company_matches(
+                row,
+                company_id,
+                optional_company_accounting_resource(resource),
+            )
+        });
+    }
+}
 
 #[derive(Clone, Copy)]
 struct AccountingChildScope {

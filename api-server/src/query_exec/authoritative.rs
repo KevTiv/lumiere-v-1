@@ -1,7 +1,7 @@
 //! Authorized single-record resource reads.
 
-use super::row_company_matches;
 use super::row_values::filter_and_strip_soft_deleted;
+use super::row_values::row_company_matches;
 use crate::error::ApiError;
 use serde_json::Value;
 use stdb_auth::{

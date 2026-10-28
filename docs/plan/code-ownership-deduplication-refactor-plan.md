@@ -1,6 +1,13 @@
 # Code ownership, deduplication, and modularization: implementation handoff
 
 Status: **IN PROGRESS — corrective integration and remaining modularization.**
+
+2026-10-28 continuation: Accounting tax administration/manual-invoice selectors,
+Inventory tab actions and remaining API query helpers have dedicated owners.
+Current bounded scope, checks and remaining work are recorded in
+[the cleanup verification record](god-file-cleanup-2026-10-28.md) and linked
+module ledgers. Historical execution entries below retain their original
+checkpoint scope; they do not establish acceptance of the current tree.
 Current evidence: [Luna integration log](code-ownership-luna-integration-log.md).
 Earlier acceptance notes below are historical implementation reports, not proof
 that all adoption, behavior, and live-service gates have passed.

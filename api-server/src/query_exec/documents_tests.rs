@@ -565,3 +565,41 @@ async fn denied_context_and_unknown_resource_issue_no_database_queries() {
     server.abort();
     assert!(queries.lock().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn owner_document_dispatch_keeps_empty_reads_handled_and_sql_actor_scoped() {
+    let access = access(&["module:documents:read"]);
+    let actor = identity_sql_literal(ACTOR).unwrap();
+    for (resource, scope) in [
+        (
+            "document-folders",
+            format!("WHERE organization_id = 7 AND (is_access_restricted = false OR owner_id = {actor})"),
+        ),
+        (
+            "documents",
+            format!("WHERE organization_id = 7 AND is_deleted = false AND owner_id = {actor}"),
+        ),
+        (
+            "documents-deleted",
+            format!("WHERE organization_id = 7 AND is_deleted = true AND owner_id = {actor}"),
+        ),
+        (
+            "document-versions",
+            format!("WHERE organization_id = 7 AND created_by = {actor}"),
+        ),
+    ] {
+        let response = json!([{"schema": {"elements": [
+            {"name": {"some": "id"}, "algebraic_type": {"U64": []}}
+        ]}, "rows": []}]);
+        let (client, queries, server) = sql_fixture(vec![response]).await;
+        let result = super::super::execute_resource_query_for_company(
+            &client, resource, 7, ACTOR, Some(&access), None,
+        ).await;
+        server.abort();
+        assert_eq!(result.unwrap(), Vec::<Value>::new(), "{resource}");
+        let queries = queries.lock().unwrap();
+        assert_eq!(queries.len(), 1, "{resource} must not fall through after an empty owner read");
+        assert!(queries[0].ends_with(&scope), "{resource}: {}", queries[0]);
+        assert!(!queries[0].starts_with("SELECT *"));
+    }
+}
