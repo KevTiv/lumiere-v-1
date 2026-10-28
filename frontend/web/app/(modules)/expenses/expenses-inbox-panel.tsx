@@ -1,262 +1,79 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useRef, useState } from "react"
+import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
-import {
-  useApproveExpenseSheet,
-  useExpenseCardStatementUnmatched,
-  useExpenseSheetsToApprove,
-  useExpensesMissingReceipt,
-  useMatchExpenseCardStatementLine,
-  useRefuseExpenseSheet,
-} from "@lumiere/query-hooks/hooks/expenses"
-import { Button } from "@lumiere/ui"
-import { orgBigInts } from "@/lib/org-scoped"
+import { Button } from "@lumiere/ui/components/button"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { useExpenseCardStatementUnmatched, useExpenseSheetsToApprove, useExpensesMissingReceipt, useExpenses, useMatchExpenseCardStatementLine } from "@lumiere/query-hooks/hooks/expenses"
+import { ExpenseRecordPicker } from "./expense-record-picker"
+import { useExpenseReportDecision } from "./expense-report-decision"
+import { cardMatchCandidates, companyWorkflowRows, workflowOptions } from "./expense-workflow-model"
 
 type InboxQueue = "to-approve" | "missing-receipt" | "unmatched-card"
 
-function rowId(row: Record<string, unknown>): string {
-  return String(row.id ?? "")
-}
-
-function field(row: Record<string, unknown>, ...keys: string[]): string {
-  for (const k of keys) {
-    const v = row[k]
-    if (v != null && v !== "") return String(v)
-  }
-  return "—"
-}
-
-/**
- * Bounded-SQL inbox queues: sheets to approve, missing receipts, unmatched cards.
- * Row actions reuse existing approve/refuse/match mutations.
- */
-export function ExpensesInboxPanel({
-  organizationId,
-  companyId,
-}: {
+export function ExpensesInboxPanel({ organizationId, companyId, onOpenExpense }: {
   organizationId: number
   companyId: bigint
+  onOpenExpense: (row: Record<string, unknown>) => void
 }) {
   const { t } = useTranslation()
-  const { orgId } = orgBigInts(organizationId)
+  const orgId = BigInt(organizationId)
   const [queue, setQueue] = useState<InboxQueue>("to-approve")
+  const [matchExpenseId, setMatchExpenseId] = useState<{ [statementId: string]: string }>({})
   const [status, setStatus] = useState<string | null>(null)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [matchExpenseId, setMatchExpenseId] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const matching = useRef(false)
+  const approvals = moduleCollection(useExpenseSheetsToApprove(orgId))
+  const receipts = moduleCollection(useExpensesMissingReceipt(orgId))
+  const cards = moduleCollection(useExpenseCardStatementUnmatched(orgId))
+  const expenses = moduleCollection(useExpenses(orgId))
+  const match = useMatchExpenseCardStatementLine(orgId)
+  const selected = queue === "to-approve" ? approvals : queue === "missing-receipt" ? receipts : cards
+  const rows = companyWorkflowRows(selected.rows, orgId, companyId)
+  const ready = selected.state.status === "ready" && companyId > 0n
+  const decision = useExpenseReportDecision(orgId, companyId, approvals.state.status === "ready")
+  const queues: InboxQueue[] = ["to-approve", "missing-receipt", "unmatched-card"]
+  const labels = { "to-approve": "toApprove", "missing-receipt": "missingReceipt", "unmatched-card": "unmatchedCard" }
 
-  const { data: toApprove = [] } = useExpenseSheetsToApprove(orgId)
-  const { data: missingReceipt = [] } = useExpensesMissingReceipt(orgId)
-  const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
-
-  const approveSheet = useApproveExpenseSheet(orgId, companyId)
-  const refuseSheet = useRefuseExpenseSheet(orgId)
-  const matchCard = useMatchExpenseCardStatementLine(orgId)
-
-  const rows = useMemo(() => {
-    if (queue === "to-approve") return toApprove as Record<string, unknown>[]
-    if (queue === "missing-receipt") return missingReceipt as Record<string, unknown>[]
-    return unmatchedCards as Record<string, unknown>[]
-  }, [queue, toApprove, missingReceipt, unmatchedCards])
-
-  const run = async (id: string, fn: () => Promise<void>, okMsg: string) => {
-    setBusyId(id)
-    setStatus(null)
-    try {
-      await fn()
-      setStatus(okMsg)
-    } catch (e) {
-      setStatus(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const queues: { id: InboxQueue; label: string; count: number; testId: string }[] = [
-    {
-      id: "to-approve",
-      label: t("expenses.inbox.toApprove", { defaultValue: "To approve" }),
-      count: toApprove.length,
-      testId: "expenses-inbox-to-approve",
-    },
-    {
-      id: "missing-receipt",
-      label: t("expenses.inbox.missingReceipt", { defaultValue: "Missing receipt" }),
-      count: missingReceipt.length,
-      testId: "expenses-inbox-missing-receipt",
-    },
-    {
-      id: "unmatched-card",
-      label: t("expenses.inbox.unmatchedCard", { defaultValue: "Unmatched cards" }),
-      count: unmatchedCards.length,
-      testId: "expenses-inbox-unmatched-card",
-    },
-  ]
-
-  return (
-    <div className="space-y-4" data-testid="expenses-inbox-panel">
-      <div>
-        <h2 className="text-sm font-medium">
-          {t("expenses.inbox.title", { defaultValue: "Exception inbox" })}
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          {t("expenses.inbox.description", {
-            defaultValue: "Server-bounded queues for approval, receipt evidence, and card match.",
-          })}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {queues.map((q) => (
-          <Button
-            key={q.id}
-            type="button"
-            size="sm"
-            variant={queue === q.id ? "default" : "outline"}
-            data-testid={q.testId}
-            onClick={() => setQueue(q.id)}
-          >
-            {q.label} ({q.count})
-          </Button>
-        ))}
-      </div>
-
-      {status ? (
-        <p className="text-sm text-muted-foreground" role="status" data-testid="expenses-inbox-status">
-          {status}
-        </p>
-      ) : null}
-
-      <div className="space-y-2" data-testid={`expenses-inbox-list-${queue}`}>
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t("expenses.inbox.empty", { defaultValue: "No items in this queue." })}
-          </p>
-        ) : null}
-        {rows.map((row) => {
-          const id = rowId(row)
-          const busy = busyId === id
-          if (queue === "to-approve") {
-            return (
-              <div
-                key={id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
-                data-testid={`expenses-inbox-row-${id}`}
-              >
-                <div>
-                  <div className="font-medium">{field(row, "name")}</div>
-                  <div className="text-muted-foreground">
-                    #{id} · {field(row, "totalAmount", "total_amount")} · {field(row, "state")}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={busy}
-                    data-testid={`expenses-inbox-approve-${id}`}
-                    onClick={() =>
-                      void run(
-                        id,
-                        async () => {
-                          await approveSheet.mutateAsync(id)
-                        },
-                        t("expenses.inbox.approved", { defaultValue: "Report approved." }),
-                      )
-                    }
-                  >
-                    {t("expenses.workflow.approveReport")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    disabled={busy}
-                    data-testid={`expenses-inbox-refuse-${id}`}
-                    onClick={() =>
-                      void run(
-                        id,
-                        () =>
-                          refuseSheet.mutateAsync({
-                            sheetId: id,
-                            params: { reason: "Refused from inbox" },
-                          }),
-                        t("expenses.inbox.refused", { defaultValue: "Report refused." }),
-                      )
-                    }
-                  >
-                    {t("expenses.workflow.refuseReport")}
-                  </Button>
-                </div>
-              </div>
-            )
-          }
-          if (queue === "missing-receipt") {
-            return (
-              <div
-                key={id}
-                className="rounded-md border p-3 text-sm"
-                data-testid={`expenses-inbox-row-${id}`}
-              >
-                <div className="font-medium">{field(row, "name")}</div>
-                <div className="text-muted-foreground">
-                  #{id} · {field(row, "totalAmount", "total_amount")} ·{" "}
-                  {t("expenses.inbox.openInExpenses", {
-                    defaultValue: "Attach a receipt from the Expenses tab, then re-submit.",
-                  })}
-                </div>
-              </div>
-            )
-          }
-          return (
-            <div
-              key={id}
-              className="flex flex-wrap items-end justify-between gap-2 rounded-md border p-3 text-sm"
-              data-testid={`expenses-inbox-row-${id}`}
-            >
-              <div>
-                <div className="font-medium">
-                  {field(row, "externalRef", "external_ref")} · {field(row, "amount")}
-                </div>
-                <div className="text-muted-foreground">
-                  #{id} · {field(row, "merchantKey", "merchant_key")} · {field(row, "status")}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  className="rounded-md border bg-background px-2 py-1.5 text-sm w-36"
-                  placeholder={t("expenses.ops.expenseId")}
-                  value={matchExpenseId[id] ?? ""}
-                  onChange={(e) =>
-                    setMatchExpenseId((prev) => ({ ...prev, [id]: e.target.value }))
-                  }
-                  data-testid={`expenses-inbox-match-expense-${id}`}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy || !(matchExpenseId[id] ?? "").trim()}
-                  data-testid={`expenses-inbox-match-${id}`}
-                  onClick={() =>
-                    void run(
-                      id,
-                      () =>
-                        matchCard.mutateAsync({
-                          statementLineId: id,
-                          expenseId: (matchExpenseId[id] ?? "").trim(),
-                        }),
-                      t("expenses.ops.matched"),
-                    )
-                  }
-                >
-                  {t("expenses.ops.match")}
-                </Button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+  return <div className="space-y-4" data-testid="expenses-inbox-panel">
+    <h2 className="text-lg font-medium">{t("expenses.inbox.title")}</h2>
+    <div className="flex flex-wrap gap-2">
+      {queues.map(id => <Button key={id} variant={queue === id ? "default" : "outline"} onClick={() => { setQueue(id); setStatus(null) }}
+        data-testid={`expenses-inbox-${id}`} aria-pressed={queue === id}>{t(`expenses.inbox.${labels[id]}`)}</Button>)}
     </div>
-  )
+    <ModuleDataNotice state={selected.state} />
+    {selected.state.status === "loading" && <p role="status">{t("common.loading")}</p>}
+    {status && <p role="status">{status}</p>}
+    {decision.error && <p role="alert" className="text-destructive">{decision.error}</p>}
+    {ready && rows.length === 0 && <p>{t("expenses.inbox.empty")}</p>}
+    {ready && rows.map(row => {
+      const id = String(row.id)
+      const options = workflowOptions(cardMatchCandidates(companyWorkflowRows(expenses.rows, orgId, companyId), row))
+      return <div key={id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3" data-testid={`expenses-inbox-row-${id}`}>
+        <div className="min-w-0 [overflow-wrap:anywhere]">{String(row.name ?? row.externalRef ?? id)}</div>
+        {queue === "to-approve" ? <div className="flex flex-wrap gap-2">
+          <Button variant="outline" render={<Link href={`/expenses/reports/${id}`} />} nativeButton={false}>{t("expenses.workflowUi.reviewReport")}</Button>
+          <Button disabled={decision.isPending || !decision.can("approve")} onClick={() => decision.open("approve", row)}>{t("expenses.workflow.approveReport")}</Button>
+          <Button variant="outline" disabled={decision.isPending || !decision.can("refuse")} onClick={() => decision.open("refuse", row)}>{t("expenses.workflow.refuseReport")}</Button>
+        </div> : queue === "missing-receipt" ? <Button variant="outline" onClick={() => onOpenExpense(row)}>{t("expenses.workflowUi.attachReceipt")}</Button> : <div className="flex min-w-0 flex-wrap items-end gap-2">
+          <ModuleDataNotice state={expenses.state} />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.expense")} value={matchExpenseId[id] ?? ""} options={options}
+            onChange={value => setMatchExpenseId(current => ({ ...current, [id]: value }))} disabled={busy || expenses.state.status !== "ready"} />
+          <Button disabled={busy || expenses.state.status !== "ready" || !options.some(option => option.value === matchExpenseId[id])}
+            onClick={async () => {
+              if (matching.current) return
+              matching.current = true; setBusy(true); setStatus(null)
+              try {
+                await match.mutateAsync({ statementLineId: id, expenseId: matchExpenseId[id]! })
+                setStatus(t("expenses.ops.matched")); setMatchExpenseId(current => ({ ...current, [id]: "" }))
+              } catch (cause) { setStatus(cause instanceof Error ? cause.message : String(cause)) }
+              finally { matching.current = false; setBusy(false) }
+            }}>{t("expenses.ops.match")}</Button>
+        </div>}
+      </div>
+    })}
+    {decision.modal}
+  </div>
 }

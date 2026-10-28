@@ -26,7 +26,7 @@ describe("RBAC action vocabulary", () => {
     expect(actionsMatch("*", "admin")).toBe(true)
   })
 
-  it.each(["post", "reconcile", "reverse", "cancel"] as const)("keeps the backend %s permission distinct from write", (action) => {
+  it.each(["approve", "post", "reconcile", "reverse", "cancel"] as const)("keeps the backend %s permission distinct from write", (action) => {
     expect(parsePermissionString(`payment:${action}`)).toEqual({ resource: "payment", action })
     expect(actionsMatch("write", action)).toBe(false)
     expect(actionsMatch(action, action)).toBe(true)
