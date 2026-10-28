@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ListOrdered, MoreHorizontal } from 'lucide-react';
@@ -21,7 +21,7 @@ import {
   SmartButtons,
   StatusBar,
   buildModuleTabHref,
-  useFormDialog,
+  FormModal,
   useRBAC,
   subscriptionAmendmentsTableConfig,
   subscriptionLinesTableConfig,
@@ -57,7 +57,10 @@ import { RecordDocumentAttachments } from '../../../../components/record-documen
 import { CrossRecordLinks } from '../../../../components/order-handoff-links';
 import { subscriptionStateOf, subscriptionStatusBar } from '../subscription-status';
 import { subscriptionPageActions, type SubscriptionActionId } from '../subscription-actions';
-import { isSubscriptionDialogAction, useSubscriptionActions } from '../use-subscription-actions';
+import { useSubscriptionActions } from '../use-subscription-actions';
+import { inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, nextSubscriptionAction, ADVANCED_SUBSCRIPTION_ACTIONS, subscriptionActionPermissions } from '../subscription-workflow';
+import { moduleCollection } from '@lumiere/ui/lib/module-data-state';
+import { SubscriptionSourceNotice } from '../subscription-overview';
 import { PAYMENT_INTENT_TYPES, newIdempotencyKey, toPaymentIntentParams } from '../subscription-payment-intent';
 
 interface SubscriptionPageClientProps {
@@ -91,16 +94,20 @@ function SubscriptionPageLoaded({
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
-  const { data: subscriptions = [], isLoading } = useSubscriptions(orgId, initialSubscriptions);
-  const { data: lines = [] } = useSubscriptionLines(orgId);
+  const subscriptionsQuery = useSubscriptions(orgId, initialSubscriptions);
+  const { rows: subscriptions, state: subscriptionsState } = moduleCollection(subscriptionsQuery);
+  const isLoading = subscriptionsQuery.isLoading;
+  const linesQuery = useSubscriptionLines(orgId);
+  const { rows: lines, state: linesState } = moduleCollection(linesQuery);
   const { data: amendments = [] } = useSubscriptionAmendments(orgId);
   const { data: billingRuns = [], isLoading: runsLoading, isError: runsError } = useSubscriptionBillingRuns(orgId);
   const { data: accountMoves = [], isLoading: movesLoading, isError: movesError } = useAccountMoves(orgId);
   const { data: accountPayments = [], isLoading: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
 
-  const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId);
-  const { checkPermission } = useRBAC();
-  const { askForm, formDialog } = useFormDialog();
+  const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId, subscriptionsState.status === 'ready');
+  const { checkPermission, permissionsReady } = useRBAC();
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestKey, setRequestKey] = useState('');
   const createPaymentIntent = useCreateSubscriptionPaymentIntent(orgId, operatingCompanyId);
   const { data: currencies = [] } = useCurrencies();
   const currencyOptions = useMemo(
@@ -109,19 +116,19 @@ function SubscriptionPageLoaded({
   );
 
   const subscription = useMemo(
-    () => (subscriptions as unknown as Row[]).find((row) => String(row.id) === subscriptionId),
-    [subscriptions, subscriptionId],
+    () => (subscriptions as unknown as Row[]).find((row) => String(row.id) === subscriptionId && inSubscriptionScope(row, { organizationId: orgId, companyId: operatingCompanyId })),
+    [subscriptions, subscriptionId, orgId, operatingCompanyId],
   );
   const ownRows = useCallback(
     (rows: unknown) =>
-      (rows as Row[]).filter((row) => String(row.subscriptionId ?? row.subscription_id ?? '') === subscriptionId),
-    [subscriptionId],
+      (rows as Row[]).filter((row) => inSubscriptionScope(row, { organizationId: orgId, companyId: operatingCompanyId }) && String(row.subscriptionId ?? row.subscription_id ?? '') === subscriptionId),
+    [subscriptionId, orgId, operatingCompanyId],
   );
   const ownLines = useMemo(() => ownRows(lines), [lines, ownRows]);
   const ownAmendments = useMemo(() => ownRows(amendments), [amendments, ownRows]);
 
   const navigation = useRecordNavigation<Row>({
-    rows: subscriptions as unknown as Row[],
+    rows: (subscriptions as unknown as Row[]).filter((row) => inSubscriptionScope(row, { organizationId: orgId, companyId: operatingCompanyId })),
     currentId: subscriptionId,
     basePath: '/subscriptions',
     labelOf: (row) => String(row.code || row.id),
@@ -142,18 +149,7 @@ function SubscriptionPageLoaded({
     [pathname, router, searchParams],
   );
 
-  const run = useCallback(async (title: string, work: () => Promise<unknown>) => {
-    try {
-      await work();
-      showWorkflowToast({ kind: 'success', title, description: '' });
-    } catch (error) {
-      showWorkflowToast({
-        kind: 'error',
-        title,
-        description: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }, []);
+  if (subscriptionsState.status === 'denied' || subscriptionsState.status === 'error') return <SubscriptionSourceNotice state={subscriptionsState} />;
 
   if (!subscription) {
     if (isLoading) {
@@ -226,83 +222,31 @@ function SubscriptionPageLoaded({
     'advance-dunning': t('subscriptions.actions.advanceDunning', { defaultValue: 'Advance dunning' }),
     'refresh-flags': t('subscriptions.actions.refreshFlags', { defaultValue: 'Refresh exception flags' }),
   };
-  const runAction = (action: SubscriptionActionId) => {
-    if (isSubscriptionDialogAction(action)) {
-      subscriptionActions.openDialog(action, id);
-      return;
-    }
-    void run(actionLabels[action], () => subscriptionActions.runDirect(action, id));
+  const runAction = (action: SubscriptionActionId) => subscriptionActions.openDialog(action, BigInt(subscriptionId));
+  const billingReady = !runsLoading && !runsError && !movesLoading && !movesError;
+  const invoices = billingReady ? subscriptionInvoices(subscription, billingRuns, accountMoves, { organizationId: orgId, companyId: operatingCompanyId }) : [];
+  const unpaidInvoices = invoices.filter((invoice) => (invoiceOutstanding(invoice) ?? 0) > 0);
+  const canAct = (action: SubscriptionActionId) => permissionsReady !== false && subscriptionsState.status === 'ready'
+    && subscriptionActionPermissions(action).every(([resource, verb]) => checkPermission(resource, verb).allowed);
+  const canRequestPayment = permissionsReady !== false && subscriptionsState.status === 'ready' && checkPermission('subscription', 'write').allowed;
+  const nextAction = nextSubscriptionAction(subscription, { linesReady: linesState.status === 'ready', lines: ownLines, billingReady, invoices });
+  const headerActions = subscriptionPageActions(state).filter((action) => canAct(action.id)
+    && (action.id !== 'activate' || (linesState.status === 'ready' && ownLines.length > 0))
+    && (action.id !== 'pay-invoice' || (billingReady && unpaidInvoices.length > 0)));
+  const primaryActions = headerActions.filter((action) => action.id === nextAction);
+  const moreActions = headerActions.filter((action) => action.id !== nextAction);
+  const paymentRequestForm = {
+    id: 'subscription-payment-request', title: t('subscriptions.workflow.requestPayment'),
+    description: t('subscriptions.workflow.requestExplanation'), submitLabel: t('subscriptions.workflow.requestPayment'),
+    sections: [{ id: 'request', fields: [
+      { id: 'intentType', name: 'intentType', type: 'select' as const, label: t('subscriptions.paymentIntent.intentType'), required: true, defaultValue: 'card_charge', options: PAYMENT_INTENT_TYPES.map((value) => ({ value, label: t(`subscriptions.paymentIntent.types.${value}`, { defaultValue: value }) })) },
+      { id: 'invoiceMoveId', name: 'invoiceMoveId', type: 'select' as const, label: t('subscriptions.workflow.invoice'), defaultValue: unpaidInvoices.length === 1 ? String(unpaidInvoices[0]!.id) : '', required: true,
+        options: unpaidInvoices.map((invoice) => ({ value: String(invoice.id), label: String(invoice.name ?? invoice.id) })) },
+      { id: 'amount', name: 'amount', type: 'money' as const, label: t('subscriptions.paymentIntent.amount'), required: true, validation: { min: 0.01 }, defaultValue: unpaidInvoices.length === 1 ? invoiceOutstanding(unpaidInvoices[0]!) ?? undefined : undefined },
+      { id: 'currencyId', name: 'currencyId', type: 'select' as const, label: t('subscriptions.paymentIntent.currency'), required: true, disabled: true, defaultValue: String(subscription.currencyId ?? subscription.currency_id ?? ''),
+        options: currencyOptions.filter((option) => option.value === String(subscription.currencyId ?? subscription.currency_id)) },
+    ] }],
   };
-  /** Opens a payment intent for this subscription. One idempotency key per dialog, so a retried submit cannot double-create. */
-  const promptPaymentIntent = async () => {
-    const title = t('subscriptions.paymentIntent.create', { defaultValue: 'Create payment intent' });
-    const idempotencyKey = newIdempotencyKey();
-    const subscriptionCurrency = String(subscription.currencyId ?? subscription.currency_id ?? '');
-    const recurringTotal = Number(subscription.recurringTotal ?? subscription.recurring_total ?? 0);
-    const values = await askForm({
-      title,
-      fields: [
-        {
-          id: 'intentType',
-          name: 'intentType',
-          label: t('subscriptions.paymentIntent.intentType', { defaultValue: 'Intent type' }),
-          type: 'select',
-          required: true,
-          defaultValue: 'card_charge',
-          width: '1/2',
-          options: PAYMENT_INTENT_TYPES.map((value) => ({
-            value,
-            label: t(`subscriptions.paymentIntent.types.${value}`, { defaultValue: value }),
-          })),
-        },
-        {
-          id: 'amount',
-          name: 'amount',
-          label: t('subscriptions.paymentIntent.amount', { defaultValue: 'Amount' }),
-          type: 'number',
-          required: true,
-          min: 0,
-          step: 0.01,
-          defaultValue: Number.isFinite(recurringTotal) && recurringTotal > 0 ? recurringTotal : undefined,
-          width: '1/2',
-        },
-        {
-          id: 'currencyId',
-          name: 'currencyId',
-          label: t('subscriptions.paymentIntent.currency', { defaultValue: 'Currency' }),
-          type: 'select',
-          required: true,
-          defaultValue: subscriptionCurrency,
-          options: currencyOptions,
-          width: '1/2',
-        },
-        {
-          id: 'invoiceMoveId',
-          name: 'invoiceMoveId',
-          label: t('subscriptions.paymentIntent.invoiceMoveId', { defaultValue: 'Invoice move ID (optional)' }),
-          type: 'text',
-          inputMode: 'numeric',
-          width: '1/2',
-        },
-      ],
-    });
-    if (values == null) return;
-    const params = toPaymentIntentParams(values, idempotencyKey);
-    if (params == null) {
-      showWorkflowToast({
-        kind: 'error',
-        title: t('subscriptions.paymentIntent.failed', { defaultValue: 'Create payment intent failed' }),
-        description: t('subscriptions.paymentIntent.invalid', {
-          defaultValue: 'Choose an intent type and a currency, and enter an amount above zero (and a valid invoice move ID, if any).',
-        }),
-      });
-      return;
-    }
-    await run(title, () => createPaymentIntent.mutateAsync({ subscriptionId: BigInt(subscriptionId), params }));
-  };
-  const headerActions = subscriptionPageActions(state);
-  const primaryActions = headerActions.filter((a) => a.primary);
-  const moreActions = headerActions.filter((a) => !a.primary);
   const id = BigInt(subscriptionId);
 
   return (
@@ -342,7 +286,19 @@ function SubscriptionPageLoaded({
       actions={
         <>
           {subscriptionActions.dialogs}
-          {formDialog}
+          <FormModal key={`${orgId}:${operatingCompanyId}:${subscriptionId}:${requestKey}`} open={requestOpen} onOpenChange={setRequestOpen} config={paymentRequestForm} draft={false}
+            isPending={createPaymentIntent.isPending} submissionDisabled={!billingReady || !canRequestPayment || unpaidInvoices.length === 0}
+            showSubmitSuccessToast={false}
+            onSubmit={async (values) => {
+              const invoice = unpaidInvoices.find((row) => String(row.id) === String(values.invoiceMoveId));
+              const amount = Number(values.amount);
+              if (!billingReady || !canRequestPayment || !invoice || !Number.isFinite(amount) || amount <= 0 || amount > (invoiceOutstanding(invoice) ?? 0)
+                || String(values.currencyId) !== String(subscription.currencyId ?? subscription.currency_id)) throw new Error(t('subscriptions.workflow.invalidPayment'));
+              const params = toPaymentIntentParams(values, requestKey);
+              if (!params) throw new Error(t('subscriptions.workflow.invalidPayment'));
+              await createPaymentIntent.mutateAsync({ subscriptionId: BigInt(subscriptionId), params });
+              showWorkflowToast({ kind: 'success', title: t('subscriptions.workflow.requestCreated'), description: t('subscriptions.workflow.requestExplanation') });
+            }} />
           {primaryActions.map((action) => (
             <Button
               key={action.id}
@@ -354,15 +310,15 @@ function SubscriptionPageLoaded({
               {actionLabels[action.id]}
             </Button>
           ))}
-          {checkPermission('subscription', 'write').allowed ? (
+          {state === 'active' && canRequestPayment && billingReady && unpaidInvoices.length > 0 ? (
             <Button
               variant="outline"
               size="sm"
               disabled={busy || createPaymentIntent.isPending}
               data-testid="subscription-create-payment-intent"
-              onClick={() => void promptPaymentIntent()}
+              onClick={() => { setRequestKey(newIdempotencyKey()); setRequestOpen(true); }}
             >
-              {t('subscriptions.paymentIntent.create', { defaultValue: 'Create payment intent' })}
+              {t('subscriptions.workflow.requestPayment')}
             </Button>
           ) : null}
           {moreActions.length > 0 ? (
@@ -370,13 +326,14 @@ function SubscriptionPageLoaded({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={busy} data-testid="subscription-more-actions">
                   <MoreHorizontal className="mr-1 h-4 w-4" />
-                  {t('subscriptions.page.moreActions', { defaultValue: 'More' })}
+                  {t('subscriptions.workflow.manageSubscription')}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {moreActions.map((action, index) => (
+                {[...moreActions.filter((action) => !ADVANCED_SUBSCRIPTION_ACTIONS.includes(action.id)), ...moreActions.filter((action) => ADVANCED_SUBSCRIPTION_ACTIONS.includes(action.id))].map((action, index, ordered) => (
                   <div key={action.id}>
-                    {action.id === 'cancel' && index > 0 ? <DropdownMenuSeparator /> : null}
+                    {index > 0 && (action.id === 'cancel' || (ADVANCED_SUBSCRIPTION_ACTIONS.includes(action.id) && !ADVANCED_SUBSCRIPTION_ACTIONS.includes(ordered[index - 1]!.id))) ? <DropdownMenuSeparator /> : null}
+                    {ADVANCED_SUBSCRIPTION_ACTIONS.includes(action.id) && (index === 0 || !ADVANCED_SUBSCRIPTION_ACTIONS.includes(ordered[index - 1]!.id)) && <p className="px-2 py-1.5 text-xs text-muted-foreground">{t('subscriptions.workflow.advanced')}</p>}
                     <DropdownMenuItem
                       data-testid={`subscription-action-${action.id}`}
                       onSelect={() => runAction(action.id)}
@@ -396,7 +353,14 @@ function SubscriptionPageLoaded({
         {
           id: 'overview',
           label: t('common.overview', { defaultValue: 'Overview' }),
-          content: <EntityDetail config={detailConfig} data={subscription} />,
+          content: <div className="space-y-5">
+            <section className="space-y-2 rounded-lg border p-4" data-testid="subscription-next-step">
+              <h2 className="font-medium">{t('subscriptions.workflow.nextStep')}</h2>
+              <p className="text-sm text-muted-foreground">{t(nextAction && !canAct(nextAction) ? 'subscriptions.workflow.operatorNeeded' : nextAction ? `subscriptions.workflow.next.${nextAction}` : state === 'closed' ? 'subscriptions.workflow.next.closed' : state === 'draft' && linesState.status === 'ready' && ownLines.length === 0 ? 'subscriptions.workflow.noLines' : !billingReady || linesState.status !== 'ready' ? 'subscriptions.workflow.next.verify' : 'subscriptions.workflow.next.scheduled')}</p>
+              <Button variant="outline" size="sm" onClick={() => setActiveTab('billing')}>{t('subscriptions.workflow.reviewBilling')}</Button>
+            </section>
+            <EntityDetail config={detailConfig} data={subscription} />
+          </div>,
         },
         {
           id: 'lines',

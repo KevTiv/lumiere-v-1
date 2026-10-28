@@ -200,6 +200,13 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
         {onApplyRules ? <Button variant="ghost" className={touchButton} disabled={locked || live.status !== "ready"} onClick={() => void find(onApplyRules)}>Find rule suggestions</Button> : null}
       </div> : null}
     </header>
+    {!operation && live.status === "ready" ? <p role="status" className="rounded-lg border bg-muted/30 p-3 text-sm" data-testid="bank-matching-next-step">
+      {!canReconcile ? t("accounting.bankMatchingGuide.permission", { defaultValue: "You can review matches. An authorized accountant must confirm the settlement." })
+        : selectedIds.length === 0 ? t("accounting.bankMatchingGuide.select", { defaultValue: "Next: select the invoices or bills covered by this bank transaction. Selecting records does not post a payment." })
+        : !review.request ? t("accounting.bankMatchingGuide.balance", { defaultValue: "Next: resolve the difference below. Select all open items for one partner so the total exactly matches the bank amount." })
+        : !reviewed ? t("accounting.bankMatchingGuide.review", { defaultValue: "Next: check the selected documents and amounts, then tick the review confirmation. The settlement button becomes available after review." })
+        : t("accounting.bankMatchingGuide.confirm", { defaultValue: "Ready to confirm. This creates a payment subject to any required approval; the bank line is matched only when settlement completes." })}
+    </p> : null}
     {operation ? <div role="status" aria-live="polite" className="space-y-3 rounded-xl border bg-muted/30 p-4" data-testid="reconciliation-operation">
       <p className="font-medium">{operation.status === "pending" ? operation.recoveryRequest ? text("pendingRecovery", "Confirming the reviewed settlement recovery…") : "Confirming the reviewed bank settlement…"
         : operation.status === "confirmed" ? "Bank settlement confirmed"
@@ -216,6 +223,7 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
         : operation.status === "reversed" ? operation.attempt?.allocationApplied ? text("restored", "The compensating entry is posted, this settlement’s invoice balances are restored, and the statement is open with an unmatched bank line.") : text("unallocatedReversed", "The unallocated payment has a posted compensating entry. The statement is open and the bank line is unmatched.")
         : operation.status === "abandoned" ? text("retired", "The unposted payment is retired and the original invoice balances are unchanged. Review a fresh settlement when ready.")
         : "The original selection is preserved. No action will be replayed automatically.")}</p>
+      {operation.paymentId && actorMatches && scopeMatches && source.state.status === "ready" ? <a href={`/accounting?tab=payments&filter=${encodeURIComponent(`id:${operation.paymentId}`)}`} className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4">{t("accounting.bankMatchingGuide.openPayment", { defaultValue: "Open settlement payment" })} #{operation.paymentId}</a> : null}
       {operation.attempt && actorMatches ? <p className="text-sm">{text("originalPayment", "Original payment")} #{operation.attempt.paymentId} · {text("selectedItems", "Selected journal items")}: {operation.attempt.selectedMoveLineIds.map((id) => `#${id}`).join(", ")}</p> : null}
       {!scopeMatches ? <p className="text-sm">The active company changed. This recovery still refers only to the original company and line.</p> : null}
       {!actorMatches ? <p className="text-sm">{text("originalUser", "Return to the original signed-in user to recover this action.")}</p> : null}

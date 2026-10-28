@@ -323,16 +323,13 @@ test.describe(
         "receivableAccountId",
         receivableLabel,
       )
-      await chooseSelectOptionByLabel(
-        page,
-        "cogsAccountId",
-        await accountLabelByCode(page, "5000"),
-      )
-      await chooseSelectOptionByLabel(
-        page,
-        "inventoryAccountId",
-        await accountLabelByCode(page, "1400"),
-      )
+      if (generatedInvoice.state === "Draft") {
+        await chooseSelectOptionByLabel(page, "cogsAccountId", await accountLabelByCode(page, "5000"))
+        await chooseSelectOptionByLabel(page, "inventoryAccountId", await accountLabelByCode(page, "1400"))
+      } else {
+        await expect(page.getByTestId("form-field-cogsAccountId")).toHaveCount(0)
+        await expect(page.getByTestId("form-field-inventoryAccountId")).toHaveCount(0)
+      }
 
       const [paid] = await Promise.all([
         page.waitForResponse(

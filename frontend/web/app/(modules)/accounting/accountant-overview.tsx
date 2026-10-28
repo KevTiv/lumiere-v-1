@@ -36,6 +36,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
   const [showAll, setShowAll] = useState(false)
   const queueDefs: Array<{ key: OverviewQueueKey; label: string; hint: string; icon: ReactNode; tab: string }> = [
     { key: "overdue", label: tr("overdue", "Overdue receivables"), hint: tr("overdueHint", "Posted invoices with an outstanding balance"), icon: <CircleAlert />, tab: "invoices" },
+    { key: "bills-due", label: tr("billsDue", "Bills due soon"), hint: tr("billsDueHint", "Outstanding vendor bills overdue or due within the next seven days"), icon: <ArrowUpRight />, tab: "bills" },
     { key: "draft-invoices", label: tr("draftInvoices", "Draft customer invoices"), hint: tr("draftInvoicesHint", "Review details before posting"), icon: <FileText />, tab: "invoices" },
     { key: "draft-bills", label: tr("draftBills", "Draft vendor bills"), hint: tr("draftBillsHint", "Check supplier details and line items"), icon: <ReceiptText />, tab: "bills" },
     { key: "bank-lines", label: tr("bankLines", "Unreconciled bank lines"), hint: tr("bankLinesHint", "Match statement activity to your records"), icon: <Landmark />, tab: "bank-statements" },
@@ -45,7 +46,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
   ]
   const activeDef = queueDefs.find((definition) => definition.key === selectedQueue)!
   const activeQueue = model.queues[selectedQueue]
-  const activeRows = selectedQueue === "deadlines" || selectedQueue === "overdue"
+  const activeRows = selectedQueue === "deadlines" || selectedQueue === "overdue" || selectedQueue === "bills-due"
     ? [...activeQueue.rows].sort((a, b) => (overviewDueDate(a)?.getTime() ?? Infinity) - (overviewDueDate(b)?.getTime() ?? Infinity))
     : activeQueue.rows
   const activityTotal = model.activity.months.reduce((sum, month) => sum + month.invoices + month.bills, 0)
@@ -94,7 +95,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     return totals.map((total) => `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(total.amount)} ${currencyLabel(total)}`).join(" · ")
   }
   function recordLink(row: OverviewRow, key: OverviewQueueKey): string | undefined {
-    if (["overdue", "draft-invoices", "draft-bills"].includes(key)) return invoiceRecordHref({ id: row.id, moveType: row.moveType ?? row.move_type })
+    if (["overdue", "bills-due", "draft-invoices", "draft-bills"].includes(key)) return invoiceRecordHref({ id: row.id, moveType: row.moveType ?? row.move_type })
     if (key === "unlinked-payments" || key === "deadlines") {
       const tab = key === "deadlines" ? "tax-deadlines" : "payments"
       return `/accounting?tab=${tab}&filter=${encodeURIComponent(`id:${String(row.id)}`)}`
@@ -107,6 +108,10 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     { label: tr("overdue", "Overdue receivables"), collection: model.overdue, icon: <CircleAlert />, key: "overdue" as OverviewQueueKey, empty: tr("noOverdue", "No overdue invoices"), hint: tr("overdueSummaryHint", "Follow up on unpaid balances") },
     { label: tr("bankLines", "Unreconciled bank lines"), collection: model.unmatched, icon: <Landmark />, key: "bank-lines" as OverviewQueueKey, hint: tr("bankSummaryHint", "Review statement matches") },
   ]
+
+  const queueHref = selectedQueue === "overdue" ? "/accounting?tab=invoices&filter=queue%3Aoverdue"
+    : selectedQueue === "draft-invoices" ? "/accounting?tab=invoices&filter=status%3ADraft"
+    : selectedQueue === "draft-bills" ? "/accounting?tab=bills&filter=status%3ADraft" : undefined
 
   return <div className="space-y-6" data-testid="accountant-overview">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -125,7 +130,6 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     <nav aria-label={t("accounting.insights.sections")} className="flex flex-wrap gap-2 text-sm">
       {[["financial-overview-title", t("accounting.insights.title")], ["accounting-insights-title", t("accounting.insights.insightsTitle")], ["accountant-action-queues", t("accounting.insights.queuesTitle")]].map(([target, label]) => <a key={target} href={`#${target}`} className="inline-flex min-h-11 items-center rounded-md border px-3 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">{label}</a>)}
     </nav>
-    <AccountantInsights key={`${data.organizationId}:${data.companyId}`} data={data} now={now} />
 
     <h2 id="accountant-action-queues" className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("accounting.insights.queuesTitle")}</h2>
     <div className={`${workspaceStyles.surface} grid grid-cols-1 overflow-hidden min-[360px]:grid-cols-2`}>
@@ -143,6 +147,48 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
           : <button key={card.key} type="button" className={className} onClick={() => { setSelectedQueue(card.key); setShowAll(false) }}>{content}</button>
       })}
     </div>
+
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="accountant-attention-title">
+        <div className="border-b px-5 py-4"><h3 id="accountant-attention-title" className="font-semibold">{tr("attention", "Needs attention")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("attentionHint", "Choose a queue to review its records.")}</p></div>
+        <div className="divide-y">{queueDefs.map((definition) => {
+          const queue = model.queues[definition.key]
+          return <button key={definition.key} type="button" aria-pressed={selectedQueue === definition.key} data-testid={`accountant-queue-${definition.key}`}
+            onClick={() => { setSelectedQueue(definition.key); setShowAll(false) }}
+            className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/40 aria-pressed:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground [&>svg]:size-4">{definition.icon}</span>
+            <span className="min-w-0 flex-1 text-sm font-medium">{definition.label}</span>
+            {queue.state.status === "ready" ? <Badge variant={definition.key === "overdue" && queue.rows.length ? "destructive" : "secondary"} className="tabular-nums">{queue.rows.length}</Badge> : <span className="max-w-28 text-right text-xs text-muted-foreground">{stateText(queue)}</span>}
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+          </button>
+        })}</div>
+      </section>
+
+      <section className="flex min-w-0 flex-col rounded-xl border bg-card" aria-labelledby="accountant-queue-title" aria-live="polite">
+        <div className="border-b px-5 py-4"><h3 id="accountant-queue-title" className="font-semibold">{activeDef.label}</h3><p className="mt-1 text-xs text-muted-foreground">{activeDef.hint}</p></div>
+        <div className="flex-1 p-5">
+          {stateNotice(activeQueue)}
+          {activeQueue.state.status === "ready" && (activeRows.length === 0
+            ? <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center"><CheckCheck className="size-7 text-muted-foreground" /><p className="text-sm font-medium">{tr("queueClear", "Nothing waiting in this queue")}</p><p className="max-w-xs text-xs text-muted-foreground">{tr("queueClearHint", "New items appear here as your accounting work progresses.")}</p></div>
+            : <div className="divide-y">{(showAll ? activeRows : activeRows.slice(0, 6)).map((row) => {
+              const href = recordLink(row, selectedQueue)
+              const due = overviewDueDate(row)
+              const statement = model.statementsById.get(String(row.statementId ?? row.statement_id))
+              const body = <><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{overviewLabel(row)}</span><span className="mt-1 block text-xs text-muted-foreground">{due ? `${tr("due", "Due")} ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(due)}` : overviewTag(row.state) || tr("reviewRecord", "Review record")}</span></span><span className="max-w-[45%] break-words text-right text-xs tabular-nums">{recordAmount(row, selectedQueue === "overdue" || selectedQueue === "bills-due")}</span><ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground" /></>
+              const className = "flex w-full items-center gap-3 rounded-md py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring"
+              return href ? <Link href={href} key={String(row.id)} className={className}>{body}</Link> : <button type="button" key={String(row.id)} className={className} onClick={() => selectedQueue === "bank-lines" && statement ? onOpenBankLine(row, statement) : onNavigate(activeDef.tab)}>{body}</button>
+            })}</div>)}
+          {!showAll && activeRows.length > 6 && <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => setShowAll(true)}>{tr("showAll", "Show all records")} ({activeRows.length})</Button>}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
+          {selectedQueue === "overdue" && activeQueue.state.status === "ready" ? money(activeQueue, tr("noOutstanding", "No outstanding balance")) : <span className="text-xs text-muted-foreground">{tr("liveWorkspace", "Current company workspace")}</span>}
+          {queueHref ? <Link href={queueHref} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium">{tr("openQueue", "Open filtered list")}<ArrowRight className="size-4" /></Link>
+            : <Button variant="ghost" size="sm" onClick={() => onNavigate(activeDef.tab)}>{selectedQueue === "bills-due" ? tr("allBills", "All vendor bills") : tr("openWorkspace", "Open workspace")}<ArrowRight /></Button>}
+        </div>
+      </section>
+    </div>
+
+    <AccountantInsights key={`${data.organizationId}:${data.companyId}`} data={data} now={now} />
 
     <section className={`${workspaceStyles.surface} min-w-0 overflow-hidden`} aria-labelledby="accountant-activity-title">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
@@ -177,45 +223,6 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
         </>}
       </div>
     </section>
-
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="accountant-attention-title">
-        <div className="border-b px-5 py-4"><h3 id="accountant-attention-title" className="font-semibold">{tr("attention", "Needs attention")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("attentionHint", "Choose a queue to review its records.")}</p></div>
-        <div className="divide-y">{queueDefs.map((definition) => {
-          const queue = model.queues[definition.key]
-          return <button key={definition.key} type="button" aria-pressed={selectedQueue === definition.key} data-testid={`accountant-queue-${definition.key}`}
-            onClick={() => { setSelectedQueue(definition.key); setShowAll(false) }}
-            className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/40 aria-pressed:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground [&>svg]:size-4">{definition.icon}</span>
-            <span className="min-w-0 flex-1 text-sm font-medium">{definition.label}</span>
-            {queue.state.status === "ready" ? <Badge variant={definition.key === "overdue" && queue.rows.length ? "destructive" : "secondary"} className="tabular-nums">{queue.rows.length}</Badge> : <span className="max-w-28 text-right text-xs text-muted-foreground">{stateText(queue)}</span>}
-            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-          </button>
-        })}</div>
-      </section>
-
-      <section className="flex min-w-0 flex-col rounded-xl border bg-card" aria-labelledby="accountant-queue-title" aria-live="polite">
-        <div className="border-b px-5 py-4"><h3 id="accountant-queue-title" className="font-semibold">{activeDef.label}</h3><p className="mt-1 text-xs text-muted-foreground">{activeDef.hint}</p></div>
-        <div className="flex-1 p-5">
-          {stateNotice(activeQueue)}
-          {activeQueue.state.status === "ready" && (activeRows.length === 0
-            ? <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center"><CheckCheck className="size-7 text-muted-foreground" /><p className="text-sm font-medium">{tr("queueClear", "Nothing waiting in this queue")}</p><p className="max-w-xs text-xs text-muted-foreground">{tr("queueClearHint", "New items appear here as your accounting work progresses.")}</p></div>
-            : <div className="divide-y">{(showAll ? activeRows : activeRows.slice(0, 6)).map((row) => {
-              const href = recordLink(row, selectedQueue)
-              const due = overviewDueDate(row)
-              const statement = model.statementsById.get(String(row.statementId ?? row.statement_id))
-              const body = <><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{overviewLabel(row)}</span><span className="mt-1 block text-xs text-muted-foreground">{due ? `${tr("due", "Due")} ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(due)}` : overviewTag(row.state) || tr("reviewRecord", "Review record")}</span></span><span className="max-w-[45%] break-words text-right text-xs tabular-nums">{recordAmount(row, selectedQueue === "overdue")}</span><ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground" /></>
-              const className = "flex w-full items-center gap-3 rounded-md py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring"
-              return href ? <Link href={href} key={String(row.id)} className={className}>{body}</Link> : <button type="button" key={String(row.id)} className={className} onClick={() => selectedQueue === "bank-lines" && statement ? onOpenBankLine(row, statement) : onNavigate(activeDef.tab)}>{body}</button>
-            })}</div>)}
-          {!showAll && activeRows.length > 6 && <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => setShowAll(true)}>{tr("showAll", "Show all records")} ({activeRows.length})</Button>}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
-          {selectedQueue === "overdue" && activeQueue.state.status === "ready" ? money(activeQueue, tr("noOutstanding", "No outstanding balance")) : <span className="text-xs text-muted-foreground">{tr("liveWorkspace", "Current company workspace")}</span>}
-          <Button variant="ghost" size="sm" onClick={() => onNavigate(activeDef.tab)}>{tr("openWorkspace", "Open workspace")}<ArrowRight /></Button>
-        </div>
-      </section>
-    </div>
 
     <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="accountant-recent-title">
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4"><div><h3 id="accountant-recent-title" className="font-semibold">{tr("recent", "Recent invoices and bills")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("recentHint", "Open a document to review its details and next action.")}</p></div><FileText className="size-4 shrink-0 text-muted-foreground" /></div>
