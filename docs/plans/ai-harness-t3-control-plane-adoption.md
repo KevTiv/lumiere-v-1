@@ -626,3 +626,18 @@ tags are never edited. The gateway parks no run until a production resume
 consumer is admitted; current budget/rate-limit errors retain terminal failure
 behavior. Provider instances, handoff persistence, descriptor client consumption
 and live queue/restart acceptance retain their documented follow-up scope.
+
+
+### Combined contracts release
+
+[Release run 40653208672](https://github.com/KevTiv/lumiere-v-1/actions/runs/40653208672)
+completed successfully and pinned v0.3.154 in `8713f74e6b330997b836b4640da5dd0256f81c6f`.
+Both generation passes and fresh post-pin verification passed. Finance migration
+27 remains unchanged and the harness delta is migration 28. Source validation
+passed 822 gateway tests (eight existing ignored), 136 codegen tests (one existing
+ignored), 168 script tests, 12 tenant-ownership tests and both changed-file Rust
+formatting checks. Those local test binaries used the Finance v0.3.153 baseline
+plus the regenerated reducer contract; hosted CI must validate the final v0.3.154
+pin. The PostgreSQL 18 Finance-to-harness upgrade regression passed, preserving
+exact rows, previous migration records and replay. The older v13 matrix expected
+list must remain sorted when adding the three harness relations.
