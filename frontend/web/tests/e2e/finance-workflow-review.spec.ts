@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { gotoModule, selectModuleTab, chooseSelectOptionByTriggerValue } from "./helpers"
+import { gotoModule } from "./helpers"
 
 async function cancelDraft(page: Page) {
   await page.getByRole("button", { name: "Cancel", exact: true }).click()
@@ -276,24 +276,23 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     expect(writes).toEqual([])
   })
 
-  test("Accounting task areas follow direct links, contain keyboard focus, and clear old record filters", async ({
+  test("Accounting workspaces follow direct links, contain keyboard focus, and clear old record filters", async ({
     page,
   }) => {
     const writes = observeOperationWrites(page)
     await gotoModule(page, "/accounting?tab=taxes&filter=id%3A999999&filter=state%3AOpen", "accounting")
     const module = page.getByTestId("module-view-accounting").filter({ visible: true })
-    const area = module.getByTestId("module-area-accounting")
-    await expect(area).toContainText("Setup")
+    await expect(module.getByTestId("module-area-accounting")).toHaveCount(0)
+    const overflow = module.getByTestId("module-workspace-accounting-overflow")
+    await expect(overflow).toBeVisible()
     const taxes = module.getByTestId("module-tab-accounting-taxes")
     const invoices = module.getByTestId("module-tab-accounting-invoices")
     await expect(taxes).toBeVisible()
     await expect(taxes).toHaveAttribute("aria-selected", "true")
     await expect(invoices).toHaveCount(0)
-    const tabAreas = JSON.parse((await area.getAttribute("data-tab-areas")) ?? "{}") as { invoices?: string }
-    const receivablesId = tabAreas.invoices
-    expect(receivablesId).toBeTruthy()
-    await chooseSelectOptionByTriggerValue(page, area, receivablesId!)
-    await expect(area).toContainText("Receivables")
+    const receivables = module.getByTestId("module-workspace-accounting-receivables")
+    await receivables.click()
+    await expect(receivables).toHaveAttribute("aria-current", "page")
     await expect(invoices).toBeVisible()
     await expect(invoices).toHaveAttribute("aria-selected", "true")
     const creditControl = module.getByTestId("module-tab-accounting-credit-control")
@@ -311,22 +310,27 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     await expect(creditControl).toBeFocused()
     await creditControl.press("Home")
     await expect(invoices).toBeFocused()
-    await selectModuleTab(page, "accounting", "period-close")
-    await expect(area).toContainText("Close")
+    const close = module.getByTestId("module-workspace-accounting-close")
+    await close.click()
+    await expect(close).toHaveAttribute("aria-current", "page")
     await expect(module.getByTestId("module-tab-accounting-period-close")).toHaveAttribute(
       "aria-selected",
       "true",
     )
     await gotoModule(page, "/accounting?tab=fixed-assets", "accounting")
-    await expect(area).toContainText("Assets")
+    await expect(module.getByTestId("module-workspace-accounting-planning")).toHaveAttribute("aria-current", "page")
     await expect(module.getByTestId("module-tab-accounting-fixed-assets")).toHaveAttribute(
       "aria-selected",
       "true",
     )
     await expect(module.getByTestId("module-tab-accounting-amortization")).toBeVisible()
     await expect(taxes).toHaveCount(0)
+    await overflow.click()
+    await page.getByTestId("module-workspace-item-accounting-taxes").click()
+    await expect(taxes).toHaveAttribute("aria-selected", "true")
+    await expect(page.getByRole("menu")).toHaveCount(0)
     await gotoModule(page, "/accounting?tab=dashboard", "accounting")
-    await expect(area).toContainText("Overview")
+    await expect(module.getByTestId("module-workspace-accounting-overview")).toHaveAttribute("aria-current", "page")
     await expect(module.getByTestId("module-tab-accounting-dashboard")).toHaveAttribute(
       "aria-selected",
       "true",
