@@ -813,7 +813,9 @@ export async function chooseSelectOptionByLabel(
     )
     .toBeGreaterThan(0)
 
-  await option.click()
+  const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
+  if (await search.isVisible()) await search.fill((await option.innerText()).trim())
+  await option.click({ timeout: 15_000 })
   await expect(listbox).toBeHidden()
 }
 
@@ -824,12 +826,18 @@ export async function chooseSelectOptionByTriggerValue(
   value: string | number | bigint,
 ) {
   const listbox = await openSelectListbox(page, trigger)
-  const selectorValue = JSON.stringify(String(value))
+  const storedValue = String(value)
+  const selectorValue = JSON.stringify(storedValue)
   let option = listbox.locator(`[role="option"][data-value=${selectorValue}], [role="option"][data-record-value=${selectorValue}]`)
 
   await expect
     .poll(
       async () => {
+        const search = page.locator('[data-slot="popover-content"]:visible [cmdk-input]')
+        if (await search.isVisible()) {
+          const query = `#${storedValue}`
+          if (await search.inputValue() !== query) await search.fill(query)
+        }
         if (await option.count()) return await option.count()
         // Older Radix markup supplies a native select; RecordPicker does not.
         const label = await trigger.locator('xpath=following-sibling::select[@aria-hidden="true"][1]/option')
@@ -842,7 +850,7 @@ export async function chooseSelectOptionByTriggerValue(
     .toBe(1)
 
   await expect(option).toBeEnabled()
-  await option.click()
+  await option.click({ timeout: 15_000 })
   await expect(listbox).toBeHidden()
 }
 

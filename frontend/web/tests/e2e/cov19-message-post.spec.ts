@@ -1,9 +1,9 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  chooseSelectOptionByValue,
   fetchSessionOrganizationId,
   fillField,
+  chooseSelectOptionByValue,
   gotoModule,
   scalarQueryId,
   signIn,

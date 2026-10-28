@@ -43,3 +43,5 @@ The first remote E2E run exposed outdated shared helpers and older test expectat
 Local regression validation: all 13 browser checks passed, including legacy selector compatibility, default-tab navigation, duplicate-name customer selection, expense posting account choices at 600/900px viewport heights, message conditional fields, and the existing Sales workspace checks. Web TypeScript, opaque-record, shared-select, transport and diff checks passed. Fixture route warmup runs before browser interaction timeouts.
 
 The updated full authenticated E2E run is tracked on PR #294. The local fixtures do not substitute for its persisted-effect assertions.
+
+After merging current main, the combined branch keeps the upstream picker's `data-value` IDs and search keywords. All 14 browser checks and all seven picker unit tests pass. Web TypeScript, the 0.3.154 vendored-contract verification, locale, opaque-record, shared-select, transport and diff checks also pass. The merge resolves overlapping shared-helper changes without dropping the upstream ID-search behavior or the no-partial-create safety checks.

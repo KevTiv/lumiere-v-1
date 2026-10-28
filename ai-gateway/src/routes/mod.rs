@@ -4,6 +4,7 @@ pub mod context;
 pub mod distributor;
 pub mod evidence;
 pub mod forms;
+pub mod harness_descriptor;
 pub mod harness_skills;
 pub mod health;
 pub mod import;

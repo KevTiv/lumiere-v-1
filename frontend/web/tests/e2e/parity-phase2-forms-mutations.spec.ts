@@ -69,7 +69,11 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
       }
       const response = await page.request.get("/api/query/leads")
       expect(response.ok()).toBe(true)
-      expect(parseQueryListResponse(await response.json()).filter((row) => row.name === leadName || row.contactName === leadName)).toEqual([])
+      expect(parseQueryListResponse(await response.json()).filter((row) => row.name === leadName || row.contactName === leadName || row.contact_name === leadName)).toEqual([])
+      const customFields = await page.request.get("/api/query/record-custom-field-values")
+      expect(customFields.ok()).toBe(true)
+      expect(parseQueryListResponse(await customFields.json()).some((row) => String(row.fieldKey ?? row.field_key ?? "") === fieldId)).toBe(false)
+      expect(creates).toEqual([])
       // Keep the safety block until the create command can atomically save the EAV values.
     } finally {
       await dismissBlockingDialogs(page)

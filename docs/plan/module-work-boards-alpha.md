@@ -16,6 +16,12 @@ This change builds on the Finance alpha navigation profile and the shared Kanban
 
 CRM, Reports and Subscriptions remain visible Finance modules, but this slice does not invent workflow adapters for subjects without a supported canonical source. Project tasks retain their own workspace and assignment command.
 
+The proposed [Finance alpha change history and review](../plans/finance-alpha-change-review-plan.md)
+extends record history and proposed-update review across all seven Finance modules.
+It reuses these approval and assignment owners and requires explicit new adapters
+before CRM, Reports or Subscriptions proposals can appear as reviewable work.
+That plan does not change the implemented board scope described here.
+
 ## User entry points
 
 - `/tasks` opens the personal My work list with the mine filter: workflow tasks claimed by the current actor, or record follow-ups assigned to them. The workspace selector can broaden this to eligible or available work and to a supported module.

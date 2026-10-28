@@ -90,9 +90,8 @@ export function RecordPicker({
             {options.map((option) => (
               <CommandItem
                 key={option.value}
-                // cmdk filters on this text: the name, plus the id so a record can be found by it.
-                value={`${option.label} #${option.value}`}
-                data-record-value={option.value}
+                value={option.value}
+                keywords={[option.label, `#${option.value}`]}
                 disabled={option.disabled}
                 onSelect={() => {
                   onChange(option.value)
