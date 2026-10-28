@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use stdb_client::StdbClient;
 
+use super::budget_park::{AdmittedBinding, BudgetBlocked};
 use crate::ai_spend::{
     self, allowance, billing_period, request_key, AcceptAttemptRequest, Allowance, AttemptResult,
     PriceSnapshot, ProviderAttempt, ProviderRecoveryAction, ReconcileAttemptRequest,
@@ -47,7 +48,6 @@ use crate::ai_spend::{
     ATTEMPT_FAILED, ATTEMPT_NOTE_MAX_LEN, ATTEMPT_OUTCOME_UNKNOWN, ATTEMPT_SUCCEEDED,
     STATUS_RELEASED, STATUS_RESERVED, STATUS_SETTLED,
 };
-use super::budget_park::{AdmittedBinding, BudgetBlocked};
 use crate::providers::llm::{
     CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse, ProviderRejection,
 };

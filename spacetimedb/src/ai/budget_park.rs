@@ -147,9 +147,7 @@ pub(crate) struct ParkBlockers {
 
 pub(crate) fn ensure_safe_boundary(blockers: ParkBlockers) -> Result<(), String> {
     if blockers.dispatched_or_uncertain_effect {
-        return Err(
-            "run has a dispatched or uncertain effect; reconcile it before parking".into(),
-        );
+        return Err("run has a dispatched or uncertain effect; reconcile it before parking".into());
     }
     if blockers.reserved_spend {
         return Err(
@@ -197,7 +195,11 @@ pub(crate) enum FireEffect {
 
 /// A schedule firing is honoured only for the current generation of a park
 /// that is still waiting. Duplicate or stale firings are no-ops.
-pub(crate) fn fire_effect(park_status: &str, park_generation: u64, job_generation: u64) -> FireEffect {
+pub(crate) fn fire_effect(
+    park_status: &str,
+    park_generation: u64,
+    job_generation: u64,
+) -> FireEffect {
     if park_status == PARK_STATUS_PARKED && park_generation == job_generation {
         FireEffect::RecordIntent
     } else {
@@ -372,14 +374,17 @@ pub fn park_ai_run_for_budget(
             .ok_or("park generation overflow")?,
         None => 1,
     };
-    let job = ctx.db.ai_run_budget_resume_job().insert(AiRunBudgetResumeJob {
-        scheduled_id: 0,
-        scheduled_at: ScheduleAt::Time(Timestamp::from_micros_since_unix_epoch(fire_micros)),
-        organization_id,
-        company_id,
-        run_id,
-        park_generation: generation,
-    });
+    let job = ctx
+        .db
+        .ai_run_budget_resume_job()
+        .insert(AiRunBudgetResumeJob {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(Timestamp::from_micros_since_unix_epoch(fire_micros)),
+            organization_id,
+            company_id,
+            run_id,
+            park_generation: generation,
+        });
     let row = AiRunBudgetPark {
         run_id,
         organization_id,
@@ -443,12 +448,15 @@ pub fn fire_ai_run_budget_resume(
     let state = ctx.db.ai_run_lifecycle_state().run_id().find(&job.run_id);
     let Some(state) = state.filter(|state| state.state == LIFECYCLE_BUDGET_PARKED) else {
         // Interrupted or otherwise moved on while parked: the intent is moot.
-        ctx.db.ai_run_budget_park().run_id().update(AiRunBudgetPark {
-            status: PARK_STATUS_SUPERSEDED.into(),
-            schedule_id: None,
-            resolved_at: Some(ctx.timestamp),
-            ..park
-        });
+        ctx.db
+            .ai_run_budget_park()
+            .run_id()
+            .update(AiRunBudgetPark {
+                status: PARK_STATUS_SUPERSEDED.into(),
+                schedule_id: None,
+                resolved_at: Some(ctx.timestamp),
+                ..park
+            });
         return Ok(());
     };
     let trigger = if ctx.timestamp >= park.window_resets_at {
@@ -457,13 +465,16 @@ pub fn fire_ai_run_budget_resume(
         PARK_TRIGGER_MAX_PARK_ELAPSED
     };
     let generation = park.park_generation;
-    ctx.db.ai_run_budget_park().run_id().update(AiRunBudgetPark {
-        status: PARK_STATUS_RESUME_REQUESTED.into(),
-        schedule_id: None,
-        resume_trigger: Some(trigger.into()),
-        resume_requested_at: Some(ctx.timestamp),
-        ..park
-    });
+    ctx.db
+        .ai_run_budget_park()
+        .run_id()
+        .update(AiRunBudgetPark {
+            status: PARK_STATUS_RESUME_REQUESTED.into(),
+            schedule_id: None,
+            resume_trigger: Some(trigger.into()),
+            resume_requested_at: Some(ctx.timestamp),
+            ..park
+        });
     let key = format!(
         "{}:{}:budget-resume:{generation}",
         job.organization_id, job.run_id
@@ -473,7 +484,10 @@ pub fn fire_ai_run_budget_resume(
         &state,
         key.clone(),
         "budget_resume_requested",
-        command_hash("budget_resume_requested", &(job.run_id, generation, trigger)),
+        command_hash(
+            "budget_resume_requested",
+            &(job.run_id, generation, trigger),
+        ),
         state.concurrency_version,
         Some(serde_json::json!({"park_generation": generation, "trigger": trigger}).to_string()),
     );
@@ -572,13 +586,16 @@ pub fn resolve_ai_run_budget_park(
     let kind = "budget_park_resolved";
     match resolution {
         Resolution::Resume => {
-            ctx.db.ai_run_budget_park().run_id().update(AiRunBudgetPark {
-                status: PARK_STATUS_RESUMED.into(),
-                schedule_id: None,
-                resolution: Some("resume".into()),
-                resolved_at: Some(ctx.timestamp),
-                ..park
-            });
+            ctx.db
+                .ai_run_budget_park()
+                .run_id()
+                .update(AiRunBudgetPark {
+                    status: PARK_STATUS_RESUMED.into(),
+                    schedule_id: None,
+                    resolution: Some("resume".into()),
+                    resolved_at: Some(ctx.timestamp),
+                    ..park
+                });
             transition_state_and_run(
                 ctx,
                 state,
@@ -600,25 +617,31 @@ pub fn resolve_ai_run_budget_park(
                 next_reset_micros,
                 park.max_park_until.to_micros_since_unix_epoch(),
             )?;
-            let job = ctx.db.ai_run_budget_resume_job().insert(AiRunBudgetResumeJob {
-                scheduled_id: 0,
-                scheduled_at: ScheduleAt::Time(Timestamp::from_micros_since_unix_epoch(
-                    fire_micros,
-                )),
-                organization_id,
-                company_id,
-                run_id,
-                park_generation: generation,
-            });
-            ctx.db.ai_run_budget_park().run_id().update(AiRunBudgetPark {
-                park_generation: generation,
-                status: PARK_STATUS_PARKED.into(),
-                window_resets_at: Timestamp::from_micros_since_unix_epoch(next_reset_micros),
-                schedule_id: Some(job.scheduled_id),
-                resume_trigger: None,
-                resume_requested_at: None,
-                ..park
-            });
+            let job = ctx
+                .db
+                .ai_run_budget_resume_job()
+                .insert(AiRunBudgetResumeJob {
+                    scheduled_id: 0,
+                    scheduled_at: ScheduleAt::Time(Timestamp::from_micros_since_unix_epoch(
+                        fire_micros,
+                    )),
+                    organization_id,
+                    company_id,
+                    run_id,
+                    park_generation: generation,
+                });
+            ctx.db
+                .ai_run_budget_park()
+                .run_id()
+                .update(AiRunBudgetPark {
+                    park_generation: generation,
+                    status: PARK_STATUS_PARKED.into(),
+                    window_resets_at: Timestamp::from_micros_since_unix_epoch(next_reset_micros),
+                    schedule_id: Some(job.scheduled_id),
+                    resume_trigger: None,
+                    resume_requested_at: None,
+                    ..park
+                });
             // Re-arming keeps the lifecycle state; the event and version bump
             // let observers see that the expected resume time moved.
             crate::ai::run_lifecycle::mutate_state(
@@ -635,12 +658,15 @@ pub fn resolve_ai_run_budget_park(
             )?;
         }
         Resolution::WaitingInput => {
-            ctx.db.ai_run_budget_park().run_id().update(AiRunBudgetPark {
-                status: PARK_STATUS_WAITING_INPUT.into(),
-                schedule_id: None,
-                resolution: Some("waiting_input".into()),
-                ..park
-            });
+            ctx.db
+                .ai_run_budget_park()
+                .run_id()
+                .update(AiRunBudgetPark {
+                    status: PARK_STATUS_WAITING_INPUT.into(),
+                    schedule_id: None,
+                    resolution: Some("waiting_input".into()),
+                    ..park
+                });
             transition_state_and_run(
                 ctx,
                 state,
@@ -653,13 +679,16 @@ pub fn resolve_ai_run_budget_park(
             )?;
         }
         Resolution::Terminate { detail, cancelled } => {
-            ctx.db.ai_run_budget_park().run_id().update(AiRunBudgetPark {
-                status: PARK_STATUS_TERMINATED.into(),
-                schedule_id: None,
-                resolution: Some(detail.clone()),
-                resolved_at: Some(ctx.timestamp),
-                ..park
-            });
+            ctx.db
+                .ai_run_budget_park()
+                .run_id()
+                .update(AiRunBudgetPark {
+                    status: PARK_STATUS_TERMINATED.into(),
+                    schedule_id: None,
+                    resolution: Some(detail.clone()),
+                    resolved_at: Some(ctx.timestamp),
+                    ..park
+                });
             let run_status = if cancelled { "cancelled" } else { "failed" };
             transition_state_and_run(
                 ctx,
@@ -678,7 +707,13 @@ pub fn resolve_ai_run_budget_park(
             });
         }
     }
-    audit(ctx, organization_id, company_id, run_id, "budget_park_resolved");
+    audit(
+        ctx,
+        organization_id,
+        company_id,
+        run_id,
+        "budget_park_resolved",
+    );
     Ok(())
 }
 

@@ -2,64 +2,138 @@
 -- Migration version: 27
 -- Migration name: 0027_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:f4966a4ca988c7e6ebb141140d18464a82465787591f3baa6ea7ac314ac05635
+-- Body checksum: sha256:3c2217cf47f2d5d3748060bf962a046c494f151f7762362ac32d3ced7b541ed8
 
--- Durable projection: ai_run_budget_park
-CREATE TABLE IF NOT EXISTS "ai_run_budget_park" (
-    "run_id" NUMERIC(20,0) NOT NULL,
+-- Durable projection: business_change
+CREATE TABLE IF NOT EXISTS "business_change" (
+    "id" NUMERIC(20,0) NOT NULL,
     "organization_id" NUMERIC(20,0) NOT NULL,
     "company_id" NUMERIC(20,0) NOT NULL,
-    "park_generation" NUMERIC(20,0) NOT NULL,
-    "reason" TEXT NOT NULL,
-    "status" TEXT NOT NULL,
-    "window_resets_at" BIGINT NOT NULL,
-    "max_park_until" BIGINT NOT NULL,
-    "required_units" NUMERIC(20,0) NOT NULL,
-    "input_token_allowance" BIGINT NOT NULL,
-    "output_token_allowance" BIGINT NOT NULL,
-    "agent_id" NUMERIC(20,0) NOT NULL,
-    "provider" TEXT NOT NULL,
-    "model" TEXT NOT NULL,
-    "schedule_id" NUMERIC(20,0),
-    "resume_trigger" TEXT,
-    "resolution" TEXT,
-    "parked_at" BIGINT NOT NULL,
-    "resume_requested_at" BIGINT,
-    "resolved_at" BIGINT,
-    CONSTRAINT "ai_run_budget_park_pkey" PRIMARY KEY ("run_id")
-);
-CREATE INDEX IF NOT EXISTS "ai_run_budget_park_organization_id" ON "ai_run_budget_park" ("organization_id");
-CREATE INDEX IF NOT EXISTS "ai_run_budget_park_status" ON "ai_run_budget_park" ("status");
--- Durable projection: ai_run_budget_resume_job
-CREATE TABLE IF NOT EXISTS "ai_run_budget_resume_job" (
-    "scheduled_id" NUMERIC(20,0) NOT NULL,
-    "scheduled_at" JSONB NOT NULL,
-    "organization_id" NUMERIC(20,0) NOT NULL,
-    "company_id" NUMERIC(20,0) NOT NULL,
-    "run_id" NUMERIC(20,0) NOT NULL,
-    "park_generation" NUMERIC(20,0) NOT NULL,
-    CONSTRAINT "ai_run_budget_resume_job_pkey" PRIMARY KEY ("scheduled_id")
-);
-CREATE INDEX IF NOT EXISTS "ai_run_budget_resume_job_organization_id" ON "ai_run_budget_resume_job" ("organization_id");
-CREATE INDEX IF NOT EXISTS "ai_run_budget_resume_job_run_id" ON "ai_run_budget_resume_job" ("run_id");
--- Durable projection: ai_run_queued_input
-CREATE TABLE IF NOT EXISTS "ai_run_queued_input" (
-    "queued_input_id" NUMERIC(20,0) NOT NULL,
-    "organization_id" NUMERIC(20,0) NOT NULL,
-    "company_id" NUMERIC(20,0) NOT NULL,
-    "run_id" NUMERIC(20,0) NOT NULL,
-    "idempotency_key" TEXT NOT NULL,
-    "request_hash" TEXT NOT NULL,
-    "position" BIGINT NOT NULL,
-    "revision" NUMERIC(20,0) NOT NULL,
-    "author" BYTEA NOT NULL,
-    "payload" TEXT NOT NULL,
-    "status" TEXT NOT NULL,
-    "promoted_run_id" NUMERIC(20,0),
-    "create_date" BIGINT NOT NULL,
-    "write_date" BIGINT NOT NULL,
-    CONSTRAINT "ai_run_queued_input_pkey" PRIMARY KEY ("queued_input_id")
-);
-CREATE INDEX IF NOT EXISTS "ai_run_queued_input_organization_id" ON "ai_run_queued_input" ("organization_id");
-CREATE INDEX IF NOT EXISTS "ai_run_queued_input_run_id" ON "ai_run_queued_input" ("run_id");
-CREATE INDEX IF NOT EXISTS "ai_run_queued_input_status" ON "ai_run_queued_input" ("status");
+    "resource" TEXT NOT NULL,
+    "record_id" NUMERIC(20,0) NOT NULL,
+    "subject_resource" TEXT NOT NULL,
+    "subject_record_id" NUMERIC(20,0) NOT NULL,
+    "operation" TEXT NOT NULL,
+    "actor_identity" BYTEA NOT NULL,
+    "occurred_at" BIGINT NOT NULL,
+    "schema_version" BIGINT NOT NULL,
+    "before_fingerprint" TEXT NOT NULL,
+    "after_fingerprint" TEXT NOT NULL,
+    "changes_json" TEXT NOT NULL,
+    "audit_log_id" NUMERIC(20,0) NOT NULL,
+    CONSTRAINT "business_change_pkey" PRIMARY KEY ("organization_id", "id")
+) PARTITION BY HASH ("organization_id");
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p00" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 0);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p01" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 1);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p02" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 2);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p03" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 3);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p04" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 4);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p05" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 5);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p06" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 6);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p07" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 7);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p08" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 8);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p09" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 9);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p10" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 10);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p11" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 11);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p12" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 12);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p13" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 13);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p14" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 14);
+    END IF;
+END
+$lumiere$;
+DO $lumiere$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = to_regclass('business_change')) THEN
+        CREATE TABLE IF NOT EXISTS "business_change_p15" PARTITION OF "business_change" FOR VALUES WITH (MODULUS 16, REMAINDER 15);
+    END IF;
+END
+$lumiere$;
+CREATE UNIQUE INDEX IF NOT EXISTS "business_change_tenant_identity_key" ON "business_change" ("organization_id", "id");
+CREATE INDEX IF NOT EXISTS "business_change_organization_id" ON "business_change" ("organization_id");

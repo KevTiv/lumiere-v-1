@@ -2,6 +2,13 @@
   "schema_version": 1,
   "reducers": [
     {
+      "source": "spacetimedb/src/accounting/journal_entries.rs",
+      "function": "update_account_move_line",
+      "operation": "update_account_move_line",
+      "operation_id": "erp.update_account_move_line",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/workflow/cancellation_repair.rs",
       "function": "repair_cancelled_workflow_tasks",
       "operation": "repair_cancelled_workflow_tasks",

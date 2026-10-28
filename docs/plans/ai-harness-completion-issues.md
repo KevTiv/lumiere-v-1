@@ -1117,31 +1117,27 @@ boundary with no dispatched or uncertain effect; resume happens once; provider
 rate limits use the same state with a maximum park duration; parked runs are
 shown separately from failed runs.
 
-**Status of the §7.2 addition — source slice only; not complete.** Implemented
-in source: module tables `ai_run_budget_park` and the scheduled
-`ai_run_budget_resume_job`; reducers `park_ai_run_for_budget` (refuses with a
-dispatched/uncertain effect or a held `reserved` reservation),
-`fire_ai_run_budget_resume` (scheduled, module-identity only, records the
-resume intent and nothing else; duplicate or stale fires are no-ops) and
-`resolve_ai_run_budget_park` (resume | stay_parked | waiting_input | terminate,
-bound to the checked continuation, park generation and idempotency key). Gateway:
-typed `BudgetBlocked` denial from spend admission, `Retry-After` carried on
-`ProviderRejection`, park-on-denial in `run_skill_admitted`, a resume-intent
-reactor that re-prices the allowance at current pricing before asking the
-module to resume, and the park state in the lifecycle inspect projection and
-run-status labels. Verified: decision-logic unit tests (park boundary,
-schedule, idempotent fire, resume once, re-denial, max park, retry-after) and
-the reducers type-checked against the real `run_lifecycle.rs` in an isolated
-crate with stubbed neighbours. NOT verified or still open: the reducers have not
-been compiled inside the full module or run in the SpacetimeDB runtime (the
-full-module build exhausts memory on the dev host); the new reducers are not yet
-in any immutable `lumiere-contracts` release, so operation contracts, reducer
-exposure, operation ids/history and `generated_reducer_contract.rs` are not
-regenerated and the gateway calls them through `ReducerCall::from_name`, which
-fails closed (the run ends as before) until the release is pinned; the reactor
-is not spawned and no production `ContinuationDispatcher` exists, because
-re-entering a governed run needs the actor's credential and a credential policy
-for background resume has not been decided; no live E2E.
+**Status of the §7.2 addition — persisted foundation; parking disabled.**
+The integration includes private budget-park/scheduled-intent tables and typed,
+compile-time checked reducer calls, with denied browser exposure and a separate
+default-deny `ai.run.budget.resolve` grant. Parking refuses dispatched/uncertain
+effects and held reservations. Scheduled firing only records an intent.
+
+`ParkPolicy::from_env()` keeps `resume_dispatch_available` false in this build:
+budget exhaustion and provider 429 errors follow the existing terminal failure
+path without writing a park. Environment variables cannot enable parking. The
+reactor is not spawned and there is no production `ContinuationDispatcher`.
+Admission requires a wired consumer, a reviewed background credential policy,
+current authority/spend checks and native restart/resume acceptance. Pure
+state-machine tests exercise an explicitly enabled test policy; a regression
+asserts the production policy never reaches a park write.
+
+The combined release baseline is Finance's v0.3.153: its published migration 27
+is preserved verbatim. The harness tables are added as migration 28; the normal
+contracts workflow owns the fresh combined release and pin. The v0.3.152 archive
+is unchanged in publication history and is not an upgrade baseline for this
+lineage. A database that applied its conflicting migration 27 fails the existing
+checksum check; no automatic checksum substitution or ledger rewriting is added.
 
 ---
 

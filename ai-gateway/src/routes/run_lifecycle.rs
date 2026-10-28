@@ -911,7 +911,10 @@ mod tests {
         assert_eq!(encoded["reason"], "budget_exhausted");
         assert_eq!(encoded["status"], "parked");
         assert_eq!(encoded["generation"], 2);
-        assert!(encoded["windowResetsAt"].as_str().unwrap().starts_with("2026-"));
+        assert!(encoded["windowResetsAt"]
+            .as_str()
+            .unwrap()
+            .starts_with("2026-"));
         assert!(encoded.get("provider").is_none() && encoded.get("agentId").is_none());
         assert!(park_from_row(&json!({"status": "parked"})).is_none());
     }

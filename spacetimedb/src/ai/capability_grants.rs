@@ -39,7 +39,6 @@ pub struct AiCapabilityRoleGrant {
     pub write_date: Timestamp,
 }
 
-
 #[derive(Clone, Copy)]
 pub(crate) struct DefaultAiCapabilityGrant {
     pub capability_key: &'static str,
@@ -101,7 +100,12 @@ pub(crate) fn provision_owner_ai_capability_grants(
     if organization_id == 0 || owner_role.id == 0 || owner_role.organization_id != organization_id {
         return Err("Owner role does not belong to this organization".to_string());
     }
-    if !owner_role.is_active || !owner_role.permissions.iter().any(|permission| permission == "*:*") {
+    if !owner_role.is_active
+        || !owner_role
+            .permissions
+            .iter()
+            .any(|permission| permission == "*:*")
+    {
         return Err("AI owner grants require the active full-access owner role".to_string());
     }
 

@@ -73,6 +73,11 @@ pub(crate) async fn try_park(
     now: DateTime<Utc>,
     policy: &ParkPolicy,
 ) -> Option<ParkRequest> {
+    // Do not strand a synchronous run: this build has no production resume
+    // dispatcher. Only an admitted consumer may enable parking.
+    if !policy.resume_dispatch_available {
+        return None;
+    }
     let request = classify(error, now, policy)?;
     let binding = error.downcast_ref::<AdmittedBinding>()?;
     let target = ParkTarget {
@@ -121,6 +126,7 @@ pub(crate) fn required_units(snapshot: &PriceSnapshot, allowance: &Allowance) ->
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ParkPolicy {
+    resume_dispatch_available: bool,
     pub max_park: Duration,
     pub default_retry_after: Duration,
 }
@@ -140,6 +146,9 @@ impl ParkPolicy {
 
     pub(crate) fn new(max_park_secs: u64) -> Self {
         Self {
+            // This is a build admission, not an environment opt-in. Enable it
+            // only alongside a wired and verified production resume consumer.
+            resume_dispatch_available: false,
             max_park: Duration::from_secs(max_park_secs.max(1)),
             default_retry_after: Duration::from_secs(DEFAULT_RETRY_AFTER_SECS),
         }
@@ -179,7 +188,9 @@ pub(crate) fn classify(
         .downcast_ref::<ProviderRejection>()
         .filter(|rejection| rejection.retryable())
     {
-        let wait = rejection.retry_after().unwrap_or(policy.default_retry_after);
+        let wait = rejection
+            .retry_after()
+            .unwrap_or(policy.default_retry_after);
         ParkRequest {
             reason: REASON_PROVIDER_RATE_LIMIT,
             window_resets_at: now.checked_add_signed(chrono::Duration::from_std(wait).ok()?)?,
@@ -226,9 +237,13 @@ pub(crate) struct ParkIntent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ResolveCommand {
     Resume,
-    StayParked { next_window_resets_at: DateTime<Utc> },
+    StayParked {
+        next_window_resets_at: DateTime<Utc>,
+    },
     WaitingInput,
-    Terminate { detail: &'static str },
+    Terminate {
+        detail: &'static str,
+    },
 }
 
 impl ResolveCommand {
@@ -471,7 +486,9 @@ fn row_str(row: &Value, key: &str) -> Result<String> {
 }
 
 fn row_time(row: &Value, key: &str) -> Result<DateTime<Utc>> {
-    let value = row.get(key).with_context(|| format!("park row is missing {key}"))?;
+    let value = row
+        .get(key)
+        .with_context(|| format!("park row is missing {key}"))?;
     let micros = value
         .get("__timestamp_micros_since_unix_epoch__")
         .unwrap_or(value)
@@ -494,24 +511,27 @@ impl ParkStore for StdbParkStore<'_> {
         call(
             self.writer,
             "park_ai_run_for_budget",
-            stdb_client::reducer_call!("park_ai_run_for_budget", json!([
-                target.organization_id,
-                target.company_id,
-                target.run_id,
-                {
-                    "continuation": continuation,
-                    "reason": request.reason,
-                    "window_resets_at_micros": request.window_resets_at.timestamp_micros(),
-                    "max_park_until_micros": request.max_park_until.timestamp_micros(),
-                    "required_units": request.required_units,
-                    "input_token_allowance": request.input_tokens,
-                    "output_token_allowance": request.output_tokens,
-                    "agent_id": target.agent_id,
-                    "provider": target.provider,
-                    "model": target.model,
-                    "idempotency_key": format!("budget-park:{}:{concurrency}", target.run_id),
-                }
-            ])),
+            stdb_client::reducer_call!(
+                "park_ai_run_for_budget",
+                json!([
+                    target.organization_id,
+                    target.company_id,
+                    target.run_id,
+                    {
+                        "continuation": continuation,
+                        "reason": request.reason,
+                        "window_resets_at_micros": request.window_resets_at.timestamp_micros(),
+                        "max_park_until_micros": request.max_park_until.timestamp_micros(),
+                        "required_units": request.required_units,
+                        "input_token_allowance": request.input_tokens,
+                        "output_token_allowance": request.output_tokens,
+                        "agent_id": target.agent_id,
+                        "provider": target.provider,
+                        "model": target.model,
+                        "idempotency_key": format!("budget-park:{}:{concurrency}", target.run_id),
+                    }
+                ])
+            ),
         )
         .await
     }
@@ -562,24 +582,27 @@ impl ParkStore for StdbParkStore<'_> {
         call(
             self.writer,
             "resolve_ai_run_budget_park",
-            stdb_client::reducer_call!("resolve_ai_run_budget_park", json!([
-                intent.organization_id,
-                intent.company_id,
-                intent.run_id,
-                {
-                    "continuation": continuation,
-                    "park_generation": intent.park_generation,
-                    "outcome": command.outcome(),
-                    "detail": detail,
-                    "next_window_resets_at_micros": next,
-                    // Deterministic per (run, generation, outcome): a repeated
-                    // reactor pass replays instead of transitioning twice.
-                    "idempotency_key": format!(
-                        "budget-resolve:{}:{}:{}",
-                        intent.run_id, intent.park_generation, command.outcome()
-                    ),
-                }
-            ])),
+            stdb_client::reducer_call!(
+                "resolve_ai_run_budget_park",
+                json!([
+                    intent.organization_id,
+                    intent.company_id,
+                    intent.run_id,
+                    {
+                        "continuation": continuation,
+                        "park_generation": intent.park_generation,
+                        "outcome": command.outcome(),
+                        "detail": detail,
+                        "next_window_resets_at_micros": next,
+                        // Deterministic per (run, generation, outcome): a repeated
+                        // reactor pass replays instead of transitioning twice.
+                        "idempotency_key": format!(
+                            "budget-resolve:{}:{}:{}",
+                            intent.run_id, intent.park_generation, command.outcome()
+                        ),
+                    }
+                ])
+            ),
         )
         .await
     }
@@ -595,7 +618,10 @@ mod tests {
     }
 
     fn policy() -> ParkPolicy {
-        ParkPolicy::new(DEFAULT_MAX_PARK_SECS)
+        ParkPolicy {
+            resume_dispatch_available: true,
+            ..ParkPolicy::new(DEFAULT_MAX_PARK_SECS)
+        }
     }
 
     fn blocked(reset: DateTime<Utc>) -> anyhow::Error {
@@ -669,7 +695,10 @@ mod tests {
         .unwrap_err();
         let request = classify(&rejection, now(), &policy()).expect("parks");
         assert_eq!(request.reason, REASON_PROVIDER_RATE_LIMIT);
-        assert_eq!(request.window_resets_at, now() + chrono::Duration::seconds(90));
+        assert_eq!(
+            request.window_resets_at,
+            now() + chrono::Duration::seconds(90)
+        );
         assert_eq!(request.required_units, 0);
     }
 
@@ -691,9 +720,8 @@ mod tests {
         .unwrap_err();
         assert!(classify(&long, now(), &ParkPolicy::new(3_600)).is_none());
         // Non-retryable rejections never park.
-        let forbidden =
-            crate::providers::llm::check_mistral_status(reqwest::StatusCode::FORBIDDEN)
-                .unwrap_err();
+        let forbidden = crate::providers::llm::check_mistral_status(reqwest::StatusCode::FORBIDDEN)
+            .unwrap_err();
         assert!(classify(&forbidden, now(), &policy()).is_none());
     }
 
@@ -776,7 +804,10 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(outcome, IntentOutcome::Resumed);
-        assert_eq!(*store.resolved.lock().unwrap(), vec![ResolveCommand::Resume]);
+        assert_eq!(
+            *store.resolved.lock().unwrap(),
+            vec![ResolveCommand::Resume]
+        );
         assert_eq!(*dispatcher.calls.lock().unwrap(), 1);
     }
 
@@ -808,9 +839,15 @@ mod tests {
         short.max_park_until = now() + chrono::Duration::days(2);
         let dispatcher = Dispatcher::default();
         assert_eq!(
-            process_intent(&store, &FixedProbe(Probe::Denied), &dispatcher, &short, now())
-                .await
-                .unwrap(),
+            process_intent(
+                &store,
+                &FixedProbe(Probe::Denied),
+                &dispatcher,
+                &short,
+                now()
+            )
+            .await
+            .unwrap(),
             IntentOutcome::WaitingInput
         );
         assert_eq!(
@@ -842,9 +879,15 @@ mod tests {
         // An admitted probe must not matter once the park window has elapsed.
         for intent in [&expired, &by_trigger] {
             assert_eq!(
-                process_intent(&store, &FixedProbe(Probe::Admitted), &dispatcher, intent, now())
-                    .await
-                    .unwrap(),
+                process_intent(
+                    &store,
+                    &FixedProbe(Probe::Admitted),
+                    &dispatcher,
+                    intent,
+                    now()
+                )
+                .await
+                .unwrap(),
                 IntentOutcome::Terminated("max_park_duration")
             );
         }
@@ -925,7 +968,10 @@ mod tests {
         let probe = LedgerAdmission { ledger: &ledger };
         assert_eq!(
             probe
-                .probe(&intent(REASON_PROVIDER_RATE_LIMIT, TRIGGER_WINDOW_RESET), now())
+                .probe(
+                    &intent(REASON_PROVIDER_RATE_LIMIT, TRIGGER_WINDOW_RESET),
+                    now()
+                )
                 .await
                 .unwrap(),
             Probe::Admitted
@@ -938,7 +984,10 @@ mod tests {
         let probe = LedgerAdmission { ledger: &ledger };
         assert_eq!(
             probe
-                .probe(&intent(REASON_BUDGET_EXHAUSTED, TRIGGER_WINDOW_RESET), now())
+                .probe(
+                    &intent(REASON_BUDGET_EXHAUSTED, TRIGGER_WINDOW_RESET),
+                    now()
+                )
                 .await
                 .unwrap(),
             Probe::NeedsOperator
@@ -951,7 +1000,10 @@ mod tests {
             let ledger = FakeLedger::configured().with_budget_limit(limit);
             async move {
                 LedgerAdmission { ledger: &ledger }
-                    .probe(&intent(REASON_BUDGET_EXHAUSTED, TRIGGER_WINDOW_RESET), now())
+                    .probe(
+                        &intent(REASON_BUDGET_EXHAUSTED, TRIGGER_WINDOW_RESET),
+                        now(),
+                    )
                     .await
                     .unwrap()
             }
@@ -969,7 +1021,9 @@ mod tests {
     impl ParkStore for RefusingStore {
         async fn park(&self, _: &ParkTarget, _: &ParkRequest) -> Result<()> {
             if self.0 {
-                anyhow::bail!("run has a dispatched or uncertain effect; reconcile it before parking");
+                anyhow::bail!(
+                    "run has a dispatched or uncertain effect; reconcile it before parking"
+                );
             }
             Ok(())
         }
@@ -990,18 +1044,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unavailable_resume_dispatcher_never_writes_a_park() {
+        struct NoParkWrites;
+        #[async_trait]
+        impl ParkStore for NoParkWrites {
+            async fn park(&self, _: &ParkTarget, _: &ParkRequest) -> Result<()> {
+                panic!("parking requires a production resume dispatcher");
+            }
+            async fn pending_intents(&self, _: usize) -> Result<Vec<ParkIntent>> {
+                unreachable!()
+            }
+            async fn resolve(&self, _: &ParkIntent, _: &ResolveCommand) -> Result<()> {
+                unreachable!()
+            }
+        }
+        for error in [
+            bound(blocked(next_window_start(now()))),
+            bound(
+                crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                    .unwrap_err(),
+            ),
+        ] {
+            assert!(try_park(
+                &NoParkWrites,
+                9,
+                3,
+                42,
+                &error,
+                now(),
+                &ParkPolicy::from_env(),
+            )
+            .await
+            .is_none());
+        }
+    }
+
+    #[tokio::test]
     async fn module_refusal_to_park_falls_back_to_the_normal_failure_path() {
         let error = bound(blocked(next_window_start(now())));
         let parked = try_park(&RefusingStore(false), 9, 3, 42, &error, now(), &policy()).await;
         assert_eq!(parked.unwrap().reason, REASON_BUDGET_EXHAUSTED);
         // An uncertain effect (or any module refusal) means: do not park.
-        assert!(try_park(&RefusingStore(true), 9, 3, 42, &error, now(), &policy())
-            .await
-            .is_none());
+        assert!(
+            try_park(&RefusingStore(true), 9, 3, 42, &error, now(), &policy())
+                .await
+                .is_none()
+        );
         // Without the admitted binding the park cannot be re-priced.
         let unbound = blocked(next_window_start(now()));
-        assert!(try_park(&RefusingStore(false), 9, 3, 42, &unbound, now(), &policy())
-            .await
-            .is_none());
+        assert!(
+            try_park(&RefusingStore(false), 9, 3, 42, &unbound, now(), &policy())
+                .await
+                .is_none()
+        );
     }
 }

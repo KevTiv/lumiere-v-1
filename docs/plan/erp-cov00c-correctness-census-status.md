@@ -31,3 +31,20 @@ The ratchet fails when a new source file enters an inventoried defect surface wi
 ## Limits
 
 This patch closes the source defects and ratchets for COV-D02 through COV-D09. It does not provide live browser/deployment certification, convert direct-BFF browser setup into operator proof, award U4/U5, or close COV-00D. COV-D10 remains a launch blocker for unmigrated consequential actions.
+
+## Finance change history test classification
+
+The 2026-10-26 addition
+`frontend/web/tests/e2e/accounting-change-history.spec.ts` is classified in the
+operator-bypass inventory because it contains direct BFF fixture calls. Its
+principal draft-line edit uses the visible invoice Lines action and edit form;
+the Changes tab then displays exact canonical before/after evidence and retains
+the same event after reload without another edit request.
+
+The BFF calls create the ordinary observer's authority, restrict current field
+access, revoke source/history permissions, and inject a caller-authored raw audit
+row to verify that it cannot become trusted history. These calls are fixture or
+adversarial authorization evidence, not substitutes for the operator edit.
+Discovery confirms test selection only. This classification does not promote
+COV-08, change the existing lifecycle evidence or launch manifest, or claim that
+the new browser scenario has passed against a running disposable stack.

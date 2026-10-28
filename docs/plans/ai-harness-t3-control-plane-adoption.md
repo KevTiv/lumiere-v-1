@@ -614,3 +614,15 @@ The pilot cannot be advertised as fully admitted until its declared path proves:
 10. Keep specialist delegation (with the §7.4 invariants) and lifecycle
     extensions disabled until their existing M8/M9 gates pass.
 11. AIH-28 outside-agent MCP surface only after P1, as its own admission.
+
+
+## Integration readiness — 2026-10-28
+
+PR #291 is stacked on Finance #279 and includes current main. Merge Finance
+first, then the harness integration after the combined contracts workflow and
+same-head CI/P0 checks pass. The earlier Finance migration 27 stays byte-identical;
+the harness delta uses migration 28 (521 tables total). Published archives and
+tags are never edited. The gateway parks no run until a production resume
+consumer is admitted; current budget/rate-limit errors retain terminal failure
+behavior. Provider instances, handoff persistence, descriptor client consumption
+and live queue/restart acceptance retain their documented follow-up scope.
