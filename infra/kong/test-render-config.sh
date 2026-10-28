@@ -71,5 +71,13 @@ reject_startup 'PostgreSQL is required' KONG_DATABASE=off
 reject_startup 'verified ingress proxy CIDRs' LUMIERE_ENV=production KONG_TRUSTED_IPS=
 reject_startup 'globally trusted proxy range' LUMIERE_ENV=production KONG_TRUSTED_IPS='0.0.0.0/0'
 reject_startup 'globally trusted proxy range' LUMIERE_ENV=production KONG_TRUSTED_IPS='192.0.2.0/24, ::/0'
+reject_startup 'rate limit scope must be ip or service' LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=header
+
+LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=service render
+assert_contains 'limit_by: service'
+if grep -Fq 'limit_by: ip' "$tmp/kong.yml"; then
+  echo 'render-kong-config test: shared limits still depend on client IP' >&2
+  exit 1
+fi
 
 echo 'render-kong-config test: ok'

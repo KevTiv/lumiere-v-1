@@ -8,6 +8,15 @@ web_port="${WEB_UPSTREAM_PORT:-3000}"
 api_host="${API_SERVER_UPSTREAM_HOST:-api-server.railway.internal}"
 api_port="${API_SERVER_UPSTREAM_PORT:-8080}"
 cors_origin="${CORS_ORIGIN:-http://localhost:8000}"
+rate_limit_scope="${LUMIERE_GATEWAY_RATE_LIMIT_SCOPE:-ip}"
+
+case "$rate_limit_scope" in
+  ip|service) ;;
+  *)
+    echo 'render-kong-config: rate limit scope must be ip or service' >&2
+    exit 1
+    ;;
+esac
 
 umask 077
 
@@ -58,6 +67,7 @@ sed \
   -e "s|__API_SERVER_UPSTREAM_HOST__|$api_host|g" \
   -e "s|__API_SERVER_UPSTREAM_PORT__|$api_port|g" \
   -e "s|__CORS_ORIGIN__|$cors_origin_escaped|g" \
+  -e "s|limit_by: ip|limit_by: $rate_limit_scope|g" \
   "$template" > "$config"
 
 if [ "${1:-}" = "--render-only" ]; then
@@ -84,7 +94,14 @@ export KONG_DATABASE=postgres
 : "${KONG_PG_HOST:?set KONG_PG_HOST to the dedicated Kong PostgreSQL service}"
 : "${KONG_PG_PASSWORD:?set KONG_PG_PASSWORD}"
 
-if [ "${LUMIERE_ENV:-}" = production ]; then
+if [ "$rate_limit_scope" = service ]; then
+  # Every replica shares one counter per route/service. Forwarded client IPs
+  # never select a quota, so platforms without verified proxy CIDRs can run
+  # with no remote proxy trust. Keep startup's temporary Admin API loopback-only.
+  export KONG_TRUSTED_IPS=127.0.0.1/32,::1/128
+  export KONG_REAL_IP_HEADER=X-Real-IP
+  export KONG_REAL_IP_RECURSIVE=off
+elif [ "${LUMIERE_ENV:-}" = production ]; then
   : "${KONG_TRUSTED_IPS:?set the verified ingress proxy CIDRs; never trust every address}"
   KONG_TRUSTED_IPS="$(printf '%s' "$KONG_TRUSTED_IPS" | tr -d '[:space:]')"
   case ",$KONG_TRUSTED_IPS," in

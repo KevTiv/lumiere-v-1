@@ -48,6 +48,12 @@ production topology also requires the dedicated `kong-postgres` service and
 the `KONG_PG_*` variables described in `docs/PRODUCTION_DEPLOY.md`. Preflight
 blocks a release before writes if this infrastructure is missing.
 
+Without verified ingress CIDRs, the production manifest selects shared
+per-service rate limits. All clients share each route's existing quota; sign-in
+is capped at 10 requests per minute and 100 per hour across the deployment.
+Kong trusts only loopback in this mode. Per-client quotas remain available
+after the ingress trust configuration is verified.
+
 The first successful automatic release performs the image-source cutover for
 web and Chromium. Confirm its terminal success and deployed image digests in
 Railway before treating the stack as synchronized. If Railway requires
