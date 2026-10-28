@@ -51,12 +51,19 @@ export async function createDraftSaleOrder(page: Page, clientRef: string): Promi
   await chooseFirstEnabledOption(page, "pricelistId")
   await chooseFirstEnabledOption(page, "warehouseId")
   await fillField(page, "clientOrderRef", clientRef)
-  await Promise.all([
+  const [, receiptResponse] = await Promise.all([
     page.waitForResponse((res) => matchesOperationResponse(res, "create_sale_order") && res.ok(), {
+      timeout: 30_000,
+    }),
+    page.waitForResponse((res) => /^\/(?:api|v1)\/sales\/order-creations\//.test(new URL(res.url()).pathname), {
       timeout: 30_000,
     }),
     submitForm(page, "new-sale-order"),
   ])
+  expect(receiptResponse.ok()).toBe(true)
+  const receipt = await receiptResponse.json() as { data: Array<{ id: string }> }
+  expect(receipt.data).toHaveLength(1)
+  expect(Object.keys(receipt.data[0]!).sort()).toEqual(["companyId", "id", "organizationId", "receipt"])
 
   let orderId = 0
   await expect
@@ -72,6 +79,7 @@ export async function createDraftSaleOrder(page: Page, clientRef: string): Promi
       { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
+  expect(receipt.data[0]!.id).toBe(String(orderId))
   await expect(page).toHaveURL((url) => url.pathname === `/sales/orders/${orderId}` && url.searchParams.get("tab") === "lines" && url.searchParams.get("created") === "1")
   await expect(page.getByTestId('sale-order-next-step')).toBeVisible()
   return orderId

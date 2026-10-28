@@ -8,7 +8,7 @@ interface CreatedOrderProjection {
   organization_id?: unknown
   companyId?: unknown
   company_id?: unknown
-  metadata?: unknown
+  receipt?: unknown
 }
 
 function metadataObject(raw: unknown): object {
@@ -25,15 +25,14 @@ export function withSaleOrderReceipt(metadata: unknown, receipt: string): string
   return JSON.stringify({ ...metadataObject(metadata), [SALE_ORDER_RECEIPT_KEY]: receipt })
 }
 
-/** An exact client receipt and both scope keys identify the draft, never its name or recency. */
+/** Validate the server's creator-scoped lookup, never infer identity from names or recency. */
 export function createdSaleOrderId(
   rows: readonly CreatedOrderProjection[], receipt: string, organizationId: bigint, companyId: bigint,
 ): string | undefined {
   const matches = rows.filter((row) => {
     if (parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId ||
         parseStrictU64(row.companyId ?? row.company_id) !== companyId) return false
-    try { return Reflect.get(metadataObject(row.metadata), SALE_ORDER_RECEIPT_KEY) === receipt }
-    catch { return false }
+    return row.receipt === receipt
   })
   if (matches.length !== 1) return undefined
   const id = parseStrictU64(matches[0]?.id)

@@ -19,6 +19,8 @@ use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
+mod creations;
+
 fn value_as_u64(v: &Value) -> Option<u64> {
     v.as_u64()
         .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
@@ -139,10 +141,12 @@ async fn sale_order_delete(
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/sales/orders/:id",
-        get(sale_order_get)
-            .put(sale_order_put)
-            .delete(sale_order_delete),
-    )
+    Router::new()
+        .route("/sales/order-creations/:receipt", get(creations::get))
+        .route(
+            "/sales/orders/:id",
+            get(sale_order_get)
+                .put(sale_order_put)
+                .delete(sale_order_delete),
+        )
 }

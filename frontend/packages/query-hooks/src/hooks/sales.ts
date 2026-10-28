@@ -285,8 +285,9 @@ export async function createSaleOrderDraftCommand(params: CreateSaleOrderParams,
   if (!r.ok) throw await salesReducerError(r, 'Failed to create quotation')
   // A read failure after an acknowledged save must not invite another create.
   try {
-    const rows = await fetchQueryList('/api/query/sale-orders', 'Failed to read saved quotation')
-    return { orderId: companyId == null ? undefined : createdSaleOrderId(rows, receipt, organizationId, companyId) }
+    if (companyId == null || companyId === 0n) return {}
+    const rows = await fetchQueryList(`/api/sales/order-creations/${receipt}?companyId=${companyId}`, 'Failed to read saved quotation')
+    return { orderId: createdSaleOrderId(rows, receipt, organizationId, companyId) }
   } catch {
     return {}
   }

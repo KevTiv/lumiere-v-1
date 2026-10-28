@@ -29,20 +29,20 @@ const params: CreateSaleOrderParams = {
 test('receipt preserves metadata and matches exactly within organization and company', () => {
   const metadata = withSaleOrderReceipt(params.metadata, 'receipt')
   assert.equal(JSON.parse(metadata).commission_rate_percent, 5)
-  const row = { id: '9007199254740993', organizationId: '1', companyId: '2', metadata }
+  const row = { id: '9007199254740993', organizationId: '1', companyId: '2', receipt: 'receipt' }
   assert.equal(createdSaleOrderId([row], 'receipt', 1n, 2n), row.id)
-  assert.equal(createdSaleOrderId([{ ...row, metadata: { some: metadata } }], 'receipt', 1n, 2n), row.id)
+  assert.equal(createdSaleOrderId([{ id: row.id, organization_id: '1', company_id: '2', receipt: 'receipt' }], 'receipt', 1n, 2n), row.id)
   assert.equal(createdSaleOrderId([row], 'other', 1n, 2n), undefined)
   assert.equal(createdSaleOrderId([row], 'receipt', 9n, 2n), undefined)
   assert.equal(createdSaleOrderId([row], 'receipt', 1n, 9n), undefined)
   assert.equal(createdSaleOrderId([row, { ...row, id: '8' }], 'receipt', 1n, 2n), undefined)
-  assert.equal(createdSaleOrderId([{ ...row, metadata: '{' }], 'receipt', 1n, 2n), undefined)
+  assert.equal(createdSaleOrderId([{ ...row, receipt: undefined }], 'receipt', 1n, 2n), undefined)
 });
 
-test('acknowledged creation opens the exact receipt, ignoring a newer unrelated draft', async () => {
+test('acknowledged creation reads the creator-scoped receipt and returns its exact saved ID', async () => {
   let metadata = ''
   let writes = 0
-  globalThis.fetch = async (_input, init) => {
+  globalThis.fetch = async (input, init) => {
     if (init?.method === 'POST') {
       writes++
       const body = JSON.parse(String(init.body))
@@ -50,13 +50,26 @@ test('acknowledged creation opens the exact receipt, ignoring a newer unrelated 
       metadata = typeof wireMetadata === 'string' ? wireMetadata : wireMetadata.some
       return new Response('{}')
     }
-    return Response.json({ data: [
-      { id: '99', organizationId: '1', companyId: '2', metadata: '{}' },
-      { id: '12', organizationId: '1', companyId: '2', metadata },
-    ] })
+    const receipt = JSON.parse(metadata).sales_create_receipt
+    assert.equal(String(input), `http://api.test/api/sales/order-creations/${receipt}?companyId=2`)
+    return Response.json({ data: [{ id: '12', organizationId: '1', companyId: '2', receipt }] })
   }
   assert.deepEqual(await createSaleOrderDraftCommand(params, 1n, 2n), { orderId: '12' })
   assert.equal(writes, 1)
+});
+
+test('missing, ambiguous or foreign readback resolves as saved without a repeated write', async () => {
+  for (const kind of ['missing', 'duplicate', 'foreign', 'wrong-receipt']) {
+    let writes = 0
+    globalThis.fetch = async (input, init) => {
+      if (init?.method === 'POST') { writes++; return new Response('{}') }
+      const receipt = new URL(String(input)).pathname.split('/').at(-1)
+      const row = { id: '12', organizationId: '1', companyId: kind === 'foreign' ? '9' : '2', receipt: kind === 'wrong-receipt' ? 'wrong' : receipt }
+      return Response.json({ data: kind === 'missing' ? [] : kind === 'duplicate' ? [row, { ...row, id: '13' }] : [row] })
+    }
+    assert.equal((await createSaleOrderDraftCommand(params, 1n, 2n)).orderId, undefined, kind)
+    assert.equal(writes, 1, kind)
+  }
 });
 
 test('failed readback after save resolves as saved and never repeats creation', async () => {
