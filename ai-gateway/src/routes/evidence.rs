@@ -5,6 +5,8 @@
 //! return an excerpt for a source outside that scope, or for a passage whose
 //! access was revoked or whose content was deleted.
 
+pub(crate) use lumiere_auth_context::CapabilityGrantBounds;
+use lumiere_auth_context::{ActorContext as ActorCredentials, CapabilityGrantEnvelope};
 use std::time::Duration;
 
 use axum::{
@@ -207,124 +209,6 @@ pub struct InspectRequest {
     pub node_key: Option<String>,
 }
 
-struct ActorCredentials {
-    identity: String,
-    token: String,
-    organization_id: u64,
-    company_id: u64,
-}
-
-impl ActorCredentials {
-    fn from_headers(headers: &HeaderMap) -> AppResult<Self> {
-        let required = |name: &str| {
-            headers
-                .get(name)
-                .and_then(|value| value.to_str().ok())
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| AppError::Forbidden("acting-user context is required".into()))
-        };
-        // Identity and token are forwarded by the session-owning API server.
-        // The internal-secret middleware authenticates that server; these
-        // values are deliberately not accepted in the JSON body.
-        let identity = required("x-lumiere-actor-identity")?.to_string();
-        if ActorIdentity::parse(&identity).is_none() {
-            return Err(AppError::Forbidden("acting-user context is invalid".into()));
-        }
-        let token = required("x-lumiere-actor-token")?.to_string();
-        let organization_id = required("x-lumiere-organization-id")?
-            .parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
-        let company_id = required("x-lumiere-company-id")?
-            .parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
-        Ok(Self {
-            identity,
-            token,
-            organization_id,
-            company_id,
-        })
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CapabilityGrantEnvelope {
-    #[serde(rename = "organizationId")]
-    organization_id: u64,
-    #[serde(rename = "companyId")]
-    company_id: u64,
-    #[serde(rename = "actorIdentity")]
-    actor_identity: String,
-    #[serde(rename = "knowledgeTeamRefs", default)]
-    _knowledge_team_refs: Vec<String>,
-    #[serde(rename = "placementGeneration", default)]
-    _placement_generation: Option<u64>,
-    #[serde(rename = "policySnapshotHash", default)]
-    _policy_snapshot_hash: Option<String>,
-    #[serde(rename = "capabilityGrantsHash", default)]
-    _capability_grants_hash: Option<String>,
-    grants: Vec<CapabilityGrant>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct CapabilityGrant {
-    capability_key: String,
-    max_rows: u64,
-    max_bytes: u64,
-}
-
-/// The row and byte limits an actor's role grant places on one capability.
-/// Callers must intersect these with their own global ceilings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct CapabilityGrantBounds {
-    pub max_rows: u64,
-    pub max_bytes: u64,
-}
-
-impl CapabilityGrantEnvelope {
-    /// The bounds granted for exactly `capability`, or `None` when the
-    /// envelope is for another actor or scope, or grants nothing usable.
-    ///
-    /// The API server already merges an actor's roles; if a malformed
-    /// envelope still repeats a capability, the smallest limits win so a
-    /// duplicate can only narrow authority.
-    fn bounds_for(
-        &self,
-        actor: &ActorCredentials,
-        capability: &str,
-    ) -> Option<CapabilityGrantBounds> {
-        if self.organization_id != actor.organization_id
-            || self.company_id != actor.company_id
-            || self.actor_identity != actor.identity
-        {
-            return None;
-        }
-        self.grants
-            .iter()
-            .filter(|grant| {
-                grant.capability_key == capability && grant.max_rows > 0 && grant.max_bytes > 0
-            })
-            .map(|grant| CapabilityGrantBounds {
-                max_rows: grant.max_rows,
-                max_bytes: grant.max_bytes,
-            })
-            .reduce(|left, right| CapabilityGrantBounds {
-                max_rows: left.max_rows.min(right.max_rows),
-                max_bytes: left.max_bytes.min(right.max_bytes),
-            })
-    }
-
-    fn permits(&self, actor: &ActorCredentials, capability: &str) -> bool {
-        self.bounds_for(actor, capability).is_some()
-    }
-}
-
 /// Ask the session-owning API server for the actor's current grants. Any
 /// transport failure, timeout, non-success status or malformed envelope is an
 /// error: authority that cannot be established is denied.
@@ -334,29 +218,14 @@ async fn fetch_actor_grants(
     actor: &ActorCredentials,
     timeout: Duration,
 ) -> AppResult<CapabilityGrantEnvelope> {
-    let response = http
-        .get(format!(
-            "{}/v1/ai/capability-grants?companyId={}",
-            api_server_url.trim_end_matches('/'),
-            actor.company_id
-        ))
-        .bearer_auth(&actor.token)
-        .header("x-stdb-identity", &actor.identity)
-        .timeout(timeout)
-        .send()
+    lumiere_auth_context::fetch_capability_grants(http, api_server_url, actor, timeout)
         .await
-        .map_err(|_| AppError::Unavailable("acting-user authorization is unavailable".into()))?;
-    if !response.status().is_success() {
-        return Err(if response.status().is_server_error() {
-            AppError::Unavailable("acting-user authorization is unavailable".into())
-        } else {
-            AppError::Forbidden("evidence access is not permitted".into())
-        });
-    }
-    response
-        .json::<CapabilityGrantEnvelope>()
-        .await
-        .map_err(|_| AppError::Unavailable("acting-user authorization is unavailable".into()))
+        .map_err(|error| match error {
+            lumiere_auth_context::AuthorityError::Denied => AppError::Forbidden(error.to_string()),
+            lumiere_auth_context::AuthorityError::Unavailable => {
+                AppError::Unavailable(error.to_string())
+            }
+        })
 }
 
 async fn require_actor_grant_bounds(
@@ -387,19 +256,7 @@ pub(crate) async fn require_scoped_capability_grant(
     company_id: u64,
     capability: &str,
 ) -> AppResult<CapabilityGrantBounds> {
-    let actor = ActorCredentials {
-        identity: actor_identity.trim().to_string(),
-        token: actor_token.trim().to_string(),
-        organization_id,
-        company_id,
-    };
-    if ActorIdentity::parse(&actor.identity).is_none()
-        || actor.token.is_empty()
-        || actor.organization_id == 0
-        || actor.company_id == 0
-    {
-        return Err(AppError::Forbidden("acting-user context is invalid".into()));
-    }
+    let actor = ActorCredentials::new(actor_identity, actor_token, organization_id, company_id)?;
     require_actor_grant_bounds(state, &actor, capability).await
 }
 

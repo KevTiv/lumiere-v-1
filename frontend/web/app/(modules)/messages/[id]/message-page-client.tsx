@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CornerUpLeft, ExternalLink, MessagesSquare } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
+  useRBAC,
   EntityDetail,
   Empty,
   EmptyContent,
@@ -34,6 +35,8 @@ import {
   useMailFollowers,
   useMailMessages,
   usePostMessage,
+  confirmPostedMessage,
+  type PostMessageInput,
   useSubscribeToRecord,
   useUnsubscribeFromRecord,
   type MailMessage,
@@ -43,6 +46,11 @@ import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useMessagesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { moduleCollection } from '@lumiere/ui/lib/module-data-state';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
+import { UnconfirmedPostedMessageError } from '@lumiere/query-hooks/hooks/mail-message-post';
+import { newCorrelationId } from '@lumiere/erp-workflows';
+import { sameMessageSource } from '../message-conversations';
 import {
   messageAuthorName,
   messageKind,
@@ -76,17 +84,21 @@ const TAB_IDS = ['overview', 'thread'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function MessagePageClient(props: MessagePageClientProps) {
+  const session = useErpSession();
+  const { currentUser, roles, policies, permissionsReady } = useRBAC();
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />;
   }
-  return <MessagePageLoaded {...props} organizationId={props.organizationId} />;
+  const scopeKey = JSON.stringify({ organizationId: props.organizationId, companyId: session.activeCompanyId, identity: session.identity, currentUser, roles, policies });
+  if (permissionsReady === false || session.activeCompanyReady === false) return <Skeleton className="h-64 w-full" />;
+  return <MessagePageLoaded key={`${scopeKey}:${props.messageId}`} {...props} scopeKey={scopeKey} organizationId={props.organizationId} />;
 }
 
 function MessagePageLoaded({
   messageId,
-  initialMessages,
   organizationId,
-}: MessagePageClientProps & { organizationId: number }) {
+  scopeKey,
+}: MessagePageClientProps & { organizationId: number; scopeKey: string }) {
   useMessagesModuleSubscription();
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -94,18 +106,33 @@ function MessagePageLoaded({
   const searchParams = useSearchParams();
   const { orgId } = orgBigInts(organizationId);
 
-  const { data: messages = [], isLoading } = useMailMessages(orgId, initialMessages);
+  const messagesQuery = useMailMessages(orgId, undefined, scopeKey);
+  const messagesRead = moduleCollection(messagesQuery);
+  const messages = messagesRead.rows;
+  const isLoading = messagesRead.state.status === 'loading';
+  const { checkPermission } = useRBAC();
   const { data: users = [] } = useUsers(orgId);
   const postMessage = usePostMessage(orgId);
   const { identity } = useErpSession();
-  const { data: followers = [] } = useMailFollowers(orgId);
+  const { data: followers = [] } = useMailFollowers(orgId, undefined, scopeKey);
   const subscribeToRecord = useSubscribeToRecord(orgId);
   const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId);
 
   const [replying, setReplying] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [pendingReply, setPendingReply] = useState<PostMessageInput | null>(null);
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const replyUpload = useChatterUploader(organizationId);
   const replyAttempt = useRef<AttachmentItem[]>([]);
+  useEffect(() => {
+    if (messagesRead.state.status !== 'ready') {
+      setReplying(false);
+      setReplyError(null);
+      setPendingReply((previous) => messagesRead.state.status === 'denied' ? null : previous ? { ...previous, body: '', attachmentIds: [] } : null);
+      replyAttempt.current = [];
+    }
+  }, [messagesRead.state.status]);
 
   const rows = messages as unknown as Row[];
   const message = useMemo(() => rows.find((row) => String(row.id) === messageId), [rows, messageId]);
@@ -132,6 +159,8 @@ function MessagePageLoaded({
     basePath: '/messages',
     labelOf: (row) => messageTitle(row, 40),
   });
+
+  if (messagesRead.state.status !== 'ready' && !isLoading) return <ModuleDataNotice state={messagesRead.state} />;
 
   if (!message) {
     if (isLoading) {
@@ -164,7 +193,8 @@ function MessagePageLoaded({
   const kind = messageKind(message);
   const authorOf = (row: Row) => messageAuthorName(row, users as unknown as Row[]);
   const author = authorOf(message);
-  const parentId = optionalId(message.parentId ?? message.parent_id);
+  const claimedParentId = optionalId(message.parentId ?? message.parent_id);
+  const parentId = rows.some((row) => String(row.id) === claimedParentId && sameMessageSource(row, message)) ? claimedParentId : undefined;
   const recordHref = messageRecordPageHref(message);
   const when = new Date(Number(message.date ?? 0) / 1000).toLocaleString(i18n.language);
   const model = String(message.model ?? '');
@@ -198,7 +228,7 @@ function MessagePageLoaded({
   const replyForm: FormConfig = {
     id: 'reply-message',
     title: t('messages.page.reply', { defaultValue: 'Reply' }),
-    submitLabel: t('messages.page.reply', { defaultValue: 'Reply' }),
+    submitLabel: pendingReply ? t('messages.workspace.checkOutcome', { defaultValue: 'Check outcome' }) : t('messages.page.reply', { defaultValue: 'Reply' }),
     sections: [
       {
         id: 'reply',
@@ -211,6 +241,8 @@ function MessagePageLoaded({
       },
     ],
   };
+
+  if (pendingReply) replyForm.sections = replyForm.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({ ...field, disabled: true, required: false })) }));
 
   const detailConfig = {
     mode: 'detail' as const,
@@ -233,7 +265,7 @@ function MessagePageLoaded({
       <RecordPage
         testIdPrefix="message"
         breadcrumbs={[
-          { label: t('nav.messages', { defaultValue: 'Messages' }), href: '/messages' },
+          { label: t('nav.messages', { defaultValue: 'Messages' }), href: `/messages?tab=messages&message=${messageId}` },
           { label: t('messages.messages.title'), href: buildModuleTabHref('messages', 'messages') },
           { label: title },
         ]}
@@ -292,7 +324,7 @@ function MessagePageLoaded({
                   : t('crm.chatter.follow', { defaultValue: 'Follow' })}
               </Button>
             ) : null}
-            <Button size="sm" data-testid="message-reply" onClick={() => setReplying(true)}>
+            <Button size="sm" data-testid="message-reply" disabled={!checkPermission("mail_message", "create").allowed || !recordTarget} onClick={() => setReplying(true)}>
               {t('messages.page.reply', { defaultValue: 'Reply' })}
             </Button>
           </>
@@ -357,6 +389,17 @@ function MessagePageLoaded({
           submitError={replyError}
           onSubmit={async (formData) => {
             setReplyError(null);
+            if (pendingReply) {
+              try {
+                const effect = await confirmPostedMessage(orgId, { idempotencyKey: pendingReply.idempotencyKey!, model: pendingReply.model, resId: BigInt(pendingReply.resId) });
+                if (!active.current) return;
+                if (!effect) { setReplyError(t('messages.workspace.unconfirmed', { defaultValue: 'The message outcome is still unconfirmed. Check again without posting another message.' })); return; }
+                await messagesQuery.refetch();
+                if (!active.current) return;
+                setPendingReply(null); setReplying(false); setActiveTab('thread');
+              } catch (error) { if (active.current) setReplyError(error instanceof Error ? error.message : String(error)); }
+              return;
+            }
             const body = String(formData.body ?? '').trim();
             if (!body) {
               setReplyError(t('common.validation.required'));
@@ -384,14 +427,10 @@ function MessagePageLoaded({
                 }
                 attachmentIds = attachmentDocumentIds(result);
               }
-              await postMessage.mutateAsync({
-                model,
-                resId,
-                body,
-                messageType: 'comment',
-                parentId: messageId,
-                attachmentIds,
-              });
+              const attempt = { model, resId, body, messageType: 'comment', parentId: messageId, attachmentIds, idempotencyKey: newCorrelationId() };
+              try { await postMessage.mutateAsync(attempt); }
+              catch (error) { if (error instanceof UnconfirmedPostedMessageError && active.current) setPendingReply(attempt); throw error; }
+              if (!active.current) return;
               replyAttempt.current = [];
               setReplying(false);
               setActiveTab('thread');

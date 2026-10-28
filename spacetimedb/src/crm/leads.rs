@@ -117,6 +117,8 @@ pub struct UpdateLeadParams {
     pub probability: Option<f64>,
     pub stage_id: Option<Option<u64>>,
     pub team_id: Option<Option<u64>>,
+    /// The UI may qualify a new enquiry. Conversion owns the terminal transition.
+    pub state: Option<String>,
 }
 
 /// Params for converting a lead to a contact/opportunity.
@@ -551,6 +553,59 @@ pub fn create_lead(
     Ok(())
 }
 
+fn validate_lead_qualification(current: &str, requested: Option<&str>) -> Result<(), String> {
+    match requested {
+        None => Ok(()),
+        Some("qualified") if matches!(current, "new" | "qualified") => Ok(()),
+        Some(_) => Err(
+            "Only a new lead can be qualified; conversion manages the converted state".to_string(),
+        ),
+    }
+}
+
+#[cfg(test)]
+mod qualification_tests {
+    use super::{validate_lead_qualification, UpdateLeadParams};
+
+    #[test]
+    fn qualification_wire_payload_preserves_sibling_patch_semantics() {
+        let payload: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/crm-lead-qualification-patch.json"
+        ))
+        .expect("shared wire fixture must be valid JSON");
+        let qualification: UpdateLeadParams =
+            spacetimedb_sats::de::serde::deserialize_from(payload.clone())
+                .expect("qualification must accept the frontend's encoded payload");
+        assert_eq!(qualification.state.as_deref(), Some("qualified"));
+        assert_eq!(qualification.title, None);
+        let mut edit = payload;
+        edit["state"] = serde_json::json!({ "none": [] });
+        edit["title"] = serde_json::json!({ "some": { "some": "Sales manager" } });
+        let existing: UpdateLeadParams =
+            spacetimedb_sats::de::serde::deserialize_from(edit.clone())
+                .expect("edits must use explicit Some(Some(value))");
+        assert_eq!(existing.state, None);
+        assert_eq!(existing.title, Some(Some("Sales manager".to_string())));
+        edit["title"] = serde_json::json!({ "some": { "none": [] } });
+        let cleared: UpdateLeadParams = spacetimedb_sats::de::serde::deserialize_from(edit)
+            .expect("explicit clears must use Some(None)");
+        assert_eq!(cleared.title, Some(None));
+    }
+
+    #[test]
+    fn qualification_is_idempotent_and_preserves_terminal_states() {
+        assert!(validate_lead_qualification("new", Some("qualified")).is_ok());
+        assert!(validate_lead_qualification("qualified", Some("qualified")).is_ok());
+        for state in ["converted", "lost", "won"] {
+            assert!(validate_lead_qualification(state, Some("qualified")).is_err());
+            assert!(validate_lead_qualification(state, None).is_ok());
+        }
+        for requested in ["converted", "lost", "new", "invalid"] {
+            assert!(validate_lead_qualification("new", Some(requested)).is_err());
+        }
+    }
+}
+
 /// Atomically patches a lead's details, address, and revenue forecast in one
 /// transaction (CRM-RI-004). Only fields explicitly present in `params` are
 /// touched; every other field on the row is preserved via the final `..lead`
@@ -569,6 +624,11 @@ pub fn update_lead(
     }
     check_permission(ctx, organization_id, "lead", "write")?;
 
+    validate_lead_qualification(&lead.state, params.state.as_deref())?;
+    if params.state.is_some() && lead.deleted_at.is_some() {
+        return Err("Deleted leads cannot be qualified".to_string());
+    }
+
     if let Some(Some(stage_id)) = params.stage_id {
         validate_lead_opportunity_stage(ctx, organization_id, stage_id)?;
     }
@@ -577,6 +637,13 @@ pub fn update_lead(
     }
 
     let mut changed_fields = Vec::new();
+    if params
+        .state
+        .as_deref()
+        .is_some_and(|state| state != lead.state)
+    {
+        changed_fields.push("state".to_string());
+    }
     if params.contact_name.is_some() {
         changed_fields.push("contact_name".to_string());
     }
@@ -621,6 +688,7 @@ pub fn update_lead(
     }
 
     ctx.db.lead().id().update(Lead {
+        state: params.state.unwrap_or_else(|| lead.state.clone()),
         contact_name: params
             .contact_name
             .unwrap_or_else(|| lead.contact_name.clone()),

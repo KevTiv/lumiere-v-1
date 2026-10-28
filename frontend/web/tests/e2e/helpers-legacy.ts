@@ -133,7 +133,8 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
       for (const [key, value] of current.searchParams) {
         if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
       }
-      if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+      // A module may default to Orders or Inbox.
+      target.searchParams.set("tab", tabId)
       await page.goto(target.toString())
       await currentModuleView(page, moduleId)
     }
@@ -471,9 +472,17 @@ export async function openTabAndCancelCreate(
   await expectNoAppError(page)
 }
 
+/** Reveal optional form sections through their visible disclosure controls. */
+export async function revealFormSection(field: Locator) {
+  for (const section of await field.locator("xpath=ancestor::details").all()) {
+    if (await section.getAttribute("open") === null) await section.locator(":scope > summary").click()
+  }
+}
+
 export async function fillField(scope: Page | Locator, name: string, value: string) {
   const field = scope.getByTestId(`form-field-${name}`)
   await expect(field, `Missing form field "${name}" in the active form`).toHaveCount(1, { timeout: 15_000 })
+  await revealFormSection(field)
   // Textarea retains its test id on the native form bridge. User input belongs
   // in the visible editor inside that same panel, including within a dialog.
   if (
@@ -495,6 +504,7 @@ export async function chooseFirstOption(page: Page, name: string) {
 
 /** Scope to this trigger's popup, including while another popup is animating closed. */
 async function openSelectListbox(page: Page, trigger: Locator) {
+  await revealFormSection(trigger)
   await expect(trigger).toBeVisible({ timeout: 15_000 })
   // Radix hides background controls from the accessibility tree while open.
   // Resolve its popup before opening so role-based trigger locators remain usable.
@@ -826,10 +836,17 @@ export async function chooseSelectOptionByTriggerValue(
 ) {
   const listbox = await openSelectListbox(page, trigger)
   const storedValue = String(value)
-  const option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
+  let option = listbox.locator(`[role="option"][data-value=${JSON.stringify(storedValue)}]`)
   const search = listbox.locator('xpath=ancestor::*[@data-slot="popover-content"][1]').locator('[cmdk-input]')
   if (await search.isVisible()) await search.fill(`#${storedValue}`)
+  // Retain compatibility with the older native-select markup.
+  if (await option.count() === 0) {
+    const label = await trigger.locator('xpath=following-sibling::select[@aria-hidden="true"][1]/option')
+      .evaluateAll((options, expected) => options.find((item) => (item as HTMLOptionElement).value === expected)?.textContent?.trim() ?? "", storedValue)
+    if (label) option = listbox.getByRole("option", { name: label, exact: true })
+  }
   await expect(option).toHaveCount(1, { timeout: 30_000 })
+  await expect(option).toBeEnabled()
   await selectOption(trigger, listbox, option)
 }
 
@@ -941,7 +958,7 @@ export async function openSaleOrderPage(page: Page, orderId: number | string) {
 /** Start "Create invoice" from a sale order's page and wait for its form. */
 export async function openCreateInvoiceFromOrder(page: Page, orderId: number | string) {
   await openSaleOrderPage(page, orderId)
-  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice").first()
+  const action = page.getByTestId("sale-order-page").getByRole("button", { name: /^Create invoice/ }).first()
   await expect(action).toBeEnabled({ timeout: 30_000 })
   await action.click()
   await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({ timeout: 15_000 })
@@ -2329,6 +2346,7 @@ export async function rejectApprovalRequestViaUi(
   await gotoApprovals(page)
   const card = page.getByTestId(`approval-card-${requestId}`)
   await expect(card).toBeVisible({ timeout: 30_000 })
+  await card.getByTestId(`approval-review-${requestId}`).click()
   await page.getByTestId(`approval-reject-${requestId}`).click()
   await page.getByTestId(`approval-reject-reason-${requestId}`).fill(reason)
   const [res] = await Promise.all([

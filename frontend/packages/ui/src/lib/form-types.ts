@@ -211,6 +211,8 @@ export type FormField =
 
 export interface FormSection {
   id: string
+  /** Optional details stay mounted so collapsing never discards entered values. */
+  collapsible?: boolean
   title?: string
   description?: string
   icon?: string

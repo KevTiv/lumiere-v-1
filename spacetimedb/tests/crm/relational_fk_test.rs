@@ -78,6 +78,7 @@ fn lead_params(name: &str, stage_id: Option<u64>, team_id: Option<u64>) -> Creat
 
 fn relation_patch(stage_id: Option<Option<u64>>, team_id: Option<Option<u64>>) -> UpdateLeadParams {
     UpdateLeadParams {
+        state: None,
         contact_name: None,
         title: None,
         website: None,
@@ -296,6 +297,66 @@ pub fn test_lead_stage_and_team_relations(ctx: &ReducerContext) -> Result<(), St
         return Err("rejected lead update changed persisted relations".to_string());
     }
 
+    Ok(())
+}
+
+pub fn test_lead_qualification(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let other = OrgFixture::seed_minimal(ctx)?;
+    create_lead(
+        ctx,
+        fixture.organization_id,
+        lead_params("Qualification enquiry", None, None),
+    )?;
+    let original = ctx
+        .db
+        .lead()
+        .iter()
+        .find(|row| {
+            row.organization_id == fixture.organization_id && row.name == "Qualification enquiry"
+        })
+        .ok_or("qualification lead missing")?;
+    let qualification = || {
+        let mut patch = relation_patch(None, None);
+        patch.state = Some("qualified".to_string());
+        patch
+    };
+    if update_lead(ctx, other.organization_id, original.id, qualification()).is_ok() {
+        return Err("cross-org qualification was accepted".to_string());
+    }
+    update_lead(ctx, fixture.organization_id, original.id, qualification())?;
+    update_lead(ctx, fixture.organization_id, original.id, qualification())?;
+    let qualified = ctx
+        .db
+        .lead()
+        .id()
+        .find(&original.id)
+        .ok_or("qualified lead missing")?;
+    if qualified.state != "qualified"
+        || qualified.name != original.name
+        || qualified.expected_revenue != original.expected_revenue
+    {
+        return Err("qualification failed or changed sibling fields".to_string());
+    }
+    ctx.db.lead().id().update(crate::crm::leads::Lead {
+        state: "converted".to_string(),
+        ..qualified
+    });
+    if update_lead(ctx, fixture.organization_id, original.id, qualification()).is_ok() {
+        return Err("converted lead was requalified".to_string());
+    }
+    if ctx
+        .db
+        .lead()
+        .id()
+        .find(&original.id)
+        .ok_or("converted lead missing")?
+        .state
+        != "converted"
+    {
+        return Err("rejected qualification changed terminal state".to_string());
+    }
     Ok(())
 }
 

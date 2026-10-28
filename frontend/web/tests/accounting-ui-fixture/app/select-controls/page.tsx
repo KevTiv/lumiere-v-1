@@ -102,6 +102,7 @@ function SelectControls() {
               value={record}
               onChange={setRecord}
               options={[
+                { value: "", label: "No record" },
                 ...Array.from({ length: 40 }, (_, i) => ({ value: String(i + 1), label: `Record ${i + 1}` })),
                 { value: "90071992547409931", label: "Shared account label" },
                 { value: "90071992547409932", label: "Shared account label" },

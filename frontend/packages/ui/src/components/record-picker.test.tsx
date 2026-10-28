@@ -45,6 +45,15 @@ function Harness({ initial = "", onChange = vi.fn() }: { initial?: string; onCha
 const open = () => fireEvent.click(screen.getByTestId("partner"))
 
 describe("RecordPicker", () => {
+  it("keeps an empty record choice searchable and returns the empty value", async () => {
+    const onChange = vi.fn()
+    render(<RecordPicker value="1" onChange={onChange} options={[{ value: "", label: "No project" }, ...options]} data-testid="partner" />)
+    open()
+    fireEvent.change(await screen.findByPlaceholderText("Search..."), { target: { value: "No project" } })
+    fireEvent.click(await screen.findByRole("option", { name: "No project", exact: true }))
+    expect(onChange).toHaveBeenCalledWith("")
+  })
+
   it("registers a caller-provided field id with its popup", async () => {
     render(<RecordPicker id="customer-field" value="" onChange={vi.fn()} options={options} data-testid="partner" />)
     open()

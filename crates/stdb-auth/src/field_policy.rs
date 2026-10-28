@@ -243,7 +243,12 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         .insert("updated_at".to_string());
     m.insert(
         "activities".to_string(),
-        ["date_deadline".to_string()].into_iter().collect(),
+        // Personal queues require authorized ownership fields as well as the
+        // deadline. Inclusion preserves selected columns; it grants no fields.
+        ["date_deadline", "user_id", "assigned_to"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
     );
     m.insert(
         "tasks".to_string(),
@@ -1210,6 +1215,41 @@ mod tests {
             role_ids: Vec::new(),
             org_permissions: Vec::new(),
         }
+    }
+
+    #[test]
+    fn activity_http_projection_supports_personal_work_without_overriding_field_rules() {
+        let mut access = field_access(&["activity:read"]);
+        for context in [None, Some(&access)] {
+            let columns = resolve_http_sql_columns("activities", context).unwrap();
+            for field in [
+                "user_id",
+                "assigned_to",
+                "res_model",
+                "res_id",
+                "deleted_at",
+            ] {
+                assert!(
+                    columns.iter().any(|column| column == field),
+                    "missing {field}"
+                );
+            }
+            assert!(!columns.iter().any(|column| column == "note"));
+        }
+        access.field_permissions.push(FieldPermissionLike {
+            id: None,
+            organization_id: Some(access.organization_id),
+            role_id: Some(access.role_id),
+            resource: "activities".into(),
+            action: "read".into(),
+            allowed_fields: vec!["summary".into()],
+            subject_user_hex: None,
+            subject_role_id: None,
+        });
+        assert_eq!(
+            resolve_http_sql_columns("activities", Some(&access)).unwrap(),
+            vec!["id", "organization_id", "summary"]
+        );
     }
 
     #[test]

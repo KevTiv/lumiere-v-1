@@ -76,6 +76,7 @@ dependencies = [
  "dashmap",
  "dotenvy",
  "futures",
+ "lumiere-auth-context",
  "lumiere-contracts",
  "lumiere-finance-review-core",
  "qdrant-client",
@@ -160,6 +161,7 @@ dependencies = [
  "futures-util",
  "hex",
  "jsonwebtoken",
+ "lumiere-auth-context",
  "lumiere-contracts",
  "lumiere-finance-review-core",
  "lumiere-presentation-core",
@@ -2125,6 +2127,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "lumiere-auth-context"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "http",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "lumiere-codegen"
 version = "0.1.0"
 dependencies = [
@@ -2138,7 +2153,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.154"
+version = "0.3.157"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",

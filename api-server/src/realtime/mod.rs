@@ -66,7 +66,7 @@ pub async fn realtime_ws_upgrade(
     headers: HeaderMap,
     cookies: Cookies,
 ) -> Result<impl IntoResponse, ApiError> {
-    if state.config.workos_client_id.is_some() {
+    if state.config.workos_auth.is_some() {
         require_browser_origin(&headers, &state.config.app_url)?;
     }
     let auth = headers
@@ -87,7 +87,7 @@ pub async fn realtime_ws_upgrade(
         &state.organization_placements,
     )?;
 
-    let maximum_deadline = if state.config.workos_client_id.is_some() {
+    let maximum_deadline = if state.config.workos_auth.is_some() {
         let token = auth
             .and_then(|value| value.strip_prefix("Bearer "))
             .or(cookie_tok.as_deref())

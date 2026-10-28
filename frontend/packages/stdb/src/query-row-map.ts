@@ -22,6 +22,7 @@ import type {
   AccountTax,
   AccountTaxGroup,
   Activity,
+  ActivityType,
   AdjustmentReason,
   AiAgent,
   AiDocumentProcessingJob,
@@ -365,6 +366,7 @@ export interface QueryRowMap {
   "account-reconciliation-widgets": AccountReconciliationWidget
   "account-taxes": AccountTax
   "activities": Activity
+  "activity-types": ActivityType
   "adjustment-reasons": AdjustmentReason
   "ai-agents": AiAgent
   "ai-document-processing-jobs": AiDocumentProcessingJob

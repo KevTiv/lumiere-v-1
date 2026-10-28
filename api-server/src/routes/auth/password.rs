@@ -26,7 +26,7 @@ pub(super) async fn signin(
     cookies: Cookies,
     Json(body): Json<SignInBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if state.config.workos_client_id.is_some() {
+    if state.config.workos_auth.is_some() {
         return Err(ApiError::Gone(
             "Password sign-in is disabled. Use the WorkOS sign-in page (Continue with WorkOS)."
                 .into(),

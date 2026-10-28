@@ -1,3 +1,4 @@
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   CreateActivityParams,
   CreateContactCategoryParams,
@@ -325,11 +326,12 @@ export function finalizeUpdateLeadRevenueParams(
  * (blocked by sandbox publish permissions) — replace this with the generated
  * type once bindings are regenerated.
  *
- * Every field maps to a Rust `Option<Option<T>>` (or plain `Option<f64>` for the
- * two revenue fields, which have no "clear" state) — omit a key to leave it
+ * Nullable fields map to Rust `Option<Option<T>>`; revenue and qualification
+ * use a single Option. Omit a key to leave it
  * unchanged, send `null` to explicitly clear, send a value to replace.
  */
 export interface UpdateLeadParams {
+  state?: "qualified"
   contactName?: string | null
   title?: string | null
   website?: string | null
@@ -342,18 +344,34 @@ export interface UpdateLeadParams {
   countryCode?: string | null
   expectedRevenue?: number
   probability?: number
+  stageId?: bigint | null
+  teamId?: bigint | null
 }
 
 /**
  * Strip undefined (untouched) keys from an `update_lead` patch before
- * `stdbParamsToJson`. Unlike the three legacy `finalizeUpdateLead*` functions
- * above, this must be passed to `stdbParamsToJson` WITHOUT a `structName` —
- * passing one would force every `Option` field absent from the object to be
- * filled with an explicit "none" tag, which collapses "unchanged" into
- * "clear" (see CRM-RI-003). See `useUpdateAccountGroup` for the precedent.
+ * the wire encoder. The domain patch keeps omission distinct from explicit null.
  */
 export function finalizeUpdateLeadParams(
   partial: Partial<UpdateLeadParams>,
 ): UpdateLeadParams {
   return pickDefined(partial);
+}
+
+/** SATS products require every field. Outer None leaves a sibling unchanged; Some(None) clears it. */
+export function encodeUpdateLeadParams(partial: Partial<UpdateLeadParams>): ReturnType<typeof stdbParamsToJson> {
+  const patch = finalizeUpdateLeadParams(partial)
+  const nullableFields = ["contactName", "title", "website", "industry", "referredBy", "description",
+    "street", "city", "zip", "countryCode", "stageId", "teamId"] as const
+  const none = { none: [] }
+  const nullable = Object.fromEntries(nullableFields.map((key) => {
+    const value = patch[key]
+    return [key, value === undefined ? none : { some: value === null ? none : { some: value } }]
+  }))
+  return stdbParamsToJson({
+    ...nullable,
+    expectedRevenue: patch.expectedRevenue === undefined ? none : { some: patch.expectedRevenue },
+    probability: patch.probability === undefined ? none : { some: patch.probability },
+    state: patch.state === undefined ? none : { some: patch.state },
+  })
 }

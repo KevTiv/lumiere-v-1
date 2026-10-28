@@ -16,7 +16,7 @@ import { businessWorkspaceNavigation, type BusinessWorkspaceModule } from "../..
 import { accountingWorkspaceNavigation } from "../../../../lib/accounting-workspace-navigation"
 import { useModuleTab } from "../../../../hooks/use-module-tab"
 
-const modules = ["accounting", "sales", "crm", "purchasing", "reports", "expenses", "uncurated"] as const
+const modules = ["accounting", "sales", "crm", "purchasing", "reports", "expenses", "documents", "calendar", "messages", "uncurated"] as const
 function Preview() {
   const { t } = useTranslation()
   const router = useRouter()
@@ -31,8 +31,9 @@ function Preview() {
   const nav: ModuleWorkspaceNav | undefined = module === "uncurated" ? undefined : module === "accounting"
     ? accountingWorkspaceNavigation(t) : businessWorkspaceNavigation(module as BusinessWorkspaceModule, t)
   const ids = nav ? [...nav.workspaces, ...(nav.overflow ?? [])].flatMap((group) => group.tabIds) : ["dashboard", ...Array.from({ length: 9 }, (_, index) => `records-${index}`)]
+  const defaultTab = params.get("defaultTab") === "orders" ? "orders" : module === "documents" ? "documents" : module === "calendar" ? "calendar" : module === "messages" ? "messages" : "dashboard"
   const config: ModuleConfig = {
-    id: module, title: module, defaultTab: "dashboard",
+    id: module, title: module, defaultTab,
     workspaceNav: nav && { ...nav, workspaces: nav.workspaces.map((group) => ({ ...group, label: longNames ? `${group.label} ${"InternationalWorkspace".repeat(8)}` : group.label })) },
     tabs: [...ids, "future-extension"].map((id) => ({ id, label: id, type: "custom", customContent: <>
       <p data-testid="navigation-content">{id} content — synthetic data only.</p>
@@ -46,7 +47,7 @@ function Preview() {
       </Tabs>}
     </> })),
   }
-  const { activeTab, setActiveTab } = useModuleTab("dashboard", config.tabs.map((tab) => tab.id))
+  const { activeTab, setActiveTab } = useModuleTab(defaultTab, config.tabs.map((tab) => tab.id))
   return <main className="mx-auto min-w-0 max-w-7xl space-y-5 p-4 sm:p-6">
     <p data-testid="navigation-disclosure" data-hydrated={hydrated}>Synthetic navigation preview — no authentication or ERP operations.</p>
     <div className="flex flex-wrap gap-3">

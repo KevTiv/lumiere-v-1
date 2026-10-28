@@ -20,10 +20,12 @@ test('optional ids read from numbers, strings and option cells', () => {
 
 test('replies are the messages whose parent is this one, oldest first', () => {
   const messages = [
-    { id: 3, parentId: 1, date: 30 },
-    { id: 2, parent_id: { some: 1 }, date: 20 },
-    { id: 4, parentId: 2, date: 40 },
-    { id: 1, parentId: null, date: 10 },
+    { id: 3, model: 'account_move', resId: 9, parentId: 1, date: 30 },
+    { id: 2, model: 'account_move', resId: 9, parent_id: { some: 1 }, date: 20 },
+    { id: 4, model: 'account_move', resId: 9, parentId: 2, date: 40 },
+    { id: 1, model: 'account_move', resId: 9, parentId: null, date: 10 },
+    { id: 5, model: 'account_move', resId: 10, parentId: 1, date: 50 },
+    { id: 6, model: 'sale_order', resId: 9, parentId: 1, date: 60 },
   ];
 
   assert.deepEqual(repliesTo(messages, '1').map((row) => row.id), [2, 3]);

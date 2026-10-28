@@ -56,6 +56,8 @@ interface ModuleViewProps {
   ) => void | Promise<void>
   /** Forwarded to tab create {@link FormModal} — e.g. parent mutation `isPending`. */
   isPending?: boolean
+  /** Disable when the caller supplies domain-specific completion feedback. */
+  showSubmitSuccessToast?: boolean
   /** Optional local authoring tool shared by table and dashboard creation paths. */
   renderCreatePreview?: (
     tabId: string,
@@ -123,6 +125,7 @@ export function ModuleView({
   onOpenFormChange,
   onOpenCreateForm,
   isPending,
+  showSubmitSuccessToast,
   renderCreatePreview,
   entityBoardContext,
   dataLoading,
@@ -488,6 +491,7 @@ export function ModuleView({
                       roleId={runtimeForms.roleId}
                       userId={runtimeForms.userId}
                       isPending={isPending}
+                      showSubmitSuccessToast={showSubmitSuccessToast}
                       preferStdbVisibility
           aiAssist={
                         defaultCompanyId && tab.entityConfig
@@ -516,6 +520,7 @@ export function ModuleView({
                         ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
                         : undefined}
                       isPending={isPending}
+                      showSubmitSuccessToast={showSubmitSuccessToast}
                       aiAssist={
                         defaultCompanyId && tab.entityConfig
                           ? {

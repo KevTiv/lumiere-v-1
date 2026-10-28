@@ -9,7 +9,7 @@ import {
 
 test.describe("Phase 11 missing modules smoke", { tag: "@phase-11" }, () => {
   test("tasks board renders stats and create task modal", async ({ page }) => {
-    await gotoModule(page, "/tasks")
+    await gotoModule(page, "/tasks?source=projects")
     await expect(page.getByRole("button", { name: /create task/i })).toBeVisible()
     await page.getByRole("button", { name: /create task/i }).click()
     await expect(page.getByTestId("form-modal-new-task")).toBeVisible()

@@ -35,6 +35,7 @@ import { useExpenseSheetsToApprove } from "@lumiere/query-hooks/hooks/expenses"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { OwnerControlLoop } from "./owner-control-loop"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
+import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
 
@@ -368,10 +369,10 @@ function OverviewClientLoaded({
   const workspaceProfile = useWorkspaceProfile()
   const myWorkActions = useMemo(
     () => [
-      { id: "new-task", label: t("workspace.actions.newTask"), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") },
+      { id: "new-task", label: t("workspace.actions.openMyWork", { defaultValue: "Open my work" }), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") },
       { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents") },
       ...(isWorkspaceSurfaceVisible(workspaceProfile, "projects") ? [{ id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") }] : []),
-      { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar") },
+      { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar?tab=calendar&create=event") },
     ],
     [t, router, workspaceProfile],
   )
@@ -418,6 +419,7 @@ function OverviewClientLoaded({
             lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
             pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
           />
+          {workspaceProfile === "finance-alpha" && <DailyWorkWorkspace organizationId={organizationId} summary />}
           <DashboardGrid sections={myWorkSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
           {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
           <DashboardGrid

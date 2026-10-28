@@ -1120,6 +1120,7 @@ mod tests {
 
         for resource in [
             "leads",
+            "activity-types",
             "lead-sources",
             "lead-lost-reasons",
             "opportunity-stages",

@@ -1,15 +1,11 @@
 /**
- * Universal API Session Resolver
- *
- * Works for both:
- * - Web: Extracts session from HTTP-only cookies
- * - Expo/Mobile: Extracts session from Authorization: Bearer <token> header
- *
- * Phase 1 of API Gateway Refactor Plan
+ * Resolve BFF/SSR sessions through the Rust API's identity and access authority.
+ * Browser credentials come from AuthKit in hosted mode or native HTTP-only
+ * cookies; explicit mobile/API bearer credentials always take precedence.
  */
 
 import { isWorkOsEnabled } from '@/lib/auth-mode'
-import { cookies } from 'next/headers'
+import { resolveRequestCredentials } from '@/lib/auth-credentials'
 import type { FieldAccessContext, StdbHttpOptions } from '@lumiere/stdb/server'
 import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
 import { callReducer } from '@/lib/stdb-reducer'
@@ -63,7 +59,7 @@ async function fetchVerifiedSession(token: string): Promise<VerifiedSession | nu
 }
 
 export interface ApiSession {
-  /** SpacetimeDB auth token */
+  /** API bearer credential: WorkOS access token in hosted mode, STDB token in native mode. */
   stdbToken: string
   /** User identity hex */
   identityHex: string
@@ -80,7 +76,7 @@ export interface ApiSession {
 
 /**
  * Resolves the API session from either:
- * - HTTP-only cookie (`stdb_token`) for web browser requests
+ * - AuthKit's hosted browser session, or native HTTP-only cookie (`stdb_token`)
  * - `Authorization: Bearer <token>` header for Expo/mobile requests
  *
  * @param req - Optional Request object (needed for Expo/mobile Bearer token extraction)
@@ -92,34 +88,13 @@ export const getStdbSession = (req?: Request) => resolveApiSession(req)
 export async function resolveApiSession(req?: Request): Promise<ApiSession | null> {
   let token: string | undefined
   let credentialsPresented = false
-
-  if (req) {
-    const authHeader = req.headers.get('authorization')
-    credentialsPresented = authHeader !== null
-    if (authHeader !== null) {
-      // Explicit credentials must never fall back to the server's development identity.
-      if (!authHeader.startsWith('Bearer ') || !authHeader.slice(7).trim()) return null
-      token = authHeader.slice(7).trim()
-    }
-  }
-
-  // Web: If no bearer credentials were supplied, try the browser session.
-  if (!credentialsPresented) {
-    try {
-      if (isWorkOsEnabled()) {
-        const { withAuth } = await import('@workos-inc/authkit-nextjs')
-        const session = await withAuth()
-        credentialsPresented = true
-        token = session.accessToken
-      } else {
-        const store = await cookies()
-        const tokenCookie = store.get('stdb_token')
-        credentialsPresented = tokenCookie !== undefined
-        token = tokenCookie?.value.trim()
-      }
-    } catch {
-      // Cookies() throws outside a request context.
-    }
+  try {
+    const credentials = await resolveRequestCredentials(req)
+    token = credentials.token
+    credentialsPresented = credentials.presented
+  } catch {
+    // Session lookup failures must not select a different authentication authority.
+    return null
   }
 
   // Anonymous local development only: never replace an explicit caller's credentials.

@@ -39,6 +39,12 @@ class ContractReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("make contracts-module-ci", shared)
         self.assertIn("make contracts-module-production-ci", shared)
         self.assertIn("actions/upload-artifact@v4", shared)
+        # The drift consumer validates the merge commit. Publishing callers
+        # retain their branch-head default rather than mixing the two schemas.
+        ci_module = ci.split("  contracts-module:\n", 1)[1].split("\n  contracts-drift:", 1)[0]
+        self.assertIn("source_ref: ${{ github.sha }}", ci_module)
+        self.assertIn("ref: ${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}", shared)
+        self.assertNotIn("source_ref:", release)
 
     def test_release_uses_prepared_staging_and_cached_candidate_checks(self):
         release = (ROOT / ".github/workflows/release-contracts.yml").read_text()

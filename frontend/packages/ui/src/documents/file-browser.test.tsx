@@ -140,7 +140,63 @@ describe("FileBrowser", () => {
     fireEvent.change(screen.getByTestId("file-browser-input"), { target: { files: [picked] } })
 
     await waitFor(() => expect(onUpload).toHaveBeenCalledWith([picked], "6"))
-    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "quota exceeded")
+    expect((await screen.findByRole("alert")).textContent).toContain("quota exceeded")
+  })
+
+  it("restores route-owned folder, search, layout and selected file without reading a stale layout preference", () => {
+    window.localStorage.setItem("test-layout", "grid")
+    const onStateChange = vi.fn()
+    const state = { folderId: "5", search: "budget", layout: "list" as const, selectedFileId: "1" }
+    const view = render(<FileBrowser folders={folders} files={files} storageKey="test-layout" state={state} onStateChange={onStateChange} />)
+    expect(shownFileIds()).toEqual(["1"])
+    expect(screen.getByTestId("file-browser-row-1").dataset.state).toBe("selected")
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "scan" } })
+    expect(onStateChange).toHaveBeenLastCalledWith({ ...state, search: "scan" })
+    view.rerender(<FileBrowser folders={folders} files={files} state={{ ...state, search: "scan" }} onStateChange={onStateChange} />)
+    expect(shownFileIds()).toEqual(["2"])
+    fireEvent.click(screen.getByTestId("file-browser-root"))
+    expect(onStateChange).toHaveBeenLastCalledWith({ ...state, search: "scan", folderId: null })
+  })
+
+  it("identifies each upload outcome and opens only a returned exact document ID without retrying failures", async () => {
+    const onUpload = vi.fn()
+      .mockResolvedValueOnce("9007199254740993")
+      .mockRejectedValueOnce(new Error("response lost"))
+      .mockResolvedValueOnce("9")
+    const onOpenFile = vi.fn()
+    render(<FileBrowser folders={folders} files={files} onUpload={onUpload} onOpenFile={onOpenFile} />)
+    fireEvent.click(screen.getByTestId("file-browser-folder-5"))
+    const picked = [new File(["1"], "first.pdf"), new File(["2"], "second.pdf"), new File(["3"], "third.pdf")]
+    fireEvent.change(screen.getByTestId("file-browser-input"), { target: { files: picked } })
+    await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(3))
+    expect(onUpload.mock.calls.map((call) => call[0])).toEqual(picked.map((file) => [file]))
+    expect(onUpload.mock.calls.every((call) => call[1] === "5")).toBe(true)
+    expect((await screen.findByRole("alert")).textContent).toContain("second.pdf")
+    const open = await screen.findAllByRole("button", { name: "Open file" })
+    fireEvent.click(open[0]!)
+    expect(onOpenFile).toHaveBeenLastCalledWith("9007199254740993")
+    expect(screen.queryByRole("button", { name: /retry/i })).toBeNull()
+  })
+
+  it("lets a keyboard user open a file from the list view", () => {
+    const onOpenFile = vi.fn()
+    render(<FileBrowser folders={folders} files={files} onOpenFile={onOpenFile} />)
+    fireEvent.click(screen.getByTestId("file-browser-layout-list"))
+    const open = screen.getByRole("button", { name: "Budget" })
+    open.focus()
+    fireEvent.click(open)
+    expect(onOpenFile).toHaveBeenCalledOnce()
+    expect(onOpenFile).toHaveBeenCalledWith("1")
+  })
+
+  it("explains a failed folder source and offers its retry while keeping files inspectable", () => {
+    const onRetry = vi.fn()
+    render(<FileBrowser folders={[]} files={files} folderState={{ status: "error", onRetry }} />)
+    expect(shownFileIds()).toEqual(["1", "2", "3"])
+    expect(screen.getByRole("alert").textContent).toContain("Folders could not be loaded")
+    expect(screen.queryByText("No folders yet")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+    expect(onRetry).toHaveBeenCalledOnce()
   })
 
   it("hides upload and new-folder buttons without handlers", () => {

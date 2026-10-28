@@ -329,13 +329,35 @@
       "state",
       "is_done",
       "activity_type_id",
-      "date_deadline"
+      "date_deadline",
+      "user_id",
+      "assigned_to",
+      "res_model",
+      "res_id",
+      "deleted_at"
     ],
     "mandatory": [
       "id",
       "organization_id"
     ],
     "table": "activity"
+  },
+  "activity-types": {
+    "aliases": [
+      "activity-types",
+      "activity_type"
+    ],
+    "default_restricted": [
+      "name",
+      "category",
+      "sequence",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "activity_type"
   },
   "adjustment-reasons": {
     "aliases": [

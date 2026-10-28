@@ -5,9 +5,7 @@ import { isWorkspaceSurfaceVisible, type WorkspaceProfile } from "@lumiere/ui/li
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import {
-  MiniCalendarWidget,
   ProjectProgressWidget,
-  RecentNotesWidget,
   TodayTasksWidget,
   customDashboardWidget,
   type DashboardSection,
@@ -23,6 +21,8 @@ import {
   type ProjectTask,
 } from "@lumiere/query-hooks/hooks/projects"
 import { agendaItems, myWorkTasks, projectProgress, recentNotes } from "./productivity-data"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ProductivityCalendar, ProductivityNotes } from "../components/productivity-source-widgets"
 
 export interface ProductivitySectionsOptions {
   organizationId: bigint
@@ -52,8 +52,10 @@ export function useProductivitySections({
   const { t } = useTranslation()
   const { identity } = useErpSession()
   const identityLabels = useIdentityLabelMap(organizationId)
-  const { data: events = [] } = useCalendarEvents(organizationId)
-  const { data: articles = [] } = useKnowledgeArticles(organizationId)
+  const eventsRead = moduleCollection(useCalendarEvents(organizationId))
+  const articlesRead = moduleCollection(useKnowledgeArticles(organizationId))
+  const events = eventsRead.rows
+  const articles = articlesRead.rows
   const updateTaskState = useUpdateTaskState(organizationId)
   // Ticked tasks stay listed (struck through) until the page is left.
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
@@ -96,7 +98,7 @@ export function useProductivitySections({
         id: `${idPrefix}-today`,
         title: quickActions ? undefined : t("workspace.myWork"),
         widgets: [
-          customDashboardWidget({
+          ...(showProjects ? [customDashboardWidget({
             id: `${idPrefix}-today-tasks`,
             title: t("workspace.widgets.todayTasks"),
             width: "2/3",
@@ -112,17 +114,24 @@ export function useProductivitySections({
               onToggleDone: toggleDone,
               viewAllHref: "/tasks?source=projects",
             },
-          }),
+          })] : []),
           customDashboardWidget({
             id: `${idPrefix}-calendar`,
             title: t("workspace.widgets.calendar"),
             width: "1/3",
-            component: MiniCalendarWidget,
-            data: { items: agendaItems(events, tasks).map((item) => !showProjects && item.kind === "deadline" ? { ...item, href: "/tasks?source=projects" } : item), calendarHref: "/calendar" },
+            component: ProductivityCalendar,
+            data: { items: agendaItems(events, showProjects ? tasks : []), calendarHref: "/calendar", state: eventsRead.state },
           }),
+          ...(!showProjects ? [customDashboardWidget({
+            id: `${idPrefix}-recent-notes`,
+            title: t("workspace.widgets.notes"),
+            width: "2/3",
+            component: ProductivityNotes,
+            data: { notes: recentNotes(articles), state: articlesRead.state },
+          })] : []),
         ],
       },
-      {
+      ...(showProjects ? [{
         id: `${idPrefix}-projects`,
         title: showProjects ? t("workspace.sections.projects") : undefined,
         widgets: [
@@ -137,13 +146,12 @@ export function useProductivitySections({
             id: `${idPrefix}-recent-notes`,
             title: t("workspace.widgets.notes"),
             width: showProjects ? "1/3" : "full",
-            component: RecentNotesWidget,
-            data: { notes: recentNotes(articles) },
+            component: ProductivityNotes,
+            data: { notes: recentNotes(articles), state: articlesRead.state },
           }),
         ],
-      },
+      }] : []),
     )
     return sections
-    // updateTaskState is a stable mutation object; its identity changes with its status.
-  }, [t, identity, identityLabels, events, articles, tasks, projects, quickActions, idPrefix, ticked, workspaceProfile]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t, identity, identityLabels, events, articles, eventsRead.state, articlesRead.state, tasks, projects, quickActions, idPrefix, ticked, workspaceProfile, updateTaskState.mutateAsync])
 }

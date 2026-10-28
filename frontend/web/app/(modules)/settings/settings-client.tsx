@@ -565,6 +565,7 @@ function FinanceAlphaSetup({
           Create operating company
         </button>
       </section>
+      <SettingsModule firstOrgProfile />
       <FormModal
         open={formOpen}
         onOpenChange={setFormOpen}

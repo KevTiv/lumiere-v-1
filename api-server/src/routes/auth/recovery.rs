@@ -29,7 +29,7 @@ pub(super) async fn forgot_password(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ForgotBody>,
 ) -> Result<Json<Value>, ApiError> {
-    require_supported_password_recovery(state.config.workos_client_id.is_some())?;
+    require_supported_password_recovery(state.config.workos_auth.is_some())?;
 
     let msg = "If that email exists, a reset link has been sent.";
     let Ok(email) = normalized_auth_email(&body.email) else {
@@ -115,7 +115,7 @@ pub(super) async fn reset_password(
     cookies: Cookies,
     Json(body): Json<ResetBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    require_supported_password_recovery(state.config.workos_client_id.is_some())?;
+    require_supported_password_recovery(state.config.workos_auth.is_some())?;
 
     validate_native_password(&body.new_password)?;
     if body.token.len() != 43 {

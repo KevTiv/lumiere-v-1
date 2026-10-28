@@ -6496,7 +6496,8 @@
     "expected_revenue": "f64",
     "probability": "f64",
     "stage_id": "option<u64>",
-    "team_id": "option<u64>"
+    "team_id": "option<u64>",
+    "state": "string"
   },
   "UpdateLeadSourceParams": {
     "name": "string",

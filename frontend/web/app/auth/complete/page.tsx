@@ -1,4 +1,4 @@
-import { withAuth } from '@workos-inc/authkit-nextjs'
+import { workOsBrowserSession } from '@/lib/auth-credentials'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
@@ -10,7 +10,7 @@ export default async function CompleteAuthentication({ searchParams }: {
   searchParams: Promise<{ next?: string }>
 }) {
   if (!isWorkOsEnabled()) redirect('/sign-in')
-  const session = await withAuth()
+  const session = await workOsBrowserSession()
   if (!session.accessToken) redirect('/sign-in')
   const store = await cookies()
   if (openHostedInvite(store.get(hostedInviteCookieName())?.value)) redirect('/accept-invite')

@@ -18,6 +18,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands";
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useErpSession } from '@lumiere/erp-session'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { dispatchNamedOperation } from "../operation-dispatch"
@@ -68,8 +69,9 @@ export interface CurrentUserProfile {
 }
 
 export function useCurrentUserProfile(enabled = true) {
+  const { identity } = useErpSession()
   return useQuery<CurrentUserProfile>({
-    queryKey: ['current-user-profile'],
+    queryKey: ['current-user-profile', identity],
     queryFn: async () => {
       const r = await apiFetch("/api/auth/profile")
       if (!r.ok) throw new Error('Failed to fetch user profile')

@@ -670,7 +670,7 @@ export const salesDashboard: DashboardConfig = {
           data: {
             columns: 4,
             actions: [
-              { id: "create_sale_order", label: "New Sale Order", icon: "file", color: "blue" },
+              { id: "create_sale_order", label: "New quotation", icon: "file", color: "blue" },
               { id: "create_pricelist", label: "New Pricelist", icon: "settings", color: "purple" },
               { id: "new_delivery", label: "New Delivery", icon: "package", color: "green" },
               { id: "view_pipeline", label: "View Pipeline", icon: "trending", color: "teal" },
@@ -797,7 +797,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
-  defaultTab: "dashboard",
+  defaultTab: "orders",
   tabs: [
     {
       id: "dashboard",
@@ -807,18 +807,18 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "ops",
-      label: t("sales.tabs.ops", { defaultValue: "Ops" }),
+      label: t("sales.tabs.ops", { defaultValue: "Needs attention" }),
       type: "custom" as const,
     },
     {
       id: "orders",
-      label: "Orders",
+      label: t("sales.workspace.quotationsAndOrders", { defaultValue: "Quotations & orders" }),
       type: "entity",
       entityConfig: saleOrdersTableConfig(t, {
         formatSaleOrderDisplayName: saleOrderPrimaryLabel,
       }),
       createForm: newSaleOrderForm(t),
-      createLabel: "New Order",
+      createLabel: t("sales.workspace.newQuotation", { defaultValue: "New quotation" }),
       createAction: "createSaleOrder",
       createPermission: { resource: "sale_order", action: "create" },
     },
@@ -2362,9 +2362,10 @@ export const iotModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "documents",
+  workspaceNav: businessWorkspaceNavigation("documents", t),
   title: "Documents",
   description: "Files, knowledge base, and document management",
-  defaultTab: "dashboard",
+  defaultTab: "documents",
   tabs: [
     {
       id: "dashboard",
@@ -2412,7 +2413,7 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "documents",
-      label: "Documents",
+      label: t("productivity.navigation.files", { defaultValue: "Files" }),
       type: "entity",
       entityConfig: documentsTableConfig(t),
       createForm: newDocumentForm(t),
@@ -2492,9 +2493,10 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "calendar",
+  workspaceNav: businessWorkspaceNavigation("calendar", t),
   title: "Calendar",
   description: "Meetings, appointments, and scheduled events",
-  defaultTab: "dashboard",
+  defaultTab: "calendar",
   tabs: [
     {
       id: "dashboard",
@@ -3321,9 +3323,10 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "messages",
+  workspaceNav: businessWorkspaceNavigation("messages", t),
   title: "Messages",
   description: "Internal messages, email threads, and notifications",
-  defaultTab: "dashboard",
+  defaultTab: "messages",
   tabs: [
     {
       id: "dashboard",
@@ -3372,7 +3375,7 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "messages",
-      label: "Messages",
+      label: t("productivity.navigation.conversations", { defaultValue: "Conversations" }),
       type: "entity",
       entityConfig: mailMessagesTableConfig(t),
       createForm: newMailMessageForm(t),
@@ -3392,7 +3395,7 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "followers",
-      label: "Followers",
+      label: t("productivity.navigation.following", { defaultValue: "Following" }),
       type: "entity",
       entityConfig: mailFollowersTableConfig(t),
       createForm: subscribeToRecordForm(t),

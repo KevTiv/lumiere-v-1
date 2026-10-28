@@ -24,8 +24,12 @@ export function optionalId(value: unknown): string | undefined {
 
 /** The replies to a message, oldest first. */
 export function repliesTo(messages: ReadonlyArray<Row>, messageId: string): Row[] {
+  const parent = messages.find((row) => String(row.id) === messageId);
+  const model = typeof parent?.model === 'string' ? parent.model : undefined;
+  const resId = optionalId(parent?.resId ?? parent?.res_id);
+  if (!model || !resId) return [];
   return messages
-    .filter((row) => optionalId(row.parentId ?? row.parent_id) === messageId)
+    .filter((row) => optionalId(row.parentId ?? row.parent_id) === messageId && row.model === model && optionalId(row.resId ?? row.res_id) === resId)
     .sort((a, b) => Number(a.date ?? 0) - Number(b.date ?? 0));
 }
 

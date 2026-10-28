@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, MapPin, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { CalendarEvent } from "@lumiere/ui"
-import { eventTypeConfig } from "@lumiere/ui"
+import type { CalendarEvent } from "../lib/calendar-types"
+import { eventTypeConfig } from "../lib/calendar-types"
 import { useTranslation } from "@lumiere/i18n"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/sheet"
 
 interface EventDetailPanelProps {
   event: CalendarEvent
@@ -23,33 +24,36 @@ export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }:
   const config = eventTypeConfig[event.type]
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <Sheet open onOpenChange={(open) => { if (!open) onClose() }}>
+      <SheetContent className="data-[side=right]:w-full overflow-y-auto p-4 sm:max-w-lg" showCloseButton={false}>
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className={cn("w-3 h-3 rounded-full", config.color)}></div>
             <Badge variant="outline">{config.label}</Badge>
+            {event.status === "cancelled" && <Badge variant="secondary">{t("calendar.workspace.cancelled", { defaultValue: "Cancelled" })}</Badge>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label={t("calendar.eventDetail.closeAria")}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             ✕
           </button>
         </div>
 
-        <h3 className="text-xl font-bold mb-2">{event.title}</h3>
-        {event.description && (
-          <p className="text-sm text-muted-foreground mb-4">{event.description}</p>
-        )}
+        <SheetHeader className="p-0">
+          <SheetTitle className="break-words text-xl">{event.title}</SheetTitle>
+          <SheetDescription>{event.description || t("calendar.workspace.eventDetails", { defaultValue: "Event details" })}</SheetDescription>
+        </SheetHeader>
 
         <div className="space-y-3 text-sm mb-4">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span>
-              {event.startTime.toLocaleString(i18n.language)} — {event.endTime.toLocaleString(i18n.language)}
+              {event.allDay ? t("calendar.workspace.allDay", { defaultValue: "All day" }) : null}
+              {event.allDay ? " · " : ""}
+              {event.allDay ? event.startTime.toLocaleDateString(i18n.language) : event.startTime.toLocaleString(i18n.language)} - {event.allDay ? event.endTime.toLocaleDateString(i18n.language) : event.endTime.toLocaleString(i18n.language)}
             </span>
           </div>
           {event.location && (
@@ -76,10 +80,10 @@ export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }:
         )}
 
         <div className="flex gap-2">
-          <Button size="sm" className="flex-1" onClick={onEdit} disabled={!onEdit}>
+          <Button size="sm" className="min-h-11 flex-1" onClick={onEdit} disabled={!onEdit}>
             {t("calendar.eventDetail.edit")}
           </Button>
-          <Button size="sm" variant="outline" className="flex-1" onClick={onDelete} disabled={!onDelete}>
+          <Button size="sm" variant="outline" className="min-h-11 flex-1" onClick={onDelete} disabled={!onDelete}>
             {t("calendar.eventDetail.delete")}
           </Button>
         </div>
@@ -87,7 +91,7 @@ export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }:
           <Button
             size="sm"
             variant="ghost"
-            className="mt-2 w-full"
+            className="mt-2 min-h-11 w-full"
             nativeButton={false}
             render={<Link href={openHref} />}
             data-testid="calendar-event-open"
@@ -95,7 +99,7 @@ export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }:
             {t("calendar.eventDetail.open", { defaultValue: "Open" })}
           </Button>
         ) : null}
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }

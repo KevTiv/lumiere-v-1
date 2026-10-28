@@ -422,6 +422,16 @@
       "predicates": [],
       "order_by": []
     },
+    "activity-types": {
+      "table": "activity_type",
+      "predicates": [],
+      "order_by": [
+        {
+          "field": "sequence",
+          "direction": "asc"
+        }
+      ]
+    },
     "utm-campaigns": {
       "table": "utm_campaign",
       "predicates": [],

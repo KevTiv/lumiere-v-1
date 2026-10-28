@@ -1110,7 +1110,9 @@
       "table": "activity_type",
       "module": "workflow",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "activity-types"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",

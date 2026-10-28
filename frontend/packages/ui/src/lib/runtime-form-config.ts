@@ -10,6 +10,7 @@ export function normalizeFormFieldKey(key: string): string {
 const STATIC_FIELD_ALIASES: Record<string, readonly string[]> = {
   contactname: ["firstname", "first_name", "name"],
   emailfrom: ["email"],
+  activitytypeid: ["activitytype", "activity_type", "activity_type_id"],
   partnername: ["company", "companyname", "company_name"],
   partnerid: ["customer", "partner_id", "partner"],
   expectedrevenue: ["expected_revenue", "revenue"],
