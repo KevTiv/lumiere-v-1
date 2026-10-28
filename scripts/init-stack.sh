@@ -61,11 +61,13 @@ trap 'rm -f "$temp_file"' EXIT
 
 if [[ "$refresh_tokens" != true ]]; then
   secret="$(openssl rand -hex 32)"
+  kong_password="$(openssl rand -hex 32)"
   sed \
     -e "s|^STDB_MODULE=.*|STDB_MODULE=$module_name|" \
     -e 's|^STDB_SERVER_TOKEN=.*|STDB_SERVER_TOKEN=replace-with-local-owner-token|' \
     -e 's|^STDB_TOKEN=.*|STDB_TOKEN=replace-with-local-owner-token|' \
     -e "s|^LUMIERE_AI_GATEWAY_INTERNAL_SECRET=.*|LUMIERE_AI_GATEWAY_INTERNAL_SECRET=$secret|" \
+    -e "s|^KONG_PG_PASSWORD=.*|KONG_PG_PASSWORD=$kong_password|" \
     "$root/.env.docker.example" >"$temp_file"
   chmod 600 "$temp_file"
   mv "$temp_file" "$env_file"

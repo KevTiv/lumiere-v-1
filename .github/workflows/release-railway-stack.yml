@@ -174,7 +174,7 @@ jobs:
         shell: bash
         run: >-
           bash scripts/railway-stack-release.sh gate
-          Postgres spacetimedb
+          Postgres spacetimedb kong-postgres
 
       - name: Phase 1 AI gate — vector store
         if: inputs.enable_ai
@@ -281,7 +281,7 @@ jobs:
         run: |
           set +e
           for service in \
-            Postgres qdrant spacetimedb spacetimedb-publisher storage-migrate \
+            Postgres kong-postgres qdrant spacetimedb spacetimedb-publisher storage-migrate \
             api-server ai-gateway chromium-worker owner-report-worker \
             workflow-worker projection-worker expense-integration-worker \
             hr-integration-worker project-integration-worker web api-gateway; do
