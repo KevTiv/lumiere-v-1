@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -61,6 +63,7 @@ export function NotebookCellComponent({
   canMoveUp,
   canMoveDown,
 }: NotebookCellProps) {
+  useTranslation()
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showOutput, setShowOutput] = useState(true)
@@ -141,7 +144,7 @@ export function NotebookCellComponent({
           <div className="bg-muted/30 rounded-lg p-4 flex items-center justify-center min-h-[200px]">
             <div className="text-center text-muted-foreground">
               <div className="text-4xl mb-2">📊</div>
-              <p className="text-xs">Chart visualization</p>
+              <p className="text-xs">{i18n.t("ui.notebook.notebookCell.chartVisualization")}</p>
               <p className="text-[10px] text-muted-foreground/60">{output.content}</p>
             </div>
           </div>
@@ -186,7 +189,7 @@ export function NotebookCellComponent({
               className="h-6 w-6"
               onClick={(e) => { e.stopPropagation(); onRun() }}
               disabled={cell.status === "running"}
-              title="Run cell (Shift+Enter)"
+              title={i18n.t("ui.notebook.notebookCell.runCellShiftEnter")}
             >
               {cell.status === "running" ? (
                 <Square className="h-3 w-3" />
@@ -201,7 +204,7 @@ export function NotebookCellComponent({
             size="icon"
             className="h-6 w-6"
             onClick={(e) => { e.stopPropagation(); onAIAssist(cell.content) }}
-            title="AI Assist"
+            title={i18n.t("ui.notebook.notebookCell.aiAssist")}
           >
             <Sparkles className="h-3 w-3" />
           </Button>
@@ -211,7 +214,7 @@ export function NotebookCellComponent({
             size="icon"
             className="h-6 w-6"
             onClick={(e) => { e.stopPropagation(); handleCopy() }}
-            title="Copy"
+            title={i18n.t("ui.notebook.notebookCell.copy")}
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           </Button>
@@ -225,22 +228,19 @@ export function NotebookCellComponent({
             <DropdownMenuContent align="end" className="w-40">
               <DropdownMenuItem onClick={onMoveUp} disabled={!canMoveUp}>
                 <ChevronUp className="h-3.5 w-3.5 mr-2" />
-                Move Up
-              </DropdownMenuItem>
+                {i18n.t("ui.notebook.notebookCell.moveUp")}</DropdownMenuItem>
               <DropdownMenuItem onClick={onMoveDown} disabled={!canMoveDown}>
                 <ChevronDown className="h-3.5 w-3.5 mr-2" />
-                Move Down
-              </DropdownMenuItem>
+                {i18n.t("ui.notebook.notebookCell.moveDown")}</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowOutput(!showOutput)}>
                 {showOutput ? <EyeOff className="h-3.5 w-3.5 mr-2" /> : <Eye className="h-3.5 w-3.5 mr-2" />}
-                {showOutput ? "Hide Output" : "Show Output"}
+                {showOutput ? i18n.t("ui.notebook.notebookCell.hideOutput") : i18n.t("ui.notebook.notebookCell.showOutput")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onDelete} className="text-destructive">
                 <Trash2 className="h-3.5 w-3.5 mr-2" />
-                Delete
-              </DropdownMenuItem>
+                {i18n.t("common.delete")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -264,7 +264,7 @@ export function NotebookCellComponent({
             onBlur={() => setIsEditing(false)}
             onFocus={() => setIsEditing(true)}
             className="field-sizing-fixed min-h-0 rounded-none border-none bg-transparent p-0 font-sans text-xs shadow-none resize-none placeholder:text-muted-foreground/50 focus-visible:ring-0 md:text-xs dark:bg-transparent"
-            placeholder="Enter markdown..."
+            placeholder={i18n.t("ui.notebook.notebookCell.enterMarkdown")}
             rows={Math.max(3, cell.content.split("\n").length)}
           />
         ) : (
@@ -275,7 +275,7 @@ export function NotebookCellComponent({
             {cell.content ? (
               <MarkdownView value={cell.content} className="[&_.ProseMirror]:text-xs" />
             ) : (
-              <span className="text-muted-foreground/50">Enter markdown...</span>
+              <span className="text-muted-foreground/50">{i18n.t("ui.notebook.notebookCell.enterMarkdown")}</span>
             )}
           </div>
         )}
@@ -289,7 +289,7 @@ export function NotebookCellComponent({
               {renderOutput(output)}
               {output.executionTime && (
                 <p className="text-[9px] text-muted-foreground mt-1">
-                  Executed in {output.executionTime}ms
+                  {i18n.t("ui.notebook.notebookCell.executionTime", { milliseconds: output.executionTime })}
                 </p>
               )}
             </div>

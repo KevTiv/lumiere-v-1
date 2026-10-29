@@ -1,5 +1,9 @@
 "use client"
 
+import { operationalLabel } from "../accounting/operational-labels"
+import { useTranslation } from "@lumiere/i18n"
+
+
 import { useMemo } from "react"
 import { ArrowLeftRightIcon, CircleDollarSignIcon, MessageSquareMoreIcon } from "lucide-react"
 
@@ -55,6 +59,7 @@ function statusVariant(status: string) {
 
 /** Contact-scoped operational records kept separate from the general CRM chatter. */
 export function ContactPaymentsAndMessagesPanel({ organizationId, contactId }: { organizationId: number; contactId: bigint }) {
+  const { t } = useTranslation()
   const organization = BigInt(organizationId)
   const { data: transactions = [] } = usePaymentTransactions(organization)
   const { data: reconciliations = [] } = usePaymentReconciliations(organization)
@@ -100,8 +105,8 @@ export function ContactPaymentsAndMessagesPanel({ organizationId, contactId }: {
       <Card>
         <CardHeader>
           <div>
-            <CardTitle>Payments & reconciliation</CardTitle>
-            <CardDescription>Provider transactions for this contact, including linked allocations and provider fees.</CardDescription>
+            <CardTitle>{t("crm.contactPaymentsAndMessagesPanel.paymentsReconciliation")}</CardTitle>
+            <CardDescription>{t("crm.contactPaymentsAndMessagesPanel.providerTransactionsForThisContactIncludingLinkedAllocationsAndProviderFees")}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -112,38 +117,38 @@ export function ContactPaymentsAndMessagesPanel({ organizationId, contactId }: {
             const status = enumName(transaction.status)
             return <div key={id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3">
               <div>
-                <div className="flex items-center gap-2"><p className="font-medium">{String(scalar(transaction.externalReference) ?? `Payment ${id}`)}</p><Badge variant={statusVariant(status)}>{status || "Draft"}</Badge></div>
-                <p className="mt-1 text-sm text-muted-foreground">{enumName(transaction.direction)} · {numeric(transaction.settlementAmount).toLocaleString()} · {formatTimestamp(transaction.occurredAt)}</p>
-                {allocations.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{allocations.length} reconciliation{allocations.length === 1 ? "" : "s"} · {allocations.reduce((sum, allocation) => sum + numeric(allocation.allocatedAmount), 0).toLocaleString()} allocated</p> : <p className="mt-1 text-xs text-muted-foreground">Not yet reconciled to an invoice or bill line.</p>}
-                {transactionFees.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{transactionFees.length} fee{transactionFees.length === 1 ? "" : "s"} · {transactionFees.reduce((sum, fee) => sum + numeric(fee.amount) + numeric(fee.taxAmount), 0).toLocaleString()}</p> : null}
+                <div className="flex items-center gap-2"><p className="font-medium">{String(scalar(transaction.externalReference) ?? t("accounting.paymentOperationsPanel.payment", { value1: id }))}</p><Badge variant={statusVariant(status)}>{operationalLabel(status) || t("accounting.invoices.draftName")}</Badge></div>
+                <p className="mt-1 text-sm text-muted-foreground">{operationalLabel(enumName(transaction.direction))} · {numeric(transaction.settlementAmount).toLocaleString()} · {formatTimestamp(transaction.occurredAt)}</p>
+                {allocations.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{t("crm.contactPaymentsAndMessagesPanel.reconciliationCount", { count: allocations.length })} · {allocations.reduce((sum, allocation) => sum + numeric(allocation.allocatedAmount), 0).toLocaleString()} {" "}{t("crm.contactPaymentsAndMessagesPanel.allocated")}</p> : <p className="mt-1 text-xs text-muted-foreground">{t("crm.contactPaymentsAndMessagesPanel.notYetReconciledToAnInvoiceOrBillLine")}</p>}
+                {transactionFees.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{t("accounting.paymentOperationsPanel.feeCount", { count: transactionFees.length })} · {transactionFees.reduce((sum, fee) => sum + numeric(fee.amount) + numeric(fee.taxAmount), 0).toLocaleString()}</p> : null}
               </div>
-              <Badge variant="outline"><ArrowLeftRightIcon data-icon="inline-start" />{allocations.length} matched</Badge>
+              <Badge variant="outline"><ArrowLeftRightIcon data-icon="inline-start" />{allocations.length} {" "}{t("crm.contactPaymentsAndMessagesPanel.matched")}</Badge>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>No payment activity</EmptyTitle><EmptyDescription>Payments recorded for this contact will appear here with their reconciliation status.</EmptyDescription></EmptyHeader></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>{t("crm.contactPaymentsAndMessagesPanel.noPaymentActivity")}</EmptyTitle><EmptyDescription>{t("crm.contactPaymentsAndMessagesPanel.paymentsRecordedForThisContactWillAppearHereWithTheirReconciliation")}</EmptyDescription></EmptyHeader></Empty>}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <div>
-            <CardTitle>Invoice reminders & messages</CardTitle>
-            <CardDescription>Operational messages for this contact, with the parent batch’s review status.</CardDescription>
+            <CardTitle>{t("crm.contactPaymentsAndMessagesPanel.invoiceRemindersMessages")}</CardTitle>
+            <CardDescription>{t("crm.contactPaymentsAndMessagesPanel.operationalMessagesForThisContactWithTheParentBatchSReview")}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {messageRows.length > 0 ? messageRows.map((message) => {
             const batch = batchById.get(String(message.messageBatchId))
             const status = enumName(message.status)
-            const batchStatus = batch == null ? "Unknown batch" : enumName(batch.status)
+            const batchStatus = batch == null ? t("crm.contactPaymentsAndMessagesPanel.unknownBatch") : operationalLabel(enumName(batch.status))
             return <div key={String(message.id)} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2"><p className="font-medium">{String(scalar(message.renderedSubject) ?? message.subjectModel ?? "Operational message")}</p><Badge variant={statusVariant(status)}>{status || "Queued"}</Badge></div>
-                <p className="mt-1 text-sm text-muted-foreground">{enumName(message.channel)} · batch #{String(message.messageBatchId)} · {batchStatus}</p>
+                <div className="flex items-center gap-2"><p className="font-medium">{String(scalar(message.renderedSubject) ?? message.subjectModel ?? t("crm.contactPaymentsAndMessagesPanel.operationalMessage"))}</p><Badge variant={statusVariant(status)}>{operationalLabel(status) || t("expenses.capture.attachments.queuedLabel")}</Badge></div>
+                <p className="mt-1 text-sm text-muted-foreground">{operationalLabel(enumName(message.channel))} {" "}{t("crm.contactPaymentsAndMessagesPanel.batch")}{String(message.messageBatchId)} · {batchStatus}</p>
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{String(message.renderedBody ?? "")}</p>
               </div>
               <p className="text-xs text-muted-foreground">{formatTimestamp(message.sentAt ?? message.createdAt)}</p>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><MessageSquareMoreIcon /></EmptyMedia><EmptyTitle>No operational messages</EmptyTitle><EmptyDescription>Invoice reminders and contact-message batches addressed to this contact will appear here.</EmptyDescription></EmptyHeader></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><MessageSquareMoreIcon /></EmptyMedia><EmptyTitle>{t("crm.contactPaymentsAndMessagesPanel.noOperationalMessages")}</EmptyTitle><EmptyDescription>{t("crm.contactPaymentsAndMessagesPanel.invoiceRemindersAndContactMessageBatchesAddressedToThisContactWill")}</EmptyDescription></EmptyHeader></Empty>}
         </CardContent>
       </Card>
     </div>

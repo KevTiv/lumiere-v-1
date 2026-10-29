@@ -208,7 +208,7 @@ export function GeneralLedgerView({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  aria-label={`Clear filter ${key}`}
+                  aria-label={t("accounting.generalLedgerView.clearFilterValue", { defaultValue: "Clear filter {{key}}", key: key })}
                   data-testid={`entity-active-filter-${key}`}
                   onClick={() => clearUrlFilter(key)}
                 >
@@ -278,7 +278,7 @@ export function GeneralLedgerView({
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between">
-                  <DialogTitle>Entry: {selectedMove.name}</DialogTitle>
+                  <DialogTitle>{t("accounting.generalLedgerView.copy.entryValue", { defaultValue: "Entry: {{name}}", name: selectedMove.name })}</DialogTitle>
                   <Badge variant={String(selectedMove.state) === "Posted" ? "default" : "secondary"}>
                     {String(selectedMove.state) === "Posted" ? t("accounting.states.posted") : t("accounting.states.draft")}
                   </Badge>
@@ -302,7 +302,7 @@ export function GeneralLedgerView({
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell>{selectedMove.invoicePartnerDisplayName ?? `Partner #${selectedMove.partnerId}`}</TableCell>
+                        <TableCell>{selectedMove.invoicePartnerDisplayName ?? t("accounting.generalLedgerView.partnerValue", { defaultValue: "Partner #{{value1}}", value1: selectedMove.partnerId })}</TableCell>
                         <TableCell className="text-right">{formatCurrency(selectedMove.amountUntaxed ?? 0, selectedMove.currencyId)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(selectedMove.amountTax ?? 0, selectedMove.currencyId)}</TableCell>
                         <TableCell className="text-right font-bold">{formatCurrency(selectedMove.amountTotal ?? 0, selectedMove.currencyId)}</TableCell>

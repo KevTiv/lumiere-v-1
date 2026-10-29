@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Expenses Module Form Configurations
 //!
 //! This module provides form configurations for Expenses.
@@ -10,23 +12,23 @@ export const expensesForms: FormRegistryEntry[] = [
   {
     moduleId: "expenses",
     formId: "new-expense",
-    name: "New Expense",
-    description: "Submit a new expense",
+    get name() { return i18n.t("forms.defaults.expenses.newExpense") },
+    get description() { return i18n.t("forms.defaults.expenses.submitANewExpense") },
     icon: "Receipt",
-    category: "Expenses",
+    get category() { return i18n.t("forms.defaults.expenses.expenses") },
     defaultConfig: () => ({
       moduleId: "expenses",
       formId: "new-expense",
-      name: "New Expense",
-      description: "Submit a new expense",
+      get name() { return i18n.t("forms.defaults.expenses.newExpense") },
+      get description() { return i18n.t("forms.defaults.expenses.submitANewExpense") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("settings.ai.description") },
           fieldType: "Text",
-          placeholder: "What was this expense for?",
+          get placeholder() { return i18n.t("forms.defaults.expenses.whatWasThisExpenseFor") },
           validation: { required: true, minLength: 3 },
           aiSuggestions: [],
           order: 1,
@@ -38,7 +40,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "amount",
           name: "amount",
-          label: "Amount",
+          get label() { return i18n.t("expenses.expenses.columns.totalAmount") },
           fieldType: "Number",
           placeholder: "0.00",
           validation: { required: true, min: 0.01 },
@@ -52,13 +54,13 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "currency",
           name: "currency",
-          label: "Currency",
+          get label() { return i18n.t("expenses.workflowUi.currency") },
           fieldType: "Select",
           options: [
             { value: "USD", label: "USD", color: "blue" },
-            { value: "EUR", label: "EUR", color: "green" },
-            { value: "GBP", label: "GBP", color: "purple" },
-            { value: "RWF", label: "RWF", color: "yellow" },
+            { value: "EUR", get label() { return i18n.t("forms.defaults.expenses.eur") }, color: "green" },
+            { value: "GBP", get label() { return i18n.t("forms.defaults.expenses.gbp") }, color: "purple" },
+            { value: "RWF", get label() { return i18n.t("forms.defaults.expenses.rwf") }, color: "yellow" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -71,16 +73,16 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "category",
           name: "category",
-          label: "Category",
+          get label() { return i18n.t("expenses.forms.newExpense.fields.productId") },
           fieldType: "Select",
           options: [
-            { value: "travel", label: "Travel", color: "blue" },
-            { value: "meals", label: "Meals & Entertainment", color: "green" },
-            { value: "supplies", label: "Office Supplies", color: "orange" },
-            { value: "software", label: "Software & Subscriptions", color: "purple" },
-            { value: "equipment", label: "Equipment", color: "teal" },
-            { value: "training", label: "Training & Education", color: "pink" },
-            { value: "other", label: "Other", color: "gray" },
+            { value: "travel", get label() { return i18n.t("forms.defaults.expenses.travel") }, color: "blue" },
+            { value: "meals", get label() { return i18n.t("forms.defaults.expenses.mealsEntertainment") }, color: "green" },
+            { value: "supplies", get label() { return i18n.t("forms.defaults.expenses.officeSupplies") }, color: "orange" },
+            { value: "software", get label() { return i18n.t("forms.defaults.expenses.softwareSubscriptions") }, color: "purple" },
+            { value: "equipment", get label() { return i18n.t("forms.defaults.expenses.equipment") }, color: "teal" },
+            { value: "training", get label() { return i18n.t("forms.defaults.expenses.trainingEducation") }, color: "pink" },
+            { value: "other", get label() { return i18n.t("common.entityView.otherColumn") }, color: "gray" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -93,7 +95,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "date",
           name: "date",
-          label: "Date",
+          get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Date") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -106,9 +108,9 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "vendor",
           name: "vendor",
-          label: "Vendor",
+          get label() { return i18n.t("forms.defaults.expenses.vendor") },
           fieldType: "Text",
-          placeholder: "Where was this purchased?",
+          get placeholder() { return i18n.t("forms.defaults.expenses.whereWasThisPurchased") },
           validation: { required: false },
           aiSuggestions: [],
           order: 6,
@@ -120,7 +122,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Notes",
+          get label() { return i18n.t("common.notes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -133,7 +135,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "receipt",
           name: "receipt",
-          label: "Receipt",
+          get label() { return i18n.t("forms.defaults.expenses.receipt") },
           fieldType: "File",
           validation: { required: false },
           aiSuggestions: [],
@@ -165,23 +167,23 @@ export const expensesForms: FormRegistryEntry[] = [
   {
     moduleId: "expenses",
     formId: "new-expense-report",
-    name: "New Expense Report",
-    description: "Create an expense report to group multiple expenses",
+    get name() { return i18n.t("forms.defaults.expenses.newExpenseReport") },
+    get description() { return i18n.t("forms.defaults.expenses.createAnExpenseReportToGroupMultipleExpenses") },
     icon: "FileText",
-    category: "Reports",
+    get category() { return i18n.t("forms.defaults.expenses.reports") },
     defaultConfig: () => ({
       moduleId: "expenses",
       formId: "new-expense-report",
-      name: "New Expense Report",
-      description: "Create an expense report to group multiple expenses",
+      get name() { return i18n.t("forms.defaults.expenses.newExpenseReport") },
+      get description() { return i18n.t("forms.defaults.expenses.createAnExpenseReportToGroupMultipleExpenses") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "title",
           name: "title",
-          label: "Report Title",
+          get label() { return i18n.t("forms.defaults.expenses.reportTitle") },
           fieldType: "Text",
-          placeholder: "e.g., Business Trip - March 2024",
+          get placeholder() { return i18n.t("forms.defaults.expenses.eGBusinessTripMarch2024") },
           validation: { required: true },
           aiSuggestions: [],
           order: 1,
@@ -193,7 +195,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "period_start",
           name: "period_start",
-          label: "Period Start",
+          get label() { return i18n.t("forms.defaults.expenses.periodStart") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -206,7 +208,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "period_end",
           name: "period_end",
-          label: "Period End",
+          get label() { return i18n.t("forms.defaults.expenses.periodEnd") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -219,7 +221,7 @@ export const expensesForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Notes",
+          get label() { return i18n.t("common.notes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],

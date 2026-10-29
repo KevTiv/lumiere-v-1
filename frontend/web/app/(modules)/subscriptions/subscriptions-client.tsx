@@ -346,8 +346,8 @@ function SubscriptionsClientLoaded({
     const fromApi = currencyOptionsFromRows(currencies)
     return fromApi.length > 0
       ? fromApi
-      : [{ value: "", label: "No currencies available", disabled: true }]
-  }, [currencies])
+      : [{ value: "", label: t("sales.salesClient.noCurrenciesAvailable"), disabled: true }]
+  }, [currencies, t])
 
   const entityLabels = useMemo(
     () => ({
@@ -616,7 +616,7 @@ function SubscriptionsClientLoaded({
             options: PLAN_PAYMENT_MODES.map((value) => ({
               value,
               label: t(`subscriptions.plans.edit.paymentModes.${value}`, {
-                defaultValue: value === "draft_invoice" ? "Draft invoice" : "Automated payment",
+                defaultValue: value === "draft_invoice" ? t("subscriptions.forms.newSubscription.fields.options.manual") : t("subscriptions.subscriptionsClient.automatedPayment"),
               }),
             })),
           },
@@ -737,7 +737,7 @@ function SubscriptionsClientLoaded({
 
     return mapDashboardWidgets(moduleConfig, (w) => {
         if (["sub-mrr-churn", "sub-plan-mix"].includes(w.id) && (subscriptionCurrencies.size !== 1 || subscriptionCurrencies.has(""))) {
-          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: t("accounting.accountingClient.thisAggregateRequiresOneKnownCurrencyMixedCurrenciesNeedVerifiedConversion") } }
         }
         if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
           return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now, 12, locale), valueFormat: money } }
@@ -747,7 +747,7 @@ function SubscriptionsClientLoaded({
         }
         return w
           })
-  }, [locale, subscriptions, plans, currencies, moduleConfig, operatingCompanyId])
+  }, [locale, subscriptions, plans, currencies, moduleConfig, operatingCompanyId, t])
 
   const config = useMemo(
     () =>
@@ -771,12 +771,12 @@ function SubscriptionsClientLoaded({
                 ] }] },
                 customTabs: [{
                   id: "handoffs",
-                  label: "Billing run invoices & reconciled payments",
+                  label: t("subscriptions.subscriptionsClient.billingRunInvoicesReconciledPayments"),
                   content: (record) => billingRunsLoading || accountMovesLoading
-                    ? <p>Loading linked records…</p>
+                    ? <p>{t("subscriptions.subscriptionsClient.loadingLinkedRecords")}</p>
                     : <CrossRecordLinks testIdPrefix="subscription-handoff"
                         result={billingRunsError || accountMovesError
-                          ? { status: "unavailable", links: [], reason: "Linked billing records are unavailable" }
+                          ? { status: "unavailable", links: [], reason: t("subscriptions.subscriptionsClient.linkedBillingRecordsUnavailable") }
                           : subscriptionRecordLinks(record, { organizationId: orgId, companyId: operatingCompanyId },
                               billingRuns, accountMoves,
                               accountPaymentsError || accountPaymentsLoading ? undefined : accountPayments)}

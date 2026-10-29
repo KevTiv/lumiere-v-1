@@ -62,7 +62,18 @@
     "closeNavigation": "Funga inzira",
     "expandNavigation": "Agura inzira",
     "collapseNavigation": "Gabanya inzira",
-    "search": "Shakisha ibice n’inyandiko"
+    "search": "Shakisha ibice n’inyandiko",
+    "ui": {
+      "page": {
+        "firstOrganization": "Ikigo cya mbere",
+        "surfaceNotAdmittedYet": "Aha hantu ntiharemererwa gukoreshwa",
+        "thisWorkspaceRemainsHiddenUntilItsRequiredProduct": "Aha hakorerwa hakomeza guhishwa kugeza ibimenyetso bisabwa ku gicuruzwa byemejwe. Kuhahisha ntibikura ubu bushobozi ku rutonde rw’imirimo yo guhuza sisitemu.",
+        "returnToFinance": "Subira mu by’imari"
+      },
+      "providers": {
+        "authorizationStateIsUnavailableReloadToTryAgain": "Imiterere y’uburenganzira ntiboneka. Ongera ufungure urupapuro kugira ngo ugerageze."
+      }
+    }
   },
   "common": {
     "select": {
@@ -350,6 +361,88 @@
     "moduleNavigation": {
       "overview": "Incamake",
       "area": "Igice cy’akazi"
+    },
+    "builtIn": {
+      "navigationCatalog": {
+        "groups": {
+          "aISkills": {
+            "label": "Ubushobozi bwa IA"
+          },
+          "approvals": {
+            "label": "Ibisabwa kwemezwa"
+          },
+          "aIApprovals": {
+            "label": "Ibisabwa kwemezwa bya IA"
+          }
+        }
+      },
+      "storedDashboardResolver": {
+        "applyDomain": {
+          "thisWidgetHasAnInvalidPersistedFilter": {
+            "message": "Ibisobanuro bya filtre yabitswe kuri iyi widget ntibyemewe."
+          }
+        },
+        "parseBinding": {
+          "thisWidgetHasAnInvalidTimeOr": {
+            "message": "Isano y’igihe cyangwa igipimo cy’iyi widget ntiyemewe."
+          }
+        },
+        "parseSortOrder": {
+          "theWidgetSortOrderMustBeA": {
+            "message": "Uburyo iyi widget itondeka amakuru bugomba kuba umwandiko wa JSON."
+          },
+          "theWidgetSortOrderMustContainOne": {
+            "message": "Uburyo iyi widget itondeka amakuru bugomba kugira umwanya umwe."
+          },
+          "theWidgetSortDirectionMustBeAsc": {
+            "message": "Icyerekezo cyo gutondeka amakuru ya widget kigomba kuba asc cyangwa desc."
+          },
+          "theWidgetSortOrderIsNotValid": {
+            "message": "Uburyo iyi widget itondeka amakuru ntabwo ari JSON yemewe."
+          }
+        },
+        "applyTimeRange": {
+          "thisWidgetDoesNotDeclareATime": {
+            "message": "Iyi widget ntigaragaza umwanya w’igihe ku matariki yatoranyijwe."
+          }
+        },
+        "applyMeasureCompleteness": {
+          "thisWidgetDoesNotDeclareTheMeasure": {
+            "message": "Iyi widget ntigaragaza igipimo ikoreshwa mu guhuriza hamwe amakuru yayo."
+          }
+        },
+        "resolveStoredDashboard": {
+          "theWidgetHasNoDataSource": {
+            "message": "Iyi widget nta soko y’amakuru ifite."
+          },
+          "aChartWidgetRequiresAGroupByField": {
+            "message": "Widget y’igishushanyo ikeneye umwanya wo gushyira amakuru mu matsinda."
+          }
+        }
+      },
+      "runtimeFormConfig": {
+        "mergeRuntimeFormConfig": {
+          "runtimeExtraFields": {
+            "title": "Imyanya y’inyongera"
+          }
+        }
+      }
+    },
+    "ui": {
+      "orderHandoffLinks": {
+        "noLinkedRecordsYet": "Nta nyandiko zihujwe ziraboneka",
+        "paymentRelationIsUnavailable": "Isano n’ubwishyu ntiboneka",
+        "paymentRelationFailedItsIdentityCheck": "Kugenzura umwirondoro w’isano n’ubwishyu ntibyagenze neza"
+      }
+    },
+    "recordLinks": {
+      "noDeliveriesOrInvoices": "Nta byoherejwe cyangwa factures biraboneka",
+      "recordNumber": "{{label}} #{{id}}",
+      "openBalance": " · asigaye {{amount}}",
+      "returnNumber": "Ibyagaruwe #{{id}}",
+      "paymentNumber": "Ubwishyu #{{id}}",
+      "delivery": "Ibyoherejwe",
+      "invoice": "Facture"
     }
   },
   "navigation": {
@@ -400,7 +493,9 @@
       "current": "Birakora",
       "selectCompany": "Hitamo ikigo",
       "singleCompany": "Ikigo",
-      "loading": "Ibigo birimo kuzanywa…"
+      "loading": "Ibigo birimo kuzanywa…",
+      "unnamedCompany": "Sosiyete #{{id}}",
+      "company": "Sosiyete"
     },
     "groups": {
       "analytics": "Isesengura",

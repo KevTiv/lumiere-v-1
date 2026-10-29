@@ -1,3 +1,5 @@
+"use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import * as React from "react"
 
 import { cn } from "@lumiere/ui/lib/utils"
@@ -5,10 +7,11 @@ import { Button } from "@lumiere/ui/components/button"
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
+  useTranslation()
   return (
     <nav
       role="navigation"
-      aria-label="pagination"
+      aria-label={i18n.t("ui.components.pagination.pagination")}
       data-slot="pagination"
       className={cn("mx-auto flex w-full justify-center", className)}
       {...props}
@@ -64,12 +67,13 @@ function PaginationLink({
 
 function PaginationPrevious({
   className,
-  text = "Previous",
+  text = i18n.t("ui.components.pagination.previous"),
   ...props
 }: React.ComponentProps<typeof PaginationLink> & { text?: string }) {
+  useTranslation()
   return (
     <PaginationLink
-      aria-label="Go to previous page"
+      aria-label={i18n.t("ui.components.pagination.goToPreviousPage")}
       size="default"
       className={cn("pl-1.5!", className)}
       {...props}
@@ -82,12 +86,13 @@ function PaginationPrevious({
 
 function PaginationNext({
   className,
-  text = "Next",
+  text = i18n.t("ui.components.pagination.next"),
   ...props
 }: React.ComponentProps<typeof PaginationLink> & { text?: string }) {
+  useTranslation()
   return (
     <PaginationLink
-      aria-label="Go to next page"
+      aria-label={i18n.t("ui.components.pagination.goToNextPage")}
       size="default"
       className={cn("pr-1.5!", className)}
       {...props}
@@ -102,6 +107,7 @@ function PaginationEllipsis({
   className,
   ...props
 }: React.ComponentProps<"span">) {
+  useTranslation()
   return (
     <span
       aria-hidden
@@ -114,7 +120,7 @@ function PaginationEllipsis({
     >
       <MoreHorizontalIcon
       />
-      <span className="sr-only">More pages</span>
+      <span className="sr-only">{i18n.t("ui.components.pagination.morePages")}</span>
     </span>
   )
 }

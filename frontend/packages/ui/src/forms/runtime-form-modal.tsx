@@ -1,5 +1,7 @@
 "use client"
 
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 import * as React from "react"
 import { Loader2 } from "lucide-react"
 import type { FormConfig } from "../lib/form-types"
@@ -62,6 +64,7 @@ export function RuntimeFormModal({
   submissionDisabled = false,
   ...rest
 }: RuntimeFormModalProps) {
+  useTranslation()
   const { config, isLoading, error, customFieldIds } = useRuntimeFormModalConfig({
     staticConfig,
     moduleId,
@@ -107,7 +110,7 @@ export function RuntimeFormModal({
   const runtimeConfigFailed = error != null
   const submissionBlocked = runtimeConfigFailed && runtimeConfigFailureMode === "block"
   const runtimeConfigError = submissionBlocked
-    ? `Runtime form configuration is unavailable. Submission is disabled. ${error}`
+    ? i18n.t("ui.forms.runtimeFormModal.unavailable", { error })
     : submitError
 
   return (

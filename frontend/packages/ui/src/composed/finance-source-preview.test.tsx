@@ -4,7 +4,7 @@ import { BillSourcePreview } from "../../../../web/components/finance-source-pre
 const fixture = vi.hoisted(() => ({ isError: false, data: [] as Record<string, unknown>[], versions: [] as Record<string, unknown>[] }))
 vi.mock("@lumiere/query-hooks/hooks/documents", () => ({ useDocuments: () => ({ ...fixture, isLoading: false }), useDocumentVersions: () => ({ data: fixture.versions, isLoading: false, isError: false }) }))
 vi.mock("@lumiere/query-hooks/hooks/expenses", () => ({ useExpenseReceipts: () => ({ data: [], isError: false, isLoading: false }) }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("../../../../web/lib/expenses-create-params", () => ({ parseAttachmentIds: () => [] }))
 const url = "/api/documents/blobs/object/7/eu/abcdef"
 beforeEach(() => {

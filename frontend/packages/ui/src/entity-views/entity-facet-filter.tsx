@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo } from "react"
 import { CirclePlus, X } from "lucide-react"
@@ -22,6 +24,7 @@ interface EntityFacetFilterProps {
 
 /** Multi-select facet: a dashed button listing ticked options, a popover of checkboxes with counts. */
 export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: EntityFacetFilterProps) {
+  useTranslation()
   const selected = useMemo(() => new Set(decodeFacetValues(value).map((v) => v.toLowerCase())), [value])
   const options = filter.options ?? []
   const counts = useMemo(() => {
@@ -66,8 +69,7 @@ export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: E
             <Separator orientation="vertical" className="mx-2 h-4" />
             {chosen.length > 2 ? (
               <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                {chosen.length} selected
-              </Badge>
+                {chosen.length} {i18n.t("ui.entityViews.entityFacetFilter.selected")}</Badge>
             ) : (
               <span className="flex gap-1">
                 {chosen.map((option) => (
@@ -117,8 +119,7 @@ export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: E
               data-testid={`entity-facet-clear-${filter.key}`}
             >
               <X className="mr-1 h-3.5 w-3.5" />
-              Clear filter
-            </Button>
+              {i18n.t("ui.entityViews.entityFacetFilter.clearFilter")}</Button>
           </>
         ) : null}
       </PopoverContent>

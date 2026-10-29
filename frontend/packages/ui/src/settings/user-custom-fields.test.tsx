@@ -3,9 +3,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { WorkspaceProfileProvider } from "../lib/workspace-profile-context"
 import { UserCustomFields } from "./user-custom-fields"
 
-vi.mock("@lumiere/i18n", () => {
+vi.mock("@lumiere/i18n", async (importOriginal) => {
   const t = (key: string) => key
-  return { useTranslation: () => ({ t }) }
+  return { ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t }) }
 })
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ organizationId: 7 }) }))
 vi.mock("@lumiere/stdb/browser-http", () => ({

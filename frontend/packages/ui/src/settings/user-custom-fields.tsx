@@ -6,7 +6,7 @@ import { isWorkspaceFormModuleVisible } from "../lib/workspace-profile"
 import { cn } from "@/lib/utils"
 import { useErpSession } from "@lumiere/erp-session"
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -50,12 +50,12 @@ const simpleFieldTypes: {
   label: string
   icon: React.ComponentType<{ className?: string }>
 }[] = [
-  { value: "Text", label: "Text", icon: Sparkles },
-  { value: "Number", label: "Number", icon: Hash },
-  { value: "Rating", label: "Rating (1-5)", icon: Star },
-  { value: "Slider", label: "Scale (1-10)", icon: TrendingUp },
-  { value: "Checkbox", label: "Yes/No", icon: Target },
-  { value: "Time", label: "Time", icon: Clock },
+  { value: "Text", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Text") }, icon: Sparkles },
+  { value: "Number", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Number") }, icon: Hash },
+  { value: "Rating", get label() { return i18n.t("settings.userCustomFields.text.rating15") }, icon: Star },
+  { value: "Slider", get label() { return i18n.t("settings.userCustomFields.text.scale110") }, icon: TrendingUp },
+  { value: "Checkbox", get label() { return i18n.t("settings.userCustomFields.text.yesNo") }, icon: Target },
+  { value: "Time", get label() { return i18n.t("ui.datePicker.time") }, icon: Clock },
 ]
 
 type FormConfigOption = {

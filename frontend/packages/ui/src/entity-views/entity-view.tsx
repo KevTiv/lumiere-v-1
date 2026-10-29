@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { TFunction } from "i18next"
@@ -71,6 +73,8 @@ export function useEntitySurfaceFilter<T extends EntityPermissioned>(
 }
 
 export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTableConfig {
+  useTranslation()
+  const language = i18n.resolvedLanguage
   const columns = useEntitySurfaceFilter(config.columns)
   const actions = useEntitySurfaceFilter(config.actions)
   const currency = useCurrencyFormat()
@@ -120,11 +124,13 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
       }),
       actions: actions.length > 0 ? actions : undefined,
     }),
-    [config, columns, actions, currency, labels],
+    [config, columns, actions, currency, labels, language],
   )
 }
 
 export function useScopedEntityDetailConfig(config: EntityDetailConfig): EntityDetailConfig {
+  useTranslation()
+  const language = i18n.resolvedLanguage
   const { checkPermission } = useRBAC()
   return useMemo(
     () => ({
@@ -136,7 +142,7 @@ export function useScopedEntityDetailConfig(config: EntityDetailConfig): EntityD
         }))
         .filter((section) => section.fields.length > 0),
     }),
-    [config, checkPermission],
+    [config, checkPermission, language],
   )
 }
 
@@ -343,6 +349,7 @@ export function EntityView({
   onInitialFilterClear,
   externalFilter,
 }: EntityViewProps) {
+  useTranslation()
   const hybrid =
     config.view.mode === "table-or-board" ? (config.view as EntityTableBoardViewConfig) : null
   const [surfaceMode, setSurfaceMode] = useState<EntitySurfaceMode>(
@@ -393,8 +400,7 @@ export function EntityView({
       if (!boardColumns.length || !onBoardMove) {
         return (
           <p className="text-sm text-muted-foreground">
-            Board view requires column definitions and a move handler.
-          </p>
+            {i18n.t("ui.entityViews.entityView.boardViewRequiresColumnDefinitionsAndAMoveHandler")}</p>
         )
       }
       return (
@@ -470,7 +476,7 @@ export function EntityView({
                   value={boardSearch}
                   onChange={(event) => setBoardSearch(event.target.value)}
                   placeholder={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder}
-                  aria-label={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder ?? "Search"}
+                  aria-label={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder ?? i18n.t("common.search")}
                   className="h-8 max-w-xs"
                   data-testid="entity-board-search"
                 />
@@ -505,8 +511,7 @@ export function EntityView({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Board view requires column definitions.
-            </p>
+              {i18n.t("ui.entityViews.entityView.boardViewRequiresColumnDefinitions")}</p>
           )}
         </div>
       )

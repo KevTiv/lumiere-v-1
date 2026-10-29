@@ -130,7 +130,7 @@ export function ContactConsentPanel({ organizationId, contactId }: ContactConsen
                 id="consent-type"
                 value={consentType}
                 onChange={(e) => setConsentType(e.target.value)}
-                placeholder="marketing"
+                placeholder={t("crm.contactConsentPanel.marketing")}
                 data-testid="contact-consent-type"
               />
             </div>

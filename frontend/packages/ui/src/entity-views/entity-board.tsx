@@ -1,5 +1,7 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
+
 import { useMemo } from "react"
 import { cn } from "../lib/utils"
 import type { EntityBoardConfig } from "../lib/entity-view-types"
@@ -31,6 +33,7 @@ export function EntityBoardView({
   onCardClick,
   className,
 }: EntityBoardViewProps) {
+  const { t } = useTranslation()
   const rowKey = config.rowKey ?? "id"
 
   const getItemId = useMemo(
@@ -55,7 +58,7 @@ export function EntityBoardView({
     }
     const shownColumns =
       other.length > 0
-        ? [...columns, { id: OTHER_COLUMN_ID, title: config.otherColumnLabel ?? "Other" }]
+        ? [...columns, { id: OTHER_COLUMN_ID, title: config.otherColumnLabel ?? t("common.entityView.otherColumn") }]
         : columns
     if (other.length > 0) grouped.set(OTHER_COLUMN_ID, other)
     return (

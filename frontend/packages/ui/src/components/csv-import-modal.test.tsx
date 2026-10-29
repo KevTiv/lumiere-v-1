@@ -18,7 +18,7 @@ vi.mock("../import-assistant/csv-import-result", () => ({ CsvImportResult: ({ re
   <button type="button" onClick={onNewFile}>Import another file</button>
 </div> }))
 vi.mock("../lib/workflow-toast", () => ({ showWorkflowToast: toast }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("../import-assistant/csv-import-history", () => ({ CsvImportHistory: () => <div>Organization import history</div> }))
 vi.mock("./dialog", () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

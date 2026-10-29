@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Calendar event types for ERP system
 export type EventType = "meeting" | "task" | "deadline" | "reminder" | "system" | "shared"
 export type ViewMode = "agenda" | "month" | "week" | "day"
@@ -71,45 +72,45 @@ export interface TeamCalendar {
 export const eventTypeConfig: Record<EventType, EventCategory> = {
   meeting: {
     type: "meeting",
-    label: "Meeting",
+    get label() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.meeting.label") },
     color: "bg-info",
     icon: "Users",
-    description: "Team or one-on-one meetings"
+    get description() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.teamOrOneOnOneMeetings.description") }
   },
   task: {
     type: "task",
-    label: "Task",
+    get label() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.task.label") },
     color: "bg-category-3",
     icon: "CheckCircle",
-    description: "Work tasks and activities"
+    get description() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.workTasksAndActivities.description") }
   },
   deadline: {
     type: "deadline",
-    label: "Deadline",
+    get label() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.deadline.label") },
     color: "bg-destructive",
     icon: "AlertCircle",
-    description: "Important deadlines"
+    get description() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.importantDeadlines.description") }
   },
   reminder: {
     type: "reminder",
-    label: "Reminder",
+    get label() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.reminder.label") },
     color: "bg-warning",
     icon: "Bell",
-    description: "Reminders and notifications"
+    get description() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.remindersAndNotifications.description") }
   },
   system: {
     type: "system",
-    label: "System Event",
+    get label() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.systemEvent.label") },
     color: "bg-success",
     icon: "Zap",
-    description: "ERP system events (invoices, orders)"
+    get description() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.eRPSystemEventsInvoicesOrders.description") }
   },
   shared: {
     type: "shared",
-    label: "Shared Event",
+    get label() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.sharedEvent.label") },
     color: "bg-category-1",
     icon: "Share2",
-    description: "Events shared by team members"
+    get description() { return uiI18n.t("calendar.builtIn.calendarTypes.eventTypeConfig.eventsSharedByTeamMembers.description") }
   }
 }
 

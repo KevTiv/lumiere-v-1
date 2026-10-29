@@ -1,9 +1,11 @@
+
+import { i18n } from "@lumiere/i18n"
 /** Local layout markup only. Dynamic data binding remains the report renderer's responsibility. */
 export const REPORT_COLUMNS = [
-  { key: "number", label: "Document number", example: "INV-EXAMPLE" },
-  { key: "date", label: "Date", example: "2026-10-20" },
-  { key: "partner", label: "Partner", example: "Example customer" },
-  { key: "total", label: "Total", example: "125.00" },
+  { key: "number", get label() { return i18n.t("reports.templateLayout.documentNumber") }, labelKey: "reports.templateLayout.documentNumber", example: "INV-EXAMPLE" },
+  { key: "date", get label() { return i18n.t("reports.ownerReports.dateLabel") }, labelKey: "reports.ownerReports.dateLabel", example: "2026-10-20" },
+  { key: "partner", get label() { return i18n.t("accounting.glDrilldown.columns.partner") }, labelKey: "accounting.glDrilldown.columns.partner", get example() { return i18n.t("reports.templateLayout.exampleCustomer") } },
+  { key: "total", get label() { return i18n.t("common.entityView.pivotTotal") }, labelKey: "common.entityView.pivotTotal", example: "125.00" },
 ] as const
 export type ReportColumnKey = (typeof REPORT_COLUMNS)[number]["key"]
 export type TemplateBlock =
@@ -52,7 +54,7 @@ export function parseTemplateBlocks(content: string): TemplateBlock[] | null {
 function blockMarkup(block: TemplateBlock, examples: boolean): string {
   if (block.kind === "table") {
     const columns = block.columns.map((key) => REPORT_COLUMNS.find((column) => column.key === key)!)
-    return `<table><thead><tr>${columns.map((column) => `<th>${escape(column.label)}</th>`).join("")}</tr></thead><tbody>${examples ? `<tr>${columns.map((column) => `<td>${escape(column.example)}</td>`).join("")}</tr>` : ""}</tbody></table>`
+    return `<table><thead><tr>${columns.map((column) => `<th>${escape(examples ? column.label : i18n.t(column.labelKey, { lng: "en" }))}</th>`).join("")}</tr></thead><tbody>${examples ? `<tr>${columns.map((column) => `<td>${escape(column.example)}</td>`).join("")}</tr>` : ""}</tbody></table>`
   }
   return block.kind === "heading"
     ? `<h2>${escape(block.text)}</h2>`

@@ -395,7 +395,7 @@ function SubscriptionPageLoaded({
                 testIdPrefix="subscription-handoff"
                 result={
                   runsError || movesError
-                    ? { status: 'unavailable', links: [], reason: 'Linked billing records are unavailable' }
+                    ? { status: 'unavailable', links: [], reason: t("subscriptions.subscriptionsClient.linkedBillingRecordsUnavailable") }
                     : billingLinks
                 }
               />

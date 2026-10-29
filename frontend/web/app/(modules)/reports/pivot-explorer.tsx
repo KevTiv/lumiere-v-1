@@ -367,7 +367,7 @@ export function PivotExplorer({
 
       {reportId ? (
         <p className="text-xs text-muted-foreground" data-testid="pivot-provenance">
-          {`Source report #${reportId} · definition ${savedReportId ? `#${savedReportId}` : "unsaved"} · company ${companyId?.toString() ?? "all permitted"}`}
+          {t("reports.pivotExplorer.sourceReportDefinitionCompany", { value1: reportId, value2: savedReportId ? `#${savedReportId}` : t("reports.pivotExplorer.unsaved"), value3: companyId?.toString() ?? t("reports.pivotExplorer.allPermitted") })}
         </p>
       ) : null}
 

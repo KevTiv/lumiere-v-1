@@ -1,5 +1,7 @@
 "use client"
 
+import { operationalLabel } from "./operational-labels"
+
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeftRightIcon, Building2Icon, CircleDollarSignIcon, FileUpIcon, PlusIcon, ReceiptTextIcon, RotateCcwIcon, SendIcon, Trash2Icon } from "lucide-react"
 
@@ -168,9 +170,9 @@ export function PaymentOperationsPanel({
   const accountOptions = useMemo(
     () => activeAccounts.map((account) => ({
       value: String(account.id),
-      label: `${String(account.name ?? account.id)} · ${enumName(account.providerCode)}`,
+      label: `${String(account.name ?? account.id)} · ${operationalLabel(enumName(account.providerCode))}`,
     })),
-    [activeAccounts],
+    [activeAccounts, t],
   )
   const accountById = useMemo(
     () => new Map(activeAccounts.map((account) => [String(account.id), account])),
@@ -263,13 +265,13 @@ export function PaymentOperationsPanel({
   const saveAccount = async (data: Row) => {
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select a company before creating a payment account.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectACompanyBeforeCreatingAPaymentAccount"))
       const currencyId = asId(data.currencyId)
       const accountJournalId = asId(data.accountJournalId)
       const providerCode = stringValue(data.providerCode) || "Other"
       const providerLabel = stringValue(data.providerLabel)
-      if (companyId <= 0n || currencyId == null || accountJournalId == null) throw new Error("Choose a company currency and accounting journal")
-      if (providerCode === "Other" && !providerLabel) throw new Error("Enter the provider label")
+      if (companyId <= 0n || currencyId == null || accountJournalId == null) throw new Error(t("accounting.paymentOperationsPanel.chooseACompanyCurrencyAndAccountingJournal"))
+      if (providerCode === "Other" && !providerLabel) throw new Error(t("accounting.paymentOperationsPanel.enterTheProviderLabel"))
       await createAccount.mutateAsync({
         companyId,
         providerCode: enumValue<PaymentProviderCode>(providerCode),
@@ -285,7 +287,7 @@ export function PaymentOperationsPanel({
       })
       setAccountDialogOpen(false)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to create the payment account"
+      const message = cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToCreateThePaymentAccount")
       setFormError(message)
       throw cause
     }
@@ -294,17 +296,17 @@ export function PaymentOperationsPanel({
   const saveTransaction = async (data: Row) => {
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select a company before recording a payment.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectACompanyBeforeRecordingAPayment"))
       const paymentAccountId = asId(data.paymentAccountId)
       const partnerId = asId(data.partnerId)
       const currencyId = asId(data.currencyId)
       const occurredAt = new Date(stringValue(data.occurredAt))
       const sourceEntity = stringValue(data.sourceEntity)
       const sourceEntityId = asId(data.sourceEntityId)
-      if (companyId <= 0n || paymentAccountId == null || partnerId == null || currencyId == null) throw new Error("Choose a payment account, partner, and currency")
-      if (Number.isNaN(occurredAt.getTime())) throw new Error("Enter a valid provider event time")
+      if (companyId <= 0n || paymentAccountId == null || partnerId == null || currencyId == null) throw new Error(t("accounting.paymentOperationsPanel.chooseAPaymentAccountPartnerAndCurrency"))
+      if (Number.isNaN(occurredAt.getTime())) throw new Error(t("accounting.paymentOperationsPanel.enterAValidProviderEventTime"))
       if ((sourceEntity !== "") !== (sourceEntityId != null)) {
-        throw new Error("Source record type and ID must be supplied together")
+        throw new Error(t("accounting.paymentOperationsPanel.sourceRecordTypeAndIDMustBeSuppliedTogether"))
       }
       await createTransaction.mutateAsync({
         companyId,
@@ -325,7 +327,7 @@ export function PaymentOperationsPanel({
       })
       setTransactionDialogOpen(false)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to record the payment transaction"
+      const message = cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToRecordThePaymentTransaction")
       setFormError(message)
       throw cause
     }
@@ -356,7 +358,7 @@ export function PaymentOperationsPanel({
     let submitted = false
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before allocating this payment.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforeAllocatingThisPayment"))
       const source = allocationData
       const allocatedMoveLineId = paymentId(data.allocatedMoveLineId)
       const item = source.kind === "ready" ? source.items.find((candidate) => paymentId(candidate.line.id) === allocatedMoveLineId) : null
@@ -375,7 +377,7 @@ export function PaymentOperationsPanel({
       const balance = balancesByTransaction.get(String(transactionId))
       const amountMinor = balance ? paymentMoneyMinor(data.allocatedAmount, balance.decimalPlaces) : null
       if (allocationBalances.state.status !== "ready" || !balance || amountMinor == null || amountMinor <= 0n || amountMinor > balance.remainingMinor) {
-        throw new Error("Enter a positive allocation within the payment's available balance. Refresh unavailable payment balances before continuing.")
+        throw new Error(t("accounting.paymentOperationsPanel.enterAPositiveAllocationWithinThePaymentSAvailableBalanceRefresh"))
       }
       const attempt = preparePaymentAllocationAttempt(allocationAttemptRef.current, organization, {
         companyId, paymentTransactionId: transactionId, allocatedMoveLineId, allocatedAmount, currencyId,
@@ -411,7 +413,7 @@ export function PaymentOperationsPanel({
       setAllocationRequestState("accepted")
     } catch (cause) {
       // A rejected retry cannot establish the earlier command's outcome.
-      setActionError(cause instanceof Error ? cause.message : "The allocation response remains unresolved.")
+      setActionError(cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.theAllocationResponseRemainsUnresolved"))
     }
   }
 
@@ -419,15 +421,15 @@ export function PaymentOperationsPanel({
     const transactionId = reversingTransaction && rowId(reversingTransaction)
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before reversing this payment.")
-      if (transactionId == null) throw new Error("The selected transaction has no ID")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforeReversingThisPayment"))
+      if (transactionId == null) throw new Error(t("accounting.paymentOperationsPanel.theSelectedTransactionHasNoID"))
       await reverseTransaction.mutateAsync({
         transactionId,
         params: { companyId, reason: stringValue(data.reason) || undefined, metadata: undefined },
       })
       setReversingTransaction(null)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to reverse the payment"
+      const message = cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToReverseThePayment")
       setFormError(message)
       throw cause
     }
@@ -438,15 +440,15 @@ export function PaymentOperationsPanel({
     const transactionId = transaction == null ? null : rowId(transaction)
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before adding a fee.")
-      if (transaction == null || transactionId == null) throw new Error("The selected transaction has no ID")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforeAddingAFee"))
+      if (transaction == null || transactionId == null) throw new Error(t("accounting.paymentOperationsPanel.theSelectedTransactionHasNoID"))
       const amount = numberValue(data.amount)
       const taxAmount = numberValue(data.taxAmount)
       const paymentAccount = accountById.get(String(transaction.paymentAccountId))
       const feeAccountId = asId(data.feeAccountId) ?? asId(paymentAccount?.feeAccountId)
       const taxAccountId = asId(data.taxAccountId)
-      if (amount > 0 && feeAccountId == null) throw new Error("Choose a fee expense account")
-      if (taxAmount > 0 && taxAccountId == null) throw new Error("Choose a fee tax account")
+      if (amount > 0 && feeAccountId == null) throw new Error(t("accounting.paymentOperationsPanel.chooseAFeeExpenseAccount"))
+      if (taxAmount > 0 && taxAccountId == null) throw new Error(t("accounting.paymentOperationsPanel.chooseAFeeTaxAccount"))
       await createFee.mutateAsync({
         companyId,
         paymentTransactionId: transactionId,
@@ -460,7 +462,7 @@ export function PaymentOperationsPanel({
       })
       setFeeTransaction(null)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to add the payment fee"
+      const message = cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToAddThePaymentFee")
       setFormError(message)
       throw cause
     }
@@ -471,11 +473,11 @@ export function PaymentOperationsPanel({
     if (transactionId == null) return
     try {
       setActionError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before voiding this payment.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforeVoidingThisPayment"))
       await voidTransaction.mutateAsync(transactionId)
       setVoidingTransaction(null)
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Unable to void the payment")
+      setActionError(cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToVoidThePayment"))
     }
   }
 
@@ -483,7 +485,7 @@ export function PaymentOperationsPanel({
     if (submittedStatement || statementPreparing) return
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select a company before importing a statement.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectACompanyBeforeImportingAStatement"))
       setStatementPreparing(true)
       const values = statementValues.current
       if (!values) throw new Error(t("accounting.workflowTools.reviewFirst", { defaultValue: "Choose a CSV file and statement setup, then select Review CSV. No rows are sent to the server during this review." }))
@@ -512,7 +514,7 @@ export function PaymentOperationsPanel({
     let submitted = false
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before importing a statement.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforeImportingAStatement"))
       const review = statementReview
       if (!review || !statementReviewMatches(review, data, companyId) || !statementBalanceReview(review).withinEnvelope) {
         throw new Error(t("accounting.workflowTools.reviewAgain", { defaultValue: "Review the current file and setup before staging." }))
@@ -540,10 +542,10 @@ export function PaymentOperationsPanel({
     if (importId == null) return
     try {
       setActionError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before approving the statement import.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforeApprovingTheStatementImport"))
       await approveStatementImport.mutateAsync(importId)
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Unable to approve the statement import")
+      setActionError(cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToApproveTheStatementImport"))
     }
   }
 
@@ -552,10 +554,10 @@ export function PaymentOperationsPanel({
     if (transactionId == null) return
     try {
       setActionError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before posting this payment.")
+      if (!scopeAvailable) throw new Error(t("accounting.paymentOperationsPanel.selectTheOriginalCompanyBeforePostingThisPayment"))
       await postTransaction.mutateAsync(transactionId)
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Unable to post the payment")
+      setActionError(cause instanceof Error ? cause.message : t("accounting.paymentOperationsPanel.unableToPostThePayment"))
     }
   }
 
@@ -576,30 +578,30 @@ export function PaymentOperationsPanel({
   return (
     <div className="space-y-4">
       {actionError ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p> : null}
-      {unresolvedAllocation && !allocateTransaction.isPending ? <div role="alert" className="space-y-2 rounded-md border border-amber-500/40 p-3 text-sm"><p>The allocation response is unresolved. Retry the original allocation with the same values to recover its result.</p>{!allocationScopeMatches ? <p>{t("accounting.paymentOperations.returnToAllocationCompany", { defaultValue: "Return to company #{{companyId}} to recover the original allocation.", companyId: String(unresolvedAllocation.params.companyId) })}</p> : null}<Button size="sm" variant="outline" disabled={!scopeAvailable || mutationPending || !allocationScopeMatches} onClick={() => void retryAllocation()}>Retry original allocation</Button></div> : null}
+      {unresolvedAllocation && !allocateTransaction.isPending ? <div role="alert" className="space-y-2 rounded-md border border-amber-500/40 p-3 text-sm"><p>{t("accounting.paymentOperationsPanel.theAllocationResponseIsUnresolvedRetryTheOriginalAllocationWithThe")}</p>{!allocationScopeMatches ? <p>{t("accounting.paymentOperations.returnToAllocationCompany", { defaultValue: "Return to company #{{companyId}} to recover the original allocation.", companyId: String(unresolvedAllocation.params.companyId) })}</p> : null}<Button size="sm" variant="outline" disabled={!scopeAvailable || mutationPending || !allocationScopeMatches} onClick={() => void retryAllocation()}>{t("accounting.paymentOperationsPanel.retryOriginalAllocation")}</Button></div> : null}
       <Card>
         <CardHeader>
           <div>
-            <CardTitle>Payment accounts</CardTitle>
-            <CardDescription>Cash drawers, bank accounts, and mobile-money wallets that post through accounting journals.</CardDescription>
+            <CardTitle>{t("accounting.paymentOperationsPanel.paymentAccounts")}</CardTitle>
+            <CardDescription>{t("accounting.paymentOperationsPanel.cashDrawersBankAccountsAndMobileMoneyWalletsThatPostThrough")}</CardDescription>
           </div>
-          <CardAction><Button size="sm" onClick={() => { setFormError(null); setAccountDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Add account</Button></CardAction>
+          <CardAction><Button size="sm" onClick={() => { setFormError(null); setAccountDialogOpen(true) }}><PlusIcon data-icon="inline-start" />{t("accounting.paymentOperationsPanel.addAccount")}</Button></CardAction>
         </CardHeader>
         <CardContent>
           {activeAccounts.length > 0 ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeAccounts.map((account) => (
             <div key={String(account.id)} className="rounded-lg border p-3">
-              <div className="flex items-center justify-between gap-2"><p className="font-medium">{String(account.name ?? account.id)}</p>{account.isPrimary ? <Badge>Primary</Badge> : null}</div>
-              <p className="mt-1 text-sm text-muted-foreground">{enumName(account.providerCode)} · {String(optionValue(account.referenceMasked) ?? "No reference")}</p>
+              <div className="flex items-center justify-between gap-2"><p className="font-medium">{String(account.name ?? account.id)}</p>{account.isPrimary ? <Badge>{t("forensics.detailModal.primary")}</Badge> : null}</div>
+              <p className="mt-1 text-sm text-muted-foreground">{operationalLabel(enumName(account.providerCode))} · {String(optionValue(account.referenceMasked) ?? t("accounting.paymentOperationsPanel.noReference"))}</p>
             </div>
-          ))}</div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Building2Icon /></EmptyMedia><EmptyTitle>{accountsLoading ? "Loading payment accounts" : "No payment accounts"}</EmptyTitle><EmptyDescription>Create the wallet, cash, or bank account that will receive operational payments.</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setAccountDialogOpen(true)}><PlusIcon data-icon="inline-start" />Add account</Button></EmptyContent></Empty>}
+          ))}</div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Building2Icon /></EmptyMedia><EmptyTitle>{accountsLoading ? t("accounting.paymentOperationsPanel.loadingPaymentAccounts") : t("accounting.paymentOperationsPanel.noPaymentAccounts")}</EmptyTitle><EmptyDescription>{t("accounting.paymentOperationsPanel.createTheWalletCashOrBankAccountThatWillReceiveOperational")}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setAccountDialogOpen(true)}><PlusIcon data-icon="inline-start" />{t("accounting.paymentOperationsPanel.addAccount")}</Button></EmptyContent></Empty>}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <div>
-            <CardTitle>Bank statement imports</CardTitle>
-            <CardDescription>Stage a CSV for validation first. Approval creates bank-statement lines for the existing manual matching workspace.</CardDescription>
+            <CardTitle>{t("accounting.paymentOperationsPanel.bankStatementImports")}</CardTitle>
+            <CardDescription>{t("accounting.paymentOperationsPanel.stageACSVForValidationFirstApprovalCreatesBankStatementLines")}</CardDescription>
           </div>
           <CardAction><Button size="sm" onClick={() => { setFormError(null); setStatementImportDialogOpen(true) }}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></CardAction>
         </CardHeader>
@@ -613,25 +615,25 @@ export function PaymentOperationsPanel({
             return <div key={String(statementImport.id)} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(statementImport.fileName) ?? `Statement import ${statementImport.id}`)}</p><Badge variant={state === "approved" ? "default" : invalidRows > 0 ? "destructive" : "secondary"}>{state || "staged"}</Badge></div>
-                  <p className="mt-1 text-sm text-muted-foreground">{numberValue(statementImport.validRows)} valid of {numberValue(statementImport.totalRows)} rows{invalidRows > 0 ? ` · ${invalidRows} need review` : ""}</p>
-                  {failedLines > 0 ? <div className="mt-1 text-xs text-destructive"><p>{failedLines} staged row{failedLines === 1 ? " has" : "s have"} a validation error. Correct the CSV and stage it again; the identical retry is safely ignored.</p><ul className="mt-1 list-inside list-disc">{importLines.filter((line) => stringValue(optionValue(line.validationError))).slice(0, 3).map((line) => <li key={String(line.id)}>Row {String(line.rowNumber)}: {stringValue(optionValue(line.validationError))}</li>)}</ul></div> : null}
-                  {state === "approved" ? <p className="mt-1 text-xs text-muted-foreground">Ready for matching. Open the Bank Statements workspace to assign candidates or manually reconcile its lines.</p> : null}
+                  <div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(statementImport.fileName) ?? t("accounting.paymentOperationsPanel.statementImport", { value1: statementImport.id }))}</p><Badge variant={state === "approved" ? "default" : invalidRows > 0 ? "destructive" : "secondary"}>{operationalLabel(state) || t("accounting.paymentOperationsPanel.staged")}</Badge></div>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("accounting.paymentOperationsPanel.importRowCounts", { valid: numberValue(statementImport.validRows), total: numberValue(statementImport.totalRows) })}{invalidRows > 0 ? " · " + t("accounting.paymentOperationsPanel.reviewRowCount", { count: invalidRows }) : ""}</p>
+                  {failedLines > 0 ? <div className="mt-1 text-xs text-destructive"><p>{t("accounting.paymentOperationsPanel.invalidStagedRows", { count: failedLines })}</p><ul className="mt-1 list-inside list-disc">{importLines.filter((line) => stringValue(optionValue(line.validationError))).slice(0, 3).map((line) => <li key={String(line.id)}>{t("common.importAssistant.row")}{" "}{String(line.rowNumber)}: {stringValue(optionValue(line.validationError))}</li>)}</ul></div> : null}
+                  {state === "approved" ? <p className="mt-1 text-xs text-muted-foreground">{t("accounting.paymentOperationsPanel.readyForMatchingOpenTheBankStatementsWorkspaceToAssignCandidates")}</p> : null}
                 </div>
-                {canApprove ? <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void approveImport(statementImport)}><SendIcon data-icon="inline-start" />Approve to reconcile</Button> : null}
+                {canApprove ? <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void approveImport(statementImport)}><SendIcon data-icon="inline-start" />{t("accounting.paymentOperationsPanel.approveToReconcile")}</Button> : null}
               </div>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileUpIcon /></EmptyMedia><EmptyTitle>{statementImportsLoading ? "Loading statement imports" : "No statement imports"}</EmptyTitle><EmptyDescription>{t("accounting.workflowTools.importEmpty", { defaultValue: "Upload a bank CSV to review its rows and balances before staging." })}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setStatementImportDialogOpen(true)}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></EmptyContent></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileUpIcon /></EmptyMedia><EmptyTitle>{statementImportsLoading ? t("accounting.paymentOperationsPanel.loadingStatementImports") : t("accounting.paymentOperationsPanel.noStatementImports")}</EmptyTitle><EmptyDescription>{t("accounting.workflowTools.importEmpty", { defaultValue: "Upload a bank CSV to review its rows and balances before staging." })}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setStatementImportDialogOpen(true)}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></EmptyContent></Empty>}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <div><CardTitle>Transactions & reconciliation</CardTitle><CardDescription>Record provider events, post them to the ledger, then match them to invoice or bill lines. Original-total history imports use the internal transaction ID shown below. Eligible migration payments must use source historical_accounting_import and an operator-supplied positive numeric migration batch reference.</CardDescription></div>
-          <CardAction><Button size="sm" disabled={activeAccounts.length === 0} onClick={() => { setFormError(null); setTransactionDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Record payment</Button></CardAction>
+          <div><CardTitle>{t("accounting.paymentOperationsPanel.transactionsReconciliation")}</CardTitle><CardDescription>{t("accounting.paymentOperationsPanel.recordProviderEventsPostThemToTheLedgerThenMatchThem")}</CardDescription></div>
+          <CardAction><Button size="sm" disabled={activeAccounts.length === 0} onClick={() => { setFormError(null); setTransactionDialogOpen(true) }}><PlusIcon data-icon="inline-start" />{t("accounting.forms.recordPayment.title")}</Button></CardAction>
         </CardHeader>
         <CardContent className="space-y-3">
-          {allocationBalances.state.status !== "ready" ? <div role="status" className="rounded-md border border-dashed p-3 text-sm text-muted-foreground"><p>{allocationBalances.state.status === "loading" ? "Loading payment allocation balances…" : allocationBalances.state.status === "denied" ? "Access to payment allocation balances is restricted." : "Complete payment allocation balances are unavailable. Allocation is paused until the ledger sources can be verified."}</p>{"onRetry" in allocationBalances.state && allocationBalances.state.onRetry ? <Button size="sm" variant="outline" className="mt-2" disabled={!scopeAvailable} onClick={allocationBalances.state.onRetry}>Retry balances</Button> : null}</div> : null}
+          {allocationBalances.state.status !== "ready" ? <div role="status" className="rounded-md border border-dashed p-3 text-sm text-muted-foreground"><p>{allocationBalances.state.status === "loading" ? t("accounting.paymentOperationsPanel.loadingPaymentAllocationBalances") : allocationBalances.state.status === "denied" ? t("accounting.paymentOperationsPanel.accessToPaymentAllocationBalancesIsRestricted") : t("accounting.paymentOperationsPanel.completePaymentAllocationBalancesAreUnavailableAllocationIsPausedUntilThe")}</p>{"onRetry" in allocationBalances.state && allocationBalances.state.onRetry ? <Button size="sm" variant="outline" className="mt-2" disabled={!scopeAvailable} onClick={allocationBalances.state.onRetry}>{t("accounting.paymentOperationsPanel.retryBalances")}</Button> : null}</div> : null}
           {companyTransactions.length > 0 ? companyTransactions.map((transaction) => {
             const id = rowId(transaction)
             const status = enumName(transaction.status)
@@ -643,21 +645,21 @@ export function PaymentOperationsPanel({
             return <div key={String(transaction.id)} data-testid={`payment-operation-${String(transaction.id)}`} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(transaction.externalReference) ?? `Payment ${transaction.id}`)}</p><Badge variant={statusVariant(status)}>{status || "Draft"}</Badge></div>
-                  <p className="mt-1 text-sm text-muted-foreground">{String(account?.name ?? "Payment account")} · {enumName(transaction.direction)} · {balance ? paymentMinorUnitsText(balance.amountMinor, balance.decimalPlaces) : String(transaction.settlementAmount ?? "Amount unavailable")}</p>
-                  <p className="mt-1 select-all font-mono text-xs text-muted-foreground" data-testid={`payment-transaction-id-${String(transaction.id)}`}>Internal transaction ID: {String(transaction.id)}</p>
-                  {stringValue(optionValue(transaction.sourceEntity)) === HISTORICAL_ACCOUNTING_IMPORT_SOURCE ? <p className="mt-1 select-all font-mono text-xs text-muted-foreground">Migration batch reference: {String(optionValue(transaction.sourceEntityId) ?? "missing")}</p> : null}
-                  {balance ? <p className="mt-1 text-xs text-muted-foreground" data-testid={`payment-allocation-balance-${String(transaction.id)}`}>{paymentMinorUnitsText(balance.allocatedMinor, balance.decimalPlaces)} allocated · {paymentMinorUnitsText(balance.remainingMinor, balance.decimalPlaces)} remaining · {currencyOptions.find((currency) => currency.value === balance.currencyId)?.label ?? `Currency #${balance.currencyId}`}</p> : null}
-                  {transactionFees.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{transactionFees.length} fee{transactionFees.length === 1 ? "" : "s"} · {transactionFees.reduce((sum, fee) => sum + numberValue(fee.amount) + numberValue(fee.taxAmount), 0).toLocaleString()}</p> : null}
+                  <div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(transaction.externalReference) ?? t("accounting.paymentOperationsPanel.payment", { value1: transaction.id }))}</p><Badge variant={statusVariant(status)}>{operationalLabel(status) || t("accounting.journalEntries.states.draft")}</Badge></div>
+                  <p className="mt-1 text-sm text-muted-foreground">{String(account?.name ?? t("accounting.forms.operationalPaymentTransaction.account"))} · {operationalLabel(enumName(transaction.direction))} · {balance ? paymentMinorUnitsText(balance.amountMinor, balance.decimalPlaces) : String(transaction.settlementAmount ?? t("subscriptions.workflow.unavailableAmount"))}</p>
+                  <p className="mt-1 select-all font-mono text-xs text-muted-foreground" data-testid={`payment-transaction-id-${String(transaction.id)}`}>{t("accounting.paymentOperationsPanel.internalTransactionID")}{" "}{String(transaction.id)}</p>
+                  {stringValue(optionValue(transaction.sourceEntity)) === HISTORICAL_ACCOUNTING_IMPORT_SOURCE ? <p className="mt-1 select-all font-mono text-xs text-muted-foreground">{t("accounting.paymentOperationsPanel.migrationBatchReference")}{" "}{String(optionValue(transaction.sourceEntityId) ?? t("accounting.paymentOperationsPanel.missing"))}</p> : null}
+                  {balance ? <p className="mt-1 text-xs text-muted-foreground" data-testid={`payment-allocation-balance-${String(transaction.id)}`}>{t("accounting.paymentOperationsPanel.allocationSummary", { allocated: paymentMinorUnitsText(balance.allocatedMinor, balance.decimalPlaces), remaining: paymentMinorUnitsText(balance.remainingMinor, balance.decimalPlaces), currency: currencyOptions.find((currency) => currency.value === balance.currencyId)?.label ?? t("accounting.paymentOperationsPanel.currency", { value1: balance.currencyId }) })}</p> : null}
+                  {transactionFees.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{t("accounting.paymentOperationsPanel.feeCount", { count: transactionFees.length })} · {transactionFees.reduce((sum, fee) => sum + numberValue(fee.amount) + numberValue(fee.taxAmount), 0).toLocaleString()}</p> : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {status === "Draft" ? <><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setFeeTransaction(transaction) }}><ReceiptTextIcon data-icon="inline-start" />Add fee</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => void post(transaction)}><SendIcon data-icon="inline-start" />Post</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => setVoidingTransaction(transaction)}><Trash2Icon data-icon="inline-start" />Void</Button></> : null}
-                  {status === "Posted" && !correction ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null || allocationBalances.state.status !== "ready" || !balance || balance.remainingMinor <= 0n} onClick={() => openAllocation(transaction)}><ArrowLeftRightIcon data-icon="inline-start" />Allocate</Button> : null}
-                  {canReverse ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null} onClick={() => { setFormError(null); setReversingTransaction(transaction) }}><RotateCcwIcon data-icon="inline-start" />Reverse</Button> : null}
+                  {status === "Draft" ? <><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setFeeTransaction(transaction) }}><ReceiptTextIcon data-icon="inline-start" />{t("accounting.forms.operationalPaymentFee.submit")}</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => void post(transaction)}><SendIcon data-icon="inline-start" />{t("accounting.journalEntries.postEntry")}</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => setVoidingTransaction(transaction)}><Trash2Icon data-icon="inline-start" />{t("accounting.paymentOperationsPanel.void")}</Button></> : null}
+                  {status === "Posted" && !correction ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null || allocationBalances.state.status !== "ready" || !balance || balance.remainingMinor <= 0n} onClick={() => openAllocation(transaction)}><ArrowLeftRightIcon data-icon="inline-start" />{t("accounting.paymentOperationsPanel.allocate")}</Button> : null}
+                  {canReverse ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null} onClick={() => { setFormError(null); setReversingTransaction(transaction) }}><RotateCcwIcon data-icon="inline-start" />{t("accounting.paymentOperationsPanel.reverse")}</Button> : null}
                 </div>
               </div>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>{transactionsLoading ? "Loading transactions" : "No payment transactions"}</EmptyTitle><EmptyDescription>Record a provider event, post it, and allocate it to an open invoice or bill.</EmptyDescription></EmptyHeader></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>{transactionsLoading ? t("accounting.paymentOperationsPanel.loadingTransactions") : t("accounting.paymentOperationsPanel.noPaymentTransactions")}</EmptyTitle><EmptyDescription>{t("accounting.paymentOperationsPanel.recordAProviderEventPostItAndAllocateItToAn")}</EmptyDescription></EmptyHeader></Empty>}
         </CardContent>
       </Card>
 
@@ -697,8 +699,8 @@ export function PaymentOperationsPanel({
       <RuntimeFormModal key={feeTransaction ? `fee-${String(feeTransaction.id)}` : "fee-none"} open={feeTransaction != null} onOpenChange={(open) => !open && setFeeTransaction(null)} staticConfig={paymentFeeForm} moduleId="accounting" organizationId={organizationId} isPending={createFee.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveFee} />
       <AlertDialog open={voidingTransaction != null} onOpenChange={(open) => !open && setVoidingTransaction(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Void draft payment?</AlertDialogTitle><AlertDialogDescription>This removes the draft from the posting flow. Posted payments must be reversed instead.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel disabled={voidTransaction.isPending}>Keep draft</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={voidTransaction.isPending} onClick={() => void voidDraft()}>Void payment</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>{t("accounting.paymentOperationsPanel.voidDraftPayment")}</AlertDialogTitle><AlertDialogDescription>{t("accounting.paymentOperationsPanel.thisRemovesTheDraftFromThePostingFlowPostedPaymentsMust")}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel disabled={voidTransaction.isPending}>{t("accounting.paymentOperationsPanel.keepDraft")}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={voidTransaction.isPending} onClick={() => void voidDraft()}>{t("accounting.paymentOperationsPanel.voidPayment")}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

@@ -46,18 +46,18 @@ import {
 } from "lucide-react"
 import type { Role, Resource, Action } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
 import { FieldPermissionsEditor } from "./field-permissions-editor"
 
 const roleColors = [
-  { value: "blue", label: "Blue", class: roleSwatchClass.blue },
-  { value: "green", label: "Green", class: roleSwatchClass.green },
-  { value: "orange", label: "Orange", class: roleSwatchClass.orange },
-  { value: "red", label: "Red", class: roleSwatchClass.red },
-  { value: "purple", label: "Purple", class: roleSwatchClass.purple },
-  { value: "teal", label: "Teal", class: roleSwatchClass.teal },
+  { value: "blue", get label() { return i18n.t("settings.roleManagement.text.blue") }, class: roleSwatchClass.blue },
+  { value: "green", get label() { return i18n.t("settings.roleManagement.text.green") }, class: roleSwatchClass.green },
+  { value: "orange", get label() { return i18n.t("settings.roleManagement.text.orange") }, class: roleSwatchClass.orange },
+  { value: "red", get label() { return i18n.t("settings.roleManagement.text.red") }, class: roleSwatchClass.red },
+  { value: "purple", get label() { return i18n.t("settings.roleManagement.text.purple") }, class: roleSwatchClass.purple },
+  { value: "teal", get label() { return i18n.t("settings.roleManagement.text.teal") }, class: roleSwatchClass.teal },
 ] as const
 
 export function RoleManagement() {

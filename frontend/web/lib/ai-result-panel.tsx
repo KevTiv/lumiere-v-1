@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n as rootI18n, useTranslation as useRootTranslation } from "@lumiere/i18n"
 type AiResultPanelProps = {
   title: string
   result: Record<string, unknown>
@@ -103,6 +104,7 @@ function ResultRow({ row }: { row: unknown }) {
 }
 
 export function AiResultPanel({ title, result, onDismiss }: AiResultPanelProps) {
+  useRootTranslation()
   const summary = firstText(result, [
     "summary",
     "explanation",
@@ -136,8 +138,7 @@ export function AiResultPanel({ title, result, onDismiss }: AiResultPanelProps) 
           className="text-xs text-muted-foreground hover:text-foreground"
           onClick={onDismiss}
         >
-          Dismiss
-        </button>
+          {rootI18n.t("aiAssistant.ui.aiResultPanel.dismiss")}</button>
       </div>
 
       {summary ? (
@@ -177,8 +178,7 @@ export function AiResultPanel({ title, result, onDismiss }: AiResultPanelProps) 
 
       <details className="mt-4">
         <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-          Technical response
-        </summary>
+          {rootI18n.t("aiAssistant.ui.aiResultPanel.technicalResponse")}</summary>
         <pre className="mt-2 max-h-72 overflow-auto rounded-md bg-muted/40 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
           {JSON.stringify(result, null, 2)}
         </pre>

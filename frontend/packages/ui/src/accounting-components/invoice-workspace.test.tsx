@@ -6,7 +6,16 @@ import { InvoiceDetailModal } from "./invoice-detail-modal"
 import { formatInvoiceMoney, InvoiceDocument, readInvoiceDocumentContent, resolveDraftInvoiceDocument } from "./invoice-document"
 import { resolveInvoiceProfile, type InvoiceDocumentSnapshot } from "@lumiere/erp-shared/invoice-personalization"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 const configuredFields = vi.hoisted(() => ({ fields: [] as { fieldId: string; label: string; isEnabled: boolean; validation: { required: boolean } }[] }))
 vi.mock("../forms/hooks/use-form-config", () => ({ useFormConfiguration: () => ({ config: configuredFields }) }))
 

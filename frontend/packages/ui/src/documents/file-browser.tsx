@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import {
   ChevronRight,
   File,
@@ -112,6 +112,7 @@ const FOLDER_TILES = [
 ] as const
 
 export function FileTypeIcon({ mimetype, fileName, className }: { mimetype: string; fileName: string; className?: string }) {
+  useTranslation()
   const style = KIND_STYLE[fileKindOf(mimetype, fileName)]
   const Icon = style.icon
   return (
@@ -402,7 +403,7 @@ export function FileBrowser({
                     <span className={cn("flex h-10 w-10 items-center justify-center rounded-lg", FOLDER_TILES[index % FOLDER_TILES.length])}>
                       <Folder className="h-5 w-5" aria-hidden />
                     </span>
-                    {folder.isFavorite ? <Star className="h-4 w-4 fill-warning text-warning" aria-label="Favorite" /> : null}
+                    {folder.isFavorite ? <Star className="h-4 w-4 fill-warning text-warning" aria-label={i18n.t("documents.page.favorite")} /> : null}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{folder.name}</p>
@@ -546,12 +547,13 @@ export function FileBrowser({
 }
 
 function FileFlags({ file }: { file: FileBrowserFile }) {
+  useTranslation()
   if (!file.isLocked && !file.isShared && !file.isFavorite) return null
   return (
     <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-      {file.isFavorite ? <Star className="h-3.5 w-3.5 fill-warning text-warning" aria-label="Favorite" /> : null}
-      {file.isShared ? <Share2 className="h-3.5 w-3.5" aria-label="Shared" /> : null}
-      {file.isLocked ? <Lock className="h-3.5 w-3.5" aria-label="Locked" /> : null}
+      {file.isFavorite ? <Star className="h-3.5 w-3.5 fill-warning text-warning" aria-label={i18n.t("documents.page.favorite")} /> : null}
+      {file.isShared ? <Share2 className="h-3.5 w-3.5" aria-label={i18n.t("documents.page.shared")} /> : null}
+      {file.isLocked ? <Lock className="h-3.5 w-3.5" aria-label={i18n.t("documents.page.locked")} /> : null}
     </span>
   )
 }

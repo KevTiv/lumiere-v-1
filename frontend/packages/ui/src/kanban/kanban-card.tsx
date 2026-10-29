@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import type { ReactNode } from "react"
 import { CalendarDays, MessageSquare, Paperclip } from "lucide-react"
@@ -105,6 +107,7 @@ export function KanbanCardContent({
   topRight,
   labels,
 }: KanbanCardProps) {
+  useTranslation()
   const pct = progress == null || !Number.isFinite(progress) ? null : Math.max(0, Math.min(100, progress))
   const hasMeta = dueLabel || commentCount > 0 || attachmentCount > 0 || assignees.length > 0
   return (
@@ -128,10 +131,10 @@ export function KanbanCardContent({
       {pct != null ? (
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>{labels?.progress ?? "Progress"}</span>
+            <span>{labels?.progress ?? i18n.t("ui.kanban.kanbanCard.progress")}</span>
             <span className="tabular-nums">{Math.round(pct)}%</span>
           </div>
-          <Progress value={pct} aria-label={labels?.progress ?? "Progress"} />
+          <Progress value={pct} aria-label={labels?.progress ?? i18n.t("ui.kanban.kanbanCard.progress")} />
         </div>
       ) : null}
 

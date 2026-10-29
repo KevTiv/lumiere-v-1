@@ -401,7 +401,7 @@ function OverviewClientLoaded({
       />
       {isHydrated ? (
         <div className="flex flex-col gap-6">
-          <section aria-label="Dashboard resource status" data-testid="overview-resource-status" className="space-y-1 text-sm">
+          <section aria-label={t("overview.overviewClient.dashboardResourceStatus")} data-testid="overview-resource-status" className="space-y-1 text-sm">
             {Object.entries(resourceStates).flatMap(([resource, state]) => {
               const label = resourceStatusLabel(state)
               return label ? [<p key={resource} data-resource={resource} data-state={state}>{resource}: {label}</p>] : []
@@ -412,7 +412,7 @@ function OverviewClientLoaded({
             draftBills={movesState ?? ownerControlLoop.draftBills}
             expenseApprovals={resourceStatusLabel(overviewResourceStatus(expenseApprovalsQuery))
               ?? ((expenseApprovalsQuery.data ?? []).some((row) => !(Number(row.companyId ?? row.company_id) > 0))
-                ? "Scope unavailable"
+                ? t("overview.overviewClient.scopeUnavailable")
                 : (expenseApprovalsQuery.data ?? []).filter((row) => matchesCompany(row, operatingCompanyId)).length)}
             overdueInvoices={movesState ?? ownerControlLoop.overdueInvoices}
             unreconciledPayments={paymentsState ?? ownerControlLoop.unreconciledPayments}
@@ -421,7 +421,7 @@ function OverviewClientLoaded({
           />
           {workspaceProfile === "finance-alpha" && <DailyWorkWorkspace organizationId={organizationId} summary />}
           <DashboardGrid sections={myWorkSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
-          {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
+          {salesState ? <p data-testid="overview-sales-trend-state">{t("overview.overviewClient.salesTrend")}{" "}{salesState}</p> : null}
           <DashboardGrid
             ref={dashboardGridRef}
             sections={liveSections}

@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
@@ -517,9 +518,9 @@ export const acknowledgeDocumentInsightForm = (t: TFunction): FormConfig => ({
 
 export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
   id: "upload-document-version",
-  title: "Upload new version",
-  description: "Check in a new file revision for the selected document.",
-  submitLabel: "Upload version",
+  title: t("documents.builtIn.documentsFormConfigs.uploadDocumentVersionForm.uploadDocumentVersion.title"),
+  description: t("documents.builtIn.documentsFormConfigs.uploadDocumentVersionForm.uploadDocumentVersion.description"),
+  submitLabel: t("documents.page.uploadVersion"),
   sections: [
     {
       id: "version",
@@ -528,7 +529,7 @@ export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
           id: "file",
           name: "file",
           type: "file",
-          label: "File",
+          label: t("documents.builtIn.documentsFormConfigs.uploadDocumentVersionForm.file.label"),
           required: true,
           width: "full",
           accept: ".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx,.xls,.xlsx,application/pdf,image/*,text/plain",
@@ -537,7 +538,7 @@ export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
           id: "changesDescription",
           name: "changesDescription",
           type: "textarea",
-          label: "Change notes",
+          label: t("documents.builtIn.documentsFormConfigs.uploadDocumentVersionForm.changesDescription.label"),
           rows: 2,
           width: "full",
         },
@@ -545,7 +546,7 @@ export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
           id: "unlockAfter",
           name: "unlockAfter",
           type: "checkbox",
-          label: "Unlock after check-in",
+          label: t("documents.builtIn.documentsFormConfigs.uploadDocumentVersionForm.unlockAfter.label"),
           defaultValue: true,
           width: "1/2",
         },
@@ -559,8 +560,8 @@ export const editKnowledgeArticleForm = (
   row: Record<string, unknown>,
 ): FormConfig => ({
   id: "edit-knowledge-article",
-  title: "Update article",
-  submitLabel: "Save article",
+  title: t("documents.builtIn.documentsFormConfigs.editKnowledgeArticleForm.editKnowledgeArticle.title"),
+  submitLabel: t("documents.builtIn.documentsFormConfigs.editKnowledgeArticleForm.editKnowledgeArticle.submitLabel"),
   sections: [
     {
       id: "article",
@@ -610,8 +611,8 @@ export const editDocumentFolderForm = (
   row: Record<string, unknown>,
 ): FormConfig => ({
   id: "edit-document-folder",
-  title: "Update folder",
-  submitLabel: "Save folder",
+  title: t("documents.builtIn.documentsFormConfigs.editDocumentFolderForm.editDocumentFolder.title"),
+  submitLabel: t("documents.builtIn.documentsFormConfigs.editDocumentFolderForm.editDocumentFolder.submitLabel"),
   sections: [
     {
       id: "folder",
@@ -683,8 +684,8 @@ export const editDocumentFolderForm = (
 
 export const addArticleMemberForm = (_t: TFunction): FormConfig => ({
   id: "add-article-member",
-  title: "Add article member",
-  submitLabel: "Add member",
+  get title() { return uiI18n.t("documents.builtIn.documentsFormConfigs.addArticleMemberForm.addArticleMember.title") },
+  get submitLabel() { return uiI18n.t("documents.builtIn.documentsFormConfigs.addArticleMemberForm.addArticleMember.submitLabel") },
   sections: [
     {
       id: "member",
@@ -693,7 +694,7 @@ export const addArticleMemberForm = (_t: TFunction): FormConfig => ({
           id: "member",
           name: "member",
           type: "text",
-          label: "Member identity (hex)",
+          get label() { return uiI18n.t("documents.knowledgeActions.memberIdentity") },
           required: true,
           width: "full",
         },
@@ -704,19 +705,19 @@ export const addArticleMemberForm = (_t: TFunction): FormConfig => ({
 
 export const newDocumentTemplateForm = (_t: TFunction): FormConfig => ({
   id: "new-document-template",
-  title: "New document template",
-  submitLabel: "Create template",
+  get title() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.newDocumentTemplate.title") },
+  get submitLabel() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.newDocumentTemplate.submitLabel") },
   sections: [
     {
       id: "template",
       fields: [
-        { id: "name", name: "name", type: "text", label: "Name", required: true, width: "full" },
-        { id: "model", name: "model", type: "text", label: "Model", required: true, width: "1/2", placeholder: "sale.order" },
+        { id: "name", name: "name", type: "text", get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.name.label") }, required: true, width: "full" },
+        { id: "model", name: "model", type: "text", get label() { return uiI18n.t("documents.processing.columns.modelUsed") }, required: true, width: "1/2", get placeholder() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.model.placeholder") } },
         {
           id: "reportType",
           name: "reportType",
           type: "text",
-          label: "Report type",
+          get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.reportType.label") },
           defaultValue: "qweb-pdf",
           width: "1/2",
         },
@@ -724,7 +725,7 @@ export const newDocumentTemplateForm = (_t: TFunction): FormConfig => ({
           id: "bodyHtml",
           name: "bodyHtml",
           type: "textarea",
-          label: "Body HTML",
+          get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.bodyHtml.label") },
           format: "plain",
           required: true,
           rows: 8,
@@ -734,14 +735,14 @@ export const newDocumentTemplateForm = (_t: TFunction): FormConfig => ({
           id: "isDefault",
           name: "isDefault",
           type: "checkbox",
-          label: "Default",
+          get label() { return uiI18n.t("documents.studio.default") },
           width: "1/2",
         },
         {
           id: "isActive",
           name: "isActive",
           type: "checkbox",
-          label: "Active",
+          get label() { return uiI18n.t("common.active") },
           defaultValue: true,
           width: "1/2",
         },
@@ -752,20 +753,20 @@ export const newDocumentTemplateForm = (_t: TFunction): FormConfig => ({
 
 export const newMailTemplateForm = (_t: TFunction): FormConfig => ({
   id: "new-mail-template",
-  title: "New mail template",
-  submitLabel: "Create template",
+  get title() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newMailTemplateForm.newMailTemplate.title") },
+  get submitLabel() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newMailTemplateForm.newMailTemplate.submitLabel") },
   sections: [
     {
       id: "template",
       fields: [
-        { id: "name", name: "name", type: "text", label: "Name", required: true, width: "full" },
-        { id: "model", name: "model", type: "text", label: "Model", required: true, width: "1/2" },
-        { id: "subject", name: "subject", type: "text", label: "Subject", required: true, width: "1/2" },
+        { id: "name", name: "name", type: "text", get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newMailTemplateForm.name.label") }, required: true, width: "full" },
+        { id: "model", name: "model", type: "text", get label() { return uiI18n.t("documents.processing.columns.modelUsed") }, required: true, width: "1/2" },
+        { id: "subject", name: "subject", type: "text", get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newMailTemplateForm.subject.label") }, required: true, width: "1/2" },
         {
           id: "bodyHtml",
           name: "bodyHtml",
           type: "textarea",
-          label: "Body HTML",
+          get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newMailTemplateForm.bodyHtml.label") },
           format: "plain",
           required: true,
           rows: 6,
@@ -775,14 +776,14 @@ export const newMailTemplateForm = (_t: TFunction): FormConfig => ({
           id: "attachDocument",
           name: "attachDocument",
           type: "checkbox",
-          label: "Attach document",
+          get label() { return uiI18n.t("documents.builtIn.documentsFormConfigs.newMailTemplateForm.attachDocument.label") },
           width: "1/2",
         },
         {
           id: "isActive",
           name: "isActive",
           type: "checkbox",
-          label: "Active",
+          get label() { return uiI18n.t("common.active") },
           defaultValue: true,
           width: "1/2",
         },

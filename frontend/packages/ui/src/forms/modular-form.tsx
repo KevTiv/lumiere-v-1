@@ -2,7 +2,7 @@
 
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
@@ -251,12 +251,12 @@ export function ModularForm({
 
   const handleAiSuggest = async () => {
     if (!aiEnabled || !aiAssist?.companyId || !aiAssist.entityType) {
-      toast.warning("AI form fill needs company context")
+      toast.warning(i18n.t("ui.forms.modularForm.aiFormFillNeedsCompanyContext"))
       return
     }
 
     if (!aiPrompt.trim()) {
-      toast.warning("Add text for AI to use")
+      toast.warning(i18n.t("ui.forms.modularForm.addTextForAIToUse"))
       return
     }
 
@@ -272,12 +272,12 @@ export function ModularForm({
       setAiValidationNotes(result.validation_notes.map((note) => note.message))
       const count = Object.keys(result.suggestions).length
       if (count === 0) {
-        toast.info("AI did not find matching fields")
+        toast.info(i18n.t("ui.forms.modularForm.aiDidNotFindMatchingFields"))
       } else {
-        toast.success(`AI suggested ${count} field${count === 1 ? "" : "s"}`)
+        toast.success(i18n.t("ui.forms.modularForm.suggestedFields", { count }))
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "AI form suggestion failed"
+      const message = error instanceof Error ? error.message : i18n.t("ui.forms.modularForm.aiFormSuggestionFailed")
       toast.error(message)
     }
   }
@@ -285,7 +285,7 @@ export function ModularForm({
   const handleApplyAiSuggestions = () => {
     const entries = Object.entries(aiSuggestions)
     if (entries.length === 0) {
-      toast.warning("No AI suggestions to apply")
+      toast.warning(i18n.t("ui.forms.modularForm.noAISuggestionsToApply"))
       return
     }
 
@@ -311,7 +311,7 @@ export function ModularForm({
       }
       return next
     })
-    toast.success("AI suggestions applied for review")
+    toast.success(i18n.t("ui.forms.modularForm.aiSuggestionsAppliedForReview"))
   }
 
   const validateField = (field: FormField, value: unknown): string | null => {
@@ -489,10 +489,9 @@ export function ModularForm({
         <div data-form-ai-panel className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className={workspaceStyles.sectionTitle}>Fill with AI</p>
+              <p className={workspaceStyles.sectionTitle}>{i18n.t("ui.forms.modularForm.fillWithAI")}</p>
               <p className={cn(workspaceStyles.sectionDescription, "mt-0.5")}>
-                Suggestions only update this form after you apply them.
-              </p>
+                {i18n.t("ui.forms.modularForm.suggestionsOnlyUpdateThisFormAfterYouApplyThem")}</p>
             </div>
             <Button
               type="button"
@@ -502,7 +501,7 @@ export function ModularForm({
               disabled={busy}
             >
               <Sparkles className="mr-2 h-4 w-4" />
-              {aiPanelOpen ? "Hide AI" : "Fill with AI"}
+              {aiPanelOpen ? i18n.t("ui.forms.modularForm.hideAI") : i18n.t("ui.forms.modularForm.fillWithAI")}
             </Button>
           </div>
 
@@ -511,7 +510,7 @@ export function ModularForm({
               <Textarea
                 value={aiPrompt}
                 onChange={(event) => setAiPrompt(event.target.value)}
-                placeholder="Paste notes, an email, invoice text, or describe what this form should contain..."
+                placeholder={i18n.t("ui.forms.modularForm.pasteNotesAnEmailInvoiceTextOrDescribeWhatThisFormShouldContain")}
                 rows={4}
                 className="bg-background"
               />
@@ -533,16 +532,14 @@ export function ModularForm({
                   disabled={busy || aiSuggest.isPending}
                 >
                   {aiSuggest.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Suggest values
-                </Button>
+                  {i18n.t("ui.forms.modularForm.suggestValues")}</Button>
                 <Button
                   type="button"
                   size="sm"
                   onClick={handleApplyAiSuggestions}
                   disabled={busy || Object.keys(aiSuggestions).length === 0}
                 >
-                  Apply suggestions
-                </Button>
+                  {i18n.t("ui.forms.modularForm.applySuggestions")}</Button>
               </div>
             </div>
           ) : null}

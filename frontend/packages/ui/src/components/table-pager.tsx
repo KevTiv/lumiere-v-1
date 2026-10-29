@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -70,6 +72,7 @@ export function TablePager({
   pageSize,
   showRange = true,
 }: TablePagerProps) {
+  useTranslation()
   if (total <= pageSize) return null
   return (
     <div className="flex flex-col items-end gap-1 pt-2" data-testid="table-pager">
@@ -119,7 +122,7 @@ export function TablePager({
       </Pagination>
       {showRange ? (
         <p className="text-xs text-muted-foreground">
-          {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, total)} of {total}
+          {i18n.t("ui.components.tablePager.range", { start: (currentPage - 1) * pageSize + 1, end: Math.min(currentPage * pageSize, total), total })}
         </p>
       ) : null}
     </div>

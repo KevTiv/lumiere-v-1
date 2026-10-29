@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // AI Chat Panel Types - Similar to v0/Zed IDE ACP
 
 export type CitationKind = "live" | "passage" | "activity" | "web"
@@ -131,7 +132,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "sales",
     name: "sales",
-    description: "Query sales data and metrics",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.sales.description") },
     icon: "trending-up",
     category: "data",
     keywords: ["revenue", "orders", "sales", "metrics"],
@@ -139,7 +140,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "inventory",
     name: "inventory",
-    description: "Access inventory and stock levels",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.inventory.description") },
     icon: "package",
     category: "data",
     keywords: ["stock", "products", "warehouse"],
@@ -147,7 +148,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "customers",
     name: "customers",
-    description: "Query customer information",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.customers.description") },
     icon: "users",
     category: "data",
     keywords: ["clients", "users", "accounts"],
@@ -155,7 +156,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "reports",
     name: "reports",
-    description: "Generate and access reports",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.reports.description") },
     icon: "file-text",
     category: "data",
     keywords: ["analytics", "export", "pdf"],
@@ -164,7 +165,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "create",
     name: "create",
-    description: "Create new records or entries",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.create.description") },
     icon: "plus-circle",
     category: "action",
     keywords: ["new", "add", "insert"],
@@ -172,7 +173,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "update",
     name: "update",
-    description: "Update existing records",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.update.description") },
     icon: "edit",
     category: "action",
     keywords: ["modify", "change", "edit"],
@@ -180,7 +181,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "delete",
     name: "delete",
-    description: "Delete records (with confirmation)",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.delete.description") },
     icon: "trash",
     category: "action",
     keywords: ["remove", "destroy"],
@@ -188,7 +189,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "export",
     name: "export",
-    description: "Export data to various formats",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.export.description") },
     icon: "download",
     category: "action",
     keywords: ["csv", "pdf", "excel"],
@@ -197,7 +198,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "view",
     name: "view",
-    description: "Current dashboard view context",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.view.description") },
     icon: "layout",
     category: "context",
     keywords: ["dashboard", "page", "screen"],
@@ -205,7 +206,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "selection",
     name: "selection",
-    description: "Currently selected items",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.selection.description") },
     icon: "check-square",
     category: "context",
     keywords: ["selected", "checked", "highlighted"],
@@ -213,7 +214,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "user",
     name: "user",
-    description: "Current user context and permissions",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.user.description") },
     icon: "user",
     category: "context",
     keywords: ["me", "profile", "permissions"],
@@ -222,7 +223,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "help",
     name: "help",
-    description: "Get help with commands and features",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.help.description") },
     icon: "help-circle",
     category: "help",
     keywords: ["?", "how", "what"],
@@ -230,7 +231,7 @@ export const defaultAtCommands: AtCommand[] = [
   {
     id: "docs",
     name: "docs",
-    description: "Access documentation",
+    get description() { return uiI18n.t("aiAssistant.builtIn.aiChatTypes.defaultAtCommands.docs.description") },
     icon: "book-open",
     category: "help",
     keywords: ["documentation", "guide", "manual"],

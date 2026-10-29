@@ -1,3 +1,4 @@
+import { i18n } from "@lumiere/i18n"
 import type { AccountMove } from "../lib/accounting-types"
 import { microsSinceEpochToDate, stbEnumTag } from "../lib/accounting-move-utils"
 import { formatInvoiceMoney } from "./invoice-document"
@@ -71,7 +72,7 @@ export function accountingCurrencySummaries(moves: readonly AccountMove[], optio
     const id = currencyId(move)
     const key = id || `unknown-${String(move.id)}`
     const option = options.find((currency) => currency.value === id)
-    const group = groups.get(key) ?? { key, label: option?.label || option?.code || (id ? `Currency #${id}` : `Document #${move.id} · Currency not available`), total: 0, residual: 0, currency: accountingListCurrency(move, options) }
+    const group = groups.get(key) ?? { key, label: option?.label || option?.code || (id ? i18n.t("accounting.accountingListDisplay.currencyValue", { defaultValue: "Currency #{{id}}", id: id }) : i18n.t("accounting.accountingListDisplay.documentValueCurrencyNotAvailable", { defaultValue: "Document #{{value1}} · Currency not available", value1: move.id })), total: 0, residual: 0, currency: accountingListCurrency(move, options) }
     group.total = group.total != null && move.amountTotal != null && Number.isFinite(move.amountTotal) ? group.total + move.amountTotal : null
     group.residual = group.residual != null && move.amountResidual != null && Number.isFinite(move.amountResidual) ? group.residual + move.amountResidual : null
     groups.set(key, group)
@@ -81,8 +82,8 @@ export function accountingCurrencySummaries(moves: readonly AccountMove[], optio
 
 export function accountingSummaryValue(groups: readonly AccountingCurrencySummary[], field: "total" | "residual"): string {
   if (!groups.length) return "—"
-  if (groups.some((group) => !group.currency.id)) return "Currency not available"
-  if (groups.length > 1) return `${groups.length} currencies`
+  if (groups.some((group) => !group.currency.id)) return i18n.t("accounting.accountingListDisplay.currencyNotAvailable", { defaultValue: "Currency not available" })
+  if (groups.length > 1) return i18n.t("accounting.accountingListDisplay.currencyCount", { defaultValue: "{{count}} currencies", count: groups.length })
   const group = groups[0]!
   return group[field] == null ? "—" : formatInvoiceMoney(group[field], group.currency)
 }

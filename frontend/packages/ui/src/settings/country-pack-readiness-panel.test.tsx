@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
 
-vi.mock("@lumiere/i18n", () => ({
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),
   useTranslation: () => ({
     t: (key: string, options?: string | { defaultValue?: string }) =>
       typeof options === "object" && options.defaultValue

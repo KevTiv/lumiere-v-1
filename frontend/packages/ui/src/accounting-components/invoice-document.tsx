@@ -1,3 +1,4 @@
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
 import { invoiceBuyerSnapshot, isManagedInvoiceLogoUrl, parseInvoiceContent, parseInvoiceDocumentSnapshot, parseInvoiceNotes, resolveInvoiceContent, type InvoiceDocumentSnapshot, type InvoicePersonalizationProfile } from "@lumiere/erp-shared/invoice-personalization"
@@ -42,7 +43,7 @@ export function formatInvoiceMoney(amount: number | null | undefined, currency: 
     return new Intl.NumberFormat(undefined, { style: "currency", currency: currency.code, currencyDisplay: "code" }).format(amount)
   }
   const value = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
-  return `${value} · ${currency.id ? `Currency #${currency.id}` : "Currency not available"}`
+  return `${value} · ${currency.id ? i18n.t("accounting.createInvoiceModal.currencyValue", { defaultValue: "Currency #{{value1}}", value1: currency.id }) : i18n.t("accounting.accountingListDisplay.currencyNotAvailable", { defaultValue: "Currency not available" })}`
 }
 
 interface InvoiceDocumentProps {
@@ -68,6 +69,7 @@ interface InvoiceDocumentProps {
 
 /** Document-style summary; generated PDF remains the authoritative printable output. */
 export function InvoiceDocument({ title, company, reference, partnerLabel, partner, date, dueDate, currency, lines, subtotal, tax, total, notes, personalization, personalizationError, draft, className }: InvoiceDocumentProps) {
+  const { t } = useTranslation()
   const money = (amount: number | null | undefined) => formatInvoiceMoney(amount, currency)
   const lineAmount = (line: NonNullable<InvoiceDocumentProps["lines"]>[number]) => {
     // Persisted null means unavailable; only unsaved draft lines omit amount.
@@ -86,45 +88,45 @@ export function InvoiceDocument({ title, company, reference, partnerLabel, partn
     <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</h3>
     <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{content}</p>
   </section> : null
-  return <article aria-label="Document preview" data-testid="invoice-document" className={cn(workspaceStyles.document, "min-w-0 p-4 [overflow-wrap:anywhere] sm:p-8", className)} style={{ backgroundColor: "#ffffff", color: "#1e293b", borderColor: "#cbd5e1", borderTopColor: accent, colorScheme: "light" }}>
+  return <article aria-label={t("accounting.invoices.documentPreview", { defaultValue: "Document preview" })} data-testid="invoice-document" className={cn(workspaceStyles.document, "min-w-0 p-4 [overflow-wrap:anywhere] sm:p-8", className)} style={{ backgroundColor: "#ffffff", color: "#1e293b", borderColor: "#cbd5e1", borderTopColor: accent, colorScheme: "light" }}>
     {personalizationError ? <p role="alert" className="mb-5 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{personalizationError}</p> : null}
     <header className="flex min-w-0 flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
       <div className="min-w-0 grow basis-64">
-        {logo ? <img src={logo} alt={seller?.name ? `${seller.name} logo` : "Company logo"} className="mb-4 max-h-20 max-w-full object-contain object-left" /> : null}
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-600">{draft ? "Draft document" : "Accounting document"}</p>
+        {logo ? <img src={logo} alt={seller?.name ? t("accounting.invoiceDocument.valueLogo", { defaultValue: "{{value1}} logo", value1: seller.name }) : t("accounting.invoiceDocument.companyLogo", { defaultValue: "Company logo" })} className="mb-4 max-h-20 max-w-full object-contain object-left" /> : null}
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-600">{draft ? t("accounting.invoiceDocument.draftDocument", { defaultValue: "Draft document" }) : t("accounting.invoiceDocument.accountingDocument", { defaultValue: "Accounting document" })}</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]" style={{ color: accent }}>{title}</h2>
         {seller?.name || company ? <p className="mt-3 font-semibold">{seller?.name || company}</p> : null}
-        {seller ? <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600" aria-label="Seller details">
+        {seller ? <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600" aria-label={t("accounting.invoiceDocument.sellerDetails", { defaultValue: "Seller details" })}>
           {seller.address.map((line, index) => <p key={index}>{line}</p>)}
-          {seller.taxId ? <p>Tax ID: {seller.taxId}</p> : null}
-          {seller.registrationNumber ? <p>Registration number: {seller.registrationNumber}</p> : null}
-          {seller.email ? <p>Email: {seller.email}</p> : null}
-          {seller.phone ? <p>Phone: {seller.phone}</p> : null}
-          {seller.website ? <p>Website: {seller.website}</p> : null}
+          {seller.taxId ? <p>{t("accounting.invoiceDocument.copy.taxIDValue", { defaultValue: "Tax ID: {{taxId}}", taxId: seller.taxId })}</p> : null}
+          {seller.registrationNumber ? <p>{t("accounting.invoiceDocument.copy.registrationNumberValue", { defaultValue: "Registration number: {{registrationNumber}}", registrationNumber: seller.registrationNumber })}</p> : null}
+          {seller.email ? <p>{t("accounting.invoiceDocument.copy.emailValue", { defaultValue: "Email: {{email}}", email: seller.email })}</p> : null}
+          {seller.phone ? <p>{t("accounting.invoiceDocument.copy.phoneValue", { defaultValue: "Phone: {{phone}}", phone: seller.phone })}</p> : null}
+          {seller.website ? <p>{t("accounting.invoiceDocument.copy.websiteValue", { defaultValue: "Website: {{website}}", website: seller.website })}</p> : null}
         </div> : null}
       </div>
-      <p className="max-w-full font-mono text-sm text-slate-600 [overflow-wrap:anywhere]">{reference || "Reference pending"}</p>
+      <p className="max-w-full font-mono text-sm text-slate-600 [overflow-wrap:anywhere]">{reference || t("accounting.invoiceDocument.referencePending", { defaultValue: "Reference pending" })}</p>
     </header>
     <div className="grid gap-5 py-6 sm:grid-cols-2">
-      <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-slate-600">{partnerLabel}</p><p className="mt-2 font-medium [overflow-wrap:anywhere]">{buyer?.name || partner || "Select a partner"}</p>
-        {buyer ? <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600" aria-label="Captured customer billing details">
+      <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-slate-600">{partnerLabel}</p><p className="mt-2 font-medium [overflow-wrap:anywhere]">{buyer?.name || partner || t("accounting.invoiceDocument.selectAPartner", { defaultValue: "Select a partner" })}</p>
+        {buyer ? <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600" aria-label={t("accounting.invoiceDocument.capturedCustomerBillingDetails", { defaultValue: "Captured customer billing details" })}>
           {buyer.address.map((line, index) => <p key={index}>{line}</p>)}
-          {buyer.taxId ? <p>Tax ID: {buyer.taxId}</p> : null}
-          {buyer.registrationNumber ? <p>Registration number: {buyer.registrationNumber}</p> : null}
-          {buyer.email ? <p>Email: {buyer.email}</p> : null}
-          {buyer.phone ? <p>Phone: {buyer.phone}</p> : null}
-          {draft ? <p className="pt-2">Captured when this draft was created. Posting refreshes billing details from the linked customer.</p> : null}
-        </div> : personalization ? <p className="mt-2 text-xs leading-relaxed text-slate-600">{draft ? "Customer billing details are unavailable in this preview." : "Customer billing details were not captured on this document."}</p> : null}
+          {buyer.taxId ? <p>{t("accounting.invoiceDocument.copy.taxIDValue", { defaultValue: "Tax ID: {{taxId}}", taxId: buyer.taxId })}</p> : null}
+          {buyer.registrationNumber ? <p>{t("accounting.invoiceDocument.copy.registrationNumberValue", { defaultValue: "Registration number: {{registrationNumber}}", registrationNumber: buyer.registrationNumber })}</p> : null}
+          {buyer.email ? <p>{t("accounting.invoiceDocument.copy.emailValue", { defaultValue: "Email: {{email}}", email: buyer.email })}</p> : null}
+          {buyer.phone ? <p>{t("accounting.invoiceDocument.copy.phoneValue", { defaultValue: "Phone: {{phone}}", phone: buyer.phone })}</p> : null}
+          {draft ? <p className="pt-2">{t("accounting.invoiceDocument.capturedWhenThisDraftWasCreatedPostingRefreshesBillingDetails", { defaultValue: "Captured when this draft was created. Posting refreshes billing details from the linked customer." })}</p> : null}
+        </div> : personalization ? <p className="mt-2 text-xs leading-relaxed text-slate-600">{draft ? t("accounting.invoiceDocument.customerBillingDetailsAreUnavailableInThisPreview", { defaultValue: "Customer billing details are unavailable in this preview." }) : t("accounting.invoiceDocument.customerBillingDetailsWereNotCapturedOnThisDocument", { defaultValue: "Customer billing details were not captured on this document." })}</p> : null}
       </div>
-      <dl className="min-w-0 space-y-2 text-sm"><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">Issue date</dt><dd>{date || "—"}</dd></div><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">Due date</dt><dd>{dueDate || "—"}</dd></div></dl>
+      <dl className="min-w-0 space-y-2 text-sm"><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">{t("accounting.invoiceDocument.issueDate", { defaultValue: "Issue date" })}</dt><dd>{date || "—"}</dd></div><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">{t("accounting.authoring.dueDate", { defaultValue: "Due date" })}</dt><dd>{dueDate || "—"}</dd></div></dl>
     </div>
-    {profile?.notice ? <section aria-label="Notice" className="mb-6 rounded-md border p-3" style={{ borderColor: accent }}><h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>Notice</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{profile.notice}</p></section> : null}
-    {lines ? <div className="min-w-0 overflow-x-auto"><table className="w-full table-fixed text-sm"><thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-xs text-slate-600"><th className="w-[43%] p-2 font-medium">Description</th><th className="w-[16%] p-2 text-right font-medium">Qty</th><th className="p-2 text-right font-medium">Amount</th></tr></thead><tbody>{lines.map((line) => <tr key={line.id} className="border-b border-slate-200"><td className="p-2 align-top [overflow-wrap:anywhere]">{line.description || "Item description"}{line.discount != null && line.discount > 0 ? <span className="block text-xs text-slate-600">{line.discount}% discount</span> : null}</td><td className="p-2 text-right align-top tabular-nums [overflow-wrap:anywhere]">{line.quantity ?? "—"}</td><td className="p-2 text-right align-top tabular-nums [overflow-wrap:anywhere]">{money(lineAmount(line))}</td></tr>)}</tbody></table></div> : null}
-    <dl className="ml-auto mt-6 max-w-sm space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-slate-600">Subtotal</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(subtotal)}</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-600">Tax</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(tax)}</dd></div><div className="flex justify-between gap-4 border-t border-slate-200 pt-4 text-base font-semibold"><dt>Total</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(total)}</dd></div></dl>
-    {contentSection("Notes", documentNotes)}
-    {contentSection("Terms", profile?.terms)}
-    {contentSection("Payment instructions", profile?.paymentInstructions)}
-    {contentSection("Footer", profile?.footer)}
-    {draft ? <p className="mt-8 text-xs text-slate-600">Draft preview. Review and confirm totals before posting.</p> : null}
+    {profile?.notice ? <section aria-label={t("accounting.invoiceDocument.notice", { defaultValue: "Notice" })} className="mb-6 rounded-md border p-3" style={{ borderColor: accent }}><h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>{t("accounting.invoiceDocument.notice", { defaultValue: "Notice" })}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{profile.notice}</p></section> : null}
+    {lines ? <div className="min-w-0 overflow-x-auto"><table className="w-full table-fixed text-sm"><thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-xs text-slate-600"><th className="w-[43%] p-2 font-medium">{t("accounting.taxSchedules.columns.description", { defaultValue: "Description" })}</th><th className="w-[16%] p-2 text-right font-medium">{t("accounting.forms.newInvoice.columns.qty", { defaultValue: "Qty" })}</th><th className="p-2 text-right font-medium">{t("accounting.invoices.amount", { defaultValue: "Amount" })}</th></tr></thead><tbody>{lines.map((line) => <tr key={line.id} className="border-b border-slate-200"><td className="p-2 align-top [overflow-wrap:anywhere]">{line.description || t("accounting.invoiceDocument.itemDescription", { defaultValue: "Item description" })}{line.discount != null && line.discount > 0 ? <span className="block text-xs text-slate-600">{t("accounting.invoiceDocument.copy.valueDiscount", { defaultValue: "{{discount}}% discount", discount: line.discount })}</span> : null}</td><td className="p-2 text-right align-top tabular-nums [overflow-wrap:anywhere]">{line.quantity ?? "—"}</td><td className="p-2 text-right align-top tabular-nums [overflow-wrap:anywhere]">{money(lineAmount(line))}</td></tr>)}</tbody></table></div> : null}
+    <dl className="ml-auto mt-6 max-w-sm space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-slate-600">{t("accounting.forms.newInvoice.summary.subtotal", { defaultValue: "Subtotal" })}</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(subtotal)}</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-600">{t("accounting.forms.newInvoice.summary.tax", { defaultValue: "Tax" })}</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(tax)}</dd></div><div className="flex justify-between gap-4 border-t border-slate-200 pt-4 text-base font-semibold"><dt>{t("common.entityView.pivotTotal", { defaultValue: "Total" })}</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(total)}</dd></div></dl>
+    {contentSection(t("common.notes", { defaultValue: "Notes" }), documentNotes)}
+    {contentSection(t("accounting.invoiceDocument.terms", { defaultValue: "Terms" }), profile?.terms)}
+    {contentSection(t("accounting.invoiceDocument.paymentInstructions", { defaultValue: "Payment instructions" }), profile?.paymentInstructions)}
+    {contentSection(t("accounting.invoiceDocument.footer", { defaultValue: "Footer" }), profile?.footer)}
+    {draft ? <p className="mt-8 text-xs text-slate-600">{t("accounting.invoiceDocument.draftPreviewReviewAndConfirmTotalsBeforePosting", { defaultValue: "Draft preview. Review and confirm totals before posting." })}</p> : null}
   </article>
 }

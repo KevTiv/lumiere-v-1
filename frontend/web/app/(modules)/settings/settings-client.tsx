@@ -1,5 +1,7 @@
 "use client"
 
+import { i18n as rootI18n, useTranslation as useRootTranslation } from "@lumiere/i18n"
+import { i18n as uiI18n } from "@lumiere/i18n"
 import { useWorkOsAuthMode } from "@/lib/auth-mode-context"
 
 import { useMemo, useState } from "react"
@@ -91,9 +93,9 @@ const INTEGRATION_SETTINGS_ACTIONS: SettingsAction[] = [
 ]
 
 const syncDirectionOptions = [
-  { value: "UploadOnly", label: "Upload only" },
-  { value: "DownloadOnly", label: "Download only" },
-  { value: "Bidirectional", label: "Bidirectional" },
+  { value: "UploadOnly", get label() { return uiI18n.t("settings.builtIn.settingsClient.syncDirectionOptions.uploadOnly.label") } },
+  { value: "DownloadOnly", get label() { return uiI18n.t("settings.builtIn.settingsClient.syncDirectionOptions.downloadOnly.label") } },
+  { value: "Bidirectional", get label() { return uiI18n.t("settings.builtIn.settingsClient.syncDirectionOptions.bidirectional.label") } },
 ]
 
 const integrationTypeOptions = [
@@ -102,346 +104,346 @@ const integrationTypeOptions = [
 ]
 
 const permissionActionOptions = [
-  { value: "Read", label: "Read" },
-  { value: "Write", label: "Write" },
-  { value: "Create", label: "Create" },
-  { value: "Delete", label: "Delete" },
-  { value: "All", label: "All" },
+  { value: "Read", get label() { return uiI18n.t("settings.builtIn.settingsClient.permissionActionOptions.read.label") } },
+  { value: "Write", get label() { return uiI18n.t("settings.builtIn.settingsClient.permissionActionOptions.write.label") } },
+  { value: "Create", get label() { return uiI18n.t("common.create") } },
+  { value: "Delete", get label() { return uiI18n.t("common.delete") } },
+  { value: "All", get label() { return uiI18n.t("settings.builtIn.settingsClient.permissionActionOptions.all.label") } },
 ]
 
 // `createCompany` is only used by the first-organization setup; Settings edits companies inline.
 const settingsActionForms: Record<SettingsAction | "createCompany", FormConfig> = {
   createCompany: {
     id: "settings-create-company",
-    title: "Create Company",
-    submitLabel: "Create company",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateCompany.title") },
+    get submitLabel() { return uiI18n.t("settings.organization.company.createSubmit") },
     sections: [
       {
         id: "company",
         fields: [
-          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-          { id: "code", type: "text", name: "code", label: "Code", required: true, width: "1/2" },
-          { id: "currency", type: "number", name: "currencyId", label: "Currency", required: true, width: "1/2" },
-          { id: "country", type: "text", name: "addressCountryCode", label: "Country code", width: "1/2" },
+          { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, required: true, width: "1/2" },
+          { id: "code", type: "text", name: "code", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.code.label") }, required: true, width: "1/2" },
+          { id: "currency", type: "number", name: "currencyId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.currency.label") }, required: true, width: "1/2" },
+          { id: "country", type: "text", name: "addressCountryCode", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.country.label") }, width: "1/2" },
         ],
       },
     ],
   },
   createAuditRule: {
     id: "settings-create-audit-rule",
-    title: "Create Audit Rule",
-    submitLabel: "Create rule",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateAuditRule.title") },
+    get submitLabel() { return uiI18n.t("settings.roles.sod.submit") },
     sections: [
       {
         id: "rule",
         fields: [
-          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "full" },
-          { id: "resource", type: "text", name: "resourceType", label: "Resource type", required: true, width: "1/2" },
-          { id: "action", type: "text", name: "actionType", label: "Action type", required: true, width: "1/2" },
-          { id: "severity", type: "text", name: "severity", label: "Severity", defaultValue: "info", width: "1/2" },
-          { id: "active", type: "switch", name: "isActive", label: "Active", defaultValue: true, width: "1/2" },
+          { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, required: true, width: "full" },
+          { id: "resource", type: "text", name: "resourceType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.resource.label") }, required: true, width: "1/2" },
+          { id: "action", type: "text", name: "actionType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.action.label") }, required: true, width: "1/2" },
+          { id: "severity", type: "text", name: "severity", get label() { return uiI18n.t("settings.ai.severity") }, defaultValue: "info", width: "1/2" },
+          { id: "active", type: "switch", name: "isActive", get label() { return uiI18n.t("common.active") }, defaultValue: true, width: "1/2" },
         ],
       },
     ],
   },
   updateAuditRule: {
     id: "settings-update-audit-rule",
-    title: "Update Audit Rule",
-    submitLabel: "Update rule",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateAuditRule.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateAuditRule.submitLabel") },
     sections: [
       {
         id: "rule",
         fields: [
-          { id: "rule-id", type: "number", name: "ruleId", label: "Rule ID", required: true, width: "1/2" },
-          { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
-          { id: "resource", type: "text", name: "resourceType", label: "Resource type", width: "1/2" },
-          { id: "action", type: "text", name: "actionType", label: "Action type", width: "1/2" },
-          { id: "severity", type: "text", name: "severity", label: "Severity", width: "1/2" },
-          { id: "active", type: "switch", name: "isActive", label: "Active", width: "1/2" },
+          { id: "rule-id", type: "number", name: "ruleId", get label() { return uiI18n.t("settings.adminOps.casbin.ruleId") }, required: true, width: "1/2" },
+          { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, width: "1/2" },
+          { id: "resource", type: "text", name: "resourceType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.resource.label") }, width: "1/2" },
+          { id: "action", type: "text", name: "actionType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.action.label") }, width: "1/2" },
+          { id: "severity", type: "text", name: "severity", get label() { return uiI18n.t("settings.ai.severity") }, width: "1/2" },
+          { id: "active", type: "switch", name: "isActive", get label() { return uiI18n.t("common.active") }, width: "1/2" },
         ],
       },
     ],
   },
   endSession: {
     id: "settings-end-session",
-    title: "End User Session",
-    submitLabel: "End session",
-    sections: [{ id: "session", fields: [{ id: "session-id", type: "number", name: "sessionId", label: "Session ID", required: true }] }],
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsEndSession.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsEndSession.submitLabel") },
+    sections: [{ id: "session", fields: [{ id: "session-id", type: "number", name: "sessionId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.sessionId.label") }, required: true }] }],
   },
   updateEmail: {
     id: "settings-update-email",
-    title: "Update Email",
-    submitLabel: "Update email",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateEmail.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateEmail.submitLabel") },
     sections: [
       {
         id: "email",
         fields: [
-          { id: "email", type: "email", name: "email", label: "Email", required: true, width: "1/2" },
-          { id: "verified", type: "switch", name: "emailVerified", label: "Email verified", width: "1/2" },
+          { id: "email", type: "email", name: "email", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.email.label") }, required: true, width: "1/2" },
+          { id: "verified", type: "switch", name: "emailVerified", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.verified.label") }, width: "1/2" },
         ],
       },
     ],
   },
   recordPrivacyConsent: {
     id: "settings-record-privacy-consent",
-    title: "Record Privacy Consent",
-    submitLabel: "Record consent",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsRecordPrivacyConsent.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsRecordPrivacyConsent.submitLabel") },
     sections: [
       {
         id: "privacy",
         fields: [
-          { id: "contact", type: "number", name: "contactId", label: "Contact ID", required: true, width: "1/2" },
-          { id: "type", type: "text", name: "consentType", label: "Consent type", required: true, width: "1/2" },
-          { id: "granted", type: "switch", name: "granted", label: "Granted", defaultValue: true, width: "1/2" },
-          { id: "ip", type: "text", name: "ipAddress", label: "IP address", width: "1/2" },
-          { id: "agent", type: "text", name: "userAgent", label: "User agent", width: "full" },
-          { id: "metadata", type: "textarea", name: "metadata", label: "Metadata JSON/string", rows: 3, width: "full" },
+          { id: "contact", type: "number", name: "contactId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.contact.label") }, required: true, width: "1/2" },
+          { id: "type", type: "text", name: "consentType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.type.label") }, required: true, width: "1/2" },
+          { id: "granted", type: "switch", name: "granted", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.granted.label") }, defaultValue: true, width: "1/2" },
+          { id: "ip", type: "text", name: "ipAddress", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.ip.label") }, width: "1/2" },
+          { id: "agent", type: "text", name: "userAgent", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.agent.label") }, width: "full" },
+          { id: "metadata", type: "textarea", name: "metadata", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.metadata.label") }, rows: 3, width: "full" },
         ],
       },
     ],
   },
   googleDriveCredentials: {
     id: "settings-google-drive-credentials",
-    title: "Update Google Drive Credentials",
-    submitLabel: "Save credentials",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsGoogleDriveCredentials.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsGoogleDriveCredentials.submitLabel") },
     sections: [
       {
         id: "credentials",
         fields: [
-          { id: "user", type: "number", name: "userId", label: "User ID", required: true, width: "full" },
-          { id: "json", type: "textarea", name: "credentialsJson", label: "Credentials JSON", required: true, rows: 6, width: "full" },
+          { id: "user", type: "number", name: "userId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.user.label") }, required: true, width: "full" },
+          { id: "json", type: "textarea", name: "credentialsJson", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.json.label") }, required: true, rows: 6, width: "full" },
         ],
       },
     ],
   },
   whatsappCredentials: {
     id: "settings-whatsapp-credentials",
-    title: "Update WhatsApp Credentials",
-    submitLabel: "Save credentials",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsWhatsappCredentials.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsWhatsappCredentials.submitLabel") },
     sections: [
       {
         id: "credentials",
         fields: [
-          { id: "user", type: "number", name: "userId", label: "User ID", required: true, width: "full" },
-          { id: "json", type: "textarea", name: "credentialsJson", label: "Credentials JSON", required: true, rows: 6, width: "full" },
+          { id: "user", type: "number", name: "userId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.user.label") }, required: true, width: "full" },
+          { id: "json", type: "textarea", name: "credentialsJson", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.json.label") }, required: true, rows: 6, width: "full" },
         ],
       },
     ],
   },
   createGoogleDriveConnection: {
     id: "settings-create-google-drive-connection",
-    title: "Create Google Drive Connection",
-    submitLabel: "Create connection",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateGoogleDriveConnection.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateGoogleDriveConnection.submitLabel") },
     sections: [
       {
         id: "connection",
         fields: [
-          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-          { id: "account-email", type: "email", name: "accountEmail", label: "Account email", required: true, width: "1/2" },
-          { id: "account-id", type: "text", name: "accountId", label: "Account ID", required: true, width: "1/2" },
-          { id: "credentials-ref", type: "text", name: "credentialsReference", label: "Credentials reference", required: true, width: "1/2" },
-          { id: "root-folder", type: "text", name: "rootFolderId", label: "Root folder ID", width: "1/2" },
-          { id: "shared-drive", type: "text", name: "sharedDriveId", label: "Shared drive ID", width: "1/2" },
-          { id: "sync-enabled", type: "switch", name: "syncEnabled", label: "Sync enabled", defaultValue: true, width: "1/3" },
-          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
-          { id: "sync-direction", type: "select", name: "syncDirection", label: "Sync direction", defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/3" },
-          { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
-          { id: "webhook-secret", type: "text", name: "webhookSecretReference", label: "Webhook secret reference", width: "1/2" },
-          { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", label: "Sync frequency minutes", defaultValue: 60, width: "1/2" },
-          { id: "max-file-size", type: "number", name: "maxFileSizeMb", label: "Max file size MB", defaultValue: 50, width: "1/2" },
-          { id: "file-types", type: "text", name: "allowedFileTypes", label: "Allowed file types (CSV)", defaultValue: "pdf,docx,xlsx", width: "full" },
+          { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, required: true, width: "1/2" },
+          { id: "account-email", type: "email", name: "accountEmail", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.accountEmail.label") }, required: true, width: "1/2" },
+          { id: "account-id", type: "text", name: "accountId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.accountId.label") }, required: true, width: "1/2" },
+          { id: "credentials-ref", type: "text", name: "credentialsReference", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.credentialsRef.label") }, required: true, width: "1/2" },
+          { id: "root-folder", type: "text", name: "rootFolderId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.rootFolder.label") }, width: "1/2" },
+          { id: "shared-drive", type: "text", name: "sharedDriveId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.sharedDrive.label") }, width: "1/2" },
+          { id: "sync-enabled", type: "switch", name: "syncEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.syncEnabled.label") }, defaultValue: true, width: "1/3" },
+          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookEnabled.label") }, width: "1/3" },
+          { id: "sync-direction", type: "select", name: "syncDirection", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.syncDirection.label") }, defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/3" },
+          { id: "webhook-url", type: "url", name: "webhookUrl", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookUrl.label") }, width: "1/2" },
+          { id: "webhook-secret", type: "text", name: "webhookSecretReference", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookSecret.label") }, width: "1/2" },
+          { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.syncFrequency.label") }, defaultValue: 60, width: "1/2" },
+          { id: "max-file-size", type: "number", name: "maxFileSizeMb", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.maxFileSize.label") }, defaultValue: 50, width: "1/2" },
+          { id: "file-types", type: "text", name: "allowedFileTypes", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.fileTypes.label") }, defaultValue: "pdf,docx,xlsx", width: "full" },
         ],
       },
     ],
   },
   updateGoogleDriveConnection: {
     id: "settings-update-google-drive-connection",
-    title: "Update Google Drive Connection",
-    submitLabel: "Update connection",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateGoogleDriveConnection.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateGoogleDriveConnection.submitLabel") },
     sections: [
       {
         id: "connection",
         fields: [
-          { id: "connection-id", type: "number", name: "connectionId", label: "Connection ID", required: true, width: "1/2" },
-          { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
-          { id: "root-folder", type: "text", name: "rootFolderId", label: "Root folder ID", width: "1/2" },
-          { id: "shared-drive", type: "text", name: "sharedDriveId", label: "Shared drive ID", width: "1/2" },
-          { id: "sync-enabled", type: "switch", name: "syncEnabled", label: "Sync enabled", width: "1/3" },
-          { id: "auto-sync", type: "switch", name: "autoSyncFiles", label: "Auto sync files", width: "1/3" },
-          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
-          { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
-          { id: "sync-direction", type: "select", name: "syncDirection", label: "Sync direction", defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/2" },
-          { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", label: "Sync frequency minutes", width: "1/2" },
-          { id: "max-file-size", type: "number", name: "maxFileSizeMb", label: "Max file size MB", width: "1/2" },
-          { id: "file-types", type: "text", name: "allowedFileTypes", label: "Allowed file types (CSV)", width: "full" },
+          { id: "connection-id", type: "number", name: "connectionId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.connectionId.label") }, required: true, width: "1/2" },
+          { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, width: "1/2" },
+          { id: "root-folder", type: "text", name: "rootFolderId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.rootFolder.label") }, width: "1/2" },
+          { id: "shared-drive", type: "text", name: "sharedDriveId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.sharedDrive.label") }, width: "1/2" },
+          { id: "sync-enabled", type: "switch", name: "syncEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.syncEnabled.label") }, width: "1/3" },
+          { id: "auto-sync", type: "switch", name: "autoSyncFiles", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.autoSync.label") }, width: "1/3" },
+          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookEnabled.label") }, width: "1/3" },
+          { id: "webhook-url", type: "url", name: "webhookUrl", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookUrl.label") }, width: "1/2" },
+          { id: "sync-direction", type: "select", name: "syncDirection", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.syncDirection.label") }, defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/2" },
+          { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.syncFrequency.label") }, width: "1/2" },
+          { id: "max-file-size", type: "number", name: "maxFileSizeMb", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.maxFileSize.label") }, width: "1/2" },
+          { id: "file-types", type: "text", name: "allowedFileTypes", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.fileTypes.label") }, width: "full" },
         ],
       },
     ],
   },
   deleteIntegration: {
     id: "settings-delete-integration",
-    title: "Delete Integration",
-    submitLabel: "Delete integration",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsDeleteIntegration.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsDeleteIntegration.submitLabel") },
     sections: [{ id: "integration", fields: [
-      { id: "integration-id", type: "number", name: "integrationId", label: "Integration ID", required: true, width: "1/2" },
-      { id: "integration-type", type: "select", name: "integrationType", label: "Integration type", defaultValue: "GoogleDrive", options: integrationTypeOptions, width: "1/2" },
+      { id: "integration-id", type: "number", name: "integrationId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.integrationId.label") }, required: true, width: "1/2" },
+      { id: "integration-type", type: "select", name: "integrationType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.integrationType.label") }, defaultValue: "GoogleDrive", options: integrationTypeOptions, width: "1/2" },
     ] }],
   },
   createWhatsappBusinessAccount: {
     id: "settings-create-whatsapp-business-account",
-    title: "Create WhatsApp Business Account",
-    submitLabel: "Create account",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateWhatsappBusinessAccount.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateWhatsappBusinessAccount.submitLabel") },
     sections: [
       {
         id: "account",
         fields: [
-          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-          { id: "phone", type: "text", name: "phoneNumber", label: "Phone number", required: true, width: "1/2" },
-          { id: "phone-id", type: "text", name: "phoneNumberId", label: "Phone number ID", required: true, width: "1/2" },
-          { id: "business-id", type: "text", name: "businessAccountId", label: "Business account ID", required: true, width: "1/2" },
-          { id: "display-name", type: "text", name: "displayName", label: "Display name", required: true, width: "1/2" },
-          { id: "language", type: "text", name: "defaultLanguage", label: "Default language", defaultValue: "en", width: "1/2" },
-          { id: "credentials-ref", type: "text", name: "credentialsReference", label: "Credentials reference", required: true, width: "1/2" },
-          { id: "webhook-secret", type: "text", name: "webhookSecretReference", label: "Webhook secret reference", required: true, width: "1/2" },
-          { id: "messaging", type: "switch", name: "messagingEnabled", label: "Messaging", defaultValue: true, width: "1/4" },
-          { id: "notifications", type: "switch", name: "notificationsEnabled", label: "Notifications", defaultValue: true, width: "1/4" },
-          { id: "templates", type: "switch", name: "templateMessagingEnabled", label: "Templates", defaultValue: true, width: "1/4" },
-          { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", label: "Interactive", defaultValue: true, width: "1/4" },
-          { id: "primary", type: "switch", name: "isPrimary", label: "Primary account", width: "1/3" },
-          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
-          { id: "daily-limit", type: "number", name: "dailyMessageLimit", label: "Daily message limit", defaultValue: 1000, width: "1/3" },
-          { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
-          { id: "events", type: "text", name: "subscribedWebhookEvents", label: "Subscribed events (CSV)", defaultValue: "messages,message_status,account_alerts", width: "1/2" },
-          { id: "namespace", type: "text", name: "templateNamespace", label: "Template namespace", width: "1/2" },
-          { id: "media", type: "text", name: "mediaProvider", label: "Media provider", width: "1/2" },
-          { id: "metadata", type: "textarea", name: "metadata", label: "Metadata JSON/string", rows: 3, width: "full" },
+          { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, required: true, width: "1/2" },
+          { id: "phone", type: "text", name: "phoneNumber", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.phone.label") }, required: true, width: "1/2" },
+          { id: "phone-id", type: "text", name: "phoneNumberId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.phoneId.label") }, required: true, width: "1/2" },
+          { id: "business-id", type: "text", name: "businessAccountId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.businessId.label") }, required: true, width: "1/2" },
+          { id: "display-name", type: "text", name: "displayName", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.displayName.label") }, required: true, width: "1/2" },
+          { id: "language", type: "text", name: "defaultLanguage", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.language.label") }, defaultValue: "en", width: "1/2" },
+          { id: "credentials-ref", type: "text", name: "credentialsReference", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.credentialsRef.label") }, required: true, width: "1/2" },
+          { id: "webhook-secret", type: "text", name: "webhookSecretReference", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookSecret.label") }, required: true, width: "1/2" },
+          { id: "messaging", type: "switch", name: "messagingEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.messaging.label") }, defaultValue: true, width: "1/4" },
+          { id: "notifications", type: "switch", name: "notificationsEnabled", get label() { return uiI18n.t("settings.sections.notifications.title") }, defaultValue: true, width: "1/4" },
+          { id: "templates", type: "switch", name: "templateMessagingEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.templates.label") }, defaultValue: true, width: "1/4" },
+          { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.interactive.label") }, defaultValue: true, width: "1/4" },
+          { id: "primary", type: "switch", name: "isPrimary", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.primary.label") }, width: "1/3" },
+          { id: "webhook-enabled", type: "switch", name: "webhookEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookEnabled.label") }, width: "1/3" },
+          { id: "daily-limit", type: "number", name: "dailyMessageLimit", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.dailyLimit.label") }, defaultValue: 1000, width: "1/3" },
+          { id: "webhook-url", type: "url", name: "webhookUrl", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookUrl.label") }, width: "1/2" },
+          { id: "events", type: "text", name: "subscribedWebhookEvents", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.events.label") }, defaultValue: "messages,message_status,account_alerts", width: "1/2" },
+          { id: "namespace", type: "text", name: "templateNamespace", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.namespace.label") }, width: "1/2" },
+          { id: "media", type: "text", name: "mediaProvider", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.media.label") }, width: "1/2" },
+          { id: "metadata", type: "textarea", name: "metadata", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.metadata.label") }, rows: 3, width: "full" },
         ],
       },
     ],
   },
   updateWhatsappBusinessAccount: {
     id: "settings-update-whatsapp-business-account",
-    title: "Update WhatsApp Business Account",
-    submitLabel: "Update account",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateWhatsappBusinessAccount.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateWhatsappBusinessAccount.submitLabel") },
     sections: [{ id: "account", fields: [
-      { id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true, width: "1/2" },
-      { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
-      { id: "display-name", type: "text", name: "displayName", label: "Display name", width: "1/2" },
-      { id: "language", type: "text", name: "defaultLanguage", label: "Default language", width: "1/2" },
-      { id: "messaging", type: "switch", name: "messagingEnabled", label: "Messaging", width: "1/4" },
-      { id: "notifications", type: "switch", name: "notificationsEnabled", label: "Notifications", width: "1/4" },
-      { id: "templates", type: "switch", name: "templateMessagingEnabled", label: "Templates", width: "1/4" },
-      { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", label: "Interactive", width: "1/4" },
-      { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/2" },
-      { id: "daily-limit", type: "number", name: "dailyMessageLimit", label: "Daily message limit", width: "1/2" },
-      { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
-      { id: "events", type: "text", name: "subscribedWebhookEvents", label: "Subscribed events (CSV)", width: "1/2" },
-      { id: "namespace", type: "text", name: "templateNamespace", label: "Template namespace", width: "1/2" },
-      { id: "media", type: "text", name: "mediaProvider", label: "Media provider", width: "1/2" },
+      { id: "account-id", type: "number", name: "accountId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.accountId.label") }, required: true, width: "1/2" },
+      { id: "name", type: "text", name: "name", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.name.label") }, width: "1/2" },
+      { id: "display-name", type: "text", name: "displayName", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.displayName.label") }, width: "1/2" },
+      { id: "language", type: "text", name: "defaultLanguage", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.language.label") }, width: "1/2" },
+      { id: "messaging", type: "switch", name: "messagingEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.messaging.label") }, width: "1/4" },
+      { id: "notifications", type: "switch", name: "notificationsEnabled", get label() { return uiI18n.t("settings.sections.notifications.title") }, width: "1/4" },
+      { id: "templates", type: "switch", name: "templateMessagingEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.templates.label") }, width: "1/4" },
+      { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.interactive.label") }, width: "1/4" },
+      { id: "webhook-enabled", type: "switch", name: "webhookEnabled", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookEnabled.label") }, width: "1/2" },
+      { id: "daily-limit", type: "number", name: "dailyMessageLimit", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.dailyLimit.label") }, width: "1/2" },
+      { id: "webhook-url", type: "url", name: "webhookUrl", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.webhookUrl.label") }, width: "1/2" },
+      { id: "events", type: "text", name: "subscribedWebhookEvents", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.events.label") }, width: "1/2" },
+      { id: "namespace", type: "text", name: "templateNamespace", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.namespace.label") }, width: "1/2" },
+      { id: "media", type: "text", name: "mediaProvider", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.media.label") }, width: "1/2" },
     ] }],
   },
   deleteWhatsappBusinessAccount: {
     id: "settings-delete-whatsapp-business-account",
-    title: "Delete WhatsApp Business Account",
-    submitLabel: "Delete account",
-    sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsDeleteWhatsappBusinessAccount.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsDeleteWhatsappBusinessAccount.submitLabel") },
+    sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.accountId.label") }, required: true }] }],
   },
   setWhatsappPrimaryAccount: {
     id: "settings-set-whatsapp-primary-account",
-    title: "Set WhatsApp Primary Account",
-    submitLabel: "Set primary",
-    sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", label: "Account ID", required: true }] }],
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsSetWhatsappPrimaryAccount.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsSetWhatsappPrimaryAccount.submitLabel") },
+    sections: [{ id: "account", fields: [{ id: "account-id", type: "number", name: "accountId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.accountId.label") }, required: true }] }],
   },
   grantPermission: {
     id: "settings-grant-permission",
-    title: "Grant Permission",
-    submitLabel: "Grant permission",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsGrantPermission.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsGrantPermission.submitLabel") },
     sections: [{ id: "permission", fields: [
-      { id: "subject-type", type: "select", name: "subjectType", label: "Subject type", defaultValue: "Role", options: [{ value: "Role", label: "Role" }, { value: "User", label: "User identity" }], width: "1/2" },
-      { id: "subject-value", type: "text", name: "subjectValue", label: "Role ID or user identity", required: true, width: "1/2" },
-      { id: "resource", type: "text", name: "resource", label: "Resource", required: true, width: "1/2" },
-      { id: "action", type: "select", name: "action", label: "Action", defaultValue: "Read", options: permissionActionOptions, width: "1/4" },
-      { id: "effect", type: "select", name: "effect", label: "Effect", defaultValue: "Allow", options: [{ value: "Allow", label: "Allow" }, { value: "Deny", label: "Deny" }], width: "1/4" },
+      { id: "subject-type", type: "select", name: "subjectType", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.subjectType.label") }, defaultValue: "Role", options: [{ value: "Role", get label() { return uiI18n.t("settings.ai.role") } }, { value: "User", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.subjectType.labeluserIdentity") } }], width: "1/2" },
+      { id: "subject-value", type: "text", name: "subjectValue", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.subjectValue.label") }, required: true, width: "1/2" },
+      { id: "resource", type: "text", name: "resource", get label() { return uiI18n.t("settings.fieldPermissions.resource") }, required: true, width: "1/2" },
+      { id: "action", type: "select", name: "action", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.action.labelaction") }, defaultValue: "Read", options: permissionActionOptions, width: "1/4" },
+      { id: "effect", type: "select", name: "effect", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.effect.label") }, defaultValue: "Allow", options: [{ value: "Allow", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.effect.labelallow") } }, { value: "Deny", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.effect.labeldeny") } }], width: "1/4" },
     ] }],
   },
   revokePermission: {
     id: "settings-revoke-permission",
-    title: "Revoke Permission",
-    submitLabel: "Revoke permission",
-    sections: [{ id: "permission", fields: [{ id: "permission-id", type: "number", name: "permissionId", label: "Permission ID", required: true }] }],
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsRevokePermission.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsRevokePermission.submitLabel") },
+    sections: [{ id: "permission", fields: [{ id: "permission-id", type: "number", name: "permissionId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.permissionId.label") }, required: true }] }],
   },
   archiveAiChatSession: {
     id: "settings-archive-ai-chat-session",
-    title: "Archive AI Chat Session",
-    submitLabel: "Update archive state",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsArchiveAiChatSession.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsArchiveAiChatSession.submitLabel") },
     sections: [{ id: "session", fields: [
-      { id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true, width: "1/2" },
-      { id: "session-key", type: "text", name: "sessionKey", label: "Session key", required: true, width: "1/2" },
-      { id: "archived", type: "switch", name: "archived", label: "Archived", defaultValue: true, width: "1/2" },
+      { id: "company-id", type: "number", name: "companyId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.companyId.label") }, required: true, width: "1/2" },
+      { id: "session-key", type: "text", name: "sessionKey", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.sessionKey.label") }, required: true, width: "1/2" },
+      { id: "archived", type: "switch", name: "archived", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.archived.label") }, defaultValue: true, width: "1/2" },
     ] }],
   },
   updateOrgMemberRole: {
     id: "settings-update-org-member-role",
-    title: "Update Org Member Role",
-    submitLabel: "Update role",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateOrgMemberRole.title") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsUpdateOrgMemberRole.submitLabel") },
     sections: [
       {
         id: "member",
         fields: [
-          { id: "user-org-id", type: "number", name: "userOrgId", label: "User org membership ID", required: true, width: "1/2" },
-          { id: "role-name", type: "text", name: "roleName", label: "Role name", required: true, width: "1/2" },
+          { id: "user-org-id", type: "number", name: "userOrgId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.userOrgId.label") }, required: true, width: "1/2" },
+          { id: "role-name", type: "text", name: "roleName", get label() { return uiI18n.t("settings.adminOps.members.roleName") }, required: true, width: "1/2" },
         ],
       },
     ],
   },
   createUserInviteDirect: {
     id: "settings-create-user-invite-direct",
-    title: "Create User Invite (direct reducer)",
-    description: "Superuser-only. Prefer User Management invite for production onboarding.",
-    submitLabel: "Create invite",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateUserInviteDirect.title") },
+    get description() { return uiI18n.t("settings.adminOps.credentials.inviteDirectDescription") },
+    get submitLabel() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateUserInviteDirect.submitLabel") },
     sections: [
       {
         id: "invite",
         fields: [
-          { id: "email", type: "email", name: "email", label: "Email", required: true, width: "1/2" },
-          { id: "role-id", type: "number", name: "roleId", label: "Role ID", required: true, width: "1/2" },
-          { id: "hash", type: "textarea", name: "tokenHash", label: "Token hash", required: true, rows: 2, width: "full" },
-          { id: "invited-by", type: "text", name: "invitedBy", label: "Invited by identity", required: true, width: "1/2" },
-          { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "1/2" },
+          { id: "email", type: "email", name: "email", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.email.label") }, required: true, width: "1/2" },
+          { id: "role-id", type: "number", name: "roleId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.roleId.label") }, required: true, width: "1/2" },
+          { id: "hash", type: "textarea", name: "tokenHash", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.hash.label") }, required: true, rows: 2, width: "full" },
+          { id: "invited-by", type: "text", name: "invitedBy", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.invitedBy.label") }, required: true, width: "1/2" },
+          { id: "expires", type: "datetime", name: "expiresAt", get label() { return uiI18n.t("settings.adminOps.sessions.expiresAt") }, required: true, width: "1/2" },
         ],
       },
     ],
   },
   createUserSession: {
     id: "settings-create-user-session-advanced",
-    title: "Create User Session",
-    submitLabel: "Create session",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsCreateUserSessionAdvanced.title") },
+    get submitLabel() { return uiI18n.t("settings.adminOps.sessions.createSubmit") },
     sections: [
       {
         id: "session",
         fields: [
-          { id: "token", type: "text", name: "sessionToken", label: "Session token", required: true, width: "full" },
-          { id: "expires", type: "datetime", name: "expiresAt", label: "Expires at", required: true, width: "1/2" },
-          { id: "ip", type: "text", name: "ipAddress", label: "IP address", width: "1/2" },
+          { id: "token", type: "text", name: "sessionToken", get label() { return uiI18n.t("settings.adminOps.sessions.sessionToken") }, required: true, width: "full" },
+          { id: "expires", type: "datetime", name: "expiresAt", get label() { return uiI18n.t("settings.adminOps.sessions.expiresAt") }, required: true, width: "1/2" },
+          { id: "ip", type: "text", name: "ipAddress", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.ip.label") }, width: "1/2" },
         ],
       },
     ],
   },
   logAuditEvent: {
     id: "settings-log-audit-event-advanced",
-    title: "Log Audit Event",
-    submitLabel: "Log event",
+    get title() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.settingsLogAuditEventAdvanced.title") },
+    get submitLabel() { return uiI18n.t("settings.adminOps.audit.logEventSubmit") },
     sections: [
       {
         id: "event",
         fields: [
-          { id: "table", type: "text", name: "tableName", label: "Table name", required: true, width: "1/2" },
-          { id: "record", type: "number", name: "recordId", label: "Record ID", required: true, width: "1/2" },
-          { id: "action", type: "text", name: "action", label: "Action", required: true, width: "1/2" },
-          { id: "company", type: "number", name: "companyId", label: "Company ID", width: "1/2" },
-          { id: "old", type: "textarea", name: "oldValues", label: "Old values JSON", rows: 2, width: "full" },
-          { id: "new", type: "textarea", name: "newValues", label: "New values JSON", rows: 2, width: "full" },
-          { id: "fields", type: "text", name: "changedFields", label: "Changed fields (CSV)", width: "full" },
+          { id: "table", type: "text", name: "tableName", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.table.label") }, required: true, width: "1/2" },
+          { id: "record", type: "number", name: "recordId", get label() { return uiI18n.t("settings.adminOps.audit.recordId") }, required: true, width: "1/2" },
+          { id: "action", type: "text", name: "action", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.action.labelaction") }, required: true, width: "1/2" },
+          { id: "company", type: "number", name: "companyId", get label() { return uiI18n.t("settings.builtIn.settingsClient.settingsActionForms.company.label") }, width: "1/2" },
+          { id: "old", type: "textarea", name: "oldValues", get label() { return uiI18n.t("settings.adminOps.audit.oldValues") }, rows: 2, width: "full" },
+          { id: "new", type: "textarea", name: "newValues", get label() { return uiI18n.t("settings.adminOps.audit.newValues") }, rows: 2, width: "full" },
+          { id: "fields", type: "text", name: "changedFields", get label() { return uiI18n.t("settings.adminOps.audit.changedFields") }, width: "full" },
         ],
       },
     ],
@@ -535,6 +537,7 @@ function FinanceAlphaSetup({
   title: string
   description: string
 }) {
+  const { i18n: setupI18n } = useRootTranslation()
   const [formOpen, setFormOpen] = useState(true)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const { data: currencyRows = [] } = useCurrencies()
@@ -545,25 +548,22 @@ function FinanceAlphaSetup({
       withLinkedPickers(settingsActionForms.createCompany, {
         currencyId: currencyOptionsFromRows(currencyRows),
       }),
-    [currencyRows],
+    [currencyRows, setupI18n.language],
   )
 
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} description={description} />
       <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="text-base font-semibold">Complete Finance setup</h2>
+        <h2 className="text-base font-semibold">{rootI18n.t("settings.ui.settingsClient.completeFinanceSetup")}</h2>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Create an operating company and choose its base currency before creating invoices,
-          bills, or historical accounting imports.
-        </p>
+          {rootI18n.t("settings.ui.settingsClient.createAnOperatingCompanyAndChooseItsBase")}</p>
         <button
           type="button"
           className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
           onClick={() => setFormOpen(true)}
         >
-          Create operating company
-        </button>
+          {rootI18n.t("settings.ui.settingsClient.createOperatingCompany")}</button>
       </section>
       <SettingsModule firstOrgProfile />
       <FormModal
@@ -611,6 +611,7 @@ function SettingsLoaded({
   title: string
   description: string
 }) {
+  useRootTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
@@ -728,7 +729,7 @@ function SettingsLoaded({
             formData.syncFrequencyMinutes === undefined || formData.syncFrequencyMinutes === "" ? undefined : Number(formData.syncFrequencyMinutes),
         })
       } else if (activeAction === "deleteIntegration") {
-        if (!(await confirmDialog({ description: "Delete this integration?" }))) return
+        if (!(await confirmDialog({ get description() { return uiI18n.t("settings.builtIn.settingsClient.handleSubmit.deleteThisIntegration.description") } }))) return
         await deleteIntegration(
           orgId,
           toBigIntId(formData.integrationId, "Integration ID"),
@@ -757,7 +758,7 @@ function SettingsLoaded({
           mediaProvider: optionalText(formData.mediaProvider),
         })
       } else if (activeAction === "deleteWhatsappBusinessAccount") {
-        if (!(await confirmDialog({ description: "Delete this WhatsApp Business account?" }))) return
+        if (!(await confirmDialog({ get description() { return uiI18n.t("settings.builtIn.settingsClient.handleSubmit.deleteThisWhatsAppBusinessAccount.description") } }))) return
         await deleteWhatsAppBusinessAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
       } else if (activeAction === "setWhatsappPrimaryAccount") {
         await setWhatsAppPrimaryAccount(orgId, toBigIntId(formData.accountId, "Account ID"))
@@ -771,7 +772,7 @@ function SettingsLoaded({
           effect: String(formData.effect ?? "Allow") as "Allow" | "Deny",
         })
       } else if (activeAction === "revokePermission") {
-        if (!(await confirmDialog({ description: "Revoke this permission?" }))) return
+        if (!(await confirmDialog({ get description() { return uiI18n.t("settings.builtIn.settingsClient.handleSubmit.revokeThisPermission.description") } }))) return
         await revokePermission(orgId, toBigIntId(formData.permissionId, "Permission ID"))
       } else if (activeAction === "archiveAiChatSession") {
         await archiveAiChatSession(
@@ -841,27 +842,27 @@ function SettingsLoaded({
   }
 
   const actions: Array<{ id: SettingsAction; title: string; description: string }> = [
-    { id: "createAuditRule", title: "Create audit rule", description: "Add a new audit rule for monitored resources." },
-    { id: "updateAuditRule", title: "Update audit rule", description: "Patch an existing audit rule by ID." },
-    { id: "endSession", title: "End session", description: "Terminate a user session by session ID." },
-    { id: "updateEmail", title: "Email", description: "Update email and verification state." },
-    { id: "recordPrivacyConsent", title: "Privacy consent", description: "Record a contact consent decision." },
-    { id: "googleDriveCredentials", title: "Google Drive", description: "Update integration credentials." },
-    { id: "whatsappCredentials", title: "WhatsApp", description: "Update integration credentials." },
-    { id: "createGoogleDriveConnection", title: "Create Google Drive", description: "Create a Google Drive connection record." },
-    { id: "updateGoogleDriveConnection", title: "Update Google Drive", description: "Patch Google Drive sync and webhook settings." },
-    { id: "deleteIntegration", title: "Delete integration", description: "Soft-delete a supported integration." },
-    { id: "createWhatsappBusinessAccount", title: "Create WhatsApp account", description: "Create a WhatsApp Business connection." },
-    { id: "updateWhatsappBusinessAccount", title: "Update WhatsApp account", description: "Patch WhatsApp Business settings." },
-    { id: "deleteWhatsappBusinessAccount", title: "Delete WhatsApp account", description: "Soft-delete a WhatsApp Business account." },
-    { id: "setWhatsappPrimaryAccount", title: "Primary WhatsApp account", description: "Set the organization primary account." },
-    { id: "grantPermission", title: "Grant permission", description: "Create a role or user permission grant." },
-    { id: "revokePermission", title: "Revoke permission", description: "Delete an organization permission by ID." },
-    { id: "archiveAiChatSession", title: "AI chat archive", description: "Archive or restore an AI chat session." },
-    { id: "updateOrgMemberRole", title: "Org member role", description: "Set membership role by role display name." },
-    { id: "createUserInviteDirect", title: "Invite (direct reducer)", description: "Superuser: create invite row directly." },
-    { id: "createUserSession", title: "Create session", description: "Record a user session row (admin/testing)." },
-    { id: "logAuditEvent", title: "Log audit event", description: "Insert a manual audit log entry." },
+    { id: "createAuditRule", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.createAuditRule.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.createAuditRule.description") } },
+    { id: "updateAuditRule", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateAuditRule.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateAuditRule.description") } },
+    { id: "endSession", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.endSession.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.endSession.description") } },
+    { id: "updateEmail", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateEmail.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateEmail.description") } },
+    { id: "recordPrivacyConsent", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.recordPrivacyConsent.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.recordPrivacyConsent.description") } },
+    { id: "googleDriveCredentials", title: "Google Drive", get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.googleDriveCredentials.description") } },
+    { id: "whatsappCredentials", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.whatsappCredentials.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.whatsappCredentials.description") } },
+    { id: "createGoogleDriveConnection", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.createGoogleDriveConnection.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.createGoogleDriveConnection.description") } },
+    { id: "updateGoogleDriveConnection", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateGoogleDriveConnection.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateGoogleDriveConnection.description") } },
+    { id: "deleteIntegration", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.deleteIntegration.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.deleteIntegration.description") } },
+    { id: "createWhatsappBusinessAccount", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.createWhatsappBusinessAccount.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.createWhatsappBusinessAccount.description") } },
+    { id: "updateWhatsappBusinessAccount", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateWhatsappBusinessAccount.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateWhatsappBusinessAccount.description") } },
+    { id: "deleteWhatsappBusinessAccount", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.deleteWhatsappBusinessAccount.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.deleteWhatsappBusinessAccount.description") } },
+    { id: "setWhatsappPrimaryAccount", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.setWhatsappPrimaryAccount.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.setWhatsappPrimaryAccount.description") } },
+    { id: "grantPermission", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.grantPermission.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.grantPermission.description") } },
+    { id: "revokePermission", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.revokePermission.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.revokePermission.description") } },
+    { id: "archiveAiChatSession", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.archiveAiChatSession.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.archiveAiChatSession.description") } },
+    { id: "updateOrgMemberRole", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateOrgMemberRole.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.updateOrgMemberRole.description") } },
+    { id: "createUserInviteDirect", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.createUserInviteDirect.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.createUserInviteDirect.description") } },
+    { id: "createUserSession", get title() { return uiI18n.t("settings.adminOps.sessions.createSubmit") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.createUserSession.description") } },
+    { id: "logAuditEvent", get title() { return uiI18n.t("settings.builtIn.settingsClient.actions.logAuditEvent.title") }, get description() { return uiI18n.t("settings.builtIn.settingsClient.actions.logAuditEvent.description") } },
   ]
 
   const visibleActions = actions.filter((action) => action.id !== "archiveAiChatSession" || isWorkspaceSurfaceVisible(workspaceProfile, "ai-skills"))
@@ -899,8 +900,8 @@ function SettingsLoaded({
     {
       id: "imports",
       groupId: "data",
-      title: "Data import",
-      description: "Bring existing records into the workspace from CSV files.",
+      get title() { return uiI18n.t("settings.builtIn.settingsClient.extraSections.imports.title") },
+      get description() { return uiI18n.t("settings.builtIn.settingsClient.extraSections.imports.description") },
       icon: Upload,
       content: (
         <section className="rounded-xl border border-border bg-card p-4">
@@ -911,15 +912,13 @@ function SettingsLoaded({
     {
       id: "integrations",
       groupId: "data",
-      title: "Integrations",
-      description:
-        "Google Drive & WhatsApp Business: connect credentials, manage sync health, verification state, and primary WhatsApp accounts.",
+      get title() { return uiI18n.t("settings.organization.integrations.title") },
+      get description() { return uiI18n.t("settings.builtIn.settingsClient.extraSections.integrations.description") },
       icon: Plug,
       content: (
         <section className="space-y-3 rounded-xl border border-border bg-card p-4">
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            OAuth flows and webhooks are recorded via these admin reducers until polished OAuth UI ships.
-          </p>
+            {rootI18n.t("settings.ui.settingsClient.oAuthFlowsAndWebhooksAreRecordedViaThese")}</p>
           {actionCards(integrationActions)}
         </section>
       ),
@@ -927,8 +926,8 @@ function SettingsLoaded({
     {
       id: "advanced",
       groupId: "platform",
-      title: "Advanced actions",
-      description: "Less common administration tasks that are not part of the other sections.",
+      get title() { return uiI18n.t("settings.builtIn.settingsClient.extraSections.advanced.title") },
+      get description() { return uiI18n.t("settings.builtIn.settingsClient.extraSections.advanced.description") },
       icon: Wrench,
       content: (
         <section className="rounded-xl border border-dashed border-border bg-card p-4">

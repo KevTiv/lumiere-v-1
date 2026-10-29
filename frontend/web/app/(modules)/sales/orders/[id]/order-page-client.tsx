@@ -590,7 +590,7 @@ function SaleOrderPageLoaded({
       editable={editable}
       onUpdateLine={async (lineId, patch) => {
         const params = toUpdateSaleOrderLineParams(patch as Record<string, unknown>);
-        if (!params) throw new Error('Enter a valid quantity, price or discount.');
+        if (!params) throw new Error(t("sales.orderPageClient.enterAValidQuantityPriceOrDiscount"));
         await lineWorkflow.update.execute({ lineId, params });
       }}
       onCreateLine={async (line) => {
@@ -601,7 +601,7 @@ function SaleOrderPageLoaded({
           priceUnit: line.priceUnit,
           discount: line.discount,
         });
-        if (!params) throw new Error('Choose a product and a quantity above zero.');
+        if (!params) throw new Error(t("sales.orderPageClient.chooseAProductAndAQuantityAboveZero"));
         await lineWorkflow.create.execute({ orderId, params });
       }}
       onDeleteLine={async (lineId) => {

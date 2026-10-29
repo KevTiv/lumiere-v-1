@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type {
   Role,
   User,
@@ -318,7 +319,7 @@ export const defaultRoles: Role[] = [
   {
     id: "role-admin",
     name: "Administrator",
-    description: "Full system access with ability to manage users and permissions",
+    get description() { return uiI18n.t("settings.builtIn.rbacDefaults.defaultRoles.roleAdmin.description") },
     isSystem: true,
     color: "red",
     permissions: [
@@ -330,7 +331,7 @@ export const defaultRoles: Role[] = [
   {
     id: "role-manager",
     name: "Manager",
-    description: "Access to most features except admin settings",
+    get description() { return uiI18n.t("settings.builtIn.rbacDefaults.defaultRoles.roleManager.description") },
     isSystem: true,
     color: "purple",
     permissions: [
@@ -371,7 +372,7 @@ export const defaultRoles: Role[] = [
   {
     id: "role-sales",
     name: "Sales Representative",
-    description: "Access to sales and customer management",
+    get description() { return uiI18n.t("settings.builtIn.rbacDefaults.defaultRoles.roleSales.description") },
     isSystem: false,
     color: "blue",
     permissions: [
@@ -393,7 +394,7 @@ export const defaultRoles: Role[] = [
   {
     id: "role-warehouse",
     name: "Warehouse Staff",
-    description: "Access to inventory management only",
+    get description() { return uiI18n.t("settings.builtIn.rbacDefaults.defaultRoles.roleWarehouse.description") },
     isSystem: false,
     color: "orange",
     permissions: [
@@ -410,7 +411,7 @@ export const defaultRoles: Role[] = [
   {
     id: "role-viewer",
     name: "Viewer",
-    description: "Read-only access to dashboards",
+    get description() { return uiI18n.t("settings.builtIn.rbacDefaults.defaultRoles.roleViewer.description") },
     isSystem: false,
     color: "teal",
     permissions: [
@@ -490,70 +491,70 @@ export const defaultPolicies: PolicyRule[] = []
 export const resourceGroups: ResourceGroup[] = [
   {
     id: "modules",
-    label: "Modules",
+    get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.label") },
     resources: [
-      { resource: "module:accounting", label: "Accounting", actions: ["read"] },
-      { resource: "module:sales", label: "Sales", actions: ["read"] },
-      { resource: "module:crm", label: "CRM", actions: ["read"] },
-      { resource: "module:inventory", label: "Inventory", actions: ["read"] },
-      { resource: "module:pos", label: "Point of Sale", actions: ["read"] },
-      { resource: "module:purchasing", label: "Purchasing", actions: ["read"] },
-      { resource: "module:hr", label: "HR & People", actions: ["read"] },
-      { resource: "module:manufacturing", label: "Manufacturing", actions: ["read"] },
-      { resource: "module:projects", label: "Projects", actions: ["read"] },
-      { resource: "module:iot", label: "IoT", actions: ["read"] },
-      { resource: "module:map", label: "Map", actions: ["read"] },
-      { resource: "module:documents", label: "Documents", actions: ["read"] },
-      { resource: "module:proposals", label: "Proposals", actions: ["read"] },
-      { resource: "module:calendar", label: "Calendar", actions: ["read"] },
-      { resource: "module:reports", label: "Reports", actions: ["read"] },
-      { resource: "module:subscriptions", label: "Subscriptions", actions: ["read"] },
-      { resource: "module:expenses", label: "Expenses", actions: ["read"] },
-      { resource: "module:helpdesk", label: "Helpdesk", actions: ["read"] },
-      { resource: "module:workflows", label: "Workflows", actions: ["read"] },
-      { resource: "module:messages", label: "Messages", actions: ["read"] },
+      { resource: "module:accounting", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelaccounting") }, actions: ["read"] },
+      { resource: "module:sales", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelsales") }, actions: ["read"] },
+      { resource: "module:crm", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelcRM") }, actions: ["read"] },
+      { resource: "module:inventory", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelinventory") }, actions: ["read"] },
+      { resource: "module:pos", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelpointOfSale") }, actions: ["read"] },
+      { resource: "module:purchasing", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelpurchasing") }, actions: ["read"] },
+      { resource: "module:hr", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelhRPeople") }, actions: ["read"] },
+      { resource: "module:manufacturing", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelmanufacturing") }, actions: ["read"] },
+      { resource: "module:projects", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelprojects") }, actions: ["read"] },
+      { resource: "module:iot", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelioT") }, actions: ["read"] },
+      { resource: "module:map", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelmap") }, actions: ["read"] },
+      { resource: "module:documents", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labeldocuments") }, actions: ["read"] },
+      { resource: "module:proposals", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelproposals") }, actions: ["read"] },
+      { resource: "module:calendar", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelcalendar") }, actions: ["read"] },
+      { resource: "module:reports", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelreports") }, actions: ["read"] },
+      { resource: "module:subscriptions", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelsubscriptions") }, actions: ["read"] },
+      { resource: "module:expenses", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelexpenses") }, actions: ["read"] },
+      { resource: "module:helpdesk", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelhelpdesk") }, actions: ["read"] },
+      { resource: "module:workflows", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelworkflows") }, actions: ["read"] },
+      { resource: "module:messages", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.modules.labelmessages") }, actions: ["read"] },
     ]
   },
   {
     id: "dashboards",
-    label: "Dashboards",
+    get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.label") },
     resources: [
-      { resource: "dashboard:overview", label: "Overview", actions: ["read"] },
-      { resource: "dashboard:sales", label: "Sales", actions: ["read", "create", "update"] },
-      { resource: "dashboard:inventory", label: "Inventory", actions: ["read", "create", "update"] },
-      { resource: "dashboard:customers", label: "Customers", actions: ["read", "create", "update"] },
-      { resource: "dashboard:analytics", label: "Analytics", actions: ["read"] },
-      { resource: "dashboard:tasks", label: "Tasks", actions: ["read", "create", "update", "delete"] },
-      { resource: "dashboard:settings", label: "Settings", actions: ["read", "manage"] },
+      { resource: "dashboard:overview", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.labeloverview") }, actions: ["read"] },
+      { resource: "dashboard:sales", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.labelsales") }, actions: ["read", "create", "update"] },
+      { resource: "dashboard:inventory", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.labelinventory") }, actions: ["read", "create", "update"] },
+      { resource: "dashboard:customers", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.labelcustomers") }, actions: ["read", "create", "update"] },
+      { resource: "dashboard:analytics", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.labelanalytics") }, actions: ["read"] },
+      { resource: "dashboard:tasks", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.dashboards.labeltasks") }, actions: ["read", "create", "update", "delete"] },
+      { resource: "dashboard:settings", get label() { return uiI18n.t("settings.page.title") }, actions: ["read", "manage"] },
     ]
   },
   {
     id: "entries",
-    label: "Data Entries",
+    get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.entries.label") },
     resources: [
-      { resource: "entries:products", label: "Products", actions: ["read", "create", "update", "delete"] },
-      { resource: "entries:customers", label: "Customers", actions: ["read", "create", "update", "delete"] },
-      { resource: "entries:orders", label: "Orders", actions: ["read", "create", "update", "delete"] },
-      { resource: "business_history", label: "Business change history", actions: ["read"] },
+      { resource: "entries:products", get label() { return uiI18n.t("settings.auditLog.products") }, actions: ["read", "create", "update", "delete"] },
+      { resource: "entries:customers", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.entries.labelcustomers") }, actions: ["read", "create", "update", "delete"] },
+      { resource: "entries:orders", get label() { return uiI18n.t("settings.auditLog.orders") }, actions: ["read", "create", "update", "delete"] },
+      { resource: "business_history", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.entries.labelbusinessChangeHistory") }, actions: ["read"] },
     ]
   },
   {
     id: "forms",
-    label: "Forms",
+    get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.forms.label") },
     resources: [
-      { resource: "forms:new-order", label: "New Order", actions: ["create"] },
-      { resource: "forms:new-customer", label: "New Customer", actions: ["create"] },
-      { resource: "forms:generate-report", label: "Generate Report", actions: ["create"] },
+      { resource: "forms:new-order", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.forms.labelnewOrder") }, actions: ["create"] },
+      { resource: "forms:new-customer", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.forms.labelnewCustomer") }, actions: ["create"] },
+      { resource: "forms:generate-report", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.forms.labelgenerateReport") }, actions: ["create"] },
     ]
   },
   {
     id: "admin",
-    label: "Administration",
+    get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.admin.label") },
     resources: [
-      { resource: "admin:users", label: "User Management", actions: ["read", "create", "update", "delete"] },
-      { resource: "admin:roles", label: "Role Management", actions: ["read", "create", "update", "delete"] },
-      { resource: "admin:permissions", label: "Permissions", actions: ["read", "manage"] },
-      { resource: "admin:audit-log", label: "Audit Log", actions: ["read"] },
+      { resource: "admin:users", get label() { return uiI18n.t("settings.sections.users.title") }, actions: ["read", "create", "update", "delete"] },
+      { resource: "admin:roles", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.resourceGroups.admin.labelroleManagement") }, actions: ["read", "create", "update", "delete"] },
+      { resource: "admin:permissions", get label() { return uiI18n.t("settings.roles.permissions") }, actions: ["read", "manage"] },
+      { resource: "admin:audit-log", get label() { return uiI18n.t("settings.sections.audit.title") }, actions: ["read"] },
     ]
   },
 ]
@@ -562,88 +563,88 @@ export const resourceGroups: ResourceGroup[] = [
 export const settingsSections: SettingsSection[] = [
   {
     id: "profile",
-    title: "Profile",
-    description: "Manage your personal information and preferences",
+    get title() { return uiI18n.t("settings.sections.profile.title") },
+    get description() { return uiI18n.t("settings.sections.profile.description") },
     icon: "user",
     requiredPermission: "dashboard:settings",
     requiredAction: "read"
   },
   {
     id: "notifications",
-    title: "Notifications",
-    description: "Configure how and when you receive notifications",
+    get title() { return uiI18n.t("settings.sections.notifications.title") },
+    get description() { return uiI18n.t("settings.sections.notifications.description") },
     icon: "bell",
     requiredPermission: "dashboard:settings",
     requiredAction: "read"
   },
   {
     id: "appearance",
-    title: "Appearance",
-    description: "Customize the look and feel of your dashboard",
+    get title() { return uiI18n.t("settings.sections.appearance.title") },
+    get description() { return uiI18n.t("settings.sections.appearance.description") },
     icon: "palette",
     requiredPermission: "dashboard:settings",
     requiredAction: "read"
   },
   {
     id: "custom-fields",
-    title: "My Custom Fields",
-    description: "Add personal tracking fields to your journal",
+    get title() { return uiI18n.t("settings.builtIn.rbacDefaults.settingsSections.customFields.title") },
+    get description() { return uiI18n.t("settings.sections.custom-fields.description") },
     icon: "bookmarked",
     requiredPermission: "dashboard:settings",
     requiredAction: "read"
   },
   {
     id: "users",
-    title: "User Management",
-    description: "Add, edit, and manage user accounts",
+    get title() { return uiI18n.t("settings.sections.users.title") },
+    get description() { return uiI18n.t("settings.sections.users.description") },
     icon: "users",
     requiredPermission: "admin:users",
     requiredAction: "read"
   },
   {
     id: "roles",
-    title: "Roles & Permissions",
-    description: "Configure roles and access control policies",
+    get title() { return uiI18n.t("settings.sections.roles.title") },
+    get description() { return uiI18n.t("settings.sections.roles.description") },
     icon: "shield",
     requiredPermission: "admin:roles",
     requiredAction: "read"
   },
   {
     id: "sso",
-    title: "SSO",
-    description: "Single sign-on status and WorkOS account linking",
+    get title() { return uiI18n.t("settings.sections.sso.title") },
+    get description() { return uiI18n.t("settings.sections.sso.description") },
     icon: "keyround",
     requiredPermission: "admin:roles",
     requiredAction: "read"
   },
     {
     id: "form-config",
-    title: "Form Configuration",
-    description: "Configure Journal and Forensic Report fields",
+    get title() { return uiI18n.t("settings.builtIn.rbacDefaults.settingsSections.formConfig.title") },
+    get description() { return uiI18n.t("settings.sections.form-config.description") },
     icon: "settings2",
     requiredPermission: "admin:roles",
     requiredAction: "update"
   },
   {
     id: "audit",
-    title: "Audit Log",
-    description: "View system activity and security events",
+    get title() { return uiI18n.t("settings.sections.audit.title") },
+    get description() { return uiI18n.t("settings.sections.audit.description") },
     icon: "scroll",
     requiredPermission: "admin:audit-log",
     requiredAction: "read"
   },
   {
     id: "organization",
-    title: "Organization",
-    description: "Manage organization settings and configuration",
+    get title() { return uiI18n.t("settings.builtIn.rbacDefaults.settingsSections.organization.title") },
+    get description() { return uiI18n.t("settings.sections.organization.description") },
     icon: "building",
     requiredPermission: "admin:organization",
     requiredAction: "update"
   },
   {
     id: "ai",
-    title: "AI",
-    description: "Agents, team personas, insights, and usage spend",
+    get title() { return uiI18n.t("settings.builtIn.rbacDefaults.settingsSections.ai.title") },
+    get description() { return uiI18n.t("settings.sections.ai.description") },
     icon: "sparkles",
     requiredPermission: "admin:organization",
     requiredAction: "update"
@@ -700,11 +701,11 @@ export function isSettingsSectionVisibleForProfile(
 
 // Dashboard view to permission mapping
 export const dashboardViewPermissions: DashboardViewPermission[] = [
-  { viewId: "overview", resource: "dashboard:overview", label: "Overview" },
-  { viewId: "sales", resource: "dashboard:sales", label: "Sales" },
-  { viewId: "inventory", resource: "dashboard:inventory", label: "Inventory" },
-  { viewId: "customers", resource: "dashboard:customers", label: "Customers" },
-  { viewId: "analytics", resource: "dashboard:analytics", label: "Analytics" },
-  { viewId: "tasks", resource: "dashboard:tasks", label: "Tasks" },
-  { viewId: "settings", resource: "dashboard:settings", label: "Settings" },
+  { viewId: "overview", resource: "dashboard:overview", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.dashboardViewPermissions.overview.label") } },
+  { viewId: "sales", resource: "dashboard:sales", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.dashboardViewPermissions.sales.label") } },
+  { viewId: "inventory", resource: "dashboard:inventory", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.dashboardViewPermissions.inventory.label") } },
+  { viewId: "customers", resource: "dashboard:customers", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.dashboardViewPermissions.customers.label") } },
+  { viewId: "analytics", resource: "dashboard:analytics", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.dashboardViewPermissions.analytics.label") } },
+  { viewId: "tasks", resource: "dashboard:tasks", get label() { return uiI18n.t("settings.builtIn.rbacDefaults.dashboardViewPermissions.tasks.label") } },
+  { viewId: "settings", resource: "dashboard:settings", get label() { return uiI18n.t("settings.page.title") } },
 ]

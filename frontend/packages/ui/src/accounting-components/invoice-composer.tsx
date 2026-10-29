@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import type { ReactNode } from "react"
 import { useState } from "react"
 import { Eye, Pencil } from "lucide-react"
@@ -20,13 +21,14 @@ interface InvoiceComposerProps {
  * phone width.
  */
 export function InvoiceComposer({ form, preview, className }: InvoiceComposerProps) {
+  const { t } = useTranslation()
   const [pane, setPane] = useState<"form" | "preview">("form")
   return (
     <div className={cn("space-y-3", className)} data-testid="invoice-composer">
-      <div className="flex gap-1 rounded-lg bg-muted p-1 lg:hidden" role="tablist" aria-label="Invoice pane">
+      <div className="flex gap-1 rounded-lg bg-muted p-1 lg:hidden" role="tablist" aria-label={t("accounting.invoiceComposer.invoicePane", { defaultValue: "Invoice pane" })}>
         {([
-          { id: "form", label: "Edit", icon: Pencil },
-          { id: "preview", label: "Preview", icon: Eye },
+          { id: "form", label: t("common.edit", { defaultValue: "Edit" }), icon: Pencil },
+          { id: "preview", label: t("common.formPreview.label", { defaultValue: "Preview" }), icon: Eye },
         ] as const).map(({ id, label, icon: Icon }) => (
           <button
             key={id}

@@ -2,7 +2,7 @@
 import { organizationCsvImportTable, trackedImportCompanyId } from "./organization-csv-import"
 
 import { useEffect, useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { toCreateCompanyParams } from "@lumiere/erp-shared/settings-create-params"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -562,7 +562,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                         if (!cid) return
                         const row = companies.find((c) => String(c.id) === cid)
                         if (row?.currencyId == null) {
-                          throw new Error("The parent company does not have a currency")
+                          throw new Error(i18n.t("settings.organizationSettings.text.theParentCompanyDoesNotHaveACurrency"))
                         }
                         const cur = BigInt(String(row.currencyId))
                         const params = toCreateCompanyParams(

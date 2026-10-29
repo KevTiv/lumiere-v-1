@@ -712,11 +712,11 @@ export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newPosPaymentMethod.fields.paymentMethodType"),
           width: "1/2",
           options: [
-            { value: "Cash", label: "Cash" },
-            { value: "Bank", label: "Bank" },
-            { value: "Card", label: "Card" },
-            { value: "DigitalWallet", label: "Digital wallet" },
-            { value: "LoyaltyPoints", label: "Loyalty points" },
+            { value: "Cash", label: t("sales.builtIn.salesFormConfigs.newPosPaymentMethodForm.paymentMethodType.label") },
+            { value: "Bank", label: t("sales.builtIn.salesFormConfigs.newPosPaymentMethodForm.paymentMethodType.labelbank") },
+            { value: "Card", label: t("sales.forms.newLoyaltyCard.sections.main") },
+            { value: "DigitalWallet", label: t("sales.builtIn.salesFormConfigs.newPosPaymentMethodForm.paymentMethodType.labeldigitalWallet") },
+            { value: "LoyaltyPoints", label: t("sales.builtIn.salesFormConfigs.newPosPaymentMethodForm.paymentMethodType.labelloyaltyPoints") },
           ],
         },
         {

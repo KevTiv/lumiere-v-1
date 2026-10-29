@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Jupyter-like Notebook Types for ML/Predictive Analytics
 
 export type CellType = "code" | "markdown" | "output" | "chart" | "table"
@@ -177,7 +178,7 @@ export const reportTemplates: ReportTemplate[] = [
   {
     id: "sales-analysis",
     name: "Sales Analysis Report",
-    description: "Comprehensive sales performance analysis with trends and forecasts",
+    get description() { return uiI18n.t("notebook.builtIn.notebookTypes.reportTemplates.salesAnalysis.description") },
     category: "sales",
     cells: [
       { type: "markdown", content: "# Sales Analysis Report\n\nGenerated analysis of sales performance." },
@@ -190,7 +191,7 @@ export const reportTemplates: ReportTemplate[] = [
   {
     id: "inventory-forecast",
     name: "Inventory Forecast",
-    description: "Predictive inventory analysis for stock optimization",
+    get description() { return uiI18n.t("notebook.builtIn.notebookTypes.reportTemplates.inventoryForecast.description") },
     category: "inventory",
     cells: [
       { type: "markdown", content: "# Inventory Forecast Report\n\nPredictive analysis for optimal stock levels." },
@@ -203,7 +204,7 @@ export const reportTemplates: ReportTemplate[] = [
   {
     id: "customer-segmentation",
     name: "Customer Segmentation",
-    description: "ML-based customer clustering and segmentation analysis",
+    get description() { return uiI18n.t("notebook.builtIn.notebookTypes.reportTemplates.customerSegmentation.description") },
     category: "customers",
     cells: [
       { type: "markdown", content: "# Customer Segmentation Analysis\n\nClustering analysis for customer segments." },

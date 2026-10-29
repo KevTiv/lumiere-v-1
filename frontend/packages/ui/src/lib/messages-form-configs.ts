@@ -99,15 +99,15 @@ export const newMailMessageForm = (t: TFunction, recordOptions: ReadonlyArray<{ 
 
 export const newMessageBatchForm = (t: TFunction): FormConfig => ({
   id: "new-message-batch",
-  title: "New message batch",
-  description: "Preview a template-controlled reminder batch before approval.",
-  submitLabel: "Create batch",
+  title: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.newMessageBatch.title"),
+  description: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.newMessageBatch.description"),
+  submitLabel: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.newMessageBatch.submitLabel"),
   cancelLabel: t("common.cancel"),
   sections: [{ id: "batch", fields: [
-    { id: "templateId", name: "templateId", type: "select", label: "Message template", required: true, width: "1/2", options: emptySelect },
-    { id: "channel", name: "channel", type: "select", label: "Channel", required: true, width: "1/2", defaultValue: "WhatsApp", options: [{ value: "WhatsApp", label: "WhatsApp" }, { value: "Sms", label: "SMS" }, { value: "Email", label: "Email" }, { value: "InApp", label: "In-app" }] },
-    { id: "subjectModel", name: "subjectModel", type: "text", label: "Subject model", required: true, width: "1/2", defaultValue: "account.move" },
-    { id: "candidateContactIds", name: "candidateContactIds", type: "textarea", format: "plain", label: "Recipient contact IDs", placeholder: "1, 2, 3", required: true, width: "full", rows: 2 },
+    { id: "templateId", name: "templateId", type: "select", label: t("messages.forms.invoiceReminder.template"), required: true, width: "1/2", options: emptySelect },
+    { id: "channel", name: "channel", type: "select", label: t("messages.forms.invoiceReminder.channel"), required: true, width: "1/2", defaultValue: "WhatsApp", options: [{ value: "WhatsApp", label: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.channel.label") }, { value: "Sms", label: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.channel.labelsMS") }, { value: "Email", label: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.channel.labelemail") }, { value: "InApp", label: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.channel.labelinApp") }] },
+    { id: "subjectModel", name: "subjectModel", type: "text", label: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.subjectModel.label"), required: true, width: "1/2", defaultValue: "account.move" },
+    { id: "candidateContactIds", name: "candidateContactIds", type: "textarea", format: "plain", label: t("messages.builtIn.messagesFormConfigs.newMessageBatchForm.candidateContactIds.label"), placeholder: "1, 2, 3", required: true, width: "full", rows: 2 },
   ] }],
 })
 
@@ -128,10 +128,10 @@ export const newMessageTemplateForm = (t: TFunction): FormConfig => ({
     id: "channels",
     title: t("messages.forms.messageTemplate.channels"),
     fields: [
-      { id: "channelWhatsApp", name: "channelWhatsApp", type: "checkbox", label: "WhatsApp", defaultValue: true, width: "1/4" },
-      { id: "channelSms", name: "channelSms", type: "checkbox", label: "SMS", defaultValue: true, width: "1/4" },
-      { id: "channelEmail", name: "channelEmail", type: "checkbox", label: "Email", defaultValue: false, width: "1/4" },
-      { id: "channelInApp", name: "channelInApp", type: "checkbox", label: "In-app", defaultValue: false, width: "1/4" },
+      { id: "channelWhatsApp", name: "channelWhatsApp", type: "checkbox", label: t("messages.builtIn.messagesFormConfigs.newMessageTemplateForm.channelWhatsApp.label"), defaultValue: true, width: "1/4" },
+      { id: "channelSms", name: "channelSms", type: "checkbox", label: t("messages.builtIn.messagesFormConfigs.newMessageTemplateForm.channelSms.label"), defaultValue: true, width: "1/4" },
+      { id: "channelEmail", name: "channelEmail", type: "checkbox", label: t("messages.builtIn.messagesFormConfigs.newMessageTemplateForm.channelEmail.label"), defaultValue: false, width: "1/4" },
+      { id: "channelInApp", name: "channelInApp", type: "checkbox", label: t("messages.builtIn.messagesFormConfigs.newMessageTemplateForm.channelInApp.label"), defaultValue: false, width: "1/4" },
     ],
   }],
 })
@@ -144,7 +144,7 @@ export const newInvoiceReminderBatchForm = (t: TFunction): FormConfig => ({
   cancelLabel: t("common.cancel"),
   sections: [{ id: "reminder", fields: [
     { id: "templateId", name: "templateId", type: "select", label: t("messages.forms.invoiceReminder.template"), required: true, width: "1/2", options: emptySelect },
-    { id: "channel", name: "channel", type: "select", label: t("messages.forms.invoiceReminder.channel"), required: true, defaultValue: "WhatsApp", width: "1/2", options: [{ value: "WhatsApp", label: "WhatsApp" }, { value: "Sms", label: "SMS" }, { value: "Email", label: "Email" }, { value: "InApp", label: "In-app" }] },
+    { id: "channel", name: "channel", type: "select", label: t("messages.forms.invoiceReminder.channel"), required: true, defaultValue: "WhatsApp", width: "1/2", options: [{ value: "WhatsApp", label: t("messages.builtIn.messagesFormConfigs.newInvoiceReminderBatchForm.channel.label") }, { value: "Sms", label: t("messages.builtIn.messagesFormConfigs.newInvoiceReminderBatchForm.channel.labelsMS") }, { value: "Email", label: t("messages.builtIn.messagesFormConfigs.newInvoiceReminderBatchForm.channel.labelemail") }, { value: "InApp", label: t("messages.builtIn.messagesFormConfigs.newInvoiceReminderBatchForm.channel.labelinApp") }] },
     { id: "invoiceIds", name: "invoiceIds", type: "textarea", format: "plain", label: t("messages.forms.invoiceReminder.invoices"), description: t("messages.forms.invoiceReminder.invoicesHint"), required: true, width: "full", rows: 3 },
   ] }],
 })

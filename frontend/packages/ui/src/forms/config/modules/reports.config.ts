@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Reports Module Form Configurations
 //!
 //! This module provides form configurations for Reports.
@@ -9,29 +11,29 @@ export const reportsForms: FormRegistryEntry[] = [
   {
     moduleId: "reports",
     formId: "generate-report",
-    name: "Generate Report",
-    description: "Generate a new report",
+    get name() { return i18n.t("forms.defaults.reports.generateReport") },
+    get description() { return i18n.t("forms.defaults.reports.generateANewReport") },
     icon: "BarChart",
-    category: "Reports",
+    get category() { return i18n.t("forms.defaults.reports.reports") },
     defaultConfig: () => ({
       moduleId: "reports",
       formId: "generate-report",
-      name: "Generate Report",
-      description: "Generate a new report",
+      get name() { return i18n.t("forms.defaults.reports.generateReport") },
+      get description() { return i18n.t("forms.defaults.reports.generateANewReport") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "report_type",
           name: "report_type",
-          label: "Report Type",
+          get label() { return i18n.t("forms.defaults.reports.reportType") },
           fieldType: "Select",
           options: [
-            { value: "sales", label: "Sales Report", color: "green" },
-            { value: "inventory", label: "Inventory Report", color: "blue" },
-            { value: "financial", label: "Financial Report", color: "purple" },
-            { value: "hr", label: "HR Report", color: "pink" },
-            { value: "project", label: "Project Report", color: "orange" },
-            { value: "custom", label: "Custom Report", color: "gray" },
+            { value: "sales", get label() { return i18n.t("forms.defaults.reports.salesReport") }, color: "green" },
+            { value: "inventory", get label() { return i18n.t("forms.defaults.reports.inventoryReport") }, color: "blue" },
+            { value: "financial", get label() { return i18n.t("forms.defaults.reports.financialReport") }, color: "purple" },
+            { value: "hr", get label() { return i18n.t("forms.defaults.reports.hrReport") }, color: "pink" },
+            { value: "project", get label() { return i18n.t("forms.defaults.reports.projectReport") }, color: "orange" },
+            { value: "custom", get label() { return i18n.t("forms.defaults.reports.customReport") }, color: "gray" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -44,9 +46,9 @@ export const reportsForms: FormRegistryEntry[] = [
         {
           fieldId: "title",
           name: "title",
-          label: "Report Title",
+          get label() { return i18n.t("forms.defaults.reports.reportTitle") },
           fieldType: "Text",
-          placeholder: "Enter report title",
+          get placeholder() { return i18n.t("forms.defaults.reports.enterReportTitle") },
           validation: { required: true },
           aiSuggestions: [],
           order: 2,
@@ -58,7 +60,7 @@ export const reportsForms: FormRegistryEntry[] = [
         {
           fieldId: "date_from",
           name: "date_from",
-          label: "From Date",
+          get label() { return i18n.t("reports.forms.generateReport.fields.dateFrom") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -71,7 +73,7 @@ export const reportsForms: FormRegistryEntry[] = [
         {
           fieldId: "date_to",
           name: "date_to",
-          label: "To Date",
+          get label() { return i18n.t("reports.forms.generateReport.fields.dateTo") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -84,12 +86,12 @@ export const reportsForms: FormRegistryEntry[] = [
         {
           fieldId: "format",
           name: "format",
-          label: "Output Format",
+          get label() { return i18n.t("forms.defaults.reports.outputFormat") },
           fieldType: "Select",
           options: [
-            { value: "pdf", label: "PDF", color: "red" },
-            { value: "excel", label: "Excel", color: "green" },
-            { value: "csv", label: "CSV", color: "blue" },
+            { value: "pdf", get label() { return i18n.t("forms.defaults.reports.pdf") }, color: "red" },
+            { value: "excel", get label() { return i18n.t("forms.defaults.reports.excel") }, color: "green" },
+            { value: "csv", get label() { return i18n.t("forms.defaults.reports.csv") }, color: "blue" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -102,7 +104,7 @@ export const reportsForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Notes",
+          get label() { return i18n.t("common.notes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],

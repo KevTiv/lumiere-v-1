@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -52,11 +54,12 @@ export function RecordAttachmentsPanel({
   resId,
   documents,
   onUpload,
-  title = "Attachments",
-  emptyLabel = "No attachments yet",
-  uploadLabel = "Upload",
+  title = i18n.t("documents.attachments.title"),
+  emptyLabel = i18n.t("documents.attachments.empty"),
+  uploadLabel = i18n.t("documents.browser.upload"),
   disabled,
 }: RecordAttachmentsPanelProps) {
+  useTranslation()
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState("")
   const [pending, setPending] = useState(false)
@@ -89,7 +92,7 @@ export function RecordAttachmentsPanel({
       ) : (
         <ul className="space-y-1 text-sm">
           {linked.map((d) => {
-            const label = d.name || d.fileName || d.file_name || `Document ${String(d.id)}`
+            const label = d.name || d.fileName || d.file_name || i18n.t("documents.attachments.unnamed", { id: String(d.id) })
             const href = d.url || undefined
             return (
               <li
@@ -117,17 +120,17 @@ export function RecordAttachmentsPanel({
 
       <div className="grid gap-2 @lg/attachments:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] @lg/attachments:items-end">
         <div className="min-w-0 space-y-1">
-          <Label htmlFor="attach-name">Name</Label>
+          <Label htmlFor="attach-name">{i18n.t("settings.ai.name")}</Label>
           <Input
             id="attach-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Attachment name"
+            placeholder={i18n.t("ui.documents.recordAttachmentsPanel.attachmentName")}
             disabled={disabled || pending}
           />
         </div>
         <div className="min-w-0 space-y-1">
-          <Label htmlFor="attach-file">File</Label>
+          <Label htmlFor="attach-file">{i18n.t("documents.forms.newDocument.fields.file")}</Label>
           <Input
             id="attach-file"
             type="file"
@@ -157,7 +160,7 @@ export function RecordAttachmentsPanel({
             }
           }}
         >
-          {pending ? "Uploading…" : uploadLabel}
+          {pending ? i18n.t("documents.browser.uploading") : uploadLabel}
         </Button>
       </div>
       {error ? (

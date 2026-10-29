@@ -1,5 +1,7 @@
 "use client"
 
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 import type { ReactNode } from "react"
 import { ChartTooltipContent, type ChartConfig } from "../components/chart"
 import { chartColor, formatChartValue, type ChartSeriesSpec, type ChartValueFormat } from "../lib/chart-format"
@@ -58,7 +60,8 @@ export function valueTooltip(
 }
 
 /** Shared frame for an empty chart so every widget says the same thing. */
-export function ChartEmpty({ label = "No data for this period yet.", className }: { label?: string; className?: string }) {
+export function ChartEmpty({ label = i18n.t("ui.pages.dashboardWidgetRenderer.noDataForThisPeriodYet"), className }: { label?: string; className?: string }) {
+  useTranslation()
   return (
     <div
       className={

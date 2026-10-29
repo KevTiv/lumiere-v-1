@@ -261,7 +261,7 @@ function TasksClientLoaded({
         ),
         rowActions: [
           { id: "edit", label: t("common.edit"), icon: Pencil, isApplicable: () => canAssign, onClick: (row) => openEditTask(String(row.id)) },
-          { id: "assign", label: "Assign people", icon: Users, isApplicable: () => canAssign, onClick: (row) => setAssignmentTaskId(String(row.id)) },
+          { id: "assign", label: t("tasks.tasksClient.assignPeople"), icon: Users, isApplicable: () => canAssign, onClick: (row) => setAssignmentTaskId(String(row.id)) },
           { id: "approve", label: t("tasks.board.columns.Approved"), icon: CheckCheck, isApplicable: notIn("Approved"), onClick: moveTo("Approved") },
           { id: "done", label: t("tasks.board.columns.Done"), icon: CircleCheck, isApplicable: notIn("Done"), onClick: moveTo("Done") },
           { id: "reopen", label: t("tasks.board.columns.InProgress"), icon: RotateCcw, isApplicable: notIn("InProgress"), onClick: moveTo("InProgress") },
@@ -358,12 +358,11 @@ function TasksClientLoaded({
         isPending={isPending}
         formLeadingActions={modal.type === "edit" && canAssign ? (
           <Button type="button" variant="outline" disabled={isPending} onClick={() => setAssignmentTaskId(String(modal.entityId))}>
-            <Users className="mr-2 h-4 w-4" /> Assign people
-          </Button>
+            <Users className="mr-2 h-4 w-4" /> {" "}{t("tasks.tasksClient.assignPeople")}{" "}</Button>
         ) : undefined}
         onSubmit={async (formData) => {
           if (!modal.type) return
-          if (modal.type === "create" ? !canCreate : !canAssign) throw new Error("Task permission is required")
+          if (modal.type === "create" ? !canCreate : !canAssign) throw new Error(t("tasks.tasksClient.taskPermissionIsRequired"))
           await handleFormSubmit(modal.action, formData)
           setModal({ type: null })
         }}

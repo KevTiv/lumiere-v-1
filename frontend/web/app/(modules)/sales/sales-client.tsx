@@ -698,7 +698,7 @@ function SalesClientLoaded({
       params: {
         status,
         externalReference: formText(values?.externalReference),
-        lastError: status === 'failed' ? 'recorded via Ops' : undefined,
+        lastError: status === 'failed' ? "recorded via Ops" : undefined,
         metadata: undefined,
       },
     });
@@ -946,7 +946,7 @@ function SalesClientLoaded({
   const currencyFieldOptions = useMemo(() => {
     const fromApi = currencyOptionsFromRows(currencies);
     if (fromApi.length > 0) return fromApi;
-    return [{ value: '', label: 'No currencies available', disabled: true }];
+    return [{ value: '', label: t("sales.salesClient.noCurrenciesAvailable"), disabled: true }];
   }, [currencies, t]);
 
   const entityLabels = useMemo(
@@ -1132,10 +1132,10 @@ function SalesClientLoaded({
       const row = user as Record<string, unknown>;
       const key = identityToHex(row.identity ?? row.id);
       if (!key) continue;
-      map.set(key, String(row.name ?? row.email ?? 'Unassigned'));
+      map.set(key, String(row.name ?? row.email ?? t("sales.salesClient.unassigned")));
     }
     return map;
-  }, [users]);
+  }, [users, t]);
 
   const saleOrderFormConfig = useMemo(
     () =>
@@ -1189,7 +1189,7 @@ function SalesClientLoaded({
             organizationId={orgId}
             resModel='sale_order'
             resId={BigInt(String(record.id))}
-            title='Attachments'
+            title={t("sales.order.attachments")}
           />
         ),
       },
@@ -1895,25 +1895,25 @@ function SalesClientLoaded({
             data: {
               stats: [
                 {
-                  label: 'Revenue MTD',
+                  label: t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.label"),
                   value: `$${revenue.toLocaleString()}`,
                   change: percentChange(revenue, previousRevenue),
                   icon: 'TrendingUp',
                 },
                 {
-                  label: 'Orders Confirmed',
+                  label: t("sales.salesClient.ordersConfirmed"),
                   value: String(orderCount),
                   change: percentChange(orderCount, previousOrderCount),
                   icon: 'ShoppingCart',
                 },
                 {
-                  label: 'Avg Deal Size',
+                  label: t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.labelavgDealSize"),
                   value: `$${Math.round(avgDeal).toLocaleString()}`,
                   change: percentChange(avgDeal, previousAvgDeal),
                   icon: 'DollarSign',
                 },
                 {
-                  label: 'Outstanding AR',
+                  label: t("sales.salesClient.outstandingAR"),
                   value: `$${Math.round(outstanding).toLocaleString()}`,
                   icon: 'AlertCircle',
                 },
@@ -1985,7 +1985,7 @@ function SalesClientLoaded({
         if (w.id === 'sales-by-rep') {
           const byRep = groupBy(confirmedOrders, (o) => {
             const key = identityToHex(o.userId);
-            return salesRepLabelByIdentity.get(key) ?? 'Unassigned';
+            return salesRepLabelByIdentity.get(key) ?? t("sales.salesClient.unassigned");
           });
           const repMetrics = Object.entries(byRep)
             .map(([rep, repOrders]) => ({
@@ -2555,7 +2555,7 @@ function SalesClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     const invalidInput = () => new Error(t('sales.forms.refinement.invalidInput', { defaultValue: 'Check the required choices and entered values. Your entries have been retained.' }));
-    if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
+    if (!tabUsable(actionTabs[action])) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"));
     if (action === 'createSaleOrder') {
       if ([contactsRead.state, pricelistsRead.state, warehousesRead.state].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
       const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
@@ -2710,7 +2710,7 @@ function SalesClientLoaded({
               organizationId={orgId}
               resModel={chatterTarget.resModel}
               resId={chatterTarget.resId}
-              title={`Attachments — ${chatterTarget.recordTitle ?? chatterTarget.resModel}`}
+              title={t("purchasing.purchasingClient.attachments", { value1: chatterTarget.recordTitle ?? chatterTarget.resModel })}
             />
           </div>
         </>

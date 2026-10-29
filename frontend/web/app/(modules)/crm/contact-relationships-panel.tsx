@@ -273,7 +273,7 @@ export function ContactRelationshipsPanel({
                     <div>
                       <div className="font-medium">{contactLabel(other)}</div>
                       <div className="text-muted-foreground">
-                        {String(row.relationshipType ?? row.relationship_type ?? "related")}
+                        {String(row.relationshipType ?? row.relationship_type ?? t("crm.contactRelationshipsPanel.related"))}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

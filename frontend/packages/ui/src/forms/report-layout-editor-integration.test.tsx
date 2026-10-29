@@ -22,7 +22,7 @@ const translation = vi.hoisted(() => ({
     return (options?.defaultValue ?? key).replace(/\{\{number\}\}/g, String(options?.number ?? ""))
   },
 }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => translation }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => translation }))
 vi.mock("@lumiere/query-hooks/hooks/ai-forms", () => ({ useAiFormSuggest: () => ({}) }))
 vi.mock("sonner", () => ({ toast: { warning: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 

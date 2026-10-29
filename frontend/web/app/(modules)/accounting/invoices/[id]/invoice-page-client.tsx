@@ -11,7 +11,7 @@ import { useUnsavedChangesGuard } from '@lumiere/ui';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Download, ListOrdered, Mail, MoreHorizontal, Printer, ShoppingCart } from 'lucide-react';
-import { useTranslation } from '@lumiere/i18n';
+import { i18n, useTranslation } from '@lumiere/i18n';
 import { useInvoicePersonalization } from '@lumiere/query-hooks/hooks/invoice-personalization';
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
 import {
@@ -139,11 +139,11 @@ type TabId = (typeof TAB_IDS)[number];
 
 /** Which accounting list a kind of document belongs to, and what to call it. */
 const KIND_TAB = {
-  invoice: { tab: 'invoices', titleKey: 'accounting.tabs.invoices', title: 'Invoices' },
-  bill: { tab: 'bills', titleKey: 'accounting.tabs.bills', title: 'Bills' },
-  creditNote: { tab: 'journal-entries', titleKey: 'accounting.tabs.journalEntries', title: 'Journal entries' },
-  vendorCredit: { tab: 'journal-entries', titleKey: 'accounting.tabs.journalEntries', title: 'Journal entries' },
-  entry: { tab: 'journal-entries', titleKey: 'accounting.tabs.journalEntries', title: 'Journal entries' },
+  invoice: { tab: 'invoices', titleKey: 'accounting.tabs.invoices', get title() { return i18n.t("accounting.insights.invoices") } },
+  bill: { tab: 'bills', titleKey: 'accounting.tabs.bills', get title() { return i18n.t("accounting.insights.bills") } },
+  creditNote: { tab: 'journal-entries', titleKey: 'accounting.tabs.journalEntries', get title() { return i18n.t("accounting.tabs.journalEntries") } },
+  vendorCredit: { tab: 'journal-entries', titleKey: 'accounting.tabs.journalEntries', get title() { return i18n.t("accounting.tabs.journalEntries") } },
+  entry: { tab: 'journal-entries', titleKey: 'accounting.tabs.journalEntries', get title() { return i18n.t("accounting.tabs.journalEntries") } },
 } as const;
 
 export function InvoicePageClient(props: InvoicePageClientProps) {
@@ -154,14 +154,14 @@ export function InvoicePageClient(props: InvoicePageClientProps) {
 }
 
 function InvoicePageCompany(props: InvoicePageClientProps & { organizationId: number }) {
+  const { t } = useTranslation()
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId);
   const retainedCompany = useRef(operatingCompanyId);
   if (operatingCompanyId != null) retainedCompany.current = operatingCompanyId;
   if (retainedCompany.current == null) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
-        Select an active company to open this document.
-      </div>
+        {t("accounting.invoicePageClient.selectAnActiveCompanyToOpenThisDocument")}{" "}</div>
     );
   }
   return <InvoicePageLoaded {...props} operatingCompanyId={retainedCompany.current} companyAvailable={operatingCompanyId != null} />;
@@ -265,7 +265,7 @@ function InvoicePageLoaded({
     const state = variantTag(move.state);
     return {
       organizationId: orgId, companyId: operatingCompanyId, moveId: BigInt(moveId), reference,
-      partner: partner || 'Customer identity unavailable', companyName: company?.name || `Company #${operatingCompanyId}`,
+      partner: partner || t("accounting.invoicePageClient.customerIdentityUnavailable"), companyName: company?.name || `Company #${operatingCompanyId}`,
       totalLabel: formatInvoiceMoney(total, currency), pdfFilename: `account-move-${moveId}.pdf`,
       posted: state === 'Posted' && ['invoice', 'creditNote'].includes(invoiceKind(move)),
       revision: invoiceEmailRecordRevision(canonicalMove),
@@ -320,7 +320,7 @@ function InvoicePageLoaded({
       return result;
     } : undefined}
     onReviewPdf={async (document) => {
-      if (emailScopeRef.current.scope !== invoiceEmailScope(document) || emailScopeRef.current.documentKey !== invoiceEmailDocumentKey(document)) throw new Error('The active company or invoice changed. Return to the original review before opening its PDF.');
+      if (emailScopeRef.current.scope !== invoiceEmailScope(document) || emailScopeRef.current.documentKey !== invoiceEmailDocumentKey(document)) throw new Error(t("accounting.invoicePageClient.theActiveCompanyOrInvoiceChangedReturnToTheOriginalReview"));
       await downloadInvoiceReviewPdf(document);
     }}
     onReloadTemplates={() => { void queryClient.invalidateQueries({ queryKey: ['invoice-email-review-templates', String(organizationId)] }); }}
@@ -330,7 +330,7 @@ function InvoicePageLoaded({
     } : undefined}
     onClose={() => setEmailOpen(false)}
   /> : null;
-  const emailRecoveryButton = emailReview && !emailOpen ? <Button variant="outline" className="min-h-11" onClick={() => setEmailOpen(true)}>Review original email request</Button> : null;
+  const emailRecoveryButton = emailReview && !emailOpen ? <Button variant="outline" className="min-h-11" onClick={() => setEmailOpen(true)}>{t("accounting.invoicePageClient.reviewOriginalEmailRequest")}</Button> : null;
   const accountLabelMap = useMemo(() => buildAccountLabelMap(accounts as Row[]), [accounts]);
   const sourceDocumentLabelMap = useMemo(
     () => buildSourceDocumentLabelMap([...(moves as unknown as Row[]), ...(saleOrders as unknown as Row[])]),
@@ -385,7 +385,7 @@ function InvoicePageLoaded({
     labelOf: (row) => String(row.name || row.id),
   });
 
-  if (!companyAvailable) return <>{emailDialog}{emailRecoveryButton}<div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">Select an active company to open this document. Any original email queue review has been retained.</div></>;
+  if (!companyAvailable) return <>{emailDialog}{emailRecoveryButton}<div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">{t("accounting.invoicePageClient.selectAnActiveCompanyToOpenThisDocumentAnyOriginalEmail")}</div></>;
   if (!move) {
     if (movesRead.state.status !== 'ready' && movesRead.state.status !== 'loading') {
       return <>{emailDialog}{emailRecoveryButton}<ModuleDataNotice state={movesRead.state} /></>;
@@ -428,7 +428,7 @@ function InvoicePageLoaded({
   const company = invoiceSellerCompanyFromQueryRow(companiesRead.rows.find((row) => String(row.id) === String(operatingCompanyId)));
   const capturedContent = readInvoiceDocumentContent(move.metadata, organizationId, kind === 'invoice' || kind === 'creditNote');
   const identityReady = isInvoiceSellerIdentityReady(company, operatingCompanyId, organizationId);
-  const identityState = companiesRead.state.status === 'ready' && !identityReady ? { status: 'error' as const, message: 'The selected company identity is unavailable. Refresh before posting this invoice.' } : companiesRead.state;
+  const identityState = companiesRead.state.status === 'ready' && !identityReady ? { status: 'error' as const, message: t("accounting.invoicePageClient.theSelectedCompanyIdentityIsUnavailableRefreshBeforePostingThisInvoice") } : companiesRead.state;
   const currentDraftContent = outgoingDraft && invoicePersonalization.profile && identityReady
     ? resolveDraftInvoiceDocument(move.metadata, invoicePersonalization.profile, invoicePersonalization.profileVersionIds, invoiceSellerFromCompany(company, invoicePersonalization.profile))
     : null;
@@ -437,7 +437,7 @@ function InvoicePageLoaded({
   const draftReady = !outgoingDraft || draftReviewState?.status === 'ready' && Boolean(currentDraftContent?.personalization) && !draftContentError;
   const postingActions = headerActions.map((action) => outgoingDraft && !draftReady ? {
     ...action,
-    blockedReason: () => draftContentError || 'Invoice settings must be available before posting. Refresh and review the current document.',
+    blockedReason: () => draftContentError || t("accounting.invoicePageClient.invoiceSettingsMustBeAvailableBeforePostingRefreshAndReviewThe"),
   } : action);
   const isCommercialDocument = kind === 'invoice' || kind === 'bill';
   const documentReady = movesRead.state.status === 'ready';
@@ -593,8 +593,8 @@ function InvoicePageLoaded({
           await createDocument.mutateAsync(params);
           showWorkflowToast({
             kind: 'success',
-            title: 'Archived to Documents',
-            description: 'PDF stored as a linked document version.',
+            title: t("accounting.accountingClient.archivedToDocuments"),
+            description: t("accounting.accountingClient.pDFStoredAsALinkedDocumentVersion"),
           });
         }),
     },
@@ -797,7 +797,7 @@ function InvoicePageLoaded({
               primaryActionIds={new Set(['accounting.invoice.post'])}
               pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
             /> : null}
-            {kind === 'invoice' || kind === 'creditNote' ? <Button variant="outline" className="min-h-11" onClick={openEmailReview} disabled={!emailReview && !canQueueEmail} data-testid="invoice-action-send-email"><Mail className="mr-2 size-4" />Review email</Button> : null}
+            {kind === 'invoice' || kind === 'creditNote' ? <Button variant="outline" className="min-h-11" onClick={openEmailReview} disabled={!emailReview && !canQueueEmail} data-testid="invoice-action-send-email"><Mail className="mr-2 size-4" />{t("accounting.invoiceDetailModal.reviewEmail")}</Button> : null}
             <Button
               variant="outline"
               size="sm"
@@ -886,7 +886,7 @@ function InvoicePageLoaded({
                 </div>
                 <ModuleDataNotice state={currenciesRead.state} />
                 <ModuleDataNotice state={companiesRead.state} />
-                {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">Customer billing details were captured when this draft was created; posting refreshes them from the linked customer. Posting also captures the latest company invoice settings shown in this review.</p></> : null}
+                {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">{t("accounting.invoicePageClient.customerBillingDetailsWereCapturedWhenThisDraftWasCreatedPosting")}</p></> : null}
                 <FinanceReviewWorkspace
                   initialView="edit"
                   editorLabel={t('financeReview.savedDetails', { defaultValue: 'Saved details' })}

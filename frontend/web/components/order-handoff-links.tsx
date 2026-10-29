@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n as rootI18n, useTranslation as useRootTranslation } from "@lumiere/i18n"
 import Link from "next/link"
 
 import { accountMoveHref, accountPaymentHref, returnOrderHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
@@ -9,10 +10,11 @@ import type { CrossRecordLinks as Result } from "@lumiere/query-hooks/hooks/cros
 export { saleOrderHref as orderHref, stockPickingHref as pickingHref, accountMoveHref as invoiceHref }
 /** Read-only cross-record navigation shares the handoff presentation owner. */
 export function CrossRecordLinks({ result, testIdPrefix }: { result: Result; testIdPrefix: string }) {
+  useRootTranslation()
   if (result.status !== "ready") {
     return <p role="alert" data-testid={`${testIdPrefix}-${result.status}`}>{result.reason}</p>
   }
-  if (result.links.length === 0 && !result.paymentNotice) return <p data-testid={`${testIdPrefix}-none`}>No linked records yet</p>
+  if (result.links.length === 0 && !result.paymentNotice) return <p data-testid={`${testIdPrefix}-none`}>{rootI18n.t("common.ui.orderHandoffLinks.noLinkedRecordsYet")}</p>
   return (
     <>
     {result.paymentNotice ? (
@@ -37,8 +39,8 @@ export function CrossRecordLinks({ result, testIdPrefix }: { result: Result; tes
  * each surface's links addressable (`{prefix}-picking-{id}`, `{prefix}-invoice-{id}`).
  */
 export function OrderHandoffLinks({
-  handoffs, testIdPrefix, emptyLabel = "No deliveries or invoices yet",
-  pickingLabel = "Delivery", invoiceLabel = "Invoice",
+  handoffs, testIdPrefix, emptyLabel,
+  pickingLabel, invoiceLabel,
 }: {
   handoffs: OrderHandoffs
   testIdPrefix: string
@@ -46,15 +48,16 @@ export function OrderHandoffLinks({
   pickingLabel?: string
   invoiceLabel?: string
 }) {
+  useRootTranslation()
   if (handoffs.pickings.length === 0 && handoffs.invoices.length === 0 && (handoffs.returns?.length ?? 0) === 0 && (handoffs.payments?.length ?? 0) === 0) {
-    return <span className="text-muted-foreground" data-testid={`${testIdPrefix}-none`}>{emptyLabel}</span>
+    return <span className="text-muted-foreground" data-testid={`${testIdPrefix}-none`}>{emptyLabel ?? rootI18n.t("common.recordLinks.noDeliveriesOrInvoices")}</span>
   }
   return (
     <ul className="flex flex-col gap-1 text-sm" data-testid={`${testIdPrefix}-list`}>
       {handoffs.pickings.map((picking) => (
         <li key={`p${picking.id}`}>
           <Link className="underline underline-offset-2" href={stockPickingHref(picking.id)} data-testid={`${testIdPrefix}-picking-${picking.id}`}>
-            {picking.name || `${pickingLabel} #${picking.id}`}
+            {picking.name || rootI18n.t("common.recordLinks.recordNumber", { label: pickingLabel ?? rootI18n.t("common.recordLinks.delivery"), id: picking.id })}
           </Link>
           <span className="ml-2 text-muted-foreground">{picking.state}</span>
         </li>
@@ -62,17 +65,17 @@ export function OrderHandoffLinks({
       {handoffs.invoices.map((invoice) => (
         <li key={`i${invoice.id}`}>
           <Link className="underline underline-offset-2" href={accountMoveHref(invoice.id)} data-testid={`${testIdPrefix}-invoice-${invoice.id}`}>
-            {invoice.name || `${invoiceLabel} #${invoice.id}`}
+            {invoice.name || rootI18n.t("common.recordLinks.recordNumber", { label: invoiceLabel ?? rootI18n.t("common.recordLinks.invoice"), id: invoice.id })}
           </Link>
           <span className="ml-2 text-muted-foreground">
-            {invoice.state}{invoice.residual > 0 ? ` · open ${invoice.residual.toFixed(2)}` : ""}
+            {invoice.state}{invoice.residual > 0 ? rootI18n.t("common.recordLinks.openBalance", { amount: invoice.residual.toFixed(2) }) : ""}
           </span>
         </li>
       ))}
       {(handoffs.returns ?? []).map((returned) => (
         <li key={`r${returned.id}`}>
           <Link className="underline underline-offset-2" href={returnOrderHref(returned.id)} data-testid={`${testIdPrefix}-return-${returned.id}`}>
-            {returned.name || `Return #${returned.id}`}
+            {returned.name || rootI18n.t("common.recordLinks.returnNumber", { id: returned.id })}
           </Link>
           <span className="ml-2 text-muted-foreground">{returned.state}</span>
         </li>
@@ -80,7 +83,7 @@ export function OrderHandoffLinks({
       {(handoffs.payments ?? []).map((payment) => (
         <li key={`pay${payment.id}`}>
           <Link className="underline underline-offset-2" href={accountPaymentHref(payment.id)} data-testid={`${testIdPrefix}-payment-${payment.id}`}>
-            {payment.name || `Payment #${payment.id}`}
+            {payment.name || rootI18n.t("common.recordLinks.paymentNumber", { id: payment.id })}
           </Link>
           <span className="ml-2 text-muted-foreground">{payment.state}</span>
         </li>
@@ -88,8 +91,8 @@ export function OrderHandoffLinks({
       {handoffs.paymentNotice ? (
         <li role="alert" data-testid={`${testIdPrefix}-payment-${handoffs.paymentNotice}`} className="text-muted-foreground">
           {handoffs.paymentNotice === "relation_unavailable"
-            ? "Payment relation is unavailable"
-            : "Payment relation failed its identity check"}
+            ? rootI18n.t("common.ui.orderHandoffLinks.paymentRelationIsUnavailable")
+            : rootI18n.t("common.ui.orderHandoffLinks.paymentRelationFailedItsIdentityCheck")}
         </li>
       ) : null}
     </ul>

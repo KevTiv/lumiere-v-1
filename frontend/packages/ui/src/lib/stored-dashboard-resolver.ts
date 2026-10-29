@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type { DashboardWidget, DiagnosticWidget, GridWidth } from "./dashboard-types"
 import {
   resolveStoredDashboardDrillTarget,
@@ -115,14 +116,14 @@ function applyDomain(
   try {
     parsed = JSON.parse(domain)
   } catch {
-    return { ok: false, code: "invalid-filter", message: "This widget has an invalid persisted filter definition." }
+    return { ok: false, code: "invalid-filter", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.thisWidgetHasAnInvalidPersistedFilter.message") } }
   }
   if (!isRecord(parsed)) {
-    return { ok: false, code: "invalid-filter", message: "This widget has an invalid persisted filter definition." }
+    return { ok: false, code: "invalid-filter", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.thisWidgetHasAnInvalidPersistedFilter.message") } }
   }
 
   for (const [field, expected] of Object.entries(parsed)) {
-    if (!field.trim()) return { ok: false, code: "invalid-filter", message: "This widget has an invalid persisted filter definition." }
+    if (!field.trim()) return { ok: false, code: "invalid-filter", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.thisWidgetHasAnInvalidPersistedFilter.message") } }
     if (!isRecord(expected)) continue
     const entries = Object.entries(expected)
     if (entries.length === 0) {
@@ -212,7 +213,7 @@ function parseBinding(raw: unknown): ParseResult<StoredDashboardBindingV1 | null
     return {
       ok: false,
       code: "invalid-binding",
-      message: "This widget has an invalid time or measure binding.",
+      get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.parseBinding.thisWidgetHasAnInvalidTimeOr.message") },
     }
   }
 }
@@ -225,21 +226,21 @@ interface SortOrder {
 function parseSortOrder(raw: unknown): ParseResult<SortOrder | null> {
   if (raw == null || raw === "") return { ok: true, value: null }
   if (typeof raw !== "string" || !raw.trim()) {
-    return { ok: false, code: "invalid-sort", message: "The widget sort order must be a JSON string." }
+    return { ok: false, code: "invalid-sort", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.parseSortOrder.theWidgetSortOrderMustBeA.message") } }
   }
   try {
     const parsed = JSON.parse(raw) as unknown
     if (!isRecord(parsed) || Object.keys(parsed).length !== 1) {
-      return { ok: false, code: "invalid-sort", message: "The widget sort order must contain one field." }
+      return { ok: false, code: "invalid-sort", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.parseSortOrder.theWidgetSortOrderMustContainOne.message") } }
     }
     const [field, direction] = Object.entries(parsed)[0]!
     const normalized = String(direction).toLowerCase()
     if (!field.trim() || (normalized !== "asc" && normalized !== "desc")) {
-      return { ok: false, code: "invalid-sort", message: "The widget sort direction must be asc or desc." }
+      return { ok: false, code: "invalid-sort", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.parseSortOrder.theWidgetSortDirectionMustBeAsc.message") } }
     }
     return { ok: true, value: { field, direction: normalized } }
   } catch {
-    return { ok: false, code: "invalid-sort", message: "The widget sort order is not valid JSON." }
+    return { ok: false, code: "invalid-sort", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.parseSortOrder.theWidgetSortOrderIsNotValid.message") } }
   }
 }
 
@@ -301,7 +302,7 @@ function applyTimeRange(
     return {
       ok: false,
       code: "missing-time-field",
-      message: "This widget does not declare a time field for the selected date range.",
+      get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyTimeRange.thisWidgetDoesNotDeclareATime.message") },
     }
   }
   const timestamps = rows.map((row) => timestampToMs(rowField(row, timeField)))
@@ -345,7 +346,7 @@ function applyMeasureCompleteness(
     return {
       ok: false,
       code: "missing-measure",
-      message: "This widget does not declare the measure used by its aggregation.",
+      get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyMeasureCompleteness.thisWidgetDoesNotDeclareTheMeasure.message") },
     }
   }
   const rejectedRows = rows.filter((row) => {
@@ -513,7 +514,7 @@ export function resolveStoredDashboard(
     if (!model) {
       pushDiagnostic({
         code: "missing-model",
-        message: "The widget has no data source.",
+        get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.resolveStoredDashboard.theWidgetHasNoDataSource.message") },
       })
       return
     }
@@ -602,7 +603,7 @@ export function resolveStoredDashboard(
       if (!groupBy) {
         pushDiagnostic({
           code: "missing-group-by",
-          message: "A chart widget requires a group-by field.",
+          get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.resolveStoredDashboard.aChartWidgetRequiresAGroupByField.message") },
         })
         return
       }

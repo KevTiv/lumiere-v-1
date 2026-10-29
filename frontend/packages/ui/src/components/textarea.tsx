@@ -1,5 +1,7 @@
 "use client"
 
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 import * as React from "react"
 import type { Editor } from "@tiptap/react"
 
@@ -93,6 +95,7 @@ function RichTextarea({
   "data-testid": testId,
   ...props
 }: React.ComponentProps<"textarea"> & { "data-testid"?: string }) {
+  useTranslation()
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
   const editorRef = React.useRef<Editor | null>(null)
   const surfaceId = React.useId()
@@ -133,8 +136,8 @@ function RichTextarea({
     if (!id || ariaLabel || ariaLabelledBy) return
     const label = textareaRef.current?.labels?.[0]
     if (!label) return
-    setLabelledBy(label.textContent?.trim() ? `${label.textContent.trim()} rich text editor` : undefined)
-  }, [ariaLabel, ariaLabelledBy, id, surfaceId])
+    setLabelledBy(label.textContent?.trim() ? i18n.t("ui.components.textarea.richTextLabel", { label: label.textContent.trim() }) : undefined)
+  }, [ariaLabel, ariaLabelledBy, id, surfaceId, i18n.resolvedLanguage])
 
   const ariaAttributes = React.useMemo(() => {
     const aria = pickAriaAttributes(props)

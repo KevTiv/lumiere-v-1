@@ -48,9 +48,9 @@ export function aiAgentCreateFormConfig(t: TFunction): FormConfig {
             width: "1/2",
             defaultValue: "Ollama",
             options: [
-              { value: "Ollama", label: "Ollama" },
-              { value: "Mistral", label: "Mistral" },
-              { value: "Gemini", label: "Google Gemini" },
+              { value: "Ollama", label: t("aiAssistant.builtIn.aiAgentFormConfigs.aiAgentCreateFormConfig.provider.label") },
+              { value: "Mistral", label: t("aiAssistant.builtIn.aiAgentFormConfigs.aiAgentCreateFormConfig.provider.labelmistral") },
+              { value: "Gemini", label: t("aiAssistant.builtIn.aiAgentFormConfigs.aiAgentCreateFormConfig.provider.labelgoogleGemini") },
             ],
           },
           {
@@ -61,7 +61,7 @@ export function aiAgentCreateFormConfig(t: TFunction): FormConfig {
             required: true,
             width: "1/2",
             defaultValue: "gemma4:e2b-mlx",
-            placeholder: "gemma4:e2b-mlx | mistral-small-latest | gemini-2.0-flash",
+            placeholder: t("aiAssistant.builtIn.aiAgentFormConfigs.aiAgentCreateFormConfig.model.placeholder"),
             validation: { minLength: 1 },
           },
           {

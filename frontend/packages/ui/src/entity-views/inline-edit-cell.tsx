@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useRef, type ReactNode } from "react"
 import { Loader2 } from "lucide-react"
@@ -31,6 +33,7 @@ interface InlineEditCellProps {
  * the old value stays. Edit state and saving live in `useInlineEdit`.
  */
 export function InlineEditCell({ edit, row, columnKey, label, value, children }: InlineEditCellProps) {
+  useTranslation()
   const { canEdit, editing, draft, setDraft, pending, error, start, commit, handleKeyDown, navigationDialog } =
     useInlineEdit({ edit, row, label, value })
   // The select popup takes focus while open; that must not count as leaving the field.
@@ -42,7 +45,7 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
     return (
       <span
         className="block cursor-text rounded-sm hover:bg-muted/50"
-        title="Double-click to edit"
+        title={i18n.t("ui.entityViews.inlineEditCell.doubleClickToEdit")}
         data-testid={`entity-inline-${columnKey}`}
         onDoubleClick={(event) => {
           event.stopPropagation()

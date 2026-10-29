@@ -602,7 +602,7 @@ function PurchaseOrderPageLoaded({
                   testIdPrefix="purchase-order-handoff"
                   result={
                     movesError || pickingsError
-                      ? { status: 'unavailable', links: [], reason: 'Linked records are unavailable' }
+                      ? { status: 'unavailable', links: [], reason: t("purchasing.orderPageClient.linkedRecordsUnavailable") }
                       : links
                   }
                 />

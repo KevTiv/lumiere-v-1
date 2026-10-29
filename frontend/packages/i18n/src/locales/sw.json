@@ -62,7 +62,18 @@
     "closeNavigation": "Funga urambazaji",
     "expandNavigation": "Panua urambazaji",
     "collapseNavigation": "Bana urambazaji",
-    "search": "Tafuta moduli na rekodi"
+    "search": "Tafuta moduli na rekodi",
+    "ui": {
+      "page": {
+        "firstOrganization": "Shirika la kwanza",
+        "surfaceNotAdmittedYet": "Sehemu hii bado haijaruhusiwa",
+        "thisWorkspaceRemainsHiddenUntilItsRequiredProduct": "Eneo hili la kazi litabaki limefichwa hadi ushahidi unaohitajika wa bidhaa ukubaliwe. Kulificha hakuondoi uwezo huu kwenye orodha ya kazi za kuunganisha mfumo.",
+        "returnToFinance": "Rudi kwenye Fedha"
+      },
+      "providers": {
+        "authorizationStateIsUnavailableReloadToTryAgain": "Hali ya ruhusa haipatikani. Pakia ukurasa upya ili ujaribu tena."
+      }
+    }
   },
   "common": {
     "select": {
@@ -350,6 +361,88 @@
     "moduleNavigation": {
       "overview": "Muhtasari",
       "area": "Eneo la kazi"
+    },
+    "builtIn": {
+      "navigationCatalog": {
+        "groups": {
+          "aISkills": {
+            "label": "Ujuzi wa AI"
+          },
+          "approvals": {
+            "label": "Maidhinisho"
+          },
+          "aIApprovals": {
+            "label": "Maidhinisho ya AI"
+          }
+        }
+      },
+      "storedDashboardResolver": {
+        "applyDomain": {
+          "thisWidgetHasAnInvalidPersistedFilter": {
+            "message": "Ufafanuzi wa kichujio kilichohifadhiwa cha wijeti hii si sahihi."
+          }
+        },
+        "parseBinding": {
+          "thisWidgetHasAnInvalidTimeOr": {
+            "message": "Uunganishaji wa muda au kipimo wa wijeti hii si sahihi."
+          }
+        },
+        "parseSortOrder": {
+          "theWidgetSortOrderMustBeA": {
+            "message": "Mpangilio wa upangaji wa wijeti lazima uwe mfuatano wa JSON."
+          },
+          "theWidgetSortOrderMustContainOne": {
+            "message": "Mpangilio wa upangaji wa wijeti lazima uwe na sehemu moja."
+          },
+          "theWidgetSortDirectionMustBeAsc": {
+            "message": "Mwelekeo wa upangaji wa wijeti lazima uwe asc au desc."
+          },
+          "theWidgetSortOrderIsNotValid": {
+            "message": "Mpangilio wa upangaji wa wijeti si JSON sahihi."
+          }
+        },
+        "applyTimeRange": {
+          "thisWidgetDoesNotDeclareATime": {
+            "message": "Wijeti hii haijabainisha sehemu ya muda kwa kipindi kilichochaguliwa."
+          }
+        },
+        "applyMeasureCompleteness": {
+          "thisWidgetDoesNotDeclareTheMeasure": {
+            "message": "Wijeti hii haijabainisha kipimo kinachotumiwa katika ujumlishaji wake."
+          }
+        },
+        "resolveStoredDashboard": {
+          "theWidgetHasNoDataSource": {
+            "message": "Wijeti haina chanzo cha data."
+          },
+          "aChartWidgetRequiresAGroupByField": {
+            "message": "Wijeti ya chati inahitaji sehemu ya kupanga data katika vikundi."
+          }
+        }
+      },
+      "runtimeFormConfig": {
+        "mergeRuntimeFormConfig": {
+          "runtimeExtraFields": {
+            "title": "Sehemu za ziada"
+          }
+        }
+      }
+    },
+    "ui": {
+      "orderHandoffLinks": {
+        "noLinkedRecordsYet": "Bado hakuna rekodi zilizounganishwa",
+        "paymentRelationIsUnavailable": "Uhusiano wa malipo haupatikani",
+        "paymentRelationFailedItsIdentityCheck": "Uhusiano wa malipo haukufaulu ukaguzi wa utambulisho"
+      }
+    },
+    "recordLinks": {
+      "noDeliveriesOrInvoices": "Bado hakuna uwasilishaji au ankara",
+      "recordNumber": "{{label}} #{{id}}",
+      "openBalance": " · kiasi kilichobaki {{amount}}",
+      "returnNumber": "Marejesho #{{id}}",
+      "paymentNumber": "Malipo #{{id}}",
+      "delivery": "Uwasilishaji",
+      "invoice": "Ankara"
     }
   },
   "navigation": {
@@ -400,7 +493,9 @@
       "current": "Inatumika",
       "selectCompany": "Chagua kampuni",
       "singleCompany": "Kampuni",
-      "loading": "Inapakia kampuni…"
+      "loading": "Inapakia kampuni…",
+      "unnamedCompany": "Kampuni #{{id}}",
+      "company": "Kampuni"
     },
     "groups": {
       "analytics": "Uchanganuzi",

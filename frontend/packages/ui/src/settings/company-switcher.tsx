@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { Building2, ChevronDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -22,7 +22,7 @@ function companyLabel(row: Record<string, unknown>): string {
   const name = row.name ?? row.displayName ?? row.legalName
   if (typeof name === "string" && name.trim()) return name.trim()
   const id = row.id
-  return id != null ? `Company #${String(id)}` : "Company"
+  return id != null ? i18n.t("nav.companySwitcher.unnamedCompany", { id: String(id) }) : i18n.t("nav.companySwitcher.company")
 }
 
 interface CompanySwitcherProps {

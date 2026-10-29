@@ -4,7 +4,16 @@ import { ReconciliationWorkbench, type ReconciliationOutcome } from "./reconcili
 import type { ReconciliationRequest, ReconciliationSource } from "./reconciliation-workbench-model"
 import type { BankSettlementAttempt, BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 afterEach(cleanup)
 
 function fixture(): ReconciliationSource {

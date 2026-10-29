@@ -1,4 +1,6 @@
 "use client"
+import { i18n } from "@lumiere/i18n"
+
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { FormValues } from "@lumiere/ui/lib/form-types"
@@ -33,7 +35,7 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
   const currentAttempt = attempt?.formOrigin?.actorIdentity === options.actorIdentity && attempt.formOrigin.organizationId === String(options.organizationId) ? attempt : null
   const readStored = useCallback(() => {
     const scope = live.current
-    if (!scope.actorIdentity || scope.organizationId <= 0n) throw new Error("Sign in before restoring an expense request")
+    if (!scope.actorIdentity || scope.organizationId <= 0n) throw new Error(i18n.t("expenses.useGenericExpenseCreate.signInBeforeRestoringAnExpenseRequest"))
     const deviceId = getOrCreateExpenseCaptureDeviceId()
     return { deviceId, item: pendingGenericExpense(readExpenseCaptureOutbox(String(scope.organizationId), deviceId, true), scope.actorIdentity) }
   }, [])
@@ -42,43 +44,43 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
     setError(null)
     if (!options.actorIdentity || options.organizationId <= 0n) return
     try { setAttempt(readStored().item) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Expense recovery is unavailable") }
+    catch (cause) { setError(cause instanceof Error ? cause.message : i18n.t("expenses.useGenericExpenseCreate.expenseRecoveryIsUnavailable")) }
   }, [options.actorIdentity, options.organizationId, readStored])
   const readPending = useCallback(() => {
-    if (live.current.companyId <= 0n) throw new Error("Select a company before saving or checking an expense")
+    if (live.current.companyId <= 0n) throw new Error(i18n.t("expenses.useGenericExpenseCreate.selectACompanyBeforeSavingOrCheckingAnExpense"))
     return readStored()
   }, [readStored])
   const resume = useCallback(() => {
     setError(null)
     try {
       const { item } = readStored()
-      if (!item) throw new Error("The retained expense request is unavailable")
+      if (!item) throw new Error(i18n.t("expenses.useGenericExpenseCreate.theRetainedExpenseRequestIsUnavailable"))
       setAttempt(item)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Expense recovery is unavailable"); throw cause }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : i18n.t("expenses.useGenericExpenseCreate.expenseRecoveryIsUnavailable")); throw cause }
   }, [readStored])
   const open = useCallback(() => {
     setError(null)
     try { setAttempt(readPending().item); return true }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Expense recovery is unavailable"); throw cause }
+    catch (cause) { setError(cause instanceof Error ? cause.message : i18n.t("expenses.useGenericExpenseCreate.expenseRecoveryIsUnavailable")); throw cause }
   }, [readPending])
 
   const run = useCallback(async (item: ExpenseCaptureOutboxItem) => {
     const scope = live.current
     const origin = item.formOrigin
-    if (!origin) throw new Error("The retained expense form identity is unavailable")
+    if (!origin) throw new Error(i18n.t("expenses.useGenericExpenseCreate.theRetainedExpenseFormIdentityIsUnavailable"))
     const assertScope = () => {
       const now = live.current
-      if (now.actorIdentity !== origin.actorIdentity || String(now.organizationId) !== origin.organizationId || String(now.companyId) !== item.companyId) throw new Error("Switch back to the company and signed-in account saved with this expense request")
+      if (now.actorIdentity !== origin.actorIdentity || String(now.organizationId) !== origin.organizationId || String(now.companyId) !== item.companyId) throw new Error(i18n.t("expenses.useGenericExpenseCreate.switchBackToTheCompanyAndSignedInAccountSavedWith"))
     }
     assertScope()
     const assertWriteAdmission = () => {
       assertScope()
-      if (!live.current.canWrite()) throw new Error("Expense creation is not available. The retained request can still be checked.")
+      if (!live.current.canWrite()) throw new Error(i18n.t("expenses.useGenericExpenseCreate.expenseCreationIsNotAvailableTheRetainedRequestCanStillBe"))
     }
     const result = await syncExpenseCapture(item, { organizationId: scope.organizationId, companyId: scope.companyId, actorIdentity: scope.actorIdentity }, fileRef.current?.requestId === item.clientRequestId ? fileRef.current.file : undefined, {
       assertWriteAllowed: assertWriteAdmission,
-      readExpenses: () => { assertScope(); return fetchQueryList("/api/query/expenses", "Unable to confirm the saved expense") },
-      readReceipts: () => { assertScope(); return fetchQueryList("/api/query/expense-receipts", "Unable to confirm the saved receipt") },
+      readExpenses: () => { assertScope(); return fetchQueryList("/api/query/expenses", i18n.t("expenses.use_generic_expense_create.unableToConfirmTheSavedExpense")) },
+      readReceipts: () => { assertScope(); return fetchQueryList("/api/query/expense-receipts", i18n.t("expenses.use_generic_expense_create.unableToConfirmTheSavedReceipt")) },
       upload: (file, companyId) => { assertWriteAdmission(); return uploadDocumentBlob({ file, companyId, purpose: "expense_receipt" }) },
       register: (params) => { assertWriteAdmission(); return createExpenseReceiptAndResolveId(scope.organizationId, params) },
       create: (params) => { assertWriteAdmission(); return scope.create(params) },
@@ -87,7 +89,7 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
         if (live.current.actorIdentity === item.formOrigin?.actorIdentity && live.current.organizationId === scope.organizationId) setAttempt(next)
       },
     })
-    if (result.syncState !== "synced") throw new Error(result.lastError ?? "The saved expense is not confirmed. Check its status before further action.")
+    if (result.syncState !== "synced") throw new Error(result.lastError ?? i18n.t("expenses.useGenericExpenseCreate.theSavedExpenseIsNotConfirmedCheckItsStatusBeforeFurther"))
     assertScope()
     fileRef.current = null
     setAttempt(null)
@@ -95,20 +97,20 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
   }, [])
 
   const execute = useCallback(async (work: () => Promise<void>) => {
-    if (active.current) throw new Error("An expense status check is already in progress")
+    if (active.current) throw new Error(i18n.t("expenses.useGenericExpenseCreate.anExpenseStatusCheckIsAlreadyInProgress"))
     active.current = true; setBusy(true); setError(null)
     try { await work() }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "The expense is not confirmed"); throw cause }
+    catch (cause) { setError(cause instanceof Error ? cause.message : i18n.t("expenses.useGenericExpenseCreate.theExpenseIsNotConfirmed")); throw cause }
     finally { active.current = false; setBusy(false) }
   }, [])
 
   const submit = useCallback((params: Partial<CreateExpenseParams>, values: FormValues) => execute(async () => {
     const { deviceId, item: retained } = readPending()
-    if (retained) { setAttempt(retained); throw new Error("This expense has a retained request. Check its status before further action.") }
+    if (retained) { setAttempt(retained); throw new Error(i18n.t("expenses.useGenericExpenseCreate.thisExpenseHasARetainedRequestCheckItsStatusBeforeFurther")) }
     const scope = live.current
     const payload = genericExpensePayload(params, values)
     const file = firstFileFromFormValue(values.receiptFile)
-    if (payload.hasReceipt && !file) throw new Error("Choose a receipt file, or clear the receipt checkbox")
+    if (payload.hasReceipt && !file) throw new Error(i18n.t("expenses.useGenericExpenseCreate.chooseAReceiptFileOrClearTheReceiptCheckbox"))
     const clientRequestId = newExpenseClientRequestId()
     const item = enqueueExpenseCapture(String(scope.organizationId), {
       clientRequestId, deviceId, companyId: String(scope.companyId), payload,
@@ -123,7 +125,7 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
 
   const checkStatus = useCallback(() => execute(async () => {
     const { item } = readPending()
-    if (!item) throw new Error("The retained expense request is unavailable")
+    if (!item) throw new Error(i18n.t("expenses.useGenericExpenseCreate.theRetainedExpenseRequestIsUnavailable"))
     setAttempt(item)
     await run(item)
   }), [execute, readPending, run])
@@ -131,7 +133,7 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
     if (!currentAttempt?.receipt || currentAttempt.receipt.uploaded || currentAttempt.syncState === "unknown" || currentAttempt.syncState === "submitting") return
     const file = firstFileFromFormValue(values.receiptFile)
     if (!file) return
-    if (!captureFileMatches(file, currentAttempt.receipt)) { fileRef.current = null; setError("Select the original receipt file with the same name, size, type, and modification time"); return }
+    if (!captureFileMatches(file, currentAttempt.receipt)) { fileRef.current = null; setError(i18n.t("expenses.useGenericExpenseCreate.selectTheOriginalReceiptFileWithTheSameNameSizeType")); return }
     fileRef.current = { requestId: currentAttempt.clientRequestId, file }; setError(null)
   }, [currentAttempt])
   return { attempt: currentAttempt, busy, error, open, resume, submit, checkStatus, reattach }

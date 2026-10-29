@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { CaptureAttachmentPreview } from '../../../../web/app/(modules)/expenses/capture-attachment-preview'
 
-vi.mock('@lumiere/i18n', () => ({
+vi.mock('@lumiere/i18n', async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),
   useTranslation: () => ({
     t: (key: string, options?: { defaultValue?: string }) =>
       options?.defaultValue ?? key,

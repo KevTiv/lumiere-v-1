@@ -1,5 +1,6 @@
 'use client'
 
+import { i18n as rootI18n, useTranslation as useRootTranslation } from "@lumiere/i18n"
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -17,6 +18,7 @@ export default function HostedAcceptInvitePage({
   signedIn: boolean
   hasInvite: boolean
 }) {
+  useRootTranslation()
   const { t } = useTranslation()
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -34,17 +36,17 @@ export default function HostedAcceptInvitePage({
       })
       if (!response.ok) {
         setError(response.status === 403
-          ? 'This invitation is not approved for your WorkOS identity and organization.'
+          ? rootI18n.t("auth.acceptInvite.errors.identityNotApproved")
           : response.status === 400
-            ? 'This invitation is invalid, expired, or already used. Request another invitation.'
-            : 'Could not accept the invitation. Try again or contact your administrator.')
+            ? rootI18n.t("auth.acceptInvite.errors.invalidInvitation")
+            : rootI18n.t("auth.acceptInvite.errors.acceptFailed"))
         return
       }
       const result = (await response.json()) as { redirectTo?: string }
       router.replace(safeAuthReturnTo(result.redirectTo, '/overview'))
       router.refresh()
     } catch {
-      setError('Could not contact the authentication service. Please retry.')
+      setError(rootI18n.t("auth.acceptInvite.errors.serviceUnavailable"))
     } finally {
       setLoading(false)
     }
@@ -54,13 +56,12 @@ export default function HostedAcceptInvitePage({
     <Card>
       <CardHeader>
         <CardTitle>{t('auth.acceptInvite.title')}</CardTitle>
-        <CardDescription>Only your administrator-approved WorkOS identity can accept this organization invitation.</CardDescription>
+        <CardDescription>{rootI18n.t("auth.ui.hostedAcceptInvite.onlyYourAdministratorApprovedWorkOSIdentityCanAcceptThis")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!hasInvite ? (
           <p role="alert" className="text-sm text-destructive">
-            Invitation missing or expired. Ask your administrator for a new link.
-          </p>
+            {rootI18n.t("auth.ui.hostedAcceptInvite.invitationMissingOrExpiredAskYourAdministratorFor")}</p>
         ) : !signedIn ? (
           <form action={redirectToWorkOsForInvite}>
             <Button type="submit" size="lg" className="w-full">

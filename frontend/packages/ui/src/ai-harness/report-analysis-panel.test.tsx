@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
   mutateAsync: vi.fn(), reset: vi.fn(), data: undefined as unknown,
   pending: false, failed: false, agentsUnavailable: false, agentsPending: false,
 }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()), useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-agents", () => ({ useAiAgents: () => ({
   isError: state.agentsUnavailable, isPending: state.agentsPending,
   data: [

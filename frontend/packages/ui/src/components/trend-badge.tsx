@@ -1,3 +1,5 @@
+"use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { TrendingDown, TrendingUp } from "lucide-react"
 
 interface TrendBadgeProps {
@@ -5,7 +7,8 @@ interface TrendBadgeProps {
   label?: string
 }
 
-export function TrendBadge({ change, label = "vs prior period" }: TrendBadgeProps) {
+export function TrendBadge({ change, label = i18n.t("ui.components.trendBadge.vsPriorPeriod") }: TrendBadgeProps) {
+  useTranslation()
   if (change === undefined) return null
 
   const isPositive = change > 0

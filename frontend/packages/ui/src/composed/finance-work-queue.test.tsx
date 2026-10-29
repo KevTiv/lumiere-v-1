@@ -4,7 +4,6 @@ import { OwnerControlLoop } from "../../../../web/app/(modules)/overview/owner-c
 import { WorkspaceProfileProvider } from "../lib/workspace-profile-context"
 const denied = vi.hoisted(() => new Set<string>())
 vi.mock("@/lib/rbac-context", () => ({ useRBAC: () => ({ checkPermission: (resource: string) => ({ allowed: !denied.has(resource) }) }) }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string; count?: number }) => (options?.defaultValue ?? key).replace("{{count}}", String(options?.count ?? "")) }) }))
 vi.mock("next/link", () => ({ default: ({ children, href, ...props }: React.ComponentProps<"a">) => <a href={href} {...props}>{children}</a> }))
 const props = { overdueInvoices: 0, unreconciledPayments: 2, lowStockProducts: 9, pendingMessageApprovals: 0, draftBills: 1, expenseApprovals: 0 }
 function queue(overrides: Partial<typeof props> = {}) { return <WorkspaceProfileProvider value="finance-alpha"><OwnerControlLoop {...props} {...overrides} /></WorkspaceProfileProvider> }

@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import * as React from "react"
 import { Command as CommandPrimitive } from "cmdk"
@@ -34,8 +36,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
+  title = i18n.t("ui.components.command.commandPalette"),
+  description = i18n.t("ui.components.command.searchForACommandToRun"),
   children,
   className,
   showCloseButton = false,
@@ -47,6 +49,7 @@ function CommandDialog({
   showCloseButton?: boolean
   children: React.ReactNode
 }) {
+  useTranslation()
   return (
     <Dialog {...props}>
       <DialogContent

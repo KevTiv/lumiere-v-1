@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@lumiere/query-hooks/http';
 import { stdbBffCommandPost } from '@lumiere/stdb/commands';
@@ -48,7 +50,7 @@ export function invoiceEmailQueueRequest(submission: InvoiceEmailSubmission) {
 /** One page-scoped client retains dispatched review tokens, preventing an automatic queue replay. */
 export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
   const sdk = createStdbSdk(async (input, init) => {
-    if (typeof input !== 'string') throw new Error('The invoice review query must use a canonical resource path.');
+    if (typeof input !== 'string') throw new Error(i18n.t("accounting.invoiceEmailTransport.theInvoiceReviewQueryMustUseACanonicalResourcePath"));
     return fetcher(input, init);
   });
   const dispatched = new Set<string>();
@@ -68,17 +70,17 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
       return confirmed === undefined ? unknown(submission, 'The exact queued message is not confirmed. It may have queued or been processed; do not queue it again. Check the original request or ask an administrator to inspect the outbox.')
         : { ...confirmed, submission };
     } catch (error) {
-      return unknown(submission, `${error instanceof Error ? error.message : 'Queue readback is unavailable.'} The original request remains unconfirmed; no new copy was queued.`);
+      return unknown(submission, `${error instanceof Error ? error.message : i18n.t("accounting.invoiceEmailTransport.queueReadbackIsUnavailable")} The original request remains unconfirmed; no new copy was queued.`);
     }
   };
 
   const queue = async (submission: InvoiceEmailSubmission, mayDispatch = () => true): Promise<InvoiceEmailQueueOutcome> => {
     if (dispatched.has(submission.reviewId)) return check(submission, mayDispatch);
     const reviewedContent = invoiceEmailContent(submission);
-    const problem = invoiceEmailRecipientProblem(submission.recipient) || invoiceEmailTemplateProblem({ ...submission.template, subject: reviewedContent.subject, bodyHtml: reviewedContent.bodyText }) || invoiceEmailContentProblem(reviewedContent) || (!submission.content && submission.template.attachDocument ? 'Review this invoice again to approve its PDF attachment.' : null);
-    if (problem || !submission.document.posted) return { status: 'rejected', message: problem || 'Post the customer invoice before queueing its email.' };
+    const problem = invoiceEmailRecipientProblem(submission.recipient) || invoiceEmailTemplateProblem({ ...submission.template, subject: reviewedContent.subject, bodyHtml: reviewedContent.bodyText }) || invoiceEmailContentProblem(reviewedContent) || (!submission.content && submission.template.attachDocument ? i18n.t("accounting.invoiceEmailTransport.reviewThisInvoiceAgainToApproveItsPDFAttachment") : null);
+    if (problem || !submission.document.posted) return { status: 'rejected', message: problem || i18n.t("accounting.invoiceEmailTransport.postTheCustomerInvoiceBeforeQueueingItsEmail") };
     if (new TextEncoder().encode(submission.document.revision).length > 65_536 || new TextEncoder().encode(invoiceEmailContext(submission)).length > 131_072) {
-      return { status: 'rejected', message: 'This document or email exceeds the supported review size. No email was queued.' };
+      return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.thisDocumentOrEmailExceedsTheSupportedReviewSizeNoEmail") };
     }
     try {
       const [templates, messages, moves] = await Promise.all([
@@ -87,24 +89,24 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
       const existing = resolveInvoiceEmailQueue(messages, submission);
       if (existing !== undefined) return { ...existing, submission };
       const current = invoiceEmailTemplates(templates, submission.document).find((row) => row.id === submission.template.id);
-      if (!current || !sameInvoiceEmailTemplate(current, submission.template)) return { status: 'rejected', message: 'The selected template changed or is no longer available. Reload templates and review the latest literal message. No email was queued.' };
+      if (!current || !sameInvoiceEmailTemplate(current, submission.template)) return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.theSelectedTemplateChangedOrIsNoLongerAvailableReloadTemplates") };
       const records = moves.filter((row) => row.id === submission.document.moveId && row.organizationId === submission.document.organizationId && row.companyId === submission.document.companyId);
-      if (records.length !== 1 || invoiceEmailRecordRevision(records[0]!) !== submission.document.revision) return { status: 'rejected', message: 'The invoice changed or is no longer readable in its original company. Review the current document before queueing. No email was queued.' };
-      if (!mayDispatch()) return { status: 'rejected', message: 'The active company, invoice or access changed before queueing. No email was queued.' };
+      if (records.length !== 1 || invoiceEmailRecordRevision(records[0]!) !== submission.document.revision) return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.theInvoiceChangedOrIsNoLongerReadableInItsOriginal") };
+      if (!mayDispatch()) return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.theActiveCompanyInvoiceOrAccessChangedBeforeQueueingNoEmail") };
     } catch (error) {
-      return { status: 'rejected', message: `${error instanceof Error ? error.message : 'The review could not be refreshed.'} No email was queued.` };
+      return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.reviewFailureNoQueue", { message: error instanceof Error ? error.message : i18n.t("accounting.invoiceEmailTransport.theReviewCouldNotBeRefreshed") }) };
     }
     // Independent callers can finish preflight together. Claim the review token before the first POST.
     if (dispatched.has(submission.reviewId)) return check(submission, mayDispatch);
     let command: ReturnType<typeof invoiceEmailQueueRequest>;
     try { command = invoiceEmailQueueRequest(submission); }
-    catch { return { status: 'rejected', message: 'The current command transport cannot represent this request exactly. No email was queued.' }; }
+    catch { return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.theCurrentCommandTransportCannotRepresentThisRequestExactlyNoEmail") }; }
     dispatched.add(submission.reviewId);
     try {
       const response = await fetcher(command.urlPath, { ...command.init, signal: AbortSignal.timeout(30_000) });
       if (!response.ok && response.status >= 400 && response.status < 500 && response.status !== 408) {
         const error = await responseError(response);
-        return { status: 'rejected', message: `${error.message} No queue confirmation was returned.` };
+        return { status: 'rejected', message: i18n.t("accounting.invoiceEmailTransport.noQueueConfirmation", { message: error.message }) };
       }
     } catch {
       // A response can be lost after the reducer creates the message. Reconcile only; never replay.
@@ -140,7 +142,7 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
 export async function downloadInvoiceReviewPdf(document: InvoiceEmailDocument, fetcher: Fetcher = apiFetch): Promise<void> {
   const response = await fetcher(`/api/documents/pdf/account-move/${document.moveId}`);
   if (!response.ok) throw await responseError(response);
-  if (!response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error('The invoice PDF could not be confirmed.');
+  if (!response.headers.get('content-type')?.startsWith('application/pdf')) throw new Error(i18n.t("accounting.invoiceEmailTransport.theInvoicePDFCouldNotBeConfirmed"));
   const objectUrl = URL.createObjectURL(await response.blob());
   try {
     const anchor = window.document.createElement('a');

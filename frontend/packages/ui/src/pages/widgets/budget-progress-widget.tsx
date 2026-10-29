@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCurrencyFormat } from "../../lib/currency-context"
 
@@ -14,12 +16,13 @@ interface BudgetProgressData {
 }
 
 export function BudgetProgressWidget({ data }: { data: BudgetProgressData }) {
+  useTranslation()
   const { money } = useCurrencyFormat()
   const fmt = { format: (value: number) => money(value, undefined, { compact: true }) }
 
   if (data.budgets.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-4">No budget data</p>
+      <p className="text-sm text-muted-foreground text-center py-4">{i18n.t("ui.pages.budgetProgressWidget.noBudgetData")}</p>
     )
   }
 
@@ -44,7 +47,7 @@ export function BudgetProgressWidget({ data }: { data: BudgetProgressData }) {
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{fmt.format(b.actual)}</span>
-              <span>of {fmt.format(b.planned)}</span>
+              <span>{i18n.t("ui.pages.budgetProgressWidget.of")}{" "}{fmt.format(b.planned)}</span>
             </div>
           </div>
         )

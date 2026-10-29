@@ -7,7 +7,7 @@ import {
   Sparkles,
   BookMarked,
 } from "lucide-react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
@@ -141,8 +141,8 @@ export function ErpCommandPalette({
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title="Command Palette"
-      description="Search modules, quick actions and records"
+      title={i18n.t("ui.pages.erpCommandPalette.commandPalette")}
+      description={i18n.t("ui.pages.erpCommandPalette.searchModulesQuickActionsAndRecords")}
       data-testid="erp-command-palette"
     >
       <Command>
@@ -152,7 +152,7 @@ export function ErpCommandPalette({
           onValueChange={setSearch}
         />
         <CommandList>
-          {showEmpty ? <CommandEmpty>No results found.</CommandEmpty> : null}
+          {showEmpty ? <CommandEmpty>{i18n.t("ui.pages.erpCommandPalette.noResultsFound")}</CommandEmpty> : null}
 
           {recordSearchActive && organizationId != null ? (
             <RecordSearchResults
@@ -203,7 +203,7 @@ export function ErpCommandPalette({
           {accessibleNavGroups.map((group, groupIndex) => (
             <CommandGroup
               key={group.label ?? `nav-group-${groupIndex}`}
-              heading={group.label ?? "Navigation"}
+              heading={group.label ?? t("commandPalette.navigation")}
             >
               {group.items.map((item) => {
                 const Icon = item.icon

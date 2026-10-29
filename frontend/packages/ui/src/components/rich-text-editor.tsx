@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import * as React from "react"
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react"
@@ -115,6 +117,7 @@ function normalizeHref(raw: string): string {
 }
 
 function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }) {
+  useTranslation()
   const [open, setOpen] = React.useState(false)
   const [href, setHref] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -147,7 +150,7 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }
     >
       <PopoverTrigger
         render={
-          <ToolbarButton label="Link" active={isActive} disabled={disabled}>
+          <ToolbarButton label={i18n.t("ui.components.richTextEditor.link")} active={isActive} disabled={disabled}>
             <LinkIcon />
           </ToolbarButton>
         }
@@ -163,7 +166,7 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }
         >
           <input
             ref={inputRef}
-            aria-label="Link URL"
+            aria-label={i18n.t("ui.components.richTextEditor.linkURL")}
             className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
             placeholder="https://"
             value={href}
@@ -173,11 +176,10 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }
             type="submit"
             className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
-            Apply
-          </button>
+            {i18n.t("ui.components.richTextEditor.apply")}</button>
           {isActive ? (
             <ToolbarButton
-              label="Remove link"
+              label={i18n.t("ui.components.richTextEditor.removeLink")}
               onClick={() => {
                 editor.chain().focus().extendMarkRange("link").unsetLink().run()
                 setOpen(false)
@@ -201,6 +203,7 @@ function RichTextToolbar({
   disabled: boolean
   maxLength?: number
 }) {
+  useTranslation()
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -227,7 +230,7 @@ function RichTextToolbar({
   return (
     <div
       role="toolbar"
-      aria-label="Text formatting"
+      aria-label={i18n.t("ui.components.richTextEditor.textFormatting")}
       className="flex min-h-10 items-center gap-0.5 overflow-x-auto border-b border-border/60 bg-muted/20 px-2 py-1"
     >
       <RichTextTemplatePicker
@@ -235,48 +238,48 @@ function RichTextToolbar({
         disabled={disabled}
         maxLength={maxLength}
       />
-      <ToolbarButton label="Heading 1" active={state.h1} disabled={disabled} onClick={() => chain().toggleHeading({ level: 1 }).run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.heading1")} active={state.h1} disabled={disabled} onClick={() => chain().toggleHeading({ level: 1 }).run()}>
         <Heading1 />
       </ToolbarButton>
-      <ToolbarButton label="Heading 2" active={state.h2} disabled={disabled} onClick={() => chain().toggleHeading({ level: 2 }).run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.heading2")} active={state.h2} disabled={disabled} onClick={() => chain().toggleHeading({ level: 2 }).run()}>
         <Heading2 />
       </ToolbarButton>
-      <ToolbarButton label="Heading 3" active={state.h3} disabled={disabled} onClick={() => chain().toggleHeading({ level: 3 }).run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.heading3")} active={state.h3} disabled={disabled} onClick={() => chain().toggleHeading({ level: 3 }).run()}>
         <Heading3 />
       </ToolbarButton>
       <ToolbarDivider />
-      <ToolbarButton label="Bold" shortcut="Ctrl+B" active={state.bold} disabled={disabled} onClick={() => chain().toggleBold().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.bold")} shortcut="Ctrl+B" active={state.bold} disabled={disabled} onClick={() => chain().toggleBold().run()}>
         <Bold />
       </ToolbarButton>
-      <ToolbarButton label="Italic" shortcut="Ctrl+I" active={state.italic} disabled={disabled} onClick={() => chain().toggleItalic().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.italic")} shortcut="Ctrl+I" active={state.italic} disabled={disabled} onClick={() => chain().toggleItalic().run()}>
         <Italic />
       </ToolbarButton>
-      <ToolbarButton label="Strikethrough" active={state.strike} disabled={disabled} onClick={() => chain().toggleStrike().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.strikethrough")} active={state.strike} disabled={disabled} onClick={() => chain().toggleStrike().run()}>
         <Strikethrough />
       </ToolbarButton>
-      <ToolbarButton label="Inline code" active={state.code} disabled={disabled} onClick={() => chain().toggleCode().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.inlineCode")} active={state.code} disabled={disabled} onClick={() => chain().toggleCode().run()}>
         <Code2 />
       </ToolbarButton>
       <ToolbarDivider />
-      <ToolbarButton label="Bulleted list" active={state.bulletList} disabled={disabled} onClick={() => chain().toggleBulletList().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.bulletedList")} active={state.bulletList} disabled={disabled} onClick={() => chain().toggleBulletList().run()}>
         <List />
       </ToolbarButton>
-      <ToolbarButton label="Numbered list" active={state.orderedList} disabled={disabled} onClick={() => chain().toggleOrderedList().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.numberedList")} active={state.orderedList} disabled={disabled} onClick={() => chain().toggleOrderedList().run()}>
         <ListOrdered />
       </ToolbarButton>
-      <ToolbarButton label="Checklist" active={state.taskList} disabled={disabled} onClick={() => chain().toggleTaskList().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.checklist")} active={state.taskList} disabled={disabled} onClick={() => chain().toggleTaskList().run()}>
         <ListChecks />
       </ToolbarButton>
-      <ToolbarButton label="Quote" active={state.blockquote} disabled={disabled} onClick={() => chain().toggleBlockquote().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.quote")} active={state.blockquote} disabled={disabled} onClick={() => chain().toggleBlockquote().run()}>
         <Quote />
       </ToolbarButton>
-      <ToolbarButton label="Code block" active={state.codeBlock} disabled={disabled} onClick={() => chain().toggleCodeBlock().run()}>
+      <ToolbarButton label={i18n.t("ui.components.richTextEditor.codeBlock")} active={state.codeBlock} disabled={disabled} onClick={() => chain().toggleCodeBlock().run()}>
         <SquareCode />
       </ToolbarButton>
       <ToolbarDivider />
       <LinkControl editor={editor} disabled={disabled} />
       <ToolbarButton
-        label={state.table ? "Delete table" : "Insert table"}
+        label={state.table ? i18n.t("ui.components.richTextEditor.deleteTable") : i18n.t("ui.components.richTextEditor.insertTable")}
         active={state.table}
         disabled={disabled}
         onClick={() =>
@@ -288,10 +291,10 @@ function RichTextToolbar({
         <TableIcon />
       </ToolbarButton>
       <span className="ml-auto flex shrink-0 items-center">
-        <ToolbarButton label="Undo" shortcut="Ctrl+Z" disabled={disabled || !state.canUndo} onClick={() => chain().undo().run()}>
+        <ToolbarButton label={i18n.t("common.entityView.inlineEdit.undo")} shortcut="Ctrl+Z" disabled={disabled || !state.canUndo} onClick={() => chain().undo().run()}>
           <Undo2 />
         </ToolbarButton>
-        <ToolbarButton label="Redo" shortcut="Ctrl+Shift+Z" disabled={disabled || !state.canRedo} onClick={() => chain().redo().run()}>
+        <ToolbarButton label={i18n.t("ui.components.richTextEditor.redo")} shortcut="Ctrl+Shift+Z" disabled={disabled || !state.canRedo} onClick={() => chain().redo().run()}>
           <Redo2 />
         </ToolbarButton>
       </span>

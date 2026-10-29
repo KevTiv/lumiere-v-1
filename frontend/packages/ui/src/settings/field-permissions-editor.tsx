@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import {
   resolveHttpSqlColumns,
@@ -27,16 +27,16 @@ import { cn } from "@/lib/utils"
 
 /** Common query resources admins restrict for column-level API reads. */
 const FIELD_POLICY_RESOURCES: readonly { key: QueryResourceKey; label: string }[] = [
-  { key: "contacts", label: "Contacts" },
-  { key: "leads", label: "Leads" },
-  { key: "opportunities", label: "Opportunities" },
-  { key: "products", label: "Products" },
-  { key: "sale-orders", label: "Sales orders" },
-  { key: "purchase-orders", label: "Purchase orders" },
-  { key: "employees", label: "Employees" },
-  { key: "account-moves", label: "Journal entries" },
-  { key: "activities", label: "Activities" },
-  { key: "documents", label: "Documents" },
+  { key: "contacts", get label() { return i18n.t("settings.fieldPermissionsEditor.text.contacts") } },
+  { key: "leads", get label() { return i18n.t("settings.fieldPermissionsEditor.text.leads") } },
+  { key: "opportunities", get label() { return i18n.t("settings.fieldPermissionsEditor.text.opportunities") } },
+  { key: "products", get label() { return i18n.t("settings.auditLog.products") } },
+  { key: "sale-orders", get label() { return i18n.t("settings.fieldPermissionsEditor.text.salesOrders") } },
+  { key: "purchase-orders", get label() { return i18n.t("settings.fieldPermissionsEditor.text.purchaseOrders") } },
+  { key: "employees", get label() { return i18n.t("settings.fieldPermissionsEditor.text.employees") } },
+  { key: "account-moves", get label() { return i18n.t("settings.fieldPermissionsEditor.text.journalEntries") } },
+  { key: "activities", get label() { return i18n.t("settings.fieldPermissionsEditor.text.activities") } },
+  { key: "documents", get label() { return i18n.t("nav.documents") } },
 ]
 
 type FieldPermissionRow = {

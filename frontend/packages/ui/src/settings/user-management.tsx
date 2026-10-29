@@ -56,7 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Role } from "@/lib/rbac-types"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { rolePillClassForColor, userStatusPillClass } from "@/lib/theme-colors"
 import { FormModal } from "../forms/form-modal"
@@ -156,7 +156,7 @@ export function UserManagement() {
     setMemberError(null)
     try {
       if (editingUser) {
-        if (!primaryRoleId) throw new Error('Choose a primary role')
+        if (!primaryRoleId) throw new Error(i18n.t("settings.userManagement.text.chooseAPrimaryRole"))
         await setMemberAccess.mutateAsync({
           user: editingUser, primaryRoleId,
           roleIds: [...new Set([primaryRoleId, ...selectedRoles])],
@@ -164,8 +164,8 @@ export function UserManagement() {
           jobTitle: formData.has('department') ? String(formData.get('department') ?? '').trim() : undefined,
         })
       } else {
-        if (!email) throw new Error("Email is required")
-        if (selectedRoles.length !== 1) throw new Error("Choose one initial role for this invitation")
+        if (!email) throw new Error(i18n.t("settings.userManagement.text.emailIsRequired"))
+        if (selectedRoles.length !== 1) throw new Error(i18n.t("settings.userManagement.text.chooseOneInitialRoleForThisInvitation"))
         await createInvite.mutateAsync({
           email,
           roleId: selectedRoles[0],
@@ -442,10 +442,10 @@ export function UserManagement() {
               </div>
             </div>}
             {!editingUser && <div className="space-y-2"><Label htmlFor="invite-email">{t("settings.users.email")}</Label><Input id="invite-email" name="email" type="email" required autoComplete="email" /></div>}
-            {editingUser && <p className="text-sm text-muted-foreground">Identity email is managed through WorkOS. Members can edit their display name in account settings.</p>}
+            {editingUser && <p className="text-sm text-muted-foreground">{i18n.t("settings.userManagement.text.identityEmailIsManagedThroughWorkOSMembersCanEditTheirDisplayNameInAccountSettings")}</p>}
             {editingUser && <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="department">Job title</Label>
+                <Label htmlFor="department">{i18n.t("settings.adminOps.members.jobTitle")}</Label>
                 <Input 
                   id="department" 
                   name="department"
@@ -465,9 +465,9 @@ export function UserManagement() {
                 </Select>
               </div>
             </div>}
-            {editingUser && <div className="space-y-2"><Label>Primary role</Label><Select value={primaryRoleId} onValueChange={setPrimaryRoleId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map(role => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}</SelectContent></Select></div>}
+            {editingUser && <div className="space-y-2"><Label>{i18n.t("settings.userManagement.text.primaryRole")}</Label><Select value={primaryRoleId} onValueChange={setPrimaryRoleId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map(role => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}</SelectContent></Select></div>}
             <div className="space-y-2">
-              <Label>{editingUser ? "Additional roles" : "Initial role"}</Label>
+              <Label>{editingUser ? i18n.t("settings.userManagement.text.additionalRoles") : i18n.t("settings.userManagement.text.initialRole")}</Label>
               <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
                 {roles.filter(role => !editingUser || role.id !== primaryRoleId).map((role) => (
                   <div key={role.id} className="flex items-center gap-2">

@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Calendar Module Form Configurations
 //!
 //! This module provides form configurations for Calendar/Events.
@@ -9,23 +11,23 @@ export const calendarForms: FormRegistryEntry[] = [
   {
     moduleId: "calendar",
     formId: "new-event",
-    name: "New Event",
-    description: "Create a new calendar event",
+    get name() { return i18n.t("forms.defaults.calendar.newEvent") },
+    get description() { return i18n.t("forms.defaults.calendar.createANewCalendarEvent") },
     icon: "Calendar",
-    category: "Events",
+    get category() { return i18n.t("forms.defaults.calendar.events") },
     defaultConfig: () => ({
       moduleId: "calendar",
       formId: "new-event",
-      name: "New Event",
-      description: "Create a new calendar event",
+      get name() { return i18n.t("forms.defaults.calendar.newEvent") },
+      get description() { return i18n.t("forms.defaults.calendar.createANewCalendarEvent") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "title",
           name: "title",
-          label: "Event Title",
+          get label() { return i18n.t("calendar.forms.newEvent.fields.name") },
           fieldType: "Text",
-          placeholder: "Enter event title",
+          get placeholder() { return i18n.t("forms.defaults.calendar.enterEventTitle") },
           validation: { required: true, minLength: 3 },
           aiSuggestions: [],
           order: 1,
@@ -37,7 +39,7 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("settings.ai.description") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -50,7 +52,7 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "start_date",
           name: "start_date",
-          label: "Start Date & Time",
+          get label() { return i18n.t("calendar.forms.newEvent.fields.start") },
           fieldType: "DateTime",
           validation: { required: true },
           aiSuggestions: [],
@@ -63,7 +65,7 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "end_date",
           name: "end_date",
-          label: "End Date & Time",
+          get label() { return i18n.t("calendar.forms.newEvent.fields.stop") },
           fieldType: "DateTime",
           validation: { required: true },
           aiSuggestions: [],
@@ -76,7 +78,7 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "all_day",
           name: "all_day",
-          label: "All Day Event",
+          get label() { return i18n.t("calendar.forms.newEvent.fields.allday") },
           fieldType: "Switch",
           validation: { required: false },
           aiSuggestions: [],
@@ -89,9 +91,9 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "location",
           name: "location",
-          label: "Location",
+          get label() { return i18n.t("ui.stock3d.details.location") },
           fieldType: "Text",
-          placeholder: "Event location",
+          get placeholder() { return i18n.t("forms.defaults.calendar.eventLocation") },
           validation: { required: false },
           aiSuggestions: [],
           order: 6,
@@ -103,7 +105,7 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "attendees",
           name: "attendees",
-          label: "Attendees",
+          get label() { return i18n.t("calendar.eventDetail.attendees") },
           fieldType: "UserSelect",
           validation: { required: false },
           aiSuggestions: [],
@@ -116,15 +118,15 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "reminder",
           name: "reminder",
-          label: "Reminder",
+          get label() { return i18n.t("ui.journal.noteTypes.reminder") },
           fieldType: "Select",
           options: [
-            { value: "none", label: "No reminder", color: "gray" },
-            { value: "5min", label: "5 minutes before", color: "blue" },
-            { value: "15min", label: "15 minutes before", color: "green" },
-            { value: "30min", label: "30 minutes before", color: "purple" },
-            { value: "1hour", label: "1 hour before", color: "orange" },
-            { value: "1day", label: "1 day before", color: "red" },
+            { value: "none", get label() { return i18n.t("forms.defaults.calendar.noReminder") }, color: "gray" },
+            { value: "5min", get label() { return i18n.t("forms.defaults.calendar.5MinutesBefore") }, color: "blue" },
+            { value: "15min", get label() { return i18n.t("forms.defaults.calendar.15MinutesBefore") }, color: "green" },
+            { value: "30min", get label() { return i18n.t("forms.defaults.calendar.30MinutesBefore") }, color: "purple" },
+            { value: "1hour", get label() { return i18n.t("forms.defaults.calendar.1HourBefore") }, color: "orange" },
+            { value: "1day", get label() { return i18n.t("forms.defaults.calendar.1DayBefore") }, color: "red" },
           ],
           validation: { required: false },
           aiSuggestions: [],
@@ -137,7 +139,7 @@ export const calendarForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Tags") },
           fieldType: "Tags",
           validation: { required: false },
           aiSuggestions: [],

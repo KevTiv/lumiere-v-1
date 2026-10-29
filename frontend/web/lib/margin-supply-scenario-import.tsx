@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n as rootI18n, useTranslation as useRootTranslation } from "@lumiere/i18n"
 import { useState } from "react"
 import { Button } from "@lumiere/ui/components/button"
 import { Input } from "@lumiere/ui/components/input"
@@ -28,6 +29,7 @@ function downloadTemplate() {
 }
 
 export function MarginSupplyScenarioImport({ onApply }: MarginSupplyScenarioImportProps) {
+  useRootTranslation()
   const [rows, setRows] = useState<ImportedMarginSupplyScenario[]>([])
   const [reviewedRows, setReviewedRows] = useState<Set<number>>(() => new Set())
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export function MarginSupplyScenarioImport({ onApply }: MarginSupplyScenarioImpo
     setError(null)
     if (!file) return
     if (file.size > MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxBytes) {
-      setError(`CSV exceeds the ${MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxBytes.toLocaleString()} byte alpha limit.`)
+      setError(rootI18n.t("reports.scenarioImport.sizeLimit", { bytes: MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxBytes.toLocaleString() }))
       return
     }
     try {
@@ -51,9 +53,9 @@ export function MarginSupplyScenarioImport({ onApply }: MarginSupplyScenarioImpo
   return (
     <div className="mt-6 space-y-4 border-t pt-5" data-testid="margin-supply-scenario-import">
       <div>
-        <p className="text-sm font-medium">Controlled scenario CSV</p>
+        <p className="text-sm font-medium">{rootI18n.t("reports.ui.marginSupplyScenarioImport.controlledScenarioCSV")}</p>
         <p className="text-sm text-muted-foreground">
-          Import up to {MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxRows} rows ({MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxBytes.toLocaleString()} bytes). Required headers: {MARGIN_SUPPLY_SCENARIO_CSV_HEADERS.join(", ")}.
+          {rootI18n.t("reports.scenarioImport.requirements", { rows: MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxRows, bytes: MARGIN_SUPPLY_SCENARIO_CSV_LIMITS.maxBytes.toLocaleString(), headers: MARGIN_SUPPLY_SCENARIO_CSV_HEADERS.join(", ") })}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -61,15 +63,15 @@ export function MarginSupplyScenarioImport({ onApply }: MarginSupplyScenarioImpo
           className="max-w-md"
           type="file"
           accept=".csv,text/csv,text/plain"
-          aria-label="Margin and supply scenario CSV"
+          aria-label={rootI18n.t("reports.ui.marginSupplyScenarioImport.marginAndSupplyScenarioCSV")}
           onChange={(event) => void handleFile(event.target.files?.[0])}
         />
-        <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>Download template</Button>
+        <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>{rootI18n.t("reports.ui.marginSupplyScenarioImport.downloadTemplate")}</Button>
       </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {rows.length > 0 ? (
         <div className="space-y-3">
-          <p className="text-sm font-medium">Review every assumption before filling the scenario form</p>
+          <p className="text-sm font-medium">{rootI18n.t("reports.ui.marginSupplyScenarioImport.reviewEveryAssumptionBeforeFillingTheScenarioForm")}</p>
           {rows.map((row) => {
             const isReviewed = reviewedRows.has(row.provenance.rowNumber)
             return (
@@ -77,7 +79,7 @@ export function MarginSupplyScenarioImport({ onApply }: MarginSupplyScenarioImpo
                 <div>
                   <p className="font-medium">{row.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {row.provenance.fileName} · imported {new Date(row.provenance.importedAt).toLocaleString()} · CSV row {row.provenance.rowNumber}
+                    {rootI18n.t("reports.scenarioImport.provenance", { fileName: row.provenance.fileName, date: new Date(row.provenance.importedAt).toLocaleString(), row: row.provenance.rowNumber })}
                   </p>
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm lg:grid-cols-4">
@@ -100,11 +102,9 @@ export function MarginSupplyScenarioImport({ onApply }: MarginSupplyScenarioImpo
                         return next
                       })}
                     />
-                    I reviewed this row and its source
-                  </label>
+                    {rootI18n.t("reports.ui.marginSupplyScenarioImport.iReviewedThisRowAndItsSource")}</label>
                   <Button type="button" size="sm" disabled={!isReviewed} onClick={() => onApply(row)}>
-                    Fill scenario fields
-                  </Button>
+                    {rootI18n.t("reports.ui.marginSupplyScenarioImport.fillScenarioFields")}</Button>
                 </div>
               </div>
             )

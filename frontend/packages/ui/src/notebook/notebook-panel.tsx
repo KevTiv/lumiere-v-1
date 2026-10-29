@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -181,7 +181,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
   const { t } = useTranslation()
   const [notebook, setNotebook] = useState<Notebook>({
     id: generateId(),
-    title: "Untitled Notebook",
+    title: i18n.t("ui.notebook.notebookPanel.untitledNotebook"),
     cells: [createCell("markdown"), createCell("code")],
     metadata: {
       kernelSpec: { name: "python3", language: "python", displayName: "Python 3" },
@@ -290,7 +290,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         outputs: [{
           id: generateId(),
           type: "error",
-          content: "Execution failed",
+          content: i18n.t("ui.notebook.notebookPanel.executionFailed"),
           timestamp: new Date(),
         }],
       })
@@ -403,16 +403,16 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={runAllCells} title="Run All">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={runAllCells} title={i18n.t("ui.notebook.notebookPanel.runAll")}>
             <Play className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearAllOutputs} title="Clear Outputs">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearAllOutputs} title={i18n.t("ui.notebook.notebookPanel.clearOutputs")}>
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })} aria-label={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })}>
             <Save className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport} title="Export">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport} title={i18n.t("common.export")}>
             <Download className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
@@ -421,11 +421,11 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             size="icon"
             className="h-7 w-7"
             onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            title={isFullscreen ? i18n.t("ui.notebook.notebookPanel.exitFullscreen") : i18n.t("ui.notebook.notebookPanel.fullscreen")}
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title={i18n.t("common.close")}>
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -443,8 +443,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         >
           <Plus className="h-3 w-3" />
           <Code className="h-3 w-3" />
-          Code
-        </Button>
+          {i18n.t("ui.notebook.notebookPanel.code")}</Button>
         <Button
           variant="outline"
           size="sm"
@@ -453,8 +452,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         >
           <Plus className="h-3 w-3" />
           <FileText className="h-3 w-3" />
-          Markdown
-        </Button>
+          {i18n.t("ui.notebook.notebookPanel.markdown")}</Button>
 
         <div className="w-px h-4 bg-border mx-1" />
 
@@ -462,8 +460,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
               <Layers className="h-3 w-3" />
-              Templates
-            </Button>
+              {i18n.t("ui.notebook.notebookPanel.templates")}</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             {reportTemplates.map((template) => (
@@ -482,19 +479,18 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
               <Terminal className="h-3 w-3" />
-              Snippets
-            </Button>
+              {i18n.t("ui.notebook.notebookPanel.snippets")}</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuItem onClick={() => insertSnippet("imports")}>Import Libraries</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => insertSnippet("loadData")}>Load Data</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => insertSnippet("basicStats")}>Basic Statistics</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("imports")}>{i18n.t("ui.notebook.notebookPanel.importLibraries")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("loadData")}>{i18n.t("ui.notebook.notebookPanel.loadData")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("basicStats")}>{i18n.t("ui.notebook.notebookPanel.basicStatistics")}</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => insertSnippet("linearRegression")}>Linear Regression</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => insertSnippet("forecast")}>Forecasting</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("linearRegression")}>{i18n.t("ui.notebook.notebookPanel.linearRegression")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("forecast")}>{i18n.t("ui.notebook.notebookPanel.forecasting")}</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => insertSnippet("visualization")}>Visualization</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => insertSnippet("reportSummary")}>Report Summary</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("visualization")}>{i18n.t("ui.notebook.notebookPanel.visualization")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertSnippet("reportSummary")}>{i18n.t("ui.notebook.notebookPanel.reportSummary")}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -502,8 +498,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
 
         <Badge variant="outline" className="text-[9px] h-5">
           <Database className="h-2.5 w-2.5 mr-1" />
-          ERP Data Connected
-        </Badge>
+          {i18n.t("ui.notebook.notebookPanel.erpDataConnected")}</Badge>
       </div>
 
       {/* Main content area */}
@@ -515,7 +510,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             size="icon"
             className="h-8 w-8"
             onClick={() => setActiveTab("notebook")}
-            title="Notebook"
+            title={i18n.t("nav.notebook")}
           >
             <BookOpen className="h-4 w-4" />
           </Button>
@@ -524,7 +519,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             size="icon"
             className="h-8 w-8"
             onClick={() => setActiveTab("files")}
-            title="Files"
+            title={i18n.t("ui.notebook.notebookPanel.files")}
           >
             <FolderOpen className="h-4 w-4" />
           </Button>
@@ -533,7 +528,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             size="icon"
             className="h-8 w-8"
             onClick={() => setActiveTab("variables")}
-            title="Variables"
+            title={i18n.t("ui.notebook.notebookPanel.variables")}
           >
             <Settings className="h-4 w-4" />
           </Button>
@@ -572,8 +567,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                   >
                     <Plus className="h-3 w-3" />
                     <Code className="h-3 w-3" />
-                    Code
-                  </Button>
+                    {i18n.t("ui.notebook.notebookPanel.code")}</Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -582,8 +576,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                   >
                     <Plus className="h-3 w-3" />
                     <FileText className="h-3 w-3" />
-                    Markdown
-                  </Button>
+                    {i18n.t("ui.notebook.notebookPanel.markdown")}</Button>
                 </div>
               </div>
             </ScrollArea>
@@ -592,7 +585,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           {activeTab === "files" && (
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-3">Recent Notebooks</p>
+                <p className="text-xs font-medium text-muted-foreground mb-3">{i18n.t("ui.notebook.notebookPanel.recentNotebooks")}</p>
                 {["Sales Analysis Q1.ipynb", "Customer Segmentation.ipynb", "Inventory Forecast.ipynb"].map((file) => (
                   <div
                     key={file}
@@ -603,7 +596,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                   </div>
                 ))}
                 <div className="border-t border-border my-3" />
-                <p className="text-xs font-medium text-muted-foreground mb-3">Data Sources</p>
+                <p className="text-xs font-medium text-muted-foreground mb-3">{i18n.t("ui.notebook.notebookPanel.dataSources")}</p>
                 {["sales_data.csv", "inventory.csv", "customers.csv"].map((file) => (
                   <div
                     key={file}
@@ -620,11 +613,11 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           {activeTab === "variables" && (
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-3">Kernel Variables</p>
+                <p className="text-xs font-medium text-muted-foreground mb-3">{i18n.t("ui.notebook.notebookPanel.kernelVariables")}</p>
                 <div className="text-xs space-y-1 font-mono">
                   <div className="flex justify-between py-1 border-b border-border">
                     <span className="text-info">df</span>
-                    <span className="text-muted-foreground">DataFrame (30 rows)</span>
+                    <span className="text-muted-foreground">{i18n.t("ui.notebook.notebookPanel.dataFrameRows", { count: 30 })}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border">
                     <span className="text-info">model</span>
@@ -640,14 +633,14 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                   </div>
                 </div>
                 <div className="border-t border-border my-3" />
-                <p className="text-xs font-medium text-muted-foreground mb-3">Execution Stats</p>
+                <p className="text-xs font-medium text-muted-foreground mb-3">{i18n.t("ui.notebook.notebookPanel.executionStats")}</p>
                 <div className="text-xs space-y-1">
                   <div className="flex justify-between">
-                    <span>Cells executed:</span>
+                    <span>{i18n.t("ui.notebook.notebookPanel.cellsExecuted")}</span>
                     <span className="font-mono">{kernel.executionCount}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Kernel status:</span>
+                    <span>{i18n.t("ui.notebook.notebookPanel.kernelStatus")}</span>
                     <span className="font-mono">{kernel.status}</span>
                   </div>
                 </div>
@@ -664,7 +657,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             <div className={cn("w-1.5 h-1.5 rounded-full", kernel.status === "idle" ? "bg-success" : "bg-info")} />
             {t("ui.notebook.preview", { defaultValue: "Local preview" })}
           </span>
-          <span>{notebook.cells.length} cells</span>
+          <span>{i18n.t("ui.notebook.notebookPanel.cellCount", { count: notebook.cells.length })}</span>
         </div>
         <div className="flex items-center gap-3">
           <span role="status" data-testid="notebook-save-status" className="flex items-center gap-1">

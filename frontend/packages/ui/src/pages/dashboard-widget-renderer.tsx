@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useRef } from "react"
 import { Download, FileDown } from "lucide-react"
@@ -102,6 +104,7 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
 ])
 
 export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance, emptyMessage }: WidgetRendererProps) {
+  useTranslation()
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
@@ -119,7 +122,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
     if (isChart && chartIsEmpty(widget)) {
       return (
         <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-          {emptyMessage ?? emptyLabelOf(widget) ?? "No data for this period yet."}
+          {emptyMessage ?? emptyLabelOf(widget) ?? i18n.t("ui.pages.dashboardWidgetRenderer.noDataForThisPeriodYet")}
         </div>
       )
     }
@@ -134,8 +137,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
             <p>{widget.data.message}</p>
             {widget.data.rejectedRows != null ? (
               <p className="text-xs">
-                {widget.data.rejectedRows} source {widget.data.rejectedRows === 1 ? "row was" : "rows were"} rejected.
-              </p>
+                {i18n.t("ui.pages.dashboardWidgetRenderer.rejectedRows", { count: widget.data.rejectedRows })}</p>
             ) : null}
           </div>
         )
@@ -214,7 +216,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
           variant="ghost"
           size="icon"
           className="h-7 w-7 shrink-0"
-          aria-label={`Export ${widget.title} chart`}
+          aria-label={i18n.t("ui.pages.dashboardWidgetRenderer.exportValueChart", { value1: widget.title })}
           onClick={() => void handleChartExport()}
         >
           <Download className="h-3.5 w-3.5" />
@@ -226,7 +228,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
           variant="ghost"
           size="icon"
           className="h-7 w-7 shrink-0"
-          aria-label={`Export ${widget.title} as CSV`}
+          aria-label={i18n.t("ui.pages.dashboardWidgetRenderer.exportValueAsCSV", { value1: widget.title })}
           onClick={handleCsvExport}
         >
           <FileDown className="h-3.5 w-3.5" />

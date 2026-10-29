@@ -1,3 +1,4 @@
+import { i18n as rootI18n } from "@lumiere/i18n"
 import type { ReactNode } from "react"
 import { Badge } from "../components/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/avatar"
@@ -8,7 +9,6 @@ import { markdownToPlainText } from "./markdown"
 import { entryTableStatusDotClass } from "./theme-colors"
 import type { BadgeVariant, EntityViewConfig } from "./entity-view-types"
 import {
-  getRowField,
   formatTimestampLike,
   unwrapEntityValue,
   humanizeEnumValue,
@@ -186,7 +186,7 @@ export function formatEntityFieldValue(
     case "boolean":
       return (
         <Badge variant={value ? "default" : "secondary"}>
-          {value ? "Yes" : "No"}
+          {value ? rootI18n.t("common.yes") : rootI18n.t("common.no")}
         </Badge>
       )
 

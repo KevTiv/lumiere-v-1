@@ -1,3 +1,4 @@
+import { i18n } from "@lumiere/i18n"
 import type { AccountMove, MailMessage, MailTemplate } from '@lumiere/stdb/types';
 import { variantTag } from '@lumiere/erp-workflows';
 
@@ -45,32 +46,32 @@ function own<Key extends string>(value: object, key: Key): value is object & { [
 function field(value: object, camel: string, snake = camel): unknown {
   if (own(value, camel)) return value[camel];
   if (own(value, snake)) return value[snake];
-  throw new Error(`Email review field ${camel} is unavailable.`);
+  throw new Error(i18n.t("accounting.invoiceEmailReview.emailReviewFieldValueIsUnavailable", { defaultValue: "Email review field {{camel}} is unavailable.", camel: camel }));
 }
 
 function text(value: unknown, name: string): string {
-  if (typeof value !== 'string') throw new Error(`Email review ${name} is unavailable.`);
+  if (typeof value !== 'string') throw new Error(i18n.t("accounting.invoiceEmailReview.emailReviewValueIsUnavailable", { defaultValue: "Email review {{name}} is unavailable.", name: name }));
   return value;
 }
 
 function bool(value: unknown, name: string): boolean {
-  if (typeof value !== 'boolean') throw new Error(`Email review ${name} is unavailable.`);
+  if (typeof value !== 'boolean') throw new Error(i18n.t("accounting.invoiceEmailReview.emailReviewValueIsUnavailable", { defaultValue: "Email review {{name}} is unavailable.", name: name }));
   return value;
 }
 
 function id(value: unknown): bigint {
-  if (typeof value === 'number' && !Number.isSafeInteger(value)) throw new Error('Email review contains an unsafe ID.');
-  if (!['string', 'number', 'bigint'].includes(typeof value) || !/^[1-9]\d*$/.test(String(value))) throw new Error('Email review ID is unavailable.');
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) throw new Error(i18n.t("accounting.invoiceEmailReview.emailReviewContainsAnUnsafeID", { defaultValue: "Email review contains an unsafe ID." }));
+  if (!['string', 'number', 'bigint'].includes(typeof value) || !/^[1-9]\d*$/.test(String(value))) throw new Error(i18n.t("accounting.invoiceEmailReview.emailReviewIDIsUnavailable", { defaultValue: "Email review ID is unavailable." }));
   const parsed = BigInt(String(value));
-  if (parsed > 18446744073709551615n) throw new Error('Email review ID is out of range.');
+  if (parsed > 18446744073709551615n) throw new Error(i18n.t("accounting.invoiceEmailReview.emailReviewIDIsOutOfRange", { defaultValue: "Email review ID is out of range." }));
   return parsed;
 }
 
 /** Normalize canonical template fields once; omitted/redacted scope never becomes organization inheritance. */
 export function parseInvoiceEmailTemplates(payload: unknown): InvoiceEmailTemplate[] {
-  if (!object(payload) || !own(payload, 'data') || !Array.isArray(payload.data)) throw new Error('Email templates could not be read.');
+  if (!object(payload) || !own(payload, 'data') || !Array.isArray(payload.data)) throw new Error(i18n.t("accounting.invoiceEmailReview.emailTemplatesCouldNotBeRead", { defaultValue: "Email templates could not be read." }));
   return payload.data.map((value: unknown) => {
-    if (!object(value)) throw new Error('Email template is malformed.');
+    if (!object(value)) throw new Error(i18n.t("accounting.invoiceEmailReview.emailTemplateIsMalformed", { defaultValue: "Email template is malformed." }));
     const company = field(value, 'companyId', 'company_id');
     return {
       id: id(field(value, 'id')), organizationId: id(field(value, 'organizationId', 'organization_id')),
@@ -85,9 +86,9 @@ export function parseInvoiceEmailTemplates(payload: unknown): InvoiceEmailTempla
 }
 
 export function parseInvoiceEmailMessages(payload: unknown, document: InvoiceEmailDocument): InvoiceEmailMessage[] {
-  if (!object(payload) || !own(payload, 'data') || !Array.isArray(payload.data)) throw new Error('Email queue records could not be read.');
+  if (!object(payload) || !own(payload, 'data') || !Array.isArray(payload.data)) throw new Error(i18n.t("accounting.invoiceEmailReview.emailQueueRecordsCouldNotBeRead", { defaultValue: "Email queue records could not be read." }));
   return payload.data.flatMap((value: unknown) => {
-    if (!object(value)) throw new Error('Email queue record is malformed.');
+    if (!object(value)) throw new Error(i18n.t("accounting.invoiceEmailReview.emailQueueRecordIsMalformed", { defaultValue: "Email queue record is malformed." }));
     // Chatter/notifications may use res_id=0. Only this record can prove this queue effect.
     if (field(value, 'model') !== 'account_move' || String(field(value, 'organizationId', 'organization_id')) !== String(document.organizationId)
       || String(field(value, 'resId', 'res_id')) !== String(document.moveId)) return [];
@@ -131,9 +132,9 @@ export function defaultInvoiceEmailTemplate(rows: readonly InvoiceEmailTemplate[
 }
 
 export function invoiceEmailTemplateProblem(template: InvoiceEmailTemplate): string | null {
-  if (new TextEncoder().encode(template.subject).length > 4096 || new TextEncoder().encode(template.bodyHtml).length > 65_536) return 'This template exceeds the supported email review size. Shorten its subject or body before queueing.';
-  if (!template.subject.trim() || !template.bodyHtml.trim()) return 'The template needs a subject and message body before it can be queued.';
-  if (/\{\{|\$\{|\{%|\bt-(?:esc|out|field)\s*=/.test(`${template.subject}\n${template.bodyHtml}`)) return 'This template contains placeholders. They are not expanded by the current email transport. Choose a template with complete literal text.';
+  if (new TextEncoder().encode(template.subject).length > 4096 || new TextEncoder().encode(template.bodyHtml).length > 65_536) return i18n.t("accounting.invoiceEmailReview.thisTemplateExceedsTheSupportedEmailReviewSizeShortenIts", { defaultValue: "This template exceeds the supported email review size. Shorten its subject or body before queueing." });
+  if (!template.subject.trim() || !template.bodyHtml.trim()) return i18n.t("accounting.invoiceEmailReview.theTemplateNeedsASubjectAndMessageBodyBeforeIt", { defaultValue: "The template needs a subject and message body before it can be queued." });
+  if (/\{\{|\$\{|\{%|\bt-(?:esc|out|field)\s*=/.test(`${template.subject}\n${template.bodyHtml}`)) return i18n.t("accounting.invoiceEmailReview.thisTemplateContainsPlaceholdersTheyAreNotExpandedByThe", { defaultValue: "This template contains placeholders. They are not expanded by the current email transport. Choose a template with complete literal text." });
   return null;
 }
 
@@ -144,7 +145,7 @@ export function sameInvoiceEmailTemplate(left: InvoiceEmailTemplate, right: Invo
 }
 
 export function invoiceEmailRecipientProblem(recipient: string): string | null {
-  return recipient.length > 254 || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(recipient.trim()) ? 'Enter one valid recipient email address.' : null;
+  return recipient.length > 254 || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(recipient.trim()) ? i18n.t("accounting.invoiceEmailReview.enterOneValidRecipientEmailAddress", { defaultValue: "Enter one valid recipient email address." }) : null;
 }
 
 export function invoiceEmailContent(submission: InvoiceEmailSubmission) {
@@ -152,9 +153,9 @@ export function invoiceEmailContent(submission: InvoiceEmailSubmission) {
 }
 
 export function invoiceEmailContentProblem(content: { subject: string; bodyText: string }): string | null {
-  if (!content.subject.trim() || !content.bodyText.trim()) return 'Enter a subject and message before queueing.';
-  if (/[\r\n\x00-\x1f\x7f]/.test(content.subject)) return 'The email subject must be a single line.';
-  if (new TextEncoder().encode(content.subject).length > 4096 || new TextEncoder().encode(content.bodyText).length > 65_536) return 'The reviewed subject or message is too long.';
+  if (!content.subject.trim() || !content.bodyText.trim()) return i18n.t("accounting.invoiceEmailReview.enterASubjectAndMessageBeforeQueueing", { defaultValue: "Enter a subject and message before queueing." });
+  if (/[\r\n\x00-\x1f\x7f]/.test(content.subject)) return i18n.t("accounting.invoiceEmailReview.theEmailSubjectMustBeASingleLine", { defaultValue: "The email subject must be a single line." });
+  if (new TextEncoder().encode(content.subject).length > 4096 || new TextEncoder().encode(content.bodyText).length > 65_536) return i18n.t("accounting.invoiceEmailReview.theReviewedSubjectOrMessageIsTooLong", { defaultValue: "The reviewed subject or message is too long." });
   return null;
 }
 
@@ -189,7 +190,7 @@ export function resolveInvoiceEmailQueue(rows: readonly InvoiceEmailMessage[], s
       && own(metadata, 'html') && metadata.html === content.bodyText
       && (!submission.content || own(metadata, 'attach_document') && metadata.attach_document === content.attachPdf);
   });
-  if (matches.length > 1) throw new Error('More than one message matches this review. Do not queue it again.');
+  if (matches.length > 1) throw new Error(i18n.t("accounting.invoiceEmailReview.moreThanOneMessageMatchesThisReviewDoNotQueue", { defaultValue: "More than one message matches this review. Do not queue it again." }));
   const match = matches[0];
   if (!match?.metadata) return undefined;
   const metadata: unknown = JSON.parse(match.metadata);

@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 interface Row { [field: string]: unknown }
 const field = (row: Row, camel: string, snake: string) => row[camel] ?? row[snake];
 const tag = (value: unknown) => typeof value === 'string' ? value : value && typeof value === 'object' && 'tag' in value ? String(value.tag) : '';
@@ -25,6 +27,6 @@ export function billLineCorrectionParams(line: Row, values: Row, companyId: bigi
   const priceUnit = finite(values.priceUnit);
   const expectedQuantity = finite(line.quantity);
   const expectedPriceUnit = finite(field(line, 'priceUnit', 'price_unit'));
-  if (quantity == null || quantity <= 0 || priceUnit == null || priceUnit < 0 || expectedQuantity == null || expectedQuantity <= 0 || expectedPriceUnit == null || expectedPriceUnit < 0 || !Number.isFinite(quantity * priceUnit)) throw new Error('Enter a finite positive quantity and a finite non-negative unit price.');
+  if (quantity == null || quantity <= 0 || priceUnit == null || priceUnit < 0 || expectedQuantity == null || expectedQuantity <= 0 || expectedPriceUnit == null || expectedPriceUnit < 0 || !Number.isFinite(quantity * priceUnit)) throw new Error(i18n.t("accounting.billLineCorrection.enterAFinitePositiveQuantityAndAFiniteNonNegativeUnit"));
   return { companyId, quantity, priceUnit, expectedQuantity, expectedPriceUnit };
 }

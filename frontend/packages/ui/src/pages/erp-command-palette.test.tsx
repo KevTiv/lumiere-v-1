@@ -22,10 +22,10 @@ function rowsHook(name: string) {
 }
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }))
-vi.mock("@lumiere/i18n", () => {
+vi.mock("@lumiere/i18n", async (importOriginal) => {
   const t = (key: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? key
   const value = { t }
-  return { useTranslation: () => value }
+  return { ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => value }
 })
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ organizationId: 7 }) }))
 vi.mock("@/lib/rbac-context", () => ({

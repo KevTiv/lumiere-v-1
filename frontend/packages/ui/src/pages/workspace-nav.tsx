@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useState, type MouseEvent } from "react"
 import { Check, ChevronDown, Settings2 } from "lucide-react"
@@ -23,6 +25,7 @@ interface WorkspaceNavProps {
 }
 
 export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, hrefForTab }: WorkspaceNavProps) {
+  useTranslation()
   const [overflowOpen, setOverflowOpen] = useState(false)
   const { workspaces, overflow } = resolveWorkspaceNavigation(tabs, config)
   const activeWorkspace = workspaces.find((group) => group.tabs.some((tab) => tab.id === activeTab))
@@ -39,7 +42,7 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
 
   return (
     <div className="min-w-0 space-y-3" data-testid={`module-tabs-${moduleId}`}>
-      <nav aria-label={config.label ?? "Workspaces"} className={workspaceStyles.workspaceNav} data-ui="workspace-nav">
+      <nav aria-label={config.label ?? i18n.t("ui.pages.workspaceNav.workspaces")} className={workspaceStyles.workspaceNav} data-ui="workspace-nav">
         {workspaces.map((workspace) => (
           <a
             key={workspace.id}
@@ -65,7 +68,7 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
                 data-testid={`module-workspace-${moduleId}-overflow`}
               >
                 <Settings2 className="size-3.5" aria-hidden />
-                <span className="min-w-0 [overflow-wrap:anywhere]">{config.overflowLabel ?? "Advanced / Configuration"}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere]">{config.overflowLabel ?? i18n.t("ui.pages.workspaceNav.advancedConfiguration")}</span>
                 <ChevronDown className="size-3.5" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
@@ -93,7 +96,7 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
           </DropdownMenu>
         )}
       </nav>
-      <ContextTabsList aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`}>
+      <ContextTabsList aria-label={i18n.t("ui.pages.workspaceNav.valueViews", { value1: activeWorkspace?.label ?? activeOverflow?.label ?? i18n.t("ui.pages.workspaceNav.workspace") })}>
         {localTabs.map((tab) => (
           <ContextTabsTrigger
             key={tab.id}

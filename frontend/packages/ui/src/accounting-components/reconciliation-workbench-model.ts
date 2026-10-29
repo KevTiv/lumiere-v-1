@@ -1,3 +1,4 @@
+import { i18n } from "@lumiere/i18n"
 import type { ModuleDataState } from "../lib/module-data-state"
 import { formatTimestampLike } from "../lib/entity-row-values"
 
@@ -114,7 +115,7 @@ export function reconciliationLifecycleContext(source: ReconciliationSource): Re
     || line.foreignCurrencyId !== null) return null
   const code = text(currency?.code).trim().toUpperCase()
   return { key: [organizationId, companyId, statementId, lineId].join(":"), organizationId, companyId, statementId, lineId,
-    statementLabel: text(statement.name) || text(statement.reference) || `Statement #${statementId}`, lineLabel: text(line.transactionType) || `Bank line #${lineId}`,
+    statementLabel: text(statement.name) || text(statement.reference) || i18n.t("accounting.reconciliationWorkbenchModel.statementValue", { defaultValue: "Statement #{{statementId}}", statementId: statementId }), lineLabel: text(line.transactionType) || i18n.t("accounting.reconciliationWorkbenchModel.bankLineValue", { defaultValue: "Bank line #{{lineId}}", lineId: lineId }),
     amount: bankAmount, currencyId, decimalPlaces, ...(/^[A-Z]{3}$/.test(code) ? { currencyCode: code } : {}) }
 }
 
@@ -128,34 +129,34 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
   const companyId = reconciliationId(source.companyId)
   const currencyId = reconciliationId(source.companyCurrencyId)
   const statement = source.statement
-  if (!source.line || !statement) return { status: "blocked", message: "Choose a statement line to review its possible matches." }
+  if (!source.line || !statement) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.chooseAStatementLineToReviewItsPossibleMatches", { defaultValue: "Choose a statement line to review its possible matches." }) }
   const focusedId = reconciliationId(source.line.id)
   const line = focusedId ? uniqueRows(source.bankLines).get(focusedId) : undefined
-  if (!line) return { status: "blocked", message: "The current bank line is unavailable or ambiguous. Refresh before matching." }
-  if (!organizationId || !companyId || !currencyId || !inScope(statement, organizationId, companyId)) return { status: "blocked", message: "The statement’s company or base currency is unavailable. Refresh before matching." }
+  if (!line) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.theCurrentBankLineIsUnavailableOrAmbiguousRefreshBefore", { defaultValue: "The current bank line is unavailable or ambiguous. Refresh before matching." }) }
+  if (!organizationId || !companyId || !currencyId || !inScope(statement, organizationId, companyId)) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.theStatementSCompanyOrBaseCurrencyIsUnavailableRefreshBefore", { defaultValue: "The statement’s company or base currency is unavailable. Refresh before matching." }) }
   const statementId = reconciliationId(statement.id)
   const lineId = reconciliationId(line.id)
   const journalId = reconciliationId(statement.journalId)
-  if (!statementId || !lineId || !journalId || reconciliationId(line.organizationId) !== organizationId || reconciliationId(line.statementId) !== statementId || reconciliationId(line.journalId) !== journalId) return { status: "blocked", message: "The bank line does not belong to this statement and company." }
-  if (tag(statement.state) !== "Open") return { status: "blocked", message: "Open the statement before matching its lines." }
-  if (line.isReconciled !== false) return { status: "blocked", message: line.isReconciled === true ? "This bank line is already matched." : "The bank line’s matching status is unavailable." }
+  if (!statementId || !lineId || !journalId || reconciliationId(line.organizationId) !== organizationId || reconciliationId(line.statementId) !== statementId || reconciliationId(line.journalId) !== journalId) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.theBankLineDoesNotBelongToThisStatementAnd", { defaultValue: "The bank line does not belong to this statement and company." }) }
+  if (tag(statement.state) !== "Open") return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.openTheStatementBeforeMatchingItsLines", { defaultValue: "Open the statement before matching its lines." }) }
+  if (line.isReconciled !== false) return { status: "blocked", message: line.isReconciled === true ? i18n.t("accounting.reconciliationWorkbenchModel.thisBankLineIsAlreadyMatched", { defaultValue: "This bank line is already matched." }) : i18n.t("accounting.reconciliationWorkbenchModel.theBankLineSMatchingStatusIsUnavailable", { defaultValue: "The bank line’s matching status is unavailable." }) }
   const bankAmount = amount(line.amount)
-  if (bankAmount === null || bankAmount === 0) return { status: "blocked", message: "A known, non-zero bank amount is required. Missing amounts are not treated as zero." }
+  if (bankAmount === null || bankAmount === 0) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.aKnownNonZeroBankAmountIsRequiredMissingAmountsAre", { defaultValue: "A known, non-zero bank amount is required. Missing amounts are not treated as zero." }) }
   const currency = uniqueRows(source.currencies).get(currencyId)
   const decimalPlaces = amount(currency?.decimalPlaces)
-  if (decimalPlaces === null || !Number.isInteger(decimalPlaces) || decimalPlaces < 0 || decimalPlaces > 6 || amount(currency?.roundingFactor) !== 10 ** -decimalPlaces) return { status: "blocked", message: "Supported currency precision is unavailable. Expert review is required before matching." }
+  if (decimalPlaces === null || !Number.isInteger(decimalPlaces) || decimalPlaces < 0 || decimalPlaces > 6 || amount(currency?.roundingFactor) !== 10 ** -decimalPlaces) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.supportedCurrencyPrecisionIsUnavailableExpertReviewIsRequiredBefore", { defaultValue: "Supported currency precision is unavailable. Expert review is required before matching." }) }
   const bankMinor = minorUnits(bankAmount, decimalPlaces)
-  if (bankMinor === null) return { status: "blocked", message: "The bank amount cannot be represented exactly at this currency’s precision." }
-  if (reconciliationId(statement.currencyId) !== currencyId || reconciliationId(line.journalCurrencyId) !== currencyId || !(line.currencyId === null || reconciliationId(line.currencyId) === currencyId) || line.foreignCurrencyId !== null) return { status: "blocked", message: "This desk supports base-currency matches only. Foreign-currency lines require expert review." }
-  if (!Array.isArray(line.moveIds) || line.moveIds.length > 0) return { status: "blocked", message: "Existing or unavailable bank links require expert review before making another match." }
+  if (bankMinor === null) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.theBankAmountCannotBeRepresentedExactlyAtThisCurrencyS", { defaultValue: "The bank amount cannot be represented exactly at this currency’s precision." }) }
+  if (reconciliationId(statement.currencyId) !== currencyId || reconciliationId(line.journalCurrencyId) !== currencyId || !(line.currencyId === null || reconciliationId(line.currencyId) === currencyId) || line.foreignCurrencyId !== null) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.thisDeskSupportsBaseCurrencyMatchesOnlyForeignCurrencyLinesRequireExpert", { defaultValue: "This desk supports base-currency matches only. Foreign-currency lines require expert review." }) }
+  if (!Array.isArray(line.moveIds) || line.moveIds.length > 0) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.existingOrUnavailableBankLinksRequireExpertReviewBeforeMaking", { defaultValue: "Existing or unavailable bank links require expert review before making another match." }) }
   const linkedIds = new Set<string>()
   for (const bankLine of source.bankLines) {
-    if (!reconciliationId(bankLine.organizationId)) return { status: "blocked", message: "Existing bank links have incomplete organization scope. Refresh before selecting records." }
+    if (!reconciliationId(bankLine.organizationId)) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.existingBankLinksHaveIncompleteOrganizationScopeRefreshBeforeSelecting", { defaultValue: "Existing bank links have incomplete organization scope. Refresh before selecting records." }) }
     if (reconciliationId(bankLine.organizationId) !== organizationId) continue
-    if (!Array.isArray(bankLine.moveIds)) return { status: "blocked", message: "Existing bank links are unavailable. Refresh before selecting records." }
+    if (!Array.isArray(bankLine.moveIds)) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.existingBankLinksAreUnavailableRefreshBeforeSelectingRecords", { defaultValue: "Existing bank links are unavailable. Refresh before selecting records." }) }
     for (const id of bankLine.moveIds) {
       const exact = reconciliationId(id)
-      if (!exact) return { status: "blocked", message: "An existing bank link is incomplete. Refresh before selecting records." }
+      if (!exact) return { status: "blocked", message: i18n.t("accounting.reconciliationWorkbenchModel.anExistingBankLinkIsIncompleteRefreshBeforeSelectingRecords", { defaultValue: "An existing bank link is incomplete. Refresh before selecting records." }) }
       linkedIds.add(exact)
     }
   }
@@ -184,8 +185,8 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
       const amountCurrency = amount(row.amountCurrency)
       if (amountCurrency == null || minorUnits(amountCurrency, decimalPlaces) !== balanceMinor) continue
     }
-    const documentLabel = text(move.name).trim() || `Journal entry #${moveId}`
-    candidates.push({ id, moveId, partnerId, accountId, documentLabel, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || "Journal item", partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || `Account #${accountId}`, amount: residual, suggested: suggestions.has(id), href: `/accounting/invoices/${encodeURIComponent(moveId)}` })
+    const documentLabel = text(move.name).trim() || i18n.t("accounting.reconciliationWorkbenchModel.journalEntryValue", { defaultValue: "Journal entry #{{moveId}}", moveId: moveId })
+    candidates.push({ id, moveId, partnerId, accountId, documentLabel, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || i18n.t("accounting.reconciliationWorkbenchModel.journalItem", { defaultValue: "Journal item" }), partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || i18n.t("accounting.reconciliationWorkbenchModel.accountValue", { defaultValue: "Account #{{accountId}}", accountId: accountId }), amount: residual, suggested: suggestions.has(id), href: `/accounting/invoices/${encodeURIComponent(moveId)}` })
   }
   candidates.sort((a, b) => Number(b.suggested) - Number(a.suggested) || a.documentLabel.localeCompare(b.documentLabel) || a.id.localeCompare(b.id))
   const code = text(currency?.code).trim().toUpperCase()
@@ -193,7 +194,7 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
   const partner = partnerId ? uniqueRows(source.partners ?? []).get(partnerId) : undefined
   const partnerLabel = partner && reconciliationId(partner.organizationId) === organizationId && (partner.companyId === null || reconciliationId(partner.companyId) === companyId) ? text(partner.name) : ""
   const date = formatTimestampLike(line.date)
-  return { status: "ready", context: { key: [organizationId, companyId, statementId, lineId].join(":"), organizationId, companyId, statementId, lineId, statementLabel: text(statement.name) || text(statement.reference) || `Statement #${statementId}`, lineLabel: text(line.transactionType) || text(line.accountNumber) || `Bank line #${lineId}`, amount: bankAmount, currencyId, decimalPlaces, ...(/^[A-Z]{3}$/.test(code) ? { currencyCode: code } : {}), ...(date ? { dateLabel: date.toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" }) } : {}), ...(partnerLabel ? { partnerLabel } : {}) }, candidates }
+  return { status: "ready", context: { key: [organizationId, companyId, statementId, lineId].join(":"), organizationId, companyId, statementId, lineId, statementLabel: text(statement.name) || text(statement.reference) || i18n.t("accounting.reconciliationWorkbenchModel.statementValue", { defaultValue: "Statement #{{statementId}}", statementId: statementId }), lineLabel: text(line.transactionType) || text(line.accountNumber) || i18n.t("accounting.reconciliationWorkbenchModel.bankLineValue", { defaultValue: "Bank line #{{lineId}}", lineId: lineId }), amount: bankAmount, currencyId, decimalPlaces, ...(/^[A-Z]{3}$/.test(code) ? { currencyCode: code } : {}), ...(date ? { dateLabel: date.toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" }) } : {}), ...(partnerLabel ? { partnerLabel } : {}) }, candidates }
 }
 
 export function reconciliationSelection(projection: ReconciliationProjection, selectedIds: readonly string[]) {

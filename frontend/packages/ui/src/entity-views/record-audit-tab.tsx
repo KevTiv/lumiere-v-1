@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo } from "react"
 import { useErpSession } from "@lumiere/erp-session"
@@ -37,13 +39,13 @@ function formatRelativeTime(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso
   const diffMs = Date.now() - date.getTime()
   const diffSec = Math.floor(diffMs / 1000)
-  if (diffSec < 60) return "just now"
+  if (diffSec < 60) return i18n.t("ui.entityViews.recordAuditTab.justNow")
   const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffMin < 60) return i18n.t("ui.entityViews.recordAuditTab.minutesAgo", { count: diffMin })
   const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
+  if (diffHr < 24) return i18n.t("ui.entityViews.recordAuditTab.hoursAgo", { count: diffHr })
   const diffDay = Math.floor(diffHr / 24)
-  if (diffDay < 30) return `${diffDay}d ago`
+  if (diffDay < 30) return i18n.t("ui.entityViews.recordAuditTab.daysAgo", { count: diffDay })
   return date.toLocaleDateString()
 }
 
@@ -51,12 +53,13 @@ function actorDisplayLabel(
   raw: unknown,
   labelMap: ReadonlyMap<string, string>,
 ): string {
-  if (raw == null) return "System"
+  if (raw == null) return i18n.t("ui.entityViews.recordAuditTab.system")
   const label = resolveIdentityLabel(raw, labelMap)
-  return label === "—" ? "System" : label
+  return label === "—" ? i18n.t("ui.entityViews.recordAuditTab.system") : label
 }
 
 export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTabProps) {
+  useTranslation()
   const { organizationId } = useErpSession()
   const orgReady = hasValidOrganizationId(organizationId)
   const orgBigInt = orgReady ? BigInt(organizationId) : 0n
@@ -94,13 +97,12 @@ export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTa
         }
       })
       .sort((a, b) => new Date(b.iso).getTime() - new Date(a.iso).getTime())
-  }, [auditQuery.data, recordIdStr, tableNorm, identityLabelMap])
+  }, [auditQuery.data, recordIdStr, tableNorm, identityLabelMap, i18n.resolvedLanguage])
 
   if (!orgReady) {
     return (
       <p className="text-sm text-muted-foreground">
-        Sign in to view audit history.
-      </p>
+        {i18n.t("ui.entityViews.recordAuditTab.signInToViewAuditHistory")}</p>
     )
   }
 
@@ -117,8 +119,7 @@ export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTa
   if (entries.length === 0) {
     return (
       <p className="text-sm text-muted-foreground" data-testid="record-audit-empty">
-        No audit entries for this record yet.
-      </p>
+        {i18n.t("ui.entityViews.recordAuditTab.noAuditEntriesForThisRecordYet")}</p>
     )
   }
 
@@ -135,7 +136,7 @@ export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTa
               variant="outline"
               className={cn("text-xs font-medium", actionPillClass(entry.action))}
             >
-              {entry.action || "EVENT"}
+              {entry.action || i18n.t("ui.entityViews.recordAuditTab.event")}
             </Badge>
             <time
               className="text-xs text-muted-foreground tabular-nums"
@@ -148,7 +149,7 @@ export function RecordAuditTab({ tableName, recordId, className }: RecordAuditTa
           {entry.details ? (
             <p className="text-sm text-foreground">{entry.details}</p>
           ) : null}
-          <p className="text-xs text-muted-foreground">by {entry.actorLabel}</p>
+          <p className="text-xs text-muted-foreground">{i18n.t("ui.entityViews.recordAuditTab.by")}{" "}{entry.actorLabel}</p>
         </li>
       ))}
     </ul>

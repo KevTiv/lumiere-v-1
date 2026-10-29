@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCurrencyFormat } from "../../lib/currency-context"
 
@@ -14,11 +16,12 @@ interface AccountBalanceData {
 }
 
 export function AccountBalanceWidget({ data }: { data: AccountBalanceData }) {
+  useTranslation()
   const { money } = useCurrencyFormat()
 
   if (data.accounts.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-4">No accounts configured</p>
+      <p className="text-sm text-muted-foreground text-center py-4">{i18n.t("ui.pages.accountBalanceWidget.noAccountsConfigured")}</p>
     )
   }
 

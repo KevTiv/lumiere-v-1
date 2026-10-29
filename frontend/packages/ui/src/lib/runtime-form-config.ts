@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type { FormConfig, FormField, FormSection, FieldWidth } from "./form-types"
 import type { MergedFormConfiguration, ParsedFormField, FieldType as StdbFieldType } from "../forms/config/types"
 import { isCustomField } from "../forms/config/types"
@@ -280,7 +281,7 @@ export function mergeRuntimeFormConfig(
   if (extraFields.length > 0) {
     sections.push({
       id: "runtime-extra-fields",
-      title: "Additional fields",
+      get title() { return uiI18n.t("common.builtIn.runtimeFormConfig.mergeRuntimeFormConfig.runtimeExtraFields.title") },
       fields: extraFields,
     })
   }

@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import {
   ACCOUNT_MOVE_BUNDLE_METADATA_KEY,
   parseCsvText,
@@ -114,7 +116,7 @@ export function validateHistoricalPaymentReplayCapability(
     objectField(data, "signatureReady") !== true
   ) {
     throw new Error(
-      "Historical payment replay is unavailable on the deployed API/contract version",
+      i18n.t("accounting.historicalPaymentImport.historicalPaymentReplayIsUnavailableOnTheDeployedAPIContractVersion"),
     );
   }
 }
@@ -151,7 +153,7 @@ export function resolveHistoricalImportResume(args: {
   }
   if (matching.length !== args.checks.length) {
     throw new Error(
-      "Historical import found only some document references from this file; use unique references or clean up the abandoned import before retrying",
+      i18n.t("accounting.historicalPaymentImport.historicalImportFoundOnlySomeDocumentReferencesFromThisFileUse"),
     );
   }
 
@@ -184,7 +186,7 @@ export function resolveHistoricalImportResume(args: {
     );
     if (candidates.length !== 1) {
       throw new Error(
-        `Document reference ${check.reference} is not unique in this company`,
+        i18n.t("accounting.historicalPaymentImport.documentReferenceIsNotUniqueInThisCompany", { value1: check.reference }),
       );
     }
     const move = candidates[0]!;
@@ -227,13 +229,13 @@ export function resolveHistoricalImportResume(args: {
       )
     ) {
       throw new Error(
-        `Existing document ${check.reference} does not exactly match this original-total import file`,
+        i18n.t("accounting.historicalPaymentImport.existingDocumentDoesNotExactlyMatchThisOriginalTotalImportFile", { value1: check.reference }),
       );
     }
     const state = normalizedTag(objectField(move, "state"));
     if (state !== "draft" && state !== "posted") {
       throw new Error(
-        `Existing document ${check.reference} is neither draft nor posted`,
+        i18n.t("accounting.historicalPaymentImport.existingDocumentIsNeitherDraftNorPosted", { value1: check.reference }),
       );
     }
     const lines = args.existingLines.filter(
@@ -252,14 +254,14 @@ export function resolveHistoricalImportResume(args: {
           expectedFingerprint.get(check.reference)
       ) {
         throw new Error(
-          `Empty document ${check.reference} is not owned by this exact bundle import`,
+          i18n.t("accounting.historicalPaymentImport.emptyDocumentIsNotOwnedByThisExactBundleImport", { value1: check.reference }),
         );
       }
       completion.push("empty");
     } else {
       if (lines.length !== 2) {
         throw new Error(
-          `Existing document ${check.reference} has an unexpected line count`,
+          i18n.t("accounting.historicalPaymentImport.existingDocumentHasAnUnexpectedLineCount", { value1: check.reference }),
         );
       }
       const expected =
@@ -306,7 +308,7 @@ export function resolveHistoricalImportResume(args: {
           )
         ) {
           throw new Error(
-            `Existing document ${check.reference} lines were altered`,
+            i18n.t("accounting.historicalPaymentImport.existingDocumentLinesWereAltered", { value1: check.reference }),
           );
         }
       }
@@ -316,7 +318,7 @@ export function resolveHistoricalImportResume(args: {
         !amountMatches(residual, check.expectedResidual)
       ) {
         throw new Error(
-          `Existing document ${check.reference} has an unexpected residual`,
+          i18n.t("accounting.historicalPaymentImport.existingDocumentHasAnUnexpectedResidual", { value1: check.reference }),
         );
       }
       completion.push("complete");
@@ -328,7 +330,7 @@ export function resolveHistoricalImportResume(args: {
     // A supported interrupted run is therefore either all empty parents or all completed
     // documents. Mixed state indicates a legacy/out-of-band change and must stay fail-closed.
     throw new Error(
-      "Historical import has mixed empty and completed documents, which an atomic bundle import cannot produce; review the affected drafts before retrying",
+      i18n.t("accounting.historicalPaymentImport.historicalImportHasMixedEmptyAndCompletedDocumentsWhichAnAtomic"),
     );
   }
   return {
@@ -353,7 +355,7 @@ export function validateHistoricalPaymentReplaySources(args: {
     const transaction = byId.get(group.paymentTransactionId);
     if (!transaction) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} was not found`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionWasNotFound", { value1: group.paymentTransactionId }),
       );
     }
     if (
@@ -361,12 +363,12 @@ export function validateHistoricalPaymentReplaySources(args: {
       String(args.companyId)
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} belongs to another company`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionBelongsToAnotherCompany", { value1: group.paymentTransactionId }),
       );
     }
     if (normalizedTag(objectField(transaction, "status")) !== "posted") {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} must be posted before import`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionMustBePostedBeforeImport", { value1: group.paymentTransactionId }),
       );
     }
     if (
@@ -374,7 +376,7 @@ export function validateHistoricalPaymentReplaySources(args: {
       HISTORICAL_ACCOUNTING_IMPORT_SOURCE
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} must come from ${HISTORICAL_ACCOUNTING_IMPORT_SOURCE}`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionMustComeFrom", { value1: group.paymentTransactionId, value2: HISTORICAL_ACCOUNTING_IMPORT_SOURCE }),
       );
     }
     const sourceEntityId = Number(
@@ -382,7 +384,7 @@ export function validateHistoricalPaymentReplaySources(args: {
     );
     if (!Number.isSafeInteger(sourceEntityId) || sourceEntityId <= 0) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} needs a positive operator-supplied migration batch reference`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionNeedsAPositiveOperatorSuppliedMigrationBatchReference", { value1: group.paymentTransactionId }),
       );
     }
     const occurredDate = timestampDate(
@@ -395,7 +397,7 @@ export function validateHistoricalPaymentReplaySources(args: {
       )
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} occurred after an imported document posting date`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionOccurredAfterAnImportedDocumentPostingDate", { value1: group.paymentTransactionId }),
       );
     }
     if (
@@ -403,7 +405,7 @@ export function validateHistoricalPaymentReplaySources(args: {
       group.currencyId
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} uses a different currency`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionUsesADifferentCurrency", { value1: group.paymentTransactionId }),
       );
     }
     if (
@@ -411,7 +413,7 @@ export function validateHistoricalPaymentReplaySources(args: {
       group.partnerId
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} uses a different partner`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionUsesADifferentPartner", { value1: group.paymentTransactionId }),
       );
     }
     const expectedDirection =
@@ -425,7 +427,7 @@ export function validateHistoricalPaymentReplaySources(args: {
         expectedPartnerType
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} is incompatible with its invoice or bill rows`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionIsIncompatibleWithItsInvoiceOrBillRows", { value1: group.paymentTransactionId }),
       );
     }
     const allocatedTotal = group.allocations.reduce(
@@ -440,7 +442,7 @@ export function validateHistoricalPaymentReplaySources(args: {
       Math.abs(settlementAmount - allocatedTotal) > 0.000_001
     ) {
       throw new Error(
-        `Historical payment transaction ${group.paymentTransactionId} settlement must equal the ${allocatedTotal} paid-to-date total in this file`,
+        i18n.t("accounting.historicalPaymentImport.historicalPaymentTransactionSettlementMustEqualThePaidToDateTotal", { value1: group.paymentTransactionId, value2: allocatedTotal }),
       );
     }
   }
@@ -465,7 +467,7 @@ export function buildHistoricalPaymentReplayBatches(args: {
       const moveId = args.moveIdByReference.get(allocation.documentReference);
       if (!moveId) {
         throw new Error(
-          `Imported document "${allocation.documentReference}" could not be resolved for historical payment replay`,
+          i18n.t("accounting.historicalPaymentImport.importedDocumentCouldNotBeResolvedForHistoricalPaymentReplay", { value1: allocation.documentReference }),
         );
       }
       return {

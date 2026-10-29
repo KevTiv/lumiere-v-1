@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Finance & Accounting Module Types
 
 export type InvoiceStatus = "draft" | "sent" | "viewed" | "partial" | "paid" | "overdue" | "cancelled"
@@ -182,40 +183,40 @@ export interface FinancialSummary {
 
 // Status configurations
 export const invoiceStatusConfig: Record<InvoiceStatus, { label: string; color: string; bgColor: string }> = {
-  draft: { label: "Draft", color: "text-muted-foreground", bgColor: "bg-muted" },
-  sent: { label: "Sent", color: "text-info", bgColor: "bg-info/10" },
-  viewed: { label: "Viewed", color: "text-category-3", bgColor: "bg-category-3/10" },
-  partial: { label: "Partial", color: "text-warning", bgColor: "bg-warning/10" },
-  paid: { label: "Paid", color: "text-success", bgColor: "bg-success/10" },
-  overdue: { label: "Overdue", color: "text-destructive", bgColor: "bg-destructive/10" },
-  cancelled: { label: "Cancelled", color: "text-muted-foreground", bgColor: "bg-muted" },
+  draft: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.draft.label") }, color: "text-muted-foreground", bgColor: "bg-muted" },
+  sent: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.sent.label") }, color: "text-info", bgColor: "bg-info/10" },
+  viewed: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.viewed.label") }, color: "text-category-3", bgColor: "bg-category-3/10" },
+  partial: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.partial.label") }, color: "text-warning", bgColor: "bg-warning/10" },
+  paid: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.paid.label") }, color: "text-success", bgColor: "bg-success/10" },
+  overdue: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.overdue.label") }, color: "text-destructive", bgColor: "bg-destructive/10" },
+  cancelled: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.invoiceStatusConfig.cancelled.label") }, color: "text-muted-foreground", bgColor: "bg-muted" },
 }
 
 export const billStatusConfig: Record<BillStatus, { label: string; color: string; bgColor: string }> = {
-  draft: { label: "Draft", color: "text-muted-foreground", bgColor: "bg-muted" },
-  pending: { label: "Pending", color: "text-info", bgColor: "bg-info/10" },
-  approved: { label: "Approved", color: "text-category-3", bgColor: "bg-category-3/10" },
-  partial: { label: "Partial", color: "text-warning", bgColor: "bg-warning/10" },
-  paid: { label: "Paid", color: "text-success", bgColor: "bg-success/10" },
-  overdue: { label: "Overdue", color: "text-destructive", bgColor: "bg-destructive/10" },
-  cancelled: { label: "Cancelled", color: "text-muted-foreground", bgColor: "bg-muted" },
+  draft: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.draft.label") }, color: "text-muted-foreground", bgColor: "bg-muted" },
+  pending: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.pending.label") }, color: "text-info", bgColor: "bg-info/10" },
+  approved: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.approved.label") }, color: "text-category-3", bgColor: "bg-category-3/10" },
+  partial: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.partial.label") }, color: "text-warning", bgColor: "bg-warning/10" },
+  paid: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.paid.label") }, color: "text-success", bgColor: "bg-success/10" },
+  overdue: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.overdue.label") }, color: "text-destructive", bgColor: "bg-destructive/10" },
+  cancelled: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.billStatusConfig.cancelled.label") }, color: "text-muted-foreground", bgColor: "bg-muted" },
 }
 
 export const paymentMethodConfig: Record<PaymentMethod, { label: string; icon: string }> = {
-  bank_transfer: { label: "Bank Transfer", icon: "building" },
-  credit_card: { label: "Credit Card", icon: "credit-card" },
-  check: { label: "Check", icon: "file-text" },
-  cash: { label: "Cash", icon: "banknote" },
-  paypal: { label: "PayPal", icon: "wallet" },
-  stripe: { label: "Stripe", icon: "credit-card" },
+  bank_transfer: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.paymentMethodConfig.bankTransfer.label") }, icon: "building" },
+  credit_card: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.paymentMethodConfig.creditCard.label") }, icon: "credit-card" },
+  check: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.paymentMethodConfig.check.label") }, icon: "file-text" },
+  cash: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.paymentMethodConfig.cash.label") }, icon: "banknote" },
+  paypal: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.paymentMethodConfig.payPal.label") }, icon: "wallet" },
+  stripe: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.paymentMethodConfig.stripe.label") }, icon: "credit-card" },
 }
 
 export const accountTypeConfig: Record<AccountType, { label: string; color: string; normalBalance: TransactionType }> = {
-  asset: { label: "Asset", color: "text-category-1", normalBalance: "debit" },
-  liability: { label: "Liability", color: "text-category-2", normalBalance: "credit" },
-  equity: { label: "Equity", color: "text-category-3", normalBalance: "credit" },
-  revenue: { label: "Revenue", color: "text-category-4", normalBalance: "credit" },
-  expense: { label: "Expense", color: "text-category-5", normalBalance: "debit" },
+  asset: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.accountTypeConfig.asset.label") }, color: "text-category-1", normalBalance: "debit" },
+  liability: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.accountTypeConfig.liability.label") }, color: "text-category-2", normalBalance: "credit" },
+  equity: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.accountTypeConfig.equity.label") }, color: "text-category-3", normalBalance: "credit" },
+  revenue: { get label() { return uiI18n.t("accounting.dashboard.revenue") }, color: "text-category-4", normalBalance: "credit" },
+  expense: { get label() { return uiI18n.t("accounting.builtIn.financeTypes.accountTypeConfig.expense.label") }, color: "text-category-5", normalBalance: "debit" },
 }
 
 // Sample Data

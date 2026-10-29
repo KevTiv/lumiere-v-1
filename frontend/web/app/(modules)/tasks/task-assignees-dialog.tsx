@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useRef, useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
@@ -21,6 +23,7 @@ export function TaskAssigneesDialog({
   task: ProjectTask
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const session = useErpSession()
   const activeCompany = useOperatingCompanyId(Number(organizationId))
   const { currentUser, roles, policies, permissionsReady, checkPermission } = useRBAC()
@@ -63,10 +66,10 @@ export function TaskAssigneesDialog({
     setError(null)
     try {
       await assign.mutateAsync({ taskId: task.id, companyId: task.companyId, userIds: [...selected] })
-      showWorkflowToast({ kind: "success", title: "Task assignment saved" })
+      showWorkflowToast({ kind: "success", title: t("tasks.taskAssigneesDialog.taskAssignmentSaved") })
       onClose()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save the assignment")
+      setError(cause instanceof Error ? cause.message : t("tasks.taskAssigneesDialog.couldNotSaveTheAssignment"))
     } finally {
       submitting.current = false
     }
@@ -76,21 +79,21 @@ export function TaskAssigneesDialog({
     <Dialog open onOpenChange={(open) => { if (!open && !assign.isPending) onClose() }}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-lg" showCloseButton={!assign.isPending}>
         <DialogHeader className="shrink-0">
-          <DialogTitle>Assign task</DialogTitle>
-          <DialogDescription>Select active members of this company. Clear the selection to leave the task unassigned.</DialogDescription>
+          <DialogTitle>{t("tasks.taskAssigneesDialog.assignTask")}</DialogTitle>
+          <DialogDescription>{t("tasks.taskAssigneesDialog.selectActiveMembersOfThisCompanyClearTheSelectionToLeave")}</DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain" data-testid="task-assignees-body">
         <p className="break-words text-sm font-medium">{task.name}</p>
-        <Input aria-label="Find an assignee" placeholder="Find a person" value={search} onChange={(event) => setSearch(event.target.value)} />
-        {canAssign && online && !ready && !directory.isError ? <p role="status">Loading eligible people…</p> : null}
-        {!online ? <p role="status">Connect to the network to change assignments.</p> : null}
+        <Input aria-label={t("tasks.taskAssigneesDialog.findAnAssignee")} placeholder={t("tasks.taskAssigneesDialog.findAPerson")} value={search} onChange={(event) => setSearch(event.target.value)} />
+        {canAssign && online && !ready && !directory.isError ? <p role="status">{t("tasks.taskAssigneesDialog.loadingEligiblePeople")}</p> : null}
+        {!online ? <p role="status">{t("tasks.taskAssigneesDialog.connectToTheNetworkToChangeAssignments")}</p> : null}
         {directory.isError ? (
           <div role="alert" className="space-y-2 text-sm text-destructive">
-            <p>Eligible people could not be loaded. Your access may have changed.</p>
-            <Button variant="outline" disabled={!canAssign || !online || directory.isFetching || assign.isPending} onClick={() => { void directory.refetch() }}>Retry</Button>
+            <p>{t("tasks.taskAssigneesDialog.eligiblePeopleCouldNotBeLoadedYourAccessMayHaveChanged")}</p>
+            <Button variant="outline" disabled={!canAssign || !online || directory.isFetching || assign.isPending} onClick={() => { void directory.refetch() }}>{t("common.retry")}</Button>
           </div>
         ) : null}
-        <div className="flex flex-col gap-1" aria-label="Eligible assignees">
+        <div className="flex flex-col gap-1" aria-label={t("tasks.taskAssigneesDialog.eligibleAssignees")}>
           {filtered.map((option) => (
             <label key={option.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-muted">
               <Checkbox
@@ -106,20 +109,20 @@ export function TaskAssigneesDialog({
               <span className="min-w-0 break-words">{option.name}</span>
             </label>
           ))}
-          {ready && filtered.length === 0 ? <p className="text-sm text-muted-foreground">No eligible people match.</p> : null}
+          {ready && filtered.length === 0 ? <p className="text-sm text-muted-foreground">{t("tasks.taskAssigneesDialog.noEligiblePeopleMatch")}</p> : null}
         </div>
         {ready && unavailable.length > 0 ? (
-          <p role="alert" className="text-sm text-destructive">{unavailable.length} current assignee(s) are no longer eligible. Clear the selection and choose active members.</p>
+          <p role="alert" className="text-sm text-destructive">{t("tasks.taskAssigneesDialog.ineligibleAssignees", { count: unavailable.length })}</p>
         ) : null}
-        {invalidAssignment ? <p role="alert" className="text-sm text-destructive">The current assignment could not be read. Clear the selection to replace it explicitly.</p> : null}
-        {!canAssign ? <p role="status" className="text-sm text-muted-foreground">You do not have permission to change task assignments.</p> : null}
+        {invalidAssignment ? <p role="alert" className="text-sm text-destructive">{t("tasks.taskAssigneesDialog.theCurrentAssignmentCouldNotBeReadClearTheSelectionTo")}</p> : null}
+        {!canAssign ? <p role="status" className="text-sm text-muted-foreground">{t("tasks.taskAssigneesDialog.youDoNotHavePermissionToChangeTaskAssignments")}</p> : null}
         {error ? <p role="alert" className="break-words text-sm text-destructive">{error}</p> : null}
         </div>
         <DialogFooter className="shrink-0">
-          <Button variant="ghost" disabled={!canAssign || assign.isPending} onClick={() => { setSelected(new Set()); setInvalidAssignment(false) }}>Clear selection</Button>
-          <Button variant="outline" disabled={assign.isPending} onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" disabled={!canAssign || assign.isPending} onClick={() => { setSelected(new Set()); setInvalidAssignment(false) }}>{t("accounting.worklists.clearSelection")}</Button>
+          <Button variant="outline" disabled={assign.isPending} onClick={onClose}>{t("common.cancel")}</Button>
           <Button disabled={!canAssign || !ready || unavailable.length > 0 || invalidAssignment || assign.isPending} onClick={() => void save()}>
-            {assign.isPending ? "Saving…" : "Save assignment"}
+            {assign.isPending ? t("common.saving") : t("tasks.taskAssigneesDialog.saveAssignment")}
           </Button>
         </DialogFooter>
       </DialogContent>

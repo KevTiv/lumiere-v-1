@@ -761,8 +761,8 @@ export const upsertExpenseMileageRateForm = (t: TFunction): FormConfig => ({
           defaultValue: "km",
           width: "1/2",
           options: [
-            { value: "km", label: "km" },
-            { value: "mi", label: "mi" },
+            { value: "km", label: t("expenses.builtIn.expensesFormConfigs.upsertExpenseMileageRateForm.unit.label") },
+            { value: "mi", label: t("expenses.builtIn.expensesFormConfigs.upsertExpenseMileageRateForm.unit.labelmi") },
           ],
         },
         {

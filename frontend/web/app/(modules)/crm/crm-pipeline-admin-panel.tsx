@@ -179,7 +179,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                   <div className="min-w-0">
                     <div className="truncate font-medium">{String(s.name ?? "—")}</div>
                     <div className="text-muted-foreground text-xs">
-                      {Number(s.probability ?? 0)}% · seq {Number(s.sequence ?? 0)}
+                      {Number(s.probability ?? 0)}{t("crm.crmPipelineAdminPanel.seq")}{" "}{Number(s.sequence ?? 0)}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -212,7 +212,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                             setError(e instanceof Error ? e.message : String(e)),
                           )
                       }}
-                      aria-label={String(s.name ?? "stage")}
+                      aria-label={String(s.name ?? t("crm.crmPipelineAdminPanel.stage"))}
                     />
                   </div>
                 </li>
@@ -296,7 +296,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                             setError(e instanceof Error ? e.message : String(e)),
                           )
                       }}
-                      aria-label={String(s.name ?? "source")}
+                      aria-label={String(s.name ?? t("crm.crmPipelineAdminPanel.source"))}
                     />
                   </div>
                 </li>
@@ -370,7 +370,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                             setError(e instanceof Error ? e.message : String(e)),
                           )
                       }}
-                      aria-label={String(r.name ?? "lost reason")}
+                      aria-label={String(r.name ?? t("crm.crmPipelineAdminPanel.lostReason"))}
                     />
                   </div>
                 </li>
@@ -456,7 +456,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                             setError(e instanceof Error ? e.message : String(e)),
                           )
                       }}
-                      aria-label={String(r.name ?? "rule")}
+                      aria-label={String(r.name ?? t("crm.crmPipelineAdminPanel.rule"))}
                     />
                   </div>
                 </li>

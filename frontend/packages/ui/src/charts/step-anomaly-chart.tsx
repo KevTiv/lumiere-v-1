@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCurrencyFormat } from "../lib/currency-context"
 import { useId } from "react"
@@ -59,6 +61,7 @@ export function StepAnomalyChart({
   valueFormat,
   className,
 }: StepAnomalyChartProps) {
+  useTranslation()
   const { locale } = useCurrencyFormat()
   const gradientId = `step-fill-${useId().replace(/:/g, "")}`
   const config = seriesChartConfig([series])
@@ -120,12 +123,12 @@ export function StepAnomalyChart({
         </ComposedChart>
       </ChartContainer>
       {flagged.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Anomalies">
+        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label={i18n.t("ui.charts.stepAnomalyChart.anomalies")}>
           {flagged.map((point) => (
             <li key={String(point[xAxisKey])} className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-destructive" />
               <span>
-                Unusual {String(point[xAxisKey])}:{" "}
+                {i18n.t("ui.charts.stepAnomalyChart.unusual")}{" "}{String(point[xAxisKey])}:{" "}
                 <span className="font-medium tabular-nums text-foreground">
                   {formatChartValue(Number(point[series.key] ?? 0), valueFormat, locale)}
                 </span>

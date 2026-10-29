@@ -7,7 +7,7 @@ vi.mock("@lumiere/query-hooks/hooks/expenses", () => ({
   useApproveExpenseSheet: () => ({ mutateAsync: mutations.approve }),
   useRefuseExpenseSheet: () => ({ mutateAsync: mutations.refuse }),
 }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("@lumiere/ui/lib/rbac-context", () => ({ useRBAC: () => ({ permissionsReady: true, checkPermission: () => ({ allowed: mutations.allowed }) }) }))
 import { useExpenseReportDecision } from "../../../../web/app/(modules)/expenses/expense-report-decision"
 

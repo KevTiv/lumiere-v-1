@@ -15,7 +15,7 @@ if (typeof globalThis.PointerEvent === "undefined") {
 }
 const i18n = createInstance()
 await i18n.init({ lng: "en", resources: { en: { translation: en } }, initImmediate: false })
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: i18n.t, i18n }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()), useTranslation: () => ({ t: i18n.t, i18n }) }))
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ identity: "ab12" }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-forms", () => ({ useAiFormSuggest: () => ({}) }))
 vi.mock("@lumiere/query-hooks/hooks/crm", () => ({

@@ -62,7 +62,18 @@
     "closeNavigation": "Fermer la navigation",
     "expandNavigation": "Développer la navigation",
     "collapseNavigation": "Réduire la navigation",
-    "search": "Rechercher des modules et des enregistrements"
+    "search": "Rechercher des modules et des enregistrements",
+    "ui": {
+      "page": {
+        "firstOrganization": "Première organisation",
+        "surfaceNotAdmittedYet": "Espace pas encore accessible",
+        "thisWorkspaceRemainsHiddenUntilItsRequiredProduct": "Cet espace reste masqué tant que les preuves requises pour le produit ne sont pas acceptées. Le masquer ne retire pas cette fonctionnalité de la liste des travaux de convergence.",
+        "returnToFinance": "Retour à la finance"
+      },
+      "providers": {
+        "authorizationStateIsUnavailableReloadToTryAgain": "L’état des autorisations est indisponible. Rechargez la page pour réessayer."
+      }
+    }
   },
   "common": {
     "select": {
@@ -350,6 +361,88 @@
     "moduleNavigation": {
       "overview": "Vue d’ensemble",
       "area": "Espace de travail"
+    },
+    "builtIn": {
+      "navigationCatalog": {
+        "groups": {
+          "aISkills": {
+            "label": "Compétences IA"
+          },
+          "approvals": {
+            "label": "Approbations"
+          },
+          "aIApprovals": {
+            "label": "Approbations IA"
+          }
+        }
+      },
+      "storedDashboardResolver": {
+        "applyDomain": {
+          "thisWidgetHasAnInvalidPersistedFilter": {
+            "message": "La définition du filtre enregistré de ce widget est invalide."
+          }
+        },
+        "parseBinding": {
+          "thisWidgetHasAnInvalidTimeOr": {
+            "message": "L’association de temps ou de mesure de ce widget est invalide."
+          }
+        },
+        "parseSortOrder": {
+          "theWidgetSortOrderMustBeA": {
+            "message": "L’ordre de tri du widget doit être une chaîne JSON."
+          },
+          "theWidgetSortOrderMustContainOne": {
+            "message": "L’ordre de tri du widget doit contenir un seul champ."
+          },
+          "theWidgetSortDirectionMustBeAsc": {
+            "message": "Le sens du tri du widget doit être asc ou desc."
+          },
+          "theWidgetSortOrderIsNotValid": {
+            "message": "L’ordre de tri du widget n’est pas un JSON valide."
+          }
+        },
+        "applyTimeRange": {
+          "thisWidgetDoesNotDeclareATime": {
+            "message": "Ce widget ne définit pas de champ temporel pour la période sélectionnée."
+          }
+        },
+        "applyMeasureCompleteness": {
+          "thisWidgetDoesNotDeclareTheMeasure": {
+            "message": "Ce widget ne définit pas la mesure utilisée pour son agrégation."
+          }
+        },
+        "resolveStoredDashboard": {
+          "theWidgetHasNoDataSource": {
+            "message": "Le widget n’a pas de source de données."
+          },
+          "aChartWidgetRequiresAGroupByField": {
+            "message": "Un widget graphique nécessite un champ de regroupement."
+          }
+        }
+      },
+      "runtimeFormConfig": {
+        "mergeRuntimeFormConfig": {
+          "runtimeExtraFields": {
+            "title": "Champs supplémentaires"
+          }
+        }
+      }
+    },
+    "ui": {
+      "orderHandoffLinks": {
+        "noLinkedRecordsYet": "Aucun enregistrement lié pour le moment",
+        "paymentRelationIsUnavailable": "Le lien avec le paiement est indisponible",
+        "paymentRelationFailedItsIdentityCheck": "La vérification de l’identité du lien avec le paiement a échoué"
+      }
+    },
+    "recordLinks": {
+      "noDeliveriesOrInvoices": "Aucune livraison ni facture pour le moment",
+      "recordNumber": "{{label}} nº {{id}}",
+      "openBalance": " · solde dû {{amount}}",
+      "returnNumber": "Retour nº {{id}}",
+      "paymentNumber": "Paiement nº {{id}}",
+      "delivery": "Livraison",
+      "invoice": "Facture"
     }
   },
   "navigation": {
@@ -400,7 +493,9 @@
       "current": "Actif",
       "selectCompany": "Choisir une société",
       "singleCompany": "Société",
-      "loading": "Chargement des sociétés…"
+      "loading": "Chargement des sociétés…",
+      "unnamedCompany": "Société nº {{id}}",
+      "company": "Société"
     },
     "groups": {
       "analytics": "Analyses",

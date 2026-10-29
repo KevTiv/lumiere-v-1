@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import type {
   Component,
   ComponentDefinition,
@@ -491,7 +491,7 @@ function currentProject(editor: Editor): unknown {
   // active text without resetting the live DOM, caret, or native undo history.
   const page = editor.Pages.getSelected()
   const wrapper = editor.getWrapper()
-  if (!page || !wrapper) throw new Error("The template page is unavailable.")
+  if (!page || !wrapper) throw new Error(i18n.t("ui.components.documentTemplateDesigner.theTemplatePageIsUnavailable"))
   const component: ComponentDefinition = JSON.parse(
     JSON.stringify(wrapper.toJSON()),
   )
@@ -499,7 +499,7 @@ function currentProject(editor: Editor): unknown {
   let current = editing
   while (!current.is("wrapper")) {
     const parent = current.parent()
-    if (!parent) throw new Error("The edited text is no longer on this page.")
+    if (!parent) throw new Error(i18n.t("ui.components.documentTemplateDesigner.theEditedTextIsNoLongerOnThisPage"))
     path.unshift(parent.components().indexOf(current))
     current = parent
   }
@@ -509,7 +509,7 @@ function currentProject(editor: Editor): unknown {
       ? target.components[index]
       : undefined
     if (!child || typeof child !== "object")
-      throw new Error("The edited text could not be saved.")
+      throw new Error(i18n.t("ui.components.documentTemplateDesigner.theEditedTextCouldNotBeSaved"))
     target = child
   }
   target.content = element.innerHTML

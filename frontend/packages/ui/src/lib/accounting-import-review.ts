@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import { parseCsvText } from "@lumiere/erp-shared"
 import { parseAccountingImportNumber } from "@lumiere/erp-shared/accounting-import-reconciliation"
 
@@ -78,7 +79,7 @@ export function accountingImportReview(
 
   const issues: AccountingImportReview["issues"] = []
   if (new Set(headers).size !== headers.length) {
-    issues.push({ message: "Duplicate column names make source totals ambiguous. Use each column once." })
+    issues.push({ get message() { return uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.duplicateColumnNamesMakeSourceTotalsAmbiguous.message") } })
   }
   const cell = (row: readonly string[], field: string) => {
     const at = index.get(field)

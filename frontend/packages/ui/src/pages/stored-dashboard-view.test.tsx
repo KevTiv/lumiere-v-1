@@ -1,13 +1,14 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
+import { i18n } from "@lumiere/i18n"
 import { forwardRef } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("./dashboard-grid", () => ({
-  DashboardGrid: forwardRef<HTMLDivElement, { testId?: string }>(function DashboardGrid(
-    { testId },
+  DashboardGrid: forwardRef<HTMLDivElement, { testId?: string; sections?: Array<{ title?: string }> }>(function DashboardGrid(
+    { testId, sections },
     ref,
   ) {
-    return <div ref={ref} data-testid={testId}>Rendered dashboard grid</div>
+    return <div ref={ref} data-testid={testId}><span data-testid="stored-grid-title">{sections?.[0]?.title}</span>Rendered dashboard grid</div>
   }),
 }))
 
@@ -26,7 +27,39 @@ const widgets = [{
 }]
 
 describe("StoredDashboardView", () => {
-  afterEach(() => cleanup())
+  afterEach(async () => {
+    cleanup()
+    await i18n.changeLanguage("en")
+  })
+
+  it("updates cached resolver messages and the unnamed-dashboard title after a language change", async () => {
+    await i18n.changeLanguage("en")
+    const titleKey = "ui.pages.storedDashboardView.dashboard"
+    const messageKey = "common.builtIn.storedDashboardResolver.resolveStoredDashboard.theWidgetHasNoDataSource.message"
+    const previousTitle = i18n.getResource("fr", "translation", titleKey)
+    const previousMessage = i18n.getResource("fr", "translation", messageKey)
+    i18n.addResource("fr", "translation", titleKey, "Tableau de bord français")
+    i18n.addResource("fr", "translation", messageKey, "Ce widget ne possède aucune source de données.")
+    try {
+      render(
+        <StoredDashboardView
+          dashboard={{ id: 9, widgetIds: [1] }}
+          widgets={[{ ...widgets[0], model: "" }]}
+          dataSources={{}}
+        />,
+      )
+      expect(screen.getByTestId("stored-grid-title").textContent).toBe("Dashboard")
+      expect(screen.getByTestId("stored-dashboard-view-invalid-definition").textContent).toContain("The widget has no data source")
+
+      await act(() => i18n.changeLanguage("fr"))
+
+      expect(screen.getByTestId("stored-grid-title").textContent).toBe("Tableau de bord français")
+      expect(screen.getByTestId("stored-dashboard-view-invalid-definition").textContent).toContain("Ce widget ne possède aucune source de données.")
+    } finally {
+      i18n.addResource("fr", "translation", titleKey, previousTitle)
+      i18n.addResource("fr", "translation", messageKey, previousMessage)
+    }
+  })
 
   it("renders an explicit denied state instead of an empty dashboard", () => {
     render(

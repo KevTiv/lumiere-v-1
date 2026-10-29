@@ -6,12 +6,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountingSetupReadinessInput } from "./accounting-setup-readiness";
 import { AccountingSetupReadinessPanel } from "./accounting-setup-readiness-panel";
 
-vi.mock("@lumiere/i18n", () => ({
-  useTranslation: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? _key,
-  }),
-}));
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+});
 
 afterEach(cleanup);
 

@@ -671,7 +671,7 @@ function MessagesClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (!actionUsable(action))
-      throw new Error("Required data is unavailable. Refresh and try again.")
+      throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "createMessage") {
       if (!checkPermission("mail_message", "create").allowed)
         throw new Error(

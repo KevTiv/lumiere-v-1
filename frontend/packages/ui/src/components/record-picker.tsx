@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useState } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
@@ -46,7 +48,7 @@ export function RecordPicker({
   options,
   placeholder = "Select...",
   searchPlaceholder = "Search...",
-  emptyText = "No matches",
+  emptyText = i18n.t("ui.components.recordPicker.noMatches"),
   disabled,
   invalid,
   id,
@@ -54,6 +56,7 @@ export function RecordPicker({
   "data-testid": testId,
   "aria-describedby": describedBy,
 }: RecordPickerProps) {
+  useTranslation()
   const [open, setOpen] = useState(false)
   const selected = options.find((option) => option.value === value)
 

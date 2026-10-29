@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ExternalLink, Layers, Link2, PenLine } from 'lucide-react';
-import { useTranslation } from '@lumiere/i18n';
+import { i18n, useTranslation } from '@lumiere/i18n';
 import {
   Button,
   EntityDetail,
@@ -106,15 +106,15 @@ export function DocumentPageClient(props: DocumentPageClientProps) {
 function editDocumentForm(row: Row): FormConfig {
   return {
     id: 'edit-document',
-    title: 'Update document',
-    submitLabel: 'Update document',
+    title: i18n.t("documents.documentPageClient.updateDocument"),
+    submitLabel: i18n.t("documents.documentPageClient.updateDocument"),
     sections: [
       {
         id: 'document',
         fields: [
-          { id: 'doc-name', name: 'name', type: 'text', label: 'Name', required: true, defaultValue: String(row.name ?? ''), width: 'full' },
-          { id: 'doc-description', name: 'description', type: 'textarea', label: 'Description', defaultValue: String(row.description ?? ''), rows: 3, width: 'full' },
-          { id: 'doc-favorite', name: 'isFavorite', type: 'checkbox', label: 'Favorite', defaultValue: Boolean(row.isFavorite), width: '1/2' },
+          { id: 'doc-name', name: 'name', type: 'text', label: i18n.t("documents.documents.columns.name"), required: true, defaultValue: String(row.name ?? ''), width: 'full' },
+          { id: 'doc-description', name: 'description', type: 'textarea', label: i18n.t("documents.documents.columns.description"), defaultValue: String(row.description ?? ''), rows: 3, width: 'full' },
+          { id: 'doc-favorite', name: 'isFavorite', type: 'checkbox', label: i18n.t("documents.documents.columns.isFavorite"), defaultValue: Boolean(row.isFavorite), width: '1/2' },
         ],
       },
     ],
@@ -124,8 +124,8 @@ function editDocumentForm(row: Row): FormConfig {
 function moveDocumentForm(row: Row, folders: Array<{ value: string; label: string }>): FormConfig {
   return {
     id: 'move-document',
-    title: 'Move to folder',
-    submitLabel: 'Move',
+    title: i18n.t("documents.page.move"),
+    submitLabel: i18n.t("ui.stock3d.details.move"),
     sections: [
       {
         id: 'move',
@@ -134,7 +134,7 @@ function moveDocumentForm(row: Row, folders: Array<{ value: string; label: strin
             id: 'doc-folder',
             name: 'folderId',
             type: 'select',
-            label: 'Folder',
+            label: i18n.t("documents.forms.newDocument.fields.folderId"),
             required: true,
             defaultValue: row.folderId == null ? '' : String(row.folderId),
             options: folders,
@@ -149,12 +149,12 @@ function moveDocumentForm(row: Row, folders: Array<{ value: string; label: strin
 function legalHoldForm(): FormConfig {
   return {
     id: 'document-legal-hold',
-    title: 'Apply legal hold',
-    submitLabel: 'Apply hold',
+    title: i18n.t("documents.documentPageClient.applyLegalHold"),
+    submitLabel: i18n.t("documents.documentPageClient.applyHold"),
     sections: [
       {
         id: 'hold',
-        fields: [{ id: 'hold-reason', name: 'reason', type: 'textarea', label: 'Reason', required: true, rows: 3, width: 'full' }],
+        fields: [{ id: 'hold-reason', name: 'reason', type: 'textarea', label: i18n.t("documents.page.holdReason"), required: true, rows: 3, width: 'full' }],
       },
     ],
   };
@@ -177,7 +177,7 @@ function requestSignatureForm(t: ReturnType<typeof useTranslation>['t']): FormCo
             name: 'provider',
             type: 'text',
             label: t('documents.page.signatureProvider', { defaultValue: 'Provider' }),
-            placeholder: 'DocuSign',
+            placeholder: i18n.t("documents.documentPageClient.docuSign"),
             required: true,
             width: '1/2',
           },
@@ -389,7 +389,7 @@ function DocumentPageLoaded({
     if (!ok) return;
     await run('Release legal hold', async () => {
       await releaseLegalHold.mutateAsync({ holdId: activeHold.id as bigint | number | string, metadata: note || undefined });
-      showWorkflowToast({ kind: 'success', title: 'Legal hold released', description: label });
+      showWorkflowToast({ kind: 'success', title: t("documents.documentPageClient.legalHoldReleased"), description: label });
     });
   };
 
@@ -423,7 +423,7 @@ function DocumentPageLoaded({
         });
       } else if (formAction === 'uploadVersion') {
         const file = firstFileFromFormValue(formData.file);
-        if (!file) throw new Error('Select a file to upload');
+        if (!file) throw new Error(t("documents.documentPageClient.selectAFileToUpload"));
         const residency = typeof document.residencyRegion === 'string' ? document.residencyRegion : undefined;
         const uploaded = await uploadDocumentBlob({ file, companyId: operatingCompanyId, residency });
         const params = toAddDocumentVersionParams({
@@ -434,7 +434,7 @@ function DocumentPageLoaded({
           url: uploaded.url,
           checksum: uploaded.checksum,
         });
-        if (!params) throw new Error('Version params incomplete after upload');
+        if (!params) throw new Error(t("documents.documentPageClient.versionParamsIncompleteAfterUpload"));
         await addVersion.mutateAsync({ documentId: id, params });
         await ingestEvidence.mutateAsync({
           companyId: operatingCompanyId,
@@ -447,13 +447,13 @@ function DocumentPageLoaded({
         await setRetention.mutateAsync({ documentId: id, params: toSetDocumentRetentionParams(formData) });
       } else if (formAction === 'move') {
         const params = moveDocumentParams(formData.folderId);
-        if (!params) throw new Error('Select a folder');
+        if (!params) throw new Error(t("documents.documentPageClient.selectAFolder"));
         await updateDocument.mutateAsync({ documentId: id, params: { folderId: optionalBigIntU64(params.folderId) } });
       } else if (formAction === 'legalHold') {
         const reason = legalHoldReason(formData.reason);
-        if (!reason) throw new Error('A reason is required');
+        if (!reason) throw new Error(t("documents.documentPageClient.aReasonIsRequired"));
         await applyLegalHold.mutateAsync({ documentId: id, reason });
-        showWorkflowToast({ kind: 'success', title: 'Legal hold', description: label });
+        showWorkflowToast({ kind: 'success', title: t("documents.page.legalHold"), description: label });
       } else if (formAction === 'requestSignature') {
         const result = toSignatureRequestParams(formData);
         if (!result.ok) {
@@ -585,7 +585,7 @@ function DocumentPageLoaded({
                   disabled={busy}
                   data-testid={isLocked ? 'document-action-unlock' : 'document-action-lock'}
                   onClick={() =>
-                    void run(isLocked ? 'Unlock' : 'Lock', () =>
+                    void run(isLocked ? t("documents.page.unlock") : t("documents.page.lock"), () =>
                       isLocked ? unlockDocument.mutateAsync(id) : lockDocument.mutateAsync(id),
                     )
                   }
@@ -673,11 +673,11 @@ function DocumentPageLoaded({
                     rowKey: 'id',
                     columns: [
                       { key: 'versionNumber', label: '#', type: 'number', align: 'right' },
-                      { key: 'fileName', label: 'File name' },
-                      { key: 'fileSize', label: 'Size', align: 'right', render: (value: unknown) => formatFileSize(value) },
-                      { key: 'changesDescription', label: 'Changes' },
-                      { key: 'isCurrent', label: 'Current', type: 'boolean' },
-                      { key: 'createdAt', label: 'Created', type: 'date' },
+                      { key: 'fileName', label: t("accounting.forms.bankStatementImport.fileName") },
+                      { key: 'fileSize', label: t("documents.documents.columns.fileSize"), align: 'right', render: (value: unknown) => formatFileSize(value) },
+                      { key: 'changesDescription', label: t("recordChanges.title") },
+                      { key: 'isCurrent', label: t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.current.label"), type: 'boolean' },
+                      { key: 'createdAt', label: t("documents.documents.columns.createDate"), type: 'date' },
                     ],
                     emptyMessage: t('documents.page.noVersions', { defaultValue: 'No versions yet' }),
                   },

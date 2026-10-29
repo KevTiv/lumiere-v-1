@@ -486,10 +486,10 @@ function PurchasingClientLoaded({
   const contactsReferenceStatus = contactsQuery.status === "success"
     ? undefined
     : initialContactsState?.status === "denied"
-      ? "Access denied"
+      ? t("aiHarness.reviewQueue.accessDenied")
       : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
-        ? "Unavailable"
-        : "Loading"
+        ? t("purchasing.purchasingClient.unavailable")
+        : t("purchasing.purchasingClient.loading")
   const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists))
   const pricelists = pricelistsRead.rows
   const productsRead = moduleCollection(useProducts(orgId, initialProducts))
@@ -779,9 +779,9 @@ function PurchasingClientLoaded({
           required: true,
           defaultValue: "medium",
           options: [
-            { value: "low", label: "Low" },
-            { value: "medium", label: "Medium" },
-            { value: "high", label: "High" },
+            { value: "low", label: t("purchasing.configuration.risk.low") },
+            { value: "medium", label: t("purchasing.configuration.risk.medium") },
+            { value: "high", label: t("purchasing.configuration.risk.high") },
           ],
         },
       ],
@@ -950,7 +950,7 @@ function PurchasingClientLoaded({
 
   const vendorFieldOptions = useMemo(() => {
     if (contactsReferenceStatus) {
-      return [{ value: "", label: `Contacts: ${contactsReferenceStatus}`, disabled: true }]
+      return [{ value: "", label: t("purchasing.purchasingClient.contactsStatus", { status: contactsReferenceStatus }), disabled: true }]
     }
     const fromApi = contactRowsToVendorSelectOptions(allContacts)
     if (fromApi.length > 0) return fromApi
@@ -1114,7 +1114,7 @@ function PurchasingClientLoaded({
             organizationId={orgId}
             resModel="purchase_order"
             resId={BigInt(String(record.id))}
-            title="Attachments"
+            title={t("purchasing.order.attachments")}
           />
         ),
       },
@@ -1251,7 +1251,7 @@ function PurchasingClientLoaded({
       rfqBids: submittedBids.map((row) => ({
         value: String(row.id ?? ""),
         rfqId: String(row.rfqId ?? row.rfq_id ?? ""),
-        label: `Bid ${String(row.id ?? "")} · Vendor ${String(row.partnerId ?? row.partner_id ?? "")} · ${String(row.priceUnit ?? row.price_unit ?? "")}`,
+        label: t("purchasing.purchasingClient.bidVendorPrice", { bid: String(row.id ?? ""), vendor: String(row.partnerId ?? row.partner_id ?? ""), price: String(row.priceUnit ?? row.price_unit ?? "") }),
       })),
       vendors: vendorFieldOptions.filter((option) => option.value !== ""),
       products: productFieldOptions.filter((option) => option.value !== ""),
@@ -1280,6 +1280,7 @@ function PurchasingClientLoaded({
       purchaseJournalFieldOptions,
       expenseAccountFieldOptions,
       payableAccountFieldOptions,
+      t,
     ])
 
   const entityLabels = useMemo(
@@ -2476,7 +2477,7 @@ function PurchasingClientLoaded({
         })()
         return {
           ...order,
-          fulfillmentLabel: dropship ? "Dropship" : "Standard",
+          fulfillmentLabel: dropship ? t("purchasing.purchasingClient.dropship") : t("purchasing.purchasingClient.standard"),
           dropshipSaleOrderRef: saleOrderId,
           originDisplay:
             dropship && saleOrderId
@@ -2484,7 +2485,7 @@ function PurchasingClientLoaded({
               : String(order.origin ?? ""),
         }
       }),
-    [orders],
+    [orders, t],
   )
 
   const data = useMemo(
@@ -2570,7 +2571,7 @@ function PurchasingClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     const invalidInput = () => new Error(t("purchasing.forms.refinement.invalidInput", { defaultValue: "Check the required choices and entered values. Your entries have been retained." }))
-    if (!tabUsable(actionTabs[action])) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!tabUsable(actionTabs[action])) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "updatePurchaseOrder") {
       const args = toUpdatePurchaseOrderHeaderArgs(formData)
       if (args == null) throw invalidInput()
@@ -2848,8 +2849,7 @@ function PurchasingClientLoaded({
       {activeTabUsable && formDialog}
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
-          Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
-        </p>
+          {t("purchasing.purchasingClient.contactsReferenceData")}{" "}{contactsReferenceStatus}{t("purchasing.purchasingClient.supplierSelectionRequiresCRMContactReadAccessExistingPurchasingRecordsRemain")}{" "}</p>
       )}
       <ModuleWorkView
         organizationId={organizationId}
@@ -2884,7 +2884,7 @@ function PurchasingClientLoaded({
           const action = purchasingWorkflow.supplierIntakeActions.find(
             (candidate) => candidate.id === "purchasing.supplier-intake.approve",
           )
-          if (!action) throw new Error("Supplier approval is unavailable")
+          if (!action) throw new Error(t("purchasing.purchasingClient.supplierApprovalIsUnavailable"))
           await action.execute(input)
         }}
         onCreateRfq={(params) => createPurchaseRfq.mutateAsync(params)}
@@ -2949,7 +2949,7 @@ function PurchasingClientLoaded({
               organizationId={orgId}
               resModel={chatterTarget.resModel}
               resId={chatterTarget.resId}
-              title={`Attachments — ${chatterTarget.recordTitle ?? chatterTarget.resModel}`}
+              title={t("purchasing.purchasingClient.attachments", { value1: chatterTarget.recordTitle ?? chatterTarget.resModel })}
             />
           </div>
         </>
@@ -3005,7 +3005,7 @@ function PurchasingClientLoaded({
           </DialogHeader>
           {landedCostDetailRow ? (
             <div className="space-y-2 text-sm">
-              <p>{String(landedCostDetailRow.description ?? `Landed cost ${landedCostDetailRow.id}`)}</p>
+              <p>{String(landedCostDetailRow.description ?? t("purchasing.purchasingClient.landedCost", { value1: landedCostDetailRow.id }))}</p>
               <p>
                 {t("purchasing.landedCostDetail.state")}: {landedCostState(landedCostDetailRow)}
               </p>
@@ -3019,7 +3019,7 @@ function PurchasingClientLoaded({
                   <ul className="max-h-40 space-y-1 overflow-y-auto text-muted-foreground">
                     {landedCostDetailLines.map((line) => (
                       <li key={String(line.id ?? "")}>
-                        #{String(line.id ?? "")} · product {String(line.productId ?? "—")} ·{" "}
+                        #{String(line.id ?? "")} {" "}{t("purchasing.purchasingClient.product")}{" "}{String(line.productId ?? "—")} ·{" "}
                         {Number(line.priceUnit ?? 0).toLocaleString()}
                       </li>
                     ))}

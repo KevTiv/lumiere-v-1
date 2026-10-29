@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
@@ -5,17 +6,17 @@ import type { EntityViewConfig } from "./entity-view-types"
 
 const moveStateBadges = {
   badgeVariants: { draft: "secondary", posted: "default", cancel: "destructive" },
-  badgeLabels: { draft: "Draft", posted: "Posted", cancel: "Cancelled" },
+  badgeLabels: { get draft() { return uiI18n.t("accounting.builtIn.entityConfigs.moveStateBadges.draft.draft") }, get posted() { return uiI18n.t("accounting.builtIn.entityConfigs.moveStateBadges.posted.posted") }, get cancel() { return uiI18n.t("accounting.builtIn.entityConfigs.moveStateBadges.cancelled.cancel") } },
 } as const
 
 const paymentStateBadges = {
   badgeVariants: { not_paid: "destructive", partial: "outline", paid: "default", reversed: "secondary" },
-  badgeLabels: { not_paid: "Unpaid", partial: "Partial", paid: "Paid", reversed: "Reversed" },
+  badgeLabels: { get not_paid() { return uiI18n.t("accounting.builtIn.entityConfigs.paymentStateBadges.unpaid.notPaid") }, get partial() { return uiI18n.t("accounting.builtIn.entityConfigs.paymentStateBadges.partial.partial") }, get paid() { return uiI18n.t("accounting.builtIn.entityConfigs.paymentStateBadges.paid.paid") }, get reversed() { return uiI18n.t("accounting.invoices.paymentStates.reversed") } },
 } as const
 
 const activeBadges = {
   badgeVariants: { true: "default", false: "secondary" },
-  badgeLabels: { true: "Active", false: "Inactive" },
+  badgeLabels: { get true() { return uiI18n.t("common.active") }, get false() { return uiI18n.t("common.inactive") } },
 } as const
 
 // ─── Chart of Accounts ───────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ export function buildAccountsTableConfig(
 
   const nameColumn = {
     key: "name",
-    label: "Name",
+    get label() { return uiI18n.t("accounting.builtIn.entityConfigs.nameColumn.name.label") },
     width: "min-w-48",
     ...(formatName
       ? {
@@ -54,55 +55,55 @@ export function buildAccountsTableConfig(
 
   return {
     id: "accounts-table",
-    title: "Chart of Accounts",
-    description: "All general ledger accounts",
+    get title() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.accountsTable.title") },
+    get description() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.accountsTable.description") },
     view: {
       mode: "table",
       rowKey: "id",
       searchable: true,
-      searchPlaceholder: "Search by code or name…",
+      get searchPlaceholder() { return uiI18n.t("accounting.entities.journals.searchPlaceholder") },
       searchKeys: ["code", "name", "internalGroup"],
       filters: [
         {
           key: "active",
-          label: "Status",
+          get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.active.label") },
           type: "select",
           options: [
-            { value: "true", label: "Active" },
-            { value: "false", label: "Inactive" },
+            { value: "true", get label() { return uiI18n.t("common.active") } },
+            { value: "false", get label() { return uiI18n.t("common.inactive") } },
           ],
         },
         {
           key: "internalGroup",
-          label: "Group",
+          get label() { return uiI18n.t("accounting.forms.accountGroup.sections.main") },
           type: "select",
           options: [
-            { value: "asset", label: "Asset" },
-            { value: "liability", label: "Liability" },
-            { value: "equity", label: "Equity" },
-            { value: "income", label: "Income" },
-            { value: "expense", label: "Expense" },
+            { value: "asset", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.internalGroup.label") } },
+            { value: "liability", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.internalGroup.labelliability") } },
+            { value: "equity", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.internalGroup.labelequity") } },
+            { value: "income", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.internalGroup.labelincome") } },
+            { value: "expense", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.internalGroup.labelexpense") } },
           ],
         },
       ],
       columns: [
-        { key: "code", label: "Code", width: "min-w-20" },
+        { key: "code", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.code.label") }, width: "min-w-20" },
         nameColumn,
-        { key: "internalGroup", label: "Group", type: "text" },
+        { key: "internalGroup", get label() { return uiI18n.t("accounting.forms.accountGroup.sections.main") }, type: "text" },
         {
           key: "openingBalance",
-          label: "Balance",
+          get label() { return uiI18n.t("accounting.accounts.balance") },
           type: "currency",
           align: "right",
         },
         {
           key: "active",
-          label: "Status",
+          get label() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.active.label") },
           type: "badge",
           ...activeBadges,
         },
       ],
-      emptyMessage: "No accounts found.",
+      get emptyMessage() { return uiI18n.t("accounting.builtIn.entityConfigs.buildAccountsTableConfig.accountsTable.emptyMessage") },
     },
   }
 }
@@ -112,38 +113,38 @@ export const accountsTableConfig = buildAccountsTableConfig()
 
 export const accountDetailConfig: EntityViewConfig = {
   id: "account-detail",
-  title: "Account Details",
+  get title() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.accountDetail.title") },
   view: {
     mode: "detail",
     sections: [
       {
         id: "identity",
-        title: "Identity",
+        get title() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.identity.title") },
         fields: [
-          { key: "code", label: "Account Code", width: "1/4" },
-          { key: "name", label: "Account Name", width: "3/4" as "2/3" },
-          { key: "internalGroup", label: "Internal Group", width: "1/2" },
-          { key: "internalType", label: "Internal Type", width: "1/2" },
+          { key: "code", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.code.label") }, width: "1/4" },
+          { key: "name", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.name.label") }, width: "3/4" as "2/3" },
+          { key: "internalGroup", get label() { return uiI18n.t("accounting.forms.newAccount.fields.internalGroup") }, width: "1/2" },
+          { key: "internalType", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.internalType.label") }, width: "1/2" },
         ],
       },
       {
         id: "balances",
-        title: "Balances",
+        get title() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.balances.title") },
         fields: [
-          { key: "openingDebit", label: "Opening Debit", type: "currency", width: "1/3" },
-          { key: "openingCredit", label: "Opening Credit", type: "currency", width: "1/3" },
-          { key: "openingBalance", label: "Net Balance", type: "currency", width: "1/3" },
+          { key: "openingDebit", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.openingDebit.label") }, type: "currency", width: "1/3" },
+          { key: "openingCredit", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.openingCredit.label") }, type: "currency", width: "1/3" },
+          { key: "openingBalance", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.openingBalance.label") }, type: "currency", width: "1/3" },
         ],
       },
       {
         id: "settings",
-        title: "Settings",
+        get title() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.settings.title") },
         fields: [
-          { key: "reconcile", label: "Reconcilable", type: "boolean", width: "1/4" },
-          { key: "isOffBalance", label: "Off-Balance", type: "boolean", width: "1/4" },
-          { key: "nonTrade", label: "Non-Trade", type: "boolean", width: "1/4" },
-          { key: "active", label: "Active", type: "badge", ...activeBadges, width: "1/4" },
-          { key: "note", type: "markdown", label: "Notes", width: "full" },
+          { key: "reconcile", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.reconcile.label") }, type: "boolean", width: "1/4" },
+          { key: "isOffBalance", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.isOffBalance.label") }, type: "boolean", width: "1/4" },
+          { key: "nonTrade", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.nonTrade.label") }, type: "boolean", width: "1/4" },
+          { key: "active", get label() { return uiI18n.t("common.active") }, type: "badge", ...activeBadges, width: "1/4" },
+          { key: "note", type: "markdown", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.accountDetailConfig.note.label") }, width: "full" },
         ],
       },
     ],
@@ -154,96 +155,96 @@ export const accountDetailConfig: EntityViewConfig = {
 
 export const journalEntriesTableConfig: EntityViewConfig = {
   id: "journal-entries-table",
-  title: "Journal Entries",
-  description: "All accounting moves",
+  get title() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.journalEntriesTable.title") },
+  get description() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.journalEntriesTable.description") },
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search by reference or partner…",
+    get searchPlaceholder() { return uiI18n.t("accounting.entities.payments.searchPlaceholder") },
     searchKeys: ["name", "ref", "invoicePartnerDisplayName"],
     filters: [
       {
         key: "state",
-        label: "Status",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.state.label") },
         type: "select",
         options: [
-          { value: "draft", label: "Draft" },
-          { value: "posted", label: "Posted" },
-          { value: "cancel", label: "Cancelled" },
+          { value: "draft", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.state.labeldraft") } },
+          { value: "posted", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.state.labelposted") } },
+          { value: "cancel", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.state.labelcancelled") } },
         ],
       },
       {
         key: "moveType",
-        label: "Type",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.moveType.label") },
         type: "select",
         options: [
-          { value: "entry", label: "Journal Entry" },
-          { value: "out_invoice", label: "Customer Invoice" },
-          { value: "in_invoice", label: "Vendor Bill" },
-          { value: "out_refund", label: "Credit Note" },
-          { value: "in_refund", label: "Vendor Credit" },
+          { value: "entry", get label() { return uiI18n.t("accounting.journalEntries.types.entry") } },
+          { value: "out_invoice", get label() { return uiI18n.t("accounting.journalEntries.types.outInvoice") } },
+          { value: "in_invoice", get label() { return uiI18n.t("accounting.journalEntries.types.inInvoice") } },
+          { value: "out_refund", get label() { return uiI18n.t("accounting.journalEntries.types.outRefund") } },
+          { value: "in_refund", get label() { return uiI18n.t("accounting.journalEntries.types.inRefund") } },
         ],
       },
     ],
     columns: [
-      { key: "name", label: "Reference", width: "min-w-32" },
-      { key: "date", label: "Date", type: "date" },
-      { key: "invoicePartnerDisplayName", label: "Partner" },
-      { key: "amountTotal", label: "Total", type: "currency", align: "right" },
-      { key: "amountResidual", label: "Due", type: "currency", align: "right" },
+      { key: "name", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.name.label") }, width: "min-w-32" },
+      { key: "date", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.date.label") }, type: "date" },
+      { key: "invoicePartnerDisplayName", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.invoicePartnerDisplayName.label") } },
+      { key: "amountTotal", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.amountTotal.label") }, type: "currency", align: "right" },
+      { key: "amountResidual", get label() { return uiI18n.t("accounting.overview.due") }, type: "currency", align: "right" },
       {
         key: "state",
-        label: "Status",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.state.label") },
         type: "badge",
         ...moveStateBadges,
       },
       {
         key: "paymentState",
-        label: "Payment",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.paymentState.label") },
         type: "badge",
         ...paymentStateBadges,
       },
     ],
-    emptyMessage: "No journal entries found.",
+    get emptyMessage() { return uiI18n.t("accounting.builtIn.entityConfigs.journalEntriesTableConfig.journalEntriesTable.emptyMessage") },
   },
 }
 
 export const invoiceDetailConfig: EntityViewConfig = {
   id: "invoice-detail",
-  title: "Invoice",
+  get title() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.invoiceDetail.title") },
   view: {
     mode: "detail",
     sections: [
       {
         id: "header",
-        title: "Invoice Header",
+        get title() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.header.title") },
         fields: [
-          { key: "name", label: "Number", width: "1/4" },
-          { key: "state", label: "Status", type: "badge", ...moveStateBadges, width: "1/4" },
-          { key: "paymentState", label: "Payment", type: "badge", ...paymentStateBadges, width: "1/4" },
-          { key: "moveType", label: "Type", width: "1/4" },
-          { key: "invoicePartnerDisplayName", label: "Partner", width: "1/2" },
-          { key: "ref", label: "Reference", width: "1/2" },
+          { key: "name", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.name.label") }, width: "1/4" },
+          { key: "state", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.state.label") }, type: "badge", ...moveStateBadges, width: "1/4" },
+          { key: "paymentState", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.paymentState.label") }, type: "badge", ...paymentStateBadges, width: "1/4" },
+          { key: "moveType", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.moveType.label") }, width: "1/4" },
+          { key: "invoicePartnerDisplayName", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.invoicePartnerDisplayName.label") }, width: "1/2" },
+          { key: "ref", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.ref.label") }, width: "1/2" },
         ],
       },
       {
         id: "dates",
-        title: "Dates",
+        get title() { return uiI18n.t("accounting.invoices.dates") },
         fields: [
-          { key: "date", label: "Accounting Date", type: "date", width: "1/3" },
-          { key: "invoiceDate", label: "Invoice Date", type: "date", width: "1/3" },
-          { key: "invoiceDateDue", label: "Due Date", type: "date", width: "1/3" },
+          { key: "date", get label() { return uiI18n.t("accounting.forms.newJournalEntry.fields.date") }, type: "date", width: "1/3" },
+          { key: "invoiceDate", get label() { return uiI18n.t("accounting.forms.newInvoice.fields.invoiceDate") }, type: "date", width: "1/3" },
+          { key: "invoiceDateDue", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.invoiceDateDue.label") }, type: "date", width: "1/3" },
         ],
       },
       {
         id: "amounts",
-        title: "Amounts",
+        get title() { return uiI18n.t("accounting.invoices.amounts") },
         fields: [
-          { key: "amountUntaxed", label: "Subtotal", type: "currency", width: "1/4" },
-          { key: "amountTax", label: "Tax", type: "currency", width: "1/4" },
-          { key: "amountTotal", label: "Total", type: "currency", width: "1/4" },
-          { key: "amountResidual", label: "Amount Due", type: "currency", width: "1/4" },
+          { key: "amountUntaxed", get label() { return uiI18n.t("accounting.forms.newInvoice.summary.subtotal") }, type: "currency", width: "1/4" },
+          { key: "amountTax", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.amountTax.label") }, type: "currency", width: "1/4" },
+          { key: "amountTotal", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.amountTotal.label") }, type: "currency", width: "1/4" },
+          { key: "amountResidual", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.invoiceDetailConfig.amountResidual.label") }, type: "currency", width: "1/4" },
         ],
       },
     ],
@@ -254,41 +255,41 @@ export const invoiceDetailConfig: EntityViewConfig = {
 
 export const taxesTableConfig: EntityViewConfig = {
   id: "taxes-table",
-  title: "Taxes",
-  description: "Configured tax rates",
+  get title() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.taxesTable.title") },
+  get description() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.taxesTable.description") },
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search taxes…",
+    get searchPlaceholder() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.taxesTable.searchPlaceholder") },
     searchKeys: ["name", "description"],
     filters: [
       {
         key: "typeTaxUse",
-        label: "Usage",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.typeTaxUse.label") },
         type: "select",
         options: [
-          { value: "sale", label: "Sales" },
-          { value: "purchase", label: "Purchase" },
-          { value: "none", label: "None" },
+          { value: "sale", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.typeTaxUse.labelsales") } },
+          { value: "purchase", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.typeTaxUse.labelpurchase") } },
+          { value: "none", get label() { return uiI18n.t("common.none") } },
         ],
       },
     ],
     columns: [
-      { key: "name", label: "Name" },
-      { key: "description", label: "Label" },
-      { key: "typeTaxUse", label: "Usage" },
-      { key: "amountType", label: "Computation" },
-      { key: "amount", label: "Rate", type: "percent", align: "right" },
-      { key: "priceInclude", label: "Price Incl.", type: "boolean", align: "center" },
+      { key: "name", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.name.label") } },
+      { key: "description", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.description.label") } },
+      { key: "typeTaxUse", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.typeTaxUse.label") } },
+      { key: "amountType", get label() { return uiI18n.t("accounting.forms.newTax.fields.computation") } },
+      { key: "amount", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.amount.label") }, type: "percent", align: "right" },
+      { key: "priceInclude", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.priceInclude.label") }, type: "boolean", align: "center" },
       {
         key: "active",
-        label: "Status",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.active.label") },
         type: "badge",
         ...activeBadges,
       },
     ],
-    emptyMessage: "No taxes found.",
+    get emptyMessage() { return uiI18n.t("accounting.builtIn.entityConfigs.taxesTableConfig.taxesTable.emptyMessage") },
   },
 }
 
@@ -296,45 +297,45 @@ export const taxesTableConfig: EntityViewConfig = {
 
 export const budgetsTableConfig: EntityViewConfig = {
   id: "budgets-table",
-  title: "Budgets",
-  description: "Budget overview with actuals vs planned",
+  get title() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.budgetsTable.title") },
+  get description() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.budgetsTable.description") },
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search budgets…",
+    get searchPlaceholder() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.budgetsTable.searchPlaceholder") },
     searchKeys: ["name"],
     filters: [
       {
         key: "state",
-        label: "Status",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.label") },
         type: "select",
         options: [
-          { value: "Draft", label: "Draft" },
-          { value: "Confirm", label: "Confirmed" },
-          { value: "Validate", label: "Validated" },
-          { value: "Done", label: "Done" },
-          { value: "Cancel", label: "Cancelled" },
+          { value: "Draft", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.labeldraft") } },
+          { value: "Confirm", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.labelconfirmed") } },
+          { value: "Validate", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.labelvalidated") } },
+          { value: "Done", get label() { return uiI18n.t("accounting.periodClose.status.done") } },
+          { value: "Cancel", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.labelcancelled") } },
         ],
       },
     ],
     columns: [
-      { key: "name", label: "Name" },
-      { key: "dateFrom", label: "From", type: "date" },
-      { key: "dateTo", label: "To", type: "date" },
-      { key: "totalPlanned", label: "Planned", type: "currency", align: "right" },
-      { key: "totalPractical", label: "Actual", type: "currency", align: "right" },
-      { key: "totalTheoretical", label: "Theoretical", type: "currency", align: "right" },
-      { key: "variancePercentage", label: "Variance %", type: "percent", align: "right" },
+      { key: "name", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.name.label") } },
+      { key: "dateFrom", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.dateFrom.label") }, type: "date" },
+      { key: "dateTo", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.dateTo.label") }, type: "date" },
+      { key: "totalPlanned", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.totalPlanned.label") }, type: "currency", align: "right" },
+      { key: "totalPractical", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.totalPractical.label") }, type: "currency", align: "right" },
+      { key: "totalTheoretical", get label() { return uiI18n.t("accounting.forms.updateBudgetLineActuals.fields.theoreticalAmount") }, type: "currency", align: "right" },
+      { key: "variancePercentage", get label() { return uiI18n.t("accounting.budgets.variance") }, type: "percent", align: "right" },
       {
         key: "state",
-        label: "Status",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.label") },
         type: "badge",
         badgeVariants: { Draft: "secondary", Confirm: "outline", Validate: "default", Done: "default", Cancel: "destructive" },
-        badgeLabels: { Draft: "Draft", Confirm: "Confirmed", Validate: "Validated", Done: "Done", Cancel: "Cancelled" },
+        badgeLabels: { get Draft() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.draft") }, get Confirm() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.confirm") }, get Validate() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.validate") }, get Done() { return uiI18n.t("accounting.periodClose.status.done") }, get Cancel() { return uiI18n.t("accounting.builtIn.entityConfigs.budgetsTableConfig.state.cancel") } },
       },
     ],
-    emptyMessage: "No budgets found.",
+    get emptyMessage() { return uiI18n.t("accounting.budgets.workspace.emptyBudgets") },
   },
 }
 
@@ -342,28 +343,28 @@ export const budgetsTableConfig: EntityViewConfig = {
 
 export const analyticAccountsTableConfig: EntityViewConfig = {
   id: "analytic-accounts-table",
-  title: "Analytic Accounts",
-  description: "Cost centers and analytic dimensions",
+  get title() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.analyticAccountsTable.title") },
+  get description() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.analyticAccountsTable.description") },
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search analytic accounts…",
+    get searchPlaceholder() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.analyticAccountsTable.searchPlaceholder") },
     searchKeys: ["name", "code"],
     columns: [
-      { key: "code", label: "Code", width: "min-w-20" },
-      { key: "name", label: "Name" },
-      { key: "balance", label: "Balance", type: "currency", align: "right" },
-      { key: "debit", label: "Debit", type: "currency", align: "right" },
-      { key: "credit", label: "Credit", type: "currency", align: "right" },
+      { key: "code", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.code.label") }, width: "min-w-20" },
+      { key: "name", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.name.label") } },
+      { key: "balance", get label() { return uiI18n.t("accounting.accounts.balance") }, type: "currency", align: "right" },
+      { key: "debit", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.debit.label") }, type: "currency", align: "right" },
+      { key: "credit", get label() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.credit.label") }, type: "currency", align: "right" },
       {
         key: "active",
-        label: "Status",
+        get label() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.active.label") },
         type: "badge",
         ...activeBadges,
       },
     ],
-    emptyMessage: "No analytic accounts found.",
+    get emptyMessage() { return uiI18n.t("accounting.builtIn.entityConfigs.analyticAccountsTableConfig.analyticAccountsTable.emptyMessage") },
   },
 }
 

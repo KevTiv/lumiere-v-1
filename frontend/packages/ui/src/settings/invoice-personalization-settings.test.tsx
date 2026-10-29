@@ -13,7 +13,16 @@ vi.mock("@lumiere/query-hooks/hooks/invoice-personalization", async (original) =
   useInvoicePersonalization: () => ({ profile: resolveInvoiceProfile(), organizationVersion: null, companyVersion: null, state: { status: "ready" }, refetch: vi.fn() }),
   useSaveInvoicePersonalizationVersion: () => ({ mutateAsync: publish }),
 }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 
 beforeAll(() => { Element.prototype.scrollIntoView ??= () => {} })
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); permissions.clear(); for (const key of ["document_template:read", "document_template:create", "organization:write", "company:write"]) permissions.add(key) })

@@ -4,7 +4,7 @@
   "packageManager": "pnpm@10.31.0",
   "scripts": {
     "contracts:verify-vendored": "node scripts/verify-vendored-contracts.mjs",
-    "i18n:check": "node scripts/check-json-duplicate-keys.mjs && node scripts/check-i18n-keys.mjs && node scripts/check-i18n-locales.mjs && node scripts/build-kinyarwanda-loanwords.mjs --check",
+    "i18n:check": "node scripts/check-json-duplicate-keys.mjs && node scripts/check-i18n-keys.mjs --self-test && node scripts/check-i18n-keys.mjs && node scripts/check-i18n-locales.mjs && node scripts/build-kinyarwanda-loanwords.mjs --check",
     "i18n:loanwords": "node scripts/build-kinyarwanda-loanwords.mjs",
     "i18n:coverage": "node scripts/check-i18n-locales.mjs",
     "i18n:check-json": "node scripts/check-json-duplicate-keys.mjs",
@@ -22,7 +22,8 @@
     "mobile": "pnpm --filter mobile start",
     "stdb:generate": "spacetime generate --lang typescript --out-dir packages/stdb/src/generated --module-path ../spacetimedb",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "i18n:audit-ui": "node scripts/audit-ui-text.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

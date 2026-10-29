@@ -32,8 +32,8 @@ export const newInvoiceForm = (t: TFunction): FormConfig => ({
           required: true,
           width: "1/2",
           options: [
-            { value: "1", label: "Customer Invoices" },
-            { value: "2", label: "Miscellaneous" },
+            { value: "1", label: t("accounting.builtIn.accountingFormConfigs.newInvoiceForm.journal.label") },
+            { value: "2", label: t("accounting.builtIn.accountingFormConfigs.newInvoiceForm.journal.labelmiscellaneous") },
           ],
         },
         {
@@ -101,9 +101,9 @@ export const newJournalEntryForm = (t: TFunction): FormConfig => ({
           required: true,
           width: "1/2",
           options: [
-            { value: "1", label: "Miscellaneous Operations" },
-            { value: "2", label: "Bank" },
-            { value: "3", label: "Cash" },
+            { value: "1", label: t("accounting.builtIn.accountingFormConfigs.newJournalEntryForm.journal.label") },
+            { value: "2", label: t("accounting.builtIn.accountingFormConfigs.newJournalEntryForm.journal.labelbank") },
+            { value: "3", label: t("accounting.builtIn.accountingFormConfigs.newJournalEntryForm.journal.labelcash") },
           ],
         },
         {
@@ -624,8 +624,8 @@ export const newBillForm = (t: TFunction): FormConfig => ({
           required: true,
           width: "1/2",
           options: [
-            { value: "1", label: "Vendor Bills" },
-            { value: "2", label: "Miscellaneous" },
+            { value: "1", label: t("accounting.builtIn.accountingFormConfigs.newBillForm.journal.label") },
+            { value: "2", label: t("accounting.builtIn.accountingFormConfigs.newBillForm.journal.labelmiscellaneous") },
           ],
         },
         {
@@ -2377,15 +2377,15 @@ export const newOperationalPaymentAccountForm = (t: TFunction): FormConfig => ({
     id: "account",
     fields: [
       { id: "providerCode", name: "providerCode", type: "select", label: t("accounting.forms.operationalPaymentAccount.provider"), required: true, width: "1/2", defaultValue: "Mtn", options: [
-        { value: "Mtn", label: "MTN Mobile Money" }, { value: "Orange", label: "Orange Money" }, { value: "Airtel", label: "Airtel Money" }, { value: "Mpesa", label: "M-Pesa" }, { value: "Moov", label: "Moov Money" }, { value: "Wave", label: "Wave" }, { value: "Cash", label: t("accounting.forms.operationalPaymentAccount.cash") }, { value: "Bank", label: t("accounting.forms.operationalPaymentAccount.bank") }, { value: "Other", label: "Other" },
+        { value: "Mtn", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerCode.label") }, { value: "Orange", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerCode.labelorangeMoney") }, { value: "Airtel", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerCode.labelairtelMoney") }, { value: "Mpesa", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerCode.labelmPesa") }, { value: "Moov", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerCode.labelmoovMoney") }, { value: "Wave", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerCode.labelwave") }, { value: "Cash", label: t("accounting.forms.operationalPaymentAccount.cash") }, { value: "Bank", label: t("accounting.forms.operationalPaymentAccount.bank") }, { value: "Other", label: t("accounting.consolidation.eliminationTypes.other") },
       ] },
-      { id: "providerLabel", name: "providerLabel", type: "text", label: "Other provider label", width: "1/2" },
+      { id: "providerLabel", name: "providerLabel", type: "text", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.providerLabel.label"), width: "1/2" },
       { id: "name", name: "name", type: "text", label: t("accounting.forms.operationalPaymentAccount.name"), required: true, width: "1/2" },
       { id: "referenceRaw", name: "referenceRaw", type: "text", label: t("accounting.forms.operationalPaymentAccount.reference"), width: "1/2" },
       { id: "currencyId", name: "currencyId", type: "select", label: t("accounting.forms.operationalPaymentAccount.currency"), required: true, width: "1/4", options: [] },
       { id: "accountJournalId", name: "accountJournalId", type: "select", label: t("accounting.forms.operationalPaymentAccount.journal"), required: true, width: "1/2", options: [] },
-      { id: "feeAccountId", name: "feeAccountId", type: "select", label: "Fee expense account", width: "1/2", options: [] },
-      { id: "clearingAccountId", name: "clearingAccountId", type: "select", label: "Clearing account", width: "1/2", options: [] },
+      { id: "feeAccountId", name: "feeAccountId", type: "select", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentAccountForm.feeAccountId.label"), width: "1/2", options: [] },
+      { id: "clearingAccountId", name: "clearingAccountId", type: "select", label: t("accounting.fxRevaluation.realizedForm.fields.clearingAccountId"), width: "1/2", options: [] },
       { id: "isPrimary", name: "isPrimary", type: "switch", label: t("accounting.forms.operationalPaymentAccount.primary"), width: "1/4" },
     ],
   }],
@@ -2410,9 +2410,9 @@ export const newOperationalPaymentTransactionForm = (t: TFunction): FormConfig =
       { id: "settlementAmount", name: "settlementAmount", type: "money", label: t("accounting.forms.operationalPaymentTransaction.settlement"), required: true, width: "1/3", validation: { min: 0 } },
       { id: "netAccountAmount", name: "netAccountAmount", type: "money", label: t("accounting.forms.operationalPaymentTransaction.net"), required: true, width: "1/3", validation: { min: 0 } },
       { id: "currencyId", name: "currencyId", type: "select", label: t("accounting.forms.operationalPaymentTransaction.currency"), required: true, width: "1/2", options: [] },
-      { id: "sourceEntity", name: "sourceEntity", type: "text", label: "Source record type", width: "1/3" },
-      { id: "sourceEntityId", name: "sourceEntityId", type: "number", label: "Source record ID", width: "1/3", validation: { min: 1 } },
-      { id: "evidenceDocumentIds", name: "evidenceDocumentIds", type: "text", label: "Evidence document IDs", description: t("accounting.forms.operationalPaymentTransaction.evidenceDocumentIdsHint"), width: "1/3" },
+      { id: "sourceEntity", name: "sourceEntity", type: "text", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentTransactionForm.sourceEntity.label"), width: "1/3" },
+      { id: "sourceEntityId", name: "sourceEntityId", type: "number", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentTransactionForm.sourceEntityId.label"), width: "1/3", validation: { min: 1 } },
+      { id: "evidenceDocumentIds", name: "evidenceDocumentIds", type: "text", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentTransactionForm.evidenceDocumentIds.label"), description: t("accounting.forms.operationalPaymentTransaction.evidenceDocumentIdsHint"), width: "1/3" },
     ],
   }],
 })
@@ -2454,8 +2454,8 @@ export const newOperationalPaymentFeeForm = (t: TFunction): FormConfig => ({
     ] },
     { id: "amount", name: "amount", type: "money", label: t("accounting.forms.operationalPaymentFee.amount"), required: true, width: "1/2", validation: { min: 0 } },
     { id: "taxAmount", name: "taxAmount", type: "money", label: t("accounting.forms.operationalPaymentFee.taxAmount"), defaultValue: 0, width: "1/2", validation: { min: 0 } },
-    { id: "feeAccountId", name: "feeAccountId", type: "select", label: "Fee expense account", width: "1/2", options: [] },
-    { id: "taxAccountId", name: "taxAccountId", type: "select", label: "Fee tax account", width: "1/2", options: [] },
+    { id: "feeAccountId", name: "feeAccountId", type: "select", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentFeeForm.feeAccountId.label"), width: "1/2", options: [] },
+    { id: "taxAccountId", name: "taxAccountId", type: "select", label: t("accounting.builtIn.accountingFormConfigs.newOperationalPaymentFeeForm.taxAccountId.label"), width: "1/2", options: [] },
     { id: "providerReference", name: "providerReference", type: "text", label: t("accounting.forms.operationalPaymentFee.reference"), width: "1/2" },
   ] }],
 })
@@ -2963,10 +2963,10 @@ const fiscalYearFormFields = (t: TFunction) =>
       required: true,
       width: "1/2" as const,
       options: [
-        { value: "standard", label: "Standard" },
-        { value: "adjustment", label: "Adjustment" },
-        { value: "opening", label: "Opening" },
-        { value: "closing", label: "Closing" },
+        { value: "standard", label: t("accounting.builtIn.accountingFormConfigs.fiscalYearFormFields.fiscalYearType.label") },
+        { value: "adjustment", label: t("accounting.builtIn.accountingFormConfigs.fiscalYearFormFields.fiscalYearType.labeladjustment") },
+        { value: "opening", label: t("accounting.builtIn.accountingFormConfigs.fiscalYearFormFields.fiscalYearType.labelopening") },
+        { value: "closing", label: t("accounting.builtIn.accountingFormConfigs.fiscalYearFormFields.fiscalYearType.labelclosing") },
       ],
     },
     {

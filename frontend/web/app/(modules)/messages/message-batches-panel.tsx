@@ -1,5 +1,7 @@
 "use client"
 
+import { operationalLabel } from "../accounting/operational-labels"
+
 import { useMemo, useState } from "react"
 import { CheckIcon, FileTextIcon, MessageSquareMoreIcon, PlusIcon, ScrollTextIcon, XIcon } from "lucide-react"
 
@@ -114,8 +116,8 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
   const contactOptions = useMemo(() => contacts.map((contact) => ({
     value: String(contact.id),
     label: String(contact.displayName ?? contact.display_name ?? contact.name ?? contact.id),
-    description: String(contact.mobile ?? contact.phone ?? "No primary phone shown"),
-  })), [contacts])
+    description: String(contact.mobile ?? contact.phone ?? t("messages.messageBatchesPanel.noPrimaryPhoneShown")),
+  })), [contacts, t])
   const invoiceOptions = useMemo(() => invoices
     .filter((invoice) => {
       const type = enumName(invoice.moveType ?? invoice.move_type)
@@ -127,8 +129,8 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
     .map((invoice) => ({
       value: String(invoice.id),
       label: String(invoice.name ?? invoice.id),
-      description: `${String(invoice.invoicePartnerDisplayName ?? invoice.invoice_partner_display_name ?? "Customer")} · ${Number(invoice.amountResidual ?? invoice.amount_residual ?? 0).toLocaleString()} due`,
-    })), [companyId, invoices])
+      description: t("messages.messageBatchesPanel.invoiceAmountDue", { customer: String(invoice.invoicePartnerDisplayName ?? invoice.invoice_partner_display_name ?? t("accounting.forms.operationalPaymentTransaction.customer")), amount: Number(invoice.amountResidual ?? invoice.amount_residual ?? 0).toLocaleString() }),
+    })), [companyId, invoices, t])
   const batchForm = useMemo(() => withSelectionPicker(mergeSelectOptionsForFields(newMessageBatchForm(t), { templateId: templateOptions }), "candidateContactIds", contactOptions), [contactOptions, t, templateOptions])
   const invoiceForm = useMemo(() => withSelectionPicker(mergeSelectOptionsForFields(newInvoiceReminderBatchForm(t), { templateId: templateOptions }), "invoiceIds", invoiceOptions), [invoiceOptions, t, templateOptions])
   const templateForm = useMemo(() => newMessageTemplateForm(t), [t])
@@ -137,11 +139,11 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
     try {
       setError(null)
       const channels = selectedChannels(data)
-      if (channels.length === 0) throw new Error("Choose at least one allowed channel")
+      if (channels.length === 0) throw new Error(t("messages.messageBatchesPanel.chooseAtLeastOneAllowedChannel"))
       const key = stringValue(data.key)
       const name = stringValue(data.name)
       const bodyTemplate = stringValue(data.bodyTemplate)
-      if (!key || !name || !bodyTemplate) throw new Error("Enter a template key, name, and message body")
+      if (!key || !name || !bodyTemplate) throw new Error(t("messages.messageBatchesPanel.enterATemplateKeyNameAndMessageBody"))
       const params: CreateMessageTemplateParams = {
         companyId: companyId > 0n ? companyId : undefined,
         key,
@@ -157,7 +159,7 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
       await createTemplate.mutateAsync(params)
       setTemplateDialogOpen(false)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to create message template"
+      const message = cause instanceof Error ? cause.message : t("messages.messageBatchesPanel.unableToCreateMessageTemplate")
       setError(message)
       throw cause
     }
@@ -168,12 +170,12 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
       setError(null)
       const templateId = asId(data.templateId)
       const candidateContactIds = ids(data.candidateContactIds)
-      if (templateId == null || candidateContactIds.length === 0) throw new Error("Choose a template and at least one recipient")
+      if (templateId == null || candidateContactIds.length === 0) throw new Error(t("messages.messageBatchesPanel.chooseATemplateAndAtLeastOneRecipient"))
       const params: CreateMessageBatchParams = { companyId: companyId > 0n ? companyId : undefined, templateId, channel: enumValue<MessageChannel>(String(data.channel || "WhatsApp")), subjectModel: stringValue(data.subjectModel) || "account.move", subjectQuery: undefined, candidateContactIds, metadata: undefined }
       await createBatch.mutateAsync(params)
       setBatchDialogOpen(false)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to create message batch"
+      const message = cause instanceof Error ? cause.message : t("messages.messageBatchesPanel.unableToCreateMessageBatch")
       setError(message)
       throw cause
     }
@@ -184,13 +186,13 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
       setError(null)
       const templateId = asId(data.templateId)
       const invoiceIds = ids(data.invoiceIds)
-      if (companyId <= 0n) throw new Error("Choose an active company before creating invoice reminders")
-      if (templateId == null || invoiceIds.length === 0) throw new Error("Choose a template and at least one outstanding invoice")
+      if (companyId <= 0n) throw new Error(t("messages.messageBatchesPanel.chooseAnActiveCompanyBeforeCreatingInvoiceReminders"))
+      if (templateId == null || invoiceIds.length === 0) throw new Error(t("messages.messageBatchesPanel.chooseATemplateAndAtLeastOneOutstandingInvoice"))
       const params: CreateInvoiceReminderBatchParams = { companyId, templateId, channel: enumValue<MessageChannel>(String(data.channel || "WhatsApp")), invoiceIds, metadata: undefined }
       await createInvoiceReminder.mutateAsync(params)
       setInvoiceDialogOpen(false)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to create invoice reminder batch"
+      const message = cause instanceof Error ? cause.message : t("messages.messageBatchesPanel.unableToCreateInvoiceReminderBatch")
       setError(message)
       throw cause
     }
@@ -201,17 +203,17 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
     if (batchId == null) return
     try {
       setError(null)
-      await reviewBatch.mutateAsync({ batchId, params: { approved, reason: approved ? undefined : "Rejected from operations workspace" } })
+      await reviewBatch.mutateAsync({ batchId, params: { approved, reason: approved ? undefined : t("messages.messageBatchesPanel.rejectedFromOperationsWorkspace") } })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to review message batch")
+      setError(cause instanceof Error ? cause.message : t("messages.messageBatchesPanel.unableToReviewMessageBatch"))
     }
   }
 
   const mutationBusy = createBatch.isPending || createInvoiceReminder.isPending || createTemplate.isPending || reviewBatch.isPending
   return <Card>
     <CardHeader>
-      <div><CardTitle>Invoice reminders & message batches</CardTitle><CardDescription>Create approved copy, choose recipients or outstanding invoices, then review the generated batch before staff copy or send it.</CardDescription></div>
-      <CardAction><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setError(null); setTemplateDialogOpen(true) }}><ScrollTextIcon data-icon="inline-start" />New template</Button><Button size="sm" variant="outline" disabled={templateOptions.length === 0 || invoiceOptions.length === 0 || companyId <= 0n} onClick={() => { setError(null); setInvoiceDialogOpen(true) }}><FileTextIcon data-icon="inline-start" />Invoice reminders</Button><Button size="sm" disabled={templateOptions.length === 0 || contactOptions.length === 0} onClick={() => { setError(null); setBatchDialogOpen(true) }}><PlusIcon data-icon="inline-start" />New batch</Button></div></CardAction>
+      <div><CardTitle>{t("messages.messageBatchesPanel.invoiceRemindersMessageBatches")}</CardTitle><CardDescription>{t("messages.messageBatchesPanel.createApprovedCopyChooseRecipientsOrOutstandingInvoicesThenReviewThe")}</CardDescription></div>
+      <CardAction><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setError(null); setTemplateDialogOpen(true) }}><ScrollTextIcon data-icon="inline-start" />{t("documents.designer.createAction")}</Button><Button size="sm" variant="outline" disabled={templateOptions.length === 0 || invoiceOptions.length === 0 || companyId <= 0n} onClick={() => { setError(null); setInvoiceDialogOpen(true) }}><FileTextIcon data-icon="inline-start" />{t("messages.messageBatchesPanel.invoiceReminders")}</Button><Button size="sm" disabled={templateOptions.length === 0 || contactOptions.length === 0} onClick={() => { setError(null); setBatchDialogOpen(true) }}><PlusIcon data-icon="inline-start" />{t("sales.forms.newPickingBatch.createButton")}</Button></div></CardAction>
     </CardHeader>
     <CardContent className="flex flex-col gap-3">
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -219,8 +221,8 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
         const status = enumName(batch.status)
         const awaitingReview = status === "PendingApproval"
         const isInvoiceReminder = stringValue(batch.subjectModel ?? batch.subject_model) === "account_move"
-        return <div key={String(batch.id)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div><div className="flex items-center gap-2"><p className="font-medium">{isInvoiceReminder ? "Invoice reminder batch" : String(batch.subjectModel ?? batch.subject_model ?? "Message batch")}</p><Badge variant={awaitingReview ? "secondary" : status === "Approved" ? "default" : "outline"}>{status || "Draft"}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{enumName(batch.channel)} · {String(batch.recipientCount ?? batch.recipient_count ?? 0)} recipients · {String(batch.excludedCount ?? batch.excluded_count ?? 0)} excluded</p></div>{awaitingReview ? <div className="flex gap-2"><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void review(batch, false)}><XIcon data-icon="inline-start" />Reject</Button><Button size="sm" disabled={mutationBusy} onClick={() => void review(batch, true)}><CheckIcon data-icon="inline-start" />Approve</Button></div> : null}</div>
-      }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><MessageSquareMoreIcon /></EmptyMedia><EmptyTitle>{isLoading ? "Loading batches" : "No message batches"}</EmptyTitle><EmptyDescription>Create an approved template, then build an invoice-reminder or contact-message batch.</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setTemplateDialogOpen(true)}><ScrollTextIcon data-icon="inline-start" />New template</Button></EmptyContent></Empty>}
+        return <div key={String(batch.id)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div><div className="flex items-center gap-2"><p className="font-medium">{isInvoiceReminder ? t("messages.messageBatchesPanel.invoiceReminderBatch") : String(batch.subjectModel ?? batch.subject_model ?? t("messages.messageBatchesPanel.messageBatch"))}</p><Badge variant={awaitingReview ? "secondary" : status === "Approved" ? "default" : "outline"}>{operationalLabel(status) || t("accounting.invoices.draftName")}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{operationalLabel(enumName(batch.channel))} · {String(batch.recipientCount ?? batch.recipient_count ?? 0)} {" "}{t("messages.messageBatchesPanel.recipients")}{" "}{String(batch.excludedCount ?? batch.excluded_count ?? 0)} {" "}{t("messages.messageBatchesPanel.excluded")}</p></div>{awaitingReview ? <div className="flex gap-2"><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void review(batch, false)}><XIcon data-icon="inline-start" />{t("purchasing.actions.rejectSelected")}</Button><Button size="sm" disabled={mutationBusy} onClick={() => void review(batch, true)}><CheckIcon data-icon="inline-start" />{t("purchasing.actions.approveSelected")}</Button></div> : null}</div>
+      }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><MessageSquareMoreIcon /></EmptyMedia><EmptyTitle>{isLoading ? t("messages.messageBatchesPanel.loadingBatches") : t("messages.messageBatchesPanel.noMessageBatches")}</EmptyTitle><EmptyDescription>{t("messages.messageBatchesPanel.createAnApprovedTemplateThenBuildAnInvoiceReminderOrContact")}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setTemplateDialogOpen(true)}><ScrollTextIcon data-icon="inline-start" />{t("documents.designer.createAction")}</Button></EmptyContent></Empty>}
     </CardContent>
     <RuntimeFormModal open={templateDialogOpen} onOpenChange={(next) => !next && setTemplateDialogOpen(false)} staticConfig={templateForm} moduleId="messages" organizationId={organizationId} isPending={createTemplate.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={error} onSubmit={saveTemplate} />
     <RuntimeFormModal open={invoiceDialogOpen} onOpenChange={(next) => !next && setInvoiceDialogOpen(false)} staticConfig={invoiceForm} moduleId="messages" organizationId={organizationId} isPending={createInvoiceReminder.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={error} onSubmit={saveInvoiceReminder} />

@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import type { AllocatePaymentParams } from "@lumiere/stdb/types"
 
 export interface PaymentAllocationAttempt {
@@ -16,7 +18,7 @@ export function preparePaymentAllocationAttempt(
   const { idempotencyKey: _key, ...previousParams } = previous.params
   const encode = (value: unknown) => JSON.stringify(value, (_name, entry: unknown) => typeof entry === "bigint" ? entry.toString() : entry)
   if (previous.organizationId !== organizationId || encode(previousParams) !== encode(params)) {
-    throw new Error("An allocation response is unresolved. Retry the original payment, line, and amounts before making another allocation.")
+    throw new Error(i18n.t("accounting.paymentAllocationAttempt.anAllocationResponseIsUnresolvedRetryTheOriginalPaymentLineAnd"))
   }
   return previous
 }
