@@ -17,6 +17,8 @@ export function DailyWorkWorkspace({ organizationId, summary = false }: {
   const params = useSearchParams()
   const canReadCrm = permissionsReady !== false && checkPermission("module:crm", "read").allowed
   const canReadProjects = permissionsReady !== false && checkPermission("module:projects", "read").allowed
+  const canReadSubscriptions = permissionsReady !== false && checkPermission("module:subscriptions", "read").allowed
+  const canReadReports = permissionsReady !== false && checkPermission("module:reports", "read").allowed
   const Heading = summary ? "h2" : "h1"
   return (
     <section className="min-w-0 space-y-4" data-testid={summary ? "overview-finance-work" : "daily-work"}>
@@ -34,14 +36,17 @@ export function DailyWorkWorkspace({ organizationId, summary = false }: {
       <p className="text-xs text-muted-foreground">
         {t("workspace.dailyWork.viewsHint", { defaultValue: "Mine shows your assignments. Eligible includes work available to your role; Available shows unclaimed workflow work or unassigned follow-ups. Counts describe only loaded records." })}
       </p>
+      <p className="text-xs text-muted-foreground">{t("workspace.dailyWork.coverage", { defaultValue: "This inbox covers Accounting, Sales, Purchasing and Expenses. CRM follow-ups, subscription billing and report schedules remain in their own workspaces." })}</p>
       <WorkBoardWorkspace organizationId={organizationId} initialView="mine" defaultLayout="list" embedded />
-      {(canReadCrm || canReadProjects) && <nav className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-sm" aria-label={t("workspace.dailyWork.otherWork", { defaultValue: "Other workspaces" })}>
+      {(canReadCrm || canReadProjects || canReadSubscriptions || canReadReports) && <nav className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-sm" aria-label={t("workspace.dailyWork.otherWork", { defaultValue: "Other workspaces" })}>
         {canReadCrm && <Link href="/crm?tab=my-activities" className="font-medium text-primary underline-offset-4 hover:underline">
           {t("workspace.dailyWork.crmWork", { defaultValue: "CRM daily work" })}
         </Link>}
         {canReadProjects && <Link href="/tasks?source=projects" className="font-medium text-primary underline-offset-4 hover:underline">
           {t("workBoard.projectTasks")}
         </Link>}
+        {canReadSubscriptions && <Link href="/subscriptions?tab=due-to-bill" className="font-medium text-primary underline-offset-4 hover:underline">{t("workspace.dailyWork.subscriptionBilling", { defaultValue: "Subscriptions due to bill" })}</Link>}
+        {canReadReports && <Link href="/reports?tab=scheduled-reports" className="font-medium text-primary underline-offset-4 hover:underline">{t("workspace.dailyWork.reportSchedules", { defaultValue: "Report schedules" })}</Link>}
       </nav>}
     </section>
   )

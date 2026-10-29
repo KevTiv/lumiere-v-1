@@ -20,7 +20,7 @@ import { calendarDate, calendarDayKey, calendarMode, shiftCalendarDate } from "@
 import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { calendarEventForView, calendarEventHref, eventInputValue, eventStateTag, updateCalendarEventParams } from "./calendar-event"
+import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, eventInputValue, eventStateTag, updateCalendarEventParams } from "./calendar-event"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { variantTag } from "@lumiere/erp-workflows"
 import { requiredInlineText } from "@/lib/inline-edit-params"
@@ -65,6 +65,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const viewMode = calendarMode(params.get("calendarView"))
   const currentDate = calendarDate(params.get("calendarDate"), initialDate)
   const selectedDate = params.has("calendarDay") ? calendarDate(params.get("calendarDay"), currentDate) : null
+  const newEventDay = calendarDayKey(selectedDate ?? currentDate)
   const searchTerm = params.get("calendarSearch") ?? ""
   const selectedEventId = params.get("calendarEvent")
   const setSelectedEventId = useCallback((id: string | null) => updateParams({ calendarEvent: id }), [updateParams])
@@ -118,7 +119,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            new_event: () => setQuickActionForm({ form: newCalendarEventForm(t), action: "createEvent" }),
+            new_event: () => setQuickActionForm({ form: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create"), action: "createEvent" }),
           }
           return {
             ...w,
@@ -130,7 +131,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         }
         return w
           })
-  }, [events, moduleConfig, t])
+  }, [events, moduleConfig, t, newEventDay])
 
   const config = useMemo(
     () => ({
@@ -146,6 +147,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         if (tab.id === "events") {
           return {
             ...tab,
+            createForm: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create"),
             entityConfig: tab.entityConfig
               ? withInlineEdits(tab.entityConfig, {
                   name: {
@@ -203,7 +205,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                 onSelectDate={(date) => updateParams({ calendarDay: calendarDayKey(date) })}
                 onSearchChange={(value) => updateParams({ calendarSearch: value }, true)}
                 onSelectEvent={setSelectedEventId}
-                onCreateEvent={canCreateEvent ? () => setQuickActionForm({ form: newCalendarEventForm(t), action: "createEvent" }) : undefined}
+                onCreateEvent={canCreateEvent ? () => setQuickActionForm({ form: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create"), action: "createEvent" }) : undefined}
                 onEditEvent={canEditEvent ? (eventId) => {
                   const event = events.find((e) => String(e.id) === eventId)
                   if (event) {
@@ -241,7 +243,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog, canCreateEvent, canEditEvent, canDeleteEvent, params, pathname, updateParams, setSelectedEventId],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, newEventDay, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog, canCreateEvent, canEditEvent, canDeleteEvent, params, pathname, updateParams, setSelectedEventId],
   )
 
   const data = useMemo(
@@ -284,9 +286,9 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     }
     if (!eventsUsable || !canCreateEvent || createIntentOpened.current) return
     createIntentOpened.current = true
-    setQuickActionForm({ form: newCalendarEventForm(t), action: "createEvent" })
+    setQuickActionForm({ form: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create"), action: "createEvent" })
     updateParams({ create: null, tab: "calendar" }, true)
-  }, [params, eventsUsable, canCreateEvent, t, updateParams])
+  }, [params, eventsUsable, canCreateEvent, t, updateParams, newEventDay])
 
   const handleFormSubmit = async (
     _tabId: string,

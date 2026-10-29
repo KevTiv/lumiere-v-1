@@ -1,8 +1,14 @@
 import { variantTag } from '@lumiere/erp-workflows';
+import { calendarEventFormRange, localCalendarDate } from '../../../lib/calendar-event-range';
 import type { CalendarEvent } from '@lumiere/ui/lib/calendar-types';
 
 type Row = Record<string, unknown>;
 type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/** Keep the calendar's selected local date when starting a new event. */
+export function calendarEventCreationDefaults(day: string): { start: string; stop: string } | undefined {
+  return localCalendarDate(day) ? { start: `${day}T09:00`, stop: `${day}T10:00` } : undefined;
+}
 
 /** Where a calendar event's page lives. */
 export function calendarEventHref(event: Row): string | undefined {
@@ -74,13 +80,12 @@ export function calendarReturnHref(value: string | null): string {
  */
 export function updateCalendarEventParams(formData: Row, state = 'confirmed'): Row | null {
   const name = String(formData.name ?? '').trim();
-  const start = new Date(String(formData.start ?? ''));
-  const stop = new Date(String(formData.stop ?? ''));
-  if (!name || Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime()) || stop.getTime() < start.getTime()) return null;
+  const range = calendarEventFormRange(formData);
+  if (!name || !range) return null;
   return {
     name,
-    start: BigInt(start.getTime() * 1000),
-    stop: BigInt(stop.getTime() * 1000),
+    start: BigInt(range.start.getTime() * 1000),
+    stop: BigInt(range.stop.getTime() * 1000),
     allday: Boolean(formData.allday),
     privacy: (formData.privacy as string) ?? 'public',
     show_as: 'busy',

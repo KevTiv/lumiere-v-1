@@ -8,6 +8,7 @@ import { Button } from "@lumiere/ui"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@lumiere/ui/components/card"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
+import { Checkbox } from "@lumiere/ui/components/checkbox"
 import {
   Select,
   SelectContent,
@@ -16,7 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  ONBOARDING_TIMEZONES,
+  isOnboardingTimezone,
+  onboardingFiscalYearEnd,
+  onboardingTimezones,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_FISCAL_YEAR_END_DAY,
 } from "@/lib/onboarding-config"
@@ -35,13 +38,27 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
-  const [timezone, setTimezone] = useState("UTC")
+  const [timezone, setTimezone] = useState("")
+  const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
+  const [browserTimezone, setBrowserTimezone] = useState("")
+  const [fiscalMonth, setFiscalMonth] = useState(String(DEFAULT_FISCAL_YEAR_END_MONTH))
+  const [fiscalDay, setFiscalDay] = useState(String(DEFAULT_FISCAL_YEAR_END_DAY))
+  const [setupConfirmed, setSetupConfirmed] = useState(false)
   const [currencies, setCurrencies] = useState<BootstrapCurrency[]>([])
   const [currencyId, setCurrencyId] = useState("")
   const [currencyCode, setCurrencyCode] = useState("")
   const [currenciesLoading, setCurrenciesLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const suggested = Intl.DateTimeFormat().resolvedOptions().timeZone
+    setTimezoneOptions(onboardingTimezones(suggested))
+    if (isOnboardingTimezone(suggested)) {
+      setBrowserTimezone(suggested)
+      setTimezone((current) => current || suggested)
+    }
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -52,10 +69,7 @@ export default function OnboardingPage() {
         const payload = (await response.json()) as { data?: BootstrapCurrency[] }
         const activeCurrencies = payload.data ?? []
         setCurrencies(activeCurrencies)
-        const defaultCurrency = activeCurrencies.find((currency) => currency.code === "USD") ?? activeCurrencies[0]
-        setCurrencyId(defaultCurrency ? String(defaultCurrency.id) : "")
-        setCurrencyCode(defaultCurrency?.code ?? "")
-        if (!defaultCurrency) setError(t("auth.onboarding.errors.failedToCreate"))
+        if (activeCurrencies.length === 0) setError(t("auth.onboarding.errors.failedToCreate"))
       } catch (err) {
         if (!controller.signal.aborted) {
           phCaptureException(err)
@@ -75,8 +89,13 @@ export default function OnboardingPage() {
     setLoading(true)
     try {
       const selectedCurrencyId = Number(currencyId)
-      if (!Number.isSafeInteger(selectedCurrencyId) || selectedCurrencyId < 0 || !currencyCode) {
+      const selectedCurrency = currencies.find((currency) => String(currency.id) === currencyId && currency.code === currencyCode)
+      if (!selectedCurrency || !Number.isSafeInteger(selectedCurrencyId) || selectedCurrencyId < 0) {
         throw new Error(t("auth.onboarding.errors.failedToCreate"))
+      }
+      const fiscalYearEnd = onboardingFiscalYearEnd(fiscalMonth, fiscalDay)
+      if (!isOnboardingTimezone(timezone) || !fiscalYearEnd || !setupConfirmed) {
+        throw new Error(t("auth.onboarding.errors.confirmSetup", { defaultValue: "Choose a valid timezone and fiscal year-end, then confirm your company settings." }))
       }
       const r = await apiFetch("/api/bootstrap/tenant", {
         method: "POST",
@@ -101,8 +120,8 @@ export default function OnboardingPage() {
           defaultCompanyCode: code,
           defaultCompanyCurrencyId: selectedCurrencyId,
           defaultCompanyCurrencyCode: currencyCode,
-          fiscalYearEndMonth: DEFAULT_FISCAL_YEAR_END_MONTH,
-          fiscalYearEndDay: DEFAULT_FISCAL_YEAR_END_DAY,
+          fiscalYearEndMonth: fiscalYearEnd.month,
+          fiscalYearEndDay: fiscalYearEnd.day,
           seedFormConfigs: true,
           settings: {
             moduleConfig: null,
@@ -168,21 +187,22 @@ export default function OnboardingPage() {
             <p className="text-xs text-muted-foreground">{t("auth.onboarding.shortCodeHint")}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="timezone">{t("auth.onboarding.timezone")}</Label>
-              <Select value={timezone} onValueChange={setTimezone}>
+              <Select value={timezone} onValueChange={(value) => { setTimezone(value); setSetupConfirmed(false) }}>
                 <SelectTrigger id="timezone">
-                  <SelectValue />
+                  <SelectValue placeholder={t("auth.onboarding.chooseTimezone", { defaultValue: "Choose timezone" })} />
                 </SelectTrigger>
                 <SelectContent>
-                  {ONBOARDING_TIMEZONES.map((tz) => (
+                  {timezoneOptions.map((tz) => (
                     <SelectItem key={tz} value={tz}>
                       {tz}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {browserTimezone && <p className="text-xs text-muted-foreground">{t("auth.onboarding.browserTimezoneHint", { defaultValue: "Browser suggestion: {{timezone}}. Confirm the timezone your company uses.", timezone: browserTimezone })}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -196,11 +216,12 @@ export default function OnboardingPage() {
                   if (!selected) return
                   setCurrencyCode(selected.code)
                   setCurrencyId(String(selected.id))
+                  setSetupConfirmed(false)
                 }}
                 disabled={currenciesLoading || currencies.length === 0}
               >
                 <SelectTrigger id="currency">
-                  <SelectValue />
+                  <SelectValue placeholder={t("auth.onboarding.chooseCurrency", { defaultValue: "Choose base currency" })} />
                 </SelectTrigger>
                 <SelectContent>
                   {currencies.map((currency) => (
@@ -210,8 +231,21 @@ export default function OnboardingPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">{t("auth.onboarding.currencyHint", { defaultValue: "Choose the company's accounting base currency. No currency is selected automatically." })}</p>
             </div>
           </div>
+
+          <fieldset className="space-y-2 rounded-lg border p-3">
+            <legend className="px-1 text-sm font-medium">{t("auth.onboarding.fiscalYearEnd", { defaultValue: "Fiscal year-end" })}</legend>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><Label htmlFor="fiscal-month">{t("auth.onboarding.fiscalMonth", { defaultValue: "Month (1–12)" })}</Label><Input id="fiscal-month" type="number" min={1} max={12} step={1} required value={fiscalMonth} onChange={(event) => { setFiscalMonth(event.target.value); setSetupConfirmed(false) }} /></div>
+              <div className="space-y-1.5"><Label htmlFor="fiscal-day">{t("auth.onboarding.fiscalDay", { defaultValue: "Day" })}</Label><Input id="fiscal-day" type="number" min={1} max={31} step={1} required value={fiscalDay} onChange={(event) => { setFiscalDay(event.target.value); setSetupConfirmed(false) }} /></div>
+            </div>
+            <p className="text-xs text-muted-foreground">{t("auth.onboarding.fiscalHint", { defaultValue: "Review the suggested December 31 year-end. Choose a month and day that exist every year." })}</p>
+            {!onboardingFiscalYearEnd(fiscalMonth, fiscalDay) && <p role="alert" className="text-sm text-destructive">{t("auth.onboarding.errors.fiscalDate", { defaultValue: "Enter a valid annual year-end, such as June 30 or December 31." })}</p>}
+          </fieldset>
+
+          <div className="flex items-start gap-2"><Checkbox id="confirm-setup" checked={setupConfirmed} onCheckedChange={(checked) => setSetupConfirmed(checked === true)} /><Label htmlFor="confirm-setup" className="text-sm leading-5">{t("auth.onboarding.confirmSetup", { defaultValue: "I have checked the base currency, company timezone and fiscal year-end." })}</Label></div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -219,7 +253,7 @@ export default function OnboardingPage() {
             type="submit"
             size="lg"
             className="w-full"
-            disabled={loading || currenciesLoading || currencyId === ""}
+            disabled={loading || currenciesLoading || currencyId === "" || !isOnboardingTimezone(timezone) || !onboardingFiscalYearEnd(fiscalMonth, fiscalDay) || !setupConfirmed}
           >
             {loading ? t("auth.onboarding.submitting") : t("auth.onboarding.submit")}
           </Button>

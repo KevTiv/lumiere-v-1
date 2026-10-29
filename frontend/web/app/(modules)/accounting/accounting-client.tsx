@@ -5,6 +5,7 @@ import { useTaxGroupAdministration } from "./features/use-tax-group-administrati
 import { useTaxJurisdictionAdministration } from "./features/use-tax-jurisdiction-administration"
 import { useTaxScheduleAdministration } from "./features/use-tax-schedule-administration"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { filterStatementJournalItems, parseStatementDrilldown } from "../reports/statement-drilldown"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
@@ -973,6 +974,14 @@ function AccountingClientReady({
   const accountPeriodsRaw = accountPeriodsRawRead.rows
   const financialReportsRead = plannedCollection("financial-reports", useFinancialReports(orgId, undefined, { enabled: readEnabled("financial-reports") }))
   const financialReportsRaw = financialReportsRead.rows
+  const statementDrilldown = useMemo(() => parseStatementDrilldown(searchParams), [searchParams])
+  const statementSources = mergeModuleStates([accountMoveLinesRead.state, financialReportsRead.state])
+  const statementItems = useMemo(() => {
+    if (statementDrilldown.status === "none") return { status: "ready" as const, rows: accountMoveLines }
+    if (statementDrilldown.status === "invalid") return { status: "invalid" as const, rows: [] }
+    if (statementSources.status !== "ready") return { status: "unavailable" as const, rows: [] }
+    return filterStatementJournalItems(accountMoveLines, financialReportsRaw, statementDrilldown.context, orgId, operatingCompanyId)
+  }, [accountMoveLines, financialReportsRaw, statementDrilldown, statementSources.status, orgId, operatingCompanyId])
 
   const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
   const updateFiscalYear = useUpdateFiscalYear(organizationId, operatingCompanyId)
@@ -4198,7 +4207,11 @@ function AccountingClientReady({
       allMovesRead.state,
     ]),
     "account-journals": journalsRead.state,
-    "move-lines": mergeModuleStates([
+    "move-lines": statementDrilldown.status !== "none" ? (
+      statementSources.status !== "ready" ? statementSources
+        : statementItems.status === "ready" ? { status: "ready" as const }
+          : { status: "partial" as const, message: t("reports.drilldown.scopeUnavailable", { defaultValue: "The saved report scope could not be verified. Return to the report and open its journal items again." }) }
+    ) : mergeModuleStates([
       accountMoveLinesRead.state,
       accountsRead.state,
       saleOrdersRead.state,
@@ -5582,7 +5595,7 @@ function AccountingClientReady({
       "payment-terms": paymentTerms,
       "payment-term-lines": paymentTermLinesDisplay,
       "account-journals": journals,
-      "move-lines": accountMoveLines,
+      "move-lines": statementItems.rows,
     }),
     [
       taxes,
@@ -5602,6 +5615,7 @@ function AccountingClientReady({
       paymentTermLinesDisplay,
       journals,
       accountMoveLines,
+      statementItems.rows,
       fiscalYearsDisplay,
       accountPeriodsDisplay,
       intercompanyRules,
@@ -5673,6 +5687,14 @@ function AccountingClientReady({
         onResolve={handleReadinessResolve}
         className="mb-4"
       /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
+      {accountingActiveTab === "move-lines" && statementDrilldown.status !== "none" ? <section className="mb-4 space-y-2 rounded-lg border p-4 text-sm" aria-label={t("reports.drilldown.title", { defaultValue: "Statement journal items" })}>
+        {statementDrilldown.status === "ready" ? <>
+          <p>{t("reports.drilldown.scope", { defaultValue: "Report #{{report}} · company {{company}} · account {{account}} · {{from}} to {{to}} · {{basis}} entries", report: statementDrilldown.context.reportId, company: statementDrilldown.context.companyId, account: statementDrilldown.context.accountId,
+            from: new Date(Number(BigInt(statementDrilldown.context.fromMicros) / 1000n)).toLocaleDateString(undefined, { timeZone: "UTC" }), to: new Date(Number(BigInt(statementDrilldown.context.toMicros) / 1000n)).toLocaleDateString(undefined, { timeZone: "UTC" }), basis: statementDrilldown.context.basis })}</p>
+          <p className="text-muted-foreground">{t("reports.drilldown.currentRows", { defaultValue: "These are current authorized journal items in the saved report's scope. Later edits, opening balances, currency translation and cash-flow classification can explain differences from a saved statement." })}</p>
+          <a className="inline-block font-medium text-primary underline" href={statementDrilldown.context.returnHref}>{t("reports.drilldown.return", { defaultValue: "Return to saved report" })}</a>
+        </> : <p role="alert">{t("reports.drilldown.invalid", { defaultValue: "This report link is incomplete or invalid. No broader ledger has been displayed. Open the saved report and try its journal-items link again." })}</p>}
+      </section> : null}
       {companyAvailable ? <ModuleWorkView
         organizationId={organizationId}
         config={config}
@@ -6504,7 +6526,7 @@ function AccountingClientReady({
                                 </div>
                                 {settlementLinked ? <p className="mt-1 max-w-xs text-xs text-muted-foreground">
                                   {line.isReconciled
-                                    ? t("accounting.bankStatementDetail.settlementLocked", { defaultValue: "Settlement confirmed. Editing, unlinking and reversal are unavailable in this alpha." })
+                                    ? t("accounting.bankStatementDetail.settlementLocked", { defaultValue: "Settlement confirmed. Use Focus line to inspect the saved settlement and any permitted recovery actions. Direct editing and unlinking remain locked." })
                                     : t("accounting.bankStatementDetail.settlementPending", { defaultValue: "Payment awaiting approval or settlement completion. Use Focus line to continue." })}
                                 </p> : null}
                               </td>

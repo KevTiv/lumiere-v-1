@@ -12,9 +12,9 @@ import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
+import { useAuthorizedPeople } from "@/lib/use-authorized-people"
 import { Badge } from "@lumiere/ui/components/badge"
 import {
-  FormModal,
   CsvImportModal,
   CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
@@ -208,12 +208,10 @@ import {
 } from "@/lib/purchasing-create-params"
 import { purchaseOrderHandoffs } from "@lumiere/query-hooks/hooks/purchase-order-handoffs"
 import { OrderHandoffLinks } from "../../../components/order-handoff-links"
-import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   toCreatePartnerBankParams,
   toUpdatePartnerBankParams,
 } from "@/lib/purchasing-partner-bank-params"
-import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 /** Forms that render their own failure inline instead of a toast. */
 const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set(["purchasing.order.create-bill"])
@@ -822,25 +820,25 @@ function PurchasingClientLoaded({
     })
   }
 
-  // Users are identified by their 64-character identity hex, which no list here carries yet.
+  const delegationPeople = useAuthorizedPeople(organizationId)
   const promptSetApprovalDelegate = async () => {
-    const hex64 = (value: unknown) =>
-      /^[0-9a-fA-F]{64}$/.test(String(value ?? "").trim())
-        ? null
-        : t("purchasing.ops.identityHexInvalid", { defaultValue: "Enter the 64-character identity hex" })
+    if (delegationPeople.status !== "ready" || delegationPeople.options.length === 0) {
+      showWorkflowToast({ kind: "error", title: t("purchasing.ops.approvalDelegate", { defaultValue: "Set approval delegate" }), description: t("peoplePicker.unavailable", { defaultValue: "Named active people could not be verified. Check organization people access and retry." }) })
+      return
+    }
     const values = await askForm({
       title: t("purchasing.ops.approvalDelegate", { defaultValue: "Set approval delegate" }),
       fields: [
-        { id: "principal", name: "principal", label: t("purchasing.ops.prompt.principalIdentity", { defaultValue: "Principal identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
-        { id: "delegate", name: "delegate", label: t("purchasing.ops.prompt.delegateIdentity", { defaultValue: "Delegate identity hex (64 chars)" }), type: "text", required: true, validation: { custom: hex64 } },
+        { id: "principal", name: "principal", label: t("peoplePicker.principal", { defaultValue: "Person delegating approval" }), type: "select", searchable: true, required: true, options: delegationPeople.options },
+        { id: "delegate", name: "delegate", label: t("peoplePicker.delegate", { defaultValue: "Person receiving delegation" }), type: "select", searchable: true, required: true, options: delegationPeople.options },
         { id: "validFrom", name: "validFrom", label: t("purchasing.ops.delegationStarts", { defaultValue: "Starts" }), type: "datetime", required: true },
         { id: "validUntil", name: "validUntil", label: t("purchasing.ops.delegationEnds", { defaultValue: "Ends" }), type: "datetime", required: true },
         { id: "reason", name: "reason", label: t("purchasing.ops.delegationReason", { defaultValue: "Reason" }), type: "textarea", required: true },
       ],
     })
-    const principalIdentity = formText(values?.principal)
-    const delegateIdentity = formText(values?.delegate)
-    if (principalIdentity == null || delegateIdentity == null) return
+    if (values == null) return
+    const [principalIdentity, delegateIdentity] = await delegationPeople.validateSelection([values.principal, values.delegate])
+    if (principalIdentity === delegateIdentity) throw new Error(t("peoplePicker.different", { defaultValue: "Choose two different people." }))
     await createWorkflowDelegation.mutateAsync({
       principalIdentity,
       delegateIdentity,
@@ -2822,6 +2820,7 @@ function PurchasingClientLoaded({
                 onOpenPurchaseOrder={openPurchaseOrder}
               />
               <PurchasingConfigurationWorkspace
+                organizationId={organizationId}
                 embedded
                 actionRequest={configurationActionRequest}
                 vendors={vendors as EntityRow[]}

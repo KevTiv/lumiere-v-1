@@ -88,7 +88,8 @@ import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
 import type { TabbedTableRow } from "@lumiere/ui"
 import { approvalBacklog, monthlySpend, spendByCategory } from "./expenses-dashboard-charts"
 import { useProjects } from "@lumiere/query-hooks/hooks/projects"
-import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountTaxes, useAccountAnalyticAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import { allocationLookupRows, expenseAllocationLines } from "./expense-allocation-input"
 import { expenseVariantTag } from "@/lib/expense-state"
 import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
 import {
@@ -228,7 +229,9 @@ function ExpensesClientLoaded({
   const { data: currencies = [] } = useCurrencies()
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
-  const { data: projects = [] } = useProjects(orgId)
+  const projectsQuery = useProjects(orgId)
+  const { data: projects = [] } = projectsQuery
+  const allocationAccountsQuery = useAccountAnalyticAccounts(orgId, { enabled: workflowForm?.kind === "setAllocations" && operatingCompanyId > 0n })
   const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: operatingCompanyId > 0n })
 
   const expenses = useMemo(
@@ -405,10 +408,16 @@ function ExpensesClientLoaded({
     [t, mileageRateFieldOptions, perDiemRateFieldOptions, projectFieldOptions, productFieldOptions, taxFieldOptions],
   )
   const addToReportFormBase = useMemo(() => addExpenseToReportForm(t), [t])
-  const allocationsFormConfig = useMemo(() => mergeSelectOptionsForFields(setExpenseAllocationsForm(t), {
-    projectId1: projectFieldOptions, projectId2: projectFieldOptions,
-    projectId3: projectFieldOptions, projectId4: projectFieldOptions,
-  }), [t, projectFieldOptions])
+  const allocationProjectsState = moduleQueryState(projectsQuery)
+  const allocationAccountsState = moduleQueryState(allocationAccountsQuery)
+  const allocationProjects = allocationProjectsState.status === "ready" ? allocationLookupRows(projects, orgId, operatingCompanyId) : []
+  const allocationAccounts = allocationAccountsState.status === "ready" ? allocationLookupRows(allocationAccountsQuery.data ?? [], orgId, operatingCompanyId, true) : []
+  const allocationChoicesReady = allocationProjects.length > 0 || allocationAccounts.length > 0
+  const allocationsFormConfig = setExpenseAllocationsForm(t, {
+    projectOptions: allocationProjects.map((row) => ({ value: String(row.id), label: String(row.name ?? row.id) })),
+    analyticAccountOptions: allocationAccounts.map((row) => ({ value: String(row.id), label: [row.code, row.name].filter(Boolean).map(String).join(" · ") || String(row.id) })),
+    projectsState: allocationProjectsState, analyticAccountsState: allocationAccountsState,
+  }, setExpenseAllocations.isPending)
   const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const pendingApproval = sheetsToApprove.length
@@ -948,26 +957,15 @@ function ExpensesClientLoaded({
         sheetId: String(sheetRaw),
       })
     } else if (workflowForm.kind === "setAllocations") {
-      const lines = []
-      for (const n of [1, 2, 3, 4] as const) {
-        const share = Number(formData[`sharePercent${n}`] ?? 0)
-        if (!(share > 0)) continue
-        lines.push({
-          analyticAccountId: optionalBigIntU64(formData[`analyticAccountId${n}`]),
-          projectId: optionalBigIntU64(formData[`projectId${n}`]),
-          sharePercent: share,
-          billable:
-            n === 1
-              ? formData.billable1 !== false && formData.billable1 !== "false"
-              : formData[`billable${n}`] === true || formData[`billable${n}`] === "true",
-          metadata: undefined as string | undefined,
-        })
+      const currentExpense = companyWorkflowRows(expenses, orgId, operatingCompanyId).find((row) => rowId(row) === rowId(workflowForm.row))
+      if (!currentExpense || expenseVariantTag(currentExpense.state) !== "Draft" || permissionsReady === false || !checkPermission("hr_expense", "write").allowed || formData.confirmAllocationReplacement !== true) {
+        throw new Error(t("expenses.allocations.reviewRequired", { defaultValue: "Confirm the replacement for a current draft expense you can edit. Your rows are retained." }))
       }
-      const shareTotal = lines.reduce((s, l) => s + l.sharePercent, 0)
-      if (Math.abs(shareTotal - 100) > 0.01) {
-        setToolbarError(t("expenses.ops.shareTotalInvalid"))
-        return
-      }
+      const lines = expenseAllocationLines(formData.allocationLines,
+        new Set(allocationProjects.map((row) => String(row.id))), new Set(allocationAccounts.map((row) => String(row.id))),
+        t("expenses.allocations.invalidRow", { defaultValue: "Each allocation needs a current company project or active analytic account, a share greater than 0 and at most 100, and a billable choice. Correct invalid or unavailable selections; your rows are retained." }),
+        t("expenses.ops.shareTotalInvalid"),
+      )
       await setExpenseAllocations.mutateAsync({
         expenseId: rowId(workflowForm.row),
         params: { lines },
@@ -1174,6 +1172,8 @@ function ExpensesClientLoaded({
           onOpenChange={(open) => !open && setWorkflowForm(null)}
           config={workflowFormConfig}
           isPending={isFormMutationPending}
+          draftKey={workflowForm.kind === "setAllocations" ? rowId(workflowForm.row) : undefined}
+          submissionDisabled={workflowForm.kind === "setAllocations" && (!allocationChoicesReady || permissionsReady === false || !checkPermission("hr_expense", "write").allowed)}
           formLeadingActions={workflowForm.kind === "addToReport" ? <Button type="button" variant="outline"
             data-testid="expense-create-report-continuation" disabled={!sheetsUsable || permissionsReady === false || !checkPermission("hr_expense_sheet", "create").allowed} onClick={() => {
               setReportContinuation(workflowForm); setQuickActionForm({ action: "createSheet" })

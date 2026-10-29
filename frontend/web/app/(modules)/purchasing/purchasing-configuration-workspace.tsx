@@ -24,10 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DatePicker } from "@lumiere/ui/components/date-picker"
+import { RecordPicker } from "@lumiere/ui/components/record-picker"
+import { useAuthorizedPeople } from "@/lib/use-authorized-people"
 
 type Row = EntityRow
 
 export interface PurchasingConfigurationWorkspaceProps {
+  organizationId?: number
   vendors: Row[]
   products: Row[]
   warehouses?: Row[]
@@ -153,6 +156,7 @@ function SelectField({
 
 /** Real form surface for purchasing configuration writes and one-off setup records. */
 export function PurchasingConfigurationWorkspace({
+  organizationId = 0,
   vendors,
   products,
   warehouses = [],
@@ -169,10 +173,12 @@ export function PurchasingConfigurationWorkspace({
 }: PurchasingConfigurationWorkspaceProps) {
   const { t } = useTranslation()
   const [kind, setKind] = useState<PurchasingConfigurationKind>("scorecard")
+  const people = useAuthorizedPeople(organizationId, kind === "approvalDelegate")
   const [values, setValues] = useState<PurchasingConfigurationValues>(() =>
     initialPurchasingConfigurationValues("scorecard"),
   )
   const [pending, setPending] = useState(false)
+  const submitting = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const handledActionToken = useRef(0)
@@ -221,6 +227,8 @@ export function PurchasingConfigurationWorkspace({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (submitting.current) return
+    submitting.current = true
     setPending(true)
     setError(null)
     setNotice(null)
@@ -241,6 +249,7 @@ export function PurchasingConfigurationWorkspace({
           await onSetRiskFlag(submission.params)
           break
         case "approvalDelegate":
+          await people.validateSelection([submission.params.principalIdentity, submission.params.delegateIdentity])
           await onSetApprovalDelegate(submission.params)
           break
         case "commodityIndex":
@@ -258,6 +267,7 @@ export function PurchasingConfigurationWorkspace({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("purchasing.configuration.errors.save", { defaultValue: "Unable to save configuration" }))
     } finally {
+      submitting.current = false
       setPending(false)
     }
   }
@@ -323,8 +333,10 @@ export function PurchasingConfigurationWorkspace({
 
         {kind === "approvalDelegate" ? (
           <>
-            <div className="space-y-1.5"><Label htmlFor="purchasing-principal">{t("purchasing.configuration.fields.principalIdentity", { defaultValue: "Principal identity" })}</Label><Input id="purchasing-principal" value={String(values.principalIdentity ?? "")} onChange={(event) => setValue("principalIdentity", event.target.value)} required /></div>
-            <div className="space-y-1.5"><Label htmlFor="purchasing-delegate">{t("purchasing.configuration.fields.delegateIdentity", { defaultValue: "Delegate identity" })}</Label><Input id="purchasing-delegate" value={String(values.delegateIdentity ?? "")} onChange={(event) => setValue("delegateIdentity", event.target.value)} required /></div>
+            <p role="status" className="text-sm text-muted-foreground">{people.status === "denied" ? t("peoplePicker.denied", { defaultValue: "Organization people access is required. Ask an administrator to manage this assignment." }) : people.status === "error" ? t("peoplePicker.failed", { defaultValue: "The people directory could not be loaded. Retry before choosing a person." }) : people.status === "loading" ? t("peoplePicker.loading", { defaultValue: "Loading authorized people…" }) : people.options.length === 0 ? t("peoplePicker.empty", { defaultValue: "No named active organization members are available in your authorized directory." }) : t("peoplePicker.hint", { defaultValue: "Choose named active members. Access and membership are checked again before saving." })}</p>
+            {people.status === "error" && <Button type="button" variant="outline" onClick={() => void people.refetch()}>{t("common.retry")}</Button>}
+            <div className="space-y-1.5"><Label htmlFor="purchasing-principal">{t("peoplePicker.principal", { defaultValue: "Person delegating approval" })}</Label><RecordPicker id="purchasing-principal" value={String(values.principalIdentity ?? "")} onChange={(value) => setValue("principalIdentity", value)} options={people.options} disabled={people.status !== "ready" || pending} /></div>
+            <div className="space-y-1.5"><Label htmlFor="purchasing-delegate">{t("peoplePicker.delegate", { defaultValue: "Person receiving delegation" })}</Label><RecordPicker id="purchasing-delegate" value={String(values.delegateIdentity ?? "")} onChange={(value) => setValue("delegateIdentity", value)} options={people.options.filter((person) => person.value !== values.principalIdentity)} disabled={people.status !== "ready" || pending} /></div>
             {values.isActive === true ? <>
               <div className="space-y-1.5"><Label htmlFor="purchasing-delegation-start">{t("purchasing.configuration.fields.delegationStarts", { defaultValue: "Starts" })}</Label><Input id="purchasing-delegation-start" type="datetime-local" value={String(values.validFrom ?? "")} onChange={(event) => setValue("validFrom", event.target.value)} required /></div>
               <div className="space-y-1.5"><Label htmlFor="purchasing-delegation-end">{t("purchasing.configuration.fields.delegationEnds", { defaultValue: "Ends" })}</Label><Input id="purchasing-delegation-end" type="datetime-local" value={String(values.validUntil ?? "")} onChange={(event) => setValue("validUntil", event.target.value)} required /></div>
@@ -363,7 +375,7 @@ export function PurchasingConfigurationWorkspace({
 
         {error ? <p role="alert" className="text-destructive text-sm">{error}</p> : null}
         {notice ? <p role="status" className="text-sm text-emerald-600">{notice}</p> : null}
-        <Button type="submit" disabled={pending}>{pending ? t("purchasing.configuration.actions.saving", { defaultValue: "Saving…" }) : t("purchasing.configuration.actions.save", { defaultValue: "Save {{kind}}", kind: kindLabel(kind, t).toLowerCase() })}</Button>
+        <Button type="submit" disabled={pending || (kind === "approvalDelegate" && (people.status !== "ready" || people.options.length === 0))}>{pending ? t("purchasing.configuration.actions.saving", { defaultValue: "Saving…" }) : t("purchasing.configuration.actions.save", { defaultValue: "Save {{kind}}", kind: kindLabel(kind, t).toLowerCase() })}</Button>
       </form>
     </section>
   )

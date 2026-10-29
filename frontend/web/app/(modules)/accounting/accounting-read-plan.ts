@@ -39,7 +39,7 @@ export const ACCOUNTING_WORKSPACE_READS = {
   "intercompany-rules": ["intercompany-rules"],
   "intercompany-transactions": ["intercompany-transactions"],
   "account-journals": [],
-  "move-lines": ["account-move-lines"],
+  "move-lines": ["account-move-lines", "financial-reports"],
   "period-close": ["bank-statements", "bank-statement-lines", "financial-reports"],
 } as const
 

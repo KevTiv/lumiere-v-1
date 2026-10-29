@@ -1,7 +1,7 @@
 "use client"
 
 import { WorkspaceProfileProvider } from "@lumiere/ui/lib/workspace-profile-context"
-import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
   DashboardWorkspace,
@@ -53,6 +53,7 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
 import { recordPageHref } from "@/lib/record-page-href"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
@@ -60,19 +61,6 @@ import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
 } from "@lumiere/query-hooks/hooks/messages"
-
-const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
-
-function ensureAiChatSessionKey(): string {
-  const existing = window.localStorage.getItem(AI_CHAT_SESSION_KEY_STORAGE)
-  if (existing) return existing
-  const next =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `ai-chat-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  window.localStorage.setItem(AI_CHAT_SESSION_KEY_STORAGE, next)
-  return next
-}
 
 function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
   return {
@@ -126,14 +114,20 @@ function dateFromStored(raw: unknown): Date {
 }
 
 function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context">) {
-  const { organizationId } = useErpSession()
+  const { organizationId, identity } = useErpSession()
   const { route, module, activeTab, selection } = useErpAiRouteContext()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const rag = useAiMemoryRag()
   const actionDraft = useAiActionDraft()
-  const [sessionKey, setSessionKey] = useState<string | null>(null)
+  const actorHistoryScope = assistantHistoryScope(identity, organizationId, operatingCompanyId)
+  const [historySession, setHistorySession] = useState<{ scope: string; key: string } | null>(null)
+  const sessionKey = historySession?.scope === actorHistoryScope ? historySession.key : null
+  const [failedHistoryScope, setFailedHistoryScope] = useState<string | null>(null)
+  const historyScope = JSON.stringify([identity, organizationId, operatingCompanyId, sessionKey])
+  const currentHistoryScope = useRef(historyScope)
+  currentHistoryScope.current = historyScope
   const [selectedScope, setSelectedScope] = useState("current")
   const workspaceScope = useMemo(
     () => resolveAiWorkspaceScope(selectedScope, route, selection),
@@ -151,8 +145,17 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const companiesQuery = useCompanies(orgId, orgReady)
 
   useEffect(() => {
-    setSessionKey(ensureAiChatSessionKey())
-  }, [])
+    if (!actorHistoryScope) return
+    const createKey = () => typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID() : `ai-chat-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    try {
+      setHistorySession({ scope: actorHistoryScope, key: scopedAssistantSession(window.localStorage, actorHistoryScope, createKey) })
+    } catch {
+      const key = createKey()
+      setHistorySession({ scope: actorHistoryScope, key })
+      setFailedHistoryScope(JSON.stringify([identity, organizationId, operatingCompanyId, key]))
+    }
+  }, [actorHistoryScope, identity, organizationId, operatingCompanyId])
 
   const chatContext = useMemo(
     (): ChatContext => ({
@@ -167,8 +170,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 
   const initialMessages = useMemo((): ChatMessage[] | undefined => {
+    if (!sessionKey || !actorHistoryScope) return []
     if (!messagesQuery.data) return undefined
-    return messagesQuery.data.map((row) => ({
+    return messagesQuery.data.filter((row) => String(row.organizationId ?? row.organization_id) === String(orgId)
+      && String(row.companyId ?? row.company_id) === String(operatingCompanyId)).map((row) => ({
       id: String(row.id),
       role:
         row.role === "user" || row.role === "assistant" || row.role === "system"
@@ -189,21 +194,17 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         runId: parseStoredChatRunId(row.metadata),
       },
     }))
-  }, [messagesQuery.data])
+  }, [messagesQuery.data, sessionKey, actorHistoryScope, orgId, operatingCompanyId])
 
   const ensureSession = useCallback(async () => {
-    if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
-    try {
-      await createSession.mutateAsync({
+    if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) throw new Error("Conversation context is unavailable")
+    await createSession.mutateAsync({
         session_key: sessionKey,
         title: "Lumière Assistant",
         route,
         module: module ?? null,
         active_tab: activeTab ?? null,
-      })
-    } catch (err) {
-      console.warn("Unable to persist AI chat session", err)
-    }
+    })
   }, [activeTab, createSession, operatingCompanyId, module, orgReady, route, sessionKey])
 
   const persistExchange = useCallback(
@@ -218,15 +219,16 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       runId?: number
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
-      try {
-        await ensureSession()
-        await appendMessage.mutateAsync({
+      const result = await saveAssistantHistory({
+        ensureSession,
+        isCurrent: () => currentHistoryScope.current === historyScope,
+        appendUser: async () => { await appendMessage.mutateAsync({
           session_key: sessionKey,
           role: "user",
           content: args.userText,
           ui_context_json: JSON.stringify(args.uiContext ?? null),
-        })
-        await appendMessage.mutateAsync({
+        }) },
+        appendAssistant: async () => { await appendMessage.mutateAsync({
           session_key: sessionKey,
           role: "assistant",
           content: args.assistantText,
@@ -244,12 +246,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
                   args.runId,
                 )
               : null,
-        })
-      } catch (err) {
-        console.warn("Unable to persist AI chat message", err)
-      }
+        }) },
+      })
+      if (result === "failed") setFailedHistoryScope(historyScope)
     },
-    [appendMessage, operatingCompanyId, ensureSession, orgReady, sessionKey],
+    [appendMessage, operatingCompanyId, ensureSession, orgReady, sessionKey, historyScope],
   )
 
   const buildRequestContext = useCallback(
@@ -527,10 +528,12 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
 
   return (
     <AIChatPanel
+      key={JSON.stringify([identity, organizationId, operatingCompanyId])}
       {...props}
       config={chatConfig}
       context={chatContext}
       initialMessages={initialMessages}
+      historySaveFailed={failedHistoryScope === historyScope}
       contextOptions={AI_WORKSPACE_SCOPES}
       selectedContext={selectedScope}
       onContextChange={setSelectedScope}
