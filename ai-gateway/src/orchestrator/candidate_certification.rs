@@ -717,6 +717,77 @@ mod tests {
         &mut request.environment.dataset[REPORT_ANALYSIS_RESOURCE]["data"]
     }
 
+    fn documented_response(key: &str) -> Value {
+        let relative = match key {
+            "report_analysis" => {
+                include_str!("../../../erp-skills/report_analysis/references/response-example.md")
+            }
+            "finance_report_review" => include_str!(
+                "../../../erp-skills/finance_report_review/references/response-example.md"
+            ),
+            _ => panic!("unknown pilot example"),
+        };
+        serde_json::from_str(
+            relative
+                .split("```json\n")
+                .nth(1)
+                .unwrap()
+                .split("```")
+                .next()
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn documented_report_example_passes_the_actual_program_and_answer_gate() {
+        let mut request = generated_report(0.1);
+        data(&mut request)["generations"][0]["response"]["content"] =
+            json!(serde_json::to_string(&documented_response("report_analysis")).unwrap());
+        let result = execute_report_analysis(request).await.unwrap();
+        assert_eq!(result.actual_output["status"], "completed");
+        assert_eq!(
+            result.actual_output["summary"],
+            documented_response("report_analysis")["content"]
+        );
+    }
+
+    #[tokio::test]
+    async fn documented_finance_example_binds_to_real_owner_projection_and_answer_gate() {
+        let mut preview: Value = serde_json::from_str(include_str!(
+            "../harness/finance_review/fixtures/payables.json"
+        ))
+        .unwrap();
+        assert_eq!(preview["report"]["totalOpen"]["minorUnits"], 16500);
+        preview["scope"]["organizationId"] = json!(1);
+        preview["scope"]["companyId"] = json!(1);
+        let mut request = finance_request(
+            "finance_report_review",
+            json!({"reportKey":"supplier_payables_v1","date":"2026-10-26","timezone":"Africa/Kigali"}),
+            json!({"preview":preview}),
+        );
+        let spec = lumiere_finance_review_core::skill("finance_report_review").unwrap();
+        let generation = &mut request.environment.dataset[spec.resource]["data"]["generations"][0]
+            ["response"]["content"];
+        let actual: Value = serde_json::from_str(generation.as_str().unwrap()).unwrap();
+        let mut example = documented_response("finance_report_review");
+        // The example's placeholders are never evidence. Bind them to this
+        // actual owner projection, exactly as a live model must copy its passage.
+        example["claims"][0]["supports"] = actual["claims"][0]["supports"].clone();
+        *generation = json!(serde_json::to_string(&example).unwrap());
+        let result = execute_finance(request).await.unwrap();
+        assert_eq!(
+            result.actual_output["status"], "completed",
+            "{:?}",
+            result.actual_output
+        );
+        // The real gate qualifies this fixture because its passage lacks effective
+        // dates. Preserve that limitation rather than treating generation as proof.
+        let summary = result.actual_output["summary"].as_str().unwrap();
+        assert!(summary.starts_with(example["content"].as_str().unwrap()));
+        assert!(summary.contains("effective dates are not recorded"));
+    }
+
     #[test]
     fn proposed_manifest_and_dev_fixture_bind_the_current_report_bundle() {
         let manifest: Value = serde_json::from_str(include_str!(

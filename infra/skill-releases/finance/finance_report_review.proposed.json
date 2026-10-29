@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "skill_key": "finance_report_review",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "risk": "green",
   "limits": {
     "max_steps": 5,
@@ -14,5 +14,5 @@
   "output_types": [
     "finance.report_review.result.v1"
   ],
-  "source_hash": "sha256:34d64307a4c899a94f551dd5b16316fc1ac7546e2bc030b7ac1c0aa0bf8f8f0b"
+  "source_hash": "sha256:6ee92a8bf6b27d3ba98bffc0c5c499e417a9b0ba2e53a798b0c585a20d0b2517"
 }

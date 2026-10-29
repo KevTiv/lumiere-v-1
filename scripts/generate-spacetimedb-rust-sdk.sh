@@ -10,6 +10,7 @@ SPACETIME_BIN="${SPACETIME_BIN:-spacetime}"
 RUSTFMT_BIN="${RUSTFMT_BIN:-rustfmt}"
 GENERATE_WASM="${STDB_GENERATE_WASM:-}"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/lumiere-stdb-rust-generate.XXXXXX")"
+GENERATED_DIR="$TMP_ROOT/bindings"
 LOG_FILE="$TMP_ROOT/generate.log"
 CLEAN_LOG_FILE="$TMP_ROOT/generate-clean.log"
 RUSTFMT_SHIM_DIR="$TMP_ROOT/rustfmt-shim"
@@ -24,11 +25,10 @@ if [[ ! -s "$GENERATE_WASM" ]]; then
   exit 1
 fi
 
-# Bindings are a complete generated snapshot. Clean the exact output directory
-# first so reducers removed from the module cannot survive as stale APIs and so
-# the generator never pauses for an interactive deletion confirmation.
-rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR"
+# Validate a fresh snapshot before touching the existing bindings. Syncing the
+# complete snapshot afterwards removes stale APIs without rewriting unchanged
+# build inputs or discarding a working snapshot when generation fails.
+mkdir -p "$GENERATED_DIR"
 
 # SpacetimeDB invokes rustfmt once with every generated file. The current
 # schema produces thousands of files, which can exhaust a constrained runner
@@ -46,7 +46,7 @@ set +e
 PATH="$RUSTFMT_SHIM_DIR:$PATH" "$SPACETIME_BIN" generate \
   --include-private \
   --lang rust \
-  --out-dir "$OUT_DIR" \
+  --out-dir "$GENERATED_DIR" \
   --bin-path "$GENERATE_WASM" 2>&1 | tee "$LOG_FILE"
 generate_status="${PIPESTATUS[0]}"
 set -e
@@ -82,17 +82,19 @@ if [[ "$expected_keyword_errors" -gt 0 ]]; then
   echo "Recovering from SpacetimeDB's Rust-keyword formatter failure" >&2
 fi
 
-bash "$ROOT/scripts/fix-spacetimedb-rust-sdk-bindings.sh" "$OUT_DIR"
+bash "$ROOT/scripts/fix-spacetimedb-rust-sdk-bindings.sh" "$GENERATED_DIR"
 
 # The CLI's formatter was intentionally suppressed before the keyword repair.
 # Run the real formatter to both normalize and parse-check every repaired file.
 # Keep each rustfmt invocation bounded: a full module currently contains more
 # than a thousand files, which can exhaust a constrained CI runner in one batch.
-find "$OUT_DIR" -name '*.rs' -print0 | xargs -0 -n 64 "$RUSTFMT_BIN" --edition 2021
+find "$GENERATED_DIR" -name '*.rs' -print0 | xargs -0 -n 64 "$RUSTFMT_BIN" --edition 2021
 
-if [[ ! -s "$OUT_DIR/mod.rs" ]]; then
-  echo "SpacetimeDB Rust generation did not produce $OUT_DIR/mod.rs" >&2
+if [[ ! -s "$GENERATED_DIR/mod.rs" ]]; then
+  echo "SpacetimeDB Rust generation did not produce mod.rs for $OUT_DIR" >&2
   exit 1
 fi
+
+python3 "$ROOT/scripts/sync-directory.py" "$GENERATED_DIR" "$OUT_DIR"
 
 echo "Generated and validated Rust bindings in $OUT_DIR"

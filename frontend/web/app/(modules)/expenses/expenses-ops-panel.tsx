@@ -5,8 +5,8 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   useCreateExpenseCardStatementLine,
   useMatchExpenseCardStatementLine,
-  useSeedStatutoryExpenseMileageRates,
   useUnmatchExpenseCardStatementLine,
+  useSeedStatutoryExpenseMileageRates,
   useUpsertExpenseMileageRate,
   useUpsertExpensePerDiemRate,
 } from "@lumiere/query-hooks/hooks/expenses"
@@ -22,30 +22,36 @@ import {
 } from "@lumiere/ui"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { ExpenseRecordPicker } from "./expense-record-picker"
+import { cardMatchCandidates, companyWorkflowRows, workflowOptions } from "./expense-workflow-model"
+import { moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { useExpenses, useExpenseCardStatementUnmatched } from "@lumiere/query-hooks/hooks/expenses"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
 
 /**
  * Wave E ops: card statement match + OCR/email inbox intent flush.
  * Wave G: mileage / per diem rate admin (upsert_expense_mileage_rate, upsert_expense_per_diem_rate).
  */
-export function ExpensesOpsPanel({ organizationId }: { organizationId: number }) {
+export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organizationId: number; section?: "cards" | "rates" }) {
   const { t } = useTranslation()
   const orgId = BigInt(organizationId)
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const createStmt = useCreateExpenseCardStatementLine(orgId, companyId)
-  const matchStmt = useMatchExpenseCardStatementLine(orgId)
   const unmatchStmt = useUnmatchExpenseCardStatementLine(orgId)
+  const [unmatchStatementId, setUnmatchStatementId] = useState("")
+  const matchStmt = useMatchExpenseCardStatementLine(orgId)
   const upsertMileage = useUpsertExpenseMileageRate(orgId, companyId)
   const upsertPerDiem = useUpsertExpensePerDiemRate(orgId, companyId)
   const seedStatutoryMileage = useSeedStatutoryExpenseMileageRates(orgId, companyId)
-  const { data: currencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const currencies = currenciesQuery.data ?? []
+  const currencyState = moduleQueryState(currenciesQuery)
+  const expensesRead = moduleCollection(useExpenses(orgId))
+  const cardsRead = moduleCollection(useExpenseCardStatementUnmatched(orgId))
+  const statementOptions = workflowOptions(companyWorkflowRows(cardsRead.rows, orgId, companyId))
+
+  const matchReady = expensesRead.state.status === "ready" && cardsRead.state.status === "ready"
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [rateForm, setRateForm] = useState<"mileage" | "perDiem" | null>(null)
@@ -57,6 +63,9 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
   const [currencyId, setCurrencyId] = useState("")
   const [statementLineId, setStatementLineId] = useState("")
   const [expenseId, setExpenseId] = useState("")
+  const selectedStatement = cardsRead.rows.find(row => String(row.id) === statementLineId)
+  const expenseOptions = workflowOptions(selectedStatement ? cardMatchCandidates(companyWorkflowRows(expensesRead.rows, orgId, companyId), selectedStatement) : [])
+  useEffect(() => { setStatementLineId(""); setExpenseId(""); setCurrencyId(""); setUnmatchStatementId("") }, [orgId, companyId])
 
   const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
   const mileageForm = useMemo(
@@ -75,10 +84,6 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
       ),
     [t, currencyOptions, currencyId],
   )
-
-  useEffect(() => {
-    if (!currencyId && currencyOptions[0]) setCurrencyId(currencyOptions[0].value)
-  }, [currencyId, currencyOptions])
 
   const requireCurrencyId = (value: unknown): bigint => {
     const parsed = optionalBigIntU64(value)
@@ -111,8 +116,8 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
       data-testid="expenses-ops-panel"
     >
       <div>
-        <h2 className="text-sm font-medium">{t("expenses.ops.title")}</h2>
-        <p className="text-xs text-muted-foreground">{t("expenses.ops.description")}</p>
+        <h2 className="text-sm font-medium">{t(section === "cards" ? "expenses.workflowUi.reconciliation" : "expenses.ops.ratesTitle")}</h2>
+        <p className="text-xs text-muted-foreground">{t(section === "cards" ? "expenses.workflowUi.reconciliationHint" : "expenses.ops.ratesDescription")}</p>
       </div>
 
       {status ? (
@@ -121,6 +126,11 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
         </p>
       ) : null}
 
+      <ModuleDataNotice state={currencyState} />
+      <ExpenseRecordPicker label={t("expenses.workflowUi.currency")} value={currencyId} onChange={setCurrencyId}
+        options={currencyOptions} disabled={busy || currencyState.status !== "ready"} testId="expenses-ops-currency" />
+      {section === "cards" && <>
+      <ModuleDataNotice state={expensesRead.state} /><ModuleDataNotice state={cardsRead.state} />
       <div className="grid gap-2 sm:grid-cols-2" data-testid="expenses-ops-card-match">
         <input
           className="rounded-md border bg-background px-2 py-1.5 text-sm"
@@ -148,20 +158,10 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
           value={fxFee}
           onChange={(e) => setFxFee(e.target.value)}
         />
-        <Select value={currencyId} onValueChange={setCurrencyId}>
-          <SelectTrigger className="w-auto min-w-28" aria-label={t("expenses.ops.currencyId")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {currencyOptions.map((currency) => (
-              <SelectItem key={currency.value} value={currency.value}>{currency.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Button
           type="button"
           size="sm"
-          disabled={busy || !externalRef.trim() || !amount || !currencyId}
+          disabled={busy || currencyState.status !== "ready" || !externalRef.trim() || !amount || !currencyOptions.some(option => option.value === currencyId)}
           data-testid="expenses-ops-create-statement"
           onClick={() =>
             void run(async () => {
@@ -178,25 +178,15 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
         >
           {t("expenses.ops.createStatement")}
         </Button>
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.statementLineId")}
-          value={statementLineId}
-          onChange={(e) => setStatementLineId(e.target.value)}
-          data-testid="expenses-ops-statement-id"
-        />
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.expenseId")}
-          value={expenseId}
-          onChange={(e) => setExpenseId(e.target.value)}
-          data-testid="expenses-ops-expense-id"
-        />
+        <ExpenseRecordPicker label={t("expenses.workflowUi.statement")} value={statementLineId} onChange={setStatementLineId}
+          options={statementOptions} disabled={busy || !matchReady} testId="expenses-ops-statement-id" />
+        <ExpenseRecordPicker label={t("expenses.workflowUi.expense")} value={expenseId} onChange={setExpenseId}
+          options={expenseOptions} disabled={busy || !matchReady} testId="expenses-ops-expense-id" />
         <Button
           type="button"
           size="sm"
           variant="outline"
-          disabled={busy || !statementLineId || !expenseId}
+          disabled={busy || !matchReady || !statementOptions.some(option => option.value === statementLineId) || !expenseOptions.some(option => option.value === expenseId)}
           data-testid="expenses-ops-match"
           onClick={() =>
             void run(async () => {
@@ -209,23 +199,19 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
         >
           {t("expenses.ops.match")}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={busy || !statementLineId}
-          data-testid="expenses-ops-unmatch"
-          onClick={() =>
-            void run(async () => {
-              await unmatchStmt.mutateAsync({ statementLineId })
-            }, t("expenses.ops.unmatched"))
-          }
-        >
-          {t("expenses.ops.unmatch")}
-        </Button>
+
       </div>
 
-      <div className="space-y-2 border-t pt-3" data-testid="expenses-ops-rates">
+      <details className="rounded-md border p-3 space-y-2">
+        <summary>{t("expenses.workflowUi.unmatchTitle")}</summary>
+        <p className="text-sm text-muted-foreground">{t("expenses.workflowUi.unmatchHint")}</p>
+        <label htmlFor="expense-unmatch-statement">{t("expenses.ops.statementLineId")}</label>
+        <input id="expense-unmatch-statement" className="rounded-md border p-2" value={unmatchStatementId} onChange={event => setUnmatchStatementId(event.target.value)} />
+        <Button variant="outline" disabled={busy || !optionalBigIntU64(unmatchStatementId)} data-testid="expenses-ops-unmatch"
+          onClick={() => { void run(async () => { await unmatchStmt.mutateAsync({ statementLineId: unmatchStatementId }) }, t("expenses.ops.unmatched")) }}>{t("expenses.ops.unmatch")}</Button>
+      </details>
+      </>}
+      {section === "rates" && <div className="space-y-2 border-t pt-3" data-testid="expenses-ops-rates">
         <div>
           <h3 className="text-sm font-medium">{t("expenses.ops.ratesTitle")}</h3>
           <p className="text-xs text-muted-foreground">{t("expenses.ops.ratesDescription")}</p>
@@ -255,7 +241,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
             type="button"
             size="sm"
             variant="secondary"
-            disabled={busy || seedStatutoryMileage.isPending}
+            disabled={busy || seedStatutoryMileage.isPending || currencyState.status !== "ready" || !currencyOptions.some(option => option.value === currencyId)}
             data-testid="expenses-ops-seed-statutory-mileage"
             onClick={() =>
               void run(async () => {
@@ -267,8 +253,7 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
             {t("expenses.ops.seedStatutoryMileage")}
           </Button>
         </div>
-      </div>
-
+      </div>}
       <FormModal
         open={rateForm !== null}
         onOpenChange={(open) => {

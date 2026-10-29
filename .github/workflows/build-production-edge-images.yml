@@ -6,12 +6,16 @@ on:
     paths:
       - frontend/**
       - infra/kong/**
+      - scripts/tests/test_kong*.py
+      - docker-compose.yml
       - .dockerignore
       - .github/workflows/build-production-edge-images.yml
   pull_request:
     paths:
       - frontend/**
       - infra/kong/**
+      - scripts/tests/test_kong*.py
+      - docker-compose.yml
       - .dockerignore
       - .github/workflows/build-production-edge-images.yml
   workflow_dispatch:
@@ -52,13 +56,10 @@ jobs:
       - name: Validate gateway configuration rendering
         if: matrix.service == 'api-gateway'
         run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
           sh infra/kong/test-render-config.sh
-          docker run --rm --entrypoint /bin/sh \
-            --mount "type=bind,src=$PWD/infra/kong,dst=/test,readonly" \
-            -e KONG_DECLARATIVE_TEMPLATE=/test/kong.yml \
-            -e KONG_DECLARATIVE_CONFIG=/tmp/kong.yml \
-            -e KONG_DATABASE=off \
-            kong:3.9 -ec 'sh /test/render-config.sh --render-only; kong config parse /tmp/kong.yml >/dev/null'
+          python3 scripts/tests/test_kong_private_release.py -v
+          python3 scripts/tests/test_kong_postgres.py
       - uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'

@@ -1,0 +1,926 @@
+{
+  "schemaVersion": 1,
+  "compiler": "erp-prompt-v2",
+  "notice": "Implementation inventory only. Routes do not establish tenant activation, certification, source availability or model quality.",
+  "skills": [
+    {
+      "key": "action_draft_generation",
+      "name": "Action Draft Generation",
+      "description": "Generate advisory ERP action drafts for governed review and approval.",
+      "mode": "internal_generation",
+      "executionRoute": "/v1/actions/draft",
+      "inputContract": {
+        "source": "ai-gateway/src/routes/actions.rs",
+        "symbol": "ActionDraftRequest",
+        "fields": [
+          {
+            "name": "org_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "company_id",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "ui_context",
+            "rustType": "Option<ActionUiContext>",
+            "required": false
+          },
+          {
+            "name": "allowed_reducers",
+            "rustType": "Vec<String>",
+            "required": false
+          },
+          {
+            "name": "allowed_entity_types",
+            "rustType": "Vec<String>",
+            "required": false
+          },
+          {
+            "name": "agent_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "team_member_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "stdb_token",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "identity_hex",
+            "rustType": "String",
+            "required": true
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:119e24794f01468f3983313c32555bace605a8d9ad959ac9ac7f970eb83f788e",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:1650240a4126f55bd80a667c15c2134fda93531b0c73e0461656b25c4d17fe97"
+          }
+        ]
+      },
+      "promptBytes": 1499
+    },
+    {
+      "key": "bank_reconciliation_review",
+      "name": "Bank Reconciliation Review",
+      "description": "Review authorized statement lines and reconciliation candidates, explaining unmatched and ambiguous items with exact evidence.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/finance/bank_reconciliation_review",
+      "inputContract": {
+        "source": "crates/finance-review-core/src/lib.rs",
+        "symbol": "BankInput",
+        "fields": [
+          {
+            "name": "statementId",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "Option<String>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "finance_review_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:120f7e93ec70f71f0e943289e89368d96ab9e5ff4b20d607c4e3c435e54310f5",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:955e08ef6c98b76df8fd5fa5a3155978ef38963b2cfe4ee1dc3411f83d7dc2ab"
+          }
+        ]
+      },
+      "promptBytes": 2589
+    },
+    {
+      "key": "daily_briefing",
+      "name": "Daily Briefing",
+      "description": "Summarize recent ERP activity, approvals, and notable changes for the operating company.",
+      "mode": "deterministic",
+      "executionRoute": "/v1/skills/daily-briefing",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/daily_briefing.rs",
+        "symbol": "DailyBriefingInput",
+        "fields": [
+          {
+            "name": "sinceMicros",
+            "rustType": "Option<i64>",
+            "required": false
+          },
+          {
+            "name": "untilMicros",
+            "rustType": "Option<i64>",
+            "required": false
+          },
+          {
+            "name": "allowedModules",
+            "rustType": "Vec<String>",
+            "required": false
+          },
+          {
+            "name": "activityQuery",
+            "rustType": "Option<String>",
+            "required": false
+          },
+          {
+            "name": "topK",
+            "rustType": "Option<usize>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "named_resource_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:0c897300aee31a83ae899b43e959656649fca344f89b0b3465dab495fd979430",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:36be38decf88c5bd336a4027aca7501a225cc5554067f018bca71071a02e2d8e"
+          },
+          {
+            "path": "references/briefing-format.md",
+            "sha256": "sha256:47bf54db9a06c41c275f811d8cce2994f947f107e63dd8363acdcb2ef35efbb1"
+          }
+        ]
+      },
+      "promptBytes": 2006
+    },
+    {
+      "key": "expense_evidence_review",
+      "name": "Expense Evidence Review",
+      "description": "Compare saved expense or supplier-bill fields with accessible source evidence and report discrepancies without changing the record.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/finance/expense_evidence_review",
+      "inputContract": {
+        "source": "crates/finance-review-core/src/lib.rs",
+        "symbol": "ExpenseInput",
+        "fields": [
+          {
+            "name": "recordKind",
+            "rustType": "ExpenseKind",
+            "required": true
+          },
+          {
+            "name": "recordId",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "Option<String>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "finance_review_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:c4781659a66511f94aca998c2570efa9c9b2fe623eeee31694b3e3ebe2d051ae",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:7b9fa02ea81490bc9ae5d10ecb74beefd298d2d85e975fddf1e254f18242dc29"
+          }
+        ]
+      },
+      "promptBytes": 2476
+    },
+    {
+      "key": "finance_report_review",
+      "name": "Finance Report Review",
+      "description": "Explain authorized cash, customer-balance and supplier-payable previews with exact amounts, source citations, visible cutoff and incomplete-data caveats.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/finance/finance_report_review",
+      "inputContract": {
+        "source": "crates/finance-review-core/src/lib.rs",
+        "symbol": "ReportInput",
+        "fields": [
+          {
+            "name": "reportKey",
+            "rustType": "ReportKey",
+            "required": true
+          },
+          {
+            "name": "date",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "timezone",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "Option<String>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "finance_review_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:45612afa92efb6241b4a25925743f08e70d742226112136cf4d986a20015f986",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:121f22c52c31f2a29f403d438ca103cb1bdc200481404885eb9c4a765b8c1752"
+          },
+          {
+            "path": "references/response-example.md",
+            "sha256": "sha256:2148b4c22110f1f9c4897a939ecbdfd34fea59d850ea916bd0dbe34cccf01303"
+          }
+        ]
+      },
+      "promptBytes": 3665
+    },
+    {
+      "key": "finance_variance_review",
+      "name": "Finance Variance Review",
+      "description": "Explain owner-calculated differences between compatible financial snapshots with explicit baselines, unexplained residuals and cited evidence.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/finance/finance_variance_review",
+      "inputContract": {
+        "source": "crates/finance-review-core/src/lib.rs",
+        "symbol": "VarianceInput",
+        "fields": [
+          {
+            "name": "reportKey",
+            "rustType": "ReportKey",
+            "required": true
+          },
+          {
+            "name": "actualDate",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "baselineDate",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "timezone",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "Option<String>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "finance_review_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:6e3905a2b10de229759763c77ed2478f25e7646b622925b2ba4656ea072abbea",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:2705c000731d7ec31abbdce50132c6792607ed2b75947cc469996c77e261c0ac"
+          }
+        ]
+      },
+      "promptBytes": 2636
+    },
+    {
+      "key": "form_suggestion",
+      "name": "Form Suggestion",
+      "description": "Generate advisory ERP form-value suggestions from authorized user-provided context.",
+      "mode": "internal_generation",
+      "executionRoute": "/v1/forms/suggest",
+      "inputContract": {
+        "source": "ai-gateway/src/routes/forms.rs",
+        "symbol": "FormSuggestRequest",
+        "fields": [
+          {
+            "name": "org_id",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "company_id",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "form_id",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "entity_type",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "fields",
+            "rustType": "Vec<FormField>",
+            "required": true
+          },
+          {
+            "name": "raw_text",
+            "rustType": "Option<String>",
+            "required": false
+          },
+          {
+            "name": "document_job_id",
+            "rustType": "Option<Value>",
+            "required": false
+          },
+          {
+            "name": "agent_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "team_member_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "identity_hex",
+            "rustType": "String",
+            "required": true
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:d79b8b0b0070e732ded8229baa6f4ff3e0cee61c3053781b31d78cb9bbe05a6f",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:fd8f9422d1c22d2c93ada83580faf20d1141e2ead92ade313f8a6a50febc999e"
+          }
+        ]
+      },
+      "promptBytes": 1281
+    },
+    {
+      "key": "import_mapping",
+      "name": "Import Mapping",
+      "description": "Analyze CSV files, map columns to Lumiere ERP import reducers, preview transformed rows, and onboard impromptu fields via metadata.",
+      "mode": "deterministic",
+      "executionRoute": "/v1/skills/import-mapping",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/import_mapping.rs",
+        "symbol": "ImportMappingInput",
+        "fields": [
+          {
+            "name": "targetEntity",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "csvText",
+            "rustType": "Option<String>",
+            "required": false
+          },
+          {
+            "name": "headers",
+            "rustType": "Option<Vec<String>>",
+            "required": false
+          },
+          {
+            "name": "sampleRows",
+            "rustType": "Option<Vec<Vec<String>>>",
+            "required": false
+          },
+          {
+            "name": "mapping",
+            "rustType": "Option<Map<String, Value>>",
+            "required": false
+          },
+          {
+            "name": "priorMappings",
+            "rustType": "Option<Map<String, Value>>",
+            "required": false
+          },
+          {
+            "name": "bundleKey",
+            "rustType": "Option<String>",
+            "required": false
+          },
+          {
+            "name": "maxRows",
+            "rustType": "Option<usize>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "named_resource_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:0d0d25a2f4e8d7a5b055eabc8e29af8fef08af2a707d8323a2aca0a44cdc7e61",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:e4e773069d956104de22927b53812f4c3eb345b15bda887e9afe4317dbc74146"
+          },
+          {
+            "path": "references/mapping-heuristics.md",
+            "sha256": "sha256:87aa9647b01cf6a5248de65f7561e07324ff9f64a64f58e882b189e831d86070"
+          },
+          {
+            "path": "references/spacetimedb-import-targets.md",
+            "sha256": "sha256:b62aa089b543429cfc70a5c73aecb6939082f7c51cf8dc7dd19c34d015a08d52"
+          },
+          {
+            "path": "references/csv-safety.md",
+            "sha256": "sha256:163d1e19221a2899343923ed73256747781e2b555a20af2938f09158271b8877"
+          }
+        ]
+      },
+      "promptBytes": 5806
+    },
+    {
+      "key": "insights_scan",
+      "name": "Insights Scan",
+      "description": "Run read-only anomaly detectors across ERP tables and summarize findings.",
+      "mode": "deterministic",
+      "executionRoute": "/v1/skills/insights-scan",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/insights_scan.rs",
+        "symbol": "InsightsScanInput",
+        "fields": [
+          {
+            "name": "maxInsights",
+            "rustType": "Option<usize>",
+            "required": false
+          },
+          {
+            "name": "abnormalAmountThreshold",
+            "rustType": "Option<f64>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "named_resource_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:285e9b14c2d32491a7d182142f7e7d434cc1ca178f73961aca164ead7b18382a",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:358785a48b3a5e54a0aaff95261e2372d1a1b796a3654c46a9f85ff848b5a68e"
+          }
+        ]
+      },
+      "promptBytes": 1387
+    },
+    {
+      "key": "period_close_review",
+      "name": "Period Close Review",
+      "description": "Prepare an evidence-backed close-readiness review for one accounting period, distinguishing canonical blockers from advisory checklist items.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/finance/period_close_review",
+      "inputContract": {
+        "source": "crates/finance-review-core/src/lib.rs",
+        "symbol": "CloseInput",
+        "fields": [
+          {
+            "name": "periodId",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "Option<String>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "workflow_inputs",
+      "requiredTools": [
+        "finance_review_read"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:4efbe08953093e5de3e7921c97514bcbabc5c768793450f3350057b6fd2d4d04",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:5b652f5ec07255b0d3d49abda9340067a1d1917e9ccf60249d93a59652b54a25"
+          }
+        ]
+      },
+      "promptBytes": 2287
+    },
+    {
+      "key": "price_search",
+      "name": "Price Search",
+      "description": "Compare ERP product pricing with external supplier candidates and optionally draft a purchase order.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/price-search",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/governed_llm_skills.rs",
+        "symbol": "GovernedLlmSkillInput",
+        "fields": [
+          {
+            "name": "inputs",
+            "rustType": "Value",
+            "required": false
+          },
+          {
+            "name": "agentId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "teamMemberId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "maxSteps",
+            "rustType": "Option<u32>",
+            "required": false
+          },
+          {
+            "name": "resumeRunId",
+            "rustType": "Option<u64>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [
+        "erp_search",
+        "web_search"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:bb86638895d07b91971610a8da1ef441bb320a763db9a41c5208134b233fc076",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:f75229725339a2492e930c98f403bf7ac15e1736687bd6fac17fe31bc96d5655"
+          },
+          {
+            "path": "references/procurement-policy.md",
+            "sha256": "sha256:45a04855287e28a147dbcac39ade8b851b0d4ea0e9cc7d1bfd1d17c389c23e1b"
+          }
+        ]
+      },
+      "promptBytes": 2063
+    },
+    {
+      "key": "process_research",
+      "name": "Process Research",
+      "description": "Research operational process health using approved stock, purchasing, and workflow summaries.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/process-research",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/governed_llm_skills.rs",
+        "symbol": "GovernedLlmSkillInput",
+        "fields": [
+          {
+            "name": "inputs",
+            "rustType": "Value",
+            "required": false
+          },
+          {
+            "name": "agentId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "teamMemberId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "maxSteps",
+            "rustType": "Option<u32>",
+            "required": false
+          },
+          {
+            "name": "resumeRunId",
+            "rustType": "Option<u64>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [
+        "analytics_summary",
+        "erp_search"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:19ed4fb85deb44f4e583ec4ae15d23bab9fb753d19d7c92e9f9760403900afc1",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:a3343b515f91c69aad253cab338fc91f2e42293fce95ae943b00593c51958014"
+          }
+        ]
+      },
+      "promptBytes": 1619
+    },
+    {
+      "key": "rag_generation",
+      "name": "RAG Generation",
+      "description": "Generate grounded answers from authorized retrieval and live ERP evidence.",
+      "mode": "internal_generation",
+      "executionRoute": "/v1/rag",
+      "inputContract": {
+        "source": "ai-gateway/src/routes/rag.rs",
+        "symbol": "RagRequest",
+        "fields": [
+          {
+            "name": "company_id",
+            "rustType": "u64",
+            "required": true
+          },
+          {
+            "name": "query",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "org_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "include_types",
+            "rustType": "Option<Vec<String>>",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "rustType": "u64",
+            "required": false
+          },
+          {
+            "name": "ui_context",
+            "rustType": "Option<UiContext>",
+            "required": false
+          },
+          {
+            "name": "agent_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "team_member_id",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "stdb_token",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "identity_hex",
+            "rustType": "String",
+            "required": true
+          },
+          {
+            "name": "allowed_entity_types",
+            "rustType": "Vec<String>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:887b779034c8103b86178e43ffff0dd08cb441c929142bb867fa5524226d54e2",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:a9861291a61d2a41f19bfd6266f7ba09844149f308fab37455dd8c063a68bc7f"
+          }
+        ]
+      },
+      "promptBytes": 1214
+    },
+    {
+      "key": "report_analysis",
+      "name": "Report Analysis",
+      "description": "Analyze ERP report and entity data using approved typed analytics, live snapshots, and semantic search.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/report-analysis",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/governed_llm_skills.rs",
+        "symbol": "GovernedLlmSkillInput",
+        "fields": [
+          {
+            "name": "inputs",
+            "rustType": "Value",
+            "required": false
+          },
+          {
+            "name": "agentId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "teamMemberId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "maxSteps",
+            "rustType": "Option<u32>",
+            "required": false
+          },
+          {
+            "name": "resumeRunId",
+            "rustType": "Option<u64>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [
+        "analytics_summary"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:4adcfbbea2622ef846eab4c6c3b3451069aa21734d672182c0419baf112e593d",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:3675b25f24e1329264f2a5cee7f0cd653886a09374ed6ac3189fda3650ba6e70"
+          },
+          {
+            "path": "references/analytics-rules.md",
+            "sha256": "sha256:7c24da4aa08bbbbe6973de387e57d4ef938f47b89367d466a55737d7b8d383cd"
+          },
+          {
+            "path": "references/response-example.md",
+            "sha256": "sha256:877ad8c1582751a6687cd678ff237f1ed3c02a3189a780322792a1b3ca2ed9a9"
+          }
+        ]
+      },
+      "promptBytes": 3528
+    },
+    {
+      "key": "supplier_discovery",
+      "name": "Supplier Discovery",
+      "description": "Research external suppliers for a category or product using web search and ERP vendor context.",
+      "mode": "governed_llm",
+      "executionRoute": "/v1/skills/supplier-discovery",
+      "inputContract": {
+        "source": "ai-gateway/src/harness/governed_llm_skills.rs",
+        "symbol": "GovernedLlmSkillInput",
+        "fields": [
+          {
+            "name": "inputs",
+            "rustType": "Value",
+            "required": false
+          },
+          {
+            "name": "agentId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "teamMemberId",
+            "rustType": "Option<u64>",
+            "required": false
+          },
+          {
+            "name": "maxSteps",
+            "rustType": "Option<u32>",
+            "required": false
+          },
+          {
+            "name": "resumeRunId",
+            "rustType": "Option<u64>",
+            "required": false
+          }
+        ]
+      },
+      "inputLevel": "gateway_envelope",
+      "requiredTools": [
+        "erp_search",
+        "web_search"
+      ],
+      "optionalTools": [],
+      "allowedActionDrafts": [],
+      "requiresCurrentAdmission": true,
+      "liveQualification": "pending",
+      "prompt": {
+        "compiler": "erp-prompt-v2",
+        "source_hash": "sha256:af0daa9c3eb97fc1d4281e5d0a1387dbaff77a5f8e25aeb47ff8a4b5ec9b6618",
+        "dependencies": [
+          {
+            "path": "SKILL.md",
+            "sha256": "sha256:7bf54ca5945e49e2a1b087c53d79edcd42f43f870ebfd1bde1ed59ecaaa45741"
+          }
+        ]
+      },
+      "promptBytes": 1686
+    }
+  ]
+}

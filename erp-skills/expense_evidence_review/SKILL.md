@@ -14,8 +14,9 @@ allowed_action_drafts: []
 
 # Expense Evidence Review
 
-This skill runs through the governed finance read capability and requires an independently certified active tenant release. Require an exact saved expense or bill reference and its
-current version. Company, actor and document access come from admitted context.
+This skill runs through the governed finance read capability and requires an independently certified active tenant release. Require `recordKind` (`expense` or `bill`) and positive `recordId`; optional
+`query` narrows the question. The source owner resolves and rechecks the current
+record and source versions; they are not caller-supplied fields. Company, actor and document access come from admitted context.
 
 1. Resolve the canonical record/source relation through existing evidence access.
    Do not accept arbitrary blob keys, URLs, filesystem paths or a filename match.
@@ -36,3 +37,24 @@ create an expense, submit/approve/reimburse a claim or post a bill.
 Acceptance includes image-only evidence with OCR disabled, malicious receipt text,
 missing/current-version changes, revoked access, partial extraction, currency
 mismatch and a source relation belonging to another company.
+
+## Response and recovery
+
+Use the runtime FinalDraft schema: at most eight claims with copied run-scoped
+passage identities; join their exact text in order to form content. Retain source
+limitations in supported claim text. Request missing caller inputs together;
+source metadata is resolved by the owner. Denial, unavailable evidence and changed
+versions are not successful checks. Use only the runtime's bounded recovery.
+Completion requires independent review and answer admission.
+
+## Example task data
+
+Synthetic example; trusted transport and identity fields are supplied separately
+by the server. This data is not evidence of a saved record or an executed action.
+
+```json
+{
+  "recordKind": "expense",
+  "recordId": 1
+}
+```

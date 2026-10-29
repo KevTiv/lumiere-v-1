@@ -68,7 +68,7 @@ common_env=(
   "RAILWAY_EXPECTED_REGION=europe-west4-drams3a"
 )
 
-env "${common_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" gate Postgres Redis
+env "${common_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" gate Postgres kong-postgres
 env "${common_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" probe api=https://api.example.test/ready ai=https://ai.example.test/ready
 
 if env "${common_env[@]}" TEST_RAILWAY_REGION=us-west2 \

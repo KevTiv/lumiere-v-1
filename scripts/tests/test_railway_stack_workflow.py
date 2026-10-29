@@ -38,6 +38,7 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
         for service in (
             "Postgres",
+            "kong-postgres",
             "qdrant",
             "spacetimedb",
             "spacetimedb-publisher",

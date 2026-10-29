@@ -4,6 +4,8 @@
   "packageManager": "pnpm@10.31.0",
   "scripts": {
     "contracts:verify-vendored": "node scripts/verify-vendored-contracts.mjs",
+    "contracts:generate-browser-operations": "node scripts/generate-browser-operation-ids.mjs",
+    "contracts:check-browser-operations": "node scripts/generate-browser-operation-ids.mjs --check && node --test scripts/generate-browser-operation-ids.test.mjs",
     "i18n:check": "node scripts/check-json-duplicate-keys.mjs && node scripts/check-i18n-keys.mjs && node scripts/check-i18n-locales.mjs && node scripts/build-kinyarwanda-loanwords.mjs --check",
     "i18n:loanwords": "node scripts/build-kinyarwanda-loanwords.mjs",
     "i18n:coverage": "node scripts/check-i18n-locales.mjs",
@@ -20,7 +22,7 @@
     "cov-launch-manifest:check": "python3 ../scripts/validate-cov27-launch-manifest.py && python3 ../scripts/test_validate_cov27_launch_manifest.py",
     "web": "pnpm --filter ./web dev",
     "mobile": "pnpm --filter mobile start",
-    "stdb:generate": "spacetime generate --lang typescript --out-dir packages/stdb/src/generated --module-path ../spacetimedb",
+    "stdb:generate": "make -C .. generate-stdb-ts-sdk",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck"
   },
