@@ -3,7 +3,6 @@ name: Build Rust runtime image
 on:
   push:
     branches:
-      - main
       - codex/railway-shared-rust-runtime
       - codex/railway-production-completion
     paths:
@@ -50,6 +49,12 @@ on:
       - Dockerfile.rust-runtime
       - .github/workflows/build-rust-runtime-image.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_sha:
+        description: Exact main revision selected by the stack release
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -58,7 +63,7 @@ permissions:
   attestations: write
 
 concurrency:
-  group: rust-runtime-${{ github.ref }}
+  group: rust-runtime-${{ github.workflow }}-${{ inputs.release_sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -71,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
       - name: Read cache inventory without modifying entries
         env:
           GH_TOKEN: ${{ github.token }}
@@ -93,7 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
 
       - name: Validate runtime dispatcher
         run: |
@@ -115,22 +120,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image_sha='${{ github.event.pull_request.head.sha || github.sha }}'
+          image_sha='${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}'
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-rust-runtime"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
           echo "tag=$repository:$image_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Refuse to rewrite an existing commit image
+      - name: Preserve existing commit image
+        id: existing
         if: github.event_name != 'pull_request'
         shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
         run: |
           set -euo pipefail
-          if docker buildx imagetools inspect '${{ steps.image.outputs.tag }}' >/dev/null 2>&1; then
-            echo "${{ steps.image.outputs.tag }} already exists; commit image tags are immutable" >&2
-            exit 1
+          if manifest="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' 2>/dev/null)"; then
+            digest="$(jq -er '.digest' <<<"$manifest")"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "Reusing immutable image $IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Build and push once
+        if: steps.existing.outputs.digest == ''
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -139,7 +149,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image.outputs.tag }}
           labels: |
-            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+            org.opencontainers.image.revision=${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=lumiere-rust-runtime
           cache-to: type=gha,mode=max,scope=lumiere-rust-runtime
@@ -147,7 +157,7 @@ jobs:
           sbom: true
 
       - name: Attest image provenance
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.build.outputs.digest != ''
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ steps.image.outputs.repository }}
@@ -162,6 +172,6 @@ jobs:
             echo '### Rust runtime image'
             echo
             echo '```text'
-            echo '${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}'
+            echo '${{ steps.image.outputs.repository }}@${{ steps.existing.outputs.digest || steps.build.outputs.digest }}'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,7 @@
 import re
+import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 import yaml
@@ -7,6 +10,28 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PrivateReleaseTests(unittest.TestCase):
+    def test_shared_scope_renders_every_limiter_without_client_ip_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / 'kong.yml'
+            env = dict(os.environ,
+                       KONG_DECLARATIVE_TEMPLATE=str(ROOT / 'infra/kong/kong.yml'),
+                       KONG_DECLARATIVE_CONFIG=str(config_path),
+                       LUMIERE_GATEWAY_RATE_LIMIT_SCOPE='service')
+            subprocess.run(['sh', str(ROOT / 'infra/kong/render-config.sh'), '--render-only'],
+                           env=env, check=True)
+            rendered = yaml.safe_load(config_path.read_text())
+            limiters = [plugin['config'] for service in rendered['services']
+                        for plugin in service.get('plugins', [])
+                        if plugin['name'] == 'rate-limiting']
+            self.assertTrue(limiters)
+            for limiter in limiters:
+                self.assertEqual(limiter['limit_by'], 'service')
+                self.assertEqual(limiter['policy'], 'cluster')
+                self.assertFalse(limiter['fault_tolerant'])
+            auth = next(s for s in rendered['services'] if s['name'] == 'api-auth-signin')
+            self.assertEqual(auth['plugins'][0]['config']['minute'], 10)
+            self.assertEqual(auth['plugins'][0]['config']['hour'], 100)
+
     def test_gateway_rejects_disabled_features_without_upstreams(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
         services = {service['name']: service for service in config['services']}

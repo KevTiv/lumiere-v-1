@@ -68,6 +68,9 @@ def start_gateway(suffix, template):
            '-e', 'KONG_DECLARATIVE_TEMPLATE=/test/kong.yml',
            '-e', f'KONG_PG_HOST={DB}', '-e', f'KONG_PG_PASSWORD={PASSWORD}',
            '-e', 'KONG_PG_SSL=off', '-e', f'WEB_UPSTREAM_HOST={UPSTREAM}',
+           '-e', 'LUMIERE_ENV=production',
+           '-e', 'LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=service',
+           '-e', 'KONG_TRUSTED_IPS=0.0.0.0/0',
            '-e', 'WEB_UPSTREAM_PORT=8080', '-e', 'KONG_ADMIN_LISTEN=0.0.0.0:8001',
            IMAGE)
     ports = json.loads(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', name))

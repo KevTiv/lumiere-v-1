@@ -67,22 +67,24 @@ class RailwayStackWorkflowTests(unittest.TestCase):
 
     def test_downstream_services_are_not_deployed_in_the_same_phase(self):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
-        self.assertIn("Postgres spacetimedb", workflow)
+        self.assertIn("Postgres spacetimedb kong-postgres", workflow)
         self.assertIn("gate qdrant", workflow)
         self.assertNotIn("deploy api-server ai-gateway", workflow)
         self.assertNotIn("deploy web api-gateway", workflow)
-        self.assertIn("redeploy-source workflow-worker owner-report-worker", workflow)
+        self.assertIn("redeploy-source workflow-worker", workflow)
+        self.assertIn("redeploy-source owner-report-worker", workflow)
         commands = [
-            "publish-stdb spacetimedb-publisher",
+            "promote-publisher spacetimedb-publisher",
             "redeploy-storage storage-migrate",
-            "deploy chromium-worker",
+            'promote-image chromium-worker "$CHROMIUM_IMAGE"',
             "redeploy-source api-server",
             "redeploy-source ai-gateway",
             "redeploy-source projection-worker",
-            "redeploy-source workflow-worker owner-report-worker",
+            "redeploy-source workflow-worker",
+            "redeploy-source owner-report-worker",
             "expense-integration-worker hr-integration-worker project-integration-worker",
-            "deploy web",
-            "deploy api-gateway",
+            'promote-image web "$WEB_IMAGE"',
+            'promote-image api-gateway "$API_GATEWAY_IMAGE"',
         ]
         offsets = [workflow.index(command) for command in commands]
         self.assertEqual(offsets, sorted(offsets))
@@ -101,10 +103,11 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
         orchestrator = (ROOT / "scripts/railway-stack-release.sh").read_text()
 
-        self.assertIn('docker pull --quiet "$RUST_RUNTIME_IMAGE"', workflow)
-        self.assertIn('org.opencontainers.image.revision', workflow)
-        self.assertIn('"$image_revision" == "$RELEASE_SHA"', workflow)
-        self.assertIn("Gate anonymous runtime image pull", workflow)
+        resolver = (ROOT / "scripts/railway-release-images.sh").read_text()
+        self.assertIn('docker pull --quiet "$image"', resolver)
+        self.assertIn('org.opencontainers.image.revision', resolver)
+        self.assertIn('"$image_revision" == "$RELEASE_SHA"', resolver)
+        self.assertIn("bash scripts/railway-release-images.sh", workflow)
         self.assertIn("railway environment edit", orchestrator)
         self.assertIn('--project "$RAILWAY_PROJECT_ID"', orchestrator)
         self.assertIn('--environment "$RAILWAY_ENVIRONMENT"', orchestrator)
