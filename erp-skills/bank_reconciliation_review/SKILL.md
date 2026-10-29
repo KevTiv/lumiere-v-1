@@ -17,7 +17,8 @@ allowed_action_drafts: []
 This skill runs through the governed finance read capability and requires an independently certified active tenant release.
 
 Use when an operator asks to investigate a statement or an unreconciled line.
-Require the exact statement ID and cutoff; the company comes from admitted
+Require `statementId` (positive integer); optional `query` narrows the question.
+The owner supplies the cutoff, versions and current statement state; the company comes from admitted
 context. Consume only the canonical bank/reconciliation owner's scoped snapshot.
 
 1. Confirm statement identity, currency, opening/closing balances, import state,
@@ -40,3 +41,23 @@ an adjustment or approve a match. Those are separate consequential workflows.
 Acceptance must include duplicate imports, same-amount competing candidates,
 wrong currency/company, partial allocations, reversals, stale snapshots, denied
 evidence and incomplete line sets. See the finance expansion plan for sequencing.
+
+## Response and recovery
+
+Use the runtime FinalDraft schema: at most eight claims with copied run-scoped
+passage identities; join their exact text in order to form content. Retain source
+limitations in supported claim text. Request missing caller inputs together;
+source metadata is resolved by the owner. Denial, unavailable evidence and changed
+versions are not successful checks. Use only the runtime's bounded recovery.
+Completion requires independent review and answer admission.
+
+## Example task data
+
+Synthetic example; trusted transport and identity fields are supplied separately
+by the server. This data is not evidence of a saved record or an executed action.
+
+```json
+{
+  "statementId": 1
+}
+```

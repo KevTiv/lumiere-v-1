@@ -11,12 +11,7 @@ on:
       - Cargo.toml
       - api-server/**
       - ai-gateway/**
-      - erp-skills/report_analysis/SKILL.md
-      - erp-skills/finance_report_review/SKILL.md
-      - erp-skills/bank_reconciliation_review/SKILL.md
-      - erp-skills/period_close_review/SKILL.md
-      - erp-skills/expense_evidence_review/SKILL.md
-      - erp-skills/finance_variance_review/SKILL.md
+      - erp-skills/**
       - crates/**
       - scripts/prepare-vendored-contracts-rust.sh
       - scripts/sync-directory.py
@@ -38,12 +33,7 @@ on:
       - Cargo.toml
       - api-server/**
       - ai-gateway/**
-      - erp-skills/report_analysis/SKILL.md
-      - erp-skills/finance_report_review/SKILL.md
-      - erp-skills/bank_reconciliation_review/SKILL.md
-      - erp-skills/period_close_review/SKILL.md
-      - erp-skills/expense_evidence_review/SKILL.md
-      - erp-skills/finance_variance_review/SKILL.md
+      - erp-skills/**
       - crates/**
       - scripts/prepare-vendored-contracts-rust.sh
       - scripts/sync-directory.py

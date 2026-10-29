@@ -102,6 +102,14 @@ function workProjectionQueryKeysForResource(
   if (sharedDependencyChanged || resource === 'activities') {
     keys.push(['activities', 'work-board', orgString])
   }
+  // Calendar's actor/company/policy-bound HTTP projections cannot be replaced
+  // by the organization-wide direct SDK cache. Invalidate their prefixes even
+  // while the subscription cache is active.
+  for (const calendarResource of ['calendar-events', 'activities', 'contacts']) {
+    if (authorityChanged || WORK_MEMBERSHIP_RESOURCES.has(resource) || resource === calendarResource) {
+      keys.push([calendarResource, orgString, 'calendar-workspace'])
+    }
+  }
   return keys
 }
 

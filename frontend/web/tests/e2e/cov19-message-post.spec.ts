@@ -72,17 +72,22 @@ test.describe("COV-19 exact message post", { tag: ["@p0", "@cov19"] }, () => {
 
     // The post under test is driven through the Messages "new message" form.
     await gotoModule(page, "/messages", "messages")
-    await page.getByTestId("quick-action-new_message").click()
-    await expect(page.getByTestId("form-modal-new-mail-message")).toBeVisible()
+    const conversations = page.getByTestId("message-conversation-workspace").filter({ visible: true })
+    await expect(conversations).toBeVisible()
+    const newMessage = conversations.getByRole("button", { name: "New message", exact: true })
+    await expect(newMessage).toBeEnabled()
+    await newMessage.click()
+    const modal = page.getByTestId("form-modal-new-mail-message")
+    await expect(modal).toBeVisible()
     await chooseSelectOptionByValue(page, "recordLinkMode", "custom")
-    await page.getByTestId("form-field-model").fill(model)
-    await page.getByTestId("form-field-resId").fill(String(resId))
-    await fillField(page, "body", body)
+    await modal.getByTestId("form-field-model").fill(model)
+    await modal.getByTestId("form-field-resId").fill(String(resId))
+    await fillField(modal, "body", body)
     const [accepted] = await Promise.all([
       page.waitForResponse((response) => matchesOperationResponse(response, "post_message"), {
         timeout: 30_000,
       }),
-      page.getByTestId("form-submit-new-mail-message").click(),
+      modal.getByTestId("form-submit-new-mail-message").click(),
     ])
     expect(accepted.ok()).toBe(true)
 

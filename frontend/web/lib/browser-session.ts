@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { workOsBrowserSession } from '@/lib/auth-credentials'
 import { isWorkOsEnabled } from '@/lib/auth-mode'
 import { cookies } from 'next/headers'
 import { getStdbSession, runtimeIsProduction, type ApiSession } from '@/lib/api-session'
@@ -14,8 +15,7 @@ function allowDevMockSession() {
 
 export async function hasStdbSessionCookie() {
   if (isWorkOsEnabled()) {
-    const { withAuth } = await import('@workos-inc/authkit-nextjs')
-    return Boolean((await withAuth()).user)
+    return Boolean((await workOsBrowserSession()).user)
   }
   const store = await cookies()
   return Boolean(store.get('stdb_token')?.value)

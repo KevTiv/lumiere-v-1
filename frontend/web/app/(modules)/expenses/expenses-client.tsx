@@ -8,12 +8,14 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
 import { ExpenseSourcePreview } from "../../../components/finance-source-preview"
-import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
-import { Textarea } from "@lumiere/ui/components/textarea"
+import { useRouter } from "next/navigation"
+import { ExpensesInboxPanel } from "./expenses-inbox-panel"
+import { useExpenseReportDecision } from "./expense-report-decision"
+import { companyWorkflowRows, eligibleExpenseReports, reportCurrencyTotals, workflowOptions } from "./expense-workflow-model"
 import {
   inlineNumberAbove,
   isDraftExpense,
@@ -21,7 +23,7 @@ import {
   requiredInlineText,
 } from "@/lib/inline-edit-params"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   EntityDetail,
@@ -64,7 +66,6 @@ import {
   useSubmitExpense,
   useSubmitExpenseSheet,
   useApproveExpenseSheet,
-  useRefuseExpenseSheet,
   useSetExpenseAllocations,
   useExpensesCsvImportMutations,
   useExpenseMileageRates,
@@ -76,7 +77,6 @@ import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
 import { ExpensesOpsPanel } from "./expenses-ops-panel"
 import { ExpensesAdminPanel } from "./expenses-admin-panel"
-import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/approvals"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
@@ -102,7 +102,6 @@ import { firstFileFromFormValue, uploadDocumentBlob } from "@/lib/document-blob-
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
-  expenseSheetRowsToDraftSelectOptions,
   expenseRateRowsToSelectOptions,
   projectRowsToSelectOptions,
   productRowsToSelectOptions,
@@ -192,6 +191,7 @@ function ExpensesClientLoaded({
 }: ExpensesClientLoadedProps) {
   useExpensesModuleSubscription()
   const { t } = useTranslation()
+  const router = useRouter()
   const { identity } = useErpSession()
   const { checkPermission, permissionsReady } = useRBAC()
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
@@ -199,22 +199,14 @@ function ExpensesClientLoaded({
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ action: "createExpense" | "createSheet" } | null>(null)
   const [rowAction, setRowAction] = useState<
-    { tabId: "expenses" | "expense-sheets"; row: Record<string, unknown> } | null
+    { tabId: "expenses"; row: Record<string, unknown> } | null
   >(null)
   const [workflowForm, setWorkflowForm] = useState<WorkflowForm | null>(null)
-  const [confirmDialog, setConfirmDialog] = useState<
-    { kind: "approve" | "refuse" | "submit"; row: Record<string, unknown> } | null
-  >(null)
-  const [refuseReason, setRefuseReason] = useState("")
-  const [confirmationError, setConfirmationError] = useState<string | null>(null)
-  const confirmationInFlight = useRef(false)
-  const [confirmationPending, setConfirmationPending] = useState(false)
-  useEffect(() => { setConfirmationError(null) }, [confirmDialog])
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
-  const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
+  const [reportContinuation, setReportContinuation] = useState<WorkflowForm | null>(null)
   const [resolveReceiptAttempt] = useState(createExpenseReceiptAttemptCache)
-  useEffect(() => { setQuickActionForm(null) }, [identity, orgId])
+  useEffect(() => { setQuickActionForm(null); setWorkflowForm(null); setReportContinuation(null) }, [identity, orgId, operatingCompanyId])
 
   const expensesRead = moduleCollection(useExpenses(orgId, initialExpenses))
   const expensesRaw = expensesRead.rows
@@ -230,11 +222,6 @@ function ExpensesClientLoaded({
   const sheetsUsable = canUseModuleData(sheetsRead.state)
   const currenciesQuery = useCurrencies()
   const sheetsState = sheetsRead.state
-  const timelineQuery = useExpenseSheetApprovalTimeline(
-    organizationId,
-    timelineSheet ? rowId(timelineSheet) : undefined,
-    timelineSheet != null,
-  )
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
   const { data: products = [] } = useProducts(orgId)
@@ -295,7 +282,7 @@ function ExpensesClientLoaded({
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
   const approveExpenseSheet = useApproveExpenseSheet(orgId, operatingCompanyId)
-  const refuseExpenseSheet = useRefuseExpenseSheet(orgId)
+  const decision = useExpenseReportDecision(orgId, operatingCompanyId, sheetsUsable)
   const finance = useExpenseReportFinance(orgId, operatingCompanyId, sheetsUsable)
   const setExpenseAllocations = useSetExpenseAllocations(orgId)
   const csvImports = useExpensesCsvImportMutations(orgId)
@@ -309,9 +296,8 @@ function ExpensesClientLoaded({
       ...ec,
       view: {
         ...ec.view,
-        // Keep click-to-select so toolbar actions with requiresSelection work.
-        // Row click still opens the detail sheet via onRowClick; e2e dismisses that dialog.
-        rowSelectionToggleOnClick: true,
+        // Use checkboxes for selection; opening a report must not also select it.
+        rowSelectionToggleOnClick: false,
         actions,
       },
     }
@@ -428,7 +414,7 @@ function ExpensesClientLoaded({
     const pendingApproval = sheetsToApprove.length
     const missingReceiptCount = missingReceipts.length
     const unmatchedCardCount = unmatchedCards.length
-    const totalAmount = sheets.reduce((sum, s) => sum + Number(s.totalAmount ?? 0), 0)
+    const scopedSheets = companyWorkflowRows(sheetsRaw, orgId, operatingCompanyId)
     const approved = sheets.filter((s) => {
       const st = String(s.state)
       return st === "Approved" || st === "Posted" || st === "Done"
@@ -497,7 +483,7 @@ function ExpensesClientLoaded({
               emptyMessage: "Nothing waiting — every expense report is handled.",
               onRowClick: (row: TabbedTableRow) => {
                 const sheet = sheetsRaw.find((candidate) => String(candidate.id) === String(row.id))
-                if (sheet) setTimelineSheet(sheet)
+                if (sheet) router.push(expenseReportHref(sheet)!)
               },
             },
           }
@@ -516,7 +502,7 @@ function ExpensesClientLoaded({
                   icon: "CreditCard",
                 },
                 { label: t("expenses.dashboard.approved"), value: String(approved), icon: "CheckCircle" },
-                { label: t("expenses.dashboard.totalAmount"), value: `$${totalAmount.toLocaleString()}`, icon: "DollarSign" },
+                { label: t("expenses.dashboard.totalAmount"), value: reportCurrencyTotals(scopedSheets, currencyCodeById, locale, t("expenses.workflowUi.amountUnavailable")), icon: "DollarSign" },
               ],
             },
           }
@@ -553,6 +539,7 @@ function ExpensesClientLoaded({
     expenseFormConfig,
     expenseSheetFormConfig,
     openExpenseCreate,
+    router, orgId, operatingCompanyId,
   ])
 
   const config = useMemo(
@@ -616,6 +603,7 @@ function ExpensesClientLoaded({
                 },
                 {
                   id: "submit-sheets",
+                  permission: { resource: "hr_expense_sheet", action: "update" },
                   label: t("expenses.workflow.submitReport"),
                   requiresSelection: true,
                   selection: "multiple",
@@ -626,6 +614,7 @@ function ExpensesClientLoaded({
                       setToolbarError(t("expenses.workflow.noDraftSheets"))
                       return
                     }
+                    if (draft.length === 1) { decision.open("submit", draft[0]!); return }
                     await runSheetAction(draft, "report", (row) =>
                       submitExpenseSheet.mutateAsync(rowId(row)),
                     )
@@ -633,6 +622,7 @@ function ExpensesClientLoaded({
                 },
                 {
                   id: "approve-sheets",
+                  permission: { resource: "hr_expense_sheet", action: "approve" },
                   label: t("expenses.workflow.approveReport"),
                   requiresSelection: true,
                   selection: "multiple",
@@ -643,6 +633,7 @@ function ExpensesClientLoaded({
                       setToolbarError(t("expenses.workflow.noSubmittedSheets"))
                       return
                     }
+                    if (submitted.length === 1) { decision.open("approve", submitted[0]!); return }
                     await runSheetAction(submitted, "report", (row) =>
                       approveExpenseSheet.mutateAsync(rowId(row)),
                     )
@@ -650,6 +641,7 @@ function ExpensesClientLoaded({
                 },
                 {
                   id: "refuse-sheets",
+                  permission: { resource: "hr_expense_sheet", action: "approve" },
                   label: t("expenses.workflow.refuseReport"),
                   requiresSelection: true,
                   selection: "multiple",
@@ -662,8 +654,7 @@ function ExpensesClientLoaded({
                       return
                     }
                     if (submitted.length === 1) {
-                      setRefuseReason("")
-                      setConfirmDialog({ kind: "refuse", row: submitted[0]! })
+                      decision.open("refuse", submitted[0]!)
                       return
                     }
                     setToolbarError("Select one submitted report to refuse (reason required).")
@@ -710,23 +701,30 @@ function ExpensesClientLoaded({
               ]),
             }
           }
+          if (tab.id === "inbox") return { ...tab, customContent: <ExpensesInboxPanel
+            organizationId={organizationId} companyId={operatingCompanyId}
+            onOpenExpense={(row) => setWorkflowForm({ kind: "editExpense", row })} /> }
           return tab
         }).concat({
           // Capture queue, statement/FX operations and admin settings live in
           // their own tab rather than above the module header.
           id: "operations",
-          label: t("expenses.operationsTab", { defaultValue: "Operations" }),
+          label: t("expenses.workflowUi.capture"),
           type: "custom" as const,
           description: t("expenses.operationsTabDescription", {
-            defaultValue: "Receipt capture queue, card statements and expense settings",
+            defaultValue: "Capture receipts and review retained expense saves",
           }),
           customContent: (
             <div className="space-y-6">
               <ExpensesCapturePanel organizationId={organizationId} />
-              <ExpensesOpsPanel organizationId={organizationId} />
-              <ExpensesAdminPanel organizationId={organizationId} />
             </div>
           ),
+        }, {
+          id: "card-reconciliation", label: t("expenses.workflowUi.reconciliation"), type: "custom" as const,
+          customContent: <ExpensesOpsPanel organizationId={organizationId} section="cards" />,
+        }, {
+          id: "expense-settings", label: t("expenses.workflowUi.settings"), type: "custom" as const,
+          customContent: <div className="space-y-6"><ExpensesOpsPanel organizationId={organizationId} section="rates" /><ExpensesAdminPanel organizationId={organizationId} /></div>,
         }),
       }) as ModuleConfig,
     [
@@ -737,7 +735,7 @@ function ExpensesClientLoaded({
       t,
       submitExpenseSheet,
       approveExpenseSheet,
-      refuseExpenseSheet,
+      decision,
       organizationId,
       updateExpense,
     ],
@@ -771,17 +769,13 @@ function ExpensesClientLoaded({
       : action === "createExpenseSheet" || action === "createSheet" ? sheetsUsable : true
   const quickActionUsable = quickActionForm == null || (quickActionForm.action === "createExpense" && expenseCreate.attempt !== null) || actionUsable(quickActionForm.action)
   const csvUsable = csvKind == null || (csvKind === "expense" ? expensesUsable : sheetsUsable)
-  const rowActionUsable = rowAction == null || (rowAction.tabId === "expenses" ? expensesUsable : sheetsUsable)
+  const rowActionUsable = rowAction == null || expensesUsable
   useEffect(() => {
     // Dialogs close when the collection their rows came from is denied or fails.
     if (!quickActionUsable) setQuickActionForm(null)
     // Keep CSV request identity and recovery mounted when the source becomes unavailable.
     if (!rowActionUsable) setRowAction(null)
     if (!expensesUsable) setWorkflowForm(null)
-    if (!sheetsUsable) {
-      setConfirmDialog(null)
-      setTimelineSheet(null)
-    }
   }, [quickActionUsable, rowActionUsable, expensesUsable, sheetsUsable])
 
   const handleFormSubmit = async (
@@ -800,6 +794,9 @@ function ExpensesClientLoaded({
       const context = expenseCreateContext(formData, employees, pricelists, orgId, operatingCompanyId, t)
       const params = toCreateExpenseSheetParams(formData, context.currencyId)
       if (params === null) throw new Error(t("expenses.forms.capture.contextRequired", { defaultValue: "Check the employee and price list before saving this report. Your entries have been retained." }))
+      if (reportContinuation && (String(context.currencyId) !== String(reportContinuation.row.currencyId) || String(context.employeeId) !== String(reportContinuation.row.employeeId))) {
+        throw new Error(t("expenses.workflowUi.reportCurrencyMismatch"))
+      }
       await createExpenseSheet.mutateAsync(params)
     }
   }
@@ -812,52 +809,22 @@ function ExpensesClientLoaded({
     submitExpense.isPending ||
     submitExpenseSheet.isPending ||
     approveExpenseSheet.isPending ||
-    refuseExpenseSheet.isPending ||
+    decision.isPending ||
     finance.isPending ||
     setExpenseAllocations.isPending ||
     csvImports.importExpense.isPending ||
     csvImports.importExpenseSheet.isPending
 
-  const confirmSheetAction = async () => {
-    if (!confirmDialog || confirmationInFlight.current || !sheetsUsable) return
-    const reason = refuseReason.trim()
-    if (confirmDialog.kind === "refuse" && !reason) {
-      setConfirmationError(t("expenses.workflow.refuseReasonRequired", { defaultValue: "Enter a reason before refusing this report." }))
-      return
-    }
-    confirmationInFlight.current = true
-    setConfirmationPending(true)
-    setConfirmationError(null)
-    setToolbarError(null)
-    try {
-      const sheetId = rowId(confirmDialog.row)
-      if (confirmDialog.kind === "submit") await submitExpenseSheet.mutateAsync(sheetId)
-      else if (confirmDialog.kind === "approve") await approveExpenseSheet.mutateAsync(sheetId)
-      else await refuseExpenseSheet.mutateAsync({ sheetId, params: { reason } })
-      setConfirmDialog(null)
-      setRefuseReason("")
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : t("expenses.workflow.financeFailed")
-      setConfirmationError(message)
-      // Source admission can close this dialog while a command is pending. Keep the result visible.
-      setToolbarError(message)
-    } finally {
-      confirmationInFlight.current = false
-      setConfirmationPending(false)
-    }
-  }
-
   const addToReportFormForRow = useCallback(
     (row: Record<string, unknown>) => {
-      const emp = String(row.employeeId ?? "")
-      const opts = expenseSheetRowsToDraftSelectOptions(sheets as Record<string, unknown>[], emp)
+      const opts = workflowOptions(eligibleExpenseReports(companyWorkflowRows(sheets, orgId, operatingCompanyId), row))
       const options =
         opts.length > 0
           ? opts
           : [{ value: "", label: t("expenses.forms.addToReport.emptySheets"), disabled: true }]
       return mergeSelectOptionsForFields(addToReportFormBase, { sheetId: options })
     },
-    [addToReportFormBase, sheets, t],
+    [addToReportFormBase, sheets, t, orgId, operatingCompanyId],
   )
 
   const workflowFormConfig: FormConfig | null = useMemo(() => {
@@ -973,7 +940,9 @@ function ExpensesClientLoaded({
       })
     } else if (workflowForm.kind === "addToReport") {
       const sheetRaw = formData.sheetId
-      if (sheetRaw === "" || sheetRaw == null) return
+      if (!sheetsUsable || !eligibleExpenseReports(companyWorkflowRows(sheets, orgId, operatingCompanyId), workflowForm.row).some(sheet => String(sheet.id) === String(sheetRaw))) {
+        throw new Error(t("expenses.workflowUi.selectionUnavailable"))
+      }
       await submitExpense.mutateAsync({
         expenseId: rowId(workflowForm.row),
         sheetId: String(sheetRaw),
@@ -1008,10 +977,9 @@ function ExpensesClientLoaded({
   }
 
   const handleRowClick = useCallback((tabId: string, row: Record<string, unknown>) => {
-    if (tabId === "expenses" || tabId === "expense-sheets") {
-      setRowAction({ tabId, row })
-    }
-  }, [])
+    if (tabId === "expense-sheets") router.push(expenseReportHref(row)!)
+    else if (tabId === "expenses") setRowAction({ tabId, row })
+  }, [router])
 
   const rowState = (row: Record<string, unknown>) => String(row.state ?? "")
 
@@ -1059,144 +1027,6 @@ function ExpensesClientLoaded({
                 </Button>
               </>
             )}
-            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Draft" && (
-              <Button
-                variant="default"
-                className="justify-start"
-                onClick={() => {
-                  const row = rowAction.row
-                  setRowAction(null)
-                  setConfirmDialog({ kind: "submit", row })
-                }}
-              >
-                {t("expenses.workflow.submitReport")}
-              </Button>
-            )}
-            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Submitted" && (
-              <>
-                <Button
-                  variant="default"
-                  className="justify-start"
-                  onClick={() => {
-                    const row = rowAction.row
-                    setRowAction(null)
-                    setConfirmDialog({ kind: "approve", row })
-                  }}
-                >
-                  {t("expenses.workflow.approveReport")}
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="justify-start"
-                  onClick={() => {
-                    const row = rowAction.row
-                    setRowAction(null)
-                    setRefuseReason("")
-                    setConfirmDialog({ kind: "refuse", row })
-                  }}
-                >
-                  {t("expenses.workflow.refuseReport")}
-                </Button>
-              </>
-            )}
-            {rowAction?.tabId === "expense-sheets" && (
-              <Button
-                variant="outline"
-                className="justify-start"
-                onClick={() => {
-                  const row = rowAction.row
-                  setRowAction(null)
-                  setTimelineSheet(row)
-                }}
-              >
-                {t("expenses.workflow.approvalTimeline")}
-              </Button>
-            )}
-            {rowAction?.tabId === "expense-sheets" && (
-              <div className="rounded-md border p-3 text-sm space-y-2" data-testid="expenses-sheet-move-links">
-                <div className="font-medium">
-                  {t("expenses.workflow.accountingMoves", { defaultValue: "Accounting moves" })}
-                </div>
-                {(
-                  [
-                    ["accountMoveId", "account_move_id", "Post JE"],
-                    ["reimbursementMoveId", "reimbursement_move_id", "Reimbursement"],
-                    ["rebillMoveId", "rebill_move_id", "Rebill"],
-                  ] as const
-                ).map(([camel, snake, label]) => {
-                  const moveId = rowAction.row[camel] ?? rowAction.row[snake]
-                  const idStr = moveId != null && moveId !== "" ? String(moveId) : ""
-                  return (
-                    <div key={camel} className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-muted-foreground">{label}</span>
-                      {idStr ? (
-                        <a
-                          className="font-mono text-xs underline underline-offset-2"
-                          href={accountMoveHref(idStr)}
-                          data-testid={`expenses-move-link-${camel}`}
-                        >
-                          #{idStr}
-                        </a>
-                      ) : (
-                        <span className="font-mono text-xs text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Approved" && (
-              <Button
-                variant="default"
-                className="justify-start"
-                onClick={() => {
-                  const row = rowAction.row
-                  setRowAction(null)
-                  finance.open("postReport", row)
-                }}
-              >
-                {t("expenses.workflow.postReport")}
-              </Button>
-            )}
-            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Posted" && (
-              <>
-                <Button
-                  variant="default"
-                  className="justify-start"
-                  onClick={() => {
-                    const row = rowAction.row
-                    setRowAction(null)
-                    finance.open("reimburseReport", row)
-                  }}
-                >
-                  {t("expenses.workflow.reimburseReport")}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start"
-                  onClick={() => {
-                    const row = rowAction.row
-                    setRowAction(null)
-                    finance.open("projectRebill", row)
-                  }}
-                >
-                  {t("expenses.workflow.projectRebill")}
-                </Button>
-              </>
-            )}
-            {rowAction?.tabId === "expense-sheets" && rowState(rowAction.row) === "Done" && (
-              <Button
-                variant="outline"
-                className="justify-start"
-                onClick={() => {
-                  const row = rowAction.row
-                  setRowAction(null)
-                  finance.open("projectRebill", row)
-                }}
-              >
-                {t("expenses.workflow.projectRebill")}
-              </Button>
-            )}
             {rowAction &&
               rowAction.tabId === "expenses" &&
               rowState(rowAction.row) !== "Draft" && (
@@ -1205,7 +1035,7 @@ function ExpensesClientLoaded({
           </div>
   )
 
-  const visibleToolbarError = toolbarError || (quickActionForm === null ? expenseCreate.error : null)
+  const visibleToolbarError = toolbarError || decision.error || (quickActionForm === null ? expenseCreate.error : null)
 
   const retainedExpenseMessage = quickActionForm?.action === "createExpense" ? [
     expenseCreate.error,
@@ -1253,13 +1083,19 @@ function ExpensesClientLoaded({
       />
       <FormModal
         open={quickActionForm !== null && quickActionUsable}
-        onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.action === "createSheet" ? expenseSheetFormConfig : { ...retainedExpenseForm(expenseFormConfig, expenseCreate.attempt, expenseCreate.attempt?.companyId === String(operatingCompanyId)), ...(expenseCreate.attempt ? { cancelLabel: t("common.close") } : {}) }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQuickActionForm(null)
+            if (reportContinuation) { setWorkflowForm(reportContinuation); setReportContinuation(null) }
+          }
+        }}
+        config={quickActionForm?.action === "createSheet" ? mergeFieldDefaultValues(expenseSheetFormConfig, reportContinuation ? { employeeId: String(reportContinuation.row.employeeId) } : {}) : { ...retainedExpenseForm(expenseFormConfig, expenseCreate.attempt, expenseCreate.attempt?.companyId === String(operatingCompanyId)), ...(expenseCreate.attempt ? { cancelLabel: t("common.close") } : {}) }}
         hasDurableRecovery={quickActionForm?.action === "createExpense" && expenseCreate.attempt !== null}
         isPending={isFormMutationPending || expenseCreate.busy}
         closeOnSubmit={quickActionForm?.action === "createSheet"}
         showSubmitSuccessToast={quickActionForm?.action === "createSheet"}
         draft={quickActionForm?.action === "createSheet"}
+        draftKey={reportContinuation ? `report-for-expense-${rowId(reportContinuation.row)}` : undefined}
         submissionDisabled={quickActionForm?.action === "createExpense" && expenseCreate.attempt !== null}
         submitError={retainedExpenseMessage}
         onValuesChange={quickActionForm?.action === "createExpense" ? expenseCreate.reattach : undefined}
@@ -1276,7 +1112,10 @@ function ExpensesClientLoaded({
         onSubmit={async (formData) => {
           if (quickActionForm) {
             await handleFormSubmit("dashboard", quickActionForm.action, formData)
-            if (quickActionForm.action === "createSheet") setQuickActionForm(null)
+            if (quickActionForm.action === "createSheet") {
+              setQuickActionForm(null)
+              if (reportContinuation) { setWorkflowForm(reportContinuation); setReportContinuation(null) }
+            }
           }
         }}
       />
@@ -1326,145 +1165,19 @@ function ExpensesClientLoaded({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={timelineSheet !== null && sheetsUsable} onOpenChange={(open) => !open && setTimelineSheet(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("expenses.workflow.approvalTimeline")}</DialogTitle>
-            <DialogDescription>
-              {timelineSheet
-                ? String(timelineSheet.name ?? timelineSheet.id ?? "")
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {timelineSheet && (
-              <div className="rounded-md border p-3 text-sm space-y-1">
-                <div>
-                  <span className="text-muted-foreground">{t("expenses.workflow.timelineState")}: </span>
-                  {rowState(timelineSheet)}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("expenses.workflow.timelineSubmittedBy")}: </span>
-                  {String(timelineSheet.submittedBy ?? timelineSheet.submitted_by ?? "—")}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("expenses.workflow.timelineApprover")}: </span>
-                  {String(timelineSheet.approverId ?? timelineSheet.approver_id ?? "—")}
-                </div>
-              </div>
-            )}
-            {timelineQuery.isLoading && (
-              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-            )}
-            {timelineQuery.isError && (
-              <div role="alert" className="space-y-2 text-sm text-destructive">
-                <p>{t("expenses.workflow.timelineUnavailable", { defaultValue: "Approval history could not be loaded." })}</p>
-                <Button variant="outline" size="sm" onClick={() => { void timelineQuery.refetch() }} disabled={timelineQuery.isFetching}>
-                  {t("common.retry")}
-                </Button>
-              </div>
-            )}
-            {!timelineQuery.isLoading && !timelineQuery.isError && timelineQuery.rows.length === 0 && (
-              <p className="text-sm text-muted-foreground">{t("expenses.workflow.noApprovalRequests")}</p>
-            )}
-            {!timelineQuery.isError && timelineQuery.rows.map((row) => (
-              <div key={String(row.id)} className="rounded-md border p-3 text-sm space-y-1">
-                <div className="font-medium">{String(row.summary ?? row.action ?? "Approval")}</div>
-                <div className="text-muted-foreground">
-                  {String(row.status ?? "pending")} · {String(row.action ?? "")}
-                </div>
-                {row.rejectReason ||
-                row.reject_reason ||
-                row.decisionComment ||
-                row.decision_comment ? (
-                  <div className="text-destructive">
-                    {String(
-                      row.rejectReason ??
-                        row.reject_reason ??
-                        row.decisionComment ??
-                        row.decision_comment,
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTimelineSheet(null)}>
-              {t("common.close")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={confirmDialog !== null && sheetsUsable}
-        onOpenChange={(open) => {
-          if (!open && !confirmationInFlight.current) {
-            setConfirmDialog(null)
-            setRefuseReason("")
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {confirmDialog?.kind === "approve"
-                ? t("expenses.workflow.confirmApprove")
-                : confirmDialog?.kind === "submit"
-                  ? t("expenses.workflow.confirmSubmit")
-                  : t("expenses.workflow.confirmRefuse")}
-            </DialogTitle>
-          </DialogHeader>
-          <DialogDescription className="[overflow-wrap:anywhere]">
-            {String(confirmDialog?.row.name ?? confirmDialog?.row.id ?? "")}
-          </DialogDescription>
-          {confirmationError ? <p id="expense-confirmation-error" role="alert" className="text-sm text-destructive [overflow-wrap:anywhere]">{confirmationError}</p> : null}
-          {confirmDialog?.kind === "refuse" && (
-            <div className="space-y-2 py-2">
-              <label className="text-sm font-medium" htmlFor="refuse-reason">
-                {t("expenses.workflow.refuseReason")}
-              </label>
-              <Textarea variant="plain"
-                id="refuse-reason"
-                className="min-h-[80px]"
-                value={refuseReason}
-                onChange={(e) => setRefuseReason(e.target.value)}
-                disabled={confirmationPending}
-                required
-                aria-invalid={Boolean(confirmationError) && !refuseReason.trim()}
-                aria-describedby={confirmationError ? "expense-confirmation-error" : undefined}
-                placeholder={t("expenses.workflow.refuseReasonPlaceholder")}
-              />
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" disabled={confirmationPending} onClick={() => { setConfirmDialog(null); setRefuseReason("") }}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant={confirmDialog?.kind === "refuse" ? "destructive" : "default"}
-              disabled={confirmationPending || !sheetsUsable}
-              onClick={() => { void confirmSheetAction() }}
-            >
-              {confirmationPending ? t("common.loading") : confirmDialog?.kind === "approve"
-                ? t("expenses.workflow.approveReport", { defaultValue: "Approve report" })
-                : confirmDialog?.kind === "submit"
-                  ? t("expenses.workflow.submitReport", { defaultValue: "Submit report" })
-                  : t("expenses.workflow.refuseReport", { defaultValue: "Refuse report" })}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {decision.modal}
       {finance.modal}
       {workflowFormConfig && workflowForm && expensesUsable && (
         <FormModal
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}
-          open
+          open={quickActionForm === null}
           onOpenChange={(open) => !open && setWorkflowForm(null)}
           config={workflowFormConfig}
           isPending={isFormMutationPending}
+          formLeadingActions={workflowForm.kind === "addToReport" ? <Button type="button" variant="outline"
+            data-testid="expense-create-report-continuation" disabled={!sheetsUsable || permissionsReady === false || !checkPermission("hr_expense_sheet", "create").allowed} onClick={() => {
+              setReportContinuation(workflowForm); setQuickActionForm({ action: "createSheet" })
+            }}>{t("expenses.workflowUi.createReport")}</Button> : undefined}
           onSubmit={(fd) => handleWorkflowSubmit(fd)}
         />
       )}

@@ -3,7 +3,7 @@ import { handleAuth } from '@workos-inc/authkit-nextjs'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { isWorkOsEnabled } from '@/lib/auth-mode'
-import { clearStdbSession } from '@/app/actions/save-stdb-token'
+import { clearStdbSession } from '@/lib/auth-cookies'
 import { bridgeWorkOsUserToStdbSession } from '@/lib/workos-stdb-bridge'
 
 const callback = handleAuth({

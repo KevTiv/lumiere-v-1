@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 
 import {
@@ -21,12 +22,41 @@ import {
   LayoutTemplate,
   Circle,
 } from "lucide-react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, languageOptions, languagePreference, profileLanguage, type DisplayLanguage, type LoanwordLanguage } from "@lumiere/i18n"
 import { useTheme } from "../components/theme-provider"
 import { cn } from "../lib/utils"
 
 interface ProfileSettingsProps {
   section: "profile" | "notifications" | "appearance"
+}
+
+function ProfileLanguageFields({ value }: { value?: string }) {
+  const { t } = useTranslation()
+  const preference = languagePreference(value)
+  const [language, setLanguage] = useState<DisplayLanguage>(preference.language)
+  const [loanwords, setLoanwords] = useState<LoanwordLanguage>(preference.loanwords)
+  return (
+    <>
+      <input type="hidden" name="language" value={profileLanguage(language, loanwords)} />
+      <div className="space-y-2">
+        <Label htmlFor="profile-language">{t("settings.profile.language")}</Label>
+        <Select value={language} onValueChange={value => setLanguage(value as DisplayLanguage)}>
+          <SelectTrigger id="profile-language" aria-describedby="profile-language-hint"><SelectValue /></SelectTrigger>
+          <SelectContent>{languageOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+        </Select>
+        <p id="profile-language-hint" className="text-sm text-muted-foreground">{t("settings.profile.languageHint")}</p>
+      </div>
+      {language === "rw" && <div className="space-y-2">
+        <Label htmlFor="profile-loanwords">{t("settings.profile.loanwords")}</Label>
+        <Select value={loanwords} onValueChange={value => setLoanwords(value as LoanwordLanguage)}>
+          <SelectTrigger id="profile-loanwords" aria-describedby="profile-loanwords-hint"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="en">English</SelectItem><SelectItem value="fr">Français</SelectItem></SelectContent>
+        </Select>
+        <p id="profile-loanwords-hint" className="text-sm text-muted-foreground">{t("settings.profile.loanwordsHint")}</p>
+      </div>}
+      {language === "sw" && <p className="text-sm text-muted-foreground">{t("settings.profile.swahiliLoanwordsHint")}</p>}
+    </>
+  )
 }
 
 export function ProfileSettings({ section }: ProfileSettingsProps) {
@@ -47,7 +77,7 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
             <CardDescription>{t("settings.profile.personalInfoDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isLoading ? <p role="status">Loading your profile…</p> : profile ? (
+            {isLoading ? <p role="status">{t("settings.profile.loading")}</p> : profile ? (
               <form key={`${profile.name}:${profile.timezone}:${profile.language}`} className="space-y-4" onSubmit={async event => {
                 event.preventDefault()
                 const form = new FormData(event.currentTarget)
@@ -62,22 +92,22 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
                     language: String(form.get('language') ?? 'en'),
                   })
                   setSaved(true)
-                } catch (error) { setProfileError(error instanceof Error ? error.message : 'Could not save your profile') }
+                } catch (error) { setProfileError(error instanceof Error ? error.message : t("settings.profile.saveError")) }
               }}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2"><Label htmlFor="profile-name">{t('settings.profile.fullName')}</Label><Input id="profile-name" name="name" defaultValue={profile.name} required /></div>
                   <div className="space-y-2"><Label htmlFor="profile-email">{t('settings.profile.email')}</Label><Input id="profile-email" type="email" value={profile.email} readOnly /></div>
-                  <div className="space-y-2"><Label htmlFor="profile-first-name">First name</Label><Input id="profile-first-name" name="firstName" defaultValue={profile.firstName ?? ''} /></div>
-                  <div className="space-y-2"><Label htmlFor="profile-last-name">Last name</Label><Input id="profile-last-name" name="lastName" defaultValue={profile.lastName ?? ''} /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-first-name">{t("settings.profile.firstName")}</Label><Input id="profile-first-name" name="firstName" defaultValue={profile.firstName ?? ''} /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-last-name">{t("settings.profile.lastName")}</Label><Input id="profile-last-name" name="lastName" defaultValue={profile.lastName ?? ''} /></div>
                   <div className="space-y-2"><Label htmlFor="profile-timezone">{t('settings.profile.timezone')}</Label><Input id="profile-timezone" name="timezone" defaultValue={profile.timezone ?? 'UTC'} required /></div>
-                  <div className="space-y-2"><Label htmlFor="profile-language">Language</Label><Input id="profile-language" name="language" defaultValue={profile.language ?? 'en'} required /></div>
+                  <ProfileLanguageFields value={profile.language} />
                 </div>
-                <p className="text-sm text-muted-foreground">Email changes require identity-provider verification and administrator approval.</p>
+                <p className="text-sm text-muted-foreground">{t("settings.profile.emailVerificationHint")}</p>
                 {profileError && <p role="alert" className="text-sm text-destructive">{profileError}</p>}
-                {saved && <p role="status" className="text-sm">Your profile has been saved.</p>}
+                {saved && <p role="status" className="text-sm">{t("settings.profile.saveSuccess")}</p>}
                 <div className="flex justify-end"><Button type="submit" disabled={saveProfile.isPending}>{t('settings.profile.saveChanges')}</Button></div>
               </form>
-            ) : <p role="alert">Could not load your profile. Reload to try again.</p>}
+            ) : <p role="alert">{t("settings.profile.loadError")}</p>}
           </CardContent>
         </Card>
 
@@ -87,8 +117,8 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
             <CardDescription>{t("settings.profile.securityDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">Your identity provider manages your password and sign-in security.</p>
-            <a href="/forgot-password" className={buttonVariants({ variant: "outline" })}>Manage sign-in security</a>
+            <p className="text-sm text-muted-foreground">{t("settings.profile.securityProviderHint")}</p>
+            <a href="/forgot-password" className={buttonVariants({ variant: "outline" })}>{t("settings.profile.manageSecurity")}</a>
           </CardContent>
         </Card>
       </div>

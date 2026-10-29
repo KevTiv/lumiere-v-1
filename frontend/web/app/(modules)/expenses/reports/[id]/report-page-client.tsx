@@ -27,27 +27,15 @@ import {
   expenseSheetsTableConfig,
   expensesTableConfig,
 } from '@lumiere/ui';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
-import { Textarea } from '@lumiere/ui/components/textarea';
-import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import { useExpenseReportDecision, type ExpenseReportDecision } from '../../expense-report-decision';
+import { moduleCollection } from '@lumiere/ui/lib/module-data-state';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
 import { useExpenseSheetApprovalTimeline } from '@lumiere/query-hooks/hooks/approvals';
 import {
-  useApproveExpenseSheet,
   useExpenseSheets,
   useExpenses,
-  useRefuseExpenseSheet,
-  useSubmitExpenseSheet,
 } from '@lumiere/query-hooks/hooks/expenses';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { accountMoveHref } from '@lumiere/erp-shared/record-links';
@@ -67,7 +55,6 @@ interface ExpenseReportPageClientProps {
 }
 
 type Row = Record<string, unknown>;
-type Confirm = 'submit' | 'approve' | 'refuse';
 
 const TAB_IDS = ['overview', 'expenses', 'approvals', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -95,18 +82,17 @@ function ExpenseReportPageLoaded({
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
-  const { data: sheetsRaw = [], isLoading } = useExpenseSheets(orgId, initialSheets as never);
-  const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses as never);
+  const sheetsRead = moduleCollection(useExpenseSheets(orgId, initialSheets as never));
+  const expensesRead = moduleCollection(useExpenses(orgId, initialExpenses as never));
+  const sheetsRaw = sheetsRead.rows;
+  const expensesRaw = expensesRead.rows;
+  const isLoading = sheetsRead.state.status === 'loading';
+  const sourcesReady = sheetsRead.state.status === 'ready';
   const timeline = useExpenseSheetApprovalTimeline(organizationId, sheetId);
 
-  const submitSheet = useSubmitExpenseSheet(orgId, operatingCompanyId);
-  const approveSheet = useApproveExpenseSheet(orgId, operatingCompanyId);
-  const refuseSheet = useRefuseExpenseSheet(orgId);
+  const finance = useExpenseReportFinance(orgId, operatingCompanyId, sourcesReady);
+  const decision = useExpenseReportDecision(orgId, operatingCompanyId, sourcesReady);
 
-  const finance = useExpenseReportFinance(orgId, operatingCompanyId);
-
-  const [confirm, setConfirm] = useState<Confirm | null>(null);
-  const [reason, setReason] = useState('');
   const [selectedLine, setSelectedLine] = useState<Row | null>(null);
 
   const sheets = useMemo(() => sheetsRaw.map((row) => mapExpenseSheetRow(row as Row)), [sheetsRaw]);
@@ -138,13 +124,7 @@ function ExpenseReportPageLoaded({
     [pathname, router, searchParams],
   );
 
-  const run = useCallback(async (title: string, work: () => Promise<unknown>) => {
-    try {
-      await work();
-    } catch (error) {
-      showWorkflowToast({ kind: 'error', title, description: error instanceof Error ? error.message : String(error) });
-    }
-  }, []);
+  if (!sourcesReady && !isLoading) return <ModuleDataNotice state={sheetsRead.state} />;
 
   if (!sheet) {
     if (isLoading) {
@@ -186,25 +166,13 @@ function ExpenseReportPageLoaded({
     sections: [{ id: 'report', fields: sheetColumns.filter((column) => column.key !== 'name').map(({ width: _width, ...field }) => field) }],
   };
 
-  const confirmTitle: Record<Confirm, string> = {
+  const confirmTitle: Record<ExpenseReportDecision, string> = {
     submit: t('expenses.workflow.submitReport'),
     approve: t('expenses.workflow.approveReport'),
     refuse: t('expenses.workflow.refuseReport'),
   };
 
-  const runConfirmed = () => {
-    const action = confirm;
-    setConfirm(null);
-    if (action === 'submit') void run(confirmTitle.submit, () => submitSheet.mutateAsync(sheetId));
-    else if (action === 'approve') void run(confirmTitle.approve, () => approveSheet.mutateAsync(sheetId));
-    else if (action === 'refuse') {
-      const text = reason.trim();
-      setReason('');
-      void run(confirmTitle.refuse, () => refuseSheet.mutateAsync({ sheetId, params: { reason: text || undefined } }));
-    }
-  };
-
-  const busy = submitSheet.isPending || approveSheet.isPending || refuseSheet.isPending || finance.isPending;
+  const busy = decision.isPending || finance.isPending;
   const financeKinds = financeKindsFor(sheet.state);
 
   const lineTable = expensesTableConfig(t);
@@ -252,16 +220,16 @@ function ExpenseReportPageLoaded({
         actions={
           <>
             {state === 'Draft' ? (
-              <Button size="sm" disabled={busy} data-testid="expense-report-submit" onClick={() => setConfirm('submit')}>
+              <Button size="sm" disabled={busy || !decision.can("submit")} data-testid="expense-report-submit" onClick={() => decision.open('submit', sheet)}>
                 {confirmTitle.submit}
               </Button>
             ) : null}
             {state === 'Submitted' ? (
               <>
-                <Button size="sm" disabled={busy} data-testid="expense-report-approve" onClick={() => setConfirm('approve')}>
+                <Button size="sm" disabled={busy || !decision.can("approve")} data-testid="expense-report-approve" onClick={() => decision.open('approve', sheet)}>
                   {confirmTitle.approve}
                 </Button>
-                <Button variant="outline" size="sm" disabled={busy} data-testid="expense-report-refuse" onClick={() => setConfirm('refuse')}>
+                <Button variant="outline" size="sm" disabled={busy || !decision.can("refuse")} data-testid="expense-report-refuse" onClick={() => decision.open('refuse', sheet)}>
                   {confirmTitle.refuse}
                 </Button>
               </>
@@ -291,7 +259,7 @@ function ExpenseReportPageLoaded({
           {
             id: 'expenses',
             label: t('expenses.expenses.title', { defaultValue: 'Expenses' }),
-            content: (
+            content: expensesRead.state.status !== 'ready' ? <ModuleDataNotice state={expensesRead.state} /> : (
               <EntityView
                 config={{ ...expensesTableConfig(t), title: '', description: undefined }}
                 data={expenses}
@@ -316,15 +284,21 @@ function ExpenseReportPageLoaded({
                   </div>
                 </div>
                 {timeline.isLoading ? <p className="text-sm text-muted-foreground">{t('common.loading')}</p> : null}
-                {!timeline.isLoading && timeline.rows.length === 0 ? (
+                {timeline.isError ? <div role="alert" className="space-y-2">
+                  <p>{t('expenses.workflow.timelineUnavailable')}</p>
+                  <Button variant="outline" size="sm" onClick={() => { void timeline.refetch() }} disabled={timeline.isFetching}>{t('common.retry')}</Button>
+                </div> : null}
+                {!timeline.isLoading && !timeline.isError && timeline.rows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t('expenses.workflow.noApprovalRequests')}</p>
                 ) : null}
-                {timeline.rows.map((row) => (
+                {!timeline.isError && timeline.rows.map((row) => (
                   <div key={String(row.id)} className="rounded-md border p-3 text-sm space-y-1">
                     <div className="font-medium">{String(row.summary ?? row.action ?? 'Approval')}</div>
                     <div className="text-muted-foreground">
                       {String(row.status ?? 'pending')} · {String(row.action ?? '')}
                     </div>
+                    {row.rejectReason || row.reject_reason || row.decisionComment || row.decision_comment ?
+                      <p className="text-destructive">{String(row.rejectReason ?? row.reject_reason ?? row.decisionComment ?? row.decision_comment)}</p> : null}
                   </div>
                 ))}
               </div>
@@ -376,26 +350,9 @@ function ExpenseReportPageLoaded({
 
       {finance.modal}
 
-      <AlertDialog open={confirm != null} onOpenChange={(open) => !open && setConfirm(null)}>
-        <AlertDialogContent data-testid="expense-report-confirm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirm ? confirmTitle[confirm] : ''}</AlertDialogTitle>
-            <AlertDialogDescription>{label}</AlertDialogDescription>
-          </AlertDialogHeader>
-          {confirm === 'refuse' ? (
-            <Textarea
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder={t('expenses.page.refuseReason', { defaultValue: 'Reason (optional)' })}
-              data-testid="expense-report-refuse-reason"
-            />
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>
-            <AlertDialogAction onClick={runConfirmed}>{t('common.confirm')}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {decision.error && <p role="alert" className="text-sm text-destructive">{decision.error}</p>}
+      {decision.modal}
+
     </>
   );
 }

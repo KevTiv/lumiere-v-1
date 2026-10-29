@@ -290,10 +290,10 @@ Preflight checks configured replicas, including explicit configuration for a
 service that has never deployed. The ordered rollout still verifies the exact
 `RAILWAY_REPLICA_REGION` after deployment. It does not move existing volumes.
 
-1. Existing `Postgres` and `spacetimedb` deployments must be successful and
+1. Existing `Postgres`, `kong-postgres` and `spacetimedb` deployments must be successful and
    report the configured EU `RAILWAY_REPLICA_REGION`. `qdrant` is required only
-   when `enable_ai=true`. Kong uses instance-local protective rate limits, so
-   Redis is not part of the baseline production topology.
+   when `enable_ai=true`. Kong uses shared counters in its dedicated PostgreSQL
+   database; Redis is not part of the baseline production topology.
 2. The one-shot `spacetimedb-publisher` builds the lean production module from the release commit, publishes
    it without clearing data, and must describe a schema containing reducers,
    tables, types, and a typespace, including the canonical `organization`
@@ -561,10 +561,67 @@ by registering a new profile, deploy the matching token/hash together, and
 allow already-pinned jobs to finish; promotion accepts evidence from only the
 currently active profile.
 
+## Gateway counters and ingress fencing
+
+Kong uses its bundled `rate-limiting` plugin with `policy: cluster`, backed by
+PostgreSQL. Redis is not a gateway dependency. Use a dedicated `kong-postgres`
+service and `lumiere_kong` database/user, separate from ERP storage, so abusive
+traffic cannot exhaust the ERP database's connections through counter writes.
+Keep this database private with no HTTP domain or public TCP proxy.
+
+Set `KONG_DATABASE=postgres`, `KONG_PG_HOST=kong-postgres.railway.internal`,
+`KONG_PG_DATABASE=lumiere_kong`, `KONG_PG_USER=lumiere_kong`, and a random
+`KONG_PG_PASSWORD` of at least 32 characters. Set the database service's
+`POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` to matching values.
+PostgreSQL TLS settings are explicit `KONG_PG_SSL`, `KONG_PG_SSL_VERIFY`, and the
+trusted CA configuration when required by the database endpoint. Compose uses
+an unpublished database on its container network. Never send database credentials
+over an untrusted network without verified TLS.
+
+There is no Redis data migration. On a fresh database, gateway startup initializes
+Kong's schema, starts a temporary process with its public proxy disabled and its
+Admin API bound only to `127.0.0.1`, reconciles the complete configuration using
+decK, then stops it and starts the public process with management listeners off.
+Using sync ensures removed routes/plugins are deleted instead of silently
+surviving an import. Configuration/setup failure prevents public startup. Future
+Kong version upgrades still need the upstream schema-upgrade procedure. Keep
+one production gateway replica while startup owns configuration reconciliation;
+scale only after separating configuration writes into a single release job.
+
+Set `LUMIERE_ENV=production` and `KONG_TRUSTED_IPS` to verified ingress-proxy
+CIDRs. Production startup rejects missing or globally trusted proxy ranges and
+uses `X-Forwarded-For` recursively. Verify the platform's header sanitization
+and CIDRs before configuring trust; observed proxy addresses alone do not prove
+a safe range. Do not use `0.0.0.0/0`, `::/0`, or a caller-controlled header as
+the rate-limit key. Test distinct real clients and forged forwarding headers.
+
+Only `api-gateway` should have public networking. Point `NEXT_PUBLIC_APP_URL`,
+WorkOS callbacks and realtime at that origin, then remove the direct `web`
+domain. Leave API, AI, Chromium, SpacetimeDB, vector storage, all workers and
+both PostgreSQL services without public domains or TCP proxies. Private network
+membership is not a service authorization policy: use distinct scoped identities,
+authenticate service calls, and restrict renderer/vector-store access as well.
+Remove obsolete `REDIS_UPSTREAM_*` variables; decommission the unused Redis
+service/volume separately after checking for other consumers.
+
+All existing route thresholds are preserved and database read failures reject
+protected requests (`fault_tolerant: false`). Counters survive gateway restarts
+and are shared between nodes. The native plugin increments asynchronously, so
+parallel requests can overshoot: these are abuse controls, not exact billing or
+tenant-budget enforcement. Keep transactional application quotas and upstream
+DDoS/WAF protection. A 32 MiB Nginx body ceiling also bounds routes without a
+smaller service-specific payload limit. `/health/ready` remains gateway liveness;
+it does not attest to database availability after startup. Monitor database
+health, counter errors, HTTP 429/5xx and rejected-auth volume separately.
+
+Run `python3 scripts/tests/test_kong_postgres.py` for the isolated Docker check
+of counter sharing/persistence, 429 headers, deleted-route reconciliation,
+untrusted forwarding headers, closed management listeners and database failure.
+
 ## Quick start (Docker)
 
 ```bash
-cp frontend/web/.env.example .env   # edit with production values
+cp .env.docker.example .env   # edit credentials, including KONG_PG_PASSWORD
 make check-env-prod
 docker compose up --build
 ```

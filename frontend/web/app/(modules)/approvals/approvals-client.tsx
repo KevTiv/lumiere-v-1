@@ -1,7 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { DashboardHeader, MissingOrganization, Button } from "@lumiere/ui"
@@ -28,21 +29,11 @@ import {
 } from "@lumiere/query-hooks/hooks/approval-controls"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { CheckCircle2, ExternalLink, Hand, Loader2, Sparkles, XCircle } from "lucide-react"
-import { approvalInboxTarget, approvalTaskMatchesTarget } from "./approval-inbox-view"
+import { approvalInboxTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 function hasValidOrganizationId(value?: number): value is number {
   return value != null && value > 0
-}
-
-function taskTitle(row: HumanTaskRow): string {
-  const model = humanTaskSubjectModel(row) ?? "record"
-  const subjectId = humanTaskSubjectId(row)
-  const node = row.nodeKey ?? row.node_key
-  if (subjectId != null) {
-    return node ? `${model} #${subjectId} · ${node}` : `${model} #${subjectId}`
-  }
-  return node ? String(node) : `Task #${humanTaskId(row)}`
 }
 
 export function ApprovalsClient({ organizationId }: { organizationId?: number }) {
@@ -53,6 +44,7 @@ export function ApprovalsClient({ organizationId }: { organizationId?: number })
 function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
+  const { identity } = useErpSession()
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const inboxQuery = useHumanTaskInbox(
     organizationId,
@@ -69,6 +61,14 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   const [commentingId, setCommentingId] = useState<number | null>(null)
   const [commentText, setCommentText] = useState("")
   const [actingForByTask, setActingForByTask] = useState<Record<number, string>>({})
+  useEffect(() => {
+    setActionError(null)
+    setRejectingId(null)
+    setRejectReason("")
+    setCommentingId(null)
+    setCommentText("")
+    setActingForByTask({})
+  }, [identity, organizationId, operatingCompanyId])
 
   const pendingTasks = useMemo(
     () =>
@@ -158,7 +158,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   return (
     <div className="space-y-6" data-testid="module-view-approvals">
       <DashboardHeader
-        title="Task inbox"
+        title={t("approvals.review.title", { defaultValue: "Approval inbox" })}
         description={t("approvals.inboxDescription", { defaultValue: "Review requests for the selected company. Open a record before you approve or reject it." })}
       />
 
@@ -220,17 +220,27 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
             const actorOptions = approvalActorOptions(row)
             const needsActorSelection = selectedActor == null
             const showActorSelection = row.directlyEligible !== true || actorOptions.length > 0
+            const kind = approvalSubjectKind(model)
+            const kindLabels = {
+              purchaseOrder: t("approvals.review.kinds.purchaseOrder", { defaultValue: "Purchase order" }),
+              salesOrder: t("approvals.review.kinds.salesOrder", { defaultValue: "Sales order" }),
+              accountingDocument: t("approvals.review.kinds.accountingDocument", { defaultValue: "Accounting document" }),
+              payment: t("approvals.review.kinds.payment", { defaultValue: "Payment" }),
+              expenseReport: t("approvals.review.kinds.expenseReport", { defaultValue: "Expense report" }),
+              aiDraft: t("approvals.review.kinds.aiDraft", { defaultValue: "AI draft" }),
+              record: t("approvals.review.kinds.record", { defaultValue: "Business record" }),
+            }
 
             return (
               <div
-                key={taskId}
+                key={`${identity}:${operatingCompanyId}:${taskId}:${humanTaskRevision(row)}`}
                 className="space-y-4 rounded-lg border bg-card p-5"
                 data-testid={`approval-card-${taskId}`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <h3 className="flex items-center gap-2 font-medium">
-                      {taskTitle(row)}
+                      {kindLabels[kind]} {resId > 0 ? `#${resId}` : ""}
                       {isAiDraft ? (
                         <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-normal">
                           <Sparkles className="h-3 w-3" />
@@ -243,9 +253,6 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       <span className="rounded border px-2 py-0.5 text-xs">
                         rev {humanTaskRevision(row)}
                       </span>
-                      {model ? (
-                        <span className="rounded border px-2 py-0.5 text-xs">{model}</span>
-                      ) : null}
                     </p>
                   </div>
                   {recordHref ? (
@@ -259,6 +266,21 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                   ) : null}
                 </div>
 
+                <details className="group rounded-lg border p-3">
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary" data-testid={`approval-review-${taskId}`}>
+                    {t("approvals.review.open", { defaultValue: "Review assignment" })}
+                  </summary>
+                  <div className="space-y-4 border-t pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      {recordHref
+                        ? t("approvals.review.sourceHint", { defaultValue: "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow." })
+                        : t("approvals.review.sourceUnavailable", { defaultValue: "A source record link is unavailable for this request. Review the request in its owning workspace before deciding." })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {status === "Open"
+                        ? t("approvals.review.openHint", { defaultValue: "This assignment is open. Claim it before deciding if the workflow requires a claimant." })
+                        : t("approvals.review.claimedHint", { defaultValue: "This assignment has been claimed. Check the source record and your selected acting principal before deciding." })}
+                    </p>
                 <div className="flex flex-wrap gap-2">
                   {showActorSelection ? (
                     <label className="flex items-center gap-2 text-sm">
@@ -395,6 +417,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     </Button>
                   </div>
                 ) : null}
+                  </div>
+                </details>
               </div>
             )
           })}

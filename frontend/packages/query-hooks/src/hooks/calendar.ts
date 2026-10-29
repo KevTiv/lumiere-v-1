@@ -10,15 +10,47 @@ import type { CalendarEvent, CreateCalendarEventParams } from '@lumiere/stdb/typ
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
+export interface CalendarReadScope {
+  /** Actor, company and current authorization projection, resolved by the caller. */
+  key: string
+  enabled: boolean
+}
+
+export function calendarProjectionQueryKey(resource: string, organizationId: bigint, scope: CalendarReadScope) {
+  return [resource, rqBigIntKey(organizationId), 'calendar-workspace', scope.key] as const
+}
+
 export function useCalendarEvents(
   organizationId: bigint,
   initialData?: CalendarEvent[],
+  scope?: CalendarReadScope,
 ) {
   return useQuery({
-    queryKey: ['calendar-events', rqBigIntKey(organizationId)],
+    queryKey: scope ? calendarProjectionQueryKey('calendar-events', organizationId, scope) : ['calendar-events', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/calendar-events', 'Failed to fetch calendar events'),
     staleTime: 30_000,
-    initialData,
+    // Unbound SSR rows cannot populate a new actor/company authorization scope.
+    initialData: scope ? undefined : initialData,
+    enabled: scope?.enabled,
+  })
+}
+
+/** Calendar views require an HTTP projection, never another scope's subscription-seeded rows. */
+export function useCalendarActivities(organizationId: bigint, scope: CalendarReadScope) {
+  return useQuery({
+    queryKey: calendarProjectionQueryKey('activities', organizationId, scope),
+    queryFn: () => fetchQueryList('/api/query/activities', 'Failed to fetch calendar activities'),
+    enabled: scope.enabled,
+    staleTime: 30_000,
+  })
+}
+
+export function useCalendarContacts(organizationId: bigint, scope: CalendarReadScope) {
+  return useQuery({
+    queryKey: calendarProjectionQueryKey('contacts', organizationId, scope),
+    queryFn: () => fetchQueryList('/api/query/contacts', 'Failed to fetch calendar attendees'),
+    enabled: scope.enabled,
+    staleTime: 30_000,
   })
 }
 

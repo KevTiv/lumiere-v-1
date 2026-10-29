@@ -1,0 +1,764 @@
+{
+  "moduleInsights": {
+    "workspaces": {
+      "lines": "Imirongo ya order",
+      "trial-balance": "Igereranya ry’imibare ya account",
+      "scheduled-reports": "Report zateganyijwe"
+    }
+  },
+  "common": {
+    "lookup": {
+      "noSaleOrders": "Nta order z’abakiriya. Banza ukore order yemejwe.",
+      "noAccounts": "Nta account z’ibaruramari rusange. Banza ushyireho urutonde rwa account.",
+      "noAnalyticAccounts": "Nta account z’isesengura. Banza ukore account y’isesengura."
+    },
+    "validation": {
+      "invalidEmail": "Aderesi ya email ntiyemewe"
+    },
+    "paramsMapper": {
+      "invalidConsolidationAccount": "Ntibyashobotse gutegura amakuru ya account yo guhuriza hamwe ibaruramari. Genzura imyanya ikenewe.",
+      "invalidTrialBalanceEntry": "Ntibyashobotse gutegura amakuru y’umurongo w’igereranya ry’imibare ya account. Genzura imyanya ikenewe.",
+      "invalidWhatsappAccount": "Ntibyashobotse gutegura amakuru ya account ya WhatsApp. Genzura imyanya ikenewe."
+    },
+    "csvImport": {
+      "description": "Hitamo file ya CSV UTF-8. Imitwe y’inkingi igomba guhura n’icyitegererezo cya SpacetimeDB.",
+      "fileLabel": "File ya CSV"
+    },
+    "importAssistant": {
+      "description": "Ohereza file ya CSV, ugenzure ihuzwa ry’inkingi ryatanzwe na AI, urebe imirongo yahinduwe, hanyuma uyinjize muri ERP.",
+      "stepUpload": "Ohereza file",
+      "uploadHint": "Hitamo file ya CSV UTF-8 kugira ngo utangire.",
+      "downloadErrors": "Manura report y’amakosa (CSV)",
+      "bundleModeHint": "Iyi CSV isa n’irimo order n’imirongo yazo. Banza uhuze amakuru y’imitwe hanyuma uhuze ay’imirongo.",
+      "lineMappingTitle": "Inkingi z’imirongo ya order",
+      "bundleLinkRequired": "Huza inkingi iranga order (client_order_ref) mbere yo kwinjiza order n’imirongo yazo."
+    },
+    "csvImportDialog": {
+      "correctedFileNotice": "Ohereza file yakosowe nk’ubusabe bushya. Kongera kugerageza iki kimenyetso bigumana igisubizo cya mbere.",
+      "exactResult": "Ibisubizo by’iyi file yoherejwe",
+      "fileLabel": "File ya CSV",
+      "spreadsheetFileLabel": "File ya CSV cyangwa Excel",
+      "importAnotherFile": "Injiza indi file",
+      "noRows": "File ifite umutwe ariko nta mirongo y’amakuru.",
+      "historyFailed": "Ntibyashobotse kuzana amateka cyangwa amakosa y’imirongo. Vugurura wongere ugerageze. File ishobora kuba yaramaze kwinjizwa; ntuyongere kohereza kugira ngo ugenzure.",
+      "historyNotice": "File yoherejwe. Amateka ya vuba y’umuryango ashobora kubamo ibyinjijwe n’abandi bakoresha. Hitamo igikorwa kugira ngo urebe ibisubizo byacyo; ibikorwa ntibihuzwa n’iyi file byikora.",
+      "manualResultNotice": "Uku kwinjiza gusaba guhitamo amateka ubwawe. Ibisubizo byako ntibirashobora guhuzwa n’iyi file byikora.",
+      "recoveryNotice": "Seriveri ishobora kuba yaramaze kwinjiza iyi file. Kongera kugerageza bigumana ikimenyetso kimwe cy’ubusabe kandi ntibishobora gukora irindi yinjiza. Ntutangire ubusabe bushya utaramenya iki gisubizo."
+    }
+  },
+  "nav": {
+    "reports": "Report"
+  },
+  "accounting": {
+    "insights": {
+      "invoices": "Invoice"
+    },
+    "overview": {
+      "activityInvoices": "Invoice z’abakiriya",
+      "activityBills": "Invoice z’abatanga ibicuruzwa",
+      "newBill": "Invoice nshya y’utanga ibicuruzwa",
+      "newInvoice": "Invoice nshya"
+    },
+    "manualInvoice": {
+      "invoiceTitle": "Invoice",
+      "billTitle": "Invoice y’utanga ibicuruzwa"
+    },
+    "accounts": {
+      "title": "Urutonde rwa account",
+      "coasTab": "Account",
+      "rowActions": {
+        "edit": "Hindura account"
+      }
+    },
+    "periodClose": {
+      "steps": {
+        "trialBalance": {
+          "title": "Igereranya ry’imibare ya account ryakozwe"
+        },
+        "vatReport": {
+          "title": "Report ya TVA yakozwe"
+        }
+      }
+    },
+    "journalEntries": {
+      "types": {
+        "inInvoice": "Invoice y’utanga ibicuruzwa"
+      }
+    },
+    "invoices": {
+      "title": "Invoice",
+      "ar": "Invoice z’abakiriya",
+      "ap": "Invoice z’abatanga ibicuruzwa",
+      "purchaseOrder": "Order y’amasoko",
+      "saleOrder": "Order y’umukiriya"
+    },
+    "bills": {
+      "title": "Invoice z’abatanga ibicuruzwa (amadeni)"
+    },
+    "taxGroups": {
+      "columns": {
+        "taxPayableAccountId": "Account y’amadeni ku batanga ibicuruzwa",
+        "taxReceivableAccountId": "Account y’amadeni y’abakiriya"
+      }
+    },
+    "taxDeadlines": {
+      "deadlineTypes": {
+        "Report": "Report"
+      },
+      "form": {
+        "types": {
+          "Report": "Report"
+        }
+      }
+    },
+    "budgets": {
+      "workspace": {
+        "colAnalytic": "Account y’isesengura"
+      }
+    },
+    "fxRevaluation": {
+      "realizedForm": {
+        "fields": {
+          "invoiceMoveId": "Invoice"
+        }
+      }
+    },
+    "creditControl": {
+      "writeOffForm": {
+        "fields": {
+          "receivableAccountId": "Account y’amadeni y’abakiriya"
+        }
+      }
+    },
+    "consolidation": {
+      "accounts": {
+        "title": "Account zo guhuriza hamwe ibaruramari",
+        "newAccount": "Account nshya",
+        "editAccount": "Hindura account"
+      },
+      "elimination": {
+        "colAccount": "Account"
+      },
+      "forms": {
+        "newAccount": {
+          "fields": {
+            "code": "Kode ya account"
+          }
+        },
+        "newElimination": {
+          "fields": {
+            "accountCode": "Kode ya account"
+          }
+        }
+      }
+    },
+    "nav": {
+      "accounts": "Urutonde rwa account",
+      "customerInvoices": "Invoice z’abakiriya",
+      "vendorBills": "Invoice z’abatanga ibicuruzwa"
+    },
+    "tabs": {
+      "analyticAccounts": "Account z’isesengura"
+    },
+    "entities": {
+      "reconciliationWidgets": {
+        "columns": {
+          "accountId": "Account"
+        }
+      },
+      "analyticLines": {
+        "columns": {
+          "accountId": "Account y’isesengura"
+        }
+      },
+      "moveLines": {
+        "columns": {
+          "accountId": "Account"
+        }
+      }
+    },
+    "forms": {
+      "newInvoice": {
+        "title": "Invoice nshya"
+      },
+      "newAccount": {
+        "title": "Account nshya",
+        "fields": {
+          "code": "Kode ya account"
+        }
+      },
+      "budgetPost": {
+        "fields": {
+          "accountIds": "Account"
+        }
+      },
+      "addAccountMoveLine": {
+        "fields": {
+          "accountId": "Account"
+        }
+      },
+      "newIntercompanyTransaction": {
+        "fields": {
+          "originDocumentModels": {
+            "saleOrder": "Order y’umukiriya"
+          }
+        }
+      },
+      "analyticAccount": {
+        "createTitle": "Account nshya y’isesengura",
+        "sections": {
+          "main": "Account"
+        }
+      },
+      "analyticLine": {
+        "fields": {
+          "accountId": "Account y’isesengura"
+        }
+      }
+    },
+    "actions": {
+      "newAccount": "Account nshya",
+      "newAnalyticAccount": "Account nshya y’isesengura",
+      "newBill": "Invoice nshya y’utanga ibicuruzwa",
+      "newInvoice": "Invoice nshya"
+    },
+    "billIntake": {
+      "title": "Igenzura rya invoice zakiriwe"
+    },
+    "authoring": {
+      "account": "Account",
+      "invoice": "Invoice"
+    }
+  },
+  "crm": {
+    "chatter": {
+      "activityTypes": {
+        "email": "Email"
+      }
+    },
+    "leads": {
+      "columns": {
+        "emailFrom": "Email"
+      }
+    },
+    "contacts": {
+      "columns": {
+        "email": "Email"
+      }
+    },
+    "forms": {
+      "newLead": {
+        "fields": {
+          "emailFrom": "Email"
+        }
+      },
+      "newContact": {
+        "fields": {
+          "email": "Email"
+        }
+      },
+      "editContact": {
+        "fields": {
+          "email": "Email"
+        }
+      }
+    }
+  },
+  "purchasing": {
+    "handoffs": {
+      "title": "Ibyakiriwe na invoice z’abatanga ibicuruzwa",
+      "bill": "Invoice y’utanga ibicuruzwa"
+    },
+    "purchaseOrders": {
+      "title": "Order z’amasoko",
+      "columns": {
+        "fulfillment": "Kuzuza order"
+      },
+      "filters": {
+        "state": {
+          "options": {
+            "Approved": "Order y’amasoko"
+          }
+        }
+      },
+      "states": {
+        "Approved": "Order y’amasoko",
+        "Purchase": "Order y’amasoko"
+      }
+    },
+    "orderLines": {
+      "title": "Imirongo ya order"
+    },
+    "rfqs": {
+      "columns": {
+        "purchaseOrderId": "Order y’amasoko"
+      }
+    },
+    "vendors": {
+      "columns": {
+        "email": "Email"
+      }
+    },
+    "landedCosts": {
+      "columns": {
+        "vendorBillId": "Invoice y’utanga ibicuruzwa"
+      }
+    },
+    "supplierIntakes": {
+      "columns": {
+        "email": "Email"
+      }
+    },
+    "tabs": {
+      "partnerBanks": "Account za banki z’abatanga ibicuruzwa",
+      "createPartnerBank": "Account nshya ya banki"
+    },
+    "partnerBanks": {
+      "title": "Account za banki z’abatanga ibicuruzwa",
+      "columns": {
+        "account": "Account"
+      }
+    },
+    "forms": {
+      "newPartnerBank": {
+        "sections": {
+          "main": "Account"
+        }
+      },
+      "editPartnerBank": {
+        "sections": {
+          "main": "Account"
+        }
+      },
+      "addPurchaseOrderLine": {
+        "sections": {
+          "order": "Order y’amasoko"
+        }
+      },
+      "receivePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Umurongo wa order"
+        }
+      },
+      "invoicePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Umurongo wa order"
+        }
+      },
+      "newSupplierIntake": {
+        "fields": {
+          "email": "Email"
+        }
+      },
+      "editSupplierIntake": {
+        "fields": {
+          "email": "Email"
+        }
+      },
+      "createBillFromOrder": {
+        "fields": {
+          "payableAccountId": "Account y’amadeni ku batanga ibicuruzwa"
+        }
+      },
+      "editPurchaseOrder": {
+        "fields": {
+          "orderId": "Order y’amasoko"
+        }
+      },
+      "fields": {
+        "expenseAccount": "Account y’amafaranga asohoka",
+        "payableAccount": "Account y’amadeni ku batanga ibicuruzwa",
+        "purchaseOrder": "Order y’amasoko"
+      }
+    },
+    "purchaseReturns": {
+      "columns": {
+        "purchaseOrderId": "Order y’amasoko"
+      }
+    },
+    "order": {
+      "bills": "Invoice z’abatanga ibicuruzwa",
+      "status": {
+        "purchase": "Order y’amasoko"
+      }
+    },
+    "blanket": {
+      "release": {
+        "title": "Hindura amasezerano rusange mo order y’amasoko"
+      }
+    },
+    "configuration": {
+      "fields": {
+        "purchaseOrder": "Order y’amasoko"
+      }
+    }
+  },
+  "sales": {
+    "order": {
+      "invoices": "Invoice",
+      "status": {
+        "sale": "Order y’umukiriya"
+      }
+    },
+    "ops": {
+      "expenseAccount": "Account y’amafaranga asohoka",
+      "payableAccount": "Account y’amadeni ku batanga ibicuruzwa"
+    },
+    "salesOrders": {
+      "title": "Order z’abakiriya",
+      "columns": {
+        "invoiceStatus": "Invoice"
+      },
+      "cashSummary": {
+        "invoice": {
+          "posted": "Byakorewe invoice"
+        }
+      },
+      "invoiceStates": {
+        "Invoiced": "Byakorewe invoice"
+      }
+    },
+    "orderLines": {
+      "title": "Imirongo ya order",
+      "columns": {
+        "qtyInvoiced": "Byakorewe invoice"
+      }
+    },
+    "fulfillment": {
+      "title": "Kuzuza order"
+    },
+    "tabs": {
+      "invoices": "Invoice",
+      "fulfillment": "Kuzuza order"
+    },
+    "forms": {
+      "newSaleOrder": {
+        "fields": {
+          "invoicePolicy": "Amabwiriza ya invoice"
+        }
+      },
+      "newDeliveryCarrier": {
+        "fields": {
+          "invoicePolicy": "Amabwiriza ya invoice"
+        }
+      },
+      "newShippingMethod": {
+        "fields": {
+          "invoicePolicy": "Amabwiriza ya invoice"
+        }
+      },
+      "createInvoiceFromOrder": {
+        "fields": {
+          "receivableAccountId": "Account y’amadeni y’abakiriya"
+        }
+      },
+      "editSaleOrderLine": {
+        "sections": {
+          "line": "Umurongo wa order"
+        },
+        "fields": {
+          "lineId": "Umurongo wa order"
+        }
+      }
+    }
+  },
+  "documents": {
+    "forms": {
+      "recordTypes": {
+        "purchaseOrder": "Order y’amasoko",
+        "salesOrder": "Order y’umukiriya"
+      }
+    },
+    "browser": {
+      "upload": "Ohereza file"
+    }
+  },
+  "subscriptions": {
+    "actions": {
+      "generateInvoice": "Kora invoice"
+    },
+    "forms": {
+      "newSubscription": {
+        "fields": {
+          "saleOrderId": "Order y’umukiriya"
+        }
+      },
+      "generateInvoice": {
+        "title": "Kora invoice",
+        "sections": {
+          "main": "Invoice"
+        },
+        "fields": {
+          "incomeAccountId": "Account y’amafaranga yinjira",
+          "receivableAccountId": "Account y’amadeni y’abakiriya"
+        }
+      },
+      "amend": {
+        "fields": {
+          "incomeAccountId": "Account y’amafaranga yinjira",
+          "receivableAccountId": "Account y’amadeni y’abakiriya"
+        }
+      },
+      "payInvoice": {
+        "fields": {
+          "invoiceMoveId": "Invoice",
+          "receivableAccountId": "Account y’amadeni y’abakiriya"
+        }
+      }
+    },
+    "dueToBill": {
+      "tabLabel": "Ibitegereje invoice",
+      "title": "Ibitegereje invoice"
+    },
+    "workflow": {
+      "queues": {
+        "due": {
+          "title": "Ibigomba gukorerwa invoice"
+        },
+        "paused": {
+          "title": "Gukora invoice byahagaritswe"
+        }
+      },
+      "steps": {
+        "order": "Order y’umukiriya"
+      },
+      "invoice": "Invoice",
+      "labels": {
+        "generate-invoice": "Kora invoice"
+      }
+    }
+  },
+  "expenses": {
+    "expenses": {
+      "columns": {
+        "sheetId": "Report"
+      }
+    },
+    "expenseReports": {
+      "title": "Report z’amafaranga yasohotse",
+      "columns": {
+        "name": "Izina rya report"
+      }
+    },
+    "forms": {
+      "newExpenseSheet": {
+        "sections": {
+          "sheetDetails": "Ibisobanuro bya report"
+        },
+        "fields": {
+          "name": "Izina rya report"
+        }
+      },
+      "newExpenseReport": {
+        "sections": {
+          "reportDetails": "Ibisobanuro bya report"
+        },
+        "fields": {
+          "name": "Izina rya report"
+        }
+      },
+      "addToReport": {
+        "sections": {
+          "sheet": "Report"
+        }
+      },
+      "postReport": {
+        "fields": {
+          "defaultExpenseAccountId": "Account y’amafaranga asohoka"
+        }
+      },
+      "projectRebill": {
+        "fields": {
+          "receivableAccountId": "Account y’amadeni y’abakiriya",
+          "incomeAccountId": "Account y’amafaranga yinjira"
+        }
+      }
+    }
+  },
+  "messages": {
+    "messages": {
+      "filters": {
+        "messageType": {
+          "options": {
+            "email": "Email"
+          }
+        }
+      },
+      "states": {
+        "email": "Email"
+      }
+    },
+    "forms": {
+      "newMessage": {
+        "fields": {
+          "options": {
+            "email": "Email"
+          }
+        }
+      },
+      "invoiceReminder": {
+        "invoices": "Invoice"
+      },
+      "recordChoice": {
+        "invoice": "Invoice",
+        "bill": "Invoice y’utanga ibicuruzwa"
+      }
+    }
+  },
+  "overview": {
+    "dashboard": {
+      "stats": {
+        "openSalesOrders": "Order z’abakiriya zitararangira",
+        "openPurchaseOrders": "Order z’amasoko zitararangira"
+      },
+      "widgets": {
+        "openPurchaseOrders": "Order z’amasoko zitararangira"
+      }
+    }
+  },
+  "settings": {
+    "page": {
+      "description": "Gena account yawe n’imikorere ya sisitemu"
+    },
+    "import": {
+      "file": "File ya CSV cyangwa Excel"
+    },
+    "users": {
+      "email": "Email"
+    },
+    "profile": {
+      "email": "Email",
+      "emailNotifications": "Imenyesha kuri email",
+      "emailNotificationsDesc": "Hitamo amakuru wakira kuri email",
+      "emailItems": {
+        "orders": {
+          "label": "Order nshya",
+          "description": "Menyeshwa igihe hari order nshya"
+        },
+        "reports": {
+          "label": "Report za buri cyumweru"
+        }
+      },
+      "languageHint": "Ururimi ruhinduka umaze kubika amakuru yawe kandi rugakurikira account yawe ku bindi bikoresho.",
+      "emailVerificationHint": "Guhindura email bisaba kwemezwa n’uguha umwirondoro n’umuyobozi."
+    },
+    "organization": {
+      "email": "Email"
+    },
+    "groups": {
+      "account": "Account"
+    },
+    "sections": {
+      "users": {
+        "description": "Ongeraho, hindura kandi ucunge account z’abakoresha"
+      },
+      "sso": {
+        "description": "Uko kwinjira rimwe bihagaze n’ihuzwa rya account ya WorkOS"
+      },
+      "form-config": {
+        "description": "Gena imyanya y’igitabo n’iya report y’igenzura"
+      }
+    }
+  },
+  "reports": {
+    "moduleTitle": "Report",
+    "dashboard": {
+      "quickActions": {
+        "generate": "Kora report",
+        "scheduleReport": "Teganya report"
+      }
+    },
+    "tabs": {
+      "financialReports": "Report z’imari",
+      "trialBalance": "Igereranya ry’imibare ya account",
+      "reportTemplates": "Ibyitegererezo bya report",
+      "vatReport": "Report ya TVA",
+      "ownerReports": "Report za nyir’ubucuruzi"
+    },
+    "ownerReports": {
+      "title": "Report za nyir’ubucuruzi"
+    },
+    "createButton": {
+      "generateReport": "Kora report",
+      "scheduleReport": "Teganya report"
+    },
+    "financialReports": {
+      "title": "Report z’imari"
+    },
+    "trialBalance": {
+      "title": "Igereranya ry’imibare ya account",
+      "searchPlaceholder": "Shakisha account…",
+      "columns": {
+        "accountName": "Account"
+      }
+    },
+    "reportTemplates": {
+      "title": "Ibyitegererezo bya report"
+    },
+    "scheduledReports": {
+      "title": "Report zateganyijwe"
+    },
+    "forms": {
+      "generateReport": {
+        "title": "Kora report",
+        "fields": {
+          "name": "Izina rya report",
+          "reportTypes": {
+            "trialBalance": "Igereranya ry’imibare ya account"
+          }
+        },
+        "submit": "Kora report"
+      },
+      "scheduledReport": {
+        "title": "Teganya report"
+      },
+      "trialBalanceEntry": {
+        "fields": {
+          "accountCode": "Kode ya account"
+        }
+      },
+      "updateFinancialReport": {
+        "sections": {
+          "update": "Ibisobanuro bya report"
+        },
+        "fields": {
+          "name": "Izina rya report"
+        }
+      }
+    },
+    "vat": {
+      "name": "Izina rya report"
+    },
+    "statements": {
+      "report": "Report"
+    },
+    "periodContext": {
+      "title": "Igenzura rya report zo gufunga igihe"
+    },
+    "authoring": {
+      "account": "Account"
+    }
+  },
+  "auth": {
+    "forms": {
+      "newAuditRule": {
+        "resourceTypes": {
+          "invoice": "Invoice"
+        }
+      }
+    },
+    "fields": {
+      "email": "Email"
+    }
+  },
+  "modules": {
+    "workspaces": {
+      "fulfillment": "Kuzuza order",
+      "financial": "Report z’imari",
+      "expenseReports": "Report z’amafaranga yasohotse"
+    },
+    "tabGroups": {
+      "fulfillment": "Kuzuza order"
+    }
+  }
+}

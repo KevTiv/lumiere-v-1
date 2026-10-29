@@ -31,7 +31,7 @@ assert_contains 'url: http://api-server.railway.internal:8080/v1/realtime'
 assert_contains '- /api/operations'
 assert_contains '- /api/history'
 assert_contains '- /api/compat/reducer'
-assert_contains 'policy: local'
+assert_contains 'policy: cluster'
 assert_contains "- /health/ready"
 assert_contains "body: '{\"status\":\"ok\",\"service\":\"api-gateway\"}'"
 
@@ -52,5 +52,24 @@ if WEB_UPSTREAM_HOST='web.railway.internal;bad' \
   echo 'render-kong-config test: unsafe host was accepted' >&2
   exit 1
 fi
+
+reject_startup() {
+  expected="$1"
+  shift
+  if env KONG_DECLARATIVE_TEMPLATE="$root/infra/kong/kong.yml" \
+    KONG_DECLARATIVE_CONFIG="$tmp/rejected.yml" \
+    KONG_PG_HOST=kong-postgres KONG_PG_PASSWORD=test-only \
+    "$@" sh "$root/infra/kong/render-config.sh" kong docker-start \
+    >"$tmp/rejected.log" 2>&1; then
+    echo 'render-kong-config test: unsafe startup was accepted' >&2
+    exit 1
+  fi
+  grep -Fq "$expected" "$tmp/rejected.log"
+}
+
+reject_startup 'PostgreSQL is required' KONG_DATABASE=off
+reject_startup 'verified ingress proxy CIDRs' LUMIERE_ENV=production KONG_TRUSTED_IPS=
+reject_startup 'globally trusted proxy range' LUMIERE_ENV=production KONG_TRUSTED_IPS='0.0.0.0/0'
+reject_startup 'globally trusted proxy range' LUMIERE_ENV=production KONG_TRUSTED_IPS='192.0.2.0/24, ::/0'
 
 echo 'render-kong-config test: ok'

@@ -1,0 +1,6 @@
+{
+  "name": "lumiere-javascript-guest-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": { "quickjs-emscripten": "0.32.0" }
+}

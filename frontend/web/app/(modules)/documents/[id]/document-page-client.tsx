@@ -20,7 +20,6 @@ import {
   RecordChatter,
   RecordPage,
   SmartButtons,
-  buildModuleTabHref,
   useRBAC,
   documentsTableConfig,
   setDocumentRetentionForm,
@@ -81,6 +80,7 @@ import {
   signatureRequestRows,
 } from '../document-record';
 import { canRequestSignature, toSignatureRequestParams } from '../signature-request';
+import { documentBrowserReturnHref } from '../document-browser-navigation';
 
 interface DocumentPageClientProps {
   documentId: string;
@@ -218,6 +218,7 @@ function DocumentPageLoaded({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const filesHref = documentBrowserReturnHref(searchParams.get('returnTo'));
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
@@ -322,7 +323,7 @@ function DocumentPageLoaded({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" render={<Link href={buildModuleTabHref('documents', 'documents')} />} nativeButton={false}>
+          <Button variant="outline" render={<Link href={filesHref} />} nativeButton={false}>
             {t('documents.backToDocuments', { defaultValue: 'Back to documents' })}
           </Button>
         </EmptyContent>
@@ -490,7 +491,7 @@ function DocumentPageLoaded({
         testIdPrefix="document"
         breadcrumbs={[
           { label: t('nav.documents', { defaultValue: 'Documents' }), href: '/documents' },
-          { label: t('documents.documents.title'), href: buildModuleTabHref('documents', 'documents') },
+          { label: t('documents.documents.title'), href: filesHref },
           { label },
         ]}
         title={label}

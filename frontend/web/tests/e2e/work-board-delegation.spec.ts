@@ -167,13 +167,16 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       expect(before.actingForOptions![0]!.workActions).toContain("approve")
       const title = before.workSourceTitle || `${before.subjectModel ?? before.subject_model ?? ""} #${before.subjectId ?? before.subject_id ?? before.id}`
       const review = delegatePage.getByRole("dialog", { name: title, exact: true })
-      // The native label also contains its option text. Use the control's
-      // accessible name, then verify the exact principal being reviewed.
+      // Verify the selected option's exact identity through the custom Select.
       const actingAs = review.getByRole("combobox", { name: "Acting as", exact: true })
       await expect(review).toBeVisible()
       await expect(actingAs).toBeVisible()
       await expect(actingAs).toBeEnabled()
-      await expect(actingAs).toHaveValue(principal.identityHex)
+      await actingAs.press("Enter")
+      const selectedPrincipal = delegatePage.locator(`[role="option"][data-value="${principal.identityHex}"]`)
+      await expect(selectedPrincipal).toHaveAttribute("data-state", "checked")
+      await selectedPrincipal.press("Escape")
+      await expect(actingAs).toHaveAttribute("aria-expanded", "false")
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
       await review.getByRole("textbox").fill("A delegated comment that must be discarded after revocation")
       const evidenceScope = { ...workflow, ...pending }
@@ -239,7 +242,10 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       await expect(review.getByRole("textbox")).toHaveValue("")
       await expect(actingAs).toBeVisible()
       await expect(actingAs).toBeEnabled()
-      await expect(actingAs).toHaveValue(principal.identityHex)
+      await actingAs.press("Enter")
+      await expect(selectedPrincipal).toHaveAttribute("data-state", "checked")
+      await selectedPrincipal.press("Escape")
+      await expect(actingAs).toHaveAttribute("aria-expanded", "false")
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
       const freshComment = "A fresh review after delegation was restored"
       await review.getByRole("textbox").fill(freshComment)

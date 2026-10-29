@@ -16,6 +16,27 @@ function config(...fields: FormField[]): FormConfig {
 const notes: FormField = { id: "notes", name: "notes", label: "Notes", type: "textarea", format: "plain" }
 
 describe("ModularForm input quality", () => {
+  it("keeps optional section entries while collapsed and opens the section when validation fails", async () => {
+    const submit = vi.fn()
+    const optional: FormConfig = { id: "optional", title: "Optional", sections: [{
+      id: "details", title: "More details", collapsible: true,
+      fields: [{ id: "email", name: "email", label: "Email", type: "email" }],
+    }] }
+    const { container } = render(<ModularForm config={optional} onSubmit={submit} />)
+    const section = container.querySelector("details")!
+    expect(section.open).toBe(false)
+    fireEvent.click(screen.getByText("More details"))
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "wrong" } })
+    fireEvent.click(screen.getByText("More details"))
+    expect(section.open).toBe(false)
+    fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
+    expect(section.open).toBe(true)
+    expect(document.activeElement).toBe(screen.getByLabelText("Email"))
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("wrong")
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "jane@example.com" } })
+    fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
+    await waitFor(() => expect(submit).toHaveBeenCalledWith({ email: "jane@example.com" }))
+  })
   it("submits with Cmd or Ctrl+Enter from a field", async () => {
     const submit = vi.fn()
     render(<ModularForm config={config(notes)} onSubmit={submit} />)

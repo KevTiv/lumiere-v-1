@@ -6,7 +6,6 @@ import {
   activeTabEntityTable,
   callReducerBff,
   fetchDefaultCompanyId,
-  fetchSessionOrganizationId,
   gotoApprovals,
   gotoModule,
   scalarQueryId,
@@ -152,6 +151,7 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
       await expect(page.getByTestId(`approval-card-${taskId}`)).toBeVisible({
         timeout: 30_000,
       })
+      await page.getByTestId(`approval-review-${taskId}`).click()
       const decision = page.waitForResponse(
         (response) => matchesOperationResponse(response, "decide_workflow_human_task"),
         { timeout: 60_000 },

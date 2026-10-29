@@ -1,8 +1,34 @@
-# Agent sandbox data-analysis, Python runtime, and reusable-work plan
+# Agent sandbox data-analysis and reusable-work plan
 
 **Status:** Proposed — sandbox execution architecture 2026-08-24
 **Tracks:** `dataset-isolation`, `daytona`, `python-sdk`, `ephemeral-sandboxes`, `artifacts`, `evidence`, `recipes`, `skill-promotion`, `warm-pools`, `provenance`, `verification`
 **Related:** [agent-generated-erp-tool-surface-plan.md](./agent-generated-erp-tool-surface-plan.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md) · [agent-harness-capability-ir-foundation.md](./agent-harness-capability-ir-foundation.md)
+
+## Initial implementation direction — 2026-10-28
+
+The first implementation uses **JavaScript analysis and Railway sandboxes**. It
+reuses the governed Rust gateway for authorization and adds a separate trusted
+Node controller for Railway management, dataset materialization and output
+validation. Agent-authored JavaScript runs in a bounded QuickJS WASM worker,
+without Node, filesystem, network or process bindings. JavaScript is an ordinary
+programming language here; the SDK is a scoped data/evidence interface rather
+than a new analysis DSL.
+
+The dataset, evidence and program contracts remain independent of language and
+provider. Python remains a later approved runtime profile for workloads that
+need its analysis libraries. Daytona remains a possible later provider. The
+Python/Daytona examples and implementation phases below record the broader
+architecture and future scope; they do not override this initial direction.
+
+Production admission remains disabled in the initial release. Railway's
+`ISOLATED` mode blocks the environment's private network but retains public
+internet egress. It is not evidence of deny-by-default networking. Customer
+datasets require reviewed runtime/egress isolation and independent certification
+after release; local synthetic execution cannot satisfy that gate. No
+environment flag may turn the unadmitted runtime into a production capability.
+
+See [Railway JavaScript sandbox status](../plan/railway-js-sandbox-status.md)
+for the implemented slice, limits and remaining release/certification evidence.
 
 ---
 

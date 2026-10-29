@@ -59,15 +59,11 @@ export async function forwardToApiServerIfEnabled(request: NextRequest): Promise
 
   if (isWorkOsEnabled()) {
     const { workOsRedirectUri } = await import('./workos-config')
+    const { resolveRequestCredentials } = await import('./auth-credentials')
     // Browser cookies are consumed by AuthKit, never forwarded to Rust. Explicit
     // caller credentials keep precedence, including malformed/rejected credentials.
     headers.delete('cookie')
     headers.delete('x-stdb-identity')
-    if (!request.headers.has('authorization')) {
-      const { withAuth } = await import('@workos-inc/authkit-nextjs')
-      const session = await withAuth()
-      if (session.accessToken) headers.set('authorization', `Bearer ${session.accessToken}`)
-    }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const origin = request.headers.get('origin')
       const site = request.headers.get('sec-fetch-site')
@@ -78,6 +74,8 @@ export async function forwardToApiServerIfEnabled(request: NextRequest): Promise
         return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
       }
     }
+    const credentials = await resolveRequestCredentials(request)
+    if (credentials.authorization !== null) headers.set('authorization', credentials.authorization)
   }
 
   const init: RequestInit = {

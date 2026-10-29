@@ -74,7 +74,7 @@ pub(super) async fn profile_update(
         .ok_or(ApiError::NotFound("User profile not found".into()))?;
     let platform_id = profile.get::<_, String>("platform_user_id");
     let platform_id = PlatformId::new(platform_id).map_err(ApiError::internal)?;
-    if state.config.workos_client_id.is_some() && body.email.is_some() {
+    if state.config.workos_auth.is_some() && body.email.is_some() {
         return Err(ApiError::BadRequest("Email changes require WorkOS verification and updated alpha approval; contact your administrator".into()));
     }
     if body
@@ -136,10 +136,24 @@ pub(super) async fn profile_update(
     }
     // Canonical data is committed even if the module is temporarily unavailable.
     // Session resolution automatically retries the durable per-organization work.
-    let projection_pending =
-        flush_profile_projection(&state, &platform_id, &session.identity_hex, organization_id)
-            .await
-            .is_err();
+    let projection_pending = match flush_profile_projection(
+        &state,
+        &platform_id,
+        &session.identity_hex,
+        organization_id,
+    )
+    .await
+    {
+        Ok(()) => false,
+        Err(error) => {
+            tracing::warn!(
+                organization_id,
+                error = ?error,
+                "canonical profile saved; ERP profile synchronization remains pending"
+            );
+            true
+        }
+    };
     Ok(Json(
         json!({ "success": true, "projectionPending": projection_pending }),
     ))

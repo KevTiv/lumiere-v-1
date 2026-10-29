@@ -30,6 +30,8 @@ import { fileKindOf, formatFileSize, type FileKind } from "../lib/file-kind"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
 import { EmptyStateCard } from "../components/empty-state-card"
+import { ModuleDataNotice } from "../pages/module-data-notice"
+import type { ModuleDataState } from "../lib/module-data-state"
 
 export interface FileBrowserFolder {
   id: string
@@ -38,7 +40,7 @@ export interface FileBrowserFolder {
   parentId: string | null
   fileCount: number
   /** Bytes in the folder's files. */
-  totalSize: number
+  totalSize: number | null
   /** Epoch ms of the latest change to the folder or a file in it. */
   updatedAt: number | null
   isFavorite?: boolean
@@ -49,7 +51,7 @@ export interface FileBrowserFile {
   name: string
   fileName: string
   mimetype: string
-  size: number
+  size: number | null
   folderId: string | null
   /** Epoch ms. */
   updatedAt: number | null
@@ -62,16 +64,28 @@ export interface FileBrowserFile {
 
 export type FileBrowserLayout = "grid" | "list"
 
+export interface FileBrowserState {
+  folderId: string | null
+  search: string
+  layout: FileBrowserLayout
+  selectedFileId?: string | null
+}
+
 export interface FileBrowserProps {
   folders: FileBrowserFolder[]
   files: FileBrowserFile[]
+  /** A folder read failure must not masquerade as an empty folder collection. */
+  folderState?: ModuleDataState
   /** Uploads into the open folder (null: no folder). Omitted hides the upload button. */
-  onUpload?: (files: File[], folderId: string | null) => Promise<void>
+  onUpload?: (files: File[], folderId: string | null) => Promise<void | string>
   /** Creates inside the open folder. Omitted hides the new-folder button. */
   onCreateFolder?: (parentId: string | null) => void
   onOpenFile?: (fileId: string) => void
   /** Remembers the grid/list choice under this key. */
   storageKey?: string
+  /** Optional route-owned view state, so opening a record does not lose its list. */
+  state?: FileBrowserState
+  onStateChange?: (state: FileBrowserState) => void
   className?: string
 }
 
@@ -148,29 +162,38 @@ function folderNavigation(folders: readonly FileBrowserFolder[]) {
 export function FileBrowser({
   folders,
   files,
+  folderState,
   onUpload,
   onCreateFolder,
   onOpenFile,
   storageKey,
+  state,
+  onStateChange,
   className,
 }: FileBrowserProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language
-  const [layout, setLayout] = useState<FileBrowserLayout>("grid")
-  const [folderId, setFolderId] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
+  const [localState, setLocalState] = useState<FileBrowserState>({ folderId: null, search: "", layout: "grid" })
+  const { folderId, search, layout, selectedFileId } = state ?? localState
   const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadResults, setUploadResults] = useState<Array<{ name: string; status: "uploaded" | "unconfirmed"; error?: string; fileId?: string }>>([])
+  const uploadBusy = useRef(false)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const stored = readLayout(storageKey)
-    if (stored) setLayout(stored)
-  }, [storageKey])
+    if (stored && !state) setLocalState((current) => ({ ...current, layout: stored }))
+  }, [storageKey, state])
+
+  const changeState = (changes: Partial<FileBrowserState>) => {
+    const next = { ...(state ?? localState), ...changes }
+    setLocalState(next)
+    onStateChange?.(next)
+  }
 
   const changeLayout = (next: FileBrowserLayout) => {
-    setLayout(next)
+    changeState({ layout: next })
     if (!storageKey) return
     try {
       window.localStorage.setItem(storageKey, next)
@@ -185,8 +208,8 @@ export function FileBrowser({
   const activeFolderId = openFolder?.id ?? null
   // A folder deleted while open falls back to all files.
   useEffect(() => {
-    if (folderId && !openFolder) setFolderId(null)
-  }, [folderId, openFolder])
+    if (folderId && !openFolder && !state) setLocalState((current) => ({ ...current, folderId: null }))
+  }, [folderId, openFolder, state])
 
   const childFolders = useMemo(
     () => folders.filter((folder) => navigation.parents.get(folder.id) === activeFolderId),
@@ -218,16 +241,28 @@ export function FileBrowser({
 
   const formatDate = (ms: number | null) =>
     ms == null ? "—" : new Date(ms).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })
+  const sizeLabel = (bytes: number | null) => bytes == null ? "—" : formatFileSize(bytes)
 
   const upload = async (picked: File[]) => {
-    if (!onUpload || picked.length === 0) return
+    if (!onUpload || picked.length === 0 || uploadBusy.current) return
+    uploadBusy.current = true
     setUploading(true)
-    setUploadError(null)
+    setUploadResults([])
     try {
-      await onUpload(picked, activeFolderId)
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : String(error))
+      // Dispatch each file only once. A lost response may have registered it, so an
+      // unconfirmed file is never silently included in an automatic batch retry.
+      for (const file of picked) {
+        try {
+          const fileId = await onUpload([file], activeFolderId)
+          setUploadResults((results) => [...results, { name: file.name, status: "uploaded", fileId: fileId || undefined }])
+        } catch (error) {
+          setUploadResults((results) => [...results, {
+            name: file.name, status: "unconfirmed", error: error instanceof Error ? error.message : String(error),
+          }])
+        }
+      }
     } finally {
+      uploadBusy.current = false
       setUploading(false)
     }
   }
@@ -247,7 +282,7 @@ export function FileBrowser({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => changeState({ search: event.target.value })}
             placeholder={t("documents.browser.search")}
             aria-label={t("documents.browser.search")}
             className="pl-9"
@@ -255,7 +290,7 @@ export function FileBrowser({
         </div>
         <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
           {onCreateFolder ? (
-            <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => onCreateFolder(activeFolderId)} data-testid="file-browser-new-folder">
+            <Button variant="outline" size="sm" className="min-h-11 flex-1 sm:min-h-8 sm:flex-none" onClick={() => onCreateFolder(activeFolderId)} data-testid="file-browser-new-folder">
               <FolderPlus className="mr-2 h-4 w-4" />
               {t("documents.browser.newFolder")}
             </Button>
@@ -264,7 +299,7 @@ export function FileBrowser({
             <>
               <Button
                 size="sm"
-                className="flex-1 sm:flex-none"
+                className="min-h-11 flex-1 sm:min-h-8 sm:flex-none"
                 disabled={uploading}
                 onClick={() => inputRef.current?.click()}
                 data-testid="file-browser-upload"
@@ -290,17 +325,30 @@ export function FileBrowser({
           ) : null}
         </div>
       </div>
-      {uploadError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {uploadError}
-        </p>
+      {uploadResults.length > 0 ? (
+        <div className="space-y-2 rounded-lg border p-3 text-sm" aria-live="polite" data-testid="file-browser-upload-results">
+          <ul className="space-y-1">
+            {uploadResults.map((result, index) => (
+              <li key={index} className="break-words" role={result.status === "unconfirmed" ? "alert" : undefined}>
+                <span className="font-medium">{result.name}</span>{" · "}
+                {result.status === "uploaded"
+                  ? t("documents.browser.uploaded", { defaultValue: "Uploaded" })
+                  : <span className="text-destructive">{result.error}</span>}
+                {result.fileId && onOpenFile ? <Button className="ml-2" variant="link" size="sm" onClick={() => onOpenFile(result.fileId!)}>{t("documents.browser.openUploaded", { defaultValue: "Open file" })}</Button> : null}
+              </li>
+            ))}
+          </ul>
+          {uploadResults.some((result) => result.status === "unconfirmed") ? (
+            <p className="text-muted-foreground">{t("documents.browser.checkUploadOutcome", { defaultValue: "Some uploads could not be confirmed. Check the files list before selecting those files again." })}</p>
+          ) : null}
+        </div>
       ) : null}
 
       <nav aria-label={t("documents.browser.folders")}>
         <ol className="flex flex-wrap items-center gap-1 text-sm">
           <li>
             {openFolder ? (
-              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setFolderId(null)} data-testid="file-browser-root">
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => changeState({ folderId: null })} data-testid="file-browser-root">
                 {t("documents.browser.allFiles")}
               </button>
             ) : (
@@ -313,7 +361,7 @@ export function FileBrowser({
               {folder.id === activeFolderId ? (
                 <span className="truncate font-medium" aria-current="page">{folder.name}</span>
               ) : (
-                <button type="button" className="truncate text-muted-foreground hover:text-foreground" onClick={() => setFolderId(folder.id)}>
+                <button type="button" className="truncate text-muted-foreground hover:text-foreground" onClick={() => changeState({ folderId: folder.id })}>
                   {folder.name}
                 </button>
               )}
@@ -326,7 +374,16 @@ export function FileBrowser({
         <h3 id="file-browser-folders" className="text-sm font-semibold text-foreground">
           {t("documents.browser.folders")}
         </h3>
-        {childFolders.length === 0 ? (
+        {folderState && folderState.status !== "ready" ? (
+          folderState.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("documents.browser.foldersLoading", { defaultValue: "Loading folders. Upload and new-folder actions will be available when the folders are ready." })}</p> : (
+            <ModuleDataNotice state={{
+              ...folderState,
+              message: folderState.status === "denied"
+                ? t("documents.browser.foldersDenied", { defaultValue: "You do not have access to folders. You can still inspect the available files." })
+                : t("documents.browser.foldersUnavailable", { defaultValue: "Folders could not be loaded. You can still inspect the available files. Retry folders to restore upload and new-folder actions." }),
+            }} />
+          )
+        ) : childFolders.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
             {t("documents.browser.noFolders")}
           </p>
@@ -337,7 +394,7 @@ export function FileBrowser({
                 <button
                   key={folder.id}
                   type="button"
-                  onClick={() => setFolderId(folder.id)}
+                  onClick={() => changeState({ folderId: folder.id })}
                   data-testid={`file-browser-folder-${folder.id}`}
                   className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40"
                 >
@@ -350,7 +407,7 @@ export function FileBrowser({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{folder.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t("documents.browser.fileCount", { count: folder.fileCount })} · {formatFileSize(folder.totalSize)}
+                      {t("documents.browser.filesLoaded", { count: folder.fileCount, defaultValue: "{{count}} loaded files" })} · {sizeLabel(folder.totalSize)}
                     </p>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
@@ -388,7 +445,7 @@ export function FileBrowser({
             <Button
               variant={layout === "grid" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 px-2"
+              className="h-11 min-w-11 px-2 sm:h-7 sm:min-w-0"
               aria-pressed={layout === "grid"}
               aria-label={t("documents.browser.grid")}
               onClick={() => changeLayout("grid")}
@@ -399,7 +456,7 @@ export function FileBrowser({
             <Button
               variant={layout === "list" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 px-2"
+              className="h-11 min-w-11 px-2 sm:h-7 sm:min-w-0"
               aria-pressed={layout === "list"}
               aria-label={t("documents.browser.list")}
               onClick={() => changeLayout("list")}
@@ -423,7 +480,8 @@ export function FileBrowser({
                 key={file.id}
                 type="button"
                 onClick={onOpenFile ? () => onOpenFile(file.id) : undefined}
-                className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-xs transition-colors hover:border-primary/40"
+                className={cn("flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-xs transition-colors hover:border-primary/40", selectedFileId === file.id && "border-primary ring-1 ring-primary/20")}
+                data-state={selectedFileId === file.id ? "selected" : undefined}
                 data-testid={`file-browser-file-${file.id}`}
               >
                 <div className="flex items-start justify-between">
@@ -435,7 +493,7 @@ export function FileBrowser({
                     {file.name}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {formatFileSize(file.size)} · {formatDate(file.updatedAt)}
+                    {sizeLabel(file.size)} · {formatDate(file.updatedAt)}
                   </p>
                 </div>
               </button>
@@ -456,7 +514,8 @@ export function FileBrowser({
                 {visibleFiles.map((file) => (
                   <tr
                     key={file.id}
-                    className={cn(onOpenFile && "cursor-pointer hover:bg-muted/40")}
+                    className={cn(onOpenFile && "cursor-pointer hover:bg-muted/40", selectedFileId === file.id && "bg-primary/5")}
+                    data-state={selectedFileId === file.id ? "selected" : undefined}
                     onClick={onOpenFile ? () => onOpenFile(file.id) : undefined}
                     data-testid={`file-browser-row-${file.id}`}
                   >
@@ -464,13 +523,15 @@ export function FileBrowser({
                       <div className="flex min-w-0 items-center gap-3">
                         <FileTypeIcon mimetype={file.mimetype} fileName={file.fileName} className="h-8 w-8" />
                         <div className="min-w-0">
-                          <p className="truncate font-medium">{file.name}</p>
+                          {onOpenFile ? (
+                            <button type="button" className="min-h-11 truncate text-left font-medium hover:underline sm:min-h-0" onClick={(event) => { event.stopPropagation(); onOpenFile(file.id) }}>{file.name}</button>
+                          ) : <p className="truncate font-medium">{file.name}</p>}
                           <p className="truncate text-xs text-muted-foreground">{file.fileName}</p>
                         </div>
                         <FileFlags file={file} />
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">{formatFileSize(file.size)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">{sizeLabel(file.size)}</td>
                     <td className="truncate px-3 py-2 text-muted-foreground">{file.modifiedBy}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatDate(file.updatedAt)}</td>
                   </tr>

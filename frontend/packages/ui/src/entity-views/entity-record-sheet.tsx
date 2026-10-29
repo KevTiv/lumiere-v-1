@@ -56,6 +56,7 @@ export function EntityRecordSheet({
   const recordId = record ? String(record.id ?? record.Id ?? "") : ""
   const showDiscussion = Boolean(discussionModel && organizationId && /^\d+$/.test(recordId))
   const openHref = record ? config.openHref?.(record) : undefined
+  const actions = record ? (typeof config.actions === "function" ? config.actions(record) : config.actions) : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -72,8 +73,8 @@ export function EntityRecordSheet({
                   {config.statusKey && statusRaw && (
                     <Badge variant={statusVariant}>{statusLabel}</Badge>
                   )}
-                  {config.actions && (
-                    <div className="flex flex-wrap gap-2">{config.actions}</div>
+                  {actions && (
+                    <div className={cn("flex flex-wrap gap-2", typeof config.actions === "function" && "w-full")}>{actions}</div>
                   )}
                   {openHref && (
                     <Button

@@ -8,6 +8,7 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
+  revealFormSection,
   reloadSettled,
   scalarQueryId,
   selectEntityRowById,
@@ -37,6 +38,22 @@ async function queryRows<T>(page: Page, path: string): Promise<T[]> {
   const result = await response.json() as { data?: T[] }
   expect(Array.isArray(result.data), `${path} must return data rows`).toBe(true)
   return result.data!
+}
+
+async function appendToParagraph(page: Page, paragraph: Locator, text: string) {
+  await paragraph.click()
+  // End stops at the visual line boundary when this paragraph wraps. Select
+  // its actual end through the browser, without changing the editor's content.
+  await paragraph.evaluate((element) => {
+    const selection = window.getSelection()
+    if (!selection) throw new Error("Browser selection is unavailable")
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  })
+  await page.keyboard.insertText(text)
 }
 
 async function templates(page: Page): Promise<DocumentTemplateRow[]> {
@@ -155,6 +172,7 @@ async function reloadContactDescription(page: Page, contact: ContactRow): Promis
 }
 
 async function openTemplatePicker(page: Page, modal: Locator, search: string) {
+  await revealFormSection(modal.getByTestId("form-field-description"))
   await modal.getByRole("button", { name: "Insert text template", exact: true }).click()
   await page.getByRole("searchbox", { name: "Search text templates", exact: true }).fill(search)
 }
@@ -269,9 +287,7 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       await expect(editor.locator("h2")).toHaveText(editedHeading)
       await expect(editor.locator("ul li")).toHaveCount(3)
       await expect(editor.locator("table")).toHaveCount(1)
-      await editor.locator("p").filter({ hasText: "Describe the agreed objectives" }).click()
-      await page.keyboard.press("End")
-      await page.keyboard.insertText(` ${customerNote}`)
+      await appendToParagraph(page, editor.locator("p").filter({ hasText: "Describe the agreed objectives" }), ` ${customerNote}`)
       await expect(editor).toContainText(customerNote)
       const createdContact = page.waitForResponse((response) => matchesOperationResponse(response, "create_contact"), { timeout: 30_000 })
       await submitForm(page, "new-contact")
@@ -291,9 +307,8 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       await expect(reopened.locator("ul li")).toHaveCount(3)
       await expect(reopened.locator("table")).toHaveCount(1)
       await expect(reopened).toContainText(customerNote)
-      await reopened.locator("p").filter({ hasText: customerNote }).click()
-      await page.keyboard.press("End")
-      await page.keyboard.insertText(` ${followupNote}`)
+      await appendToParagraph(page, reopened.locator("p").filter({ hasText: customerNote }), ` ${followupNote}`)
+      await expect(reopened).toContainText(`${customerNote} ${followupNote}`)
       const updatedContact = page.waitForResponse((response) => matchesOperationResponse(response, "update_contact_details"), { timeout: 30_000 })
       await Promise.all([
         submitForm(page, "edit-contact-details"),
@@ -308,6 +323,7 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       await expect(reopened.locator("table")).toHaveCount(1)
       await expect(reopened).toContainText(customerNote)
       await expect(reopened).toContainText(followupNote)
+      await expect(reopened).toContainText(`${customerNote} ${followupNote}`)
       // Applying and editing a template changes the business record, not the saved template.
       expect(templateBody(await templateById(page, edited.id))).toBe(templateBody(edited))
       expect((await templateById(page, edited.id)).metadata).toBe(edited.metadata)

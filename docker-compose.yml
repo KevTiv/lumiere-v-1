@@ -4,17 +4,24 @@ services:
       context: .
       dockerfile: infra/kong/Dockerfile
     depends_on:
-      - web
-      - api-server
+      kong-postgres:
+        condition: service_healthy
+      web:
+        condition: service_started
+      api-server:
+        condition: service_started
     environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-postgres
+      KONG_PG_DATABASE: lumiere_kong
+      KONG_PG_USER: lumiere_kong
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:?set a dedicated KONG_PG_PASSWORD}
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_PROXY_LISTEN: 0.0.0.0:8000
-      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_LISTEN: "off"
       WEB_UPSTREAM_HOST: web
       WEB_UPSTREAM_PORT: 3000
       API_SERVER_UPSTREAM_HOST: api-server
@@ -22,7 +29,22 @@ services:
       CORS_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
     ports:
       - "8000:8000"
-      - "127.0.0.1:8001:8001"
+    restart: unless-stopped
+
+  # Isolate ingress counter/configuration load and credentials from ERP storage.
+  kong-postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: lumiere_kong
+      POSTGRES_USER: lumiere_kong
+      POSTGRES_PASSWORD: ${KONG_PG_PASSWORD:?set a dedicated KONG_PG_PASSWORD}
+    volumes:
+      - kong-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U lumiere_kong -d lumiere_kong']
+      interval: 5s
+      timeout: 3s
+      retries: 20
     restart: unless-stopped
 
   web:
@@ -262,6 +284,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  kong-postgres-data:
   qdrant-data:
   owner-report-artifacts:
   document-blobs:
