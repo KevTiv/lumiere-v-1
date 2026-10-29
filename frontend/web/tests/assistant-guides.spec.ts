@@ -78,8 +78,13 @@ test('static HTML cannot run scripts, submit forms, or fetch external resources'
   expect(probeRequests).toEqual([]);
 });
 
-test('mobile guide actions and content stay within the viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+for (const width of [320, 390]) test(`mobile guide actions and content stay within the ${width}px viewport`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  const expectPageToFit = () => expect.poll(
+    () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+    { message: 'The ERP page and guide must not introduce horizontal scrolling' },
+  ).toBe(0);
+  await expectPageToFit();
   await page.getByTestId('assistant-guide-card').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -88,12 +93,15 @@ test('mobile guide actions and content stay within the viewport', async ({ page 
   const title = await page.getByTestId('assistant-guide-viewer').getByRole('heading', { name: 'Resolve a bill posting error', level: 2, exact: true }).boundingBox();
   expect(title).not.toBeNull();
   // Reading space matters as well as containment: actions must not squeeze the title.
-  expect(title!.width).toBeGreaterThanOrEqual(250);
+  expect(title!.width).toBeGreaterThanOrEqual(Math.min(250, width - 100));
   const bounds = await dialog.boundingBox();
   expect(bounds).not.toBeNull();
   expect(bounds!.x).toBeGreaterThanOrEqual(-1);
-  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(391);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(845);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: '/tmp/assistant-guides-mobile.png', fullPage: true });
+  await expectPageToFit();
+  await page.screenshot({ path: `/tmp/assistant-guides-mobile-${width}.png`, fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expectPageToFit();
 });

@@ -1,6 +1,6 @@
 # Alpha contextual assistant implementation status
 
-Updated: 2026-10-29. Initial implementation and backend/module checks used baseline `48aa5912ec007be1996e4561411b9179899ae745`. The PR branch now incorporates main through `c6e14b531466bd4c7eca0bc5b0f099dba65e0caf` and pins guide contracts `0.3.158`. Historical checks below retain their original baselines. This is implementation and release evidence, not a deployed release or completed Alpha admission.
+Updated: 2026-10-29. Initial implementation and backend/module checks used baseline `48aa5912ec007be1996e4561411b9179899ae745`. The PR branch now incorporates main through `58441915629248bbab6bed45249cfee7f0ebe02d` and pins guide contracts `0.3.158`. Historical checks below retain their original baselines. This is implementation and release evidence, not a deployed release or completed Alpha admission.
 
 Owning scope: [Alpha contextual ERP assistant and help documents](../plans/alpha-assistant-help-artifacts-plan.md), AIH-29.
 
@@ -65,6 +65,14 @@ The initial backend/module results above predate the main integration. The follo
 - Rebuilt the API test target against the pinned Rust contracts `0.3.158`: all 33 migration tests and six guide API tests passed again. Updated the codegen ledger regression to pin migration 29's released checksum and pending version 30; all 141 codegen tests passed (one existing ignored test).
 
 The guide-contract release and durable migration work are complete. Hosted application CI must validate the final pinned branch head; broader ERP admission below remains separate.
+
+## Follow-up after the Accounting and stack-release merges
+
+Merged main `58441915` in `252b3535` after PRs #308 and #311 landed. This preserves both branches' web unit-test entries and the guide contracts pin.
+
+- Hosted CI on `6f644a6f` passed Rust, module compilation, contracts drift, typecheck, and the other frontend browser suites. The guide fixture's mobile page-width assertion failed. Its mobile grid now uses a bounded single column and shrinkable children; the browser test checks zero horizontal overflow before opening, during the modal, and after closing at both 320px and 390px. Polling allows layout transitions to settle without relaxing the zero-overflow requirement.
+- The completed P0 run passed two shards; its remaining failure was the expense capture employee select. The retained trace shows an open employee listbox whose ID differs from the trigger's `aria-controls` in both attempts. The employee and price-list capture controls now provide explicit matching popup IDs. The existing full-stack expense scenario remains the hosted regression check for that repair.
+- Local checks on the integrated source pass: all seven guide browser scenarios in Chromium 154, full web TypeScript, 98 API query tests, 141 codegen tests (one existing ignored test), and all 209 script tests. Finance review inventory, ERP skill catalog, shared selects, immutable operation transport, and the type-debt baseline of 2269 occurrences also verify. The complete expense queue path still needs the hosted rerun; these local checks do not claim its result.
 
 ## Remaining admission work
 

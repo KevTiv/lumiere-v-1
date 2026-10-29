@@ -17,15 +17,15 @@ export default function Page() {
   useUnsavedChangesGuard(draft !== "")
   const saved = isSavedGuide(fixture.document)
 
-  return <main className="grid min-h-[90dvh] gap-4 p-4 md:grid-cols-[minmax(0,1fr)_22rem]">
+  return <main className="grid min-h-[90dvh] grid-cols-1 gap-4 p-4 md:grid-cols-[minmax(0,1fr)_22rem]">
     <span className="sr-only" data-testid="guide-fixture-ready">{ready ? "Ready" : "Loading"}</span>
-    <section aria-label="ERP record" className="rounded-lg border p-4">
+    <section aria-label="ERP record" className="min-w-0 rounded-lg border p-4">
       <h1 className="mb-4 text-xl">Vendor bill VB-1042</h1>
       <label className="block">ERP draft description<input className="mt-2 block w-full rounded border p-2" value={draft} onChange={(event) => setDraft(event.target.value)} /></label>
       <button className="mt-3 rounded border p-2" onClick={() => setDraft("")}>Clear ERP draft</button>
       <label className="mt-4 block"><input type="checkbox" checked={fixture.failSave} onChange={(event) => fixture.setFailSave(event.target.checked)} /> Simulate guide save failure</label>
     </section>
-    <aside aria-label="Contextual side chat" className="rounded-lg border p-4">
+    <aside aria-label="Contextual side chat" className="min-w-0 rounded-lg border p-4">
       <h2 className="font-medium">Accounting / Vendor bill VB-1042</h2>
       <p className="mt-4">Check the bill details and accounting period before posting.</p>
       <AssistantGuideCard title={fixture.document.title} module={fixture.document.module} revision={isSavedGuide(fixture.document) ? fixture.document.revision : undefined} onOpen={() => setOpen(true)} />
