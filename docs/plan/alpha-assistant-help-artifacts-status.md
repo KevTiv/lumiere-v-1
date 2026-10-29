@@ -1,6 +1,6 @@
 # Alpha contextual assistant implementation status
 
-Date: 2026-10-28. Initial implementation and backend/module checks used baseline `48aa5912ec007be1996e4561411b9179899ae745`. The PR branch incorporates main through `021aa272160dbbf6b35c46933c097fe1d3ae9630`, retaining its centralized auth, productivity, language settings, and contracts pin. This is local implementation evidence, not a deployed release or completed Alpha admission.
+Updated: 2026-10-29. Initial implementation and backend/module checks used baseline `48aa5912ec007be1996e4561411b9179899ae745`. The PR branch now incorporates main through `c6e14b531466bd4c7eca0bc5b0f099dba65e0caf` and pins guide contracts `0.3.158`. Historical checks below retain their original baselines. This is implementation and release evidence, not a deployed release or completed Alpha admission.
 
 Owning scope: [Alpha contextual ERP assistant and help documents](../plans/alpha-assistant-help-artifacts-plan.md), AIH-29.
 
@@ -51,14 +51,24 @@ This is a development-only test artifact, not a production module. Its SHA-256 i
 
 After incorporating main through `021aa272`, the focused viewer/chat suite passed all 22 tests and the Chromium fixture passed all six scenarios. Both Node helper test files passed. A frozen offline install with the pinned pnpm 10.31.0 completed; duplicate JSON, translation-key, locale/interpolation, Kinyarwanda override, and vendored `0.3.157` checks passed. Diff whitespace checks passed and change classification requires every validation lane.
 
-The initial backend/module results above predate the main integration. Hosted CI and regeneration from the integrated source remain required; a draft PR does not establish those results.
+The initial backend/module results above predate the main integration. The following checks cover the October 29 integration and contracts work.
+
+## Integrated contracts release evidence (2026-10-29)
+
+- Merged main `c6e14b53` in `e2f623eb`, preserving the stable reducer-parameter identifiers introduced by main. Fresh Rust and TypeScript SDK generation from the integrated module completed successfully. Canonical IR validates with 1486 operations, 372 resources, 523 tables, and 1417 types; storage coverage classifies all 523 tables.
+- Promoted the generated two-table delta to immutable ledger migration `0029_durable_projection_delta.sql` and registered application migration 29, `knowledge_guide_revisions`. Previously released SQL remains byte-identical. The next pending ledger version is 30; every migration in this release is promoted.
+- The application catalog checksum is `sha256:97e5d85d159c55fe3408b31d799ef71e7a80b465f82f0b231ac3ca0bd48c6100`. All 33 migration tests passed against PostgreSQL 16, including the catalog binding, full upgrades, rollback compatibility, and the new 28-to-29 regression. The new regression preserves migration history, legacy data, a guide ID above JavaScript's safe integer range, and immutable revision content across a repeated schema check.
+- The integrated development module passed the actual `run_knowledge_guide_tests` reducer in an isolated SpacetimeDB 2.8.2 instance. All six guide API tests and 15 Node helper tests passed after main integration. All 196 script regressions passed after regenerating the ERP skill catalog's optional `guide_refs` input and finance review inventory.
+- [Release contracts run 40931465831](https://github.com/KevTiv/lumiere-v-1/actions/runs/40931465831) succeeded: clean regeneration, promoted-migration admission, publication, application pinning, and post-pin drift verification all passed. Immutable tag `v0.3.158` resolves to contracts commit `2df2320544f43fce60d63ff2d8a9a2e1dd4db12e`, generated from application source `d2f9b0b34f880f862741587b55d206e7edcd5549`, with schema hash `sha256:099431903745ac1dded9be8fb6f793596f929999108d4c4c71f7a6522771ae00`.
+- Application commit `6ab77083` pins the matching Rust archive, all three frontend consumers, lockfiles, and release compatibility manifest. The release workflow now regenerates and commits the compact browser operation registry when updating the pin. Its checked output contains 949 session operations, including `save_knowledge_guide`.
+
+The guide-contract release and durable migration work are complete. Hosted application CI must validate the final pinned branch head; broader ERP admission below remains separate.
 
 ## Remaining admission work
 
-1. Review and release matching generated contracts, module, durable schema artifacts, and application revision through the existing release workflow. Main advanced the consumer pin from the initial implementation's `0.3.154` to `0.3.157`; neither release includes these new guide contracts. The initial staging IR is an unreleased candidate. Regenerate from the integrated source and include the new contracts and migration 0029 in a matching release before merge/deployment admission.
-2. Exercise authenticated save/reload/new-conversation retrieval against the integrated ERP stack, including denied access, company changes, stale edits, and restart/reconnect. UI fixtures, API wire tests, and direct gateway fixtures do not replace that evidence.
-3. All saved revisions currently remain drafts. Independent verification/promotion, source-change invalidation, and a KnowledgeArticle-revision adapter into the existing evidence graph remain separate work. Automatic discovery returns related references; explicit user document questions quote reauthorized text as unverified input. Neither path makes a saved draft independent evidence for generated business facts.
-4. Language/workflow/product-version applicability needs a trusted compatibility source and accepted filtering. Returned version metadata alone is not proof of compatibility.
-5. A dedicated contextual `Explain this error` control on admitted ERP forms remains to be wired through the existing owner. Contextual chat and existing draft/action-review paths are reused; this slice does not certify every record-entry/recovery journey.
+1. Exercise authenticated save/reload/new-conversation retrieval against the integrated ERP stack, including denied access, company changes, stale edits, and restart/reconnect. UI fixtures, API wire tests, and direct gateway fixtures do not replace that evidence.
+2. All saved revisions currently remain drafts. Independent verification/promotion, source-change invalidation, and a KnowledgeArticle-revision adapter into the existing evidence graph remain separate work. Automatic discovery returns related references; explicit user document questions quote reauthorized text as unverified input. Neither path makes a saved draft independent evidence for generated business facts.
+3. Language/workflow/product-version applicability needs a trusted compatibility source and accepted filtering. Returned version metadata alone is not proof of compatibility.
+4. A dedicated contextual `Explain this error` control on admitted ERP forms remains to be wired through the existing owner. Contextual chat and existing draft/action-review paths are reused; this slice does not certify every record-entry/recovery journey.
 
 No provider completion, production provisioning, feature merge into main, or deployment is recorded here.
