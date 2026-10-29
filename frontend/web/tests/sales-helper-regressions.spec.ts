@@ -18,10 +18,11 @@ test('confirmed discard opens a fresh form when the same dialog is reopened', as
   const openMessage = page.getByRole('button', { name: 'Message', exact: true });
   await openMessage.click();
   await page.getByTestId('form-field-body').fill('Discarded message');
+  await expect(page.locator('textarea[name="body"]')).toHaveValue('Discarded message');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByTestId('discard-changes-confirm').click();
   await openMessage.click();
-  await expect(page.getByTestId('form-field-body')).toHaveValue('');
+  await expect(page.locator('textarea[name="body"]')).toHaveValue('');
   await expect(page.getByTestId('saved-fixture')).toHaveText('');
 });
 
