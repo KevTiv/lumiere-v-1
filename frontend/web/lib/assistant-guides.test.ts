@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
   guideId, guideRevision, guideReturnHref, guidePageHref,
-  parseStoredGuideReferences, guideReferencesMetadata,
+  parseStoredGuideReferences, guideReferencesMetadata, withGuideReferencesMetadata,
   readAssistantGuide, saveAssistantGuide, GuideRequestError, guideDraftQuestion,
   boundedGuideSearch, guideSaveRequestKey,
   guideQuestionContext,
@@ -125,6 +125,32 @@ test("stored guide metadata contains only versioned canonical pointers", () => {
   assert.equal(parseStoredGuideReferences('{"guideReferences":[{"guideId":"1","revision":1}]}'), undefined)
   assert.equal(parseStoredGuideReferences('{"guideSchemaVersion":1,"guideReferences":[{"guideId":"0","revision":1}]}'), undefined)
   assert.equal(parseStoredGuideReferences("bad JSON"), undefined)
+})
+
+test("guide reference metadata preserves other fields and rejects non-object envelopes", () => {
+  const references = [{ guideId: "9007199254740993", revision: 3, title: "Untrusted label" }]
+  const metadata = withGuideReferencesMetadata('{"runId":"run-1","other":{"keep":true}}', references)
+  assert.deepEqual(JSON.parse(metadata!), {
+    runId: "run-1", other: { keep: true }, guideSchemaVersion: 1,
+    guideReferences: [{ guideId: "9007199254740993", revision: 3 }],
+  })
+  assert.deepEqual(parseStoredGuideReferences(metadata), [{ guideId: "9007199254740993", revision: 3 }])
+  for (const raw of ["null", "[]", "42", '"text"']) {
+    assert.throws(() => withGuideReferencesMetadata(raw, references), /Invalid guide metadata/)
+  }
+  assert.equal(withGuideReferencesMetadata("unchanged", undefined), "unchanged")
+})
+
+test("guide reads reject malformed response envelopes and keep HTTP error status", async () => {
+  const prior = globalThis.fetch
+  try {
+    for (const value of [null, [], "text", 42, { schemaVersion: "1" }]) {
+      globalThis.fetch = async () => Response.json(value)
+      await assert.rejects(readAssistantGuide({ guideId: "42" }, "7"), /Unsupported guide response/)
+    }
+    globalThis.fetch = async () => Response.json(null, { status: 403 })
+    await assert.rejects(readAssistantGuide({ guideId: "42" }, "7"), (error: unknown) => error instanceof GuideRequestError && error.status === 403)
+  } finally { globalThis.fetch = prior }
 })
 
 test("guide return paths cannot redirect to an external or API destination", () => {

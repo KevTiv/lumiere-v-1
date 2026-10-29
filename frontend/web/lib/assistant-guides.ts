@@ -114,8 +114,8 @@ export function parseStoredGuideReferences(raw: unknown): GuideReference[] | und
     const references: GuideReference[] = []
     for (const item of metadata.guideReferences.slice(0, 10)) {
       if (item && typeof item === "object" && !Array.isArray(item)) {
-        const id = guideId((item as Record<string, unknown>).guideId)
-        const revision = guideRevision((item as Record<string, unknown>).revision)
+        const id = guideId("guideId" in item ? item.guideId : undefined)
+        const revision = guideRevision("revision" in item ? item.revision : undefined)
         // Labels/body from old message metadata are never treated as currently authorized data.
         if (id && revision) references.push({ guideId: id, revision })
       }
@@ -133,7 +133,8 @@ export function guideReferencesMetadata(reference: GuideReference): string {
 
 export function withGuideReferencesMetadata(raw: string | null | undefined, references: GuideReference[] | undefined): string | null {
   if (!references?.length) return raw ?? null
-  const metadata = raw ? JSON.parse(raw) as Record<string, unknown> : {}
+  const metadata: unknown = raw ? JSON.parse(raw) : {}
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) throw new Error("Invalid guide metadata")
   return JSON.stringify({ ...metadata, guideSchemaVersion: 1, guideReferences: references.slice(0, 10).map((reference) => ({ guideId: reference.guideId, revision: reference.revision })) })
 }
 
@@ -192,9 +193,17 @@ function documentFromResponse(value: unknown): GuideDocument {
   return guide
 }
 
-async function guideJson(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
+type GuideResponse = {
+  schemaVersion?: unknown
+  error?: unknown
+  guide?: unknown
+  guides?: unknown
+}
+
+async function guideJson(url: string, init?: RequestInit): Promise<GuideResponse> {
   const response = await fetch(url, { ...init, cache: "no-store", credentials: "same-origin" })
-  const body = await response.json().catch(() => null) as Record<string, unknown> | null
+  const parsed: unknown = await response.json().catch(() => null)
+  const body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as GuideResponse : null
   if (!response.ok) {
     throw new GuideRequestError(typeof body?.error === "string" ? body.error : "The guide could not be loaded. Try again.", response.status)
   }
