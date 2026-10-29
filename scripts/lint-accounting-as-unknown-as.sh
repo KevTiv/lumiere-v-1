@@ -18,7 +18,8 @@ fi
 source_files() {
   printf '%s\0' "$TARGET_ROOT/accounting-client.tsx"
   if [ -d "$TARGET_ROOT/features" ]; then
-    rg --files --null "$TARGET_ROOT/features" -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx'
+    find "$TARGET_ROOT/features" -type f \( -name '*.ts' -o -name '*.tsx' \) \
+      ! -name '*.test.ts' ! -name '*.test.tsx' -print0
   fi
 }
 
@@ -36,7 +37,7 @@ while IFS= read -r -d '' TARGET; do
       sed -n "${start},${line}p" "$TARGET" | sed 's/^/  /'
       violations=1
     fi
-  done < <(rg -nF "as unknown as" "$TARGET" || true)
+  done < <(grep -nF "as unknown as" "$TARGET" || true)
 done < <(source_files)
 
 if [ "$violations" -ne 0 ]; then

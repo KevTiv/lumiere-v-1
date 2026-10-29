@@ -1,5 +1,7 @@
 """Keep Accounting feature extraction inside the existing assertion review gate."""
 
+import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -10,7 +12,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "lint-accounting-as-unknown-as.sh
 
 
 class AccountingCastGuardTests(unittest.TestCase):
-    def run_guard(self, sources):
+    def run_guard(self, sources, *, without_ripgrep=False):
         with tempfile.TemporaryDirectory(prefix="accounting cast guard ") as directory:
             root = Path(directory)
             (root / "accounting-client.tsx").write_text("export {}\n")
@@ -18,9 +20,26 @@ class AccountingCastGuardTests(unittest.TestCase):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(source)
+            env = os.environ.copy()
+            if without_ripgrep:
+                tools = root / "bin"
+                tools.mkdir()
+                for name in ("bash", "dirname", "find", "grep", "sed"):
+                    tool = shutil.which(name)
+                    self.assertIsNotNone(tool, name)
+                    (tools / name).symlink_to(tool)
+                env["PATH"] = str(tools)
             return subprocess.run(
-                ["bash", str(SCRIPT), str(root)], capture_output=True, text=True
+                ["bash", str(SCRIPT), str(root)], capture_output=True, text=True, env=env
             )
+
+    def test_unreviewed_feature_cast_is_rejected_without_ripgrep(self):
+        result = self.run_guard(
+            {"features/tax/deadline.ts": "const row = input as unknown as Deadline\n"},
+            without_ripgrep=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("features/tax/deadline.ts:1", result.stdout)
 
     def test_unreviewed_cast_cannot_escape_into_nested_feature(self):
         result = self.run_guard(

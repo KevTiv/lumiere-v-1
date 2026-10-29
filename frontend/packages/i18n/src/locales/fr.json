@@ -1,0 +1,4876 @@
+{
+  "recordChanges": {
+    "fields": {
+      "name": "Description",
+      "debit": "Débit",
+      "credit": "Crédit",
+      "balance": "Solde"
+    }
+  },
+  "moduleInsights": {
+    "overview": "Vue d’ensemble",
+    "previous": "Période précédente",
+    "month": "Mois",
+    "state": "État",
+    "states": {
+      "draft": "Brouillon",
+      "sent": "Envoyé",
+      "sale": "Confirmé",
+      "done": "Terminé",
+      "cancelled": "Annulé",
+      "open": "Ouvert",
+      "purchase": "Confirmé",
+      "submitted": "Envoyé",
+      "approved": "Approuvé",
+      "posted": "Comptabilisé",
+      "refused": "Refusé",
+      "generated": "Généré",
+      "exported": "Exporté",
+      "archived": "Archivé"
+    },
+    "workspaces": {
+      "ops": "Opérations",
+      "operations": "Opérations",
+      "deliveries": "Livraisons",
+      "commission-plans": "Plans de commission",
+      "leads": "Prospects",
+      "activities": "Activités",
+      "contacts": "Contacts",
+      "requisitions": "Accords d’achat",
+      "vendors": "Fournisseurs",
+      "lines": "Lignes de commande",
+      "trial-balance": "Balance générale",
+      "scheduled-reports": "Rapports planifiés"
+    }
+  },
+  "workspaceShell": {
+    "preferences": "Préférences de l’espace de travail",
+    "preferencesDescription": "Adaptez cet espace de travail à vos besoins.",
+    "appearance": "Apparence",
+    "contentWidth": "Largeur du contenu",
+    "centered": "Centré",
+    "fullWidth": "Pleine largeur",
+    "navigation": "Navigation",
+    "expanded": "Développé",
+    "compact": "Compact",
+    "comfortable": "Aéré",
+    "density": "Densité du tableau",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système",
+    "toggleNavigation": "Afficher ou masquer la navigation",
+    "closeNavigation": "Fermer la navigation",
+    "expandNavigation": "Développer la navigation",
+    "collapseNavigation": "Réduire la navigation",
+    "search": "Rechercher des modules et des enregistrements"
+  },
+  "common": {
+    "select": {
+      "search": "Rechercher des options…",
+      "options": "Options",
+      "noMatches": "Aucune option correspondante"
+    },
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "confirmAction": "Confirmer l’action",
+    "loading": "Chargement…",
+    "search": "Rechercher",
+    "export": "Exporter",
+    "refresh": "Actualiser",
+    "settings": "Paramètres",
+    "back": "Retour",
+    "next": "Suivant",
+    "actionCompleted": "{{action}} terminé",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "none": "Aucun",
+    "close": "Fermer",
+    "submit": "Envoyer",
+    "create": "Créer",
+    "notes": "Notes",
+    "metadata": "Métadonnées",
+    "saving": "Enregistrement…",
+    "reset": "Réinitialiser",
+    "yes": "Oui",
+    "no": "Non",
+    "error": {
+      "title": "Erreur",
+      "generic": "Une erreur s’est produite. Réessayez."
+    },
+    "success": "Réussite",
+    "warning": "Avertissement",
+    "noData": "Aucune donnée disponible",
+    "noOrganization": {
+      "title": "Aucune organisation sélectionnée",
+      "description": "Vous devez appartenir à une organisation pour accéder à cet espace. Terminez la configuration ou demandez une invitation à un administrateur.",
+      "goToOnboarding": "Accéder à la configuration initiale"
+    },
+    "lookup": {
+      "noJournals": "Aucun journal disponible. Créez d’abord des journaux dans les paramètres comptables.",
+      "noPartners": "Aucun client. Ajoutez d’abord des contacts dans le CRM.",
+      "noPricelists": "Aucune liste de prix. Créez-en une d’abord.",
+      "noVendors": "Aucun fournisseur. Marquez des contacts comme fournisseurs dans le CRM ou ajoutez leurs informations.",
+      "noProducts": "Aucun produit au catalogue. Créez-en un d’abord.",
+      "noUoms": "Aucune unité de mesure. Configurez d’abord celles de votre organisation.",
+      "noSaleOrders": "Aucune commande client. Créez d’abord une commande confirmée.",
+      "noSubscriptionPlans": "Aucune offre d’abonnement. Créez-en une d’abord.",
+      "noAccounts": "Aucun compte général. Configurez d’abord le plan comptable.",
+      "noAnalyticAccounts": "Aucun compte analytique. Créez-en un d’abord.",
+      "noEmployees": "Aucun employé. Ajoutez-en d’abord dans les ressources humaines.",
+      "noProjects": "Aucun projet. Créez-en un d’abord.",
+      "noTasks": "Aucune tâche. Créez-en une d’abord.",
+      "noWarehouses": "Aucun entrepôt disponible. Créez-en un d’abord dans les stocks.",
+      "noStockMoves": "Aucun type d’opération ni emplacement trouvé. Créez d’abord des mouvements ou des quantités de stock.",
+      "noCategories": "Aucune catégorie de produits. Créez-en d’abord dans les paramètres des stocks.",
+      "noTeams": "Aucune équipe d’assistance. Configurez-en une d’abord.",
+      "noStages": "Aucune étape définie. Configurez d’abord les étapes d’assistance.",
+      "noBoms": "Aucune nomenclature. Créez-en une d’abord.",
+      "noTaskStages": "Aucune étape de tâche. Créez une tâche avec une étape ou laissez ce champ vide.",
+      "noLeaveTypes": "Aucun type de congé configuré. Créez-en d’abord.",
+      "noDepartments": "Aucun service. Créez-en un d’abord.",
+      "noPayrollStructures": "Aucune structure salariale. Créez-en une d’abord."
+    },
+    "validation": {
+      "required": "Ce champ est obligatoire",
+      "minLength": "Au moins {{min}} caractères requis",
+      "maxLength": "Au plus {{max}} caractères autorisés",
+      "min": "La valeur minimale est {{min}}",
+      "max": "La valeur maximale est {{max}}",
+      "invalidFormat": "Format non valide",
+      "invalidEmail": "Adresse e-mail non valide",
+      "invalidUrl": "Adresse web non valide",
+      "invalidNumber": "Saisissez un nombre"
+    },
+    "form": {
+      "unavailableSelection": "Sélection indisponible : {{value}}",
+      "multiSelect": {
+        "placeholder": "Ajouter…",
+        "search": "Rechercher…",
+        "empty": "Aucun résultat",
+        "remove": "Retirer {{value}}"
+      }
+    },
+    "formPreview": {
+      "label": "Aperçu"
+    },
+    "formSubmit": {
+      "busy": "Patientez, une autre demande est en cours.",
+      "validationFailed": "Corrigez les champs signalés, puis réessayez.",
+      "noHandler": "L’enregistrement de ce formulaire n’est pas disponible. Contactez l’assistance.",
+      "failed": "Échec de l’envoi",
+      "saved": "Enregistrement réussi."
+    },
+    "paramsMapper": {
+      "periodNotFound": "Aucune période comptable ne correspond à ce nom.",
+      "invalidConsolidationAccount": "Impossible de préparer les paramètres du compte de consolidation. Vérifiez les champs obligatoires.",
+      "invalidConsolidationJournal": "Impossible de préparer les paramètres du journal de consolidation. Vérifiez les champs obligatoires.",
+      "invalidEliminationEntry": "Impossible de préparer les paramètres de l’écriture d’élimination. Vérifiez les champs obligatoires.",
+      "invalidTrialBalanceEntry": "Impossible de préparer les paramètres de la ligne de balance générale. Vérifiez les champs obligatoires.",
+      "invalidCompany": "Impossible de préparer les paramètres de la société. Vérifiez les champs obligatoires.",
+      "invalidWhatsappAccount": "Impossible de préparer les paramètres du compte WhatsApp. Vérifiez les champs obligatoires.",
+      "invalidSkill": "Impossible de préparer les paramètres de la compétence. Vérifiez les champs obligatoires.",
+      "invalidAgent": "Impossible de préparer les paramètres de l’agent. Vérifiez les champs obligatoires.",
+      "invalidTeamMember": "Impossible de préparer les paramètres du membre d’équipe. Vérifiez les champs obligatoires.",
+      "invalidInsight": "Impossible de préparer les paramètres de l’analyse. Vérifiez les champs obligatoires.",
+      "invalidProductivityLog": "Impossible de préparer les paramètres du suivi de productivité. Vérifiez les champs obligatoires.",
+      "invalidCustomField": "Impossible de préparer les paramètres du champ personnalisé. Vérifiez les champs obligatoires.",
+      "invalidAiActionDraft": "Impossible de préparer les paramètres du brouillon d’action IA.",
+      "invalidAiChatSession": "Impossible de préparer les paramètres de la conversation IA.",
+      "invalidIotAction": "Impossible de préparer les paramètres de l’action IoT."
+    },
+    "csvImport": {
+      "description": "Choisissez un fichier CSV UTF-8 dont les en-têtes correspondent au modèle attendu par SpacetimeDB.",
+      "submit": "Importer",
+      "fileLabel": "Fichier CSV"
+    },
+    "importAssistant": {
+      "description": "Téléversez un CSV, vérifiez les associations de colonnes proposées par l’IA, prévisualisez les lignes transformées, puis importez-les dans l’ERP.",
+      "stepUpload": "Téléverser",
+      "stepMap": "Associer les colonnes",
+      "stepPreview": "Aperçu",
+      "uploadHint": "Choisissez un fichier CSV UTF-8 pour commencer.",
+      "structureSummary": "{{columns}} colonnes · {{rows}} lignes de données détectées",
+      "safetyPassed": "Le CSV a passé les contrôles de sécurité du navigateur",
+      "analyze": "Analyser les colonnes",
+      "analyzing": "Analyse…",
+      "preview": "Aperçu de l’importation",
+      "previewing": "Préparation de l’aperçu…",
+      "confirmImport": "Confirmer l’importation",
+      "sourceColumn": "Colonne source",
+      "targetField": "Champ ERP",
+      "confidence": "Fiabilité",
+      "skipColumn": "Ignorer la colonne",
+      "unmappedTargets": "Champs ERP obligatoires non associés : {{fields}}",
+      "validationErrors": "{{count}} erreur(s) de validation dans l’aperçu",
+      "previewClean": "L’aperçu est valide pour {{count}} ligne(s)",
+      "row": "Ligne",
+      "field": "Champ",
+      "message": "Message",
+      "targetEntity": "Entité cible",
+      "stepDone": "Statut de l’importation",
+      "jobPending": "En attente du statut de l’importation…",
+      "jobNotFound": "Importation lancée. Son statut apparaîtra ici quand SpacetimeDB aura terminé le traitement.",
+      "jobStatusTitle": "Tâche d’importation",
+      "jobTotal": "Nombre total de lignes",
+      "jobImported": "Importé",
+      "jobErrors": "Erreurs",
+      "downloadErrors": "Télécharger le rapport d’erreurs (CSV)",
+      "savedTemplateLabel": "Modèle d’association enregistré",
+      "savedTemplatePlaceholder": "Choisir un modèle enregistré (facultatif)",
+      "noSavedTemplate": "Aucun modèle enregistré",
+      "templateUses": "utilisations",
+      "deleteTemplate": "Supprimer le modèle",
+      "saveTemplateLabel": "Enregistrer cette association pour de futures importations",
+      "saveTemplatePlaceholder": "Nom du modèle",
+      "saveTemplate": "Enregistrer le modèle",
+      "savingTemplate": "Enregistrement…",
+      "templateSaved": "Modèle d’association enregistré",
+      "templateDeleted": "Modèle d’association supprimé",
+      "bundleModeHint": "Ce CSV semble contenir des commandes avec leurs lignes. Associez d’abord les champs d’en-tête, puis les lignes.",
+      "lineMappingTitle": "Colonnes des lignes de commande",
+      "linePreviewTitle": "Aperçu des lignes",
+      "bundleActive": "en-tête et lignes",
+      "bundleLinkRequired": "Associez une colonne de référence de commande (client_order_ref) avant d’importer les commandes groupées.",
+      "retryFailedRows": "Réessayer {{count}} ligne(s) en échec",
+      "retrySessionHint": "Nouvel essai de {{count}} ligne(s) en échec lors de l’importation précédente.",
+      "jobHistoryTitle": "Importations récentes",
+      "rollbackImport": "Annuler l’importation",
+      "rollbackComplete": "Cette importation a été annulée.",
+      "rollbackFailed": "Échec de l’annulation",
+      "abandonedDraftsTitle": "Brouillons d’écritures importées abandonnés",
+      "parentPhaseOnly": "En-tête uniquement",
+      "cleanupEmptyDrafts": "Supprimer les brouillons vides",
+      "cleanupRefused": "Nettoyage refusé : {{message}}",
+      "cleanupConfirmTitle": "Supprimer les brouillons importés vides ?",
+      "cleanupConfirmAction": "Supprimer les brouillons",
+      "abandonedDraftsDescription": "Ces importations ont créé des en-têtes d’écritures sans terminer leurs lignes. Le nettoyage supprime uniquement les brouillons vides et inchangés. Le serveur refuse les écritures ayant des lignes ou une activité comptable.",
+      "cleanupConfirmDescription": "L’importation n° {{jobId}} sera vérifiée de nouveau avant le nettoyage. Seuls ses brouillons d’origine vides peuvent être supprimés. Toute écriture modifiée, comptabilisée, sécurisée, payée ou non vide arrête le nettoyage complet."
+    },
+    "audit": "Audit",
+    "overview": "Vue d’ensemble",
+    "remove": "Retirer",
+    "entityView": {
+      "mixedCurrencies": "Ce groupe utilise plusieurs devises. Aucun total unique n’est affiché.",
+      "inlineEdit": {
+        "edit": "Modifier {{label}}",
+        "saved": "{{label}} mis à jour",
+        "undo": "Annuler la modification",
+        "undone": "Modification de {{label}} annulée",
+        "notSaved": "{{label}} n’a pas été enregistré",
+        "saveHint": "Appuyez sur {{shortcut}} pour enregistrer, Échap pour annuler"
+      },
+      "board": "Tableau",
+      "emptyColumn": "Aucun enregistrement",
+      "table": "Tableau de données",
+      "toggleLabel": "Changer de vue",
+      "boardSearch": "Rechercher des cartes",
+      "list": "Liste",
+      "otherColumn": "Autre",
+      "pivot": "Résumé",
+      "pivotChartTitle": "{{measure}} par groupe",
+      "pivotColumnsBy": "Colonnes",
+      "pivotCount": "Nombre",
+      "pivotEmpty": "Non défini",
+      "pivotGroupBy": "Regrouper par",
+      "pivotMixedCurrencies": "Ces enregistrements utilisent plusieurs devises ({{currencies}}). Les totaux additionnent les montants sans conversion.",
+      "pivotNoData": "Aucun enregistrement à résumer",
+      "pivotNone": "Aucun",
+      "pivotTotal": "Total",
+      "pivotExportCsv": "Exporter en CSV",
+      "export": "Exporter",
+      "exportTruncated": "Export limité aux {{max}} premières lignes",
+      "exportDone": "{{count}} lignes exportées",
+      "exportDone_one": "{{count}} ligne exportée",
+      "exportDone_other": "{{count}} lignes exportées",
+      "firstTime": {
+        "readOnly": "Votre accès est en lecture seule. Demandez à un administrateur d’ajouter le premier enregistrement.",
+        "title": "Aucun enregistrement pour le moment"
+      },
+      "noResults": {
+        "clear": "Effacer les filtres",
+        "description": "Essayez une autre recherche ou effacez les filtres.",
+        "title": "Aucun enregistrement correspondant"
+      }
+    },
+    "retry": "Réessayer",
+    "recordsDenied": "Vous n’avez pas accès à ces enregistrements.",
+    "recordsPartial": "Certains enregistrements n’ont pas pu être actualisés. Les données affichées peuvent être anciennes.",
+    "recordsUnavailable": "Impossible de charger les enregistrements.",
+    "discardChanges": {
+      "navigate": "Certaines modifications ne sont pas enregistrées. Elles seront perdues si vous quittez cette page.",
+      "description": "Certaines modifications ne sont pas enregistrées. Elles seront perdues si vous fermez ce formulaire.",
+      "discard": "Abandonner",
+      "keep": "Continuer la modification",
+      "title": "Abandonner les modifications ?"
+    },
+    "formDraft": {
+      "restored": "Modifications non enregistrées de {{time}} restaurées",
+      "discard": "Abandonner le brouillon"
+    },
+    "loadFailed": "Impossible de charger cette liste",
+    "loadFailedHint": "Réessayez dans un instant.",
+    "csvImportDialog": {
+      "checkResult": "Vérifier les résultats",
+      "correctedFileNotice": "Envoyez le fichier corrigé comme un nouvel envoi. Réessayer cette référence conserve son résultat initial.",
+      "downloadTemplate": "Télécharger le modèle",
+      "errorsRestricted": "Vos autorisations ne donnent pas accès à tous les détails d’erreurs des lignes.",
+      "exactResult": "Résultats de cet envoi de fichier",
+      "failure": "Échec de l’importation",
+      "fileLabel": "Fichier CSV",
+      "spreadsheetFileLabel": "Fichier CSV ou Excel",
+      "historyEmpty": "Aucune importation correspondante n’est encore visible. L’historique s’actualise tant que cette fenêtre est ouverte.",
+      "importAnotherFile": "Importer un autre fichier",
+      "loadingErrors": "Chargement des erreurs de lignes…",
+      "missingColumns": "Colonnes obligatoires manquantes : {{columns}}",
+      "noRows": "Le fichier contient un en-tête mais aucune ligne de données.",
+      "outcomeUnknown": "Résultat de l’importation non vérifié",
+      "outcomeUnknownDescription": "Le serveur a accepté {{file}}, mais n’a renvoyé aucune tâche d’importation précise. Vérifiez l’historique avant de réessayer.",
+      "refreshHistory": "Actualiser l’historique",
+      "requestReference": "Référence de l’envoi : {{requestId}}",
+      "retrySameSubmission": "Réessayer le même envoi",
+      "rowCount": "{{count}} lignes trouvées",
+      "rowError": "Ligne {{row}} : {{message}}",
+      "scopeChanged": "L’organisation ou la société active a changé. Revenez au contexte initial pour vérifier cet envoi.",
+      "selectJob": "Tâche d’importation",
+      "selectJobPrompt": "Choisir une importation à vérifier",
+      "submit": "Importer",
+      "success": "Importation envoyée",
+      "successDescription": "{{count}} lignes de {{file}} ont été envoyées. Les lignes refusées par le serveur figurent dans l’historique d’importation.",
+      "unknownColumns": "Ces colonnes ne sont pas utilisées et seront ignorées : {{columns}}",
+      "viewJob": "Voir l’importation",
+      "historyFailed": "Impossible de charger l’historique ou les erreurs de lignes. Actualisez pour réessayer. Le fichier a peut-être déjà été importé. Ne le renvoyez pas pour vérifier.",
+      "historyLimit": "L’historique affiche jusqu’à 100 importations et 500 erreurs de lignes récentes de l’organisation. Certaines erreurs peuvent ne plus être disponibles ici.",
+      "historyNotice": "Le fichier a été envoyé. L’historique récent de l’organisation peut contenir des importations d’autres utilisateurs. Choisissez une importation pour vérifier ses résultats. Elle n’est pas liée automatiquement à ce fichier.",
+      "manualResultNotice": "Cette importation utilise une sélection manuelle de l’historique. Ses résultats ne peuvent pas encore être liés automatiquement à ce fichier.",
+      "recoveryNotice": "Le serveur a peut-être déjà importé ce fichier. Réessayer conserve la même référence et ne peut pas créer une deuxième importation. Ne commencez pas un nouvel envoi tant que ce résultat est inconnu."
+    },
+    "moduleNavigation": {
+      "overview": "Vue d’ensemble",
+      "area": "Espace de travail"
+    }
+  },
+  "navigation": {
+    "overview": "Vue d’ensemble",
+    "sales": "Ventes",
+    "inventory": "Stocks",
+    "customers": "Clients",
+    "analytics": "Analyses",
+    "settings": "Paramètres"
+  },
+  "nav": {
+    "overview": "Vue d’ensemble",
+    "tasks": "Mon travail",
+    "forensics": "Investigation",
+    "trackers": "Suivis",
+    "accounting": "Comptabilité",
+    "sales": "Ventes",
+    "crm": "CRM",
+    "purchasing": "Achats",
+    "reports": "Rapports",
+    "subscriptions": "Abonnements",
+    "expenses": "Dépenses",
+    "inventory": "Stocks",
+    "distributor": "Distributeur",
+    "pos": "Point de vente",
+    "manufacturing": "Fabrication",
+    "map": "Carte",
+    "fleet": "Parc automobile",
+    "helpdesk": "Assistance",
+    "workflows": "Circuits de traitement",
+    "documents": "Documents",
+    "proposals": "Propositions",
+    "calendar": "Calendrier",
+    "messages": "Messages",
+    "hr": "Ressources humaines",
+    "projects": "Projets",
+    "iot": "IoT",
+    "settings": "Paramètres",
+    "journal": "Journal",
+    "notebook": "Carnet",
+    "aiAssistant": "Assistant IA",
+    "noRole": "Aucun rôle",
+    "signOut": "Se déconnecter",
+    "signedIn": "Connecté",
+    "erpSystem": "Lumiere ERP",
+    "companySwitcher": {
+      "switchCompany": "Changer de société",
+      "current": "Actif",
+      "selectCompany": "Choisir une société",
+      "singleCompany": "Société",
+      "loading": "Chargement des sociétés…"
+    },
+    "groups": {
+      "analytics": "Analyses",
+      "finance": "Finance",
+      "operations": "Opérations",
+      "productivity": "Productivité",
+      "people": "Personnel",
+      "system": "Système"
+    }
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "erpSystem": "Lumiere ERP",
+    "sales": {
+      "table": {
+        "product": "Produit",
+        "sales": "Ventes",
+        "revenue": "Chiffre d’affaires"
+      }
+    }
+  },
+  "accounting": {
+    "applyPayment": {
+      "title": "Imputer un paiement existant"
+    },
+    "workflowGuide": {
+      "amountDue": "Montant dû",
+      "applyPayment": "Imputer un paiement existant",
+      "vendor": "Fournisseur",
+      "customer": "Client"
+    },
+    "insights": {
+      "title": "Vue financière",
+      "daysValue": "{{count}} jours",
+      "previous": "Période précédente",
+      "invoices": "Factures",
+      "planned": "Planifié",
+      "actual": "Réel",
+      "daysOverdue": "Jours de retard",
+      "month": "Mois",
+      "retry": "Réessayer"
+    },
+    "overview": {
+      "deadlines": "Échéances fiscales",
+      "loading": "Chargement…",
+      "retry": "Réessayer",
+      "receivables": "Créances clients",
+      "payables": "Dettes fournisseurs",
+      "title": "Comptabilité",
+      "currency": "Devise",
+      "activityInvoices": "Factures clients",
+      "activityBills": "Factures fournisseurs",
+      "activityMonth": "Mois",
+      "newJournalEntry": "Écriture comptable",
+      "newBill": "Nouvelle facture fournisseur",
+      "newInvoice": "Nouvelle facture",
+      "attention": "À traiter",
+      "due": "Échéance",
+      "unpaid": "Impayé"
+    },
+    "manualInvoice": {
+      "invoiceTitle": "Facture",
+      "billTitle": "Facture fournisseur"
+    },
+    "workspaces": {
+      "overview": "Vue d’ensemble",
+      "receivables": "Créances clients",
+      "payables": "Dettes fournisseurs",
+      "taxSetup": "Taxes"
+    },
+    "title": "Comptabilité",
+    "dashboard": {
+      "accountsReceivable": "Créances clients",
+      "accountsPayable": "Dettes fournisseurs",
+      "revenue": "Chiffre d’affaires"
+    },
+    "accounts": {
+      "title": "Plan comptable",
+      "code": "Code",
+      "name": "Nom",
+      "type": "Type",
+      "balance": "Solde",
+      "active": "Actif",
+      "status": "Statut",
+      "actions": "Actions",
+      "all": "Tous",
+      "badges": {
+        "bank": "Banque",
+        "deprecated": "Obsolète",
+        "active": "Actif"
+      },
+      "coasTab": "Comptes",
+      "rowActions": {
+        "edit": "Modifier le compte"
+      },
+      "edit": {
+        "deprecated": "Obsolète",
+        "note": "Note",
+        "reconcile": "Autoriser le rapprochement",
+        "unchanged": "Aucune modification."
+      }
+    },
+    "glDrilldown": {
+      "title": "{{code}} — {{name}}",
+      "moveDetail": "Écriture comptable",
+      "columns": {
+        "date": "Date",
+        "move": "Écriture",
+        "partner": "Partenaire",
+        "debit": "Débit",
+        "credit": "Crédit"
+      }
+    },
+    "periodClose": {
+      "title": "Liste de clôture mensuelle",
+      "status": {
+        "done": "Terminé",
+        "pending": "En attente"
+      },
+      "steps": {
+        "fiscalCalendar": {
+          "title": "Calendrier comptable configuré"
+        },
+        "bankRecon": {
+          "title": "Rapprochement bancaire vérifié"
+        },
+        "draftMoves": {
+          "title": "Brouillons d’écritures traités"
+        },
+        "trialBalance": {
+          "title": "Balance générale générée"
+        },
+        "vatReport": {
+          "title": "Rapport de TVA généré"
+        },
+        "closePeriod": {
+          "title": "Clôturer la période comptable"
+        }
+      },
+      "review": {
+        "company": "Société",
+        "title": "Vérifier cette période",
+        "date": "Date (UTC)"
+      }
+    },
+    "chartStructure": {
+      "colName": "Nom",
+      "colDeprecated": "Obsolète",
+      "colLevel": "Niveau",
+      "colParent": "Parent"
+    },
+    "journalEntries": {
+      "title": "Écritures comptables",
+      "ref": "Référence",
+      "date": "Date",
+      "journal": "Journal",
+      "state": "Statut",
+      "total": "Total",
+      "type": "Type",
+      "partner": "Partenaire",
+      "untaxed": "Hors taxes",
+      "residual": "Restant dû",
+      "payment": "Paiement",
+      "postEntry": "Comptabiliser",
+      "cancelEntry": "Annuler",
+      "recalculateInvoiceTotals": "Recalculer les totaux",
+      "states": {
+        "cancelled": "Annulé",
+        "draft": "Brouillon",
+        "posted": "Comptabilisé"
+      },
+      "types": {
+        "entry": "Écriture comptable",
+        "inInvoice": "Facture fournisseur",
+        "outRefund": "Avoir"
+      }
+    },
+    "invoices": {
+      "title": "Factures",
+      "creditNote": "Avoir",
+      "total": "Total",
+      "amountDue": "Montant dû",
+      "documentPreview": "Aperçu du document",
+      "vendor": "Fournisseur",
+      "ar": "Factures clients",
+      "ap": "Factures fournisseurs",
+      "dueDate": "Date d’échéance",
+      "paymentState": "Paiement",
+      "partner": "Partenaire",
+      "amount": "Montant",
+      "customer": "Client",
+      "dates": "Dates",
+      "totalAmount": "Montant total",
+      "daysRemaining": "{{count}} jours",
+      "invoiceActions": {
+        "downloadPDF": "Télécharger le PDF",
+        "send": "Envoyer",
+        "download": "Télécharger",
+        "recordPayment": "Enregistrer un paiement",
+        "postDraft": "Comptabiliser",
+        "recalculateTotals": "Recalculer les totaux",
+        "createCreditNote": "Créer un avoir",
+        "recalculate": "Recalculer les totaux",
+        "registerPayment": "Enregistrer un paiement"
+      },
+      "recordSheet": {
+        "actionsTab": "Actions"
+      },
+      "attachments": "Pièces jointes",
+      "preview": "Aperçu",
+      "discussion": "Discussion",
+      "draftName": "Brouillon",
+      "moreActions": "Plus",
+      "purchaseOrder": "Commande fournisseur",
+      "saleOrder": "Commande client",
+      "payment": "Paiement",
+      "paymentStates": {
+        "paid": "Payé",
+        "partial": "Partiel",
+        "unpaid": "Impayé"
+      }
+    },
+    "bills": {
+      "title": "Factures fournisseurs (dettes)",
+      "vendor": "Fournisseur",
+      "billActions": {
+        "download": "Télécharger",
+        "recalculateTotals": "Recalculer les totaux"
+      }
+    },
+    "worklists": {
+      "openStatus": "Ouvert",
+      "unavailable": "Indisponible",
+      "currency": "Devise",
+      "columns": "Colonnes",
+      "exportCsv": "Exporter en CSV",
+      "actions": "Actions",
+      "partner": "Partenaire",
+      "documentType": "Type de document"
+    },
+    "taxes": {
+      "title": "Taxes",
+      "rate": "Taux",
+      "taxUse": "Type",
+      "actions": {
+        "active": "Actif"
+      }
+    },
+    "taxGroups": {
+      "title": "Groupes de taxes",
+      "columns": {
+        "name": "Nom",
+        "sequence": "Séquence",
+        "taxPayableAccountId": "Compte de dettes fournisseurs",
+        "taxReceivableAccountId": "Compte de créances clients",
+        "company": "Société"
+      },
+      "filters": {
+        "name": "Nom"
+      },
+      "actions": {
+        "newTaxGroup": "Nouveau groupe de taxes",
+        "new": "Nouveau groupe de taxes"
+      },
+      "form": {
+        "none": "Aucun"
+      }
+    },
+    "taxJurisdictions": {
+      "title": "Juridictions fiscales",
+      "columns": {
+        "name": "Nom",
+        "code": "Code",
+        "countryCode": "Pays",
+        "stateCode": "État",
+        "city": "Ville",
+        "isActive": "Actif",
+        "status": "Statut"
+      },
+      "filters": {
+        "countryCode": "Pays",
+        "stateCode": "État",
+        "isActive": "Statut"
+      },
+      "actions": {
+        "newJurisdiction": "Nouvelle juridiction",
+        "new": "Nouvelle juridiction"
+      },
+      "active": "Actif",
+      "inactive": "Inactif"
+    },
+    "taxSchedules": {
+      "title": "Calendriers fiscaux",
+      "searchPlaceholder": "Rechercher des échéanciers…",
+      "columns": {
+        "name": "Nom",
+        "description": "Description",
+        "jurisdictionId": "Juridiction",
+        "taxIds": "Taxes",
+        "isActive": "Actif",
+        "company": "Société",
+        "jurisdiction": "Juridiction",
+        "status": "Statut",
+        "taxes": "Taxes"
+      },
+      "filters": {
+        "jurisdictionId": "Juridiction",
+        "isActive": "Statut"
+      },
+      "actions": {
+        "newSchedule": "Nouvel échéancier",
+        "new": "Nouvel échéancier"
+      },
+      "active": "Actif",
+      "form": {
+        "none": "Aucun"
+      },
+      "inactive": "Inactif"
+    },
+    "taxDeadlines": {
+      "title": "Échéances fiscales",
+      "columns": {
+        "title": "Titre",
+        "deadlineType": "Type",
+        "dueDate": "Date d’échéance",
+        "status": "Statut",
+        "companyId": "Société",
+        "reminderDaysBefore": "Rappels",
+        "description": "Description"
+      },
+      "filters": {
+        "deadlineType": "Type",
+        "status": "Statut",
+        "companyId": "Société"
+      },
+      "deadlineTypes": {
+        "Filing": "Déclaration",
+        "Payment": "Paiement",
+        "Registration": "Immatriculation",
+        "Report": "Rapport",
+        "Renewal": "Renouvellement"
+      },
+      "statuses": {
+        "pending": "En attente",
+        "completed": "Terminé",
+        "overdue": "En retard"
+      },
+      "actions": {
+        "newDeadline": "Nouvelle échéance",
+        "completeSelected": "Terminer la sélection",
+        "deleteSelected": "Supprimer la sélection",
+        "complete": "Marquer comme terminé",
+        "done": "{{action}} terminé",
+        "failed": "Échec de {{action}}",
+        "new": "Nouvelle échéance"
+      },
+      "reminders": {
+        "sentAt": "Envoyé",
+        "status": "Statut",
+        "tab": "Rappels"
+      },
+      "form": {
+        "company": "Société (facultatif)",
+        "type": "Type",
+        "types": {
+          "Filing": "Déclaration",
+          "Payment": "Paiement",
+          "Registration": "Immatriculation",
+          "Report": "Rapport",
+          "Renewal": "Renouvellement"
+        }
+      }
+    },
+    "budgets": {
+      "title": "Budgets",
+      "planned": "Planifié",
+      "practical": "Réel",
+      "variance": "Écart %",
+      "cancelSelected": "Annuler la sélection",
+      "workspace": {
+        "listTitle": "Budgets",
+        "colName": "Nom",
+        "confirm": "Confirmer",
+        "validate": "Valider",
+        "markDone": "Marquer comme terminé",
+        "colAnalytic": "Compte analytique",
+        "actions": "Actions",
+        "postCode": "Code",
+        "postDescription": "Description",
+        "active": "Actif",
+        "newLine": "Nouvelle ligne"
+      }
+    },
+    "fxRevaluation": {
+      "realizedAction": "Comptabiliser les écarts de change réalisés",
+      "colCurrency": "Devise",
+      "colMove": "Écriture comptable",
+      "colReference": "Référence",
+      "form": {
+        "title": "Réévaluer les devises",
+        "sections": {
+          "main": "Paramètres"
+        },
+        "fields": {
+          "journalId": "Journal",
+          "reference": "Référence (facultatif)"
+        }
+      },
+      "batchForm": {
+        "title": "Réévaluer les devises par lot",
+        "sections": {
+          "main": "Paramètres"
+        }
+      },
+      "realizedForm": {
+        "title": "Comptabiliser les écarts de change réalisés",
+        "submitLabel": "Comptabiliser les écarts de change réalisés",
+        "fields": {
+          "paymentId": "Paiement",
+          "invoiceMoveId": "Facture",
+          "date": "Date"
+        }
+      }
+    },
+    "creditControl": {
+      "writeOffAction": "Passage en perte d’une créance",
+      "colPartner": "Partenaire",
+      "colLimit": "Plafond de crédit",
+      "colNotes": "Notes",
+      "form": {
+        "title": "Définir le contrôle de crédit du partenaire",
+        "submitLabel": "Enregistrer",
+        "sections": {
+          "main": "Crédit"
+        },
+        "fields": {
+          "partnerId": "Partenaire",
+          "creditLimit": "Plafond de crédit",
+          "notes": "Notes"
+        }
+      },
+      "writeOffForm": {
+        "title": "Passage en perte d’une créance",
+        "fields": {
+          "amount": "Montant",
+          "receivableAccountId": "Compte de créances clients",
+          "date": "Date"
+        }
+      }
+    },
+    "amortization": {
+      "createAction": "Nouvel échéancier",
+      "schedulesTitle": "Échéanciers",
+      "searchSchedules": "Rechercher des échéanciers…",
+      "searchLines": "Rechercher des lignes…",
+      "colKind": "Nature",
+      "colDescription": "Description",
+      "colTotal": "Total",
+      "colState": "État",
+      "colSchedule": "Échéancier",
+      "colSequence": "Séq.",
+      "colAmount": "Montant",
+      "period": {
+        "month": "Mensuel",
+        "year": "Annuel"
+      },
+      "form": {
+        "title": "Créer un échéancier d’étalement",
+        "sections": {
+          "main": "Échéancier"
+        },
+        "fields": {
+          "scheduleKind": "Nature",
+          "description": "Description",
+          "totalAmount": "Montant total",
+          "currencyId": "Devise",
+          "startDate": "Début",
+          "endDate": "Fin"
+        }
+      }
+    },
+    "consolidation": {
+      "accounts": {
+        "title": "Comptes de consolidation",
+        "newAccount": "Nouveau compte",
+        "editAccount": "Modifier le compte",
+        "colCode": "Code",
+        "colName": "Nom",
+        "colType": "Type",
+        "colRate": "Taux",
+        "colActive": "Actif"
+      },
+      "journals": {
+        "title": "Journaux de consolidation",
+        "newJournal": "Nouveau journal",
+        "colName": "Nom",
+        "colPeriod": "Période",
+        "colState": "État",
+        "colDebit": "Débit",
+        "colCredit": "Crédit",
+        "validate": "Valider"
+      },
+      "elimination": {
+        "title": "Écritures d’élimination",
+        "colName": "Nom",
+        "colAccount": "Compte",
+        "colType": "Type",
+        "colDebit": "Débit",
+        "colCredit": "Crédit"
+      },
+      "forms": {
+        "newAccount": {
+          "fields": {
+            "name": "Nom",
+            "code": "Code du compte",
+            "currencyId": "ID de devise"
+          }
+        },
+        "newJournal": {
+          "fields": {
+            "periodId": "Période",
+            "currencyId": "ID de devise"
+          }
+        },
+        "newElimination": {
+          "fields": {
+            "journalId": "ID du journal",
+            "name": "Description",
+            "accountCode": "Code du compte",
+            "debit": "Débit",
+            "credit": "Crédit",
+            "currencyId": "ID de devise",
+            "reference": "Référence"
+          }
+        }
+      },
+      "accountTypes": {
+        "equity": "Capitaux propres",
+        "income": "Produits",
+        "expense": "Charge"
+      },
+      "eliminationMethods": {
+        "partial": "Partiel"
+      },
+      "eliminationTypes": {
+        "other": "Autre"
+      },
+      "rates": {
+        "company": "Société",
+        "currency": "Devise",
+        "period": "Période",
+        "rate": "Taux",
+        "title": "Taux de change des sociétés",
+        "type": "Type"
+      }
+    },
+    "states": {
+      "draft": "Brouillon",
+      "posted": "Comptabilisé",
+      "cancelled": "Annulé",
+      "paid": "Payé",
+      "partial": "Partiel",
+      "notPaid": "Impayé",
+      "sent": "Envoyé",
+      "overdue": "En retard",
+      "pending": "En attente",
+      "approved": "Approuvé"
+    },
+    "nav": {
+      "overview": "Vue d’ensemble",
+      "accounts": "Plan comptable",
+      "journalEntries": "Écritures comptables",
+      "customerInvoices": "Factures clients",
+      "vendorBills": "Factures fournisseurs",
+      "taxes": "Taxes",
+      "budgets": "Budgets"
+    },
+    "tabs": {
+      "analyticAccounts": "Comptes analytiques",
+      "analyticLines": "Lignes analytiques",
+      "analyticDistribution": "Modèles de répartition",
+      "reconciliationWidgets": "Rapprochement",
+      "fiscalYears": "Exercices comptables",
+      "accountPeriods": "Périodes",
+      "taxGroups": "Groupes de taxes",
+      "taxJurisdictions": "Juridictions",
+      "taxSchedules": "Échéanciers",
+      "taxDeadlines": "Échéances",
+      "payments": "Paiements",
+      "operationalPayments": "Opérations de paiement",
+      "paymentTerms": "Conditions de paiement",
+      "paymentTermLines": "Lignes d’échéancier",
+      "journals": "Journaux",
+      "journalEntries": "Écritures comptables",
+      "moveLines": "Lignes comptables"
+    },
+    "entities": {
+      "bankStatements": {
+        "title": "Relevés bancaires",
+        "columns": {
+          "name": "Référence",
+          "journalId": "Journal",
+          "state": "Statut",
+          "date": "Date",
+          "balanceStart": "Solde d’ouverture",
+          "lineIds": "Lignes"
+        },
+        "filters": {
+          "state": {
+            "label": "Statut",
+            "options": {
+              "Open": "Ouvert",
+              "Posted": "Comptabilisé",
+              "Confirm": "Confirmé"
+            }
+          }
+        },
+        "states": {
+          "Open": "Ouvert",
+          "Posted": "Comptabilisé",
+          "Confirm": "Confirmé"
+        }
+      },
+      "reconciliationWidgets": {
+        "title": "Outils de rapprochement",
+        "columns": {
+          "accountId": "Compte",
+          "partnerId": "Partenaire",
+          "moveLineIds": "ID des lignes comptables"
+        }
+      },
+      "analyticLines": {
+        "title": "Lignes analytiques",
+        "searchPlaceholder": "Rechercher des lignes…",
+        "columns": {
+          "name": "Libellé",
+          "accountId": "Compte analytique",
+          "amount": "Montant",
+          "date": "Date"
+        }
+      },
+      "analyticDistributionModels": {
+        "title": "Modèles de répartition analytique",
+        "columns": {
+          "name": "Nom",
+          "isActive": "Actif"
+        }
+      },
+      "fixedAssets": {
+        "title": "Immobilisations",
+        "columns": {
+          "active": "Actif",
+          "state": "Statut"
+        },
+        "filters": {
+          "state": {
+            "label": "Statut",
+            "options": {
+              "Draft": "Brouillon",
+              "Open": "En cours",
+              "Close": "Clôturé"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Brouillon",
+          "Open": "En cours",
+          "Close": "Clôturé"
+        },
+        "actions": {
+          "deleteSelected": "Supprimer la sélection"
+        },
+        "form": {
+          "code": "Code",
+          "currency": "Devise",
+          "name": "Nom",
+          "none": "Aucun",
+          "typePurchase": "Achat",
+          "typeSale": "Vente"
+        }
+      },
+      "depreciationSchedule": {
+        "title": "Plan d’amortissement",
+        "columns": {
+          "date": "Date",
+          "name": "Libellé",
+          "amount": "Montant",
+          "movePosted": "Comptabilisé"
+        }
+      },
+      "payments": {
+        "title": "Paiements",
+        "columns": {
+          "name": "Référence",
+          "amount": "Montant",
+          "state": "Statut",
+          "partnerId": "Partenaire",
+          "journalId": "Journal",
+          "currencyId": "Devise"
+        },
+        "filters": {
+          "state": {
+            "label": "Statut",
+            "options": {
+              "NotPaid": "Brouillon",
+              "Paid": "Comptabilisé",
+              "Reversed": "Annulé"
+            }
+          }
+        },
+        "states": {
+          "NotPaid": "Brouillon",
+          "Paid": "Comptabilisé",
+          "Reversed": "Annulé"
+        },
+        "actions": {
+          "cancelSelected": "Annuler la sélection"
+        }
+      },
+      "paymentTerms": {
+        "title": "Conditions de paiement",
+        "columns": {
+          "name": "Nom",
+          "isActive": "Actif",
+          "note": "Note"
+        },
+        "actions": {
+          "deleteSelected": "Supprimer la sélection",
+          "addLine": "Ajouter une ligne"
+        }
+      },
+      "journals": {
+        "title": "Journaux",
+        "columns": {
+          "code": "Code",
+          "name": "Nom",
+          "type": "Type",
+          "active": "Actif"
+        }
+      },
+      "moveLines": {
+        "title": "Lignes d’écritures comptables",
+        "columns": {
+          "moveId": "Écriture",
+          "accountId": "Compte",
+          "name": "Libellé",
+          "debit": "Débit",
+          "credit": "Crédit"
+        },
+        "actions": {
+          "deleteSelected": "Supprimer la sélection"
+        }
+      },
+      "intercompanyRules": {
+        "title": "Règles intersociétés",
+        "columns": {
+          "ruleType": "Type",
+          "isActive": "Actif"
+        },
+        "filters": {
+          "ruleType": {
+            "label": "Type",
+            "options": {
+              "Sale": "Vente",
+              "Purchase": "Achat",
+              "Transfer": "Virement",
+              "Service": "Service"
+            }
+          },
+          "isActive": {
+            "label": "Statut",
+            "options": {
+              "true": "Actif",
+              "false": "Inactif"
+            }
+          }
+        },
+        "states": {
+          "Sale": "Vente",
+          "Purchase": "Achat",
+          "Transfer": "Virement",
+          "Service": "Service"
+        },
+        "actions": {
+          "deleteSelected": "Supprimer la sélection"
+        }
+      },
+      "intercompanyTransactions": {
+        "title": "Transactions intersociétés",
+        "columns": {
+          "originDocumentModel": "Type de document",
+          "amount": "Montant",
+          "currencyId": "Devise",
+          "transactionType": "Type",
+          "state": "Statut"
+        },
+        "filters": {
+          "state": {
+            "label": "Statut",
+            "options": {
+              "Draft": "Brouillon",
+              "Pending": "En attente",
+              "Approved": "Approuvé",
+              "Completed": "Terminé",
+              "Error": "Erreur",
+              "Cancelled": "Annulé"
+            }
+          },
+          "transactionType": {
+            "label": "Type",
+            "options": {
+              "Sale": "Vente",
+              "Purchase": "Achat",
+              "Transfer": "Virement",
+              "Service": "Service"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Brouillon",
+          "Pending": "En attente",
+          "Approved": "Approuvé",
+          "Completed": "Terminé",
+          "Error": "Erreur",
+          "Cancelled": "Annulé"
+        },
+        "actions": {
+          "completeSelected": "Terminer la sélection",
+          "cancelSelected": "Annuler la sélection"
+        }
+      },
+      "fiscalYears": {
+        "title": "Exercices comptables",
+        "columns": {
+          "name": "Nom",
+          "dateFrom": "Début",
+          "dateTo": "Fin",
+          "state": "Statut",
+          "type": "Type"
+        },
+        "filters": {
+          "state": {
+            "label": "Statut",
+            "options": {
+              "Draft": "Brouillon",
+              "Running": "En cours",
+              "Closed": "Clôturé",
+              "Locked": "Verrouillé"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Brouillon",
+          "Running": "En cours",
+          "Closed": "Clôturé",
+          "Locked": "Verrouillé"
+        }
+      },
+      "accountPeriods": {
+        "title": "Périodes",
+        "columns": {
+          "name": "Nom",
+          "code": "Code",
+          "fiscalYear": "Exercice comptable",
+          "dateFrom": "Début",
+          "dateTo": "Fin",
+          "state": "Statut"
+        },
+        "filters": {
+          "state": {
+            "label": "Statut",
+            "options": {
+              "Draft": "Brouillon",
+              "Open": "Ouvert",
+              "Closed": "Clôturé"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Brouillon",
+          "Open": "Ouvert",
+          "Closed": "Clôturé"
+        },
+        "actions": {
+          "closeSelected": "Clôturer la période"
+        }
+      }
+    },
+    "forms": {
+      "operationalPaymentAccount": {
+        "provider": "Prestataire",
+        "currency": "Devise",
+        "bank": "Banque"
+      },
+      "operationalPaymentTransaction": {
+        "customer": "Client",
+        "supplier": "Fournisseur",
+        "partner": "Partenaire",
+        "currency": "Devise"
+      },
+      "reverseOperationalPayment": {
+        "reason": "Motif"
+      },
+      "operationalPaymentFee": {
+        "company": "Société",
+        "customer": "Client",
+        "supplier": "Fournisseur"
+      },
+      "bankStatementImport": {
+        "currency": "Devise",
+        "openingBalance": "Solde d’ouverture",
+        "csvData": "Données CSV"
+      },
+      "newInvoice": {
+        "title": "Nouvelle facture",
+        "fields": {
+          "journal": "Journal",
+          "journalPlaceholder": "Choisir un journal",
+          "dueDate": "Date d’échéance",
+          "ref": "Référence",
+          "notes": "Notes"
+        },
+        "columns": {
+          "description": "Description",
+          "qty": "Qté",
+          "unitPrice": "Prix unitaire",
+          "discountPercent": "Remise %",
+          "total": "Total"
+        },
+        "summary": {
+          "subtotal": "Sous-total",
+          "tax": "Taxe",
+          "total": "Total"
+        }
+      },
+      "newBill": {
+        "fields": {
+          "journal": "Journal",
+          "journalPlaceholder": "Choisir un journal",
+          "dueDate": "Date d’échéance",
+          "ref": "Référence",
+          "notes": "Notes"
+        }
+      },
+      "newJournalEntry": {
+        "title": "Nouvelle écriture comptable",
+        "addLine": "Ajouter une ligne",
+        "refOptional": "Référence (facultatif)",
+        "fields": {
+          "journal": "Journal",
+          "journalPlaceholder": "Choisir un journal",
+          "ref": "Référence",
+          "notes": "Notes"
+        },
+        "columns": {
+          "description": "Description",
+          "debit": "Débit",
+          "credit": "Crédit"
+        }
+      },
+      "newAccount": {
+        "title": "Nouveau compte",
+        "fields": {
+          "code": "Code du compte",
+          "reconcile": "Autoriser le rapprochement",
+          "notes": "Notes",
+          "openingBalance": "Solde d’ouverture",
+          "options": {
+            "equity": "Capitaux propres",
+            "income": "Produits",
+            "expense": "Charge"
+          }
+        }
+      },
+      "newTax": {
+        "title": "Nouvelle taxe",
+        "fields": {
+          "description": "Description",
+          "options": {
+            "sale": "Ventes",
+            "purchase": "Achat",
+            "none": "Aucun"
+          }
+        }
+      },
+      "newBudget": {
+        "title": "Nouveau budget",
+        "fields": {
+          "dateFrom": "Date de début",
+          "dateTo": "Date de fin",
+          "description": "Description"
+        }
+      },
+      "fiscalYear": {
+        "title": "Nouvel exercice comptable",
+        "submitEditLabel": "Enregistrer les modifications",
+        "sections": {
+          "main": "Exercice comptable"
+        },
+        "fields": {
+          "name": "Nom",
+          "dateFrom": "Début",
+          "dateTo": "Fin",
+          "notes": "Notes",
+          "notesPlaceholder": "Facultatif",
+          "metadata": "Métadonnées"
+        }
+      },
+      "accountPeriod": {
+        "title": "Nouvelle période",
+        "submitEditLabel": "Enregistrer les modifications",
+        "sections": {
+          "main": "Période"
+        },
+        "fields": {
+          "name": "Nom",
+          "code": "Code",
+          "fiscalYearId": "Exercice comptable",
+          "dateFrom": "Début",
+          "dateTo": "Fin",
+          "notes": "Notes",
+          "notesPlaceholder": "Facultatif"
+        }
+      },
+      "budgetPost": {
+        "fields": {
+          "name": "Nom",
+          "code": "Code",
+          "description": "Description",
+          "accountIds": "Comptes",
+          "isActive": "Actif"
+        }
+      },
+      "accountAccountType": {
+        "sections": {
+          "main": "Type"
+        },
+        "fields": {
+          "name": "Nom",
+          "isDeprecated": "Obsolète",
+          "metadata": "Métadonnées"
+        }
+      },
+      "accountGroup": {
+        "fields": {
+          "name": "Nom",
+          "level": "Niveau",
+          "metadata": "Métadonnées"
+        }
+      },
+      "createCreditNote": {
+        "title": "Créer un avoir",
+        "submitLabel": "Créer un avoir",
+        "fields": {
+          "reason": "Motif"
+        }
+      },
+      "recordPayment": {
+        "title": "Enregistrer un paiement",
+        "submitLabel": "Enregistrer un paiement",
+        "sections": {
+          "payment": "Paiement"
+        },
+        "fields": {
+          "amount": "Montant"
+        }
+      },
+      "newAccountPayment": {
+        "title": "Nouveau paiement",
+        "sections": {
+          "main": "Paiement"
+        },
+        "fields": {
+          "partnerTypeCustomer": "Client",
+          "partnerTypeSupplier": "Fournisseur",
+          "partnerId": "ID du partenaire",
+          "amount": "Montant",
+          "currencyId": "ID de devise",
+          "journalId": "Journal"
+        }
+      },
+      "newPaymentTerm": {
+        "title": "Nouvelles conditions de paiement",
+        "fields": {
+          "name": "Nom",
+          "note": "Note"
+        }
+      },
+      "newPaymentTermLine": {
+        "submitLabel": "Ajouter une ligne",
+        "sections": {
+          "main": "Ligne"
+        },
+        "fields": {
+          "sequence": "Séquence"
+        }
+      },
+      "editPaymentTermLine": {
+        "sections": {
+          "main": "Ligne"
+        }
+      },
+      "newAccountJournal": {
+        "title": "Nouveau journal",
+        "sections": {
+          "main": "Journal"
+        },
+        "fields": {
+          "name": "Nom",
+          "code": "Code",
+          "type": "Type",
+          "typeSale": "Ventes",
+          "typePurchase": "Achat",
+          "typeBank": "Banque",
+          "active": "Actif"
+        }
+      },
+      "editAccountJournal": {
+        "submitLabel": "Enregistrer les modifications",
+        "sections": {
+          "main": "Journal"
+        }
+      },
+      "addAccountMoveLine": {
+        "submitLabel": "Ajouter une ligne",
+        "sections": {
+          "line": "Ligne"
+        },
+        "fields": {
+          "moveId": "Écriture comptable",
+          "accountId": "Compte",
+          "name": "Libellé",
+          "debit": "Débit",
+          "credit": "Crédit"
+        }
+      },
+      "editAccountMoveLine": {
+        "submitLabel": "Enregistrer les modifications",
+        "sections": {
+          "line": "Ligne"
+        }
+      },
+      "newDepreciationLine": {
+        "submitLabel": "Ajouter une ligne",
+        "fields": {
+          "name": "Libellé",
+          "amount": "Montant"
+        }
+      },
+      "newIntercompanyRule": {
+        "sections": {
+          "main": "Règle"
+        },
+        "fields": {
+          "ruleType": "Type",
+          "isActive": "Actif",
+          "journalId": "Journal"
+        }
+      },
+      "editIntercompanyRule": {
+        "submitLabel": "Enregistrer les modifications",
+        "sections": {
+          "main": "Règle"
+        },
+        "fields": {
+          "sequence": "Séquence",
+          "notes": "Notes"
+        }
+      },
+      "newIntercompanyTransaction": {
+        "fields": {
+          "originDocumentModel": "Type de document",
+          "originDocumentModels": {
+            "accountMove": "Écriture comptable",
+            "saleOrder": "Commande client"
+          },
+          "transactionType": "Type",
+          "amount": "Montant",
+          "currencyId": "ID de devise",
+          "notes": "Notes"
+        }
+      },
+      "markIntercompanyTransactionError": {
+        "sections": {
+          "main": "Erreur"
+        }
+      },
+      "newCurrencyRate": {
+        "title": "Nouveau taux de change",
+        "sections": {
+          "main": "Taux"
+        },
+        "fields": {
+          "rate": "Taux"
+        }
+      },
+      "reconcilePaymentInvoice": {
+        "submitLabel": "Rapprocher"
+      },
+      "analyticAccount": {
+        "createTitle": "Nouveau compte analytique",
+        "sections": {
+          "main": "Compte"
+        },
+        "fields": {
+          "name": "Nom",
+          "code": "Code",
+          "currencyId": "ID de devise",
+          "active": "Actif",
+          "accountActive": "Actif"
+        }
+      },
+      "analyticLine": {
+        "createTitle": "Nouvelle ligne analytique",
+        "sections": {
+          "main": "Ligne"
+        },
+        "fields": {
+          "name": "Libellé",
+          "accountId": "Compte analytique",
+          "amount": "Montant",
+          "unitAmount": "Montant unitaire",
+          "date": "Date",
+          "description": "Description"
+        }
+      },
+      "analyticDistribution": {
+        "createTitle": "Nouveau modèle de répartition",
+        "sections": {
+          "main": "Modèle"
+        },
+        "fields": {
+          "name": "Nom",
+          "isActive": "Actif"
+        }
+      },
+      "bankStatementLine": {
+        "submitLabel": "Ajouter une ligne",
+        "sections": {
+          "main": "Ligne"
+        },
+        "fields": {
+          "date": "Date",
+          "amount": "Montant",
+          "partnerId": "ID du partenaire"
+        }
+      },
+      "reconciliationWidget": {
+        "fields": {
+          "partnerId": "ID du partenaire",
+          "partnerIdPlaceholder": "Facultatif",
+          "moveLineIds": "ID des lignes comptables"
+        },
+        "picker": {
+          "modeBank": "Banque",
+          "partner": "Partenaire"
+        }
+      }
+    },
+    "bankStatementDetail": {
+      "title": "Relevé bancaire",
+      "linesHeading": "Lignes",
+      "addLineButton": "Ajouter une ligne",
+      "candidateType": "Type",
+      "candidateAmount": "Montant",
+      "reconcileWithCandidate": "Rapprocher",
+      "manualMoveLineIds": "ID des lignes comptables"
+    },
+    "fiscalYears": {
+      "title": "Exercices comptables",
+      "columns": {
+        "name": "Nom",
+        "dateFrom": "Date de début",
+        "dateTo": "Date de fin",
+        "state": "Statut"
+      }
+    },
+    "accountPeriods": {
+      "title": "Périodes comptables",
+      "columns": {
+        "name": "Nom",
+        "dateFrom": "Date de début",
+        "dateTo": "Date de fin",
+        "state": "Statut"
+      }
+    },
+    "reconciliation": {
+      "title": "Rapprochement"
+    },
+    "fixedAssets": {
+      "title": "Immobilisations",
+      "columns": {
+        "depreciationMethod": "Méthode",
+        "state": "Statut"
+      }
+    },
+    "actions": {
+      "closeFiscalYear": "Clôturer l’exercice",
+      "closePeriod": "Clôturer la période",
+      "depreciate": "Calculer l’amortissement",
+      "dispose": "Sortir l’immobilisation",
+      "newAccount": "Nouveau compte",
+      "newAccountPeriod": "Nouvelle période",
+      "newAnalyticAccount": "Nouveau compte analytique",
+      "newAnalyticDistribution": "Nouveau modèle de répartition",
+      "newAnalyticLine": "Nouvelle ligne analytique",
+      "newBill": "Nouvelle facture fournisseur",
+      "newBudget": "Nouveau budget",
+      "newCurrencyRate": "Nouveau taux de change",
+      "newEntry": "Nouvelle écriture comptable",
+      "newFiscalYear": "Nouvel exercice comptable",
+      "newInvoice": "Nouvelle facture",
+      "newPayment": "Nouveau paiement",
+      "newPaymentTerm": "Nouvelles conditions de paiement",
+      "newPaymentTermLine": "Ajouter une échéance",
+      "newJournal": "Nouveau journal",
+      "addMoveLine": "Ajouter une ligne",
+      "newReconciliationWidget": "Nouveau widget",
+      "newTax": "Nouvelle taxe",
+      "newTaxDeadline": "Nouvelle échéance",
+      "newTaxGroup": "Nouveau groupe de taxes",
+      "newTaxJurisdiction": "Nouvelle juridiction",
+      "newTaxSchedule": "Nouvel échéancier",
+      "post": "Comptabiliser",
+      "postStatement": "Comptabiliser le relevé",
+      "reconcile": "Rapprocher",
+      "registerPayment": "Enregistrer un paiement",
+      "reopenPeriod": "Rouvrir la période"
+    },
+    "fiscalSetup": {
+      "title": "Assistant de configuration comptable",
+      "fields": {
+        "dateFrom": "Date de début",
+        "dateTo": "Date de fin"
+      }
+    },
+    "bankStatementImportLines": {
+      "description": "Description",
+      "reference": "Référence",
+      "row": "Ligne"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Devise",
+        "editTab": "Modifier",
+        "reference": "Référence"
+      }
+    },
+    "billCorrection": {
+      "price": "Prix unitaire"
+    },
+    "importReview": {
+      "title": "Totaux de contrôle source",
+      "fields": {
+        "opening_balance": "Solde d’ouverture",
+        "debit": "Débit",
+        "credit": "Crédit"
+      }
+    },
+    "billIntake": {
+      "title": "Vérification des factures reçues"
+    },
+    "billDocuments": {
+      "title": "Documents et reçus fournisseurs"
+    },
+    "authoring": {
+      "account": "Compte",
+      "amount": "Montant",
+      "credit": "Crédit",
+      "customer": "Client",
+      "debit": "Débit",
+      "description": "Description",
+      "documentPreview": "Aperçu du document",
+      "dueDate": "Date d’échéance",
+      "invoice": "Facture",
+      "paymentTerms": "Conditions de paiement",
+      "quantity": "Quantité",
+      "tax": "Taxe",
+      "total": "Total",
+      "unitPrice": "Prix unitaire",
+      "vendor": "Fournisseur"
+    },
+    "assetSchedule": {
+      "title": "Plan d’amortissement enregistré",
+      "date": "Date (UTC)"
+    },
+    "workflowTools": {
+      "amount": "Montant",
+      "opening": "Solde d’ouverture",
+      "row": "Ligne",
+      "date": "Date"
+    },
+    "navigation": {
+      "receivables": "Créances clients",
+      "payables": "Dettes fournisseurs"
+    }
+  },
+  "crm": {
+    "attribution": {
+      "title": "Attribution UTM",
+      "nameLabel": "Nom"
+    },
+    "chatter": {
+      "logActivity": "Planifier une activité",
+      "activitySummary": "Résumé",
+      "activityType": "Type",
+      "activityDeadline": "Date d’échéance",
+      "activityNote": "Notes",
+      "scheduleActivity": "Planifier une activité",
+      "activityDone": "Terminé",
+      "activityPlanned": "Planifié",
+      "markDone": "Marquer comme terminé",
+      "activityTypes": {
+        "email": "E-mail"
+      },
+      "removeAttachment": "Retirer"
+    },
+    "leads": {
+      "title": "Prospects",
+      "columns": {
+        "contactName": "Nom",
+        "partnerName": "Société",
+        "emailFrom": "E-mail",
+        "phone": "Téléphone",
+        "state": "Statut",
+        "expectedRevenue": "Chiffre d’affaires prévu",
+        "createDate": "Créé"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut"
+        }
+      }
+    },
+    "opportunities": {
+      "title": "Opportunités",
+      "board": {
+        "viewTable": "Tableau de données"
+      },
+      "columns": {
+        "name": "Opportunité",
+        "priority": "Priorité",
+        "expectedRevenue": "Chiffre d’affaires prévu"
+      },
+      "states": {
+        "Low": "Faible",
+        "Medium": "Moyenne",
+        "High": "Élevée"
+      }
+    },
+    "opportunityLines": {
+      "tabLabel": "Lignes d’opportunité",
+      "title": "Lignes d’opportunité",
+      "columns": {
+        "opportunityId": "Opportunité",
+        "quantity": "Qté",
+        "priceUnit": "Prix unitaire",
+        "priceSubtotal": "Sous-total",
+        "discount": "Remise %"
+      }
+    },
+    "contacts": {
+      "title": "Contacts",
+      "columns": {
+        "name": "Nom",
+        "companyName": "Société",
+        "email": "E-mail",
+        "phone": "Téléphone",
+        "isCompany": "Type",
+        "city": "Ville",
+        "countryId": "Pays"
+      }
+    },
+    "activities": {
+      "title": "Activités",
+      "columns": {
+        "summary": "Résumé",
+        "activityType": "Type",
+        "activityTypeId": "Type",
+        "state": "Statut",
+        "dateDeadline": "Date d’échéance",
+        "isDone": "Terminé"
+      },
+      "states": {
+        "planned": "Planifié",
+        "done": "Terminé"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "planned": "Planifié",
+            "done": "Terminé"
+          }
+        }
+      }
+    },
+    "actions": {
+      "newOpportunityLine": "Nouvelle ligne",
+      "markComplete": "Marquer comme terminé",
+      "editOpportunity": "Modifier",
+      "editLeadAddress": "Modifier l’adresse",
+      "editContactAddress": "Modifier l’adresse"
+    },
+    "duplicates": {
+      "title": "Contacts en double"
+    },
+    "contactTags": {
+      "tabLabel": "Étiquettes de contact",
+      "title": "Étiquettes de contact",
+      "columns": {
+        "name": "Nom",
+        "color": "Couleur",
+        "description": "Description"
+      }
+    },
+    "contactCategories": {
+      "tabLabel": "Catégories de contacts",
+      "createLabel": "Nouvelle catégorie",
+      "title": "Catégories de contacts",
+      "columns": {
+        "name": "Nom",
+        "color": "Couleur",
+        "parentId": "Parent",
+        "isActive": "Actif"
+      }
+    },
+    "contactSegments": {
+      "tabLabel": "Segments de contacts",
+      "title": "Segments de contacts",
+      "columns": {
+        "name": "Nom",
+        "isActive": "Actif",
+        "description": "Description"
+      }
+    },
+    "forms": {
+      "newLead": {
+        "sections": {
+          "notes": "Notes"
+        },
+        "fields": {
+          "contactName": "Nom du contact",
+          "partnerName": "Société",
+          "emailFrom": "E-mail",
+          "phone": "Téléphone",
+          "expectedRevenue": "Chiffre d’affaires prévu",
+          "state": "Statut",
+          "description": "Notes"
+        }
+      },
+      "newOpportunity": {
+        "sections": {
+          "opportunity": "Opportunité"
+        },
+        "fields": {
+          "stage": "Étape commerciale",
+          "expectedRevenue": "Chiffre d’affaires prévu",
+          "priority": "Priorité",
+          "options": {
+            "Low": "Faible",
+            "Medium": "Moyenne",
+            "High": "Élevée"
+          },
+          "color": "Couleur",
+          "description": "Notes"
+        }
+      },
+      "changeStage": {
+        "fields": {
+          "stage": "Étape commerciale"
+        }
+      },
+      "editOpportunity": {
+        "submit": "Enregistrer les modifications",
+        "sections": {
+          "opportunity": "Opportunité"
+        },
+        "fields": {
+          "expectedRevenue": "Chiffre d’affaires prévu",
+          "stage": "Étape commerciale",
+          "description": "Notes"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "newContact": {
+        "sections": {
+          "address": "Adresse"
+        },
+        "fields": {
+          "email": "E-mail",
+          "phone": "Téléphone",
+          "city": "Ville",
+          "color": "Couleur",
+          "description": "Notes"
+        }
+      },
+      "newContactCategory": {
+        "sections": {
+          "category": "Catégorie"
+        },
+        "fields": {
+          "name": "Nom",
+          "color": "Couleur",
+          "isActive": "Actif"
+        }
+      },
+      "editContactCategory": {
+        "submit": "Enregistrer les modifications",
+        "sections": {
+          "category": "Catégorie"
+        },
+        "fields": {
+          "name": "Nom",
+          "color": "Couleur",
+          "isActive": "Actif"
+        }
+      },
+      "contactIdentity": {
+        "save": "Enregistrer les modifications",
+        "fields": {
+          "kind": "Type"
+        },
+        "states": {
+          "pending": "En attente"
+        }
+      },
+      "endContactRole": {
+        "fields": {
+          "reason": "Motif"
+        }
+      },
+      "newActivity": {
+        "fields": {
+          "summary": "Résumé",
+          "dateDeadline": "Date d’échéance",
+          "note": "Notes"
+        },
+        "submit": "Planifier une activité"
+      },
+      "convertToSaleOrder": {
+        "fields": {
+          "pricelist": "Liste de prix",
+          "warehouse": "Entrepôt"
+        }
+      },
+      "addOpportunityLine": {
+        "sections": {
+          "opportunity": "Opportunité",
+          "product": "Produit et tarification"
+        },
+        "fields": {
+          "productId": "Produit",
+          "productPlaceholder": "Choisir un produit…",
+          "uomId": "Unité de mesure",
+          "quantity": "Quantité",
+          "priceUnit": "Prix unitaire",
+          "discount": "Remise %",
+          "sequence": "Séquence",
+          "name": "Description",
+          "taxIds": "Taxes"
+        }
+      },
+      "assignCategory": {
+        "sections": {
+          "category": "Catégorie"
+        },
+        "fields": {
+          "categoryId": "Catégorie"
+        }
+      },
+      "newContactTag": {
+        "fields": {
+          "name": "Nom",
+          "color": "Couleur",
+          "description": "Description"
+        }
+      },
+      "newContactSegment": {
+        "fields": {
+          "name": "Nom",
+          "isActive": "Actif",
+          "description": "Description"
+        }
+      },
+      "editContact": {
+        "submit": "Enregistrer les modifications",
+        "fields": {
+          "name": "Nom",
+          "email": "E-mail",
+          "phone": "Téléphone",
+          "isCustomer": "Client",
+          "isVendor": "Fournisseur"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "editContactAddress": {
+        "title": "Modifier l’adresse",
+        "sections": {
+          "address": "Adresse"
+        },
+        "fields": {
+          "city": "Ville"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "editContactBusiness": {
+        "submit": "Enregistrer les modifications",
+        "fields": {
+          "industry": "Secteur d’activité"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "editContactDetails": {
+        "submit": "Enregistrer les modifications",
+        "sections": {
+          "details": "Détails"
+        },
+        "fields": {
+          "firstName": "Prénom",
+          "lastName": "Nom de famille",
+          "website": "Site web",
+          "color": "Couleur",
+          "description": "Notes"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "editLeadDetails": {
+        "submit": "Enregistrer les modifications",
+        "sections": {
+          "details": "Détails"
+        },
+        "fields": {
+          "contactName": "Nom du contact",
+          "website": "Site web",
+          "industry": "Secteur d’activité",
+          "description": "Notes"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "editLeadAddress": {
+        "sections": {
+          "address": "Adresse"
+        },
+        "fields": {
+          "city": "Ville"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      },
+      "editLeadRevenue": {
+        "submit": "Enregistrer les modifications",
+        "sections": {
+          "revenue": "Chiffre d’affaires"
+        },
+        "fields": {
+          "expectedRevenue": "Chiffre d’affaires prévu"
+        },
+        "validation": {
+          "noChanges": "Modifiez au moins un champ avant d’enregistrer."
+        }
+      }
+    },
+    "consent": {
+      "title": "Historique des consentements",
+      "save": "Enregistrer",
+      "loading": "Chargement…"
+    },
+    "relationships": {
+      "tabLabel": "Relations",
+      "title": "Relations",
+      "noParent": "Aucun",
+      "type": "Type",
+      "save": "Enregistrer",
+      "loading": "Chargement…",
+      "active": "Actif",
+      "end": "Fin"
+    },
+    "admin": {
+      "stageName": "Nom",
+      "sourceName": "Nom",
+      "lostReasonName": "Nom",
+      "ruleName": "Nom",
+      "active": "Actif"
+    },
+    "countryPacks": {
+      "title": "Modules pays"
+    },
+    "scoring": {
+      "title": "Score du prospect"
+    },
+    "inbox": {
+      "tabLabel": "Boîte de réception",
+      "title": "Boîte de réception WhatsApp",
+      "close": "Fermer"
+    },
+    "relIntel": {
+      "title": "Analyse des relations",
+      "relationships": "Relations"
+    },
+    "myActivities": {
+      "overdue": "En retard"
+    },
+    "kpi": {
+      "expectedRevenue": "Chiffre d’affaires prévu"
+    }
+  },
+  "purchasing": {
+    "handoffs": {
+      "title": "Réceptions et factures fournisseurs",
+      "receipt": "Reçu",
+      "bill": "Facture fournisseur"
+    },
+    "purchaseOrders": {
+      "title": "Commandes fournisseurs",
+      "columns": {
+        "name": "Référence",
+        "partnerId": "Fournisseur",
+        "state": "Statut",
+        "amountUntaxed": "Sous-total",
+        "amountTotal": "Total",
+        "receiptStatus": "Reçu",
+        "fulfillment": "Exécution"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "Draft": "Brouillon",
+            "Sent": "Envoyé",
+            "ToApprove": "À approuver",
+            "Approved": "Commande fournisseur",
+            "Done": "Terminé",
+            "Cancelled": "Annulé"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "Sent": "Envoyé",
+        "ToApprove": "À approuver",
+        "Approved": "Commande fournisseur",
+        "Done": "Terminé",
+        "Cancelled": "Annulé",
+        "Purchase": "Commande fournisseur"
+      },
+      "fulfillment": {
+        "standard": "Standard"
+      }
+    },
+    "orderLines": {
+      "title": "Lignes de commande",
+      "columns": {
+        "productId": "Produit",
+        "priceUnit": "Prix unitaire",
+        "priceSubtotal": "Sous-total",
+        "state": "Statut"
+      },
+      "matchStatus": {
+        "pending": "En attente",
+        "unavailable": "Indisponible"
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "Confirmed": "Confirmé",
+        "Done": "Terminé",
+        "Cancelled": "Annulé"
+      },
+      "recovery": {
+        "title": "Récupération de quantité"
+      }
+    },
+    "rfqs": {
+      "title": "Demandes de devis",
+      "columns": {
+        "name": "Demande de devis",
+        "state": "État",
+        "purchaseOrderId": "Commande fournisseur",
+        "notes": "Notes"
+      }
+    },
+    "rfqBids": {
+      "title": "Offres de fournisseurs",
+      "columns": {
+        "rfqId": "Demande de devis",
+        "partnerId": "Fournisseur",
+        "priceUnit": "Prix unitaire",
+        "amountTotal": "Total",
+        "state": "État"
+      }
+    },
+    "purchaseAgreements": {
+      "title": "Accords d’achat",
+      "columns": {
+        "origin": "Document source",
+        "vendorId": "Fournisseur",
+        "state": "Statut"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "Draft": "Brouillon",
+            "Sent": "Envoyé",
+            "InProgress": "En cours",
+            "Approved": "Approuvé",
+            "Cancelled": "Annulé",
+            "Closed": "Clôturé"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "Sent": "Envoyé",
+        "InProgress": "En cours",
+        "Approved": "Approuvé",
+        "Cancelled": "Annulé",
+        "Closed": "Clôturé"
+      }
+    },
+    "blanketOrders": {
+      "tab": "Commandes-cadres"
+    },
+    "vendors": {
+      "title": "Fournisseurs",
+      "columns": {
+        "email": "E-mail",
+        "phone": "Téléphone",
+        "city": "Ville",
+        "countryId": "Pays"
+      }
+    },
+    "landedCosts": {
+      "title": "Coûts d’acquisition",
+      "columns": {
+        "name": "Nom",
+        "state": "Statut",
+        "amountTotal": "Total",
+        "vendorBillId": "Facture fournisseur"
+      }
+    },
+    "supplierIntakes": {
+      "title": "Demandes fournisseurs",
+      "columns": {
+        "reference": "Référence",
+        "state": "Statut",
+        "companyName": "Société",
+        "email": "E-mail"
+      }
+    },
+    "tabs": {
+      "partnerBanks": "Comptes bancaires fournisseurs",
+      "createPartnerBank": "Nouveau compte bancaire"
+    },
+    "partnerBanks": {
+      "title": "Comptes bancaires fournisseurs",
+      "columns": {
+        "id": "ID",
+        "partnerId": "Partenaire",
+        "account": "Compte",
+        "active": "Actif"
+      }
+    },
+    "actions": {
+      "sendSelected": "Envoyer",
+      "confirmSelected": "Confirmer",
+      "cancelSelected": "Annuler",
+      "recalculateTotals": "Recalculer les totaux",
+      "submitSelected": "Envoyer",
+      "approveSelected": "Approuver",
+      "closeSelected": "Fermer",
+      "cancelRequisitions": "Annuler",
+      "postSelected": "Comptabiliser",
+      "rejectSelected": "Rejeter"
+    },
+    "landedCostDetail": {
+      "title": "Lignes de coûts d’acquisition",
+      "amountTotal": "Montant total",
+      "state": "Statut",
+      "addLine": "Ajouter une ligne",
+      "lines": "Lignes"
+    },
+    "forms": {
+      "newPartnerBank": {
+        "sections": {
+          "main": "Compte"
+        }
+      },
+      "editPartnerBank": {
+        "sections": {
+          "main": "Compte"
+        },
+        "fields": {
+          "active": "Actif"
+        }
+      },
+      "newPurchaseOrder": {
+        "sections": {
+          "vendor": "Fournisseur",
+          "schedule": "Échéancier"
+        },
+        "fields": {
+          "partnerId": "Fournisseur",
+          "paymentTermId": "Conditions de paiement",
+          "origin": "Document source",
+          "notes": "Notes"
+        }
+      },
+      "newPurchaseRequisition": {
+        "sections": {
+          "dates": "Dates"
+        },
+        "fields": {
+          "vendorId": "Fournisseur",
+          "departmentId": "Service",
+          "origin": "Document source",
+          "description": "Description",
+          "productId": "Produit",
+          "quantity": "Quantité"
+        }
+      },
+      "editPurchaseOrderLine": {
+        "sections": {
+          "line": "Ligne"
+        },
+        "fields": {
+          "lineId": "Ligne",
+          "productId": "Produit",
+          "productPlaceholder": "Choisir un produit…",
+          "uomId": "Unité de mesure",
+          "quantity": "Quantité",
+          "priceUnit": "Prix unitaire"
+        }
+      },
+      "addPurchaseOrderLine": {
+        "sections": {
+          "order": "Commande fournisseur",
+          "product": "Produit et tarification"
+        },
+        "fields": {
+          "productId": "Produit",
+          "productPlaceholder": "Choisir un produit…",
+          "uomId": "Unité de mesure",
+          "quantity": "Quantité",
+          "priceUnit": "Prix unitaire"
+        }
+      },
+      "receivePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Ligne de commande"
+        }
+      },
+      "invoicePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Ligne de commande"
+        }
+      },
+      "newLandedCost": {
+        "sections": {
+          "main": "Détails"
+        },
+        "fields": {
+          "currencyId": "ID de devise",
+          "amountTotal": "Montant total",
+          "date": "Date",
+          "description": "Description"
+        },
+        "targetMoves": {
+          "receipt": "Reçu",
+          "posted": "Comptabilisé"
+        }
+      },
+      "editLandedCost": {
+        "sections": {
+          "main": "Détails"
+        },
+        "fields": {
+          "landedCostId": "Coût d’acquisition",
+          "currencyId": "ID de devise",
+          "amountTotal": "Montant total",
+          "date": "Date",
+          "description": "Description"
+        }
+      },
+      "landedCostLine": {
+        "sections": {
+          "landedCost": "Coût d’acquisition"
+        },
+        "fields": {
+          "landedCostId": "Coût d’acquisition",
+          "productPlaceholder": "Choisir un produit…",
+          "currencyId": "ID de devise"
+        }
+      },
+      "newSupplierIntake": {
+        "fields": {
+          "contactName": "Nom du contact",
+          "email": "E-mail",
+          "phone": "Téléphone",
+          "industry": "Secteur d’activité",
+          "website": "Site web",
+          "notes": "Notes"
+        }
+      },
+      "editSupplierIntake": {
+        "sections": {
+          "main": "Détails"
+        },
+        "fields": {
+          "contactName": "Nom du contact",
+          "email": "E-mail",
+          "phone": "Téléphone",
+          "notes": "Notes"
+        }
+      },
+      "createBillFromOrder": {
+        "sections": {
+          "accounting": "Comptabilité"
+        },
+        "fields": {
+          "payableAccountId": "Compte de dettes fournisseurs"
+        }
+      },
+      "editPurchaseOrder": {
+        "fields": {
+          "orderId": "Commande fournisseur"
+        }
+      },
+      "common": {
+        "cancel": "Annuler",
+        "none": "Aucun",
+        "saving": "Enregistrement…"
+      },
+      "fields": {
+        "expenseAccount": "Compte de charges",
+        "journal": "Journal",
+        "notes": "Notes",
+        "payableAccount": "Compte de dettes fournisseurs",
+        "product": "Produit",
+        "purchaseOrder": "Commande fournisseur",
+        "quantity": "Quantité",
+        "returnReason": "Motif du retour",
+        "rfq": "Demande de devis",
+        "unitPrice": "Prix unitaire",
+        "uom": "Unité de mesure",
+        "vendor": "Fournisseur"
+      },
+      "refinement": {
+        "pricelist": "Liste de prix et devise"
+      }
+    },
+    "ops": {
+      "approve": "Approuver",
+      "delegationReason": "Motif",
+      "prompt": {
+        "contractName": "Nom du contrat",
+        "creditJournalId": "ID du journal",
+        "currencyId": "ID de devise",
+        "idempotencyKey": "Clé d’idempotence",
+        "intentProvider": "Prestataire",
+        "intentStatus": "Statut",
+        "intentType": "Type d’intention",
+        "partnerId": "ID du partenaire",
+        "productId": "ID du produit",
+        "returnProductId": "ID du produit",
+        "returnQty": "Quantité",
+        "rfqProductId": "ID du produit",
+        "rfqQty": "Quantité"
+      },
+      "recordIntentResult": "Enregistrer le résultat de l’intégration",
+      "reject": "Rejeter",
+      "recordIntegrationResult": "Enregistrer le résultat de l’intégration"
+    },
+    "purchaseReturns": {
+      "title": "Retours fournisseurs",
+      "filters": {
+        "state": {
+          "label": "Statut"
+        }
+      },
+      "states": {
+        "draft": "Brouillon",
+        "confirmed": "Confirmé"
+      },
+      "columns": {
+        "name": "Référence",
+        "purchaseOrderId": "Commande fournisseur",
+        "partnerId": "Fournisseur",
+        "state": "Statut",
+        "returnReason": "Motif du retour",
+        "pickingId": "Reçu",
+        "createDate": "Créé"
+      }
+    },
+    "operationsTab": "Opérations",
+    "order": {
+      "attachments": "Pièces jointes",
+      "bills": "Factures fournisseurs",
+      "discussion": "Discussion",
+      "receipts": "Reçus",
+      "status": {
+        "cancelled": "Annulé",
+        "done": "Terminé",
+        "purchase": "Commande fournisseur",
+        "rfq": "Demande de devis",
+        "toApprove": "À approuver"
+      },
+      "moreActions": "Plus"
+    },
+    "requisition": {
+      "addLine": {
+        "quantity": "Quantité",
+        "title": "Ajouter une ligne de demande",
+        "uom": "Unité de mesure"
+      }
+    },
+    "kpi": {
+      "rfqs": "Demandes de devis"
+    },
+    "blanket": {
+      "actions": {
+        "addLine": "Ajouter une ligne",
+        "cancel": "Annuler",
+        "remove": "Retirer"
+      },
+      "states": {
+        "draft": "Brouillon"
+      },
+      "fallback": {
+        "draft": "Brouillon",
+        "product": "Produit {{id}}"
+      },
+      "fields": {
+        "currency": "Devise",
+        "end": "Fin",
+        "name": "Nom",
+        "quantity": "Quantité",
+        "start": "Début",
+        "unitPrice": "Prix unitaire",
+        "vendor": "Fournisseur"
+      },
+      "release": {
+        "title": "Émettre une commande depuis l’accord-cadre"
+      },
+      "title": "Commandes-cadres"
+    },
+    "configuration": {
+      "actions": {
+        "saving": "Enregistrement…"
+      },
+      "fields": {
+        "contractName": "Nom du contrat",
+        "delegationReason": "Motif",
+        "endDate": "Date de fin",
+        "idempotencyKey": "Clé d’idempotence",
+        "intentType": "Type d’intention",
+        "product": "Produit",
+        "provider": "Prestataire",
+        "purchaseOrder": "Commande fournisseur",
+        "rate": "Taux",
+        "reason": "Motif",
+        "startDate": "Date de début",
+        "vendor": "Fournisseur",
+        "warehouse": "Entrepôt"
+      },
+      "none": "Aucun",
+      "risk": {
+        "high": "Élevée",
+        "low": "Faible",
+        "medium": "Moyenne"
+      },
+      "title": "Configuration des achats"
+    }
+  },
+  "erpWorkflow": {
+    "applied": "Terminé",
+    "retry": "Réessayer",
+    "confirm": {
+      "confirm": "Confirmer"
+    }
+  },
+  "sales": {
+    "order": {
+      "attachments": "Pièces jointes",
+      "deliveries": "Livraisons",
+      "discussion": "Discussion",
+      "invoices": "Factures",
+      "moreActions": "Plus",
+      "status": {
+        "cancelled": "Annulé",
+        "locked": "Verrouillé",
+        "sale": "Commande client",
+        "toApprove": "À approuver"
+      },
+      "options": {
+        "description": "Description",
+        "discount": "Remise %",
+        "priceUnit": "Prix unitaire",
+        "product": "Produit",
+        "quantity": "Quantité",
+        "subtotal": "Sous-total"
+      }
+    },
+    "dashboard": {
+      "widgets": {
+        "revenue": "Chiffre d’affaires"
+      }
+    },
+    "ops": {
+      "cancelSelected": "Annuler la sélection",
+      "journal": "Journal",
+      "expenseAccount": "Compte de charges",
+      "payableAccount": "Compte de dettes fournisseurs",
+      "lines": "Lignes",
+      "approve": "Approuver",
+      "prompt": {
+        "contractName": "Nom du contrat",
+        "idempotencyKey": "Clé d’idempotence",
+        "intentProvider": "Prestataire",
+        "intentStatus": "Statut",
+        "intentType": "Type d’intention",
+        "partnerId": "ID du partenaire"
+      },
+      "recordIntegrationResult": "Enregistrer le résultat de l’intégration",
+      "reject": "Rejeter"
+    },
+    "salesOrders": {
+      "title": "Commandes clients",
+      "columns": {
+        "state": "Statut",
+        "amountTotal": "Total",
+        "invoiceStatus": "Facture",
+        "deliveryCount": "Livraisons",
+        "deliverySummary": "Livraison",
+        "paymentSummary": "Paiement",
+        "partnerName": "Client"
+      },
+      "cashSummary": {
+        "invoice": {
+          "posted": "Facturé"
+        },
+        "payment": {
+          "unpaid": "Impayé",
+          "paid": "Payé"
+        }
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "Draft": "Brouillon",
+            "Sent": "Envoyé",
+            "ToApprove": "À approuver",
+            "Sale": "Confirmé",
+            "Done": "Terminé",
+            "Cancel": "Annulé"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "Sent": "Envoyé",
+        "ToApprove": "À approuver",
+        "Sale": "Confirmé",
+        "Done": "Terminé",
+        "Cancel": "Annulé"
+      },
+      "invoiceStates": {
+        "InvoicedPartially": "Partiel",
+        "Invoiced": "Facturé"
+      }
+    },
+    "orderLines": {
+      "title": "Lignes de commande",
+      "columns": {
+        "qtyInvoiced": "Facturé",
+        "priceUnit": "Prix unitaire",
+        "priceSubtotal": "Sous-total",
+        "discount": "Remise %",
+        "description": "Description"
+      },
+      "add": "Ajouter une ligne",
+      "addLine": "Ajouter une ligne",
+      "discountPercent": "Remise %",
+      "product": "Produit",
+      "productFallback": "Produit {{id}}",
+      "quantity": "Quantité",
+      "subtotal": "Sous-total",
+      "taxes": "Taxes",
+      "total": "Total",
+      "unitPrice": "Prix unitaire",
+      "untaxed": "Hors taxes"
+    },
+    "pricelistItems": {
+      "title": "Règles de tarification",
+      "tabLabel": "Règles de tarification",
+      "columns": {
+        "pricelistId": "Liste de prix",
+        "sequence": "Séq.",
+        "productId": "Produit",
+        "fixedPrice": "Prix fixe"
+      }
+    },
+    "pricelists": {
+      "title": "Listes de prix",
+      "columns": {
+        "name": "Nom",
+        "currencyId": "Devise",
+        "active": "Actif"
+      }
+    },
+    "deliveries": {
+      "title": "Livraisons",
+      "columns": {
+        "state": "Statut",
+        "scheduledDate": "Planifié"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "Draft": "Brouillon",
+            "InProgress": "En cours",
+            "Done": "Terminé",
+            "Cancel": "Annulé"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "InProgress": "En cours",
+        "Done": "Terminé",
+        "Cancel": "Annulé"
+      }
+    },
+    "fulfillment": {
+      "title": "Exécution des commandes"
+    },
+    "returns": {
+      "title": "Retours / RMA"
+    },
+    "returnOrders": {
+      "title": "Retours / RMA",
+      "columns": {
+        "state": "État",
+        "partnerId": "Client",
+        "creditMoveId": "Avoir",
+        "returnReason": "Motif"
+      },
+      "states": {
+        "draft": "Brouillon",
+        "confirmed": "Confirmé",
+        "cancelled": "Annulé"
+      },
+      "actions": {
+        "confirm": "Confirmer",
+        "cancel": "Annuler",
+        "createCreditNote": "Créer un avoir"
+      }
+    },
+    "returnOrderLines": {
+      "title": "Lignes de retour",
+      "columns": {
+        "productId": "Produit",
+        "quantity": "Qté",
+        "priceUnit": "Prix unitaire"
+      }
+    },
+    "tabs": {
+      "invoices": "Factures",
+      "fulfillment": "Exécution",
+      "returns": "Retours / RMA",
+      "deliveryPriceRules": "Règles des frais d’expédition",
+      "createDeliveryPriceRule": "Nouvelle règle de tarification",
+      "deliveryCarriers": "Transporteurs",
+      "createDeliveryCarrier": "Nouveau transporteur",
+      "shippingMethods": "Modes d’expédition",
+      "createShippingMethod": "Nouvelle méthode",
+      "posPaymentMethods": "Paiements du point de vente",
+      "createPaymentMethod": "Nouveau mode de paiement",
+      "loyaltyPrograms": "Programmes de fidélité",
+      "createLoyaltyProgram": "Nouveau programme",
+      "loyaltyCards": "Cartes de fidélité",
+      "createLoyaltyCard": "Nouvelle carte",
+      "ops": "Opérations",
+      "commissionPlans": "Plans de commission"
+    },
+    "deliveryPriceRules": {
+      "title": "Règles des frais de livraison",
+      "columns": {
+        "id": "ID"
+      }
+    },
+    "deliveryCarriers": {
+      "title": "Transporteurs de livraison",
+      "columns": {
+        "name": "Nom",
+        "deliveryType": "Type",
+        "active": "Actif",
+        "currencyId": "Devise",
+        "productId": "Produit"
+      }
+    },
+    "shippingMethods": {
+      "title": "Modes d’expédition",
+      "columns": {
+        "name": "Nom",
+        "provider": "Prestataire",
+        "deliveryType": "Type",
+        "active": "Actif",
+        "fixedPrice": "Prix fixe"
+      }
+    },
+    "posPaymentMethods": {
+      "title": "Modes de paiement du point de vente",
+      "columns": {
+        "name": "Nom",
+        "sequence": "Séq.",
+        "active": "Actif"
+      }
+    },
+    "loyaltyPrograms": {
+      "title": "Programmes de fidélité",
+      "columns": {
+        "name": "Nom",
+        "currencyId": "Devise",
+        "programType": "Type",
+        "isActive": "Actif"
+      }
+    },
+    "loyaltyCards": {
+      "title": "Cartes de fidélité",
+      "columns": {
+        "code": "Code",
+        "partnerId": "Partenaire",
+        "currencyId": "Devise",
+        "isActive": "Actif"
+      }
+    },
+    "forms": {
+      "newSaleOrder": {
+        "sections": {
+          "customer": "Client",
+          "notes": "Notes"
+        },
+        "fields": {
+          "partnerId": "Client",
+          "pricelistId": "Liste de prix",
+          "warehouseId": "Entrepôt",
+          "paymentTermId": "Conditions de paiement",
+          "note": "Notes",
+          "invoicePolicy": "Politique de facturation"
+        }
+      },
+      "newPricelist": {
+        "fields": {
+          "currencyId": "Devise"
+        }
+      },
+      "newPricelistItem": {
+        "fields": {
+          "pricelistId": "Liste de prix",
+          "appliedOnProduct": "Produit",
+          "computeFixed": "Prix fixe",
+          "productId": "ID du produit",
+          "fixedPrice": "Prix fixe",
+          "priceDiscount": "Remise %",
+          "sequence": "Séquence"
+        }
+      },
+      "newReturnOrder": {
+        "fields": {
+          "partnerId": "Client",
+          "returnReason": "Motif du retour"
+        }
+      },
+      "addReturnOrderLine": {
+        "sections": {
+          "product": "Produit"
+        },
+        "fields": {
+          "productId": "Produit",
+          "uomId": "Unité de mesure",
+          "quantity": "Quantité",
+          "priceUnit": "Prix unitaire"
+        }
+      },
+      "newDeliveryPriceRule": {
+        "sections": {
+          "main": "Règle"
+        }
+      },
+      "newDeliveryCarrier": {
+        "fields": {
+          "name": "Nom",
+          "currencyId": "ID de devise",
+          "invoicePolicy": "Politique de facturation",
+          "amount": "Montant"
+        }
+      },
+      "newShippingMethod": {
+        "sections": {
+          "main": "Méthode"
+        },
+        "fields": {
+          "name": "Nom",
+          "provider": "Prestataire",
+          "productId": "ID du produit",
+          "invoicePolicy": "Politique de facturation",
+          "fixedPrice": "Prix fixe",
+          "amount": "Montant"
+        }
+      },
+      "newPosPaymentMethod": {
+        "fields": {
+          "name": "Nom",
+          "paymentMethodType": "Type",
+          "sequence": "Séquence",
+          "journalId": "ID du journal"
+        }
+      },
+      "newLoyaltyProgram": {
+        "fields": {
+          "name": "Nom",
+          "currencyId": "ID de devise",
+          "dateTo": "Date de fin"
+        }
+      },
+      "createInvoiceFromOrder": {
+        "sections": {
+          "accounting": "Comptabilité"
+        },
+        "fields": {
+          "receivableAccountId": "Compte de créances clients"
+        }
+      },
+      "addSaleOrderLine": {
+        "sections": {
+          "product": "Produit et tarification"
+        },
+        "fields": {
+          "productId": "Produit",
+          "productPlaceholder": "Choisir un produit…",
+          "uomId": "Unité de mesure",
+          "quantity": "Quantité",
+          "priceUnit": "Prix unitaire",
+          "discount": "Remise %",
+          "sequence": "Séquence",
+          "name": "Description",
+          "taxIds": "Taxes"
+        }
+      },
+      "editSaleOrderLine": {
+        "sections": {
+          "line": "Ligne de commande"
+        },
+        "fields": {
+          "lineId": "Ligne de commande"
+        }
+      },
+      "partialDelivery": {
+        "sections": {
+          "moveLines": "Lignes comptables"
+        }
+      },
+      "editSaleOrder": {
+        "submitLabel": "Enregistrer"
+      },
+      "refinement": {
+        "pricelist": "Liste de prix et devise",
+        "delivery": "Livraison",
+        "uom": "Unité de mesure"
+      }
+    },
+    "actions": {
+      "confirmSelected": "Confirmer",
+      "recalculateTotals": "Recalculer les totaux",
+      "newSaleOrderLine": "Nouvelle ligne",
+      "deletePricelists": "Supprimer",
+      "startBatches": "Début",
+      "completeBatches": "Terminer",
+      "downloadPdf": "Télécharger le PDF"
+    },
+    "commissionPlans": {
+      "active": "Actif",
+      "name": "Plan",
+      "partner": "Partenaire"
+    },
+    "quotationDocument": {
+      "title": "Document de devis",
+      "download": "Télécharger le PDF",
+      "close": "Fermer"
+    }
+  },
+  "calendar": {
+    "activitiesTab": "Activités",
+    "dashboard": {
+      "confirmed": "Confirmé"
+    },
+    "events": {
+      "title": "Événements du calendrier",
+      "columns": {
+        "start": "Début",
+        "stop": "Fin",
+        "state": "Statut"
+      },
+      "filters": {
+        "state": "Statut",
+        "stateOptions": {
+          "draft": "Brouillon",
+          "confirmed": "Confirmé",
+          "cancelled": "Annulé"
+        }
+      },
+      "states": {
+        "draft": "Brouillon",
+        "confirmed": "Confirmé",
+        "cancelled": "Annulé"
+      }
+    },
+    "forms": {
+      "newEvent": {
+        "fields": {
+          "description": "Description"
+        }
+      }
+    },
+    "eventDetail": {
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "closeAria": "Fermer",
+      "open": "Ouvert",
+      "moreActions": "Plus"
+    },
+    "page": {
+      "discussion": "Discussion"
+    }
+  },
+  "documents": {
+    "designer": {
+      "draft": "Brouillon",
+      "save": "Enregistrer le modèle",
+      "starterContent": {
+        "quotationDate": "Date",
+        "quotationSubtotal": "Sous-total",
+        "quotationTax": "Taxe",
+        "quotationTotal": "Total"
+      },
+      "saveChanges": "Enregistrer les modifications",
+      "status": "Statut",
+      "inactive": "Inactif"
+    },
+    "documents": {
+      "title": "Documents",
+      "columns": {
+        "name": "Nom",
+        "mimetype": "Type",
+        "createDate": "Créé",
+        "description": "Description"
+      },
+      "filters": {
+        "isDeleted": {
+          "label": "Statut",
+          "options": {
+            "false": "Actif"
+          }
+        }
+      }
+    },
+    "knowledgeBase": {
+      "title": "Base de connaissances",
+      "columns": {
+        "name": "Titre",
+        "description": "Description",
+        "createDate": "Créé"
+      },
+      "filters": {
+        "isPublished": {
+          "options": {
+            "false": "Brouillon"
+          }
+        }
+      }
+    },
+    "knowledgeCategories": {
+      "title": "Catégories de connaissances",
+      "columns": {
+        "name": "Nom",
+        "description": "Description",
+        "sequence": "Séquence",
+        "createDate": "Créé"
+      }
+    },
+    "folders": {
+      "title": "Dossiers de documents",
+      "columns": {
+        "name": "Nom",
+        "documentCount": "Documents",
+        "createDate": "Créé"
+      }
+    },
+    "tabs": {
+      "processing": "Traitements",
+      "insights": "Analyses IA",
+      "categories": "Catégories",
+      "folders": "Dossiers",
+      "newCategory": "Nouvelle catégorie",
+      "newFolder": "Nouveau dossier"
+    },
+    "processing": {
+      "title": "Traitements de documents",
+      "columns": {
+        "id": "ID",
+        "documentType": "Type de document",
+        "status": "Statut",
+        "approved": "Approuvé",
+        "confidence": "Fiabilité",
+        "modelUsed": "Modèle",
+        "created": "Créé"
+      },
+      "filters": {
+        "isApproved": {
+          "label": "Approuvé",
+          "options": {
+            "yes": "Oui",
+            "no": "Non"
+          }
+        }
+      }
+    },
+    "insights": {
+      "title": "Analyses IA",
+      "columns": {
+        "title": "Titre",
+        "generatedAt": "Généré"
+      },
+      "filters": {
+        "dismissed": {
+          "options": {
+            "open": "Ouvert"
+          }
+        },
+        "isAcknowledged": {
+          "options": {
+            "yes": "Oui",
+            "no": "Non"
+          }
+        }
+      }
+    },
+    "forms": {
+      "newDocument": {
+        "fields": {
+          "description": "Description",
+          "resModelNone": "Aucun",
+          "fiscalKindNone": "Aucun"
+        }
+      },
+      "newArticle": {
+        "fields": {
+          "description": "Description"
+        }
+      },
+      "newKnowledgeArticle": {
+        "fields": {
+          "description": "Description"
+        }
+      },
+      "newCategory": {
+        "title": "Nouvelle catégorie",
+        "sections": {
+          "category": "Catégorie"
+        },
+        "fields": {
+          "name": "Nom",
+          "description": "Description",
+          "sequence": "Séquence",
+          "color": "Couleur"
+        }
+      },
+      "newFolder": {
+        "title": "Nouveau dossier",
+        "fields": {
+          "name": "Nom",
+          "description": "Description",
+          "sequence": "Séquence"
+        }
+      },
+      "newProcessingJob": {
+        "fields": {
+          "documentType": "Type de document"
+        }
+      },
+      "recordTypes": {
+        "expense": "Charge",
+        "purchaseOrder": "Commande fournisseur",
+        "salesOrder": "Commande client"
+      }
+    },
+    "page": {
+      "delete": "Supprimer",
+      "discussion": "Discussion",
+      "edit": "Modifier",
+      "locked": "Verrouillé",
+      "holdReason": "Motif",
+      "refSystem": "Système",
+      "signatureCompleted": "Terminé",
+      "signatureStatus": "Statut",
+      "signatureProvider": "Prestataire"
+    },
+    "knowledgeActions": {
+      "done": "{{action}} terminé",
+      "failed": "Échec de {{action}}"
+    },
+    "browser": {
+      "folders": "Dossiers",
+      "newFolder": "Nouveau dossier",
+      "upload": "Téléverser",
+      "name": "Nom",
+      "viewTable": "Tableau de données"
+    },
+    "studio": {
+      "undo": "Annuler la modification",
+      "color": "Couleur",
+      "none": "Aucun",
+      "light": "Clair",
+      "blockLabels": {
+        "table": "Tableau de données"
+      },
+      "fields": {
+        "quotation_currency": "Devise",
+        "quotation_subtotal": "Sous-total",
+        "quotation_tax": "Taxe",
+        "quotation_total": "Total"
+      },
+      "all": "Tous"
+    },
+    "templatePicker": {
+      "retry": "Réessayer",
+      "kind": {
+        "list": "Liste",
+        "table": "Tableau de données",
+        "code": "Code"
+      }
+    }
+  },
+  "subscriptions": {
+    "subscriptions": {
+      "title": "Abonnements",
+      "columns": {
+        "name": "Référence",
+        "code": "Code",
+        "description": "Description",
+        "partnerId": "Client",
+        "productId": "Plan",
+        "state": "Statut",
+        "dateStart": "Date de début",
+        "dateEnd": "Date de fin"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "draft": "Brouillon",
+            "active": "Actif",
+            "closed": "Clôturé",
+            "Draft": "Brouillon",
+            "Open": "Actif",
+            "Pending": "En attente",
+            "Close": "Clôturé",
+            "Cancelled": "Annulé"
+          }
+        }
+      },
+      "states": {
+        "draft": "Brouillon",
+        "active": "Actif",
+        "closed": "Clôturé",
+        "Draft": "Brouillon",
+        "Open": "Actif",
+        "Pending": "En attente",
+        "Close": "Clôturé",
+        "Cancelled": "Annulé"
+      }
+    },
+    "plans": {
+      "title": "Offres d’abonnement",
+      "columns": {
+        "code": "Code",
+        "productId": "Produit",
+        "active": "Actif"
+      },
+      "actions": {
+        "failed": "Échec de {{action}}"
+      },
+      "bundle": {
+        "plan": "Plan"
+      },
+      "edit": {
+        "description": "Description",
+        "paymentMode": "Mode de paiement",
+        "unchanged": "Aucune modification."
+      }
+    },
+    "deferredSchedules": {
+      "title": "Échéanciers de produits différés",
+      "searchPlaceholder": "Rechercher des échéanciers…",
+      "columns": {
+        "id": "ID",
+        "description": "Description",
+        "state": "État",
+        "totalAmount": "Total",
+        "startDate": "Début",
+        "endDate": "Fin"
+      }
+    },
+    "deferredLines": {
+      "title": "Lignes de produits différés",
+      "searchPlaceholder": "Rechercher des lignes…",
+      "columns": {
+        "id": "ID",
+        "scheduleId": "Échéancier",
+        "sequence": "Séq.",
+        "amount": "Montant",
+        "recognized": "Comptabilisé"
+      }
+    },
+    "recognitionRules": {
+      "title": "Règles de constatation des produits",
+      "columns": {
+        "id": "ID",
+        "description": "Description",
+        "priority": "Priorité",
+        "isActive": "Actif",
+        "recognitionMethod": "Méthode",
+        "recognitionPeriod": "Période"
+      }
+    },
+    "actions": {
+      "generateInvoice": "Générer une facture",
+      "cancel": "Résilier l’abonnement",
+      "payInvoice": "Enregistrer un paiement"
+    },
+    "forms": {
+      "newSubscription": {
+        "fields": {
+          "state": "Statut",
+          "saleOrderId": "Commande client",
+          "partnerId": "Client",
+          "productId": "Plan",
+          "productPlaceholder": "ID du produit",
+          "code": "Référence",
+          "description": "Description",
+          "dateStart": "Date de début",
+          "options": {
+            "recurring": {
+              "monthly": "Mensuel",
+              "yearly": "Annuel"
+            },
+            "state": {
+              "draft": "Brouillon",
+              "open": "Ouvert",
+              "pending": "En attente"
+            }
+          }
+        },
+        "startingValues": {
+          "draft": "Brouillon"
+        }
+      },
+      "newPlan": {
+        "fields": {
+          "pricelistId": "Liste de prix et devise",
+          "description": "Description",
+          "productId": "Produit",
+          "productPlaceholder": "ID du produit",
+          "options": {
+            "month": "Mois",
+            "monthly": "Mensuel",
+            "yearly": "Annuel"
+          }
+        }
+      },
+      "deferredSchedule": {
+        "sections": {
+          "main": "Échéancier"
+        },
+        "fields": {
+          "description": "Description",
+          "journalId": "Journal",
+          "currencyId": "ID de devise",
+          "startDate": "Date de début",
+          "endDate": "Date de fin",
+          "state": "État",
+          "notes": "Notes"
+        },
+        "options": {
+          "monthly": "Mensuel",
+          "stateDraft": "Brouillon",
+          "stateRunning": "En cours"
+        }
+      },
+      "recognitionRule": {
+        "sections": {
+          "main": "Règle"
+        },
+        "fields": {
+          "description": "Description",
+          "idListPlaceholder": "Ajouter…",
+          "recognitionMethod": "Méthode",
+          "recognitionPeriod": "Période",
+          "isActive": "Actif",
+          "notes": "Notes"
+        }
+      },
+      "closeSubscription": {
+        "sections": {
+          "main": "Détails"
+        },
+        "fields": {
+          "notes": "Notes"
+        }
+      },
+      "generateInvoice": {
+        "title": "Générer une facture",
+        "sections": {
+          "main": "Facture"
+        },
+        "fields": {
+          "incomeAccountId": "Compte de produits",
+          "journalId": "Journal",
+          "receivableAccountId": "Compte de créances clients"
+        }
+      },
+      "recognizeLine": {
+        "sections": {
+          "main": "Écriture comptable"
+        }
+      },
+      "importPlanCsv": {
+        "sections": {
+          "main": "Données CSV"
+        }
+      },
+      "importSubscriptionCsv": {
+        "sections": {
+          "main": "Données CSV"
+        }
+      },
+      "amend": {
+        "fields": {
+          "amendmentType": "Type",
+          "incomeAccountId": "Compte de produits",
+          "journalId": "Journal",
+          "lineId": "Ligne",
+          "notes": "Notes",
+          "receivableAccountId": "Compte de créances clients"
+        }
+      },
+      "cancel": {
+        "fields": {
+          "notes": "Notes"
+        },
+        "sections": {
+          "main": "Annuler"
+        },
+        "title": "Résilier l’abonnement"
+      },
+      "commitment": {
+        "fields": {
+          "active": "Actif"
+        }
+      },
+      "ingestUsage": {
+        "fields": {
+          "quantity": "Quantité"
+        }
+      },
+      "payInvoice": {
+        "fields": {
+          "invoiceMoveId": "Facture",
+          "receivableAccountId": "Compte de créances clients"
+        },
+        "sections": {
+          "main": "Paiement"
+        },
+        "title": "Enregistrer un paiement"
+      },
+      "priceTier": {
+        "fields": {
+          "planId": "Plan",
+          "sequence": "Séquence",
+          "unitPrice": "Prix unitaire"
+        }
+      },
+      "renew": {
+        "fields": {
+          "notes": "Notes"
+        },
+        "sections": {
+          "main": "Renouvellement"
+        }
+      }
+    },
+    "amendments": {
+      "columns": {
+        "amendmentType": "Type",
+        "creditNoteMoveId": "Avoir",
+        "notes": "Notes",
+        "subscriptionId": "Abonnement"
+      },
+      "tabLabel": "Avenants",
+      "title": "Avenants"
+    },
+    "dueToBill": {
+      "tabLabel": "À facturer",
+      "title": "À facturer"
+    },
+    "entitlements": {
+      "tabLabel": "Droits d’accès",
+      "title": "Droits d’accès"
+    },
+    "lines": {
+      "columns": {
+        "name": "Description",
+        "priceSubtotal": "Sous-total",
+        "priceUnit": "Prix unitaire",
+        "qty": "Qté",
+        "subscriptionId": "Abonnement"
+      },
+      "searchPlaceholder": "Rechercher des lignes…",
+      "tabLabel": "Lignes",
+      "title": "Lignes d’abonnement"
+    },
+    "pastDue": {
+      "tabLabel": "Échu",
+      "title": "Échu"
+    },
+    "paymentIntents": {
+      "tabLabel": "Intentions de paiement",
+      "title": "Intentions de paiement"
+    },
+    "priceTiers": {
+      "tabLabel": "Paliers de tarification",
+      "title": "Paliers de tarification"
+    },
+    "ratingBacklog": {
+      "tabLabel": "Événements à tarifer",
+      "title": "Événements à tarifer"
+    },
+    "usageCharges": {
+      "tabLabel": "Frais d’utilisation",
+      "title": "Frais d’utilisation"
+    },
+    "usageEvents": {
+      "tabLabel": "Événements d’utilisation",
+      "title": "Événements d’utilisation"
+    },
+    "page": {
+      "attachments": "Pièces jointes",
+      "discussion": "Discussion",
+      "moreActions": "Plus"
+    },
+    "paymentIntent": {
+      "amount": "Montant",
+      "currency": "Devise",
+      "intentType": "Type d’intention"
+    },
+    "bundles": {
+      "columns": {
+        "active": "Actif",
+        "code": "Code",
+        "name": "Nom",
+        "plan": "Plan"
+      },
+      "tabLabel": "Offres groupées",
+      "title": "Offres groupées"
+    },
+    "workflow": {
+      "overview": "Vue d’ensemble",
+      "needsAttention": "À traiter",
+      "queues": {
+        "drafts": {
+          "title": "Brouillons à activer"
+        },
+        "due": {
+          "title": "Facturation à effectuer"
+        },
+        "overdue": {
+          "title": "Paiements en retard"
+        },
+        "paused": {
+          "title": "Facturation suspendue"
+        }
+      },
+      "steps": {
+        "order": "Commande client",
+        "plan": "Plan"
+      },
+      "back": "Retour",
+      "starts": "Date de début",
+      "contract": "Abonnement",
+      "invoice": "Facture",
+      "credit": "Avoir",
+      "pastDueDays": "Jours de retard",
+      "labels": {
+        "generate-invoice": "Générer une facture",
+        "pay-invoice": "Enregistrer un paiement",
+        "cancel": "Résilier l’abonnement"
+      }
+    }
+  },
+  "expenses": {
+    "dashboard": {
+      "approved": "Approuvé",
+      "totalAmount": "Montant total"
+    },
+    "expenses": {
+      "title": "Dépenses",
+      "columns": {
+        "name": "Description",
+        "employeeId": "Employé",
+        "date": "Date",
+        "totalAmount": "Montant",
+        "quantity": "Qté",
+        "state": "Statut",
+        "sheetId": "Rapport"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "Draft": "Brouillon",
+            "Submitted": "Envoyé",
+            "Approved": "Approuvé",
+            "Posted": "Comptabilisé",
+            "Done": "Terminé",
+            "Refused": "Refusé"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "Submitted": "Envoyé",
+        "Approved": "Approuvé",
+        "Posted": "Comptabilisé",
+        "Done": "Terminé",
+        "Refused": "Refusé"
+      }
+    },
+    "expenseReports": {
+      "title": "Notes de frais",
+      "columns": {
+        "name": "Nom du rapport",
+        "employeeId": "Employé",
+        "state": "Statut",
+        "createDate": "Envoyé",
+        "totalAmount": "Montant total",
+        "createdAt": "Créé"
+      },
+      "filters": {
+        "state": {
+          "label": "Statut",
+          "options": {
+            "Draft": "Brouillon",
+            "Submitted": "Envoyé",
+            "Approved": "Approuvé",
+            "Posted": "Comptabilisé",
+            "Done": "Terminé",
+            "Refused": "Refusé"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Brouillon",
+        "Submitted": "Envoyé",
+        "Approved": "Approuvé",
+        "Posted": "Comptabilisé",
+        "Done": "Terminé",
+        "Refused": "Refusé"
+      }
+    },
+    "workflow": {
+      "expenseTitle": "Charge",
+      "actionsTitle": "Actions",
+      "approveReport": "Approuver",
+      "timelineState": "État"
+    },
+    "capture": {
+      "title": "Saisie de reçus",
+      "retry": "Réessayer",
+      "discard": "Abandonner"
+    },
+    "tabs": {
+      "inbox": "Boîte de réception"
+    },
+    "inbox": {
+      "title": "Exceptions à traiter",
+      "toApprove": "À approuver"
+    },
+    "ops": {
+      "title": "Opérations de dépenses (cartes et réception)",
+      "amount": "Montant",
+      "currencyId": "ID de devise"
+    },
+    "admin": {
+      "title": "Avances, exceptions et fraude",
+      "amount": "Montant",
+      "currencyId": "ID de devise",
+      "journalId": "ID du journal",
+      "residual": "Restant dû",
+      "approve": "Approuver",
+      "reject": "Rejeter"
+    },
+    "forms": {
+      "newExpense": {
+        "fields": {
+          "pricelistId": "Liste de prix et devise",
+          "pricelistPlaceholder": "Choisir une liste de prix",
+          "name": "Description",
+          "description": "Détails",
+          "date": "Date",
+          "totalAmount": "Montant unitaire",
+          "quantity": "Quantité",
+          "employeeId": "Employé",
+          "employeePlaceholder": "Choisir un employé",
+          "productId": "Catégorie",
+          "productPlaceholder": "ID du produit",
+          "paymentMode": "Mode de paiement",
+          "lineKindStandard": "Achat"
+        }
+      },
+      "newExpenseSheet": {
+        "sections": {
+          "sheetDetails": "Détails du rapport"
+        },
+        "fields": {
+          "pricelistId": "Liste de prix",
+          "pricelistPlaceholder": "Choisir une liste de prix",
+          "name": "Nom du rapport",
+          "employeeId": "Employé",
+          "employeePlaceholder": "Choisir un employé"
+        }
+      },
+      "newExpenseReport": {
+        "sections": {
+          "reportDetails": "Détails du rapport"
+        },
+        "fields": {
+          "pricelistId": "Liste de prix et devise",
+          "pricelistPlaceholder": "Choisir une liste de prix",
+          "name": "Nom du rapport",
+          "employeeId": "Employé",
+          "employeePlaceholder": "Choisir un employé",
+          "notes": "Notes"
+        }
+      },
+      "editExpense": {
+        "sections": {
+          "details": "Détails"
+        },
+        "fields": {
+          "name": "Description",
+          "unitAmount": "Montant unitaire",
+          "quantity": "Quantité",
+          "productId": "Catégorie",
+          "paymentMode": "Mode de paiement",
+          "description": "Notes"
+        }
+      },
+      "addToReport": {
+        "sections": {
+          "sheet": "Rapport"
+        }
+      },
+      "postReport": {
+        "sections": {
+          "accounts": "Comptabilité"
+        },
+        "fields": {
+          "journalId": "Journal",
+          "defaultExpenseAccountId": "Compte de charges"
+        }
+      },
+      "reimburseReport": {
+        "sections": {
+          "accounts": "Paiement"
+        },
+        "fields": {
+          "journalId": "Journal"
+        }
+      },
+      "upsertMileageRate": {
+        "fields": {
+          "name": "Nom",
+          "currencyId": "ID de devise",
+          "active": "Actif"
+        }
+      },
+      "upsertPerDiemRate": {
+        "fields": {
+          "name": "Nom",
+          "currencyId": "ID de devise",
+          "active": "Actif"
+        }
+      },
+      "projectRebill": {
+        "fields": {
+          "journalId": "Journal",
+          "receivableAccountId": "Compte de créances clients",
+          "incomeAccountId": "Compte de produits"
+        }
+      },
+      "capture": {
+        "project": "Projet",
+        "taxes": "Taxes",
+        "unitAmount": "Montant unitaire"
+      }
+    },
+    "operationsTab": "Opérations",
+    "page": {
+      "discussion": "Discussion"
+    }
+  },
+  "messages": {
+    "dashboard": {
+      "notifications": "Notifications"
+    },
+    "messages": {
+      "title": "Messages",
+      "filters": {
+        "messageType": {
+          "label": "Type",
+          "options": {
+            "email": "E-mail"
+          }
+        }
+      },
+      "columns": {
+        "body": "Message",
+        "model": "Modèle",
+        "messageType": "Type",
+        "date": "Date"
+      },
+      "states": {
+        "email": "E-mail"
+      }
+    },
+    "followers": {
+      "title": "Abonnés au suivi",
+      "columns": {
+        "resModel": "Modèle",
+        "partnerId": "Partenaire"
+      }
+    },
+    "forms": {
+      "newMessage": {
+        "sections": {
+          "message": "Message"
+        },
+        "fields": {
+          "options": {
+            "email": "E-mail"
+          }
+        }
+      },
+      "messageTemplate": {
+        "name": "Nom du modèle"
+      },
+      "invoiceReminder": {
+        "invoices": "Factures"
+      },
+      "recordChoice": {
+        "invoice": "Facture",
+        "bill": "Facture fournisseur",
+        "creditNote": "Avoir",
+        "journalEntry": "Écriture comptable"
+      }
+    },
+    "notifications": {
+      "tabLabel": "Mes notifications",
+      "title": "Mes notifications"
+    },
+    "page": {
+      "openReply": "Ouvert"
+    }
+  },
+  "tasks": {
+    "page": {
+      "title": "Tâches"
+    },
+    "board": {
+      "stats": {
+        "total": "Total",
+        "inProgress": "En cours",
+        "done": "Terminé",
+        "overdue": "En retard"
+      },
+      "columns": {
+        "InProgress": "En cours",
+        "Approved": "Approuvé",
+        "Done": "Terminé",
+        "Cancelled": "Annulé"
+      },
+      "tableView": "Tableau de données"
+    },
+    "create": {
+      "title": "Créer une tâche"
+    },
+    "detail": {
+      "notSet": "Non défini"
+    },
+    "fields": {
+      "description": "Description",
+      "dueDate": "Date d’échéance",
+      "priority": "Priorité",
+      "status": "Statut",
+      "title": "Titre",
+      "type": "Type"
+    },
+    "priorities": {
+      "high": "Élevée",
+      "low": "Faible",
+      "medium": "Moyenne"
+    },
+    "sprint": {
+      "statuses": {
+        "active": "Actif",
+        "completed": "Terminé"
+      }
+    },
+    "stats": {
+      "completed": "Terminé"
+    },
+    "statuses": {
+      "done": "Terminé",
+      "in-progress": "En cours"
+    },
+    "types": {
+      "task": "Tâche"
+    }
+  },
+  "overview": {
+    "page": {
+      "title": "Vue d’ensemble",
+      "description": "Votre activité en un coup d’œil"
+    },
+    "dashboard": {
+      "keyMetrics": "Indicateurs clés",
+      "sections": {
+        "attention": "À traiter",
+        "pipeline": "Opportunités en cours",
+        "trends": "Tendances"
+      },
+      "stats": {
+        "openSalesOrders": "Commandes clients en cours",
+        "openPurchaseOrders": "Commandes fournisseurs en cours",
+        "accountsReceivable": "Créances clients",
+        "accountsPayable": "Dettes fournisseurs",
+        "lowStockAlerts": "Alertes de stock faible",
+        "openTasks": "Tâches de projet en cours",
+        "activeProjects": "Projets actifs",
+        "pendingAiDrafts": "Brouillons IA en attente"
+      },
+      "actions": {
+        "sales": "Ventes",
+        "accounting": "Comptabilité",
+        "crm": "CRM",
+        "inventory": "Stocks",
+        "aiDrafts": "Approbations IA",
+        "projects": "Projets"
+      },
+      "widgets": {
+        "upcomingTasks": "Prochaines échéances des tâches",
+        "lowStock": "Stock faible ou épuisé",
+        "openPurchaseOrders": "Commandes fournisseurs en cours",
+        "salesTrend": "Ventes confirmées (6 mois)",
+        "pipelineMix": "Opportunités en cours"
+      },
+      "overdue": "En retard",
+      "tables": {
+        "task": "Tâche",
+        "project": "Projet",
+        "due": "Échéance",
+        "status": "Statut",
+        "sku": "SKU",
+        "product": "Produit",
+        "qty": "Qté",
+        "reference": "Référence",
+        "vendor": "Fournisseur",
+        "amount": "Montant"
+      }
+    }
+  },
+  "settings": {
+    "page": {
+      "title": "Paramètres",
+      "description": "Gérez votre compte et la configuration du système"
+    },
+    "import": {
+      "file": "Fichier CSV ou Excel",
+      "analyzing": "Analyse…",
+      "preview": "Aperçu de l’importation",
+      "previewErrors": "Erreurs",
+      "run": "Importer",
+      "row": "Ligne",
+      "saveTemplate": "Enregistrer le modèle",
+      "templateName": "Nom du modèle",
+      "deleteTemplate": "Supprimer le modèle",
+      "status": "Statut",
+      "importedRows": "Importé",
+      "errorRows": "Erreurs"
+    },
+    "backToSettings": "Retour aux paramètres",
+    "adminAccess": "Accès administrateur",
+    "configure": "Configurer",
+    "restricted": "Certains paramètres sont restreints. Contactez un administrateur pour y accéder.",
+    "formConfig": {
+      "title": "Configuration des formulaires",
+      "reset": "Réinitialiser",
+      "saveChanges": "Enregistrer les modifications",
+      "preview": {
+        "submitHidden": "Aperçu"
+      },
+      "refresh": "Actualiser",
+      "fieldDialog": {
+        "label": "Libellé",
+        "type": "Type",
+        "enabled": "Activé",
+        "fieldTypes": {
+          "Date": "Date"
+        }
+      },
+      "fieldCard": {
+        "system": "Système",
+        "edit": "Modifier",
+        "delete": "Supprimer"
+      }
+    },
+    "ai": {
+      "title": "IA",
+      "description": "Description",
+      "active": "Actif",
+      "inactive": "Inactif",
+      "edit": "Modifier",
+      "insightTitleField": "Titre",
+      "insightDescriptionField": "Description",
+      "name": "Nom",
+      "provider": "Prestataire",
+      "model": "Modèle",
+      "optional": "Facultatif",
+      "create": "Créer",
+      "allowlistEnabled": "Activé"
+    },
+    "auditLog": {
+      "filter": "Filtrer",
+      "exportCsv": "Exporter en CSV"
+    },
+    "users": {
+      "fullName": "Nom complet",
+      "email": "E-mail",
+      "department": "Service",
+      "status": "Statut",
+      "statuses": {
+        "active": "Actif",
+        "inactive": "Inactif",
+        "pending": "En attente"
+      },
+      "saveChanges": "Enregistrer les modifications"
+    },
+    "roles": {
+      "system": "Système",
+      "edit": "Modifier",
+      "color": "Couleur",
+      "roleDescription": "Description",
+      "saveChanges": "Enregistrer les modifications",
+      "sod": {
+        "description": "Description",
+        "inactive": "Inactif"
+      }
+    },
+    "adminOps": {
+      "reference": {
+        "countryName": "Nom",
+        "currencyName": "Nom"
+      }
+    },
+    "profile": {
+      "personalInfo": "Informations personnelles",
+      "personalInfoDesc": "Mettez à jour vos informations personnelles",
+      "changeAvatar": "Changer l’avatar",
+      "avatarHint": "JPG, PNG ou GIF. 2 Mo maximum.",
+      "fullName": "Nom complet",
+      "email": "E-mail",
+      "department": "Service",
+      "timezone": "Fuseau horaire",
+      "timezones": {
+        "pacific": "Heure du Pacifique (UTC-8)",
+        "eastern": "Heure de l’Est (UTC-5)",
+        "utc": "UTC",
+        "centralEuropean": "Heure d’Europe centrale (UTC+1)"
+      },
+      "saveChanges": "Enregistrer les modifications",
+      "saveSuccess": "Profil mis à jour",
+      "saveError": "Impossible de mettre à jour le profil",
+      "managedByProvider": "Votre fournisseur de connexion gère votre avatar et votre mot de passe.",
+      "notificationsUnavailable": "Les préférences de notification ne sont pas encore disponibles.",
+      "security": "Sécurité",
+      "securityDesc": "Gérez votre mot de passe et vos paramètres de sécurité",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "updatePassword": "Modifier le mot de passe",
+      "emailNotifications": "Notifications par e-mail",
+      "emailNotificationsDesc": "Choisissez les informations reçues par e-mail",
+      "emailItems": {
+        "orders": {
+          "label": "Nouvelles commandes",
+          "description": "Recevez une notification pour les nouvelles commandes"
+        },
+        "inventory": {
+          "label": "Alertes de stock faible",
+          "description": "Recevez une alerte quand le stock baisse"
+        },
+        "reports": {
+          "label": "Rapports hebdomadaires",
+          "description": "Recevez un résumé hebdomadaire des résultats"
+        },
+        "security": {
+          "label": "Alertes de sécurité",
+          "description": "Notifications de sécurité importantes"
+        }
+      },
+      "inAppNotifications": "Notifications dans l’application",
+      "inAppNotificationsDesc": "Configurez les notifications du tableau de bord",
+      "inAppItems": {
+        "push": {
+          "label": "Notifications push",
+          "description": "Notifications push du navigateur"
+        },
+        "sound": {
+          "label": "Son",
+          "description": "Émettre un son pour les nouvelles notifications"
+        },
+        "badge": {
+          "label": "Compteur de notifications",
+          "description": "Afficher le nombre de notifications non lues"
+        }
+      },
+      "theme": "Thème",
+      "themeDesc": "Choisissez votre thème de couleurs",
+      "themes": {
+        "light": "Clair",
+        "dark": "Sombre",
+        "system": "Système"
+      },
+      "palette": "Palette de couleurs",
+      "paletteDesc": "Couleurs d’accent et graphiques. Mistral utilise des tons beiges, rouges et orange.",
+      "palettes": {
+        "default": "Mistral",
+        "ocean": "Océan"
+      },
+      "shell": "Fond de l’interface",
+      "shellDesc": "Aspect du fond de l’application",
+      "shells": {
+        "default": "Standard",
+        "cssArt": "Fond artistique"
+      },
+      "dashboardLayout": "Disposition du tableau de bord",
+      "dashboardLayoutDesc": "Personnalisez votre tableau de bord",
+      "layout": {
+        "compactMode": {
+          "label": "Mode compact",
+          "description": "Réduire l’espacement entre les éléments"
+        },
+        "sidebarCollapsed": {
+          "label": "Barre latérale réduite",
+          "description": "Démarrer avec la barre latérale réduite"
+        },
+        "showQuickActions": {
+          "label": "Afficher les actions rapides",
+          "description": "Afficher les boutons d’action rapide sur le tableau de bord"
+        }
+      },
+      "accessibility": "Accessibilité",
+      "accessibilityDesc": "Réglez les options d’accessibilité",
+      "a11y": {
+        "reduceMotion": {
+          "label": "Réduire les animations",
+          "description": "Limiter les animations"
+        },
+        "highContrast": {
+          "label": "Contraste élevé",
+          "description": "Augmenter le contraste des couleurs"
+        }
+      },
+      "language": "Langue d’affichage",
+      "languageHint": "Votre langue s’applique après l’enregistrement du profil et suit votre compte sur vos autres appareils.",
+      "loanwords": "Emprunts en kinyarwanda",
+      "loanwordsHint": "Choisissez le français ou l’anglais pour les termes techniques empruntés et les textes pas encore traduits.",
+      "swahiliLoanwordsHint": "Le swahili utilise l’anglais pour les termes techniques empruntés et les textes pas encore traduits.",
+      "loading": "Chargement de votre profil…",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "emailVerificationHint": "La modification de l’e-mail nécessite la vérification du fournisseur d’identité et l’approbation d’un administrateur.",
+      "loadError": "Impossible de charger votre profil. Rechargez la page pour réessayer.",
+      "securityProviderHint": "Votre fournisseur d’identité gère votre mot de passe et la sécurité de connexion.",
+      "manageSecurity": "Gérer la sécurité de connexion"
+    },
+    "customFields": {
+      "title": "Mes champs personnalisés",
+      "saveChanges": "Enregistrer les modifications"
+    },
+    "formConfigSettings": {
+      "title": "Configuration des formulaires",
+      "saveChanges": "Enregistrer les modifications",
+      "system": "Système",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "dialog": {
+        "label": "Libellé",
+        "type": "Type",
+        "fieldDescription": "Description",
+        "options": "Options"
+      }
+    },
+    "organization": {
+      "title": "Organisation",
+      "description": "Description",
+      "address": "Adresse",
+      "city": "Ville",
+      "country": "Pays",
+      "email": "E-mail",
+      "phone": "Téléphone",
+      "website": "Site web",
+      "company": {
+        "selectLabel": "Société"
+      },
+      "countryPacks": {
+        "enabled": "Activé",
+        "disabled": "Désactivé"
+      },
+      "privacy": {
+        "classificationName": "Nom",
+        "delegatedAdminCompany": "Société"
+      }
+    },
+    "groups": {
+      "account": "Compte",
+      "organization": "Organisation",
+      "data": "Données et intégrations",
+      "platform": "Plateforme"
+    },
+    "sections": {
+      "profile": {
+        "title": "Profil",
+        "description": "Gérez vos informations personnelles et vos préférences"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "Choisissez comment et quand recevoir des notifications"
+      },
+      "appearance": {
+        "title": "Apparence",
+        "description": "Personnalisez l’apparence de votre tableau de bord"
+      },
+      "custom-fields": {
+        "title": "Mes champs personnalisés",
+        "description": "Ajoutez des champs de suivi personnel à votre journal"
+      },
+      "users": {
+        "title": "Gestion des utilisateurs",
+        "description": "Ajoutez, modifiez et gérez les comptes utilisateurs"
+      },
+      "roles": {
+        "title": "Rôles et autorisations",
+        "description": "Configurez les rôles et les règles d’accès"
+      },
+      "sso": {
+        "title": "SSO",
+        "description": "Statut de connexion unique et liaison du compte WorkOS"
+      },
+      "form-config": {
+        "title": "Configuration des formulaires",
+        "description": "Configurez les champs du journal et du rapport d’investigation"
+      },
+      "audit": {
+        "title": "Journal d’audit",
+        "description": "Consultez l’activité du système et les événements de sécurité"
+      },
+      "organization": {
+        "title": "Organisation",
+        "description": "Gérez les paramètres de l’organisation"
+      },
+      "ai": {
+        "title": "IA",
+        "description": "Agents, profils d’équipe, analyses et coûts d’utilisation"
+      },
+      "my-profile": {
+        "title": "Mon profil",
+        "description": "Votre nom, votre langue et votre fuseau horaire."
+      }
+    }
+  },
+  "reports": {
+    "moduleTitle": "Rapports",
+    "states": {
+      "draft": "Brouillon",
+      "generated": "Généré",
+      "exported": "Exporté",
+      "archived": "Archivé"
+    },
+    "dashboard": {
+      "kpiTitle": "Indicateurs clés",
+      "quickActions": {
+        "generate": "Générer un rapport",
+        "scheduleReport": "Planifier un rapport",
+        "newMetric": "Nouvel indicateur",
+        "newWidget": "Nouveau widget"
+      },
+      "kpis": {
+        "generated": "Généré",
+        "exported": "Exporté",
+        "scheduled": "Planifié",
+        "metrics": "Indicateurs"
+      }
+    },
+    "tabs": {
+      "dashboard": "Tableau de bord",
+      "financialReports": "Rapports financiers",
+      "trialBalance": "Balance générale",
+      "reportTemplates": "Modèles de rapports",
+      "scheduledReports": "Planifié",
+      "analyticsMetrics": "Indicateurs",
+      "dashboards": "Tableaux de bord",
+      "dashboardWidgets": "Widgets",
+      "pivotExplorer": "Analyse croisée",
+      "vatReport": "Rapport de TVA",
+      "queryBuilder": "Éditeur de requêtes",
+      "ownerReports": "Rapports de direction",
+      "statements": "États financiers"
+    },
+    "queryBuilder": {
+      "title": "Éditeur de requêtes en libre-service",
+      "widgetTypes": {
+        "chart": "Graphique",
+        "table": "Tableau de données"
+      },
+      "aggregation": "Agrégation",
+      "groupBy": "Regrouper par",
+      "filters": "Filtres",
+      "sortNone": "Aucun"
+    },
+    "ownerReports": {
+      "title": "Rapports de direction",
+      "companyLabel": "Société",
+      "dateLabel": "Date",
+      "timezoneLabel": "Fuseau horaire",
+      "previewButton": "Aperçu",
+      "availability": {
+        "preview": "Aperçu",
+        "planned": "Planifié"
+      },
+      "scope": {
+        "company": "Société",
+        "timezone": "Fuseau horaire"
+      },
+      "totals": {
+        "receipts": "Reçus"
+      },
+      "sections": {
+        "sales": "Ventes",
+        "receipts": "Reçus"
+      },
+      "columns": {
+        "tax": "Taxe",
+        "total": "Total"
+      },
+      "stockAlerts": {
+        "productId": "Produit {{id}}"
+      }
+    },
+    "createButton": {
+      "generateReport": "Générer un rapport",
+      "scheduleReport": "Planifier un rapport",
+      "newMetric": "Nouvel indicateur"
+    },
+    "financialReports": {
+      "title": "Rapports financiers",
+      "columns": {
+        "name": "Nom",
+        "state": "État",
+        "generatedAt": "Généré"
+      },
+      "filters": {
+        "state": {
+          "label": "État",
+          "options": {
+            "draft": "Brouillon",
+            "generated": "Généré",
+            "exported": "Exporté",
+            "archived": "Archivé"
+          }
+        }
+      },
+      "states": {
+        "draft": "Brouillon",
+        "generated": "Généré",
+        "exported": "Exporté",
+        "archived": "Archivé"
+      }
+    },
+    "trialBalance": {
+      "title": "Balance générale",
+      "searchPlaceholder": "Rechercher des comptes…",
+      "columns": {
+        "accountCode": "Code",
+        "accountName": "Compte"
+      }
+    },
+    "reportTemplates": {
+      "title": "Modèles de rapports",
+      "columns": {
+        "name": "Nom",
+        "model": "Modèle",
+        "isActive": "Actif"
+      }
+    },
+    "scheduledReports": {
+      "title": "Rapports planifiés",
+      "searchPlaceholder": "Rechercher des échéanciers…",
+      "columns": {
+        "name": "Nom",
+        "isActive": "Actif"
+      }
+    },
+    "analyticsMetrics": {
+      "title": "Indicateurs d’analyse",
+      "columns": {
+        "name": "Nom",
+        "category": "Catégorie",
+        "metricType": "Type",
+        "model": "Modèle",
+        "aggregation": "Agrégation",
+        "isActive": "Actif"
+      }
+    },
+    "dashboards": {
+      "title": "Tableaux de bord",
+      "columns": {
+        "name": "Nom",
+        "description": "Description",
+        "createDate": "Créé"
+      }
+    },
+    "dashboardWidgets": {
+      "title": "Widgets de tableau de bord",
+      "columns": {
+        "name": "Nom",
+        "model": "Modèle",
+        "width": "Largeur",
+        "isActive": "Actif"
+      }
+    },
+    "actions": {
+      "exportCsv": "Exporter en CSV",
+      "delete": "Supprimer",
+      "newWidget": "Nouveau widget"
+    },
+    "forms": {
+      "generateReport": {
+        "title": "Générer un rapport",
+        "sections": {
+          "comparison": "Comparaison"
+        },
+        "fields": {
+          "name": "Nom du rapport",
+          "reportTypes": {
+            "trialBalance": "Balance générale"
+          },
+          "comparisonMode": "Comparaison",
+          "comparisonOptions": {
+            "none": "Aucun",
+            "previousPeriod": "Période précédente"
+          },
+          "currencyId": "ID de devise"
+        },
+        "submit": "Générer un rapport"
+      },
+      "reportTemplate": {
+        "fields": {
+          "name": "Nom",
+          "model": "Modèle",
+          "isActive": "Actif"
+        }
+      },
+      "scheduledReport": {
+        "title": "Planifier un rapport",
+        "sections": {
+          "timing": "Échéancier"
+        },
+        "fields": {
+          "model": "Modèle",
+          "isActive": "Actif"
+        },
+        "frequencies": {
+          "monthly": "Mensuel"
+        }
+      },
+      "analyticsMetric": {
+        "title": "Nouvel indicateur",
+        "fields": {
+          "name": "Nom",
+          "category": "Catégorie",
+          "model": "Modèle",
+          "field": "Champ",
+          "aggregation": "Agrégation",
+          "isActive": "Actif"
+        }
+      },
+      "trialBalanceEntry": {
+        "fields": {
+          "accountCode": "Code du compte",
+          "currencyId": "ID de devise",
+          "level": "Niveau"
+        }
+      },
+      "dashboard": {
+        "fields": {
+          "description": "Description"
+        }
+      },
+      "dashboardWidget": {
+        "fields": {
+          "types": {
+            "chart": "Graphique"
+          }
+        },
+        "types": {
+          "chart": "Graphique"
+        }
+      },
+      "addWidgetToDashboard": {
+        "fields": {
+          "width": "Largeur"
+        }
+      },
+      "updateWidgetLayout": {
+        "fields": {
+          "width": "Largeur"
+        }
+      },
+      "updateFinancialReport": {
+        "sections": {
+          "update": "Détails du rapport"
+        },
+        "fields": {
+          "name": "Nom du rapport"
+        }
+      },
+      "reportSource": {
+        "company": "Société (facultatif)"
+      }
+    },
+    "pivot": {
+      "title": "Analyse croisée",
+      "none": "Aucun"
+    },
+    "vat": {
+      "title": "Déclaration de TVA de l’UE",
+      "name": "Nom du rapport",
+      "columns": {
+        "name": "Nom",
+        "state": "État",
+        "actions": "Actions"
+      }
+    },
+    "statements": {
+      "columns": {
+        "amount": "Montant",
+        "comparison": "Comparaison",
+        "line": "Ligne",
+        "variancePercent": "Écart %"
+      },
+      "exportCsv": "Exporter en CSV",
+      "report": "Rapport"
+    },
+    "periodContext": {
+      "title": "Vérification des rapports de clôture"
+    },
+    "authoring": {
+      "account": "Compte",
+      "balance": "Solde",
+      "credit": "Crédit",
+      "currency": "Devise",
+      "debit": "Débit",
+      "delivery": "Livraison",
+      "equity": "Capitaux propres",
+      "expenses": "Dépenses",
+      "income": "Produits",
+      "metric": {
+        "company": "Société",
+        "sum": "Total"
+      },
+      "payments": "Paiements",
+      "preview": "Aperçu",
+      "status": "Statut"
+    }
+  },
+  "auth": {
+    "appName": "Lumiere ERP",
+    "forms": {
+      "newRole": {
+        "fields": {
+          "description": "Description"
+        }
+      },
+      "updateRole": {
+        "fields": {
+          "isActive": "Actif"
+        }
+      },
+      "newAuditRule": {
+        "fields": {
+          "isActive": "Actif"
+        },
+        "resourceTypes": {
+          "invoice": "Facture",
+          "product": "Produit"
+        },
+        "actionTypes": {
+          "create": "Créer",
+          "delete": "Supprimer",
+          "export": "Exporter"
+        },
+        "severities": {
+          "warning": "Avertissement",
+          "error": "Erreur"
+        }
+      },
+      "updateUserPassword": {
+        "title": "Modifier le mot de passe",
+        "fields": {
+          "newPassword": "Nouveau mot de passe"
+        }
+      }
+    },
+    "fields": {
+      "email": "E-mail",
+      "newPassword": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le mot de passe"
+    },
+    "errors": {
+      "generic": "Une erreur s’est produite. Réessayez."
+    },
+    "onboarding": {
+      "timezone": "Fuseau horaire",
+      "currency": "Devise"
+    }
+  },
+  "modules": {
+    "workspaces": {
+      "overview": "Vue d’ensemble",
+      "fulfillment": "Exécution",
+      "contacts": "Contacts",
+      "activities": "Activités",
+      "financial": "Rapports financiers",
+      "analytics": "Analyses",
+      "schedules": "Échéanciers",
+      "expenses": "Dépenses",
+      "expenseReports": "Notes de frais",
+      "operations": "Opérations"
+    },
+    "tabGroups": {
+      "close": "Fermer",
+      "fulfillment": "Exécution",
+      "people": "Personnel",
+      "revenue": "Chiffre d’affaires",
+      "subscriptions": "Abonnements",
+      "warehouse": "Entrepôt"
+    }
+  },
+  "notifications": {
+    "bell": {
+      "label": "Notifications"
+    }
+  },
+  "recordHeader": {
+    "note": "Note",
+    "name": "Nom"
+  },
+  "ui": {
+    "journal": {
+      "filter": "Filtrer",
+      "other": "Autre",
+      "priorities": {
+        "high": "Élevée",
+        "low": "Faible"
+      },
+      "status": "Statut",
+      "statuses": {
+        "active": "Actif",
+        "archived": "Archivé"
+      },
+      "type": "Type"
+    },
+    "notebook": {
+      "title": "Carnet"
+    }
+  },
+  "workspace": {
+    "myWork": "Mon travail",
+    "widgets": {
+      "calendar": "Calendrier"
+    }
+  },
+  "financeReview": {
+    "currency": "Devise",
+    "receipt": "Reçu",
+    "employee": "Employé",
+    "comfortable": "Aéré",
+    "compact": "Compact",
+    "sourceTitle": "Document source"
+  },
+  "workBoard": {
+    "title": "Mon travail",
+    "tab": "Travail",
+    "finance": "Finance",
+    "mine": "À ma charge",
+    "board": "Tableau",
+    "list": "Liste",
+    "team": "Équipe",
+    "refresh": "Actualiser",
+    "statusLabel": "Statut",
+    "mineBadge": "À ma charge",
+    "loadMore": "Charger plus",
+    "saving": "Enregistrement…",
+    "module": {
+      "purchasing": "Achats",
+      "sales": "Ventes",
+      "accounting": "Comptabilité",
+      "expenses": "Dépenses"
+    },
+    "status": {
+      "Open": "Ouvert",
+      "Claimed": "Pris en charge",
+      "Approved": "Approuvé",
+      "Completed": "Terminé",
+      "Rejected": "Rejeté",
+      "Invalidated": "Invalidé",
+      "Cancelled": "Annulé"
+    },
+    "action": {
+      "claim": "Prendre en charge",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "complete": "Terminer"
+    }
+  }
+}

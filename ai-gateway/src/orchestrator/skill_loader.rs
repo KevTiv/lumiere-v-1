@@ -192,7 +192,7 @@ pub async fn load_skill(
             allowed_action_drafts: row_string_list(skill_row, "allowedActionDrafts"),
             source: SkillSource::Remote,
         };
-        apply_bundled_overlay(&mut skill);
+        apply_bundled_overlay(&mut skill)?;
         return Ok(skill);
     }
 
@@ -202,16 +202,16 @@ pub async fn load_skill(
 fn load_bundled_skill_only(skill_key: &str) -> Result<LoadedSkill> {
     let md = load_bundled_skill(skill_key)?
         .ok_or_else(|| anyhow::anyhow!("skill '{skill_key}' not found"))?;
-    Ok(bundled_to_loaded(&md))
+    bundled_to_loaded(&md)
 }
 
-fn bundled_to_loaded(md: &crate::skills::BundledSkillMd) -> LoadedSkill {
-    LoadedSkill {
+fn bundled_to_loaded(md: &crate::skills::BundledSkillMd) -> Result<LoadedSkill> {
+    Ok(LoadedSkill {
         id: 0,
         skill_key: md.skill_key.clone(),
         name: md.name.clone(),
         category: md.category.clone(),
-        prompt_template: compose_prompt(md),
+        prompt_template: compose_prompt(md)?,
         required_tools: md.required_tools.clone(),
         optional_tools: md.optional_tools.clone(),
         default_max_steps: md.default_max_steps,
@@ -222,24 +222,23 @@ fn bundled_to_loaded(md: &crate::skills::BundledSkillMd) -> LoadedSkill {
         enabled: true,
         allowed_action_drafts: md.allowed_action_drafts.clone(),
         source: SkillSource::Bundled,
-    }
+    })
 }
 
-fn apply_bundled_overlay(skill: &mut LoadedSkill) {
-    let Ok(Some(md)) = load_bundled_skill(&skill.skill_key) else {
-        return;
+fn apply_bundled_overlay(skill: &mut LoadedSkill) -> Result<()> {
+    let Some(md) = load_bundled_skill(&skill.skill_key)? else {
+        return Ok(());
     };
 
-    skill.prompt_template = compose_prompt(&md);
-    if skill.required_tools.is_empty() && !md.required_tools.is_empty() {
-        skill.required_tools = md.required_tools.clone();
-        skill.optional_tools = md.optional_tools.clone();
-    }
-    if skill.allowed_action_drafts.is_empty() && !md.allowed_action_drafts.is_empty() {
-        skill.allowed_action_drafts = md.allowed_action_drafts.clone();
-    }
+    skill.prompt_template = compose_prompt(&md)?;
+    // Bundled metadata describes the compiled program; stale database tool lists
+    // must not resurrect retired tools or draft workflows during overlay.
+    skill.required_tools = md.required_tools.clone();
+    skill.optional_tools = md.optional_tools.clone();
+    skill.allowed_action_drafts = md.allowed_action_drafts.clone();
     migrate_legacy_analytics_tools(skill);
     skill.source = SkillSource::Merged;
+    Ok(())
 }
 
 fn migrate_legacy_analytics_tools(skill: &mut LoadedSkill) {
@@ -828,7 +827,7 @@ pub async fn list_skills(stdb: &StdbClient, org_id: u64) -> Result<Vec<Value>> {
         seen.insert(key)
     });
 
-    for md in crate::skills::discover_bundled_skills().unwrap_or_default() {
+    for md in crate::skills::discover_bundled_skills()? {
         if seen.contains(&md.skill_key) {
             continue;
         }
@@ -851,7 +850,7 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
     let mut synced = Vec::new();
 
     for md in bundled {
-        let payload = crate::skills::bundled_to_sync_payload(&md);
+        let payload = crate::skills::bundled_to_sync_payload(&md)?;
         stdb.call_reducer(stdb_client::reducer_call!("upsert_ai_skill", serde_json::json!([
                 organization_id,
                 {
@@ -1079,6 +1078,17 @@ mod tests {
             serde_json::json!({"some": 9})
         );
         assert_eq!(sats_option(None), serde_json::json!({"none": []}));
+    }
+
+    #[test]
+    fn bundled_overlay_cannot_restore_database_only_tools_or_drafts() {
+        let mut skill = legacy_analytics_skill("report_analysis");
+        skill.allowed_action_drafts = vec!["create_task".into()];
+        apply_bundled_overlay(&mut skill).unwrap();
+        assert_eq!(skill.required_tools, vec!["analytics_summary"]);
+        assert!(skill.optional_tools.is_empty());
+        assert!(skill.allowed_action_drafts.is_empty());
+        assert_eq!(skill.source, SkillSource::Merged);
     }
 
     #[test]

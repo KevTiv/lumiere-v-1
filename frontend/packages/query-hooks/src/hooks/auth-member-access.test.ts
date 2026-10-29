@@ -9,10 +9,17 @@ import * as scalar from "@lumiere/erp-shared/u64"
 
 function memberMutation() {
   const calls: Array<{ url: string; body: Record<string, unknown> }> = []
+  const invalidations: unknown[][] = []
+  const session = { identity: "ab".repeat(32) as string | null }
   const dependencies: Record<string, unknown> = {
     "@lumiere/stdb/commands": { stdbBffCommandPost },
     "@lumiere/stdb/browser-http": {},
-    "@tanstack/react-query": { useQueryClient: () => ({}), useMutation: (options: unknown) => options },
+    "@tanstack/react-query": {
+      useQueryClient: () => ({ invalidateQueries: async ({ queryKey }: { queryKey: readonly unknown[] }) => { invalidations.push(Array.from(queryKey)) } }),
+      useMutation: (options: unknown) => options,
+      useQuery: (options: unknown) => options,
+    },
+    "@lumiere/erp-session": { useErpSession: () => session },
     "../http": {
       apiFetch: async (url: string, init: RequestInit) => {
         calls.push({ url, body: JSON.parse(String(init.body)) })
@@ -36,6 +43,8 @@ function memberMutation() {
   }).outputText
   type Mutation = { mutationFn(input: unknown): Promise<void> }
   const module = { exports: {} as {
+    useCurrentUserProfile(enabled?: boolean): { queryKey: readonly unknown[]; enabled: boolean }
+    useUpdateUserProfile(org: bigint): Mutation & { onSuccess(): Promise<void> }
     useSetMemberAccess(org: bigint): Mutation
     useCreateRole(org: bigint): Mutation
     useUpdateRole(org: bigint): Mutation
@@ -43,14 +52,40 @@ function memberMutation() {
     useAddUserToOrganization(org: bigint): Mutation
   } }
   runInNewContext(compiled, {
-    module, exports: module.exports,
+    module, exports: module.exports, Response,
     require: (name: string) => {
       assert.ok(name in dependencies, `Unexpected dependency ${name}`)
       return dependencies[name]
     },
   })
-  return { calls, mutation: module.exports.useSetMemberAccess(1n), hooks: module.exports }
+  return { calls, session, invalidations, mutation: module.exports.useSetMemberAccess(1n), hooks: module.exports }
 }
+
+test("saving French refreshes the account profile without restarting authority queries", async () => {
+  const { calls, invalidations, hooks } = memberMutation()
+  const profile = hooks.useUpdateUserProfile(1n)
+  await profile.mutationFn({ language: "fr" })
+  await profile.onSuccess()
+  assert.deepEqual(calls, [{ url: "/api/auth/profile", body: { language: "fr" } }])
+  assert.deepEqual(invalidations, [["current-user-profile"]])
+})
+
+test("account profile cache separates signed-in identities and preserves the read gate", () => {
+  const { session, hooks } = memberMutation()
+  const first = hooks.useCurrentUserProfile()
+  session.identity = "cd".repeat(32)
+  const second = hooks.useCurrentUserProfile()
+  assert.notDeepEqual(first.queryKey, second.queryKey)
+  assert.equal(first.queryKey[0], "current-user-profile")
+  assert.equal(second.queryKey[0], "current-user-profile")
+  assert.equal(first.enabled, true)
+  assert.equal(second.enabled, true)
+  session.identity = null
+  const signedOut = hooks.useCurrentUserProfile(false)
+  assert.equal(signedOut.enabled, false)
+  assert.notDeepEqual(signedOut.queryKey, first.queryKey)
+  assert.notDeepEqual(signedOut.queryKey, second.queryKey)
+})
 
 test("member access saves encode optional job titles and preserve the optimistic access snapshot", async () => {
   const { calls, mutation } = memberMutation()

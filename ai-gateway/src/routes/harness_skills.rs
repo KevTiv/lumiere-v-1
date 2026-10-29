@@ -283,47 +283,7 @@ pub struct TrustedGovernedLlmSkillRequest {
     pub org_privacy_policy: OrgPrivacyPolicy,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct TrustedActorContext {
-    organization_id: u64,
-    company_id: u64,
-    identity: String,
-    token: String,
-}
-
-impl TrustedActorContext {
-    fn from_headers(headers: &HeaderMap) -> AppResult<Self> {
-        let required = |name: &str| {
-            headers
-                .get(name)
-                .and_then(|value| value.to_str().ok())
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| AppError::Forbidden("acting-user context is required".into()))
-        };
-        let organization_id = required("x-lumiere-organization-id")?
-            .parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
-        let company_id = required("x-lumiere-company-id")?
-            .parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
-        let credentials = ActorCredentials::new(
-            required("x-lumiere-actor-token")?,
-            required("x-lumiere-actor-identity")?,
-        )
-        .map_err(|error| AppError::Forbidden(error.to_string()))?;
-        Ok(Self {
-            organization_id,
-            company_id,
-            identity: credentials.identity_hex,
-            token: credentials.stdb_token,
-        })
-    }
-}
+type TrustedActorContext = lumiere_auth_context::ActorContext;
 
 pub async fn post_report_analysis(
     State(state): State<AppState>,

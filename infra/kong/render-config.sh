@@ -2,7 +2,7 @@
 set -eu
 
 template="${KONG_DECLARATIVE_TEMPLATE:-/kong/templates/kong.yml}"
-config="${KONG_DECLARATIVE_CONFIG:-/kong/declarative/kong.yml}"
+config="${KONG_RENDERED_CONFIG:-${KONG_DECLARATIVE_CONFIG:-/kong/declarative/kong.yml}}"
 web_host="${WEB_UPSTREAM_HOST:-web.railway.internal}"
 web_port="${WEB_UPSTREAM_PORT:-3000}"
 api_host="${API_SERVER_UPSTREAM_HOST:-api-server.railway.internal}"
@@ -68,8 +68,35 @@ fi
 # public edge while accepting private service traffic on the same proxy port.
 export KONG_PROXY_LISTEN="${KONG_PROXY_LISTEN:-0.0.0.0:${PORT:-8000}, [::]:${PORT:-8000} ipv6only=on}"
 
-# The declarative gateway has no operational reason to expose an Admin API or
-# Manager listener. Do not allow a stray Railway variable to turn either on.
+# Only the database preparation process gets a temporary loopback Admin API.
+# The public process must never expose management listeners.
 export KONG_ADMIN_LISTEN=off
 export KONG_ADMIN_GUI_LISTEN=off
+export KONG_STATUS_LISTEN=off
+export KONG_ANONYMOUS_REPORTS=off
+unset KONG_DECLARATIVE_CONFIG
+
+if [ "${KONG_DATABASE:-postgres}" != postgres ]; then
+  echo 'render-kong-config: PostgreSQL is required for cluster rate limits' >&2
+  exit 1
+fi
+export KONG_DATABASE=postgres
+: "${KONG_PG_HOST:?set KONG_PG_HOST to the dedicated Kong PostgreSQL service}"
+: "${KONG_PG_PASSWORD:?set KONG_PG_PASSWORD}"
+
+if [ "${LUMIERE_ENV:-}" = production ]; then
+  : "${KONG_TRUSTED_IPS:?set the verified ingress proxy CIDRs; never trust every address}"
+  KONG_TRUSTED_IPS="$(printf '%s' "$KONG_TRUSTED_IPS" | tr -d '[:space:]')"
+  case ",$KONG_TRUSTED_IPS," in
+    ,,|*,*/0,*|*,*/00,*)
+      echo 'render-kong-config: refusing a globally trusted proxy range' >&2
+      exit 1
+      ;;
+  esac
+  export KONG_TRUSTED_IPS
+  export KONG_REAL_IP_HEADER=X-Forwarded-For
+  export KONG_REAL_IP_RECURSIVE=on
+fi
+
+/usr/local/bin/prepare-kong-database "$config"
 exec /docker-entrypoint.sh "$@"

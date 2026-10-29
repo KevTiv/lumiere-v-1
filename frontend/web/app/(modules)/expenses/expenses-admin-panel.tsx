@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useApplyExpenseAdvanceToSheet,
@@ -14,6 +14,15 @@ import {
 } from "@lumiere/query-hooks/hooks/expenses"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { Button } from "@lumiere/ui"
+import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
+import { useExpenses, useExpenseSheets } from "@lumiere/query-hooks/hooks/expenses"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { ExpenseRecordPicker } from "./expense-record-picker"
+import { companyWorkflowRows, workflowOptions } from "./expense-workflow-model"
+import { currencyOptionsFromRows } from "../../../lib/form-lookup"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 /**
@@ -26,8 +35,14 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
   const { t } = useTranslation()
   const orgId = BigInt(organizationId)
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-  const advancesQ = useExpenseAdvances(orgId)
-  const exceptionsQ = useExpensePolicyExceptions(orgId)
+  const employeeRead = moduleCollection(useEmployees(orgId))
+  const expenseRead = moduleCollection(useExpenses(orgId))
+  const reportRead = moduleCollection(useExpenseSheets(orgId))
+  const journalRead = moduleCollection(useAccountJournals(orgId))
+  const accountRead = moduleCollection(useAccountAccounts(orgId))
+  const currencyRead = moduleCollection(useCurrencies())
+  const advancesQ = moduleCollection(useExpenseAdvances(orgId))
+  const exceptionsQ = moduleCollection(useExpensePolicyExceptions(orgId))
   const createAdvance = useCreateExpenseAdvance(orgId, companyId)
   const applyAdvance = useApplyExpenseAdvanceToSheet(orgId)
   const requestExc = useRequestExpensePolicyException(orgId)
@@ -35,8 +50,16 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
   const rejectExc = useRejectExpensePolicyException(orgId)
   const fraudHold = useSetExpenseFraudHold(orgId)
 
+  const employeeOptions = workflowOptions(companyWorkflowRows(employeeRead.rows, orgId, companyId))
+  const expenseOptions = workflowOptions(companyWorkflowRows(expenseRead.rows, orgId, companyId))
+  const reportOptions = workflowOptions(companyWorkflowRows(reportRead.rows, orgId, companyId))
+  const journalOptions = workflowOptions(companyWorkflowRows(journalRead.rows, orgId, companyId))
+  const accountOptions = workflowOptions(companyWorkflowRows(accountRead.rows, orgId, companyId))
+  const currencyOptions = currencyOptionsFromRows(currencyRead.rows)
+  const sources = [employeeRead, expenseRead, reportRead, journalRead, accountRead, currencyRead, advancesQ, exceptionsQ]
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const inFlight = useRef(false)
 
   const [advEmployeeId, setAdvEmployeeId] = useState("")
   const [advName, setAdvName] = useState("")
@@ -44,7 +67,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
   const [advJournalId, setAdvJournalId] = useState("")
   const [advCashId, setAdvCashId] = useState("")
   const [advAccountId, setAdvAccountId] = useState("")
-  const [advCurrencyId, setAdvCurrencyId] = useState("1")
+  const [advCurrencyId, setAdvCurrencyId] = useState("")
   const [applyAdvanceId, setApplyAdvanceId] = useState("")
   const [applySheetId, setApplySheetId] = useState("")
   const [applyAmount, setApplyAmount] = useState("")
@@ -57,16 +80,31 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
   const [fraudReason, setFraudReason] = useState("")
 
   const advances = useMemo(() => {
-    const rows = (advancesQ.data ?? []) as Record<string, unknown>[]
-    return rows.filter((r) => Number(r.residual ?? r.Residual ?? 0) > 0.0001)
-  }, [advancesQ.data])
+    const rows = (companyWorkflowRows(advancesQ.rows, orgId, companyId))
+    return rows.filter((r) => Number(r.residual ?? 0) > 0.0001)
+  }, [advancesQ.rows, orgId, companyId])
 
   const exceptions = useMemo(
-    () => (exceptionsQ.data ?? []) as Record<string, unknown>[],
-    [exceptionsQ.data],
+    () => (companyWorkflowRows(exceptionsQ.rows, orgId, companyId)),
+    [exceptionsQ.rows, orgId, companyId],
   )
 
-  const run = async (fn: () => Promise<void>, okMsg: string) => {
+  const advanceReady = companyId > 0n && [employeeRead, journalRead, accountRead, currencyRead].every(source => source.state.status === "ready")
+    && employeeOptions.some(option => option.value === advEmployeeId) && currencyOptions.some(option => option.value === advCurrencyId)
+    && journalOptions.some(option => option.value === advJournalId) && accountOptions.some(option => option.value === advCashId)
+    && accountOptions.some(option => option.value === advAccountId)
+  const applyReady = advancesQ.state.status === "ready" && reportRead.state.status === "ready"
+    && advances.some(row => String(row.id) === applyAdvanceId) && reportOptions.some(option => option.value === applySheetId)
+  const expenseReady = expenseRead.state.status === "ready"
+  const exceptionsReady = exceptionsQ.state.status === "ready"
+  useEffect(() => {
+    setAdvEmployeeId(""); setAdvCurrencyId(""); setAdvJournalId(""); setAdvCashId(""); setAdvAccountId("")
+    setApplyAdvanceId(""); setApplySheetId(""); setExcExpenseId(""); setFraudExpenseId(""); setStatus(null)
+  }, [orgId, companyId])
+
+  const run = async (fn: () => Promise<void>, okMsg: string, ready: boolean) => {
+    if (!ready || inFlight.current) return
+    inFlight.current = true
     setBusy(true)
     setStatus(null)
     try {
@@ -75,11 +113,12 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
     } catch (e) {
       setStatus(e instanceof Error ? e.message : String(e))
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }
 
-  const rowId = (row: Record<string, unknown>) => String(row.id ?? "")
+  const rowId = (row: { id?: unknown }) => String(row.id ?? "")
 
   return (
     <div
@@ -97,18 +136,15 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
         </p>
       ) : null}
 
+      {sources.map((source, index) => <ModuleDataNotice key={index} state={source.state} />)}
+      {sources.some(source => source.state.status === "loading") && <p role="status">{t("common.loading")}</p>}
       {/* Advances */}
       <section className="space-y-2 border-t pt-3" data-testid="expenses-admin-advances">
         <h3 className="text-sm font-medium">{t("expenses.admin.advancesTitle")}</h3>
         <p className="text-xs text-muted-foreground">{t("expenses.admin.advancesDescription")}</p>
         <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.employeeId")}
-            value={advEmployeeId}
-            onChange={(e) => setAdvEmployeeId(e.target.value)}
-            data-testid="expenses-admin-adv-employee"
-          />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.employee")} value={advEmployeeId} onChange={setAdvEmployeeId}
+            options={employeeOptions} disabled={busy || employeeRead.state.status !== "ready"} testId="expenses-admin-adv-employee" />
           <input
             className="rounded-md border bg-background px-2 py-1.5 text-sm"
             placeholder={t("expenses.admin.advanceName")}
@@ -123,41 +159,23 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
             onChange={(e) => setAdvAmount(e.target.value)}
             data-testid="expenses-admin-adv-amount"
           />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.currencyId")}
-            value={advCurrencyId}
-            onChange={(e) => setAdvCurrencyId(e.target.value)}
-          />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.journalId")}
-            value={advJournalId}
-            onChange={(e) => setAdvJournalId(e.target.value)}
-            data-testid="expenses-admin-adv-journal"
-          />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.cashAccountId")}
-            value={advCashId}
-            onChange={(e) => setAdvCashId(e.target.value)}
-            data-testid="expenses-admin-adv-cash"
-          />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.advanceAccountId")}
-            value={advAccountId}
-            onChange={(e) => setAdvAccountId(e.target.value)}
-            data-testid="expenses-admin-adv-account"
-          />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.currency")} value={advCurrencyId} onChange={setAdvCurrencyId}
+            options={currencyOptions} disabled={busy || currencyRead.state.status !== "ready"} />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.journal")} value={advJournalId} onChange={setAdvJournalId}
+            options={journalOptions} disabled={busy || journalRead.state.status !== "ready"} testId="expenses-admin-adv-journal" />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.cashAccount")} value={advCashId} onChange={setAdvCashId}
+            options={accountOptions} disabled={busy || accountRead.state.status !== "ready"} testId="expenses-admin-adv-cash" />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.advanceAccount")} value={advAccountId} onChange={setAdvAccountId}
+            options={accountOptions} disabled={busy || accountRead.state.status !== "ready"} testId="expenses-admin-adv-account" />
           <Button
             type="button"
             size="sm"
             disabled={
-              busy ||
+              busy || !advanceReady ||
               !advEmployeeId ||
               !advName.trim() ||
               !advAmount ||
+              !advCurrencyId ||
               !advJournalId ||
               !advCashId ||
               !advAccountId
@@ -169,14 +187,14 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                   employeeId: BigInt(advEmployeeId),
                   name: advName.trim(),
                   amount: Number(advAmount),
-                  currencyId: BigInt(advCurrencyId || "1"),
+                  currencyId: BigInt(advCurrencyId),
                   journalId: BigInt(advJournalId),
                   cashAccountId: BigInt(advCashId),
                   advanceAccountId: BigInt(advAccountId),
                   accountingDate: stbTimestampFromDate(new Date()),
                   clientRequestId: `adv-ui-${Date.now()}`,
                 })
-              }, t("expenses.admin.advanceCreated"))
+              }, t("expenses.admin.advanceCreated"), advanceReady)
             }
           >
             {t("expenses.admin.createAdvance")}
@@ -200,20 +218,10 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
         )}
 
         <div className="grid gap-2 sm:grid-cols-3">
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.advanceId")}
-            value={applyAdvanceId}
-            onChange={(e) => setApplyAdvanceId(e.target.value)}
-            data-testid="expenses-admin-apply-advance-id"
-          />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.sheetId")}
-            value={applySheetId}
-            onChange={(e) => setApplySheetId(e.target.value)}
-            data-testid="expenses-admin-apply-sheet-id"
-          />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.advance")} value={applyAdvanceId} onChange={setApplyAdvanceId}
+            options={workflowOptions(advances)} disabled={busy || advancesQ.state.status !== "ready"} testId="expenses-admin-apply-advance-id" />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.report")} value={applySheetId} onChange={setApplySheetId}
+            options={reportOptions} disabled={busy || reportRead.state.status !== "ready"} testId="expenses-admin-apply-sheet-id" />
           <input
             className="rounded-md border bg-background px-2 py-1.5 text-sm"
             placeholder={t("expenses.admin.amount")}
@@ -225,7 +233,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
             type="button"
             size="sm"
             variant="outline"
-            disabled={busy || !applyAdvanceId || !applySheetId || !applyAmount}
+            disabled={busy || !applyReady || !applyAdvanceId || !applySheetId || !applyAmount}
             data-testid="expenses-admin-apply-advance"
             onClick={() =>
               void run(async () => {
@@ -234,7 +242,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                   sheetId: applySheetId,
                   amount: Number(applyAmount),
                 })
-              }, t("expenses.admin.advanceApplied"))
+              }, t("expenses.admin.advanceApplied"), applyReady)
             }
           >
             {t("expenses.admin.applyAdvance")}
@@ -247,13 +255,8 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
         <h3 className="text-sm font-medium">{t("expenses.admin.exceptionsTitle")}</h3>
         <p className="text-xs text-muted-foreground">{t("expenses.admin.exceptionsDescription")}</p>
         <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.expenseId")}
-            value={excExpenseId}
-            onChange={(e) => setExcExpenseId(e.target.value)}
-            data-testid="expenses-admin-exc-expense"
-          />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.expense")} value={excExpenseId} onChange={setExcExpenseId}
+            options={expenseOptions} disabled={busy || expenseRead.state.status !== "ready"} testId="expenses-admin-exc-expense" />
           <input
             className="rounded-md border bg-background px-2 py-1.5 text-sm"
             placeholder={t("expenses.admin.exceptionReason")}
@@ -264,7 +267,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           <Button
             type="button"
             size="sm"
-            disabled={busy || !excExpenseId || !excReason.trim()}
+            disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === excExpenseId) || !excExpenseId || !excReason.trim()}
             data-testid="expenses-admin-request-exception"
             onClick={() =>
               void run(async () => {
@@ -272,7 +275,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                   expenseId: excExpenseId,
                   reason: excReason.trim(),
                 })
-              }, t("expenses.admin.exceptionRequested"))
+              }, t("expenses.admin.exceptionRequested"), expenseReady && expenseOptions.some(option => option.value === excExpenseId))
             }
           >
             {t("expenses.admin.requestException")}
@@ -290,7 +293,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                 >
                   <span className="font-medium">#{id}</span>
                   <span className="text-muted-foreground">
-                    {t("expenses.admin.expenseId")}: {String(row.expenseId ?? row.expense_id ?? "")}
+                    {t("expenses.admin.expenseId")}: {String(row.expenseId ?? "")}
                   </span>
                   <span className="text-muted-foreground flex-1 min-w-[8rem]">
                     {String(row.reason ?? "")}
@@ -298,12 +301,12 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                   <Button
                     type="button"
                     size="sm"
-                    disabled={busy}
+                    disabled={busy || !exceptionsReady}
                     data-testid={`expenses-admin-approve-exc-${id}`}
                     onClick={() =>
                       void run(async () => {
                         await approveExc.mutateAsync(id)
-                      }, t("expenses.admin.exceptionApproved"))
+                      }, t("expenses.admin.exceptionApproved"), exceptionsReady)
                     }
                   >
                     {t("expenses.admin.approve")}
@@ -312,7 +315,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={busy || !rejectReason.trim()}
+                    disabled={busy || !exceptionsReady || !rejectReason.trim()}
                     data-testid={`expenses-admin-reject-exc-${id}`}
                     onClick={() =>
                       void run(async () => {
@@ -320,7 +323,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                           exceptionId: id,
                           reason: rejectReason.trim(),
                         })
-                      }, t("expenses.admin.exceptionRejected"))
+                      }, t("expenses.admin.exceptionRejected"), exceptionsReady)
                     }
                   >
                     {t("expenses.admin.reject")}
@@ -346,13 +349,8 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
         <h3 className="text-sm font-medium">{t("expenses.admin.fraudTitle")}</h3>
         <p className="text-xs text-muted-foreground">{t("expenses.admin.fraudDescription")}</p>
         <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.expenseId")}
-            value={fraudExpenseId}
-            onChange={(e) => setFraudExpenseId(e.target.value)}
-            data-testid="expenses-admin-fraud-expense"
-          />
+          <ExpenseRecordPicker label={t("expenses.workflowUi.expense")} value={fraudExpenseId} onChange={setFraudExpenseId}
+            options={expenseOptions} disabled={busy || expenseRead.state.status !== "ready"} testId="expenses-admin-fraud-expense" />
           <input
             className="rounded-md border bg-background px-2 py-1.5 text-sm"
             placeholder={t("expenses.admin.fraudReason")}
@@ -363,7 +361,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           <Button
             type="button"
             size="sm"
-            disabled={busy || !fraudExpenseId}
+            disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === fraudExpenseId) || !fraudExpenseId}
             data-testid="expenses-admin-set-fraud"
             onClick={() =>
               void run(async () => {
@@ -372,7 +370,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                   fraudHold: true,
                   fraudReason: fraudReason.trim() || undefined,
                 })
-              }, t("expenses.admin.fraudSet"))
+              }, t("expenses.admin.fraudSet"), expenseReady && expenseOptions.some(option => option.value === fraudExpenseId))
             }
           >
             {t("expenses.admin.setFraudHold")}
@@ -381,7 +379,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
             type="button"
             size="sm"
             variant="outline"
-            disabled={busy || !fraudExpenseId}
+            disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === fraudExpenseId) || !fraudExpenseId}
             data-testid="expenses-admin-clear-fraud"
             onClick={() =>
               void run(async () => {
@@ -389,7 +387,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
                   expenseId: fraudExpenseId,
                   fraudHold: false,
                 })
-              }, t("expenses.admin.fraudCleared"))
+              }, t("expenses.admin.fraudCleared"), expenseReady && expenseOptions.some(option => option.value === fraudExpenseId))
             }
           >
             {t("expenses.admin.clearFraudHold")}

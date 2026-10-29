@@ -12,6 +12,7 @@ mod rate_limit;
 mod retrieval_policy;
 mod rig_agent;
 mod routes;
+mod sandbox;
 mod skills;
 mod state;
 mod stdb_embed;

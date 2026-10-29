@@ -2362,9 +2362,10 @@ export const iotModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "documents",
+  workspaceNav: businessWorkspaceNavigation("documents", t),
   title: "Documents",
   description: "Files, knowledge base, and document management",
-  defaultTab: "dashboard",
+  defaultTab: "documents",
   tabs: [
     {
       id: "dashboard",
@@ -2412,7 +2413,7 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "documents",
-      label: "Documents",
+      label: t("productivity.navigation.files", { defaultValue: "Files" }),
       type: "entity",
       entityConfig: documentsTableConfig(t),
       createForm: newDocumentForm(t),
@@ -2492,9 +2493,10 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "calendar",
+  workspaceNav: businessWorkspaceNavigation("calendar", t),
   title: "Calendar",
   description: "Meetings, appointments, and scheduled events",
-  defaultTab: "dashboard",
+  defaultTab: "calendar",
   tabs: [
     {
       id: "dashboard",
@@ -3321,9 +3323,10 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "messages",
+  workspaceNav: businessWorkspaceNavigation("messages", t),
   title: "Messages",
   description: "Internal messages, email threads, and notifications",
-  defaultTab: "dashboard",
+  defaultTab: "messages",
   tabs: [
     {
       id: "dashboard",
@@ -3372,7 +3375,7 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "messages",
-      label: "Messages",
+      label: t("productivity.navigation.conversations", { defaultValue: "Conversations" }),
       type: "entity",
       entityConfig: mailMessagesTableConfig(t),
       createForm: newMailMessageForm(t),
@@ -3392,7 +3395,7 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "followers",
-      label: "Followers",
+      label: t("productivity.navigation.following", { defaultValue: "Following" }),
       type: "entity",
       entityConfig: mailFollowersTableConfig(t),
       createForm: subscribeToRecordForm(t),

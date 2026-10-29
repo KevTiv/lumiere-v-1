@@ -1,0 +1,4876 @@
+{
+  "recordChanges": {
+    "fields": {
+      "name": "Ibisobanuro",
+      "debit": "Debi",
+      "credit": "Kredi",
+      "balance": "Amafaranga asigaye"
+    }
+  },
+  "moduleInsights": {
+    "overview": "Incamake",
+    "previous": "Igihe cyashize",
+    "month": "Ukwezi",
+    "state": "Uko bihagaze",
+    "states": {
+      "draft": "Umushinga",
+      "sent": "Byoherejwe",
+      "sale": "Byemejwe",
+      "done": "Byarangiye",
+      "cancelled": "Byahagaritswe",
+      "open": "Birafunguye",
+      "purchase": "Byemejwe",
+      "submitted": "Byoherejwe",
+      "approved": "Byemejwe",
+      "posted": "Byanditswe mu ibaruramari",
+      "refused": "Byanzwe",
+      "generated": "Byakozwe",
+      "exported": "Byasohowe",
+      "archived": "Byabitswe mu bubiko"
+    },
+    "workspaces": {
+      "ops": "Ibikorwa",
+      "operations": "Ibikorwa",
+      "deliveries": "Ibyagejejwe ku bakiriya",
+      "commission-plans": "Gahunda za komisiyo",
+      "leads": "Abashobora kuba abakiriya",
+      "activities": "Ibikorwa",
+      "contacts": "Abo kuvugana",
+      "requisitions": "Amasezerano y’amasoko",
+      "vendors": "Abatanga ibicuruzwa",
+      "lines": "Imirongo ya komande",
+      "trial-balance": "Igereranya ry’imibare ya konti",
+      "scheduled-reports": "Raporo zateganyijwe"
+    }
+  },
+  "workspaceShell": {
+    "preferences": "Ibyifuzo by’aho ukorera",
+    "preferencesDescription": "Hindura aho ukorera uko ubishaka.",
+    "appearance": "Imigaragarire",
+    "contentWidth": "Ubugari bw’ibigaragara",
+    "centered": "Hagati",
+    "fullWidth": "Ubugari bwose",
+    "navigation": "Kugenda mu bice",
+    "expanded": "Byagutse",
+    "compact": "Bicucitse",
+    "comfortable": "Bisanzuye",
+    "density": "Ubucucike bw’imbonerahamwe",
+    "light": "Urumuri",
+    "dark": "Umwijima",
+    "system": "Sisitemu",
+    "toggleNavigation": "Erekana cyangwa uhishe inzira",
+    "closeNavigation": "Funga inzira",
+    "expandNavigation": "Agura inzira",
+    "collapseNavigation": "Gabanya inzira",
+    "search": "Shakisha ibice n’inyandiko"
+  },
+  "common": {
+    "select": {
+      "search": "Shakisha amahitamo…",
+      "options": "Amahitamo",
+      "noMatches": "Nta mahitamo ahuye n’ibyo ushaka"
+    },
+    "save": "Bika",
+    "cancel": "Reka",
+    "edit": "Hindura",
+    "delete": "Siba",
+    "confirm": "Emeza",
+    "confirmAction": "Emeza igikorwa",
+    "loading": "Birimo gutegurwa…",
+    "search": "Shakisha",
+    "export": "Sohora",
+    "refresh": "Vugurura",
+    "settings": "Igenamiterere",
+    "back": "Subira inyuma",
+    "next": "Komeza",
+    "actionCompleted": "{{action}} byarangiye",
+    "active": "Birakora",
+    "inactive": "Ntibikora",
+    "none": "Nta na kimwe",
+    "close": "Funga",
+    "submit": "Ohereza",
+    "create": "Kora",
+    "notes": "Ibisobanuro",
+    "metadata": "Amakuru asobanura inyandiko",
+    "saving": "Birimo kubikwa…",
+    "reset": "Subiza uko byari biri",
+    "yes": "Yego",
+    "no": "Oya",
+    "error": {
+      "title": "Ikosa",
+      "generic": "Habaye ikosa. Ongera ugerageze."
+    },
+    "success": "Byagenze neza",
+    "warning": "Iburira",
+    "noData": "Nta makuru ahari",
+    "noOrganization": {
+      "title": "Nta muryango watoranyijwe",
+      "description": "Ugomba kuba mu muryango kugira ngo ukoreshe iki gice. Soza kwiyandikisha cyangwa usabe umuyobozi kugutumira.",
+      "goToOnboarding": "Jya ku iyandikisha"
+    },
+    "lookup": {
+      "noJournals": "Nta bitabo by’ibaruramari bihari. Banza ubikore mu igenamiterere ry’ibaruramari.",
+      "noPartners": "Nta bakiriya baraboneka. Banza wongereho abo kuvugana muri CRM.",
+      "noPricelists": "Nta rutonde rw’ibiciro ruhari. Banza urukore.",
+      "noVendors": "Nta batanga ibicuruzwa baraboneka. Bagaragaze muri CRM cyangwa wongereho amakuru yabo.",
+      "noProducts": "Nta bicuruzwa biri ku rutonde. Banza ukore igicuruzwa.",
+      "noUoms": "Nta bipimo bihari. Banza ugene ibipimo by’umuryango wawe.",
+      "noSaleOrders": "Nta komande z’abakiriya. Banza ukore komande yemejwe.",
+      "noSubscriptionPlans": "Nta gahunda y’ifatabuguzi. Banza uyikore.",
+      "noAccounts": "Nta konti z’ibaruramari rusange. Banza ushyireho urutonde rwa konti.",
+      "noAnalyticAccounts": "Nta konti z’isesengura. Banza ukore konti y’isesengura.",
+      "noEmployees": "Nta bakozi. Banza ubongere mu gice cy’abakozi.",
+      "noProjects": "Nta mishinga. Banza ukore umushinga.",
+      "noTasks": "Nta mirimo. Banza ukore umurimo.",
+      "noWarehouses": "Nta bubiko buhari. Banza ubukore mu gice cy’ibarura ry’ibicuruzwa.",
+      "noStockMoves": "Nta bwoko bw’ibikorwa cyangwa ahantu habonetse. Banza ukore ibikorwa by’ububiko cyangwa ingano yabwo.",
+      "noCategories": "Nta byiciro by’ibicuruzwa. Banza ubikore mu igenamiterere ry’ibarura ry’ibicuruzwa.",
+      "noTeams": "Nta matsinda y’ubufasha. Banza uyagene.",
+      "noStages": "Nta byiciro by’imigendekere y’akazi. Banza ugene ibyiciro by’ubufasha.",
+      "noBoms": "Nta rutonde rw’ibikoresho. Banza urukore.",
+      "noTaskStages": "Nta byiciro by’imirimo. Kora umurimo ufite icyiciro cyangwa usige icyiciro kirimo ubusa.",
+      "noLeaveTypes": "Nta bwoko bw’ikiruhuko bwagenwe. Banza ubukore.",
+      "noDepartments": "Nta mashami. Banza uyakore.",
+      "noPayrollStructures": "Nta miterere y’imishahara. Banza uyikore."
+    },
+    "validation": {
+      "required": "Aya makuru arakenewe",
+      "minLength": "Hagomba kuba nibura inyuguti {{min}}",
+      "maxLength": "Ntibirenge inyuguti {{max}}",
+      "min": "Agaciro gato ni {{min}}",
+      "max": "Agaciro kanini ni {{max}}",
+      "invalidFormat": "Imiterere ntiyemewe",
+      "invalidEmail": "Aderesi ya imeyili ntiyemewe",
+      "invalidUrl": "Aderesi y’urubuga ntiyemewe",
+      "invalidNumber": "Andika umubare"
+    },
+    "form": {
+      "unavailableSelection": "Ibyatoranyijwe ntibihari: {{value}}",
+      "multiSelect": {
+        "placeholder": "Ongeraho…",
+        "search": "Shakisha…",
+        "empty": "Nta bihuye",
+        "remove": "Kuraho {{value}}"
+      }
+    },
+    "formPreview": {
+      "label": "Reba mbere"
+    },
+    "formSubmit": {
+      "busy": "Tegereza, hari ubundi busabe burimo gukorwa.",
+      "validationFailed": "Kosora ahagaragajwe, wongere ugerageze.",
+      "noHandler": "Iyi fishi ntirashobora kubika. Baza abatanga ubufasha.",
+      "failed": "Kohereza byanze",
+      "saved": "Byabitswe neza."
+    },
+    "paramsMapper": {
+      "periodNotFound": "Nta gihe cy’ibaruramari gifite iryo zina.",
+      "invalidConsolidationAccount": "Ntibyashobotse gutegura amakuru ya konti yo guhuriza hamwe ibaruramari. Genzura imyanya ikenewe.",
+      "invalidConsolidationJournal": "Ntibyashobotse gutegura amakuru y’igitabo cy’ibaruramari rihurijwe hamwe. Genzura imyanya ikenewe.",
+      "invalidEliminationEntry": "Ntibyashobotse gutegura amakuru y’inyandiko ikuramo ibikorwa hagati y’ibigo. Genzura imyanya ikenewe.",
+      "invalidTrialBalanceEntry": "Ntibyashobotse gutegura amakuru y’umurongo w’igereranya ry’imibare ya konti. Genzura imyanya ikenewe.",
+      "invalidCompany": "Ntibyashobotse gutegura amakuru y’ikigo. Genzura imyanya ikenewe.",
+      "invalidWhatsappAccount": "Ntibyashobotse gutegura amakuru ya konti ya WhatsApp. Genzura imyanya ikenewe.",
+      "invalidSkill": "Ntibyashobotse gutegura amakuru y’ubushobozi. Genzura imyanya ikenewe.",
+      "invalidAgent": "Ntibyashobotse gutegura amakuru y’umufasha. Genzura imyanya ikenewe.",
+      "invalidTeamMember": "Ntibyashobotse gutegura amakuru y’umunyamuryango w’itsinda. Genzura imyanya ikenewe.",
+      "invalidInsight": "Ntibyashobotse gutegura amakuru y’isesengura. Genzura imyanya ikenewe.",
+      "invalidProductivityLog": "Ntibyashobotse gutegura amakuru y’amateka y’umusaruro. Genzura imyanya ikenewe.",
+      "invalidCustomField": "Ntibyashobotse gutegura amakuru y’umwanya wihariye. Genzura imyanya ikenewe.",
+      "invalidAiActionDraft": "Ntibyashobotse gutegura amakuru y’umushinga w’igikorwa cya AI.",
+      "invalidAiChatSession": "Ntibyashobotse gutegura amakuru y’ikiganiro cya AI.",
+      "invalidIotAction": "Ntibyashobotse gutegura amakuru y’igikorwa cya IoT."
+    },
+    "csvImport": {
+      "description": "Hitamo dosiye ya CSV UTF-8. Imitwe y’inkingi igomba guhura n’icyitegererezo cya SpacetimeDB.",
+      "submit": "Injiza",
+      "fileLabel": "Dosiye ya CSV"
+    },
+    "importAssistant": {
+      "description": "Ohereza dosiye ya CSV, ugenzure ihuzwa ry’inkingi ryatanzwe na AI, urebe imirongo yahinduwe, hanyuma uyinjize muri ERP.",
+      "stepUpload": "Ohereza dosiye",
+      "stepMap": "Huza inkingi",
+      "stepPreview": "Reba mbere",
+      "uploadHint": "Hitamo dosiye ya CSV UTF-8 kugira ngo utangire.",
+      "structureSummary": "Habonetse inkingi {{columns}} n’imirongo {{rows}}",
+      "safetyPassed": "CSV yatsinze igenzura ry’umutekano muri mushakisha",
+      "analyze": "Sesengura inkingi",
+      "analyzing": "Birimo gusesengurwa…",
+      "preview": "Reba ibizinjizwa mbere",
+      "previewing": "Birimo gutegurwa ngo ubirebe…",
+      "confirmImport": "Emeza kwinjiza",
+      "sourceColumn": "Inkingi y’inkomoko",
+      "targetField": "Umwanya wa ERP",
+      "confidence": "Icyizere",
+      "skipColumn": "Simbuka inkingi",
+      "unmappedTargets": "Imyanya ya ERP ikenewe itarahuzwa: {{fields}}",
+      "validationErrors": "Amakosa {{count}} yo kugenzura mu byo ureba mbere",
+      "previewClean": "Imirongo {{count}} yagenzuwe neza",
+      "row": "Umurongo",
+      "field": "Umwanya w’amakuru",
+      "message": "Ubutumwa",
+      "targetEntity": "Ubwoko bw’inyandiko zigenewe",
+      "stepDone": "Uko kwinjiza bihagaze",
+      "jobPending": "Hategerejwe uko kwinjiza bihagaze…",
+      "jobNotFound": "Kwinjiza byatangiye. Uko bihagaze bizagaragara hano SpacetimeDB nirangiza.",
+      "jobStatusTitle": "Igikorwa cyo kwinjiza",
+      "jobTotal": "Imirongo yose",
+      "jobImported": "Byinjijwe",
+      "jobErrors": "Amakosa",
+      "downloadErrors": "Manura raporo y’amakosa (CSV)",
+      "savedTemplateLabel": "Icyitegererezo cy’ihuzwa cyabitswe",
+      "savedTemplatePlaceholder": "Hitamo icyitegererezo cyabitswe (si ngombwa)",
+      "noSavedTemplate": "Nta cyitegererezo cyabitswe",
+      "templateUses": "inshuro cyakoreshejwe",
+      "deleteTemplate": "Siba icyitegererezo",
+      "saveTemplateLabel": "Bika iri huza rizakoreshwe mu kwinjiza gutaha",
+      "saveTemplatePlaceholder": "Izina ry’icyitegererezo",
+      "saveTemplate": "Bika icyitegererezo",
+      "savingTemplate": "Birimo kubikwa…",
+      "templateSaved": "Icyitegererezo cy’ihuzwa cyabitswe",
+      "templateDeleted": "Icyitegererezo cy’ihuzwa cyasibwe",
+      "bundleModeHint": "Iyi CSV isa n’irimo komande n’imirongo yazo. Banza uhuze amakuru y’imitwe hanyuma uhuze ay’imirongo.",
+      "lineMappingTitle": "Inkingi z’imirongo ya komande",
+      "linePreviewTitle": "Reba imirongo mbere",
+      "bundleActive": "umutwe n’imirongo",
+      "bundleLinkRequired": "Huza inkingi iranga komande (client_order_ref) mbere yo kwinjiza komande n’imirongo yazo.",
+      "retryFailedRows": "Ongera ugerageze imirongo {{count}} yanze",
+      "retrySessionHint": "Kongera kugerageza imirongo {{count}} yanze mu kwinjiza gushize.",
+      "jobHistoryTitle": "Ibikorwa byo kwinjiza biheruka",
+      "rollbackImport": "Subiza inyuma ibyinjijwe",
+      "rollbackComplete": "Ibyinjijwe byasubijwe inyuma.",
+      "rollbackFailed": "Gusubiza inyuma byanze",
+      "abandonedDraftsTitle": "Imishinga y’ibaruramari yinjijwe itarangiye",
+      "parentPhaseOnly": "Icyiciro cy’umutwe gusa",
+      "cleanupEmptyDrafts": "Siba imishinga irimo ubusa",
+      "cleanupRefused": "Gusiba byanzwe: {{message}}",
+      "cleanupConfirmTitle": "Gusiba imishinga yinjijwe irimo ubusa?",
+      "cleanupConfirmAction": "Siba imishinga",
+      "abandonedDraftsDescription": "Ibi bikorwa byo kwinjiza byakoze imitwe y’inyandiko z’ibaruramari ariko ntibyarangiza imirongo yazo. Gusiba bikuraho gusa imishinga irimo ubusa kandi itarahinduwe. Seriveri yanga gusiba inyandiko zifite imirongo cyangwa ibikorwa by’ibaruramari.",
+      "cleanupConfirmDescription": "Igikorwa cyo kwinjiza #{{jobId}} kizongera kugenzurwa mbere yo gusiba. Imishinga yacyo y’umwimerere irimo ubusa gusa ni yo ishobora gusibwa. Inyandiko yahinduwe, yanditswe mu ibaruramari, irinzwe, yishyuwe cyangwa itarimo ubusa ihagarika gusiba byose."
+    },
+    "audit": "Igenzura",
+    "overview": "Incamake",
+    "remove": "Kuraho",
+    "entityView": {
+      "mixedCurrencies": "Iri tsinda ririmo amafaranga atandukanye, ni yo mpamvu nta giteranyo kimwe kigaragazwa.",
+      "inlineEdit": {
+        "edit": "Hindura {{label}}",
+        "saved": "{{label}} byavuguruwe",
+        "undo": "Subiza uko byari biri",
+        "undone": "Ihinduka rya {{label}} ryasubijwe inyuma",
+        "notSaved": "{{label}} ntibyabitswe",
+        "saveHint": "Kanda {{shortcut}} kugira ngo ubike, Esc kugira ngo ureke"
+      },
+      "board": "Ikibaho",
+      "emptyColumn": "Nta nyandiko",
+      "table": "Imbonerahamwe",
+      "toggleLabel": "Hindura uburyo bwo kureba",
+      "boardSearch": "Shakisha amakarita",
+      "list": "Urutonde",
+      "otherColumn": "Ibindi",
+      "pivot": "Incamake",
+      "pivotChartTitle": "{{measure}} kuri buri tsinda",
+      "pivotColumnsBy": "Inkingi",
+      "pivotCount": "Umubare",
+      "pivotEmpty": "Ntibyashyizweho",
+      "pivotGroupBy": "Shyira mu matsinda ukurikije",
+      "pivotMixedCurrencies": "Izi nyandiko zikoresha amafaranga atandukanye ({{currencies}}). Ibiteranyo biteranya amafaranga uko ari, nta kuvunja.",
+      "pivotNoData": "Nta nyandiko zo guhinira hamwe",
+      "pivotNone": "Nta na kimwe",
+      "pivotTotal": "Igiteranyo",
+      "pivotExportCsv": "Sohora CSV",
+      "export": "Sohora",
+      "exportTruncated": "Hasohorwa imirongo {{max}} ya mbere gusa",
+      "exportDone": "Hasohowe imirongo {{count}}",
+      "exportDone_one": "Hasohowe umurongo {{count}}",
+      "exportDone_other": "Hasohowe imirongo {{count}}",
+      "firstTime": {
+        "readOnly": "Wemerewe gusoma gusa. Saba umuyobozi kongeraho inyandiko ya mbere.",
+        "title": "Nta nyandiko ziraboneka"
+      },
+      "noResults": {
+        "clear": "Kuraho ibiyungurura",
+        "description": "Gerageza gushakisha ukundi cyangwa ukureho ibiyungurura.",
+        "title": "Nta nyandiko zihuye n’ibyo ushaka"
+      }
+    },
+    "retry": "Ongera ugerageze",
+    "recordsDenied": "Ntiwemerewe kureba izi nyandiko.",
+    "recordsPartial": "Inyandiko zimwe ntizashoboye kuvugururwa. Izigaragara zishobora kuba zishaje.",
+    "recordsUnavailable": "Ntibyashobotse kuzana inyandiko.",
+    "discardChanges": {
+      "navigate": "Hari impinduka zitabitswe. Zizabura nuva kuri uru rupapuro.",
+      "description": "Hari impinduka zitabitswe. Zizabura nufunga iyi fishi.",
+      "discard": "Reka kubika",
+      "keep": "Komeza guhindura",
+      "title": "Kureka impinduka?"
+    },
+    "formDraft": {
+      "restored": "Impinduka zitabitswe zo kuri {{time}} zagaruwe",
+      "discard": "Reka umushinga"
+    },
+    "loadFailed": "Ntibyashobotse kuzana uru rutonde",
+    "loadFailedHint": "Ongera ugerageze mu kanya.",
+    "csvImportDialog": {
+      "checkResult": "Reba ibisubizo",
+      "correctedFileNotice": "Ohereza dosiye yakosowe nk’ubusabe bushya. Kongera kugerageza iki kimenyetso bigumana igisubizo cya mbere.",
+      "downloadTemplate": "Manura icyitegererezo",
+      "errorsRestricted": "Uburenganzira bwawe ntibukwemerera kubona ibisobanuro byose by’amakosa y’imirongo.",
+      "exactResult": "Ibisubizo by’iyi dosiye yoherejwe",
+      "failure": "Kwinjiza byanze",
+      "fileLabel": "Dosiye ya CSV",
+      "spreadsheetFileLabel": "Dosiye ya CSV cyangwa Excel",
+      "historyEmpty": "Nta bikorwa byo kwinjiza bihuye biragaragara. Amateka aravugururwa igihe iri dirishya rifunguye.",
+      "importAnotherFile": "Injiza indi dosiye",
+      "loadingErrors": "Amakosa y’imirongo arimo kuzanywa…",
+      "missingColumns": "Inkingi zikenewe zibura: {{columns}}",
+      "noRows": "Dosiye ifite umutwe ariko nta mirongo y’amakuru.",
+      "outcomeUnknown": "Ibisubizo byo kwinjiza ntibiragenzurwa",
+      "outcomeUnknownDescription": "Seriveri yemeye {{file}}, ariko ntiyagaruye igikorwa cyo kwinjiza cyihariye. Reba amateka mbere yo kongera kugerageza.",
+      "refreshHistory": "Vugurura amateka",
+      "requestReference": "Ikimenyetso cy’ubusabe: {{requestId}}",
+      "retrySameSubmission": "Ongera ugerageze ubusabe bumwe",
+      "rowCount": "Habonetse imirongo {{count}}",
+      "rowError": "Umurongo {{row}}: {{message}}",
+      "scopeChanged": "Umuryango cyangwa ikigo byahindutse. Subira mu muryango cyangwa ikigo cya mbere kugira ngo ugenzure ubu busabe.",
+      "selectJob": "Igikorwa cyo kwinjiza",
+      "selectJobPrompt": "Hitamo igikorwa cyo kugenzura",
+      "submit": "Injiza",
+      "success": "Ubushake bwo kwinjiza bwoherejwe",
+      "successDescription": "Imirongo {{count}} yo muri {{file}} yoherejwe. Imirongo seriveri yanze igaragara mu mateka y’igikorwa cyo kwinjiza.",
+      "unknownColumns": "Izi nkingi ntizikoreshwa kandi ntizizitabwaho: {{columns}}",
+      "viewJob": "Reba igikorwa cyo kwinjiza",
+      "historyFailed": "Ntibyashobotse kuzana amateka cyangwa amakosa y’imirongo. Vugurura wongere ugerageze. Dosiye ishobora kuba yaramaze kwinjizwa; ntuyongere kohereza kugira ngo ugenzure.",
+      "historyLimit": "Amateka agaragaza ibikorwa byo kwinjiza biheruka bitarenze 100 n’amakosa y’imirongo atarenze 500 mu muryango. Amakosa amwe ashobora kuba atakiboneka hano.",
+      "historyNotice": "Dosiye yoherejwe. Amateka ya vuba y’umuryango ashobora kubamo ibyinjijwe n’abandi bakoresha. Hitamo igikorwa kugira ngo urebe ibisubizo byacyo; ibikorwa ntibihuzwa n’iyi dosiye byikora.",
+      "manualResultNotice": "Uku kwinjiza gusaba guhitamo amateka ubwawe. Ibisubizo byako ntibirashobora guhuzwa n’iyi dosiye byikora.",
+      "recoveryNotice": "Seriveri ishobora kuba yaramaze kwinjiza iyi dosiye. Kongera kugerageza bigumana ikimenyetso kimwe cy’ubusabe kandi ntibishobora gukora irindi yinjiza. Ntutangire ubusabe bushya utaramenya iki gisubizo."
+    },
+    "moduleNavigation": {
+      "overview": "Incamake",
+      "area": "Igice cy’akazi"
+    }
+  },
+  "navigation": {
+    "overview": "Incamake",
+    "sales": "Ibyagurishijwe",
+    "inventory": "Ibarura ry’ibicuruzwa",
+    "customers": "Abakiriya",
+    "analytics": "Isesengura",
+    "settings": "Igenamiterere"
+  },
+  "nav": {
+    "overview": "Incamake",
+    "tasks": "Akazi kanjye",
+    "forensics": "Iperereza",
+    "trackers": "Ibikurikiranwa",
+    "accounting": "Ibaruramari",
+    "sales": "Ibyagurishijwe",
+    "crm": "CRM",
+    "purchasing": "Amasoko",
+    "reports": "Raporo",
+    "subscriptions": "Ifatabuguzi",
+    "expenses": "Amafaranga yasohotse",
+    "inventory": "Ibarura ry’ibicuruzwa",
+    "distributor": "Umucuruzi wo kurangura",
+    "pos": "Aho kugurishiriza",
+    "manufacturing": "Inganda",
+    "map": "Ikarita",
+    "fleet": "Ibinyabiziga",
+    "helpdesk": "Ubufasha",
+    "workflows": "Imigendekere y’akazi",
+    "documents": "Inyandiko",
+    "proposals": "Ibyifuzo",
+    "calendar": "Kalendari",
+    "messages": "Ubutumwa",
+    "hr": "Abakozi",
+    "projects": "Imishinga",
+    "iot": "IoT",
+    "settings": "Igenamiterere",
+    "journal": "Igitabo cy’ibaruramari",
+    "notebook": "Ikayi",
+    "aiAssistant": "Umufasha wa AI",
+    "noRole": "Nta nshingano",
+    "signOut": "Sohoka",
+    "signedIn": "Winjiye",
+    "erpSystem": "Lumiere ERP",
+    "companySwitcher": {
+      "switchCompany": "Hindura ikigo",
+      "current": "Birakora",
+      "selectCompany": "Hitamo ikigo",
+      "singleCompany": "Ikigo",
+      "loading": "Ibigo birimo kuzanywa…"
+    },
+    "groups": {
+      "analytics": "Isesengura",
+      "finance": "Imari",
+      "operations": "Ibikorwa",
+      "productivity": "Umusaruro",
+      "people": "Abantu",
+      "system": "Sisitemu"
+    }
+  },
+  "dashboard": {
+    "title": "Ikibaho cy’amakuru",
+    "erpSystem": "Lumiere ERP",
+    "sales": {
+      "table": {
+        "product": "Igicuruzwa",
+        "sales": "Ibyagurishijwe",
+        "revenue": "Amafaranga yinjiye"
+      }
+    }
+  },
+  "accounting": {
+    "applyPayment": {
+      "title": "Huza ubwishyu busanzwe"
+    },
+    "workflowGuide": {
+      "amountDue": "Amafaranga agomba kwishyurwa",
+      "applyPayment": "Huza ubwishyu busanzwe",
+      "vendor": "Utanga ibicuruzwa",
+      "customer": "Umukiriya"
+    },
+    "insights": {
+      "title": "Incamake y’imari",
+      "daysValue": "Iminsi {{count}}",
+      "previous": "Igihe cyashize",
+      "invoices": "Fagitire",
+      "planned": "Byateganyijwe",
+      "actual": "Ibyabaye",
+      "daysOverdue": "Iminsi y’ubukererwe",
+      "month": "Ukwezi",
+      "retry": "Ongera ugerageze"
+    },
+    "overview": {
+      "deadlines": "Ibihe ntarengwa by’imisoro",
+      "loading": "Birimo gutegurwa…",
+      "retry": "Ongera ugerageze",
+      "receivables": "Amadeni abakiriya babereyemo ikigo",
+      "payables": "Amadeni ikigo kibereyemo abatanga ibicuruzwa",
+      "title": "Ibaruramari",
+      "currency": "Ifaranga",
+      "activityInvoices": "Fagitire z’abakiriya",
+      "activityBills": "Fagitire z’abatanga ibicuruzwa",
+      "activityMonth": "Ukwezi",
+      "newJournalEntry": "Inyandiko y’ibaruramari",
+      "newBill": "Fagitire nshya y’utanga ibicuruzwa",
+      "newInvoice": "Fagitire nshya",
+      "attention": "Ibisaba kwitabwaho",
+      "due": "Igihe ntarengwa",
+      "unpaid": "Ntibyishyuwe"
+    },
+    "manualInvoice": {
+      "invoiceTitle": "Fagitire",
+      "billTitle": "Fagitire y’utanga ibicuruzwa"
+    },
+    "workspaces": {
+      "overview": "Incamake",
+      "receivables": "Amadeni y’abakiriya",
+      "payables": "Amadeni ku batanga ibicuruzwa",
+      "taxSetup": "Imisoro"
+    },
+    "title": "Ibaruramari",
+    "dashboard": {
+      "accountsReceivable": "Amadeni abakiriya babereyemo ikigo",
+      "accountsPayable": "Amadeni ikigo kibereyemo abatanga ibicuruzwa",
+      "revenue": "Amafaranga yinjiye"
+    },
+    "accounts": {
+      "title": "Urutonde rwa konti",
+      "code": "Kode",
+      "name": "Izina",
+      "type": "Ubwoko",
+      "balance": "Amafaranga asigaye",
+      "active": "Birakora",
+      "status": "Uko bihagaze",
+      "actions": "Ibikorwa",
+      "all": "Byose",
+      "badges": {
+        "bank": "Banki",
+        "deprecated": "Ntibigikoreshwa",
+        "active": "Birakora"
+      },
+      "coasTab": "Konti",
+      "rowActions": {
+        "edit": "Hindura konti"
+      },
+      "edit": {
+        "deprecated": "Ntibigikoreshwa",
+        "note": "Icyitonderwa",
+        "reconcile": "Emera guhuza inyandiko",
+        "unchanged": "Nta gihinduka."
+      }
+    },
+    "glDrilldown": {
+      "title": "{{code}} — {{name}}",
+      "moveDetail": "Inyandiko y’ibaruramari",
+      "columns": {
+        "date": "Itariki",
+        "move": "Inyandiko y’ibaruramari",
+        "partner": "Umufatanyabikorwa",
+        "debit": "Debi",
+        "credit": "Kredi"
+      }
+    },
+    "periodClose": {
+      "title": "Urutonde rwo gufunga ukwezi",
+      "status": {
+        "done": "Byarangiye",
+        "pending": "Birategereje"
+      },
+      "steps": {
+        "fiscalCalendar": {
+          "title": "Kalendari y’ibaruramari yagenwe"
+        },
+        "bankRecon": {
+          "title": "Ihuza ry’inyandiko za banki ryagenzuwe"
+        },
+        "draftMoves": {
+          "title": "Imishinga y’ibaruramari yarangiye"
+        },
+        "trialBalance": {
+          "title": "Igereranya ry’imibare ya konti ryakozwe"
+        },
+        "vatReport": {
+          "title": "Raporo ya TVA yakozwe"
+        },
+        "closePeriod": {
+          "title": "Funga igihe cy’ibaruramari"
+        }
+      },
+      "review": {
+        "company": "Ikigo",
+        "title": "Genzura iki gihe",
+        "date": "Itariki (UTC)"
+      }
+    },
+    "chartStructure": {
+      "colName": "Izina",
+      "colDeprecated": "Ntibigikoreshwa",
+      "colLevel": "Urwego",
+      "colParent": "Icyiciro gikuru"
+    },
+    "journalEntries": {
+      "title": "Inyandiko z’ibaruramari",
+      "ref": "Ikimenyetso",
+      "date": "Itariki",
+      "journal": "Igitabo cy’ibaruramari",
+      "state": "Uko bihagaze",
+      "total": "Igiteranyo",
+      "type": "Ubwoko",
+      "partner": "Umufatanyabikorwa",
+      "untaxed": "Hatabariwemo umusoro",
+      "residual": "Amafaranga asigaye kwishyurwa",
+      "payment": "Ubwishyu",
+      "postEntry": "Andika mu ibaruramari",
+      "cancelEntry": "Reka",
+      "recalculateInvoiceTotals": "Ongera ubare ibiteranyo",
+      "states": {
+        "cancelled": "Byahagaritswe",
+        "draft": "Umushinga",
+        "posted": "Byanditswe mu ibaruramari"
+      },
+      "types": {
+        "entry": "Inyandiko y’ibaruramari",
+        "inInvoice": "Fagitire y’utanga ibicuruzwa",
+        "outRefund": "Inyandiko igabanya ideni"
+      }
+    },
+    "invoices": {
+      "title": "Fagitire",
+      "creditNote": "Inyandiko igabanya ideni",
+      "total": "Igiteranyo",
+      "amountDue": "Amafaranga agomba kwishyurwa",
+      "documentPreview": "Reba inyandiko mbere",
+      "vendor": "Utanga ibicuruzwa",
+      "ar": "Fagitire z’abakiriya",
+      "ap": "Fagitire z’abatanga ibicuruzwa",
+      "dueDate": "Itariki ntarengwa",
+      "paymentState": "Ubwishyu",
+      "partner": "Umufatanyabikorwa",
+      "amount": "Amafaranga",
+      "customer": "Umukiriya",
+      "dates": "Amatariki",
+      "totalAmount": "Amafaranga yose",
+      "daysRemaining": "Iminsi {{count}}",
+      "invoiceActions": {
+        "downloadPDF": "Manura PDF",
+        "send": "Ohereza",
+        "download": "Manura",
+        "recordPayment": "Andika ubwishyu",
+        "postDraft": "Andika mu ibaruramari",
+        "recalculateTotals": "Ongera ubare ibiteranyo",
+        "createCreditNote": "Kora inyandiko igabanya ideni",
+        "recalculate": "Ongera ubare ibiteranyo",
+        "registerPayment": "Andika ubwishyu"
+      },
+      "recordSheet": {
+        "actionsTab": "Ibikorwa"
+      },
+      "attachments": "Inyandiko zometseho",
+      "preview": "Reba mbere",
+      "discussion": "Ikiganiro",
+      "draftName": "Umushinga",
+      "moreActions": "Ibindi",
+      "purchaseOrder": "Komande y’amasoko",
+      "saleOrder": "Komande y’umukiriya",
+      "payment": "Ubwishyu",
+      "paymentStates": {
+        "paid": "Byishyuwe",
+        "partial": "Igice",
+        "unpaid": "Ntibyishyuwe"
+      }
+    },
+    "bills": {
+      "title": "Fagitire z’abatanga ibicuruzwa (amadeni)",
+      "vendor": "Utanga ibicuruzwa",
+      "billActions": {
+        "download": "Manura",
+        "recalculateTotals": "Ongera ubare ibiteranyo"
+      }
+    },
+    "worklists": {
+      "openStatus": "Birafunguye",
+      "unavailable": "Ntibihari",
+      "currency": "Ifaranga",
+      "columns": "Inkingi",
+      "exportCsv": "Sohora CSV",
+      "actions": "Ibikorwa",
+      "partner": "Umufatanyabikorwa",
+      "documentType": "Ubwoko bw’inyandiko"
+    },
+    "taxes": {
+      "title": "Imisoro",
+      "rate": "Igipimo",
+      "taxUse": "Ubwoko",
+      "actions": {
+        "active": "Birakora"
+      }
+    },
+    "taxGroups": {
+      "title": "Amatsinda y’imisoro",
+      "columns": {
+        "name": "Izina",
+        "sequence": "Urukurikirane",
+        "taxPayableAccountId": "Konti y’amadeni ku batanga ibicuruzwa",
+        "taxReceivableAccountId": "Konti y’amadeni y’abakiriya",
+        "company": "Ikigo"
+      },
+      "filters": {
+        "name": "Izina"
+      },
+      "actions": {
+        "newTaxGroup": "Itsinda rishya ry’imisoro",
+        "new": "Itsinda rishya ry’imisoro"
+      },
+      "form": {
+        "none": "Nta na kimwe"
+      }
+    },
+    "taxJurisdictions": {
+      "title": "Uturere tw’ububasha bw’imisoro",
+      "columns": {
+        "name": "Izina",
+        "code": "Kode",
+        "countryCode": "Igihugu",
+        "stateCode": "Uko bihagaze",
+        "city": "Umujyi",
+        "isActive": "Birakora",
+        "status": "Uko bihagaze"
+      },
+      "filters": {
+        "countryCode": "Igihugu",
+        "stateCode": "Uko bihagaze",
+        "isActive": "Uko bihagaze"
+      },
+      "actions": {
+        "newJurisdiction": "Akarere gashya k’ububasha",
+        "new": "Akarere gashya k’ububasha"
+      },
+      "active": "Birakora",
+      "inactive": "Ntibikora"
+    },
+    "taxSchedules": {
+      "title": "Ingengabihe z’imisoro",
+      "searchPlaceholder": "Shakisha ingengabihe…",
+      "columns": {
+        "name": "Izina",
+        "description": "Ibisobanuro",
+        "jurisdictionId": "Akarere k’ububasha",
+        "taxIds": "Imisoro",
+        "isActive": "Birakora",
+        "company": "Ikigo",
+        "jurisdiction": "Akarere k’ububasha",
+        "status": "Uko bihagaze",
+        "taxes": "Imisoro"
+      },
+      "filters": {
+        "jurisdictionId": "Akarere k’ububasha",
+        "isActive": "Uko bihagaze"
+      },
+      "actions": {
+        "newSchedule": "Ingengabihe nshya",
+        "new": "Ingengabihe nshya"
+      },
+      "active": "Birakora",
+      "form": {
+        "none": "Nta na kimwe"
+      },
+      "inactive": "Ntibikora"
+    },
+    "taxDeadlines": {
+      "title": "Ibihe ntarengwa by’imisoro",
+      "columns": {
+        "title": "Umutwe",
+        "deadlineType": "Ubwoko",
+        "dueDate": "Itariki ntarengwa",
+        "status": "Uko bihagaze",
+        "companyId": "Ikigo",
+        "reminderDaysBefore": "Ibyibutsa",
+        "description": "Ibisobanuro"
+      },
+      "filters": {
+        "deadlineType": "Ubwoko",
+        "status": "Uko bihagaze",
+        "companyId": "Ikigo"
+      },
+      "deadlineTypes": {
+        "Filing": "Kumenyekanisha imisoro",
+        "Payment": "Ubwishyu",
+        "Registration": "Kwiyandikisha",
+        "Report": "Raporo",
+        "Renewal": "Kongera igihe"
+      },
+      "statuses": {
+        "pending": "Birategereje",
+        "completed": "Byarangiye",
+        "overdue": "Byarengeje igihe"
+      },
+      "actions": {
+        "newDeadline": "Igihe gishya ntarengwa",
+        "completeSelected": "Soza ibyatoranyijwe",
+        "deleteSelected": "Siba ibyatoranyijwe",
+        "complete": "Shyiraho ko byarangiye",
+        "done": "{{action}} byarangiye",
+        "failed": "{{action}} byanze",
+        "new": "Igihe gishya ntarengwa"
+      },
+      "reminders": {
+        "sentAt": "Byoherejwe",
+        "status": "Uko bihagaze",
+        "tab": "Ibyibutsa"
+      },
+      "form": {
+        "company": "Ikigo (si ngombwa)",
+        "type": "Ubwoko",
+        "types": {
+          "Filing": "Kumenyekanisha imisoro",
+          "Payment": "Ubwishyu",
+          "Registration": "Kwiyandikisha",
+          "Report": "Raporo",
+          "Renewal": "Kongera igihe"
+        }
+      }
+    },
+    "budgets": {
+      "title": "Ingengo y’imari",
+      "planned": "Byateganyijwe",
+      "practical": "Ibyabaye",
+      "variance": "Itandukaniro %",
+      "cancelSelected": "Hagarika ibyatoranyijwe",
+      "workspace": {
+        "listTitle": "Ingengo y’imari",
+        "colName": "Izina",
+        "confirm": "Emeza",
+        "validate": "Emeza",
+        "markDone": "Shyiraho ko byarangiye",
+        "colAnalytic": "Konti y’isesengura",
+        "actions": "Ibikorwa",
+        "postCode": "Kode",
+        "postDescription": "Ibisobanuro",
+        "active": "Birakora",
+        "newLine": "Umurongo mushya"
+      }
+    },
+    "fxRevaluation": {
+      "realizedAction": "Andika inyungu cyangwa igihombo by’ivunjisha byabaye",
+      "colCurrency": "Ifaranga",
+      "colMove": "Inyandiko y’ibaruramari",
+      "colReference": "Ikimenyetso",
+      "form": {
+        "title": "Ongera ubare agaciro k’amafaranga y’amahanga",
+        "sections": {
+          "main": "Ibipimo ngenderwaho"
+        },
+        "fields": {
+          "journalId": "Igitabo cy’ibaruramari",
+          "reference": "Ikimenyetso (si ngombwa)"
+        }
+      },
+      "batchForm": {
+        "title": "Ongera ubare agaciro k’amafaranga y’amahanga mu cyiciro",
+        "sections": {
+          "main": "Ibipimo ngenderwaho"
+        }
+      },
+      "realizedForm": {
+        "title": "Andika inyungu cyangwa igihombo by’ivunjisha byabaye",
+        "submitLabel": "Andika inyungu cyangwa igihombo by’ivunjisha byabaye",
+        "fields": {
+          "paymentId": "Ubwishyu",
+          "invoiceMoveId": "Fagitire",
+          "date": "Itariki"
+        }
+      }
+    },
+    "creditControl": {
+      "writeOffAction": "Gukuramo ideni ritazishyurwa",
+      "colPartner": "Umufatanyabikorwa",
+      "colLimit": "Umubare ntarengwa w’ideni",
+      "colNotes": "Ibisobanuro",
+      "form": {
+        "title": "Gena igenzura ry’ideni ry’umufatanyabikorwa",
+        "submitLabel": "Bika",
+        "sections": {
+          "main": "Kredi"
+        },
+        "fields": {
+          "partnerId": "Umufatanyabikorwa",
+          "creditLimit": "Umubare ntarengwa w’ideni",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "writeOffForm": {
+        "title": "Gukuramo ideni ritazishyurwa",
+        "fields": {
+          "amount": "Amafaranga",
+          "receivableAccountId": "Konti y’amadeni y’abakiriya",
+          "date": "Itariki"
+        }
+      }
+    },
+    "amortization": {
+      "createAction": "Ingengabihe nshya",
+      "schedulesTitle": "Ingengabihe",
+      "searchSchedules": "Shakisha ingengabihe…",
+      "searchLines": "Shakisha imirongo…",
+      "colKind": "Ubwoko",
+      "colDescription": "Ibisobanuro",
+      "colTotal": "Igiteranyo",
+      "colState": "Uko bihagaze",
+      "colSchedule": "Ingengabihe",
+      "colSequence": "Uruk.",
+      "colAmount": "Amafaranga",
+      "period": {
+        "month": "Buri kwezi",
+        "year": "Buri mwaka"
+      },
+      "form": {
+        "title": "Kora ingengabihe yo kugabanya ikiguzi",
+        "sections": {
+          "main": "Ingengabihe"
+        },
+        "fields": {
+          "scheduleKind": "Ubwoko",
+          "description": "Ibisobanuro",
+          "totalAmount": "Amafaranga yose",
+          "currencyId": "Ifaranga",
+          "startDate": "Intangiriro",
+          "endDate": "Iherezo"
+        }
+      }
+    },
+    "consolidation": {
+      "accounts": {
+        "title": "Konti zo guhuriza hamwe ibaruramari",
+        "newAccount": "Konti nshya",
+        "editAccount": "Hindura konti",
+        "colCode": "Kode",
+        "colName": "Izina",
+        "colType": "Ubwoko",
+        "colRate": "Igipimo",
+        "colActive": "Birakora"
+      },
+      "journals": {
+        "title": "Ibitabo by’ibaruramari rihurijwe hamwe",
+        "newJournal": "Igitabo gishya cy’ibaruramari",
+        "colName": "Izina",
+        "colPeriod": "Igihe",
+        "colState": "Uko bihagaze",
+        "colDebit": "Debi",
+        "colCredit": "Kredi",
+        "validate": "Emeza"
+      },
+      "elimination": {
+        "title": "Inyandiko zo gukuramo ibikorwa hagati y’ibigo",
+        "colName": "Izina",
+        "colAccount": "Konti",
+        "colType": "Ubwoko",
+        "colDebit": "Debi",
+        "colCredit": "Kredi"
+      },
+      "forms": {
+        "newAccount": {
+          "fields": {
+            "name": "Izina",
+            "code": "Kode ya konti",
+            "currencyId": "ID y’ifaranga"
+          }
+        },
+        "newJournal": {
+          "fields": {
+            "periodId": "Igihe",
+            "currencyId": "ID y’ifaranga"
+          }
+        },
+        "newElimination": {
+          "fields": {
+            "journalId": "ID y’igitabo cy’ibaruramari",
+            "name": "Ibisobanuro",
+            "accountCode": "Kode ya konti",
+            "debit": "Debi",
+            "credit": "Kredi",
+            "currencyId": "ID y’ifaranga",
+            "reference": "Ikimenyetso"
+          }
+        }
+      },
+      "accountTypes": {
+        "equity": "Imari bwite",
+        "income": "Amafaranga yinjira",
+        "expense": "Amafaranga asohoka"
+      },
+      "eliminationMethods": {
+        "partial": "Igice"
+      },
+      "eliminationTypes": {
+        "other": "Ibindi"
+      },
+      "rates": {
+        "company": "Ikigo",
+        "currency": "Ifaranga",
+        "period": "Igihe",
+        "rate": "Igipimo",
+        "title": "Ibipimo by’ivunjisha by’ibigo",
+        "type": "Ubwoko"
+      }
+    },
+    "states": {
+      "draft": "Umushinga",
+      "posted": "Byanditswe mu ibaruramari",
+      "cancelled": "Byahagaritswe",
+      "paid": "Byishyuwe",
+      "partial": "Igice",
+      "notPaid": "Ntibyishyuwe",
+      "sent": "Byoherejwe",
+      "overdue": "Byarengeje igihe",
+      "pending": "Birategereje",
+      "approved": "Byemejwe"
+    },
+    "nav": {
+      "overview": "Incamake",
+      "accounts": "Urutonde rwa konti",
+      "journalEntries": "Inyandiko z’ibaruramari",
+      "customerInvoices": "Fagitire z’abakiriya",
+      "vendorBills": "Fagitire z’abatanga ibicuruzwa",
+      "taxes": "Imisoro",
+      "budgets": "Ingengo y’imari"
+    },
+    "tabs": {
+      "analyticAccounts": "Konti z’isesengura",
+      "analyticLines": "Imirongo y’isesengura",
+      "analyticDistribution": "Ibyitegererezo byo kugabanya",
+      "reconciliationWidgets": "Guhuza inyandiko",
+      "fiscalYears": "Imyaka y’ibaruramari",
+      "accountPeriods": "Ibihe",
+      "taxGroups": "Amatsinda y’imisoro",
+      "taxJurisdictions": "Uturere tw’ububasha",
+      "taxSchedules": "Ingengabihe",
+      "taxDeadlines": "Ibihe ntarengwa",
+      "payments": "Ubwishyu",
+      "operationalPayments": "Ibikorwa by’ubwishyu",
+      "paymentTerms": "Amabwiriza y’ubwishyu",
+      "paymentTermLines": "Imirongo y’ubwishyu",
+      "journals": "Ibitabo by’ibaruramari",
+      "journalEntries": "Inyandiko z’ibaruramari",
+      "moveLines": "Imirongo y’ibaruramari"
+    },
+    "entities": {
+      "bankStatements": {
+        "title": "Inyandiko za banki",
+        "columns": {
+          "name": "Ikimenyetso",
+          "journalId": "Igitabo cy’ibaruramari",
+          "state": "Uko bihagaze",
+          "date": "Itariki",
+          "balanceStart": "Amafaranga atangirirwaho",
+          "lineIds": "Imirongo"
+        },
+        "filters": {
+          "state": {
+            "label": "Uko bihagaze",
+            "options": {
+              "Open": "Birafunguye",
+              "Posted": "Byanditswe mu ibaruramari",
+              "Confirm": "Byemejwe"
+            }
+          }
+        },
+        "states": {
+          "Open": "Birafunguye",
+          "Posted": "Byanditswe mu ibaruramari",
+          "Confirm": "Byemejwe"
+        }
+      },
+      "reconciliationWidgets": {
+        "title": "Ibikoresho byo guhuza inyandiko",
+        "columns": {
+          "accountId": "Konti",
+          "partnerId": "Umufatanyabikorwa",
+          "moveLineIds": "ID z’imirongo y’ibaruramari"
+        }
+      },
+      "analyticLines": {
+        "title": "Imirongo y’isesengura",
+        "searchPlaceholder": "Shakisha imirongo…",
+        "columns": {
+          "name": "Izina rigaragazwa",
+          "accountId": "Konti y’isesengura",
+          "amount": "Amafaranga",
+          "date": "Itariki"
+        }
+      },
+      "analyticDistributionModels": {
+        "title": "Ibyitegererezo by’isaranganya ry’isesengura",
+        "columns": {
+          "name": "Izina",
+          "isActive": "Birakora"
+        }
+      },
+      "fixedAssets": {
+        "title": "Umutungo urambye",
+        "columns": {
+          "active": "Birakora",
+          "state": "Uko bihagaze"
+        },
+        "filters": {
+          "state": {
+            "label": "Uko bihagaze",
+            "options": {
+              "Draft": "Umushinga",
+              "Open": "Birimo gukorwa",
+              "Close": "Byafunzwe"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Umushinga",
+          "Open": "Birimo gukorwa",
+          "Close": "Byafunzwe"
+        },
+        "actions": {
+          "deleteSelected": "Siba ibyatoranyijwe"
+        },
+        "form": {
+          "code": "Kode",
+          "currency": "Ifaranga",
+          "name": "Izina",
+          "none": "Nta na kimwe",
+          "typePurchase": "Kugura",
+          "typeSale": "Igurisha"
+        }
+      },
+      "depreciationSchedule": {
+        "title": "Ingengabihe y’igabanyuka ry’agaciro",
+        "columns": {
+          "date": "Itariki",
+          "name": "Izina rigaragazwa",
+          "amount": "Amafaranga",
+          "movePosted": "Byanditswe mu ibaruramari"
+        }
+      },
+      "payments": {
+        "title": "Ubwishyu",
+        "columns": {
+          "name": "Ikimenyetso",
+          "amount": "Amafaranga",
+          "state": "Uko bihagaze",
+          "partnerId": "Umufatanyabikorwa",
+          "journalId": "Igitabo cy’ibaruramari",
+          "currencyId": "Ifaranga"
+        },
+        "filters": {
+          "state": {
+            "label": "Uko bihagaze",
+            "options": {
+              "NotPaid": "Umushinga",
+              "Paid": "Byanditswe mu ibaruramari",
+              "Reversed": "Byahagaritswe"
+            }
+          }
+        },
+        "states": {
+          "NotPaid": "Umushinga",
+          "Paid": "Byanditswe mu ibaruramari",
+          "Reversed": "Byahagaritswe"
+        },
+        "actions": {
+          "cancelSelected": "Hagarika ibyatoranyijwe"
+        }
+      },
+      "paymentTerms": {
+        "title": "Amabwiriza y’ubwishyu",
+        "columns": {
+          "name": "Izina",
+          "isActive": "Birakora",
+          "note": "Icyitonderwa"
+        },
+        "actions": {
+          "deleteSelected": "Siba ibyatoranyijwe",
+          "addLine": "Ongeraho umurongo"
+        }
+      },
+      "journals": {
+        "title": "Ibitabo by’ibaruramari",
+        "columns": {
+          "code": "Kode",
+          "name": "Izina",
+          "type": "Ubwoko",
+          "active": "Birakora"
+        }
+      },
+      "moveLines": {
+        "title": "Imirongo y’inyandiko z’ibaruramari",
+        "columns": {
+          "moveId": "Inyandiko y’ibaruramari",
+          "accountId": "Konti",
+          "name": "Izina rigaragazwa",
+          "debit": "Debi",
+          "credit": "Kredi"
+        },
+        "actions": {
+          "deleteSelected": "Siba ibyatoranyijwe"
+        }
+      },
+      "intercompanyRules": {
+        "title": "Amabwiriza y’ibikorwa hagati y’ibigo",
+        "columns": {
+          "ruleType": "Ubwoko",
+          "isActive": "Birakora"
+        },
+        "filters": {
+          "ruleType": {
+            "label": "Ubwoko",
+            "options": {
+              "Sale": "Igurisha",
+              "Purchase": "Kugura",
+              "Transfer": "Kohereza amafaranga",
+              "Service": "Serivisi"
+            }
+          },
+          "isActive": {
+            "label": "Uko bihagaze",
+            "options": {
+              "true": "Birakora",
+              "false": "Ntibikora"
+            }
+          }
+        },
+        "states": {
+          "Sale": "Igurisha",
+          "Purchase": "Kugura",
+          "Transfer": "Kohereza amafaranga",
+          "Service": "Serivisi"
+        },
+        "actions": {
+          "deleteSelected": "Siba ibyatoranyijwe"
+        }
+      },
+      "intercompanyTransactions": {
+        "title": "Ibikorwa hagati y’ibigo",
+        "columns": {
+          "originDocumentModel": "Ubwoko bw’inyandiko",
+          "amount": "Amafaranga",
+          "currencyId": "Ifaranga",
+          "transactionType": "Ubwoko",
+          "state": "Uko bihagaze"
+        },
+        "filters": {
+          "state": {
+            "label": "Uko bihagaze",
+            "options": {
+              "Draft": "Umushinga",
+              "Pending": "Birategereje",
+              "Approved": "Byemejwe",
+              "Completed": "Byarangiye",
+              "Error": "Ikosa",
+              "Cancelled": "Byahagaritswe"
+            }
+          },
+          "transactionType": {
+            "label": "Ubwoko",
+            "options": {
+              "Sale": "Igurisha",
+              "Purchase": "Kugura",
+              "Transfer": "Kohereza amafaranga",
+              "Service": "Serivisi"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Umushinga",
+          "Pending": "Birategereje",
+          "Approved": "Byemejwe",
+          "Completed": "Byarangiye",
+          "Error": "Ikosa",
+          "Cancelled": "Byahagaritswe"
+        },
+        "actions": {
+          "completeSelected": "Soza ibyatoranyijwe",
+          "cancelSelected": "Hagarika ibyatoranyijwe"
+        }
+      },
+      "fiscalYears": {
+        "title": "Imyaka y’ibaruramari",
+        "columns": {
+          "name": "Izina",
+          "dateFrom": "Intangiriro",
+          "dateTo": "Iherezo",
+          "state": "Uko bihagaze",
+          "type": "Ubwoko"
+        },
+        "filters": {
+          "state": {
+            "label": "Uko bihagaze",
+            "options": {
+              "Draft": "Umushinga",
+              "Running": "Birimo gukorwa",
+              "Closed": "Byafunzwe",
+              "Locked": "Byafunzwe"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Umushinga",
+          "Running": "Birimo gukorwa",
+          "Closed": "Byafunzwe",
+          "Locked": "Byafunzwe"
+        }
+      },
+      "accountPeriods": {
+        "title": "Ibihe",
+        "columns": {
+          "name": "Izina",
+          "code": "Kode",
+          "fiscalYear": "Umwaka w’ibaruramari",
+          "dateFrom": "Intangiriro",
+          "dateTo": "Iherezo",
+          "state": "Uko bihagaze"
+        },
+        "filters": {
+          "state": {
+            "label": "Uko bihagaze",
+            "options": {
+              "Draft": "Umushinga",
+              "Open": "Birafunguye",
+              "Closed": "Byafunzwe"
+            }
+          }
+        },
+        "states": {
+          "Draft": "Umushinga",
+          "Open": "Birafunguye",
+          "Closed": "Byafunzwe"
+        },
+        "actions": {
+          "closeSelected": "Funga igihe"
+        }
+      }
+    },
+    "forms": {
+      "operationalPaymentAccount": {
+        "provider": "Utanga serivisi",
+        "currency": "Ifaranga",
+        "bank": "Banki"
+      },
+      "operationalPaymentTransaction": {
+        "customer": "Umukiriya",
+        "supplier": "Utanga ibicuruzwa",
+        "partner": "Umufatanyabikorwa",
+        "currency": "Ifaranga"
+      },
+      "reverseOperationalPayment": {
+        "reason": "Impamvu"
+      },
+      "operationalPaymentFee": {
+        "company": "Ikigo",
+        "customer": "Umukiriya",
+        "supplier": "Utanga ibicuruzwa"
+      },
+      "bankStatementImport": {
+        "currency": "Ifaranga",
+        "openingBalance": "Amafaranga atangirirwaho",
+        "csvData": "Amakuru ya CSV"
+      },
+      "newInvoice": {
+        "title": "Fagitire nshya",
+        "fields": {
+          "journal": "Igitabo cy’ibaruramari",
+          "journalPlaceholder": "Hitamo igitabo cy’ibaruramari",
+          "dueDate": "Itariki ntarengwa",
+          "ref": "Ikimenyetso",
+          "notes": "Ibisobanuro"
+        },
+        "columns": {
+          "description": "Ibisobanuro",
+          "qty": "Ingano",
+          "unitPrice": "Igiciro kuri kimwe",
+          "discountPercent": "Igabanyirizwa %",
+          "total": "Igiteranyo"
+        },
+        "summary": {
+          "subtotal": "Igiteranyo gito",
+          "tax": "Umusoro",
+          "total": "Igiteranyo"
+        }
+      },
+      "newBill": {
+        "fields": {
+          "journal": "Igitabo cy’ibaruramari",
+          "journalPlaceholder": "Hitamo igitabo cy’ibaruramari",
+          "dueDate": "Itariki ntarengwa",
+          "ref": "Ikimenyetso",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "newJournalEntry": {
+        "title": "Inyandiko nshya y’ibaruramari",
+        "addLine": "Ongeraho umurongo",
+        "refOptional": "Ikimenyetso (si ngombwa)",
+        "fields": {
+          "journal": "Igitabo cy’ibaruramari",
+          "journalPlaceholder": "Hitamo igitabo cy’ibaruramari",
+          "ref": "Ikimenyetso",
+          "notes": "Ibisobanuro"
+        },
+        "columns": {
+          "description": "Ibisobanuro",
+          "debit": "Debi",
+          "credit": "Kredi"
+        }
+      },
+      "newAccount": {
+        "title": "Konti nshya",
+        "fields": {
+          "code": "Kode ya konti",
+          "reconcile": "Emera guhuza inyandiko",
+          "notes": "Ibisobanuro",
+          "openingBalance": "Amafaranga atangirirwaho",
+          "options": {
+            "equity": "Imari bwite",
+            "income": "Amafaranga yinjira",
+            "expense": "Amafaranga asohoka"
+          }
+        }
+      },
+      "newTax": {
+        "title": "Umusoro mushya",
+        "fields": {
+          "description": "Ibisobanuro",
+          "options": {
+            "sale": "Ibyagurishijwe",
+            "purchase": "Kugura",
+            "none": "Nta na kimwe"
+          }
+        }
+      },
+      "newBudget": {
+        "title": "Ingengo y’imari nshya",
+        "fields": {
+          "dateFrom": "Itariki yo gutangira",
+          "dateTo": "Itariki yo kurangiza",
+          "description": "Ibisobanuro"
+        }
+      },
+      "fiscalYear": {
+        "title": "Umwaka mushya w’ibaruramari",
+        "submitEditLabel": "Bika impinduka",
+        "sections": {
+          "main": "Umwaka w’ibaruramari"
+        },
+        "fields": {
+          "name": "Izina",
+          "dateFrom": "Intangiriro",
+          "dateTo": "Iherezo",
+          "notes": "Ibisobanuro",
+          "notesPlaceholder": "Si ngombwa",
+          "metadata": "Amakuru asobanura inyandiko"
+        }
+      },
+      "accountPeriod": {
+        "title": "Igihe gishya",
+        "submitEditLabel": "Bika impinduka",
+        "sections": {
+          "main": "Igihe"
+        },
+        "fields": {
+          "name": "Izina",
+          "code": "Kode",
+          "fiscalYearId": "Umwaka w’ibaruramari",
+          "dateFrom": "Intangiriro",
+          "dateTo": "Iherezo",
+          "notes": "Ibisobanuro",
+          "notesPlaceholder": "Si ngombwa"
+        }
+      },
+      "budgetPost": {
+        "fields": {
+          "name": "Izina",
+          "code": "Kode",
+          "description": "Ibisobanuro",
+          "accountIds": "Konti",
+          "isActive": "Birakora"
+        }
+      },
+      "accountAccountType": {
+        "sections": {
+          "main": "Ubwoko"
+        },
+        "fields": {
+          "name": "Izina",
+          "isDeprecated": "Ntibigikoreshwa",
+          "metadata": "Amakuru asobanura inyandiko"
+        }
+      },
+      "accountGroup": {
+        "fields": {
+          "name": "Izina",
+          "level": "Urwego",
+          "metadata": "Amakuru asobanura inyandiko"
+        }
+      },
+      "createCreditNote": {
+        "title": "Kora inyandiko igabanya ideni",
+        "submitLabel": "Kora inyandiko igabanya ideni",
+        "fields": {
+          "reason": "Impamvu"
+        }
+      },
+      "recordPayment": {
+        "title": "Andika ubwishyu",
+        "submitLabel": "Andika ubwishyu",
+        "sections": {
+          "payment": "Ubwishyu"
+        },
+        "fields": {
+          "amount": "Amafaranga"
+        }
+      },
+      "newAccountPayment": {
+        "title": "Ubwishyu bushya",
+        "sections": {
+          "main": "Ubwishyu"
+        },
+        "fields": {
+          "partnerTypeCustomer": "Umukiriya",
+          "partnerTypeSupplier": "Utanga ibicuruzwa",
+          "partnerId": "ID y’umufatanyabikorwa",
+          "amount": "Amafaranga",
+          "currencyId": "ID y’ifaranga",
+          "journalId": "Igitabo cy’ibaruramari"
+        }
+      },
+      "newPaymentTerm": {
+        "title": "Amabwiriza mashya y’ubwishyu",
+        "fields": {
+          "name": "Izina",
+          "note": "Icyitonderwa"
+        }
+      },
+      "newPaymentTermLine": {
+        "submitLabel": "Ongeraho umurongo",
+        "sections": {
+          "main": "Umurongo"
+        },
+        "fields": {
+          "sequence": "Urukurikirane"
+        }
+      },
+      "editPaymentTermLine": {
+        "sections": {
+          "main": "Umurongo"
+        }
+      },
+      "newAccountJournal": {
+        "title": "Igitabo gishya cy’ibaruramari",
+        "sections": {
+          "main": "Igitabo cy’ibaruramari"
+        },
+        "fields": {
+          "name": "Izina",
+          "code": "Kode",
+          "type": "Ubwoko",
+          "typeSale": "Ibyagurishijwe",
+          "typePurchase": "Kugura",
+          "typeBank": "Banki",
+          "active": "Birakora"
+        }
+      },
+      "editAccountJournal": {
+        "submitLabel": "Bika impinduka",
+        "sections": {
+          "main": "Igitabo cy’ibaruramari"
+        }
+      },
+      "addAccountMoveLine": {
+        "submitLabel": "Ongeraho umurongo",
+        "sections": {
+          "line": "Umurongo"
+        },
+        "fields": {
+          "moveId": "Inyandiko y’ibaruramari",
+          "accountId": "Konti",
+          "name": "Izina rigaragazwa",
+          "debit": "Debi",
+          "credit": "Kredi"
+        }
+      },
+      "editAccountMoveLine": {
+        "submitLabel": "Bika impinduka",
+        "sections": {
+          "line": "Umurongo"
+        }
+      },
+      "newDepreciationLine": {
+        "submitLabel": "Ongeraho umurongo",
+        "fields": {
+          "name": "Izina rigaragazwa",
+          "amount": "Amafaranga"
+        }
+      },
+      "newIntercompanyRule": {
+        "sections": {
+          "main": "Itegeko"
+        },
+        "fields": {
+          "ruleType": "Ubwoko",
+          "isActive": "Birakora",
+          "journalId": "Igitabo cy’ibaruramari"
+        }
+      },
+      "editIntercompanyRule": {
+        "submitLabel": "Bika impinduka",
+        "sections": {
+          "main": "Itegeko"
+        },
+        "fields": {
+          "sequence": "Urukurikirane",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "newIntercompanyTransaction": {
+        "fields": {
+          "originDocumentModel": "Ubwoko bw’inyandiko",
+          "originDocumentModels": {
+            "accountMove": "Inyandiko y’ibaruramari",
+            "saleOrder": "Komande y’umukiriya"
+          },
+          "transactionType": "Ubwoko",
+          "amount": "Amafaranga",
+          "currencyId": "ID y’ifaranga",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "markIntercompanyTransactionError": {
+        "sections": {
+          "main": "Ikosa"
+        }
+      },
+      "newCurrencyRate": {
+        "title": "Igipimo gishya cy’ivunjisha",
+        "sections": {
+          "main": "Igipimo"
+        },
+        "fields": {
+          "rate": "Igipimo"
+        }
+      },
+      "reconcilePaymentInvoice": {
+        "submitLabel": "Huza inyandiko"
+      },
+      "analyticAccount": {
+        "createTitle": "Konti nshya y’isesengura",
+        "sections": {
+          "main": "Konti"
+        },
+        "fields": {
+          "name": "Izina",
+          "code": "Kode",
+          "currencyId": "ID y’ifaranga",
+          "active": "Birakora",
+          "accountActive": "Birakora"
+        }
+      },
+      "analyticLine": {
+        "createTitle": "Umurongo mushya w’isesengura",
+        "sections": {
+          "main": "Umurongo"
+        },
+        "fields": {
+          "name": "Izina rigaragazwa",
+          "accountId": "Konti y’isesengura",
+          "amount": "Amafaranga",
+          "unitAmount": "Amafaranga kuri kimwe",
+          "date": "Itariki",
+          "description": "Ibisobanuro"
+        }
+      },
+      "analyticDistribution": {
+        "createTitle": "Icyitegererezo gishya cyo kugabanya",
+        "sections": {
+          "main": "Icyitegererezo"
+        },
+        "fields": {
+          "name": "Izina",
+          "isActive": "Birakora"
+        }
+      },
+      "bankStatementLine": {
+        "submitLabel": "Ongeraho umurongo",
+        "sections": {
+          "main": "Umurongo"
+        },
+        "fields": {
+          "date": "Itariki",
+          "amount": "Amafaranga",
+          "partnerId": "ID y’umufatanyabikorwa"
+        }
+      },
+      "reconciliationWidget": {
+        "fields": {
+          "partnerId": "ID y’umufatanyabikorwa",
+          "partnerIdPlaceholder": "Si ngombwa",
+          "moveLineIds": "ID z’imirongo y’ibaruramari"
+        },
+        "picker": {
+          "modeBank": "Banki",
+          "partner": "Umufatanyabikorwa"
+        }
+      }
+    },
+    "bankStatementDetail": {
+      "title": "Inyandiko ya banki",
+      "linesHeading": "Imirongo",
+      "addLineButton": "Ongeraho umurongo",
+      "candidateType": "Ubwoko",
+      "candidateAmount": "Amafaranga",
+      "reconcileWithCandidate": "Huza inyandiko",
+      "manualMoveLineIds": "ID z’imirongo y’ibaruramari"
+    },
+    "fiscalYears": {
+      "title": "Imyaka y’ibaruramari",
+      "columns": {
+        "name": "Izina",
+        "dateFrom": "Itariki yo gutangira",
+        "dateTo": "Itariki yo kurangiza",
+        "state": "Uko bihagaze"
+      }
+    },
+    "accountPeriods": {
+      "title": "Ibihe by’ibaruramari",
+      "columns": {
+        "name": "Izina",
+        "dateFrom": "Itariki yo gutangira",
+        "dateTo": "Itariki yo kurangiza",
+        "state": "Uko bihagaze"
+      }
+    },
+    "reconciliation": {
+      "title": "Guhuza inyandiko"
+    },
+    "fixedAssets": {
+      "title": "Umutungo urambye",
+      "columns": {
+        "depreciationMethod": "Uburyo",
+        "state": "Uko bihagaze"
+      }
+    },
+    "actions": {
+      "closeFiscalYear": "Funga umwaka w’ibaruramari",
+      "closePeriod": "Funga igihe",
+      "depreciate": "Bara igabanyuka ry’agaciro",
+      "dispose": "Kuramo umutungo",
+      "newAccount": "Konti nshya",
+      "newAccountPeriod": "Igihe gishya",
+      "newAnalyticAccount": "Konti nshya y’isesengura",
+      "newAnalyticDistribution": "Icyitegererezo gishya cyo kugabanya",
+      "newAnalyticLine": "Umurongo mushya w’isesengura",
+      "newBill": "Fagitire nshya y’utanga ibicuruzwa",
+      "newBudget": "Ingengo y’imari nshya",
+      "newCurrencyRate": "Igipimo gishya cy’ivunjisha",
+      "newEntry": "Inyandiko nshya y’ibaruramari",
+      "newFiscalYear": "Umwaka mushya w’ibaruramari",
+      "newInvoice": "Fagitire nshya",
+      "newPayment": "Ubwishyu bushya",
+      "newPaymentTerm": "Amabwiriza mashya y’ubwishyu",
+      "newPaymentTermLine": "Ongeraho umurongo w’icyiciro cy’ubwishyu",
+      "newJournal": "Igitabo gishya cy’ibaruramari",
+      "addMoveLine": "Ongeraho umurongo",
+      "newReconciliationWidget": "Agace gashya k’amakuru",
+      "newTax": "Umusoro mushya",
+      "newTaxDeadline": "Igihe gishya ntarengwa",
+      "newTaxGroup": "Itsinda rishya ry’imisoro",
+      "newTaxJurisdiction": "Akarere gashya k’ububasha",
+      "newTaxSchedule": "Ingengabihe nshya",
+      "post": "Andika mu ibaruramari",
+      "postStatement": "Andika inyandiko ya banki mu ibaruramari",
+      "reconcile": "Huza inyandiko",
+      "registerPayment": "Andika ubwishyu",
+      "reopenPeriod": "Ongera ufungure igihe"
+    },
+    "fiscalSetup": {
+      "title": "Umufasha wo kugena ibihe by’ibaruramari",
+      "fields": {
+        "dateFrom": "Itariki yo gutangira",
+        "dateTo": "Itariki yo kurangiza"
+      }
+    },
+    "bankStatementImportLines": {
+      "description": "Ibisobanuro",
+      "reference": "Ikimenyetso",
+      "row": "Umurongo"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Ifaranga",
+        "editTab": "Hindura",
+        "reference": "Ikimenyetso"
+      }
+    },
+    "billCorrection": {
+      "price": "Igiciro kuri kimwe"
+    },
+    "importReview": {
+      "title": "Ibiteranyo byo kugenzura inkomoko",
+      "fields": {
+        "opening_balance": "Amafaranga atangirirwaho",
+        "debit": "Debi",
+        "credit": "Kredi"
+      }
+    },
+    "billIntake": {
+      "title": "Igenzura rya fagitire zakiriwe"
+    },
+    "billDocuments": {
+      "title": "Inyandiko n’inyemezabwishyu z’abatanga ibicuruzwa"
+    },
+    "authoring": {
+      "account": "Konti",
+      "amount": "Amafaranga",
+      "credit": "Kredi",
+      "customer": "Umukiriya",
+      "debit": "Debi",
+      "description": "Ibisobanuro",
+      "documentPreview": "Reba inyandiko mbere",
+      "dueDate": "Itariki ntarengwa",
+      "invoice": "Fagitire",
+      "paymentTerms": "Amabwiriza y’ubwishyu",
+      "quantity": "Ingano",
+      "tax": "Umusoro",
+      "total": "Igiteranyo",
+      "unitPrice": "Igiciro kuri kimwe",
+      "vendor": "Utanga ibicuruzwa"
+    },
+    "assetSchedule": {
+      "title": "Ingengabihe y’igabanyuka ry’agaciro yabitswe",
+      "date": "Itariki (UTC)"
+    },
+    "workflowTools": {
+      "amount": "Amafaranga",
+      "opening": "Amafaranga atangirirwaho",
+      "row": "Umurongo",
+      "date": "Itariki"
+    },
+    "navigation": {
+      "receivables": "Amadeni y’abakiriya",
+      "payables": "Amadeni ku batanga ibicuruzwa"
+    }
+  },
+  "crm": {
+    "attribution": {
+      "title": "Kugaragaza inkomoko ya UTM",
+      "nameLabel": "Izina"
+    },
+    "chatter": {
+      "logActivity": "Teganya igikorwa",
+      "activitySummary": "Incamake",
+      "activityType": "Ubwoko",
+      "activityDeadline": "Itariki ntarengwa",
+      "activityNote": "Ibisobanuro",
+      "scheduleActivity": "Teganya igikorwa",
+      "activityDone": "Byarangiye",
+      "activityPlanned": "Byateganyijwe",
+      "markDone": "Shyiraho ko byarangiye",
+      "activityTypes": {
+        "email": "Imeyili"
+      },
+      "removeAttachment": "Kuraho"
+    },
+    "leads": {
+      "title": "Abashobora kuba abakiriya",
+      "columns": {
+        "contactName": "Izina",
+        "partnerName": "Ikigo",
+        "emailFrom": "Imeyili",
+        "phone": "Telefoni",
+        "state": "Uko bihagaze",
+        "expectedRevenue": "Amafaranga yinjira ateganyijwe",
+        "createDate": "Byakozwe"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze"
+        }
+      }
+    },
+    "opportunities": {
+      "title": "Amahirwe y’ubucuruzi",
+      "board": {
+        "viewTable": "Imbonerahamwe"
+      },
+      "columns": {
+        "name": "Amahirwe y’ubucuruzi",
+        "priority": "Ubwihutirwe",
+        "expectedRevenue": "Amafaranga yinjira ateganyijwe"
+      },
+      "states": {
+        "Low": "Buke",
+        "Medium": "Hagati",
+        "High": "Bwinshi"
+      }
+    },
+    "opportunityLines": {
+      "tabLabel": "Imirongo y’amahirwe y’ubucuruzi",
+      "title": "Imirongo y’amahirwe y’ubucuruzi",
+      "columns": {
+        "opportunityId": "Amahirwe y’ubucuruzi",
+        "quantity": "Ingano",
+        "priceUnit": "Igiciro kuri kimwe",
+        "priceSubtotal": "Igiteranyo gito",
+        "discount": "Igabanyirizwa %"
+      }
+    },
+    "contacts": {
+      "title": "Abo kuvugana",
+      "columns": {
+        "name": "Izina",
+        "companyName": "Ikigo",
+        "email": "Imeyili",
+        "phone": "Telefoni",
+        "isCompany": "Ubwoko",
+        "city": "Umujyi",
+        "countryId": "Igihugu"
+      }
+    },
+    "activities": {
+      "title": "Ibikorwa",
+      "columns": {
+        "summary": "Incamake",
+        "activityType": "Ubwoko",
+        "activityTypeId": "Ubwoko",
+        "state": "Uko bihagaze",
+        "dateDeadline": "Itariki ntarengwa",
+        "isDone": "Byarangiye"
+      },
+      "states": {
+        "planned": "Byateganyijwe",
+        "done": "Byarangiye"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "planned": "Byateganyijwe",
+            "done": "Byarangiye"
+          }
+        }
+      }
+    },
+    "actions": {
+      "newOpportunityLine": "Umurongo mushya",
+      "markComplete": "Shyiraho ko byarangiye",
+      "editOpportunity": "Hindura",
+      "editLeadAddress": "Hindura aderesi",
+      "editContactAddress": "Hindura aderesi"
+    },
+    "duplicates": {
+      "title": "Abo kuvugana banditswe inshuro nyinshi"
+    },
+    "contactTags": {
+      "tabLabel": "Ibirango by’abo kuvugana",
+      "title": "Ibirango by’abo kuvugana",
+      "columns": {
+        "name": "Izina",
+        "color": "Ibara",
+        "description": "Ibisobanuro"
+      }
+    },
+    "contactCategories": {
+      "tabLabel": "Ibyiciro by’abo kuvugana",
+      "createLabel": "Icyiciro gishya",
+      "title": "Ibyiciro by’abo kuvugana",
+      "columns": {
+        "name": "Izina",
+        "color": "Ibara",
+        "parentId": "Icyiciro gikuru",
+        "isActive": "Birakora"
+      }
+    },
+    "contactSegments": {
+      "tabLabel": "Amatsinda y’abo kuvugana",
+      "title": "Amatsinda y’abo kuvugana",
+      "columns": {
+        "name": "Izina",
+        "isActive": "Birakora",
+        "description": "Ibisobanuro"
+      }
+    },
+    "forms": {
+      "newLead": {
+        "sections": {
+          "notes": "Ibisobanuro"
+        },
+        "fields": {
+          "contactName": "Izina ry’uwo kuvugana",
+          "partnerName": "Ikigo",
+          "emailFrom": "Imeyili",
+          "phone": "Telefoni",
+          "expectedRevenue": "Amafaranga yinjira ateganyijwe",
+          "state": "Uko bihagaze",
+          "description": "Ibisobanuro"
+        }
+      },
+      "newOpportunity": {
+        "sections": {
+          "opportunity": "Amahirwe y’ubucuruzi"
+        },
+        "fields": {
+          "stage": "Icyiciro cy’ubucuruzi",
+          "expectedRevenue": "Amafaranga yinjira ateganyijwe",
+          "priority": "Ubwihutirwe",
+          "options": {
+            "Low": "Buke",
+            "Medium": "Hagati",
+            "High": "Bwinshi"
+          },
+          "color": "Ibara",
+          "description": "Ibisobanuro"
+        }
+      },
+      "changeStage": {
+        "fields": {
+          "stage": "Icyiciro cy’ubucuruzi"
+        }
+      },
+      "editOpportunity": {
+        "submit": "Bika impinduka",
+        "sections": {
+          "opportunity": "Amahirwe y’ubucuruzi"
+        },
+        "fields": {
+          "expectedRevenue": "Amafaranga yinjira ateganyijwe",
+          "stage": "Icyiciro cy’ubucuruzi",
+          "description": "Ibisobanuro"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "newContact": {
+        "sections": {
+          "address": "Aderesi"
+        },
+        "fields": {
+          "email": "Imeyili",
+          "phone": "Telefoni",
+          "city": "Umujyi",
+          "color": "Ibara",
+          "description": "Ibisobanuro"
+        }
+      },
+      "newContactCategory": {
+        "sections": {
+          "category": "Icyiciro"
+        },
+        "fields": {
+          "name": "Izina",
+          "color": "Ibara",
+          "isActive": "Birakora"
+        }
+      },
+      "editContactCategory": {
+        "submit": "Bika impinduka",
+        "sections": {
+          "category": "Icyiciro"
+        },
+        "fields": {
+          "name": "Izina",
+          "color": "Ibara",
+          "isActive": "Birakora"
+        }
+      },
+      "contactIdentity": {
+        "save": "Bika impinduka",
+        "fields": {
+          "kind": "Ubwoko"
+        },
+        "states": {
+          "pending": "Birategereje"
+        }
+      },
+      "endContactRole": {
+        "fields": {
+          "reason": "Impamvu"
+        }
+      },
+      "newActivity": {
+        "fields": {
+          "summary": "Incamake",
+          "dateDeadline": "Itariki ntarengwa",
+          "note": "Ibisobanuro"
+        },
+        "submit": "Teganya igikorwa"
+      },
+      "convertToSaleOrder": {
+        "fields": {
+          "pricelist": "Urutonde rw’ibiciro",
+          "warehouse": "Ububiko"
+        }
+      },
+      "addOpportunityLine": {
+        "sections": {
+          "opportunity": "Amahirwe y’ubucuruzi",
+          "product": "Igicuruzwa n’ibiciro"
+        },
+        "fields": {
+          "productId": "Igicuruzwa",
+          "productPlaceholder": "Hitamo igicuruzwa…",
+          "uomId": "Igipimo",
+          "quantity": "Ingano",
+          "priceUnit": "Igiciro kuri kimwe",
+          "discount": "Igabanyirizwa %",
+          "sequence": "Urukurikirane",
+          "name": "Ibisobanuro",
+          "taxIds": "Imisoro"
+        }
+      },
+      "assignCategory": {
+        "sections": {
+          "category": "Icyiciro"
+        },
+        "fields": {
+          "categoryId": "Icyiciro"
+        }
+      },
+      "newContactTag": {
+        "fields": {
+          "name": "Izina",
+          "color": "Ibara",
+          "description": "Ibisobanuro"
+        }
+      },
+      "newContactSegment": {
+        "fields": {
+          "name": "Izina",
+          "isActive": "Birakora",
+          "description": "Ibisobanuro"
+        }
+      },
+      "editContact": {
+        "submit": "Bika impinduka",
+        "fields": {
+          "name": "Izina",
+          "email": "Imeyili",
+          "phone": "Telefoni",
+          "isCustomer": "Umukiriya",
+          "isVendor": "Utanga ibicuruzwa"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "editContactAddress": {
+        "title": "Hindura aderesi",
+        "sections": {
+          "address": "Aderesi"
+        },
+        "fields": {
+          "city": "Umujyi"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "editContactBusiness": {
+        "submit": "Bika impinduka",
+        "fields": {
+          "industry": "Urwego rw’ubucuruzi"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "editContactDetails": {
+        "submit": "Bika impinduka",
+        "sections": {
+          "details": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "firstName": "Izina bwite",
+          "lastName": "Izina ry’umuryango",
+          "website": "Urubuga",
+          "color": "Ibara",
+          "description": "Ibisobanuro"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "editLeadDetails": {
+        "submit": "Bika impinduka",
+        "sections": {
+          "details": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "contactName": "Izina ry’uwo kuvugana",
+          "website": "Urubuga",
+          "industry": "Urwego rw’ubucuruzi",
+          "description": "Ibisobanuro"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "editLeadAddress": {
+        "sections": {
+          "address": "Aderesi"
+        },
+        "fields": {
+          "city": "Umujyi"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      },
+      "editLeadRevenue": {
+        "submit": "Bika impinduka",
+        "sections": {
+          "revenue": "Amafaranga yinjiye"
+        },
+        "fields": {
+          "expectedRevenue": "Amafaranga yinjira ateganyijwe"
+        },
+        "validation": {
+          "noChanges": "Hindura nibura amakuru amwe mbere yo kubika."
+        }
+      }
+    },
+    "consent": {
+      "title": "Amateka y’ubwumvikane",
+      "save": "Bika",
+      "loading": "Birimo gutegurwa…"
+    },
+    "relationships": {
+      "tabLabel": "Imibanire",
+      "title": "Imibanire",
+      "noParent": "Nta na kimwe",
+      "type": "Ubwoko",
+      "save": "Bika",
+      "loading": "Birimo gutegurwa…",
+      "active": "Birakora",
+      "end": "Iherezo"
+    },
+    "admin": {
+      "stageName": "Izina",
+      "sourceName": "Izina",
+      "lostReasonName": "Izina",
+      "ruleName": "Izina",
+      "active": "Birakora"
+    },
+    "countryPacks": {
+      "title": "Ibipfunyika by’amabwiriza y’ibihugu"
+    },
+    "scoring": {
+      "title": "Amanota y’ushobora kuba umukiriya"
+    },
+    "inbox": {
+      "tabLabel": "Ubutumwa bwakiriwe",
+      "title": "Ubutumwa bwa WhatsApp bwakiriwe",
+      "close": "Funga"
+    },
+    "relIntel": {
+      "title": "Isesengura ry’imibanire",
+      "relationships": "Imibanire"
+    },
+    "myActivities": {
+      "overdue": "Byarengeje igihe"
+    },
+    "kpi": {
+      "expectedRevenue": "Amafaranga yinjira ateganyijwe"
+    }
+  },
+  "purchasing": {
+    "handoffs": {
+      "title": "Ibyakiriwe na fagitire z’abatanga ibicuruzwa",
+      "receipt": "Inyemezabwishyu",
+      "bill": "Fagitire y’utanga ibicuruzwa"
+    },
+    "purchaseOrders": {
+      "title": "Komande z’amasoko",
+      "columns": {
+        "name": "Ikimenyetso",
+        "partnerId": "Utanga ibicuruzwa",
+        "state": "Uko bihagaze",
+        "amountUntaxed": "Igiteranyo gito",
+        "amountTotal": "Igiteranyo",
+        "receiptStatus": "Inyemezabwishyu",
+        "fulfillment": "Kuzuza komande"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "Draft": "Umushinga",
+            "Sent": "Byoherejwe",
+            "ToApprove": "Bitegereje kwemezwa",
+            "Approved": "Komande y’amasoko",
+            "Done": "Byarangiye",
+            "Cancelled": "Byahagaritswe"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "Sent": "Byoherejwe",
+        "ToApprove": "Bitegereje kwemezwa",
+        "Approved": "Komande y’amasoko",
+        "Done": "Byarangiye",
+        "Cancelled": "Byahagaritswe",
+        "Purchase": "Komande y’amasoko"
+      },
+      "fulfillment": {
+        "standard": "Bisanzwe"
+      }
+    },
+    "orderLines": {
+      "title": "Imirongo ya komande",
+      "columns": {
+        "productId": "Igicuruzwa",
+        "priceUnit": "Igiciro kuri kimwe",
+        "priceSubtotal": "Igiteranyo gito",
+        "state": "Uko bihagaze"
+      },
+      "matchStatus": {
+        "pending": "Birategereje",
+        "unavailable": "Ntibihari"
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "Confirmed": "Byemejwe",
+        "Done": "Byarangiye",
+        "Cancelled": "Byahagaritswe"
+      },
+      "recovery": {
+        "title": "Kugarura ingano"
+      }
+    },
+    "rfqs": {
+      "title": "Ubusabe bw’ibiciro",
+      "columns": {
+        "name": "Gusaba ibiciro",
+        "state": "Uko bihagaze",
+        "purchaseOrderId": "Komande y’amasoko",
+        "notes": "Ibisobanuro"
+      }
+    },
+    "rfqBids": {
+      "title": "Ibiciro byatanzwe",
+      "columns": {
+        "rfqId": "Gusaba ibiciro",
+        "partnerId": "Utanga ibicuruzwa",
+        "priceUnit": "Igiciro kuri kimwe",
+        "amountTotal": "Igiteranyo",
+        "state": "Uko bihagaze"
+      }
+    },
+    "purchaseAgreements": {
+      "title": "Amasezerano y’amasoko",
+      "columns": {
+        "origin": "Inyandiko y’inkomoko",
+        "vendorId": "Utanga ibicuruzwa",
+        "state": "Uko bihagaze"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "Draft": "Umushinga",
+            "Sent": "Byoherejwe",
+            "InProgress": "Birimo gukorwa",
+            "Approved": "Byemejwe",
+            "Cancelled": "Byahagaritswe",
+            "Closed": "Byafunzwe"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "Sent": "Byoherejwe",
+        "InProgress": "Birimo gukorwa",
+        "Approved": "Byemejwe",
+        "Cancelled": "Byahagaritswe",
+        "Closed": "Byafunzwe"
+      }
+    },
+    "blanketOrders": {
+      "tab": "Amasezerano rusange y’amasoko"
+    },
+    "vendors": {
+      "title": "Abatanga ibicuruzwa",
+      "columns": {
+        "email": "Imeyili",
+        "phone": "Telefoni",
+        "city": "Umujyi",
+        "countryId": "Igihugu"
+      }
+    },
+    "landedCosts": {
+      "title": "Ibiguzi byo kugeza ibicuruzwa",
+      "columns": {
+        "name": "Izina",
+        "state": "Uko bihagaze",
+        "amountTotal": "Igiteranyo",
+        "vendorBillId": "Fagitire y’utanga ibicuruzwa"
+      }
+    },
+    "supplierIntakes": {
+      "title": "Ubusabe bw’abatanga ibicuruzwa",
+      "columns": {
+        "reference": "Ikimenyetso",
+        "state": "Uko bihagaze",
+        "companyName": "Ikigo",
+        "email": "Imeyili"
+      }
+    },
+    "tabs": {
+      "partnerBanks": "Konti za banki z’abatanga ibicuruzwa",
+      "createPartnerBank": "Konti nshya ya banki"
+    },
+    "partnerBanks": {
+      "title": "Konti za banki z’abatanga ibicuruzwa",
+      "columns": {
+        "id": "ID",
+        "partnerId": "Umufatanyabikorwa",
+        "account": "Konti",
+        "active": "Birakora"
+      }
+    },
+    "actions": {
+      "sendSelected": "Ohereza",
+      "confirmSelected": "Emeza",
+      "cancelSelected": "Reka",
+      "recalculateTotals": "Ongera ubare ibiteranyo",
+      "submitSelected": "Ohereza",
+      "approveSelected": "Emeza",
+      "closeSelected": "Funga",
+      "cancelRequisitions": "Reka",
+      "postSelected": "Andika mu ibaruramari",
+      "rejectSelected": "Wange"
+    },
+    "landedCostDetail": {
+      "title": "Imirongo y’ibiguzi byo kugeza ibicuruzwa",
+      "amountTotal": "Amafaranga yose",
+      "state": "Uko bihagaze",
+      "addLine": "Ongeraho umurongo",
+      "lines": "Imirongo"
+    },
+    "forms": {
+      "newPartnerBank": {
+        "sections": {
+          "main": "Konti"
+        }
+      },
+      "editPartnerBank": {
+        "sections": {
+          "main": "Konti"
+        },
+        "fields": {
+          "active": "Birakora"
+        }
+      },
+      "newPurchaseOrder": {
+        "sections": {
+          "vendor": "Utanga ibicuruzwa",
+          "schedule": "Ingengabihe"
+        },
+        "fields": {
+          "partnerId": "Utanga ibicuruzwa",
+          "paymentTermId": "Amabwiriza y’ubwishyu",
+          "origin": "Inyandiko y’inkomoko",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "newPurchaseRequisition": {
+        "sections": {
+          "dates": "Amatariki"
+        },
+        "fields": {
+          "vendorId": "Utanga ibicuruzwa",
+          "departmentId": "Ishami",
+          "origin": "Inyandiko y’inkomoko",
+          "description": "Ibisobanuro",
+          "productId": "Igicuruzwa",
+          "quantity": "Ingano"
+        }
+      },
+      "editPurchaseOrderLine": {
+        "sections": {
+          "line": "Umurongo"
+        },
+        "fields": {
+          "lineId": "Umurongo",
+          "productId": "Igicuruzwa",
+          "productPlaceholder": "Hitamo igicuruzwa…",
+          "uomId": "Igipimo",
+          "quantity": "Ingano",
+          "priceUnit": "Igiciro kuri kimwe"
+        }
+      },
+      "addPurchaseOrderLine": {
+        "sections": {
+          "order": "Komande y’amasoko",
+          "product": "Igicuruzwa n’ibiciro"
+        },
+        "fields": {
+          "productId": "Igicuruzwa",
+          "productPlaceholder": "Hitamo igicuruzwa…",
+          "uomId": "Igipimo",
+          "quantity": "Ingano",
+          "priceUnit": "Igiciro kuri kimwe"
+        }
+      },
+      "receivePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Umurongo wa komande"
+        }
+      },
+      "invoicePurchaseOrderLine": {
+        "fields": {
+          "lineId": "Umurongo wa komande"
+        }
+      },
+      "newLandedCost": {
+        "sections": {
+          "main": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "currencyId": "ID y’ifaranga",
+          "amountTotal": "Amafaranga yose",
+          "date": "Itariki",
+          "description": "Ibisobanuro"
+        },
+        "targetMoves": {
+          "receipt": "Inyemezabwishyu",
+          "posted": "Byanditswe mu ibaruramari"
+        }
+      },
+      "editLandedCost": {
+        "sections": {
+          "main": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "landedCostId": "Ikiguzi cyo kugeza ibicuruzwa",
+          "currencyId": "ID y’ifaranga",
+          "amountTotal": "Amafaranga yose",
+          "date": "Itariki",
+          "description": "Ibisobanuro"
+        }
+      },
+      "landedCostLine": {
+        "sections": {
+          "landedCost": "Ikiguzi cyo kugeza ibicuruzwa"
+        },
+        "fields": {
+          "landedCostId": "Ikiguzi cyo kugeza ibicuruzwa",
+          "productPlaceholder": "Hitamo igicuruzwa…",
+          "currencyId": "ID y’ifaranga"
+        }
+      },
+      "newSupplierIntake": {
+        "fields": {
+          "contactName": "Izina ry’uwo kuvugana",
+          "email": "Imeyili",
+          "phone": "Telefoni",
+          "industry": "Urwego rw’ubucuruzi",
+          "website": "Urubuga",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "editSupplierIntake": {
+        "sections": {
+          "main": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "contactName": "Izina ry’uwo kuvugana",
+          "email": "Imeyili",
+          "phone": "Telefoni",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "createBillFromOrder": {
+        "sections": {
+          "accounting": "Ibaruramari"
+        },
+        "fields": {
+          "payableAccountId": "Konti y’amadeni ku batanga ibicuruzwa"
+        }
+      },
+      "editPurchaseOrder": {
+        "fields": {
+          "orderId": "Komande y’amasoko"
+        }
+      },
+      "common": {
+        "cancel": "Reka",
+        "none": "Nta na kimwe",
+        "saving": "Birimo kubikwa…"
+      },
+      "fields": {
+        "expenseAccount": "Konti y’amafaranga asohoka",
+        "journal": "Igitabo cy’ibaruramari",
+        "notes": "Ibisobanuro",
+        "payableAccount": "Konti y’amadeni ku batanga ibicuruzwa",
+        "product": "Igicuruzwa",
+        "purchaseOrder": "Komande y’amasoko",
+        "quantity": "Ingano",
+        "returnReason": "Impamvu yo gusubiza",
+        "rfq": "Gusaba ibiciro",
+        "unitPrice": "Igiciro kuri kimwe",
+        "uom": "Igipimo",
+        "vendor": "Utanga ibicuruzwa"
+      },
+      "refinement": {
+        "pricelist": "Urutonde rw’ibiciro n’ifaranga"
+      }
+    },
+    "ops": {
+      "approve": "Emeza",
+      "delegationReason": "Impamvu",
+      "prompt": {
+        "contractName": "Izina ry’amasezerano",
+        "creditJournalId": "ID y’igitabo cy’ibaruramari",
+        "currencyId": "ID y’ifaranga",
+        "idempotencyKey": "Urufunguzo rwo kutongera igikorwa",
+        "intentProvider": "Utanga serivisi",
+        "intentStatus": "Uko bihagaze",
+        "intentType": "Ubwoko bw’ubusabe bw’ubwishyu",
+        "partnerId": "ID y’umufatanyabikorwa",
+        "productId": "ID y’igicuruzwa",
+        "returnProductId": "ID y’igicuruzwa",
+        "returnQty": "Ingano",
+        "rfqProductId": "ID y’igicuruzwa",
+        "rfqQty": "Ingano"
+      },
+      "recordIntentResult": "Andika igisubizo cy’ihuzwa",
+      "reject": "Wange",
+      "recordIntegrationResult": "Andika igisubizo cy’ihuzwa"
+    },
+    "purchaseReturns": {
+      "title": "Ibyasubijwe abatanga ibicuruzwa",
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze"
+        }
+      },
+      "states": {
+        "draft": "Umushinga",
+        "confirmed": "Byemejwe"
+      },
+      "columns": {
+        "name": "Ikimenyetso",
+        "purchaseOrderId": "Komande y’amasoko",
+        "partnerId": "Utanga ibicuruzwa",
+        "state": "Uko bihagaze",
+        "returnReason": "Impamvu yo gusubiza",
+        "pickingId": "Inyemezabwishyu",
+        "createDate": "Byakozwe"
+      }
+    },
+    "operationsTab": "Ibikorwa",
+    "order": {
+      "attachments": "Inyandiko zometseho",
+      "bills": "Fagitire z’abatanga ibicuruzwa",
+      "discussion": "Ikiganiro",
+      "receipts": "Inyemezabwishyu",
+      "status": {
+        "cancelled": "Byahagaritswe",
+        "done": "Byarangiye",
+        "purchase": "Komande y’amasoko",
+        "rfq": "Gusaba ibiciro",
+        "toApprove": "Bitegereje kwemezwa"
+      },
+      "moreActions": "Ibindi"
+    },
+    "requisition": {
+      "addLine": {
+        "quantity": "Ingano",
+        "title": "Ongeraho umurongo w’ubusabe",
+        "uom": "Igipimo"
+      }
+    },
+    "kpi": {
+      "rfqs": "Ubusabe bw’ibiciro"
+    },
+    "blanket": {
+      "actions": {
+        "addLine": "Ongeraho umurongo",
+        "cancel": "Reka",
+        "remove": "Kuraho"
+      },
+      "states": {
+        "draft": "Umushinga"
+      },
+      "fallback": {
+        "draft": "Umushinga",
+        "product": "Igicuruzwa {{id}}"
+      },
+      "fields": {
+        "currency": "Ifaranga",
+        "end": "Iherezo",
+        "name": "Izina",
+        "quantity": "Ingano",
+        "start": "Intangiriro",
+        "unitPrice": "Igiciro kuri kimwe",
+        "vendor": "Utanga ibicuruzwa"
+      },
+      "release": {
+        "title": "Hindura amasezerano rusange mo komande y’amasoko"
+      },
+      "title": "Amasezerano rusange y’amasoko"
+    },
+    "configuration": {
+      "actions": {
+        "saving": "Birimo kubikwa…"
+      },
+      "fields": {
+        "contractName": "Izina ry’amasezerano",
+        "delegationReason": "Impamvu",
+        "endDate": "Itariki yo kurangiza",
+        "idempotencyKey": "Urufunguzo rwo kutongera igikorwa",
+        "intentType": "Ubwoko bw’ubusabe bw’ubwishyu",
+        "product": "Igicuruzwa",
+        "provider": "Utanga serivisi",
+        "purchaseOrder": "Komande y’amasoko",
+        "rate": "Igipimo",
+        "reason": "Impamvu",
+        "startDate": "Itariki yo gutangira",
+        "vendor": "Utanga ibicuruzwa",
+        "warehouse": "Ububiko"
+      },
+      "none": "Nta na kimwe",
+      "risk": {
+        "high": "Bwinshi",
+        "low": "Buke",
+        "medium": "Hagati"
+      },
+      "title": "Igenamiterere ry’amasoko"
+    }
+  },
+  "erpWorkflow": {
+    "applied": "Byarangiye",
+    "retry": "Ongera ugerageze",
+    "confirm": {
+      "confirm": "Emeza"
+    }
+  },
+  "sales": {
+    "order": {
+      "attachments": "Inyandiko zometseho",
+      "deliveries": "Ibyagejejwe ku bakiriya",
+      "discussion": "Ikiganiro",
+      "invoices": "Fagitire",
+      "moreActions": "Ibindi",
+      "status": {
+        "cancelled": "Byahagaritswe",
+        "locked": "Byafunzwe",
+        "sale": "Komande y’umukiriya",
+        "toApprove": "Bitegereje kwemezwa"
+      },
+      "options": {
+        "description": "Ibisobanuro",
+        "discount": "Igabanyirizwa %",
+        "priceUnit": "Igiciro kuri kimwe",
+        "product": "Igicuruzwa",
+        "quantity": "Ingano",
+        "subtotal": "Igiteranyo gito"
+      }
+    },
+    "dashboard": {
+      "widgets": {
+        "revenue": "Amafaranga yinjiye"
+      }
+    },
+    "ops": {
+      "cancelSelected": "Hagarika ibyatoranyijwe",
+      "journal": "Igitabo cy’ibaruramari",
+      "expenseAccount": "Konti y’amafaranga asohoka",
+      "payableAccount": "Konti y’amadeni ku batanga ibicuruzwa",
+      "lines": "Imirongo",
+      "approve": "Emeza",
+      "prompt": {
+        "contractName": "Izina ry’amasezerano",
+        "idempotencyKey": "Urufunguzo rwo kutongera igikorwa",
+        "intentProvider": "Utanga serivisi",
+        "intentStatus": "Uko bihagaze",
+        "intentType": "Ubwoko bw’ubusabe bw’ubwishyu",
+        "partnerId": "ID y’umufatanyabikorwa"
+      },
+      "recordIntegrationResult": "Andika igisubizo cy’ihuzwa",
+      "reject": "Wange"
+    },
+    "salesOrders": {
+      "title": "Komande z’abakiriya",
+      "columns": {
+        "state": "Uko bihagaze",
+        "amountTotal": "Igiteranyo",
+        "invoiceStatus": "Fagitire",
+        "deliveryCount": "Ibyagejejwe ku bakiriya",
+        "deliverySummary": "Kugeza ku mukiriya",
+        "paymentSummary": "Ubwishyu",
+        "partnerName": "Umukiriya"
+      },
+      "cashSummary": {
+        "invoice": {
+          "posted": "Byakorewe fagitire"
+        },
+        "payment": {
+          "unpaid": "Ntibyishyuwe",
+          "paid": "Byishyuwe"
+        }
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "Draft": "Umushinga",
+            "Sent": "Byoherejwe",
+            "ToApprove": "Bitegereje kwemezwa",
+            "Sale": "Byemejwe",
+            "Done": "Byarangiye",
+            "Cancel": "Byahagaritswe"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "Sent": "Byoherejwe",
+        "ToApprove": "Bitegereje kwemezwa",
+        "Sale": "Byemejwe",
+        "Done": "Byarangiye",
+        "Cancel": "Byahagaritswe"
+      },
+      "invoiceStates": {
+        "InvoicedPartially": "Igice",
+        "Invoiced": "Byakorewe fagitire"
+      }
+    },
+    "orderLines": {
+      "title": "Imirongo ya komande",
+      "columns": {
+        "qtyInvoiced": "Byakorewe fagitire",
+        "priceUnit": "Igiciro kuri kimwe",
+        "priceSubtotal": "Igiteranyo gito",
+        "discount": "Igabanyirizwa %",
+        "description": "Ibisobanuro"
+      },
+      "add": "Ongeraho umurongo",
+      "addLine": "Ongeraho umurongo",
+      "discountPercent": "Igabanyirizwa %",
+      "product": "Igicuruzwa",
+      "productFallback": "Igicuruzwa {{id}}",
+      "quantity": "Ingano",
+      "subtotal": "Igiteranyo gito",
+      "taxes": "Imisoro",
+      "total": "Igiteranyo",
+      "unitPrice": "Igiciro kuri kimwe",
+      "untaxed": "Hatabariwemo umusoro"
+    },
+    "pricelistItems": {
+      "title": "Amabwiriza y’ibiciro",
+      "tabLabel": "Amabwiriza y’ibiciro",
+      "columns": {
+        "pricelistId": "Urutonde rw’ibiciro",
+        "sequence": "Uruk.",
+        "productId": "Igicuruzwa",
+        "fixedPrice": "Igiciro kidahinduka"
+      }
+    },
+    "pricelists": {
+      "title": "Intonde z’ibiciro",
+      "columns": {
+        "name": "Izina",
+        "currencyId": "Ifaranga",
+        "active": "Birakora"
+      }
+    },
+    "deliveries": {
+      "title": "Ibyagejejwe ku bakiriya",
+      "columns": {
+        "state": "Uko bihagaze",
+        "scheduledDate": "Byateganyijwe"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "Draft": "Umushinga",
+            "InProgress": "Birimo gukorwa",
+            "Done": "Byarangiye",
+            "Cancel": "Byahagaritswe"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "InProgress": "Birimo gukorwa",
+        "Done": "Byarangiye",
+        "Cancel": "Byahagaritswe"
+      }
+    },
+    "fulfillment": {
+      "title": "Kuzuza komande"
+    },
+    "returns": {
+      "title": "Ibyasubijwe / RMA"
+    },
+    "returnOrders": {
+      "title": "Ibyasubijwe / RMA",
+      "columns": {
+        "state": "Uko bihagaze",
+        "partnerId": "Umukiriya",
+        "creditMoveId": "Inyandiko igabanya ideni",
+        "returnReason": "Impamvu"
+      },
+      "states": {
+        "draft": "Umushinga",
+        "confirmed": "Byemejwe",
+        "cancelled": "Byahagaritswe"
+      },
+      "actions": {
+        "confirm": "Emeza",
+        "cancel": "Reka",
+        "createCreditNote": "Kora inyandiko igabanya ideni"
+      }
+    },
+    "returnOrderLines": {
+      "title": "Imirongo y’ibyasubijwe",
+      "columns": {
+        "productId": "Igicuruzwa",
+        "quantity": "Ingano",
+        "priceUnit": "Igiciro kuri kimwe"
+      }
+    },
+    "tabs": {
+      "invoices": "Fagitire",
+      "fulfillment": "Kuzuza komande",
+      "returns": "Ibyasubijwe / RMA",
+      "deliveryPriceRules": "Amabwiriza y’ibiciro byo kohereza",
+      "createDeliveryPriceRule": "Itegeko rishya ry’ibiciro",
+      "deliveryCarriers": "Abatwara ibicuruzwa",
+      "createDeliveryCarrier": "Utwara ibicuruzwa mushya",
+      "shippingMethods": "Uburyo bwo kohereza",
+      "createShippingMethod": "Uburyo bushya",
+      "posPaymentMethods": "Ubwishyu bw’aho kugurishiriza",
+      "createPaymentMethod": "Uburyo bushya bwo kwishyura",
+      "loyaltyPrograms": "Gahunda zo gushimira abakiriya",
+      "createLoyaltyProgram": "Gahunda nshya",
+      "loyaltyCards": "Amakarita yo gushimira abakiriya",
+      "createLoyaltyCard": "Ikarita nshya",
+      "ops": "Ibikorwa",
+      "commissionPlans": "Gahunda za komisiyo"
+    },
+    "deliveryPriceRules": {
+      "title": "Amabwiriza y’ibiciro byo kugeza ibicuruzwa",
+      "columns": {
+        "id": "ID"
+      }
+    },
+    "deliveryCarriers": {
+      "title": "Abageza ibicuruzwa",
+      "columns": {
+        "name": "Izina",
+        "deliveryType": "Ubwoko",
+        "active": "Birakora",
+        "currencyId": "Ifaranga",
+        "productId": "Igicuruzwa"
+      }
+    },
+    "shippingMethods": {
+      "title": "Uburyo bwo kohereza",
+      "columns": {
+        "name": "Izina",
+        "provider": "Utanga serivisi",
+        "deliveryType": "Ubwoko",
+        "active": "Birakora",
+        "fixedPrice": "Igiciro kidahinduka"
+      }
+    },
+    "posPaymentMethods": {
+      "title": "Uburyo bwo kwishyura aho kugurishiriza",
+      "columns": {
+        "name": "Izina",
+        "sequence": "Uruk.",
+        "active": "Birakora"
+      }
+    },
+    "loyaltyPrograms": {
+      "title": "Gahunda zo gushimira abakiriya",
+      "columns": {
+        "name": "Izina",
+        "currencyId": "Ifaranga",
+        "programType": "Ubwoko",
+        "isActive": "Birakora"
+      }
+    },
+    "loyaltyCards": {
+      "title": "Amakarita yo gushimira abakiriya",
+      "columns": {
+        "code": "Kode",
+        "partnerId": "Umufatanyabikorwa",
+        "currencyId": "Ifaranga",
+        "isActive": "Birakora"
+      }
+    },
+    "forms": {
+      "newSaleOrder": {
+        "sections": {
+          "customer": "Umukiriya",
+          "notes": "Ibisobanuro"
+        },
+        "fields": {
+          "partnerId": "Umukiriya",
+          "pricelistId": "Urutonde rw’ibiciro",
+          "warehouseId": "Ububiko",
+          "paymentTermId": "Amabwiriza y’ubwishyu",
+          "note": "Ibisobanuro",
+          "invoicePolicy": "Amabwiriza ya fagitire"
+        }
+      },
+      "newPricelist": {
+        "fields": {
+          "currencyId": "Ifaranga"
+        }
+      },
+      "newPricelistItem": {
+        "fields": {
+          "pricelistId": "Urutonde rw’ibiciro",
+          "appliedOnProduct": "Igicuruzwa",
+          "computeFixed": "Igiciro kidahinduka",
+          "productId": "ID y’igicuruzwa",
+          "fixedPrice": "Igiciro kidahinduka",
+          "priceDiscount": "Igabanyirizwa %",
+          "sequence": "Urukurikirane"
+        }
+      },
+      "newReturnOrder": {
+        "fields": {
+          "partnerId": "Umukiriya",
+          "returnReason": "Impamvu yo gusubiza"
+        }
+      },
+      "addReturnOrderLine": {
+        "sections": {
+          "product": "Igicuruzwa"
+        },
+        "fields": {
+          "productId": "Igicuruzwa",
+          "uomId": "Igipimo",
+          "quantity": "Ingano",
+          "priceUnit": "Igiciro kuri kimwe"
+        }
+      },
+      "newDeliveryPriceRule": {
+        "sections": {
+          "main": "Itegeko"
+        }
+      },
+      "newDeliveryCarrier": {
+        "fields": {
+          "name": "Izina",
+          "currencyId": "ID y’ifaranga",
+          "invoicePolicy": "Amabwiriza ya fagitire",
+          "amount": "Amafaranga"
+        }
+      },
+      "newShippingMethod": {
+        "sections": {
+          "main": "Uburyo"
+        },
+        "fields": {
+          "name": "Izina",
+          "provider": "Utanga serivisi",
+          "productId": "ID y’igicuruzwa",
+          "invoicePolicy": "Amabwiriza ya fagitire",
+          "fixedPrice": "Igiciro kidahinduka",
+          "amount": "Amafaranga"
+        }
+      },
+      "newPosPaymentMethod": {
+        "fields": {
+          "name": "Izina",
+          "paymentMethodType": "Ubwoko",
+          "sequence": "Urukurikirane",
+          "journalId": "ID y’igitabo cy’ibaruramari"
+        }
+      },
+      "newLoyaltyProgram": {
+        "fields": {
+          "name": "Izina",
+          "currencyId": "ID y’ifaranga",
+          "dateTo": "Itariki yo kurangiza"
+        }
+      },
+      "createInvoiceFromOrder": {
+        "sections": {
+          "accounting": "Ibaruramari"
+        },
+        "fields": {
+          "receivableAccountId": "Konti y’amadeni y’abakiriya"
+        }
+      },
+      "addSaleOrderLine": {
+        "sections": {
+          "product": "Igicuruzwa n’ibiciro"
+        },
+        "fields": {
+          "productId": "Igicuruzwa",
+          "productPlaceholder": "Hitamo igicuruzwa…",
+          "uomId": "Igipimo",
+          "quantity": "Ingano",
+          "priceUnit": "Igiciro kuri kimwe",
+          "discount": "Igabanyirizwa %",
+          "sequence": "Urukurikirane",
+          "name": "Ibisobanuro",
+          "taxIds": "Imisoro"
+        }
+      },
+      "editSaleOrderLine": {
+        "sections": {
+          "line": "Umurongo wa komande"
+        },
+        "fields": {
+          "lineId": "Umurongo wa komande"
+        }
+      },
+      "partialDelivery": {
+        "sections": {
+          "moveLines": "Imirongo y’ibaruramari"
+        }
+      },
+      "editSaleOrder": {
+        "submitLabel": "Bika"
+      },
+      "refinement": {
+        "pricelist": "Urutonde rw’ibiciro n’ifaranga",
+        "delivery": "Kugeza ku mukiriya",
+        "uom": "Igipimo"
+      }
+    },
+    "actions": {
+      "confirmSelected": "Emeza",
+      "recalculateTotals": "Ongera ubare ibiteranyo",
+      "newSaleOrderLine": "Umurongo mushya",
+      "deletePricelists": "Siba",
+      "startBatches": "Intangiriro",
+      "completeBatches": "Soza",
+      "downloadPdf": "Manura PDF"
+    },
+    "commissionPlans": {
+      "active": "Birakora",
+      "name": "Gahunda",
+      "partner": "Umufatanyabikorwa"
+    },
+    "quotationDocument": {
+      "title": "Inyandiko y’ibiciro biteganyijwe",
+      "download": "Manura PDF",
+      "close": "Funga"
+    }
+  },
+  "calendar": {
+    "activitiesTab": "Ibikorwa",
+    "dashboard": {
+      "confirmed": "Byemejwe"
+    },
+    "events": {
+      "title": "Ibikorwa bya kalendari",
+      "columns": {
+        "start": "Intangiriro",
+        "stop": "Iherezo",
+        "state": "Uko bihagaze"
+      },
+      "filters": {
+        "state": "Uko bihagaze",
+        "stateOptions": {
+          "draft": "Umushinga",
+          "confirmed": "Byemejwe",
+          "cancelled": "Byahagaritswe"
+        }
+      },
+      "states": {
+        "draft": "Umushinga",
+        "confirmed": "Byemejwe",
+        "cancelled": "Byahagaritswe"
+      }
+    },
+    "forms": {
+      "newEvent": {
+        "fields": {
+          "description": "Ibisobanuro"
+        }
+      }
+    },
+    "eventDetail": {
+      "edit": "Hindura",
+      "delete": "Siba",
+      "closeAria": "Funga",
+      "open": "Birafunguye",
+      "moreActions": "Ibindi"
+    },
+    "page": {
+      "discussion": "Ikiganiro"
+    }
+  },
+  "documents": {
+    "designer": {
+      "draft": "Umushinga",
+      "save": "Bika icyitegererezo",
+      "starterContent": {
+        "quotationDate": "Itariki",
+        "quotationSubtotal": "Igiteranyo gito",
+        "quotationTax": "Umusoro",
+        "quotationTotal": "Igiteranyo"
+      },
+      "saveChanges": "Bika impinduka",
+      "status": "Uko bihagaze",
+      "inactive": "Ntibikora"
+    },
+    "documents": {
+      "title": "Inyandiko",
+      "columns": {
+        "name": "Izina",
+        "mimetype": "Ubwoko",
+        "createDate": "Byakozwe",
+        "description": "Ibisobanuro"
+      },
+      "filters": {
+        "isDeleted": {
+          "label": "Uko bihagaze",
+          "options": {
+            "false": "Birakora"
+          }
+        }
+      }
+    },
+    "knowledgeBase": {
+      "title": "Ububiko bw’ubumenyi",
+      "columns": {
+        "name": "Umutwe",
+        "description": "Ibisobanuro",
+        "createDate": "Byakozwe"
+      },
+      "filters": {
+        "isPublished": {
+          "options": {
+            "false": "Umushinga"
+          }
+        }
+      }
+    },
+    "knowledgeCategories": {
+      "title": "Ibyiciro by’ubumenyi",
+      "columns": {
+        "name": "Izina",
+        "description": "Ibisobanuro",
+        "sequence": "Urukurikirane",
+        "createDate": "Byakozwe"
+      }
+    },
+    "folders": {
+      "title": "Ububiko bw’inyandiko",
+      "columns": {
+        "name": "Izina",
+        "documentCount": "Inyandiko",
+        "createDate": "Byakozwe"
+      }
+    },
+    "tabs": {
+      "processing": "Ibikorwa byo gutunganya",
+      "insights": "Isesengura rya AI",
+      "categories": "Ibyiciro",
+      "folders": "Ububiko",
+      "newCategory": "Icyiciro gishya",
+      "newFolder": "Ububiko bushya"
+    },
+    "processing": {
+      "title": "Ibikorwa byo gutunganya inyandiko",
+      "columns": {
+        "id": "ID",
+        "documentType": "Ubwoko bw’inyandiko",
+        "status": "Uko bihagaze",
+        "approved": "Byemejwe",
+        "confidence": "Icyizere",
+        "modelUsed": "Icyitegererezo",
+        "created": "Byakozwe"
+      },
+      "filters": {
+        "isApproved": {
+          "label": "Byemejwe",
+          "options": {
+            "yes": "Yego",
+            "no": "Oya"
+          }
+        }
+      }
+    },
+    "insights": {
+      "title": "Isesengura rya AI",
+      "columns": {
+        "title": "Umutwe",
+        "generatedAt": "Byakozwe"
+      },
+      "filters": {
+        "dismissed": {
+          "options": {
+            "open": "Birafunguye"
+          }
+        },
+        "isAcknowledged": {
+          "options": {
+            "yes": "Yego",
+            "no": "Oya"
+          }
+        }
+      }
+    },
+    "forms": {
+      "newDocument": {
+        "fields": {
+          "description": "Ibisobanuro",
+          "resModelNone": "Nta na kimwe",
+          "fiscalKindNone": "Nta na kimwe"
+        }
+      },
+      "newArticle": {
+        "fields": {
+          "description": "Ibisobanuro"
+        }
+      },
+      "newKnowledgeArticle": {
+        "fields": {
+          "description": "Ibisobanuro"
+        }
+      },
+      "newCategory": {
+        "title": "Icyiciro gishya",
+        "sections": {
+          "category": "Icyiciro"
+        },
+        "fields": {
+          "name": "Izina",
+          "description": "Ibisobanuro",
+          "sequence": "Urukurikirane",
+          "color": "Ibara"
+        }
+      },
+      "newFolder": {
+        "title": "Ububiko bushya",
+        "fields": {
+          "name": "Izina",
+          "description": "Ibisobanuro",
+          "sequence": "Urukurikirane"
+        }
+      },
+      "newProcessingJob": {
+        "fields": {
+          "documentType": "Ubwoko bw’inyandiko"
+        }
+      },
+      "recordTypes": {
+        "expense": "Amafaranga asohoka",
+        "purchaseOrder": "Komande y’amasoko",
+        "salesOrder": "Komande y’umukiriya"
+      }
+    },
+    "page": {
+      "delete": "Siba",
+      "discussion": "Ikiganiro",
+      "edit": "Hindura",
+      "locked": "Byafunzwe",
+      "holdReason": "Impamvu",
+      "refSystem": "Sisitemu",
+      "signatureCompleted": "Byarangiye",
+      "signatureStatus": "Uko bihagaze",
+      "signatureProvider": "Utanga serivisi"
+    },
+    "knowledgeActions": {
+      "done": "{{action}} byarangiye",
+      "failed": "{{action}} byanze"
+    },
+    "browser": {
+      "folders": "Ububiko",
+      "newFolder": "Ububiko bushya",
+      "upload": "Ohereza dosiye",
+      "name": "Izina",
+      "viewTable": "Imbonerahamwe"
+    },
+    "studio": {
+      "undo": "Subiza uko byari biri",
+      "color": "Ibara",
+      "none": "Nta na kimwe",
+      "light": "Urumuri",
+      "blockLabels": {
+        "table": "Imbonerahamwe"
+      },
+      "fields": {
+        "quotation_currency": "Ifaranga",
+        "quotation_subtotal": "Igiteranyo gito",
+        "quotation_tax": "Umusoro",
+        "quotation_total": "Igiteranyo"
+      },
+      "all": "Byose"
+    },
+    "templatePicker": {
+      "retry": "Ongera ugerageze",
+      "kind": {
+        "list": "Urutonde",
+        "table": "Imbonerahamwe",
+        "code": "Kode"
+      }
+    }
+  },
+  "subscriptions": {
+    "subscriptions": {
+      "title": "Ifatabuguzi",
+      "columns": {
+        "name": "Ikimenyetso",
+        "code": "Kode",
+        "description": "Ibisobanuro",
+        "partnerId": "Umukiriya",
+        "productId": "Gahunda",
+        "state": "Uko bihagaze",
+        "dateStart": "Itariki yo gutangira",
+        "dateEnd": "Itariki yo kurangiza"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "draft": "Umushinga",
+            "active": "Birakora",
+            "closed": "Byafunzwe",
+            "Draft": "Umushinga",
+            "Open": "Birakora",
+            "Pending": "Birategereje",
+            "Close": "Byafunzwe",
+            "Cancelled": "Byahagaritswe"
+          }
+        }
+      },
+      "states": {
+        "draft": "Umushinga",
+        "active": "Birakora",
+        "closed": "Byafunzwe",
+        "Draft": "Umushinga",
+        "Open": "Birakora",
+        "Pending": "Birategereje",
+        "Close": "Byafunzwe",
+        "Cancelled": "Byahagaritswe"
+      }
+    },
+    "plans": {
+      "title": "Gahunda z’ifatabuguzi",
+      "columns": {
+        "code": "Kode",
+        "productId": "Igicuruzwa",
+        "active": "Birakora"
+      },
+      "actions": {
+        "failed": "{{action}} byanze"
+      },
+      "bundle": {
+        "plan": "Gahunda"
+      },
+      "edit": {
+        "description": "Ibisobanuro",
+        "paymentMode": "Uburyo bwo kwishyura",
+        "unchanged": "Nta gihinduka."
+      }
+    },
+    "deferredSchedules": {
+      "title": "Ingengabihe z’amafaranga yinjira asubitswe",
+      "searchPlaceholder": "Shakisha ingengabihe…",
+      "columns": {
+        "id": "ID",
+        "description": "Ibisobanuro",
+        "state": "Uko bihagaze",
+        "totalAmount": "Igiteranyo",
+        "startDate": "Intangiriro",
+        "endDate": "Iherezo"
+      }
+    },
+    "deferredLines": {
+      "title": "Imirongo y’amafaranga yinjira asubitswe",
+      "searchPlaceholder": "Shakisha imirongo…",
+      "columns": {
+        "id": "ID",
+        "scheduleId": "Ingengabihe",
+        "sequence": "Uruk.",
+        "amount": "Amafaranga",
+        "recognized": "Byanditswe mu ibaruramari"
+      }
+    },
+    "recognitionRules": {
+      "title": "Amabwiriza yo kwemeza amafaranga yinjiye",
+      "columns": {
+        "id": "ID",
+        "description": "Ibisobanuro",
+        "priority": "Ubwihutirwe",
+        "isActive": "Birakora",
+        "recognitionMethod": "Uburyo",
+        "recognitionPeriod": "Igihe"
+      }
+    },
+    "actions": {
+      "generateInvoice": "Kora fagitire",
+      "cancel": "Hagarika ifatabuguzi",
+      "payInvoice": "Andika ubwishyu"
+    },
+    "forms": {
+      "newSubscription": {
+        "fields": {
+          "state": "Uko bihagaze",
+          "saleOrderId": "Komande y’umukiriya",
+          "partnerId": "Umukiriya",
+          "productId": "Gahunda",
+          "productPlaceholder": "ID y’igicuruzwa",
+          "code": "Ikimenyetso",
+          "description": "Ibisobanuro",
+          "dateStart": "Itariki yo gutangira",
+          "options": {
+            "recurring": {
+              "monthly": "Buri kwezi",
+              "yearly": "Buri mwaka"
+            },
+            "state": {
+              "draft": "Umushinga",
+              "open": "Birafunguye",
+              "pending": "Birategereje"
+            }
+          }
+        },
+        "startingValues": {
+          "draft": "Umushinga"
+        }
+      },
+      "newPlan": {
+        "fields": {
+          "pricelistId": "Urutonde rw’ibiciro n’ifaranga",
+          "description": "Ibisobanuro",
+          "productId": "Igicuruzwa",
+          "productPlaceholder": "ID y’igicuruzwa",
+          "options": {
+            "month": "Ukwezi",
+            "monthly": "Buri kwezi",
+            "yearly": "Buri mwaka"
+          }
+        }
+      },
+      "deferredSchedule": {
+        "sections": {
+          "main": "Ingengabihe"
+        },
+        "fields": {
+          "description": "Ibisobanuro",
+          "journalId": "Igitabo cy’ibaruramari",
+          "currencyId": "ID y’ifaranga",
+          "startDate": "Itariki yo gutangira",
+          "endDate": "Itariki yo kurangiza",
+          "state": "Uko bihagaze",
+          "notes": "Ibisobanuro"
+        },
+        "options": {
+          "monthly": "Buri kwezi",
+          "stateDraft": "Umushinga",
+          "stateRunning": "Birimo gukorwa"
+        }
+      },
+      "recognitionRule": {
+        "sections": {
+          "main": "Itegeko"
+        },
+        "fields": {
+          "description": "Ibisobanuro",
+          "idListPlaceholder": "Ongeraho…",
+          "recognitionMethod": "Uburyo",
+          "recognitionPeriod": "Igihe",
+          "isActive": "Birakora",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "closeSubscription": {
+        "sections": {
+          "main": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "notes": "Ibisobanuro"
+        }
+      },
+      "generateInvoice": {
+        "title": "Kora fagitire",
+        "sections": {
+          "main": "Fagitire"
+        },
+        "fields": {
+          "incomeAccountId": "Konti y’amafaranga yinjira",
+          "journalId": "Igitabo cy’ibaruramari",
+          "receivableAccountId": "Konti y’amadeni y’abakiriya"
+        }
+      },
+      "recognizeLine": {
+        "sections": {
+          "main": "Inyandiko y’ibaruramari"
+        }
+      },
+      "importPlanCsv": {
+        "sections": {
+          "main": "Amakuru ya CSV"
+        }
+      },
+      "importSubscriptionCsv": {
+        "sections": {
+          "main": "Amakuru ya CSV"
+        }
+      },
+      "amend": {
+        "fields": {
+          "amendmentType": "Ubwoko",
+          "incomeAccountId": "Konti y’amafaranga yinjira",
+          "journalId": "Igitabo cy’ibaruramari",
+          "lineId": "Umurongo",
+          "notes": "Ibisobanuro",
+          "receivableAccountId": "Konti y’amadeni y’abakiriya"
+        }
+      },
+      "cancel": {
+        "fields": {
+          "notes": "Ibisobanuro"
+        },
+        "sections": {
+          "main": "Reka"
+        },
+        "title": "Hagarika ifatabuguzi"
+      },
+      "commitment": {
+        "fields": {
+          "active": "Birakora"
+        }
+      },
+      "ingestUsage": {
+        "fields": {
+          "quantity": "Ingano"
+        }
+      },
+      "payInvoice": {
+        "fields": {
+          "invoiceMoveId": "Fagitire",
+          "receivableAccountId": "Konti y’amadeni y’abakiriya"
+        },
+        "sections": {
+          "main": "Ubwishyu"
+        },
+        "title": "Andika ubwishyu"
+      },
+      "priceTier": {
+        "fields": {
+          "planId": "Gahunda",
+          "sequence": "Urukurikirane",
+          "unitPrice": "Igiciro kuri kimwe"
+        }
+      },
+      "renew": {
+        "fields": {
+          "notes": "Ibisobanuro"
+        },
+        "sections": {
+          "main": "Kongera igihe"
+        }
+      }
+    },
+    "amendments": {
+      "columns": {
+        "amendmentType": "Ubwoko",
+        "creditNoteMoveId": "Inyandiko igabanya ideni",
+        "notes": "Ibisobanuro",
+        "subscriptionId": "Ifatabuguzi"
+      },
+      "tabLabel": "Impinduka z’amasezerano",
+      "title": "Impinduka z’amasezerano"
+    },
+    "dueToBill": {
+      "tabLabel": "Ibitegereje fagitire",
+      "title": "Ibitegereje fagitire"
+    },
+    "entitlements": {
+      "tabLabel": "Uburenganzira bwo gukoresha",
+      "title": "Uburenganzira bwo gukoresha"
+    },
+    "lines": {
+      "columns": {
+        "name": "Ibisobanuro",
+        "priceSubtotal": "Igiteranyo gito",
+        "priceUnit": "Igiciro kuri kimwe",
+        "qty": "Ingano",
+        "subscriptionId": "Ifatabuguzi"
+      },
+      "searchPlaceholder": "Shakisha imirongo…",
+      "tabLabel": "Imirongo",
+      "title": "Imirongo y’ifatabuguzi"
+    },
+    "pastDue": {
+      "tabLabel": "Byarengeje igihe",
+      "title": "Byarengeje igihe"
+    },
+    "paymentIntents": {
+      "tabLabel": "Ubusabe bw’ubwishyu",
+      "title": "Ubusabe bw’ubwishyu"
+    },
+    "priceTiers": {
+      "tabLabel": "Inzego z’ibiciro",
+      "title": "Inzego z’ibiciro"
+    },
+    "ratingBacklog": {
+      "tabLabel": "Ibikorwa bitegereje kubarirwa ibiciro",
+      "title": "Ibikorwa bitegereje kubarirwa ibiciro"
+    },
+    "usageCharges": {
+      "tabLabel": "Ibiguzi by’ikoreshwa",
+      "title": "Ibiguzi by’ikoreshwa"
+    },
+    "usageEvents": {
+      "tabLabel": "Ibikorwa by’ikoreshwa",
+      "title": "Ibikorwa by’ikoreshwa"
+    },
+    "page": {
+      "attachments": "Inyandiko zometseho",
+      "discussion": "Ikiganiro",
+      "moreActions": "Ibindi"
+    },
+    "paymentIntent": {
+      "amount": "Amafaranga",
+      "currency": "Ifaranga",
+      "intentType": "Ubwoko bw’ubusabe bw’ubwishyu"
+    },
+    "bundles": {
+      "columns": {
+        "active": "Birakora",
+        "code": "Kode",
+        "name": "Izina",
+        "plan": "Gahunda"
+      },
+      "tabLabel": "Ibipfunyika by’ibicuruzwa",
+      "title": "Ibipfunyika by’ibicuruzwa"
+    },
+    "workflow": {
+      "overview": "Incamake",
+      "needsAttention": "Ibisaba kwitabwaho",
+      "queues": {
+        "drafts": {
+          "title": "Imishinga yo gutangiza"
+        },
+        "due": {
+          "title": "Ibigomba gukorerwa fagitire"
+        },
+        "overdue": {
+          "title": "Ubwishyu bwarengeje igihe"
+        },
+        "paused": {
+          "title": "Gukora fagitire byahagaritswe"
+        }
+      },
+      "steps": {
+        "order": "Komande y’umukiriya",
+        "plan": "Gahunda"
+      },
+      "back": "Subira inyuma",
+      "starts": "Itariki yo gutangira",
+      "contract": "Ifatabuguzi",
+      "invoice": "Fagitire",
+      "credit": "Inyandiko igabanya ideni",
+      "pastDueDays": "Iminsi y’ubukererwe",
+      "labels": {
+        "generate-invoice": "Kora fagitire",
+        "pay-invoice": "Andika ubwishyu",
+        "cancel": "Hagarika ifatabuguzi"
+      }
+    }
+  },
+  "expenses": {
+    "dashboard": {
+      "approved": "Byemejwe",
+      "totalAmount": "Amafaranga yose"
+    },
+    "expenses": {
+      "title": "Amafaranga yasohotse",
+      "columns": {
+        "name": "Ibisobanuro",
+        "employeeId": "Umukozi",
+        "date": "Itariki",
+        "totalAmount": "Amafaranga",
+        "quantity": "Ingano",
+        "state": "Uko bihagaze",
+        "sheetId": "Raporo"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "Draft": "Umushinga",
+            "Submitted": "Byoherejwe",
+            "Approved": "Byemejwe",
+            "Posted": "Byanditswe mu ibaruramari",
+            "Done": "Byarangiye",
+            "Refused": "Byanzwe"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "Submitted": "Byoherejwe",
+        "Approved": "Byemejwe",
+        "Posted": "Byanditswe mu ibaruramari",
+        "Done": "Byarangiye",
+        "Refused": "Byanzwe"
+      }
+    },
+    "expenseReports": {
+      "title": "Raporo z’amafaranga yasohotse",
+      "columns": {
+        "name": "Izina rya raporo",
+        "employeeId": "Umukozi",
+        "state": "Uko bihagaze",
+        "createDate": "Byoherejwe",
+        "totalAmount": "Amafaranga yose",
+        "createdAt": "Byakozwe"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "Draft": "Umushinga",
+            "Submitted": "Byoherejwe",
+            "Approved": "Byemejwe",
+            "Posted": "Byanditswe mu ibaruramari",
+            "Done": "Byarangiye",
+            "Refused": "Byanzwe"
+          }
+        }
+      },
+      "states": {
+        "Draft": "Umushinga",
+        "Submitted": "Byoherejwe",
+        "Approved": "Byemejwe",
+        "Posted": "Byanditswe mu ibaruramari",
+        "Done": "Byarangiye",
+        "Refused": "Byanzwe"
+      }
+    },
+    "workflow": {
+      "expenseTitle": "Amafaranga asohoka",
+      "actionsTitle": "Ibikorwa",
+      "approveReport": "Emeza",
+      "timelineState": "Uko bihagaze"
+    },
+    "capture": {
+      "title": "Gufata inyemezabwishyu",
+      "retry": "Ongera ugerageze",
+      "discard": "Reka kubika"
+    },
+    "tabs": {
+      "inbox": "Ubutumwa bwakiriwe"
+    },
+    "inbox": {
+      "title": "Ibidasanzwe byo gukemura",
+      "toApprove": "Bitegereje kwemezwa"
+    },
+    "ops": {
+      "title": "Ibikorwa by’amafaranga yasohotse (amakarita n’ibyakiriwe)",
+      "amount": "Amafaranga",
+      "currencyId": "ID y’ifaranga"
+    },
+    "admin": {
+      "title": "Avansi, ibidasanzwe n’uburiganya",
+      "amount": "Amafaranga",
+      "currencyId": "ID y’ifaranga",
+      "journalId": "ID y’igitabo cy’ibaruramari",
+      "residual": "Amafaranga asigaye kwishyurwa",
+      "approve": "Emeza",
+      "reject": "Wange"
+    },
+    "forms": {
+      "newExpense": {
+        "fields": {
+          "pricelistId": "Urutonde rw’ibiciro n’ifaranga",
+          "pricelistPlaceholder": "Hitamo urutonde rw’ibiciro",
+          "name": "Ibisobanuro",
+          "description": "Ibisobanuro birambuye",
+          "date": "Itariki",
+          "totalAmount": "Amafaranga kuri kimwe",
+          "quantity": "Ingano",
+          "employeeId": "Umukozi",
+          "employeePlaceholder": "Hitamo umukozi",
+          "productId": "Icyiciro",
+          "productPlaceholder": "ID y’igicuruzwa",
+          "paymentMode": "Uburyo bwo kwishyura",
+          "lineKindStandard": "Kugura"
+        }
+      },
+      "newExpenseSheet": {
+        "sections": {
+          "sheetDetails": "Ibisobanuro bya raporo"
+        },
+        "fields": {
+          "pricelistId": "Urutonde rw’ibiciro",
+          "pricelistPlaceholder": "Hitamo urutonde rw’ibiciro",
+          "name": "Izina rya raporo",
+          "employeeId": "Umukozi",
+          "employeePlaceholder": "Hitamo umukozi"
+        }
+      },
+      "newExpenseReport": {
+        "sections": {
+          "reportDetails": "Ibisobanuro bya raporo"
+        },
+        "fields": {
+          "pricelistId": "Urutonde rw’ibiciro n’ifaranga",
+          "pricelistPlaceholder": "Hitamo urutonde rw’ibiciro",
+          "name": "Izina rya raporo",
+          "employeeId": "Umukozi",
+          "employeePlaceholder": "Hitamo umukozi",
+          "notes": "Ibisobanuro"
+        }
+      },
+      "editExpense": {
+        "sections": {
+          "details": "Ibisobanuro birambuye"
+        },
+        "fields": {
+          "name": "Ibisobanuro",
+          "unitAmount": "Amafaranga kuri kimwe",
+          "quantity": "Ingano",
+          "productId": "Icyiciro",
+          "paymentMode": "Uburyo bwo kwishyura",
+          "description": "Ibisobanuro"
+        }
+      },
+      "addToReport": {
+        "sections": {
+          "sheet": "Raporo"
+        }
+      },
+      "postReport": {
+        "sections": {
+          "accounts": "Ibaruramari"
+        },
+        "fields": {
+          "journalId": "Igitabo cy’ibaruramari",
+          "defaultExpenseAccountId": "Konti y’amafaranga asohoka"
+        }
+      },
+      "reimburseReport": {
+        "sections": {
+          "accounts": "Ubwishyu"
+        },
+        "fields": {
+          "journalId": "Igitabo cy’ibaruramari"
+        }
+      },
+      "upsertMileageRate": {
+        "fields": {
+          "name": "Izina",
+          "currencyId": "ID y’ifaranga",
+          "active": "Birakora"
+        }
+      },
+      "upsertPerDiemRate": {
+        "fields": {
+          "name": "Izina",
+          "currencyId": "ID y’ifaranga",
+          "active": "Birakora"
+        }
+      },
+      "projectRebill": {
+        "fields": {
+          "journalId": "Igitabo cy’ibaruramari",
+          "receivableAccountId": "Konti y’amadeni y’abakiriya",
+          "incomeAccountId": "Konti y’amafaranga yinjira"
+        }
+      },
+      "capture": {
+        "project": "Umushinga",
+        "taxes": "Imisoro",
+        "unitAmount": "Amafaranga kuri kimwe"
+      }
+    },
+    "operationsTab": "Ibikorwa",
+    "page": {
+      "discussion": "Ikiganiro"
+    }
+  },
+  "messages": {
+    "dashboard": {
+      "notifications": "Imenyesha"
+    },
+    "messages": {
+      "title": "Ubutumwa",
+      "filters": {
+        "messageType": {
+          "label": "Ubwoko",
+          "options": {
+            "email": "Imeyili"
+          }
+        }
+      },
+      "columns": {
+        "body": "Ubutumwa",
+        "model": "Icyitegererezo",
+        "messageType": "Ubwoko",
+        "date": "Itariki"
+      },
+      "states": {
+        "email": "Imeyili"
+      }
+    },
+    "followers": {
+      "title": "Abakurikira",
+      "columns": {
+        "resModel": "Icyitegererezo",
+        "partnerId": "Umufatanyabikorwa"
+      }
+    },
+    "forms": {
+      "newMessage": {
+        "sections": {
+          "message": "Ubutumwa"
+        },
+        "fields": {
+          "options": {
+            "email": "Imeyili"
+          }
+        }
+      },
+      "messageTemplate": {
+        "name": "Izina ry’icyitegererezo"
+      },
+      "invoiceReminder": {
+        "invoices": "Fagitire"
+      },
+      "recordChoice": {
+        "invoice": "Fagitire",
+        "bill": "Fagitire y’utanga ibicuruzwa",
+        "creditNote": "Inyandiko igabanya ideni",
+        "journalEntry": "Inyandiko y’ibaruramari"
+      }
+    },
+    "notifications": {
+      "tabLabel": "Imenyesha ryanjye",
+      "title": "Imenyesha ryanjye"
+    },
+    "page": {
+      "openReply": "Birafunguye"
+    }
+  },
+  "tasks": {
+    "page": {
+      "title": "Imirimo"
+    },
+    "board": {
+      "stats": {
+        "total": "Igiteranyo",
+        "inProgress": "Birimo gukorwa",
+        "done": "Byarangiye",
+        "overdue": "Byarengeje igihe"
+      },
+      "columns": {
+        "InProgress": "Birimo gukorwa",
+        "Approved": "Byemejwe",
+        "Done": "Byarangiye",
+        "Cancelled": "Byahagaritswe"
+      },
+      "tableView": "Imbonerahamwe"
+    },
+    "create": {
+      "title": "Kora umurimo mushya"
+    },
+    "detail": {
+      "notSet": "Ntibyashyizweho"
+    },
+    "fields": {
+      "description": "Ibisobanuro",
+      "dueDate": "Itariki ntarengwa",
+      "priority": "Ubwihutirwe",
+      "status": "Uko bihagaze",
+      "title": "Umutwe",
+      "type": "Ubwoko"
+    },
+    "priorities": {
+      "high": "Bwinshi",
+      "low": "Buke",
+      "medium": "Hagati"
+    },
+    "sprint": {
+      "statuses": {
+        "active": "Birakora",
+        "completed": "Byarangiye"
+      }
+    },
+    "stats": {
+      "completed": "Byarangiye"
+    },
+    "statuses": {
+      "done": "Byarangiye",
+      "in-progress": "Birimo gukorwa"
+    },
+    "types": {
+      "task": "Umurimo"
+    }
+  },
+  "overview": {
+    "page": {
+      "title": "Incamake",
+      "description": "Incamake y’ubucuruzi bwawe"
+    },
+    "dashboard": {
+      "keyMetrics": "Ibipimo by’ingenzi",
+      "sections": {
+        "attention": "Ibisaba kwitabwaho",
+        "pipeline": "Amahirwe akiri gukurikiranwa",
+        "trends": "Imigendekere"
+      },
+      "stats": {
+        "openSalesOrders": "Komande z’abakiriya zitararangira",
+        "openPurchaseOrders": "Komande z’amasoko zitararangira",
+        "accountsReceivable": "Amadeni abakiriya babereyemo ikigo",
+        "accountsPayable": "Amadeni ikigo kibereyemo abatanga ibicuruzwa",
+        "lowStockAlerts": "Amaburira y’ibicuruzwa bike",
+        "openTasks": "Imirimo y’umushinga itararangira",
+        "activeProjects": "Imishinga iri gukora",
+        "pendingAiDrafts": "Imishinga ya AI itaremezwa"
+      },
+      "actions": {
+        "sales": "Ibyagurishijwe",
+        "accounting": "Ibaruramari",
+        "crm": "CRM",
+        "inventory": "Ibarura ry’ibicuruzwa",
+        "aiDrafts": "Kwemeza ibyakozwe na AI",
+        "projects": "Imishinga"
+      },
+      "widgets": {
+        "upcomingTasks": "Igihe ntarengwa cy’imirimo yegereje",
+        "lowStock": "Ibicuruzwa bike cyangwa byashize",
+        "openPurchaseOrders": "Komande z’amasoko zitararangira",
+        "salesTrend": "Ibyagurishijwe byemejwe (amezi 6)",
+        "pipelineMix": "Amahirwe akiri gukurikiranwa"
+      },
+      "overdue": "Byarengeje igihe",
+      "tables": {
+        "task": "Umurimo",
+        "project": "Umushinga",
+        "due": "Igihe ntarengwa",
+        "status": "Uko bihagaze",
+        "sku": "SKU",
+        "product": "Igicuruzwa",
+        "qty": "Ingano",
+        "reference": "Ikimenyetso",
+        "vendor": "Utanga ibicuruzwa",
+        "amount": "Amafaranga"
+      }
+    }
+  },
+  "settings": {
+    "page": {
+      "title": "Igenamiterere",
+      "description": "Gena konti yawe n’imikorere ya sisitemu"
+    },
+    "import": {
+      "file": "Dosiye ya CSV cyangwa Excel",
+      "analyzing": "Birimo gusesengurwa…",
+      "preview": "Reba ibizinjizwa mbere",
+      "previewErrors": "Amakosa",
+      "run": "Injiza",
+      "row": "Umurongo",
+      "saveTemplate": "Bika icyitegererezo",
+      "templateName": "Izina ry’icyitegererezo",
+      "deleteTemplate": "Siba icyitegererezo",
+      "status": "Uko bihagaze",
+      "importedRows": "Byinjijwe",
+      "errorRows": "Amakosa"
+    },
+    "backToSettings": "Subira ku igenamiterere",
+    "adminAccess": "Uburenganzira bw’umuyobozi",
+    "configure": "Gena",
+    "restricted": "Igenamiterere rimwe rirabujijwe. Saba umuyobozi uburenganzira.",
+    "formConfig": {
+      "title": "Igenamiterere ry’amafishi",
+      "reset": "Subiza uko byari biri",
+      "saveChanges": "Bika impinduka",
+      "preview": {
+        "submitHidden": "Reba mbere"
+      },
+      "refresh": "Vugurura",
+      "fieldDialog": {
+        "label": "Izina rigaragazwa",
+        "type": "Ubwoko",
+        "enabled": "Byemerewe",
+        "fieldTypes": {
+          "Date": "Itariki"
+        }
+      },
+      "fieldCard": {
+        "system": "Sisitemu",
+        "edit": "Hindura",
+        "delete": "Siba"
+      }
+    },
+    "ai": {
+      "title": "AI",
+      "description": "Ibisobanuro",
+      "active": "Birakora",
+      "inactive": "Ntibikora",
+      "edit": "Hindura",
+      "insightTitleField": "Umutwe",
+      "insightDescriptionField": "Ibisobanuro",
+      "name": "Izina",
+      "provider": "Utanga serivisi",
+      "model": "Icyitegererezo",
+      "optional": "Si ngombwa",
+      "create": "Kora",
+      "allowlistEnabled": "Byemerewe"
+    },
+    "auditLog": {
+      "filter": "Yungurura",
+      "exportCsv": "Sohora CSV"
+    },
+    "users": {
+      "fullName": "Amazina yose",
+      "email": "Imeyili",
+      "department": "Ishami",
+      "status": "Uko bihagaze",
+      "statuses": {
+        "active": "Birakora",
+        "inactive": "Ntibikora",
+        "pending": "Birategereje"
+      },
+      "saveChanges": "Bika impinduka"
+    },
+    "roles": {
+      "system": "Sisitemu",
+      "edit": "Hindura",
+      "color": "Ibara",
+      "roleDescription": "Ibisobanuro",
+      "saveChanges": "Bika impinduka",
+      "sod": {
+        "description": "Ibisobanuro",
+        "inactive": "Ntibikora"
+      }
+    },
+    "adminOps": {
+      "reference": {
+        "countryName": "Izina",
+        "currencyName": "Izina"
+      }
+    },
+    "profile": {
+      "personalInfo": "Amakuru bwite",
+      "personalInfoDesc": "Vugurura amakuru yawe bwite",
+      "changeAvatar": "Hindura ifoto ikuranga",
+      "avatarHint": "JPG, PNG cyangwa GIF. Ntibirenge MB 2.",
+      "fullName": "Amazina yose",
+      "email": "Imeyili",
+      "department": "Ishami",
+      "timezone": "Akarere k’amasaha",
+      "timezones": {
+        "pacific": "Isaha ya Pasifika (UTC-8)",
+        "eastern": "Isaha y’Iburasirazuba (UTC-5)",
+        "utc": "UTC",
+        "centralEuropean": "Isaha y’Uburayi bwo hagati (UTC+1)"
+      },
+      "saveChanges": "Bika impinduka",
+      "saveSuccess": "Amakuru yawe yavuguruwe",
+      "saveError": "Ntibyashobotse kuvugurura amakuru yawe",
+      "managedByProvider": "Ifoto yawe n’ijambo ry’ibanga bigenwa n’uguha uburyo bwo kwinjira.",
+      "notificationsUnavailable": "Igenamiterere ry’imenyesha ntiriraboneka.",
+      "security": "Umutekano",
+      "securityDesc": "Gena ijambo ry’ibanga n’umutekano",
+      "currentPassword": "Ijambo ry’ibanga ukoresha",
+      "newPassword": "Ijambo rishya ry’ibanga",
+      "confirmPassword": "Emeza ijambo ry’ibanga",
+      "updatePassword": "Hindura ijambo ry’ibanga",
+      "emailNotifications": "Imenyesha kuri imeyili",
+      "emailNotificationsDesc": "Hitamo amakuru wakira kuri imeyili",
+      "emailItems": {
+        "orders": {
+          "label": "Komande nshya",
+          "description": "Menyeshwa igihe hari komande nshya"
+        },
+        "inventory": {
+          "label": "Amaburira y’ibicuruzwa bike",
+          "description": "Menyeshwa igihe ibicuruzwa bigenda bigabanuka"
+        },
+        "reports": {
+          "label": "Raporo za buri cyumweru",
+          "description": "Akira incamake y’imikorere ya buri cyumweru"
+        },
+        "security": {
+          "label": "Imenyesha ry’umutekano",
+          "description": "Imenyesha ry’ingenzi ry’umutekano"
+        }
+      },
+      "inAppNotifications": "Imenyesha muri porogaramu",
+      "inAppNotificationsDesc": "Gena imenyesha ry’ikibaho cy’amakuru",
+      "inAppItems": {
+        "push": {
+          "label": "Imenyesha ryihuta",
+          "description": "Imenyesha ryihuta rya mushakisha"
+        },
+        "sound": {
+          "label": "Ijwi",
+          "description": "Koresha ijwi ku imenyesha rishya"
+        },
+        "badge": {
+          "label": "Umubare w’imenyesha",
+          "description": "Erekana umubare w’ibitarasomwa ku kimenyetso"
+        }
+      },
+      "theme": "Insanganyamatsiko",
+      "themeDesc": "Hitamo amabara ukunda",
+      "themes": {
+        "light": "Urumuri",
+        "dark": "Umwijima",
+        "system": "Sisitemu"
+      },
+      "palette": "Amabara",
+      "paletteDesc": "Amabara y’ibimenyetso n’ibishushanyo. Mistral ikoresha beje, umutuku na oranje.",
+      "palettes": {
+        "default": "Mistral",
+        "ocean": "Inyanja"
+      },
+      "shell": "Imigaragarire y’inyuma",
+      "shellDesc": "Imigaragarire y’inyuma ya porogaramu",
+      "shells": {
+        "default": "Bisanzwe",
+        "cssArt": "Ubuhanzi bw’inyuma"
+      },
+      "dashboardLayout": "Imitunganyirize y’ikibaho cy’amakuru",
+      "dashboardLayoutDesc": "Hindura ikibaho cy’amakuru uko ubishaka",
+      "layout": {
+        "compactMode": {
+          "label": "Uburyo bucucitse",
+          "description": "Gabanya intera hagati y’ibintu"
+        },
+        "sidebarCollapsed": {
+          "label": "Urutonde rwo ku ruhande ruhinnye",
+          "description": "Tangira urutonde rwo ku ruhande ruhinnye"
+        },
+        "showQuickActions": {
+          "label": "Erekana ibikorwa byihuta",
+          "description": "Erekana buto z’ibikorwa byihuta ku kibaho cy’amakuru"
+        }
+      },
+      "accessibility": "Uburyo bwo korohereza abakoresha",
+      "accessibilityDesc": "Hindura uburyo bwo korohereza abakoresha",
+      "a11y": {
+        "reduceMotion": {
+          "label": "Gabanya ibikorwa by’ibishushanyo",
+          "description": "Gabanya ibishushanyo byimuka"
+        },
+        "highContrast": {
+          "label": "Amabara agaragara cyane",
+          "description": "Ongera itandukaniro ry’amabara"
+        }
+      },
+      "language": "Ururimi rugaragazwa",
+      "languageHint": "Ururimi ruhinduka umaze kubika amakuru yawe kandi rugakurikira konti yawe ku bindi bikoresho.",
+      "loanwords": "Amagambo y’amatirano mu Kinyarwanda",
+      "loanwordsHint": "Hitamo Igifaransa cyangwa Icyongereza ku magambo y’ikoranabuhanga y’amatirano n’inyandiko zitarahindurwa.",
+      "swahiliLoanwordsHint": "Igiswahili gikoresha Icyongereza ku magambo y’ikoranabuhanga y’amatirano n’inyandiko zitarahindurwa.",
+      "loading": "Amakuru yawe arimo kuzanywa…",
+      "firstName": "Izina bwite",
+      "lastName": "Izina ry’umuryango",
+      "emailVerificationHint": "Guhindura imeyili bisaba kwemezwa n’uguha umwirondoro n’umuyobozi.",
+      "loadError": "Ntibyashobotse kuzana amakuru yawe. Ongera ufungure urupapuro ugerageze.",
+      "securityProviderHint": "Uguha umwirondoro ni we ucunga ijambo ry’ibanga n’umutekano wo kwinjira.",
+      "manageSecurity": "Gena umutekano wo kwinjira"
+    },
+    "customFields": {
+      "title": "Imyanya y’amakuru yanjye bwite",
+      "saveChanges": "Bika impinduka"
+    },
+    "formConfigSettings": {
+      "title": "Igenamiterere ry’amafishi",
+      "saveChanges": "Bika impinduka",
+      "system": "Sisitemu",
+      "edit": "Hindura",
+      "delete": "Siba",
+      "dialog": {
+        "label": "Izina rigaragazwa",
+        "type": "Ubwoko",
+        "fieldDescription": "Ibisobanuro",
+        "options": "Amahitamo"
+      }
+    },
+    "organization": {
+      "title": "Umuryango",
+      "description": "Ibisobanuro",
+      "address": "Aderesi",
+      "city": "Umujyi",
+      "country": "Igihugu",
+      "email": "Imeyili",
+      "phone": "Telefoni",
+      "website": "Urubuga",
+      "company": {
+        "selectLabel": "Ikigo"
+      },
+      "countryPacks": {
+        "enabled": "Byemerewe",
+        "disabled": "Byahagaritswe"
+      },
+      "privacy": {
+        "classificationName": "Izina",
+        "delegatedAdminCompany": "Ikigo"
+      }
+    },
+    "groups": {
+      "account": "Konti",
+      "organization": "Umuryango",
+      "data": "Amakuru n’ihuzwa",
+      "platform": "Urubuga rw’imikorere"
+    },
+    "sections": {
+      "profile": {
+        "title": "Amakuru bwite",
+        "description": "Gena amakuru yawe bwite n’ibyifuzo byawe"
+      },
+      "notifications": {
+        "title": "Imenyesha",
+        "description": "Gena uko wakira imenyesha n’igihe uryakirira"
+      },
+      "appearance": {
+        "title": "Imigaragarire",
+        "description": "Hindura imigaragarire y’ikibaho cy’amakuru"
+      },
+      "custom-fields": {
+        "title": "Imyanya y’amakuru yanjye bwite",
+        "description": "Ongeraho imyanya yo gukurikirana amakuru yawe mu gitabo cyawe"
+      },
+      "users": {
+        "title": "Gucunga abakoresha",
+        "description": "Ongeraho, hindura kandi ucunge konti z’abakoresha"
+      },
+      "roles": {
+        "title": "Inshingano n’uburenganzira",
+        "description": "Gena inshingano n’amabwiriza y’uburenganzira"
+      },
+      "sso": {
+        "title": "SSO",
+        "description": "Uko kwinjira rimwe bihagaze n’ihuzwa rya konti ya WorkOS"
+      },
+      "form-config": {
+        "title": "Igenamiterere ry’amafishi",
+        "description": "Gena imyanya y’igitabo n’iya raporo y’igenzura"
+      },
+      "audit": {
+        "title": "Amateka y’igenzura",
+        "description": "Reba ibikorwa bya sisitemu n’iby’umutekano"
+      },
+      "organization": {
+        "title": "Umuryango",
+        "description": "Gena imikorere y’umuryango"
+      },
+      "ai": {
+        "title": "AI",
+        "description": "Abafasha, inshingano z’itsinda, isesengura n’ikiguzi cy’ikoreshwa"
+      },
+      "my-profile": {
+        "title": "Amakuru yanjye",
+        "description": "Izina ryawe, ururimi n’akarere k’amasaha."
+      }
+    }
+  },
+  "reports": {
+    "moduleTitle": "Raporo",
+    "states": {
+      "draft": "Umushinga",
+      "generated": "Byakozwe",
+      "exported": "Byasohowe",
+      "archived": "Byabitswe mu bubiko"
+    },
+    "dashboard": {
+      "kpiTitle": "Ibipimo by’ingenzi",
+      "quickActions": {
+        "generate": "Kora raporo",
+        "scheduleReport": "Teganya raporo",
+        "newMetric": "Igipimo gishya",
+        "newWidget": "Agace gashya k’amakuru"
+      },
+      "kpis": {
+        "generated": "Byakozwe",
+        "exported": "Byasohowe",
+        "scheduled": "Byateganyijwe",
+        "metrics": "Ibipimo"
+      }
+    },
+    "tabs": {
+      "dashboard": "Ikibaho cy’amakuru",
+      "financialReports": "Raporo z’imari",
+      "trialBalance": "Igereranya ry’imibare ya konti",
+      "reportTemplates": "Ibyitegererezo bya raporo",
+      "scheduledReports": "Byateganyijwe",
+      "analyticsMetrics": "Ibipimo",
+      "dashboards": "Ibibaho by’amakuru",
+      "dashboardWidgets": "Uduce tw’amakuru",
+      "pivotExplorer": "Isesengura ry’imbonerahamwe",
+      "vatReport": "Raporo ya TVA",
+      "queryBuilder": "Umwubatsi w’ubusabe bw’amakuru",
+      "ownerReports": "Raporo za nyir’ubucuruzi",
+      "statements": "Inyandiko z’imari"
+    },
+    "queryBuilder": {
+      "title": "Umwubatsi w’ubusabe bw’amakuru wikoresha",
+      "widgetTypes": {
+        "chart": "Igishushanyo",
+        "table": "Imbonerahamwe"
+      },
+      "aggregation": "Guteranya",
+      "groupBy": "Shyira mu matsinda ukurikije",
+      "filters": "Ibiyungurura",
+      "sortNone": "Nta na kimwe"
+    },
+    "ownerReports": {
+      "title": "Raporo za nyir’ubucuruzi",
+      "companyLabel": "Ikigo",
+      "dateLabel": "Itariki",
+      "timezoneLabel": "Akarere k’amasaha",
+      "previewButton": "Reba mbere",
+      "availability": {
+        "preview": "Reba mbere",
+        "planned": "Byateganyijwe"
+      },
+      "scope": {
+        "company": "Ikigo",
+        "timezone": "Akarere k’amasaha"
+      },
+      "totals": {
+        "receipts": "Inyemezabwishyu"
+      },
+      "sections": {
+        "sales": "Ibyagurishijwe",
+        "receipts": "Inyemezabwishyu"
+      },
+      "columns": {
+        "tax": "Umusoro",
+        "total": "Igiteranyo"
+      },
+      "stockAlerts": {
+        "productId": "Igicuruzwa {{id}}"
+      }
+    },
+    "createButton": {
+      "generateReport": "Kora raporo",
+      "scheduleReport": "Teganya raporo",
+      "newMetric": "Igipimo gishya"
+    },
+    "financialReports": {
+      "title": "Raporo z’imari",
+      "columns": {
+        "name": "Izina",
+        "state": "Uko bihagaze",
+        "generatedAt": "Byakozwe"
+      },
+      "filters": {
+        "state": {
+          "label": "Uko bihagaze",
+          "options": {
+            "draft": "Umushinga",
+            "generated": "Byakozwe",
+            "exported": "Byasohowe",
+            "archived": "Byabitswe mu bubiko"
+          }
+        }
+      },
+      "states": {
+        "draft": "Umushinga",
+        "generated": "Byakozwe",
+        "exported": "Byasohowe",
+        "archived": "Byabitswe mu bubiko"
+      }
+    },
+    "trialBalance": {
+      "title": "Igereranya ry’imibare ya konti",
+      "searchPlaceholder": "Shakisha konti…",
+      "columns": {
+        "accountCode": "Kode",
+        "accountName": "Konti"
+      }
+    },
+    "reportTemplates": {
+      "title": "Ibyitegererezo bya raporo",
+      "columns": {
+        "name": "Izina",
+        "model": "Icyitegererezo",
+        "isActive": "Birakora"
+      }
+    },
+    "scheduledReports": {
+      "title": "Raporo zateganyijwe",
+      "searchPlaceholder": "Shakisha ingengabihe…",
+      "columns": {
+        "name": "Izina",
+        "isActive": "Birakora"
+      }
+    },
+    "analyticsMetrics": {
+      "title": "Ibipimo by’isesengura",
+      "columns": {
+        "name": "Izina",
+        "category": "Icyiciro",
+        "metricType": "Ubwoko",
+        "model": "Icyitegererezo",
+        "aggregation": "Guteranya",
+        "isActive": "Birakora"
+      }
+    },
+    "dashboards": {
+      "title": "Ibibaho by’amakuru",
+      "columns": {
+        "name": "Izina",
+        "description": "Ibisobanuro",
+        "createDate": "Byakozwe"
+      }
+    },
+    "dashboardWidgets": {
+      "title": "Uduce tw’amakuru two ku kibaho",
+      "columns": {
+        "name": "Izina",
+        "model": "Icyitegererezo",
+        "width": "Ubugari",
+        "isActive": "Birakora"
+      }
+    },
+    "actions": {
+      "exportCsv": "Sohora CSV",
+      "delete": "Siba",
+      "newWidget": "Agace gashya k’amakuru"
+    },
+    "forms": {
+      "generateReport": {
+        "title": "Kora raporo",
+        "sections": {
+          "comparison": "Kugereranya"
+        },
+        "fields": {
+          "name": "Izina rya raporo",
+          "reportTypes": {
+            "trialBalance": "Igereranya ry’imibare ya konti"
+          },
+          "comparisonMode": "Kugereranya",
+          "comparisonOptions": {
+            "none": "Nta na kimwe",
+            "previousPeriod": "Igihe cyashize"
+          },
+          "currencyId": "ID y’ifaranga"
+        },
+        "submit": "Kora raporo"
+      },
+      "reportTemplate": {
+        "fields": {
+          "name": "Izina",
+          "model": "Icyitegererezo",
+          "isActive": "Birakora"
+        }
+      },
+      "scheduledReport": {
+        "title": "Teganya raporo",
+        "sections": {
+          "timing": "Ingengabihe"
+        },
+        "fields": {
+          "model": "Icyitegererezo",
+          "isActive": "Birakora"
+        },
+        "frequencies": {
+          "monthly": "Buri kwezi"
+        }
+      },
+      "analyticsMetric": {
+        "title": "Igipimo gishya",
+        "fields": {
+          "name": "Izina",
+          "category": "Icyiciro",
+          "model": "Icyitegererezo",
+          "field": "Umwanya w’amakuru",
+          "aggregation": "Guteranya",
+          "isActive": "Birakora"
+        }
+      },
+      "trialBalanceEntry": {
+        "fields": {
+          "accountCode": "Kode ya konti",
+          "currencyId": "ID y’ifaranga",
+          "level": "Urwego"
+        }
+      },
+      "dashboard": {
+        "fields": {
+          "description": "Ibisobanuro"
+        }
+      },
+      "dashboardWidget": {
+        "fields": {
+          "types": {
+            "chart": "Igishushanyo"
+          }
+        },
+        "types": {
+          "chart": "Igishushanyo"
+        }
+      },
+      "addWidgetToDashboard": {
+        "fields": {
+          "width": "Ubugari"
+        }
+      },
+      "updateWidgetLayout": {
+        "fields": {
+          "width": "Ubugari"
+        }
+      },
+      "updateFinancialReport": {
+        "sections": {
+          "update": "Ibisobanuro bya raporo"
+        },
+        "fields": {
+          "name": "Izina rya raporo"
+        }
+      },
+      "reportSource": {
+        "company": "Ikigo (si ngombwa)"
+      }
+    },
+    "pivot": {
+      "title": "Isesengura ry’imbonerahamwe",
+      "none": "Nta na kimwe"
+    },
+    "vat": {
+      "title": "Imenyekanisha rya TVA ry’Ubumwe bw’Uburayi",
+      "name": "Izina rya raporo",
+      "columns": {
+        "name": "Izina",
+        "state": "Uko bihagaze",
+        "actions": "Ibikorwa"
+      }
+    },
+    "statements": {
+      "columns": {
+        "amount": "Amafaranga",
+        "comparison": "Kugereranya",
+        "line": "Umurongo",
+        "variancePercent": "Itandukaniro %"
+      },
+      "exportCsv": "Sohora CSV",
+      "report": "Raporo"
+    },
+    "periodContext": {
+      "title": "Igenzura rya raporo zo gufunga igihe"
+    },
+    "authoring": {
+      "account": "Konti",
+      "balance": "Amafaranga asigaye",
+      "credit": "Kredi",
+      "currency": "Ifaranga",
+      "debit": "Debi",
+      "delivery": "Kugeza ku mukiriya",
+      "equity": "Imari bwite",
+      "expenses": "Amafaranga yasohotse",
+      "income": "Amafaranga yinjira",
+      "metric": {
+        "company": "Ikigo",
+        "sum": "Igiteranyo"
+      },
+      "payments": "Ubwishyu",
+      "preview": "Reba mbere",
+      "status": "Uko bihagaze"
+    }
+  },
+  "auth": {
+    "appName": "Lumiere ERP",
+    "forms": {
+      "newRole": {
+        "fields": {
+          "description": "Ibisobanuro"
+        }
+      },
+      "updateRole": {
+        "fields": {
+          "isActive": "Birakora"
+        }
+      },
+      "newAuditRule": {
+        "fields": {
+          "isActive": "Birakora"
+        },
+        "resourceTypes": {
+          "invoice": "Fagitire",
+          "product": "Igicuruzwa"
+        },
+        "actionTypes": {
+          "create": "Kora",
+          "delete": "Siba",
+          "export": "Sohora"
+        },
+        "severities": {
+          "warning": "Iburira",
+          "error": "Ikosa"
+        }
+      },
+      "updateUserPassword": {
+        "title": "Hindura ijambo ry’ibanga",
+        "fields": {
+          "newPassword": "Ijambo rishya ry’ibanga"
+        }
+      }
+    },
+    "fields": {
+      "email": "Imeyili",
+      "newPassword": "Ijambo rishya ry’ibanga",
+      "confirmPassword": "Emeza ijambo ry’ibanga"
+    },
+    "errors": {
+      "generic": "Habaye ikosa. Ongera ugerageze."
+    },
+    "onboarding": {
+      "timezone": "Akarere k’amasaha",
+      "currency": "Ifaranga"
+    }
+  },
+  "modules": {
+    "workspaces": {
+      "overview": "Incamake",
+      "fulfillment": "Kuzuza komande",
+      "contacts": "Abo kuvugana",
+      "activities": "Ibikorwa",
+      "financial": "Raporo z’imari",
+      "analytics": "Isesengura",
+      "schedules": "Ingengabihe",
+      "expenses": "Amafaranga yasohotse",
+      "expenseReports": "Raporo z’amafaranga yasohotse",
+      "operations": "Ibikorwa"
+    },
+    "tabGroups": {
+      "close": "Funga",
+      "fulfillment": "Kuzuza komande",
+      "people": "Abantu",
+      "revenue": "Amafaranga yinjiye",
+      "subscriptions": "Ifatabuguzi",
+      "warehouse": "Ububiko"
+    }
+  },
+  "notifications": {
+    "bell": {
+      "label": "Imenyesha"
+    }
+  },
+  "recordHeader": {
+    "note": "Icyitonderwa",
+    "name": "Izina"
+  },
+  "ui": {
+    "journal": {
+      "filter": "Yungurura",
+      "other": "Ibindi",
+      "priorities": {
+        "high": "Bwinshi",
+        "low": "Buke"
+      },
+      "status": "Uko bihagaze",
+      "statuses": {
+        "active": "Birakora",
+        "archived": "Byabitswe mu bubiko"
+      },
+      "type": "Ubwoko"
+    },
+    "notebook": {
+      "title": "Ikayi"
+    }
+  },
+  "workspace": {
+    "myWork": "Akazi kanjye",
+    "widgets": {
+      "calendar": "Kalendari"
+    }
+  },
+  "financeReview": {
+    "currency": "Ifaranga",
+    "receipt": "Inyemezabwishyu",
+    "employee": "Umukozi",
+    "comfortable": "Bisanzuye",
+    "compact": "Bicucitse",
+    "sourceTitle": "Inyandiko y’inkomoko"
+  },
+  "workBoard": {
+    "title": "Akazi kanjye",
+    "tab": "Akazi",
+    "finance": "Imari",
+    "mine": "Nashinzwe",
+    "board": "Ikibaho",
+    "list": "Urutonde",
+    "team": "Itsinda",
+    "refresh": "Vugurura",
+    "statusLabel": "Uko bihagaze",
+    "mineBadge": "Nashinzwe",
+    "loadMore": "Zana ibindi",
+    "saving": "Birimo kubikwa…",
+    "module": {
+      "purchasing": "Amasoko",
+      "sales": "Ibyagurishijwe",
+      "accounting": "Ibaruramari",
+      "expenses": "Amafaranga yasohotse"
+    },
+    "status": {
+      "Open": "Birafunguye",
+      "Claimed": "Byafashwe n’umukozi",
+      "Approved": "Byemejwe",
+      "Completed": "Byarangiye",
+      "Rejected": "Byanzwe",
+      "Invalidated": "Byateshejwe agaciro",
+      "Cancelled": "Byahagaritswe"
+    },
+    "action": {
+      "claim": "Fata uyu murimo",
+      "approve": "Emeza",
+      "reject": "Wange",
+      "complete": "Soza"
+    }
+  }
+}

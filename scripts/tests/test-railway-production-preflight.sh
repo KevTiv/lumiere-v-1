@@ -47,6 +47,7 @@ for domain in expense hr project; do
 done
 
 jq -n '{LUMIERE_DOCUMENT_BLOB_DIR: "/data/document-blobs"}' >"$TMP/api-server.variables.json"
+jq -n '{LUMIERE_ENV:"production",KONG_DATABASE:"postgres",KONG_PG_HOST:"kong-postgres.railway.internal",KONG_PG_DATABASE:"lumiere_kong",KONG_PG_USER:"lumiere_kong",KONG_PG_PASSWORD:null,KONG_TRUSTED_IPS:"192.0.2.0/24"}' >"$TMP/api-gateway.variables.json"
 
 cat >"$TMP/railway" <<'SH'
 #!/usr/bin/env bash

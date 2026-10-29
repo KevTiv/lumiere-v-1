@@ -4,11 +4,11 @@
 
 When the user gives a folder or file path:
 
-1. List or read CSV files in that path (workspace-local only).
+1. The client reads authorized CSV files locally; the gateway has no file browser.
 2. Prefer one entity per file; if multiple files exist, ask which maps to which `target_entity`.
 3. Parse the header row and up to 50 sample rows.
 4. Run the safety scan before analysis (formula and prompt-injection patterns).
-5. Call analyze with `target_entity`, `headers`, and `sample_rows` (or `csv_text`).
+5. The governed route accepts `targetEntity`, `headers`, and `sampleRows` (or `csvText`).
 
 ## Analyze → map → preview → import
 

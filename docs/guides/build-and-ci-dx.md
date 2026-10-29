@@ -7,6 +7,37 @@ workstream: moving Rust modules alone does not create smaller compilation units.
 
 ## Daily local loop
 
+For a focused generation and browser-transport check, run `make dx-check`.
+Use `make dx-check-rust` or `make dx-check-frontend` to check one lane. These
+commands require the Rust/Python toolchains, prepared vendored Rust contracts,
+and installed frontend dependencies. They do not fetch a live schema, compile
+WASM, or start the application stack. Full application typechecks and browser
+acceptance tests remain separate checks.
+Generated Turbo task logs are ignored rather than tracked, so running a
+typecheck does not leave modified log files in the checkout.
+
+Codegen preserves unchanged output files. Reducer parameter constants use
+operation names, so inserting a reducer does not rename subsequent constants.
+The Rust and TypeScript SDK wrappers generate and validate temporary snapshots
+before syncing changed files and removing stale output. Generation or validation
+failures leave the previous SDK snapshot available.
+
+The browser command transport uses a compact operation ID registry generated
+from the installed, pinned contracts package. After changing that package pin
+and installing dependencies, run:
+
+```sh
+make generate-browser-operation-ids
+make dx-check-frontend
+```
+
+CI checks the registry against the pinned canonical descriptors. Rich operation
+metadata remains available through the contracts package for tools that need it.
+`pnpm --dir frontend stdb:generate` delegates to `make generate-stdb-ts-sdk`,
+including the generator compatibility fixes, and writes to contracts staging.
+It does not overwrite the frontend's handwritten contract proxy files or change
+the application's installed contracts release.
+
 From the repository root, with frontend dependencies and the pinned contracts
 staging available:
 
@@ -188,6 +219,43 @@ cache. It still spent 3m21s compiling API binaries, which motivates the separate
 API cache. The API cache's first fill and later hit need separate CI measurements;
 editing the workflow or fingerprint recipe also invalidates the WASM key once.
 These are builder timings, not end-to-end browser-suite timings.
+
+### Native and WASM dependency snapshots
+
+The 28 October audit found eight completed API builds that restored an exact
+dependency cache but still compiled the same 398 third-party crates. A
+[cancelled main build](https://github.com/KevTiv/lumiere-v-1/actions/runs/40676386750/job/122775877515)
+had published that cache before reaching native compilation. Later exact hits
+left the incomplete snapshot unchanged. CI also used Ubuntu 26 through
+`ubuntu-latest`, while E2E used Ubuntu 24, so their dependency keys differed.
+
+Native Rust CI and the E2E builder now both use `ubuntu-24.04` and the
+`workspace-native-dev-deps-v2` namespace. The root Cargo workspace is cached
+separately from the standalone module's `workspace-wasm-deps-v2` cache. Compiler,
+runner image, flags, Cargo configuration and dependency hashes remain cache
+inputs; Cargo still checks feature and profile compatibility.
+
+E2E restores each dependency snapshot only after the corresponding executable
+cache misses and its compilation will run. Dependency snapshots are published
+only when the owning job succeeds. A cancelled or failed build cannot reserve
+a new exact dependency entry. Verified API executables and WASM modules are
+still saved immediately after validation, before a later frontend failure.
+No existing cache entries need to be deleted: the new namespaces exclude the
+old mixed snapshots.
+
+Run `python3 -B -m unittest discover -s scripts/tests` for the workflow and
+measurement regressions. The **Measure CI builds** report distinguishes exact,
+fallback and missed dependency lookups, and separately counts native API
+third-party and local crate compilations. An exact hit with third-party
+recompilation is a diagnostic; legitimate feature/profile differences can also
+require compilation. Raw logs and environment values are not retained.
+Missing timestamped Cargo evidence is reported as unobserved rather than zero.
+
+The first build with the new namespaces and workflow fingerprint can be cold.
+Compare a successful cold build with a later application-only change, checking
+dependency reuse and cache transfer time separately from application linking,
+frontend compilation and runner queue time. Hosted cold/warm measurements are
+still required before claiming a speedup.
 
 A local production-cache check on October 19 used the real frontend build helper
 with `CI=true`, `GITHUB_ACTIONS=true`, Node 22.23.3, pnpm 10.31.0, Next 16.1.6,

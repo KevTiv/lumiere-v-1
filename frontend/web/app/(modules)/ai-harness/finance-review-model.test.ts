@@ -71,3 +71,14 @@ test("invalid dates, timezones, report keys, IDs and empty comparisons never sub
     null,
   )
 })
+
+test("reporting timezone must be explicitly selected and is never inferred", () => {
+  for (const skill of ["finance_report_review", "finance_variance_review"] as const) {
+    assert.equal(financeReviewInput(skill, { ...fields, timezone: "" }), null)
+    assert.equal(financeReviewInput(skill, { ...fields, timezone: "  " }), null)
+    assert.ok(financeReviewInput(skill, { ...fields, timezone: "Africa/Kigali" }))
+  }
+  assert.deepEqual(financeReviewInput("bank_reconciliation_review", { ...fields, timezone: "" }), {
+    statementId: 42, query: fields.query,
+  })
+})

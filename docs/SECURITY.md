@@ -2,13 +2,34 @@
 
 ## Auth rate limiting
 
-Production api-server should sit behind Kong or a reverse proxy with rate limits on:
+The Kong gateway uses PostgreSQL-backed shared counters (`policy: cluster`)
+with `fault_tolerant: false`. See [gateway setup and fencing](PRODUCTION_DEPLOY.md#gateway-counters-and-ingress-fencing).
+Production must expose only the gateway, verify trusted-proxy/client-IP handling,
+and keep the counter database isolated from the ERP database. Limits can be
+bypassed if `web` retains a public domain. CORS, robots instructions, and scanner
+path rejection do not replace authentication, authorization, or network fencing.
 
-- `POST /v1/auth/sign-in`
-- `POST /v1/auth/sign-up`
-- `POST /v1/auth/forgot-password`
+Configuration inspection on 2026-10-28 found both `api-gateway` and `web` public
+in Railway's `reasonable-optimism` production environment. The other 15 services
+had no HTTP domains or public TCP proxies. Redis and four obsolete gateway
+`REDIS_UPSTREAM_*` variables were still provisioned. Gateway logs showed rotating
+`100.64.0.*` proxy addresses; trusted-client-IP settings were not configured.
+Remove the direct web ingress and verify real-client attribution before treating
+IP limits as effective. The PostgreSQL gateway changes in this checkout do not
+themselves update those Railway resources.
 
-Local dev has no in-process limiter yet; use Kong plugins or cloud WAF in production.
+Qdrant had no API-key variables, and the Chromium renderer accepted internal
+requests without a service credential. These services were not publicly exposed,
+but shared private networking alone does not provide authentication between
+services. Renderer egress restrictions, request authentication, request-size and
+concurrency bounds, vector-store credentials, upstream WAF/DDoS rules, and
+end-to-end authorization tests remain separate work. This configuration review
+does not establish that malicious traffic is comprehensively prevented.
+
+Kong limits `/api/auth/signin`, invite/accept-invite, forgot-password and
+reset-password to 10 requests per minute and 100 per hour per client IP.
+Public `/api/auth/signup` is rejected at the gateway. Local development that
+bypasses Kong does not receive these ingress limits.
 
 ## Session policy
 

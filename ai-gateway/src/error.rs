@@ -52,3 +52,9 @@ impl IntoResponse for AppError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
+
+impl From<lumiere_auth_context::ActorContextError> for AppError {
+    fn from(error: lumiere_auth_context::ActorContextError) -> Self {
+        Self::Forbidden(error.to_string())
+    }
+}

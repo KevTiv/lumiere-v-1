@@ -2,7 +2,7 @@ import { workOsRedirectUri } from '@/lib/workos-config'
 import { type NextRequest, NextResponse } from 'next/server'
 import { signOut } from '@workos-inc/authkit-nextjs'
 import { isWorkOsEnabled } from '@/lib/auth-mode'
-import { clearStdbSession } from '@/app/actions/save-stdb-token'
+import { clearStdbSession } from '@/lib/auth-cookies'
 import { forwardToApiServerIfEnabled } from '@/lib/api-server-forward'
 
 export async function POST(req: NextRequest) {

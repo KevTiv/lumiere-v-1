@@ -25,6 +25,9 @@ for (const width of [320, 1440]) {
       await expect(page.getByTestId("record-value")).toHaveText("40")
       await chooseSelectOptionByValue(page, "record", "90071992547409931")
       await expect(page.getByTestId("record-value")).toHaveText("90071992547409931")
+      await chooseSelectOptionByLabel(page, "record", "No record")
+      await expect(page.getByTestId("record-value")).toHaveText("")
+      await expect(page.getByTestId("form-field-record")).toHaveText("No record")
       await expect(page.getByRole("dialog", { name: "Account selectors" })).toBeVisible()
     })
     test("search starts at 15, retains selection and supports keyboard input inside a dialog", async ({

@@ -32,6 +32,10 @@ jobs:
         run: python3 -B -m unittest discover -s scripts/tests
       - name: Verify finance change review inventory
         run: python3 -B scripts/generate-finance-change-review-inventory.py --check
+      - name: Validate ERP skill contracts and source-bound manifests
+        run: |
+          python3 -B scripts/erp_skill_catalog.py --check
+          python3 -B scripts/finance-skill-manifests.py --check
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -43,6 +47,24 @@ jobs:
         run: |
           bash scripts/tests/test-railway-stack-release.sh
           bash scripts/tests/test-railway-production-preflight.sh
+
+  sandbox-controller:
+    name: JavaScript sandbox controller
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: sandbox-controller/package-lock.json
+      - name: Install pinned sandbox dependencies
+        working-directory: sandbox-controller
+        run: npm ci --ignore-scripts
+      - name: Test broker, lifecycle recovery, and actual JavaScript execution
+        working-directory: sandbox-controller
+        run: npm test
 
   stdb-check:
     name: SpacetimeDB check
@@ -74,7 +96,8 @@ jobs:
     name: Rust
     needs: scope
     if: needs.scope.outputs.run_rust == 'true'
-    runs-on: ubuntu-latest
+    # Match the native E2E builder so compatible dependency artifacts can be shared.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:18
@@ -105,10 +128,8 @@ jobs:
 
       - uses: ./.github/actions/prepare-contracts
 
-      # CI and E2E compile the same Cargo dev dependencies. Share those
-      # artifacts across jobs; Cargo still rebuilds changed local crates and
-      # validates dependency/features/profile fingerprints. Keep native runner
-      # images separate, alongside rust-cache's compiler/flags/lockfile keys.
+      # Share native dependencies with E2E while Cargo validates feature/profile
+      # fingerprints. The v2 namespace excludes the old mixed WASM/native cache.
       - name: Identify Rust dependency cache environment
         id: rust-dependency-environment
         shell: bash
@@ -118,15 +139,16 @@ jobs:
           : "${ImageVersion:?runner image version must be identified}"
           printf 'image=%s-%s\n' "$ImageOS" "$ImageVersion" >> "$GITHUB_OUTPUT"
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Restore native Rust dependencies
+        uses: Swatinem/rust-cache@v2
         with:
-          shared-key: workspace-dev-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-dependency-environment.outputs.image }}
-          workspaces: |
-            spacetimedb
-            .
+          shared-key: workspace-native-dev-deps-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-dependency-environment.outputs.image }}
+          workspaces: .
           # Cache only third-party dependencies, keeping local source builds fresh.
           cache-workspace-crates: false
-          cache-on-failure: true
+          cache-bin: false
+          # Failed/cancelled jobs must not reserve an immutable partial snapshot.
+          cache-on-failure: false
 
       # No `spacetime` CLI in this runner, so bindings can't be regenerated
       # from the live module here — populate .contracts-staging/ from the
@@ -141,6 +163,11 @@ jobs:
 
       - name: Query authorization and field projection tests
         run: cargo test --locked -p stdb-auth --lib
+
+      - name: WorkOS session and profile synchronization regressions
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::workos::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::tests
 
       - name: Work board authorization and pagination tests
         run: |
@@ -216,6 +243,9 @@ jobs:
       - name: SpacetimeDB Rust generator recovery test
         run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
 
+      - name: SDK generation preserves unchanged outputs and failed snapshots
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p '*sdk_generation.py'
+
       - name: Verify pinned generated contracts and source policy
         run: make check-codegen-pinned
 
@@ -242,6 +272,10 @@ jobs:
     needs: scope
     if: needs.scope.outputs.run_contracts == 'true'
     uses: ./.github/workflows/build-contracts-module.yml
+    with:
+      # Drift validation checks out github.sha (the PR merge commit), so the
+      # compiled module must include the same base-branch contract changes.
+      source_ref: ${{ github.sha }}
 
   contracts-drift:
     name: Contracts drift
@@ -331,6 +365,9 @@ jobs:
       - name: Validate frontend build-cache graph
         run: node ../scripts/test-frontend-build-cache.mjs
 
+      - name: Check compact browser operation contracts
+        run: pnpm contracts:check-browser-operations
+
       - name: Check accounting double-cast rationales
         run: bash ../scripts/lint-accounting-as-unknown-as.sh
 
@@ -380,6 +417,9 @@ jobs:
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
+      - name: Unit tests (productivity workspace models)
+        run: pnpm --dir web test:productivity:models
+
       - name: Install Playwright Chromium
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
@@ -402,6 +442,9 @@ jobs:
 
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
+
+      - name: Productivity workspace browser regressions
+        run: pnpm --dir web test:e2e:productivity-ui
 
       - name: Accounting next-action and authoring browser regressions
         working-directory: frontend/web
@@ -518,13 +561,14 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [scope, stdb-check, rust, contracts-drift, frontend, frontend-typecheck, owner-report-pdf, playwright-compile]
+    needs: [scope, sandbox-controller, stdb-check, rust, contracts-drift, frontend, frontend-typecheck, owner-report-pdf, playwright-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Require scope and scheduled validations to pass
         run: |
           test "${{ needs.scope.result }}" = success
           test "${{ needs.scope.outputs.valid }}" = true
+          test "${{ needs.sandbox-controller.result }}" = success
           for pair in \
             "run_contracts:${{ needs.scope.outputs.run_contracts }}:${{ needs.stdb-check.result }}" \
             "run_rust:${{ needs.scope.outputs.run_rust }}:${{ needs.rust.result }}" \

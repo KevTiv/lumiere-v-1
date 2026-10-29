@@ -18,6 +18,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands";
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useErpSession } from '@lumiere/erp-session'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { dispatchNamedOperation } from "../operation-dispatch"
@@ -68,8 +69,9 @@ export interface CurrentUserProfile {
 }
 
 export function useCurrentUserProfile(enabled = true) {
+  const { identity } = useErpSession()
   return useQuery<CurrentUserProfile>({
-    queryKey: ['current-user-profile'],
+    queryKey: ['current-user-profile', identity],
     queryFn: async () => {
       const r = await apiFetch("/api/auth/profile")
       if (!r.ok) throw new Error('Failed to fetch user profile')
@@ -769,7 +771,7 @@ export function useCreateUserInvite(organizationId: bigint) {
   })
 }
 
-export function useUpdateUserProfile(organizationId: bigint) {
+export function useUpdateUserProfile(_organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
@@ -790,7 +792,9 @@ export function useUpdateUserProfile(organizationId: bigint) {
       if (!r.ok) throw new Error('Failed to update user profile')
     },
     onSuccess: async () => {
-      await invalidateAuthModule(qc, organizationId)
+      // Display preferences do not change roles, permissions or admission.
+      // Refresh the account profile without fanning out authority requests.
+      await qc.invalidateQueries({ queryKey: ['current-user-profile'] })
     },
   })
 }

@@ -16,11 +16,23 @@ import subprocess
 
 WORKFLOWS = {"CI", "E2E smoke", "Build Rust runtime image",
              "Build production edge images", "Release contracts"}
-LOG_JOBS = {"Build exact-commit E2E artifacts", "Build contracts module",
+LOG_JOBS = {"Rust", "Build exact-commit E2E artifacts", "Build contracts module",
             "Contracts module / Build contracts module", "contracts-module / Build contracts module"}
 STEPS = {"Compile E2E module", "Compile and validate E2E API binaries",
          "Compile contracts module", "Typecheck", "Run make e2e-smoke"}
-CACHE_PREFIXES = ("e2e-wasm-", "e2e-api-", "contracts-module-", "next-compiler-", "e2e-build-")
+ARTIFACT_CACHE_PREFIXES = ("e2e-wasm-", "e2e-api-", "contracts-module-", "next-compiler-", "e2e-build-")
+DEPENDENCY_CACHE_PREFIXES = ("v0-rust-workspace-native-dev-deps-v2-",
+                             "v0-rust-workspace-wasm-deps-v2-",
+                             "v0-rust-workspace-dev-deps-")
+CACHE_PREFIXES = ARTIFACT_CACHE_PREFIXES + DEPENDENCY_CACHE_PREFIXES
+NATIVE_API_STEP = "Compile and validate E2E API binaries"
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+LOG_LINE = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z) (.*)$")
+CRATE_COMPILE = re.compile(r"^\s*Compiling ([A-Za-z0-9_-]+) v([0-9][A-Za-z0-9.+-]*)(?: \(([^)]*)\))?\s*$")
+CRATE_FRESH = re.compile(r"^\s*Fresh [A-Za-z0-9_-]+ v[0-9][A-Za-z0-9.+-]*(?: \([^)]*\))?\s*$")
+CARGO_FINISHED = re.compile(
+    r"^\s*Finished (?:`[A-Za-z0-9_-]+` profile|[A-Za-z0-9_-]+) "
+    r"\[[^\]\r\n]*\] target\(s\) in (?:\d+(?:\.\d+)?[hms](?:\s+|$))+\s*$")
 
 
 def seconds(start, end):
@@ -43,24 +55,90 @@ def stats(values):
             "min_seconds": values[0], "max_seconds": values[-1], "sum_seconds": sum(values)}
 
 
-def log_signals(log):
+def cache_key(value, prefixes=CACHE_PREFIXES):
+    return bool(isinstance(value, str) and len(value) <= 512
+                and value.startswith(prefixes) and re.fullmatch(r"[A-Za-z0-9_.-]+", value))
+
+
+def filesystem_source(source):
+    # Cargo also prints Git source URLs in parentheses. Only filesystem paths
+    # identify local crates; neither paths nor URLs are retained in the report.
+    return bool(source and (source.startswith(("/", "\\\\", "file://"))
+                            or re.match(r"^[A-Za-z]:[\\/]", source)))
+
+
+def native_api_signals(lines, job):
+    step = next((s for s in (job or {}).get("steps", []) if s["name"] == NATIVE_API_STEP), None)
+    if step is None:
+        return None
+    complete = step.get("status") == "completed" and step.get("conclusion") == "success"
+    result = {"status": step.get("status"), "conclusion": step.get("conclusion"),
+              "complete": complete, "observed": False,
+              "third_party_compilations": 0, "local_compilations": 0}
+    start, end = step.get("started_at"), step.get("completed_at")
+    # The timestamp window binds compiler output to this build rather than to
+    # preceding WASM compilation, later tests, or echoed workflow commands.
+    if (seconds(start, start) is None
+            or (step.get("status") == "completed" and not end)
+            or (end and seconds(start, end) is None)
+            or step.get("conclusion") == "skipped"):
+        return result
+    for timestamp, line in lines:
+        if not timestamp or seconds(start, timestamp) is None:
+            continue
+        if end and seconds(timestamp, end) in (None, 0):
+            continue
+        match = CRATE_COMPILE.fullmatch(line)
+        if match:
+            result["observed"] = True
+            field = "local_compilations" if filesystem_source(match[3]) else "third_party_compilations"
+            result[field] += 1
+        elif CRATE_FRESH.fullmatch(line) or CARGO_FINISHED.fullmatch(line):
+            result["observed"] = True
+    return result
+
+
+def log_signals(log, job=None):
     # Never persist arbitrary log lines or environment dumps. Cache identifiers
     # are constrained to the workflow's known prefixes and inert key alphabet.
-    observations = []
-    for line in log.splitlines():
+    clean_log = ANSI_ESCAPE.sub("", log)
+    lines = []
+    for line in clean_log.splitlines():
+        match = LOG_LINE.fullmatch(line)
+        lines.append((match[1], match[2]) if match else (None, line))
+    observations, dependencies = [], {}
+    active_key, expect_key = None, False
+    for _timestamp, line in lines:
+        if line == "Cache Key:":
+            expect_key = True
+            active_key = None
+            continue
+        if expect_key:
+            expect_key = False
+            candidate = line.strip()
+            if cache_key(candidate, DEPENDENCY_CACHE_PREFIXES):
+                active_key = candidate
+                dependencies.setdefault(candidate, {"key": candidate, "result": "unknown"})
+        restored = re.fullmatch(r'Restored from cache key "([^"]+)" full match: (true|false)\.?', line)
+        if restored and active_key and cache_key(restored[1], DEPENDENCY_CACHE_PREFIXES):
+            dependencies[active_key].update(
+                result="exact" if restored[2] == "true" else "fallback", restored_key=restored[1])
+        elif line == "No cache found." and active_key:
+            dependencies[active_key]["result"] = "miss"
         for marker in ("Cache not found for input keys: ", "Cache restored from key: ",
                        "Cache saved with key: "):
             if marker not in line:
                 continue
             keys = line.split(marker, 1)[1].strip().split(", ")
-            keys = [key for key in keys if key.startswith(CACHE_PREFIXES)
-                    and re.fullmatch(r"[A-Za-z0-9_.-]+", key)]
+            keys = [key for key in keys if cache_key(key)]
             if keys:
                 observations.append(marker + ", ".join(keys))
     return {"observations": observations,
-            "compiled_crates": len(re.findall(r"\bCompiling [A-Za-z0-9_-]+ v", log)),
+            "compiled_crates": len(re.findall(r"\bCompiling [A-Za-z0-9_-]+ v", clean_log)),
             "cache_export_seconds": [float(x) for x in re.findall(
-                r"(?:preparing build cache for export|sending cache export) ([0-9.]+)s done", log)]}
+                r"(?:preparing build cache for export|sending cache export) ([0-9.]+)s done", clean_log)],
+            "rust_dependency_caches": list(dependencies.values()),
+            "native_api_compilation": native_api_signals(lines, job)}
 
 
 def analyse(snapshot, logs, inventory=None):
@@ -107,6 +185,8 @@ def analyse(snapshot, logs, inventory=None):
                 groups["E2E artifact job (total)"].append(seconds(job.get("started_at"), job.get("completed_at")))
     caches = defaultdict(lambda: {"misses": 0, "restores": 0, "saves": 0})
     duplicate_keys = defaultdict(list)
+    dependency_lookups = defaultdict(lambda: {"exact": 0, "fallback": 0, "miss": 0, "unknown": 0})
+    native_reuse = []
     seen_logs = set()
     for entry in logs:
         if entry["job"] not in jobs_by_id:
@@ -114,6 +194,23 @@ def analyse(snapshot, logs, inventory=None):
         if entry["job"] in seen_logs:
             continue
         seen_logs.add(entry["job"])
+        native_dependencies = []
+        for dependency in entry.get("rust_dependency_caches", []):
+            key = dependency.get("key")
+            state = dependency.get("result")
+            if (not cache_key(key, DEPENDENCY_CACHE_PREFIXES)
+                    or state not in {"exact", "fallback", "miss", "unknown"}):
+                continue
+            family = next(p for p in DEPENDENCY_CACHE_PREFIXES if key.startswith(p))
+            dependency_lookups[family][state] += 1
+            # A separate WASM restore is not evidence of native dependency reuse.
+            if "workspace-wasm-deps-" not in key:
+                native_dependencies.append(dependency)
+        native = entry.get("native_api_compilation")
+        if native:
+            native_reuse.append({"job": entry["job"], "run": entry["run"],
+                                 "url": jobs_by_id[entry["job"]].get("html_url"),
+                                 "dependency_caches": native_dependencies, **native})
         for observation in entry["observations"]:
             for marker, action in (("Cache not found for input keys: ", "misses"),
                                    ("Cache restored from key: ", "restores"),
@@ -144,6 +241,11 @@ def analyse(snapshot, logs, inventory=None):
             "successful_step_timings": {k: stats(v) for k, v in sorted(groups.items())},
             "runner_queue_timings": {k: stats(v) for k, v in sorted(queues.items())},
             "cache_lookups": dict(caches), "cache_inventory": cache_inventory,
+            "rust_dependency_cache_lookups": dict(dependency_lookups),
+            "native_api_dependency_reuse": native_reuse,
+            "exact_dependency_hits_with_native_recompilation": [row for row in native_reuse
+                if row.get("complete") and row.get("observed") and row["third_party_compilations"] > 0
+                and any(cache["result"] == "exact" for cache in row["dependency_caches"])],
             "repeated_exact_input_compilations": {k: v for k, v in duplicate_keys.items() if len(v) > 1}}
 
 
@@ -164,6 +266,27 @@ def markdown(result):
                   "| Cache family | Missed lookups | Restores | Saves |", "|---|---:|---:|---:|"])
     for name, value in sorted(result["cache_lookups"].items()):
         lines.append(f"| {name} | {value['misses']} | {value['restores']} | {value['saves']} |")
+    lines.extend(["", "## Rust dependency cache reuse", "",
+                  "Exact and fallback hits below prove retrieval only. Native compiler output is measured separately; an exact hit can still lack the dependencies needed by this build.", "",
+                  "| Dependency cache family | Exact | Fallback | Miss | Unknown |", "|---|---:|---:|---:|---:|"])
+    for name, value in sorted(result.get("rust_dependency_cache_lookups", {}).items()):
+        lines.append(f"| {name} | {value['exact']} | {value['fallback']} | {value['miss']} | {value['unknown']} |")
+    lines.extend(["", "Native API counts include only timestamped Cargo compilation events within the API compile/validate step. A valid step window without recognized Cargo output remains unobserved. Local paths, raw log lines and environment values are not retained. Cancelled/running steps are incomplete observations.", "",
+                  "| Native API job | Step result | Dependency restore | Third-party compilations | Local compilations |", "|---|---|---|---:|---:|"])
+    repository = result.get("repository", "KevTiv/lumiere-v-1")
+    for row in result.get("native_api_dependency_reuse", []):
+        url = f"https://github.com/{repository}/actions/runs/{row['run']}/job/{row['job']}"
+        status = row.get("conclusion") or row.get("status") or "unknown"
+        if not row.get("complete"):
+            status += " (incomplete)"
+        restore = ", ".join(sorted({cache["result"] for cache in row["dependency_caches"]})) or "unobserved"
+        third_party = row["third_party_compilations"] if row.get("observed") else "unobserved"
+        local = row["local_compilations"] if row.get("observed") else "unobserved"
+        lines.append(f"| [job {row['job']}]({url}) | {status} | {restore} | {third_party} | {local} |")
+    rebuilt = result.get("exact_dependency_hits_with_native_recompilation", [])
+    if rebuilt:
+        links = ", ".join(f"[job {row['job']}](https://github.com/{repository}/actions/runs/{row['run']}/job/{row['job']})" for row in rebuilt)
+        lines.extend(["", f"Completed native builds recompiled third-party crates after an exact dependency-cache restore: {links}. Investigate cache completeness and Cargo fingerprints before treating these restores as avoided compilation."])
     inventory = result["cache_inventory"]
     lines.extend(["", "## Cache inventory", ""])
     if inventory["available"]:
@@ -234,13 +357,13 @@ def collect(repository, limit, log_limit):
             ("id", "name", "head_branch", "head_sha", "event", "run_attempt", "status", "conclusion", "created_at", "html_url")},
             "jobs": [{k: job.get(k) for k in ("id", "name", "status", "conclusion", "created_at", "started_at", "completed_at", "html_url", "steps")} for job in jobs]})
         for job in jobs:
-            if len(logs) >= log_limit or job["status"] != "completed" or job["conclusion"] != "success":
+            if len(logs) >= log_limit or job["status"] != "completed" or job.get("conclusion") in {"skipped", "neutral"}:
                 continue
             if job["name"] not in LOG_JOBS and run["name"] != "Build Rust runtime image":
                 continue
             try:
                 log = subprocess.check_output(["gh", "api", f"repos/{repository}/actions/jobs/{job['id']}/logs"], text=True, stderr=subprocess.DEVNULL)
-                logs.append({"job": job["id"], "run": run["id"], **log_signals(log)})
+                logs.append({"job": job["id"], "run": run["id"], **log_signals(log, job)})
             except subprocess.CalledProcessError:
                 errors.append({"job": job["id"], "error": "log unavailable"})
     # Inventory is read-only. Report access failures without losing timings.

@@ -9934,6 +9934,20 @@
       "activityIncomplete": "Complete the activity details before saving. Your entries are retained.",
       "deleteFailed": "The event could not be deleted. It is still selected.",
       "eventIncomplete": "Enter an event title and valid times. The end must not be before the start. Your entries are retained."
+    },
+    "workspace": {
+      "agenda": "Agenda",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "allDay": "All day",
+      "cancelled": "Cancelled",
+      "timezone": "Times shown in {{timezone}}",
+      "view": "Calendar view",
+      "previous": "Previous period",
+      "next": "Next period",
+      "agendaRange": "{{start}} to {{end}}",
+      "eventDetails": "Event details"
     }
   },
   "documents": {
@@ -10065,7 +10079,9 @@
         "isPublished": "Published",
         "articleItemCount": "Items",
         "articleMemberCount": "Members",
-        "createDate": "Created"
+        "createDate": "Created",
+        "content": "Article",
+        "published": "Published"
       },
       "filters": {
         "isPublished": {
@@ -10492,7 +10508,14 @@
       "modified": "Modified",
       "viewFiles": "Files",
       "viewTable": "Table",
-      "uploadFailed": "Upload failed"
+      "uploadFailed": "Upload failed",
+      "uploaded": "Uploaded",
+      "openUploaded": "Open file",
+      "checkUploadOutcome": "Some uploads could not be confirmed. Check the files list before selecting those files again.",
+      "filesLoaded": "{{count}} loaded files",
+      "foldersLoading": "Loading folders. Upload and new-folder actions will be available when the folders are ready.",
+      "foldersDenied": "You do not have access to folders. You can still inspect the available files.",
+      "foldersUnavailable": "Folders could not be loaded. You can still inspect the available files. Retry folders to restore upload and new-folder actions."
     },
     "studio": {
       "templateDesignActions": "Template design actions",
@@ -12203,7 +12226,7 @@
       }
     },
     "operationsTab": "Operations",
-    "operationsTabDescription": "Receipt capture queue, card statements and expense settings",
+    "operationsTabDescription": "Capture receipts and review retained expense saves",
     "page": {
       "backToReports": "Back to expense reports",
       "discussion": "Discussion",
@@ -12216,6 +12239,34 @@
     "inlineEdit": {
       "nameRequired": "An expense needs a description",
       "quantityInvalid": "Quantity must be above 0"
+    },
+    "workflowUi": {
+      "selectRecord": "Select a record",
+      "noRecords": "No matching records available.",
+      "capture": "Receipt capture",
+      "reconciliation": "Card reconciliation",
+      "settings": "Expense settings",
+      "createReport": "Create report",
+      "reviewReport": "Review report",
+      "attachReceipt": "Attach receipt",
+      "expense": "Expense",
+      "statement": "Card statement line",
+      "employee": "Employee",
+      "currency": "Currency",
+      "journal": "Journal",
+      "cashAccount": "Cash account",
+      "advanceAccount": "Advance account",
+      "advance": "Advance",
+      "report": "Expense report",
+      "amountUnavailable": "Amount unavailable",
+      "reportCurrencyMismatch": "Use the same employee and currency as this expense. Your entries have been retained.",
+      "selectionUnavailable": "A selected record is no longer available. Choose an available record before continuing.",
+      "submitEffect": "Sends this report for approval. It does not post accounting entries or record a reimbursement.",
+      "approveEffect": "Approves this report. Posting to accounting is a separate action.",
+      "refuseEffect": "Refuses this report with your reason and returns its expenses to draft for correction.",
+      "unmatchTitle": "Unmatch an existing statement line",
+      "unmatchHint": "Enter the exact matched statement line ID. The current statement lookup provides unmatched lines only.",
+      "reconciliationHint": "Match corporate card statement lines to expenses by name, amount and currency."
     }
   },
   "workflows": {
@@ -12702,6 +12753,35 @@
       "replies": "Replies",
       "reply": "Reply",
       "thread": "Replies"
+    },
+    "workspace": {
+      "loading": "Loading conversations and current access…",
+      "openConversation": "Open conversation",
+      "markReadFailed": "The notification could not be marked read.",
+      "markRead": "Mark notification read",
+      "parentMismatch": "Choose a parent message on the same record. Your entries are retained.",
+      "linkedRecord": "Linked record #{{id}}",
+      "sourceUnavailable": "Source unavailable",
+      "unconfirmed": "The message outcome is still unconfirmed. Check again without posting another message.",
+      "replyFailed": "The reply could not be posted. Your draft is retained.",
+      "title": "Conversations",
+      "description": "Open a record conversation and reply with its context beside you.",
+      "newMessage": "New message",
+      "list": "Conversation list",
+      "search": "Search loaded conversations",
+      "loaded": "{{count}} loaded conversations",
+      "empty": "No conversations match this view.",
+      "unavailable": "This conversation is unavailable in the current view.",
+      "select": "Select a conversation to read and reply.",
+      "back": "Back to conversations",
+      "openMessage": "Open message",
+      "openRecord": "Open record",
+      "contentUnavailable": "Message content unavailable.",
+      "reply": "Reply to this conversation",
+      "postedNote": "Messages are posted as comments on the linked record.",
+      "checkOutcome": "Check outcome",
+      "postReply": "Post reply",
+      "replyUnavailable": "Replying is unavailable for this source or your current access."
     }
   },
   "pos": {
@@ -13358,6 +13438,11 @@
       "baselineDate": "Comparison date",
       "timezone": "Reporting timezone",
       "recordId": "Statement, period or record ID",
+      "statementId": "Bank statement ID",
+      "periodId": "Accounting period ID",
+      "expenseRecordId": "Expense or bill ID",
+      "actualDate": "Actual report date",
+      "requiredInputs": "Enter valid values for {{fields}}. For date-based reports, select the reporting timezone explicitly.",
       "recordKind": "Record type",
       "question": "Optional review question",
       "expense": "Expense",
@@ -14316,7 +14401,19 @@
           "label": "High Contrast",
           "description": "Increase color contrast"
         }
-      }
+      },
+      "language": "Display language",
+      "languageHint": "Your language is applied after you save your profile and follows your account on other devices.",
+      "loanwords": "Kinyarwanda loanwords",
+      "loanwordsHint": "Choose French or English for borrowed technical terms and text that is not yet translated.",
+      "swahiliLoanwordsHint": "Swahili uses English for borrowed technical terms and text that is not yet translated.",
+      "loading": "Loading your profile…",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "emailVerificationHint": "Email changes require identity-provider verification and administrator approval.",
+      "loadError": "Could not load your profile. Reload to try again.",
+      "securityProviderHint": "Your identity provider manages your password and sign-in security.",
+      "manageSecurity": "Manage sign-in security"
     },
     "customFields": {
       "title": "My Custom Fields",
@@ -14594,6 +14691,62 @@
         "tokenRequired": "Access token is required",
         "apiKeyRequired": "API key is required",
         "saveError": "Failed to save credentials"
+      }
+    },
+    "groups": {
+      "account": "Account",
+      "organization": "Organization",
+      "data": "Data & integrations",
+      "platform": "Platform"
+    },
+    "sections": {
+      "profile": {
+        "title": "Profile",
+        "description": "Manage your personal information and preferences"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "Configure how and when you receive notifications"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "description": "Customize the look and feel of your dashboard"
+      },
+      "custom-fields": {
+        "title": "My Custom Fields",
+        "description": "Add personal tracking fields to your journal"
+      },
+      "users": {
+        "title": "User Management",
+        "description": "Add, edit, and manage user accounts"
+      },
+      "roles": {
+        "title": "Roles & Permissions",
+        "description": "Configure roles and access control policies"
+      },
+      "sso": {
+        "title": "SSO",
+        "description": "Single sign-on status and WorkOS account linking"
+      },
+      "form-config": {
+        "title": "Form Configuration",
+        "description": "Configure Journal and Forensic Report fields"
+      },
+      "audit": {
+        "title": "Audit Log",
+        "description": "View system activity and security events"
+      },
+      "organization": {
+        "title": "Organization",
+        "description": "Manage organization settings and configuration"
+      },
+      "ai": {
+        "title": "AI",
+        "description": "Agents, team personas, insights, and usage spend"
+      },
+      "my-profile": {
+        "title": "My profile",
+        "description": "Your name, language and time zone."
       }
     }
   },
@@ -16599,7 +16752,21 @@
       "newTask": "New task",
       "upload": "Upload file",
       "logTime": "Log time",
-      "newEvent": "New event"
+      "newEvent": "New event",
+      "openMyWork": "Open my work"
+    },
+    "dailyWork": {
+      "description": "Review assigned Finance workflow work, or switch to record follow-ups. Completing a follow-up does not approve its business record.",
+      "viewsHint": "Mine shows your assignments. Eligible includes work available to your role; Available shows unclaimed workflow work or unassigned follow-ups. Counts describe only loaded records.",
+      "otherWork": "Other workspaces",
+      "crmWork": "CRM daily work",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "undated": "No due date",
+      "completed": "Completed",
+      "due": "Due",
+      "deadlineUnavailable": "Due date unavailable"
     }
   },
   "financeReview": {
@@ -16763,6 +16930,36 @@
       "loadFailed": "Approval tasks could not be loaded. Retry before making a decision."
     },
     "inboxDescription": "Review requests for the selected company. Open a record before you approve or reject it.",
-    "loading": "Loading approval tasks…"
+    "loading": "Loading approval tasks…",
+    "review": {
+      "title": "Approval inbox",
+      "kinds": {
+        "purchaseOrder": "Purchase order",
+        "salesOrder": "Sales order",
+        "accountingDocument": "Accounting document",
+        "payment": "Payment",
+        "expenseReport": "Expense report",
+        "aiDraft": "AI draft",
+        "record": "Business record"
+      },
+      "open": "Review assignment",
+      "sourceHint": "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow.",
+      "sourceUnavailable": "A source record link is unavailable for this request. Review the request in its owning workspace before deciding.",
+      "openHint": "This assignment is open. Claim it before deciding if the workflow requires a claimant.",
+      "claimedHint": "This assignment has been claimed. Check the source record and your selected acting principal before deciding."
+    }
+  },
+  "productivity": {
+    "navigation": {
+      "files": "Files",
+      "knowledge": "Knowledge",
+      "templates": "Templates",
+      "manage": "Manage",
+      "schedule": "Schedule",
+      "conversations": "Conversations",
+      "notifications": "Notifications",
+      "following": "Following",
+      "messageBatches": "Message batches"
+    }
   }
 }

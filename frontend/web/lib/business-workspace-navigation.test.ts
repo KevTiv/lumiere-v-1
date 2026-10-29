@@ -9,14 +9,15 @@ import en from "../../packages/i18n/src/locales/en.json"
 const i18n = createInstance()
 await i18n.init({ lng: "en", resources: { en: { translation: en } }, initImmediate: false })
 
-for (const module of ["sales", "crm", "purchasing", "reports", "expenses"] as BusinessWorkspaceModule[]) {
+for (const module of ["sales", "crm", "purchasing", "reports", "expenses", "documents", "calendar", "messages"] as BusinessWorkspaceModule[]) {
   test(`${module}: translated, bounded workspaces retain every runtime destination exactly once`, () => {
     const config = businessWorkspaceNavigation(module, i18n.t)
     const groups = [...config.workspaces, ...(config.overflow ?? [])]
     const ids = groups.flatMap((group) => group.tabIds)
     assert.equal(new Set(ids).size, ids.length)
     assert.ok(config.workspaces.length <= 5)
-    const expectedLabel = module === "crm" ? "My Work" : module === "reports" ? "Run a report" : "Overview"
+    const expectedLabel = module === "crm" ? "My Work" : module === "reports" ? "Run a report"
+      : module === "documents" ? "Files" : module === "calendar" ? "Schedule" : module === "messages" ? "Conversations" : "Overview"
     assert.equal(config.workspaces[0]?.label, expectedLabel)
     for (const group of groups) assert.ok(!group.label.startsWith("modules."), group.label)
     const tabs: ModuleTab[] = [...ids, "future-extension"].map((id) => ({ id, label: id, type: "custom" }))
@@ -41,8 +42,32 @@ test("runtime activity views join CRM while base-only installs retain a valid la
   assert.deepEqual(resolveWorkspaceNavigation([tab("activities"), tab("my-activities")], config).workspaces.flatMap((group) => group.tabs.map((item) => item.id)), ["my-activities", "activities"])
 })
 
-test("Expenses operations land on the implemented operational panel, not the legacy Inbox", () => {
+test("Expenses operations land on the connected Inbox and keep specialist settings separate", () => {
   const config = businessWorkspaceNavigation("expenses", i18n.t)
   const operations = config.workspaces.find((group) => group.id === "operations")
-  assert.equal(operations?.tabIds[0], "operations")
+  assert.equal(operations?.tabIds[0], "inbox")
+  assert.ok(operations?.tabIds.includes("card-reconciliation"))
+  assert.ok(config.overflow?.some(group => group.tabIds.includes("expense-settings")))
+})
+
+test("Documents keeps every file, knowledge and management destination reachable after grouping", () => {
+  const config = businessWorkspaceNavigation("documents", i18n.t)
+  const tab = (id: string): ModuleTab => ({ id, label: id, type: "custom" })
+  const ids = ["dashboard", "documents", "knowledge-base", "knowledge-categories", "document-folders", "documents-recycle-bin", "document-templates", "mail-templates", "document-processing", "document-insights"]
+  const result = resolveWorkspaceNavigation(ids.map(tab), config)
+  assert.deepEqual(result.workspaces.map((group) => group.id), ["files", "knowledge", "templates"])
+  assert.deepEqual(result.overflow.map((group) => group.id), ["manage", "overview"])
+  assert.deepEqual(new Set([...result.workspaces, ...result.overflow].flatMap((group) => group.tabs.map((item) => item.id))), new Set(ids))
+})
+
+test("productivity navigation resolves only the authorized runtime destinations", () => {
+  const tab = (id: string): ModuleTab => ({ id, label: id, type: "custom" })
+  const filesOnly = resolveWorkspaceNavigation([tab("documents")], businessWorkspaceNavigation("documents", i18n.t))
+  assert.deepEqual(filesOnly.workspaces.map((group) => group.id), ["files"])
+  assert.deepEqual(filesOnly.overflow, [])
+  const notificationsOnly = resolveWorkspaceNavigation([tab("notifications")], businessWorkspaceNavigation("messages", i18n.t))
+  assert.deepEqual(notificationsOnly.workspaces.map((group) => group.id), ["notifications"])
+  assert.deepEqual(notificationsOnly.overflow, [])
+  const eventsOnly = resolveWorkspaceNavigation([tab("events")], businessWorkspaceNavigation("calendar", i18n.t))
+  assert.equal(eventsOnly.workspaces[0]?.tabs[0]?.id, "events")
 })

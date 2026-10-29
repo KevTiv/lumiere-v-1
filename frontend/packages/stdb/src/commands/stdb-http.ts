@@ -1,10 +1,11 @@
 import { stringifyReducerCommandBody } from "@lumiere/api-client";
-import {
-  SESSION_OPERATION_DESCRIPTORS,
-  SESSION_OPERATION_NAMES,
-  type SessionOperationName,
-} from "@lumiere/contracts/generated/operation-descriptors";
+import type { SessionOperationName } from "@lumiere/contracts/generated/operation-descriptors";
 import type { OperationInputMap } from "@lumiere/contracts/generated/operation-inputs";
+
+import {
+  SESSION_OPERATION_IDS,
+  SESSION_OPERATION_NAMES,
+} from "../generated/browser-operation-ids";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -33,7 +34,10 @@ export type StdbBffCommandInput<K extends StdbBffNamedReducerKey> = {
 
 /** Same-origin typed-operation path for all named command consumers. */
 export function stdbBffCallUrl(reducer: StdbBffReducerKey): string {
-  const operationId = SESSION_OPERATION_DESCRIPTORS[reducer].contractOperationId;
+  if (!Object.hasOwn(SESSION_OPERATION_IDS, reducer)) {
+    throw new Error(`Unknown session operation: ${reducer}`);
+  }
+  const operationId = SESSION_OPERATION_IDS[reducer];
   return `/api/operations/${encodeURIComponent(operationId)}`;
 }
 

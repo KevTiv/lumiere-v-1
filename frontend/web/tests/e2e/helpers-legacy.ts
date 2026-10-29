@@ -2346,6 +2346,7 @@ export async function rejectApprovalRequestViaUi(
   await gotoApprovals(page)
   const card = page.getByTestId(`approval-card-${requestId}`)
   await expect(card).toBeVisible({ timeout: 30_000 })
+  await card.getByTestId(`approval-review-${requestId}`).click()
   await page.getByTestId(`approval-reject-${requestId}`).click()
   await page.getByTestId(`approval-reject-reason-${requestId}`).fill(reason)
   const [res] = await Promise.all([

@@ -1,6 +1,6 @@
 import { isWorkOsEnabled } from '@/lib/auth-mode'
 import { hostedInviteCookieName, openHostedInvite } from '@/lib/hosted-invite-token'
-import { withAuth } from '@workos-inc/authkit-nextjs'
+import { workOsBrowserSession } from '@/lib/auth-credentials'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import NativeAcceptInvitePage from './native-accept-invite'
@@ -24,6 +24,6 @@ export default async function AcceptInvitePage({
   }
   const store = await cookies()
   const inviteToken = openHostedInvite(store.get(hostedInviteCookieName())?.value)
-  const { user } = await withAuth()
+  const { user } = await workOsBrowserSession()
   return <HostedAcceptInvitePage signedIn={Boolean(user)} hasInvite={Boolean(inviteToken)} />
 }

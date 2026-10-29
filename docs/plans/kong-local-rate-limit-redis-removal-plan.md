@@ -1,6 +1,9 @@
 # Kong local rate limiting and Redis removal plan
 
-**Status:** Proposed — 2026-08-24
+**Status:** Superseded — 2026-10-28. The requested baseline now uses Kong's
+native PostgreSQL-backed `cluster` rate-limit policy and a dedicated gateway
+database. See [current setup](../PRODUCTION_DEPLOY.md#gateway-counters-and-ingress-fencing).
+The local-counter decision and migration checklist below are historical.
 **Tracks:** `kong`, `redis-removal`, `rate-limiting`, `admission-control`, `spacetimedb`, `postgres`
 **Related:** [traffic-resilience-admission-control-plan.md](./traffic-resilience-admission-control-plan.md) · [scaleway-cloudflare-bootstrap-deployment-plan.md](./scaleway-cloudflare-bootstrap-deployment-plan.md) · [regional-stdb-scaleway-durable-foundation.md](./regional-stdb-scaleway-durable-foundation.md)
 

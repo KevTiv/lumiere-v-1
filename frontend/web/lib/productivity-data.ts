@@ -155,7 +155,7 @@ export function recentNotes(articles: readonly WorkNoteRow[], limit = 5): Recent
       excerpt: article.description ?? undefined,
       updatedAt: epochMs(article.writeDate),
       kind: 'article' as const,
-      href: '/documents?tab=knowledge-base',
+      href: `/documents?tab=knowledge-base&filter=${encodeURIComponent(`id:${String(article.id)}`)}`,
     }))
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
     .slice(0, limit);
