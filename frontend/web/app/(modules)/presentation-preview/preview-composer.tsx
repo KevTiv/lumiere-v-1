@@ -1,4 +1,6 @@
 'use client'
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useErpSession } from '@lumiere/erp-session'
@@ -33,7 +35,7 @@ export function PreviewComposer({ organizationId }: { organizationId: number }) 
 }
 
 class ResponseError extends Error {
-  constructor(readonly status: number, readonly body: unknown) { super('Presentation request failed') }
+  constructor(readonly status: number, readonly body: unknown) { super(i18n.t("presentation-preview.previewComposer.requestFailed")) }
 }
 
 async function readResponse(response: Response): Promise<unknown> {
@@ -76,6 +78,7 @@ function evidenceIds(value: string, required: boolean): string[] | null {
 }
 
 function Composer({ organizationId, identity, companyId }: { organizationId: number; identity: string | null; companyId: string | undefined }) {
+  const { t } = useTranslation()
   const moduleKey = 'collections-preview'
   const scopeKey = draftScopeKey(organizationId, identity, moduleKey)
   const [options, setOptions] = useState<PreviewOptions | null>(null)
@@ -101,9 +104,9 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
   const loadSavedDraft = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch(`/api/presentation/drafts/${encodeURIComponent(moduleKey)}`, { signal, cache: 'no-store' })
     const saved = decodeSavedDraft(await readResponse(response))
-    if (saved.moduleKey !== moduleKey) throw new Error('Saved draft module key mismatch')
+    if (saved.moduleKey !== moduleKey) throw new Error(i18n.t("presentation-preview.previewComposer.savedDraftModuleKeyMismatch"))
     return saved
-  }, [])
+  }, [t])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -131,7 +134,7 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
         setDraft({ definition: updateNode(updateNode(initial, 'collection', defaults), 'detail', defaults), revision: null, dirty: false, conflictRevision: null })
       }
     }).catch((reason: unknown) => {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to load drafts')
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : t("presentation-preview.previewComposer.unableToLoadDrafts"))
     })
     return () => {
       controller.abort()
@@ -159,7 +162,7 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
       else setDraft(stateFromSavedDraft(saved))
       setError(undefined)
     } catch (reason: unknown) {
-      if (!controller.signal.aborted && scopeKeyRef.current === requestScope) setError(reason instanceof Error ? reason.message : 'Unable to reopen saved draft')
+      if (!controller.signal.aborted && scopeKeyRef.current === requestScope) setError(reason instanceof Error ? reason.message : t("presentation-preview.previewComposer.unableToReopenSavedDraft"))
     }
   }
 
@@ -181,7 +184,7 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
       const response = await fetch('/api/presentation/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ companyId, definition: draft.definition } satisfies PreviewRequest), signal: controller.signal, cache: 'no-store' })
       const value = decodePreviewResponse(await readResponse(response))
       if (!controller.signal.aborted) setResult({ key, value })
-    } catch (reason: unknown) { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to load preview') }
+    } catch (reason: unknown) { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : t("presentation-preview.previewComposer.unableToLoadPreview")) }
     finally { if (!controller.signal.aborted) setLoading(false) }
   }
 
@@ -190,10 +193,10 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
     const decisionIds = evidenceIds(decisionIdsInput, false)
     const claimIds = evidenceIds(claimIdsInput, false)
     if (!decisionIds || !claimIds || !/^[1-9][0-9]*$/.test(companyId)) {
-      setError('Evidence decision and claim IDs must be positive comma-separated integers.'); return
+      setError(t("presentation-preview.previewComposer.evidenceDecisionAndClaimIDsMustBePositiveCommaSeparatedIntegers")); return
     }
     if (claimIds.length > 0 && decisionIds.length === 0) {
-      setError('Evidence claims cannot be bound without at least one accepted decision.'); return
+      setError(t("presentation-preview.previewComposer.evidenceClaimsCannotBeBoundWithoutAtLeastOneAcceptedDecision")); return
     }
     saveRequestRef.current?.abort()
     const controller = new AbortController()
@@ -209,7 +212,7 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
     try {
       const response = await fetch('/api/presentation/drafts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(saveRequest({ ...draft, definition: submittedDefinition })), signal: controller.signal })
       const saved = decodeSavedDraft(await readResponse(response))
-      if (saved.moduleKey !== moduleKey) throw new Error('Saved draft module key mismatch')
+      if (saved.moduleKey !== moduleKey) throw new Error(i18n.t("presentation-preview.previewComposer.savedDraftModuleKeyMismatch"))
       if (controller.signal.aborted || scopeKeyRef.current !== requestScope) return
       setDraft((current) => current ? stateAfterSave(current, saved, submittedDefinition) : current)
       setSavedSummary({ moduleKey: saved.moduleKey, title: saved.definition.title, revision: saved.revision }); setConflict(false)
@@ -217,7 +220,7 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
       if (controller.signal.aborted || scopeKeyRef.current !== requestScope) return
       if (reason instanceof ResponseError && reason.status === 409) {
         setDraft((current) => current ? stateAfterConflict(current, serverRevision(reason.body)) : current); setConflict(true)
-      } else setError(reason instanceof Error ? reason.message : 'Unable to save draft')
+      } else setError(reason instanceof Error ? reason.message : t("presentation-preview.previewComposer.unableToSaveDraft"))
     } finally {
       if (!controller.signal.aborted && scopeKeyRef.current === requestScope) setSaving(false)
     }
@@ -227,23 +230,23 @@ function Composer({ organizationId, identity, companyId }: { organizationId: num
   const detailFields = useMemo(() => fieldsFor(draft?.definition ?? createInitialDraft(''), 'detail'), [draft])
   const evidenceDirty = decisionIdsInput.trim() !== (evidenceBinding(draft?.definition)?.decisionIds.join(', ') ?? '')
     || claimIdsInput.trim() !== (evidenceBinding(draft?.definition)?.claimIds.join(', ') ?? '')
-  if (!draft) return <main className="mx-auto max-w-5xl p-6"><p>{error ?? 'Loading saved drafts…'}</p></main>
+  if (!draft) return <main className="mx-auto max-w-5xl p-6"><p>{error ?? t("presentation-preview.previewComposer.loadingSavedDrafts")}</p></main>
 
   return <main className="mx-auto max-w-5xl space-y-6 p-6">
-    <h1 className="text-2xl font-semibold">Module preview</h1>
-    <p>Choose fields for accounting entries in your active company. Saved definitions are visible only to you in this organization.</p>
-    {!companyId ? <p>Select an active company to preview this draft.</p> : null}
+    <h1 className="text-2xl font-semibold">{t("presentation-preview.previewComposer.modulePreview")}</h1>
+    <p>{t("presentation-preview.previewComposer.chooseFieldsForAccountingEntriesInYourActiveCompanySavedDefinitions")}</p>
+    {!companyId ? <p>{t("presentation-preview.previewComposer.selectAnActiveCompanyToPreviewThisDraft")}</p> : null}
     {error ? <p role="alert">{error}</p> : null}
-    {conflict ? <div role="alert" className="space-y-2"><p>This draft changed elsewhere. Your edits are preserved.</p><Button type="button" onClick={() => void reopen()}>Reload saved draft</Button></div> : null}
-    {pendingSaved ? <div role="alert" className="space-y-2"><p>A newer saved draft is available.</p><Button type="button" onClick={() => applySavedDraft(pendingSaved)}>Load saved draft</Button><Button type="button" variant="ghost" onClick={() => setPendingSaved(null)}>Keep editing</Button></div> : null}
+    {conflict ? <div role="alert" className="space-y-2"><p>{t("presentation-preview.previewComposer.thisDraftChangedElsewhereYourEditsArePreserved")}</p><Button type="button" onClick={() => void reopen()}>{t("presentation-preview.previewComposer.reloadSavedDraft")}</Button></div> : null}
+    {pendingSaved ? <div role="alert" className="space-y-2"><p>{t("presentation-preview.previewComposer.aNewerSavedDraftIsAvailable")}</p><Button type="button" onClick={() => applySavedDraft(pendingSaved)}>{t("presentation-preview.previewComposer.loadSavedDraft")}</Button><Button type="button" variant="ghost" onClick={() => setPendingSaved(null)}>{t("common.discardChanges.keep")}</Button></div> : null}
     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void preview() }}>
-      <label className="block">Module title<input className="ml-3 rounded border p-2" value={draft.definition.title} maxLength={160} required onChange={(event) => editDefinition({ ...draft.definition, title: event.target.value })} /></label>
-      {options ? <div className="grid gap-4 sm:grid-cols-2"><fieldset><legend className="font-semibold">Collection fields</legend>{options.fields.map((field) => <label key={field} className="block"><input type="checkbox" checked={collectionFields.includes(field)} onChange={() => toggle('collection', field)} /> {field.replaceAll('_', ' ')}</label>)}</fieldset><fieldset><legend className="font-semibold">Detail fields</legend>{options.fields.map((field) => <label key={field} className="block"><input type="checkbox" checked={detailFields.includes(field)} onChange={() => toggle('detail', field)} /> {field.replaceAll('_', ' ')}</label>)}</fieldset></div> : null}
+      <label className="block">{t("presentation-preview.previewComposer.moduleTitle")}<input className="ml-3 rounded border p-2" value={draft.definition.title} maxLength={160} required onChange={(event) => editDefinition({ ...draft.definition, title: event.target.value })} /></label>
+      {options ? <div className="grid gap-4 sm:grid-cols-2"><fieldset><legend className="font-semibold">{t("presentation-preview.previewComposer.collectionFields")}</legend>{options.fields.map((field) => <label key={field} className="block"><input type="checkbox" checked={collectionFields.includes(field)} onChange={() => toggle('collection', field)} /> {field.replaceAll('_', ' ')}</label>)}</fieldset><fieldset><legend className="font-semibold">{t("presentation-preview.previewComposer.detailFields")}</legend>{options.fields.map((field) => <label key={field} className="block"><input type="checkbox" checked={detailFields.includes(field)} onChange={() => toggle('detail', field)} /> {field.replaceAll('_', ' ')}</label>)}</fieldset></div> : null}
       <FieldGroup className="grid gap-4 sm:grid-cols-2">
-        <Field><FieldLabel htmlFor="presentation-decision-ids">Accepted decision IDs</FieldLabel><Input id="presentation-decision-ids" placeholder="12, 18" value={decisionIdsInput} onChange={(event) => setDecisionIdsInput(event.target.value)} /></Field>
-        <Field><FieldLabel htmlFor="presentation-claim-ids">Linked claim IDs (optional)</FieldLabel><Input id="presentation-claim-ids" placeholder="4, 7" value={claimIdsInput} onChange={(event) => setClaimIdsInput(event.target.value)} /></Field>
+        <Field><FieldLabel htmlFor="presentation-decision-ids">{t("presentation-preview.previewComposer.acceptedDecisionIDs")}</FieldLabel><Input id="presentation-decision-ids" placeholder="12, 18" value={decisionIdsInput} onChange={(event) => setDecisionIdsInput(event.target.value)} /></Field>
+        <Field><FieldLabel htmlFor="presentation-claim-ids">{t("presentation-preview.previewComposer.linkedClaimIDsOptional")}</FieldLabel><Input id="presentation-claim-ids" placeholder="4, 7" value={claimIdsInput} onChange={(event) => setClaimIdsInput(event.target.value)} /></Field>
       </FieldGroup>
-      <div className="flex gap-2"><Button type="submit" disabled={!options || !companyId || loading}>Preview module</Button><Button type="button" variant="secondary" disabled={saving || (!draft.dirty && !evidenceDirty)} onClick={() => void save()}>Save draft</Button>{savedSummary ? <Button type="button" variant="ghost" disabled={saving} onClick={() => void reopen()}>Reopen saved draft</Button> : null}</div>
+      <div className="flex gap-2"><Button type="submit" disabled={!options || !companyId || loading}>{t("presentation-preview.previewComposer.previewModule")}</Button><Button type="button" variant="secondary" disabled={saving || (!draft.dirty && !evidenceDirty)} onClick={() => void save()}>{t("purchasing.forms.refinement.saveDraft")}</Button>{savedSummary ? <Button type="button" variant="ghost" disabled={saving} onClick={() => void reopen()}>{t("presentation-preview.previewComposer.reopenSavedDraft")}</Button> : null}</div>
     </form>
     {result?.key === key ? <h2 className="text-xl font-semibold">{result.value.definition.title}</h2> : null}
     <ComposedCollectionDetailHost preview={result?.key === key ? result.value : null} loading={loading} error={error} />

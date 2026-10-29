@@ -35,7 +35,7 @@ function decimalUnits(value: string): bigint {
   const digits = (integer + fraction).replace(/^0+/, "") || "0"
   const places = fraction.length - exponent
   const trailing = Math.max(0, places - 12)
-  if (trailing && !digits.endsWith("0".repeat(trailing))) throw new Error("supports at most 12 decimal places")
+  if (trailing && !digits.endsWith("0".repeat(trailing))) throw new Error(uiI18n.t("accounting.builtIn.accountingImportReview.decimalUnits.error", { defaultValue: "supports at most 12 decimal places" }))
   const units = places <= 12 ? BigInt(digits) * 10n ** BigInt(12 - places) : BigInt(digits.slice(0, -trailing) || "0")
   return negative ? -units : units
 }
@@ -48,10 +48,10 @@ function exactAmount(raw: string): bigint | null {
   // decimal spelling while retaining source digits, rather than summing parsed floats.
   const normalized = [compact, compact.replaceAll(",", ""), compact.replace(",", "."), compact.replaceAll(".", ""), compact.replaceAll(".", "").replace(",", ".")]
     .find((candidate) => /^[+-]?\d+(?:\.\d+)?$/.test(candidate) && Number(candidate) === parsed)
-  if (normalized == null) throw new Error("has an unsupported decimal format")
+  if (normalized == null) throw new Error(uiI18n.t("accounting.builtIn.accountingImportReview.exactAmount.error", { defaultValue: "has an unsupported decimal format" }))
   const units = decimalUnits(normalized)
   if (units > MAX_AMOUNT || units < -MAX_AMOUNT || units !== decimalUnits(String(parsed))) {
-    throw new Error("exceeds supported monetary magnitude or precision")
+    throw new Error(uiI18n.t("accounting.builtIn.accountingImportReview.exactAmount.errorexceedsSupportedMonetaryMagnitudeOrPrecision", { defaultValue: "exceeds supported monetary magnitude or precision" }))
   }
   return units
 }
@@ -97,7 +97,7 @@ export function accountingImportReview(
     const reference = referenceField ? cell(row, referenceField) : ""
     if (reference) references.add(reference)
     if (outstanding && seenDocuments.has(reference)) {
-      issues.push({ rowNumber, message: `Row ${rowNumber}: duplicate document reference ${reference}.` })
+      issues.push({ rowNumber, get message() { return uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.message", { defaultValue: "Row {{rowNumber}}: duplicate document reference {{reference}}.", rowNumber: rowNumber, reference: reference }) } })
     }
     if (outstanding) seenDocuments.add(reference)
     const values = new Map<string, bigint>()
@@ -105,22 +105,22 @@ export function accountingImportReview(
       try {
         const raw = cell(row, field)
         const amount = exactAmount(raw)
-        if (outstanding && amount == null) throw new Error("is required")
+        if (outstanding && amount == null) throw new Error(uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.error", { defaultValue: "is required" }))
         if (amount == null) continue
-        if (outstanding && amount < 0n) throw new Error("cannot be negative")
+        if (outstanding && amount < 0n) throw new Error(uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.errorcannotBeNegative", { defaultValue: "cannot be negative" }))
         values.set(field, amount)
         const key = JSON.stringify([currency, documentType, field])
         const total = totals.get(key) ?? { currency, documentType, field, units: 0n }
         const nextAmount = total.units + amount
-        if (nextAmount > MAX_AMOUNT || nextAmount < -MAX_AMOUNT) throw new Error("exceeds the supported monetary total")
+        if (nextAmount > MAX_AMOUNT || nextAmount < -MAX_AMOUNT) throw new Error(uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.errorexceedsTheSupportedMonetaryTotal", { defaultValue: "exceeds the supported monetary total" }))
         total.units = nextAmount
         totals.set(key, total)
       } catch (cause) {
-        issues.push({ rowNumber, message: `Row ${rowNumber}, ${field}: ${cause instanceof Error ? cause.message : String(cause)}.` })
+        issues.push({ rowNumber, get message() { return uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.messagerowRowNumberFieldValue3", { defaultValue: "Row {{rowNumber}}, {{field}}: {{value3}}.", rowNumber: rowNumber, field: field, value3: cause instanceof Error ? cause.message : String(cause) }) } })
       }
     }
     if (outstanding && values.has("opening_residual") && values.has("source_total") && values.get("opening_residual")! > values.get("source_total")!) {
-      issues.push({ rowNumber, message: `Row ${rowNumber}: opening residual exceeds the source total.` })
+      issues.push({ rowNumber, get message() { return uiI18n.t("accounting.builtIn.accountingImportReview.accountingImportReview.messagerowRowNumberOpeningResidualExceedsTheSource", { defaultValue: "Row {{rowNumber}}: opening residual exceeds the source total.", rowNumber: rowNumber }) } })
     }
   }
   return {

@@ -56,7 +56,7 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
           id: "currencyId",
           name: "currencyId",
           type: "select",
-          label: "Currency",
+          label: t("proposals.builtIn.proposalsFormConfigs.newProposalForm.currencyId.label", { defaultValue: "Currency" }),
           required: true,
           width: "1/2",
           options: [],

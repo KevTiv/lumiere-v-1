@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { useCurrencyFormat } from "../../lib/currency-context"
 import { useId } from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
@@ -9,10 +10,11 @@ import { seriesChartConfig } from "../../charts/chart-kit"
 import type { AreaChartWidget as AreaChartWidgetType } from "../../lib/dashboard-types"
 
 export function AreaChartWidget({ data }: { data: AreaChartWidgetType["data"] }) {
+  useTranslation()
   const { locale } = useCurrencyFormat()
   // Series names can hold spaces, so gradient ids come from a stable per-chart id plus the index.
   const gradientPrefix = `area-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`
-  const config = seriesChartConfig(data.series.map((s) => ({ key: s.name, label: s.name })))
+  const config = seriesChartConfig(data.series.map((s) => ({ key: s.name, label: s.label ?? s.name })))
   return (
     <ChartContainer config={config} className="aspect-auto h-[300px] w-full">
       <AreaChart data={data.values} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -34,6 +36,7 @@ export function AreaChartWidget({ data }: { data: AreaChartWidgetType["data"] })
             key={s.name}
             type="monotone"
             dataKey={s.name}
+            name={s.label ?? s.name}
             stroke={s.color}
             strokeWidth={2}
             fill={`url(#${gradientPrefix}-${index})`}

@@ -64,7 +64,7 @@ export function ProjectGanttPanel({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left">
-                <th className="px-3 py-2">WBS</th>
+                <th className="px-3 py-2">{t("projects.projectsPanels.wBS")}</th>
                 <th className="px-3 py-2">{t("projects.gantt.columns.task")}</th>
                 <th className="px-3 py-2">{t("projects.gantt.columns.project")}</th>
                 <th className="px-3 py-2">{t("projects.gantt.columns.deadline")}</th>
@@ -135,13 +135,13 @@ export function ResourceAllocationPanel({
       if (row.active === false) continue
       const eid = String(row.employeeId ?? "")
       if (!eid) continue
-      const label = `${skillName.get(String(row.skillId ?? "")) ?? "Skill"} L${row.level ?? "?"}`
+      const label = `${skillName.get(String(row.skillId ?? "")) ?? t("projects.projectsPanels.skill")} L${row.level ?? "?"}`
       const list = m.get(eid) ?? []
       list.push(label)
       m.set(eid, list)
     }
     return m
-  }, [employeeSkills, skillName])
+  }, [employeeSkills, skillName, t])
 
   const capacityRows = useMemo(() => {
     const empName = new Map<string, string>()
@@ -202,8 +202,7 @@ export function ResourceAllocationPanel({
         <div>
           <h2 className="text-lg font-semibold">{t("projects.resourceAllocation.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Live capacity = available − leave − allocations − actual timesheet hours (snapshot table).
-          </p>
+            {t("projects.projectsPanels.liveCapacityAvailableLeaveAllocationsActualTimesheetHoursSnapshotTable")}{" "}</p>
         </div>
         {onBookAllocation ? (
           <button
@@ -211,42 +210,39 @@ export function ResourceAllocationPanel({
             className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
             onClick={onBookAllocation}
           >
-            Book allocation
-          </button>
+            {t("projects.projectsPanels.bookAllocation")}{" "}</button>
         ) : null}
       </div>
 
       {capacityRows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No capacity snapshots yet. Book an allocation or approve leave to materialise remaining hours.
-        </p>
+          {t("projects.projectsPanels.noCapacitySnapshotsYetBookAnAllocationOrApproveLeaveTo")}{" "}</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left">
-                <th className="px-3 py-2">Resource</th>
-                <th className="px-3 py-2 text-right">Available</th>
-                <th className="px-3 py-2 text-right">Leave</th>
-                <th className="px-3 py-2 text-right">Allocated</th>
-                <th className="px-3 py-2 text-right">Actual</th>
-                <th className="px-3 py-2 text-right">Remaining</th>
-                <th className="px-3 py-2">Skills (soft match)</th>
+                <th className="px-3 py-2">{t("settings.auditLog.text.resource")}</th>
+                <th className="px-3 py-2 text-right">{t("inventory.stockOnHand.columns.availableQuantity")}</th>
+                <th className="px-3 py-2 text-right">{t("projects.projectsPanels.leave")}</th>
+                <th className="px-3 py-2 text-right">{t("hr.leaveAllocations.columns.allocated")}</th>
+                <th className="px-3 py-2 text-right">{t("accounting.insights.actual")}</th>
+                <th className="px-3 py-2 text-right">{t("accounting.amortization.colRemaining")}</th>
+                <th className="px-3 py-2">{t("projects.projectsPanels.skillsSoftMatch")}</th>
               </tr>
             </thead>
             <tbody>
               {capacityPager.pageRows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-medium">{row.label}</td>
-                  <td className="px-3 py-2 text-right">{row.available.toFixed(1)}h</td>
-                  <td className="px-3 py-2 text-right">{row.leave.toFixed(1)}h</td>
-                  <td className="px-3 py-2 text-right">{row.allocated.toFixed(1)}h</td>
-                  <td className="px-3 py-2 text-right">{row.actual.toFixed(1)}h</td>
+                  <td className="px-3 py-2 text-right">{row.available.toFixed(1)}{t("projects.projectsPanels.h")}</td>
+                  <td className="px-3 py-2 text-right">{row.leave.toFixed(1)}{t("projects.projectsPanels.h")}</td>
+                  <td className="px-3 py-2 text-right">{row.allocated.toFixed(1)}{t("projects.projectsPanels.h")}</td>
+                  <td className="px-3 py-2 text-right">{row.actual.toFixed(1)}{t("projects.projectsPanels.h")}</td>
                   <td
                     className={`px-3 py-2 text-right font-medium ${row.over ? "text-destructive" : ""}`}
                   >
-                    {row.remaining.toFixed(1)}h
-                  </td>
+                    {row.remaining.toFixed(1)}{t("projects.projectsPanels.h")}{" "}</td>
                   <td className="px-3 py-2 text-muted-foreground text-xs">
                     {row.skillHint || "—"}
                   </td>
@@ -259,7 +255,7 @@ export function ResourceAllocationPanel({
       )}
 
       <div>
-        <h3 className="text-sm font-semibold mb-2">Bookings</h3>
+        <h3 className="text-sm font-semibold mb-2">{t("projects.projectsPanels.bookings")}</h3>
         {bookingRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("projects.resourceAllocation.emptyMessage")}</p>
         ) : (
@@ -268,10 +264,10 @@ export function ResourceAllocationPanel({
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-left">
                   <th className="px-3 py-2">{t("projects.resourceAllocation.columns.employee")}</th>
-                  <th className="px-3 py-2">Project</th>
-                  <th className="px-3 py-2 text-right">Hours / %</th>
-                  <th className="px-3 py-2">From</th>
-                  <th className="px-3 py-2">To</th>
+                  <th className="px-3 py-2">{t("projects.projects.columns.name")}</th>
+                  <th className="px-3 py-2 text-right">{t("projects.projectsPanels.hours")}</th>
+                  <th className="px-3 py-2">{t("accounting.builtIn.entityConfigs.budgetsTableConfig.dateFrom.label")}</th>
+                  <th className="px-3 py-2">{t("accounting.builtIn.entityConfigs.budgetsTableConfig.dateTo.label")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,7 +276,7 @@ export function ResourceAllocationPanel({
                     <td className="px-3 py-2 font-medium">{row.employee}</td>
                     <td className="px-3 py-2">{row.projectId}</td>
                     <td className="px-3 py-2 text-right">
-                      {row.hours > 0 ? `${row.hours}h` : `${row.percent}%`}
+                      {row.hours > 0 ? t("projects.projectsPanels.h2", { value1: row.hours }) : `${row.percent}%`}
                     </td>
                     <td className="px-3 py-2">{row.from}</td>
                     <td className="px-3 py-2">{row.to}</td>
@@ -304,6 +300,7 @@ export function ResourceUtilisationPanel({
   employees: QueryRows
   utilisation: QueryRows
 }) {
+  const { t } = useTranslation()
   const rows = useMemo(() => {
     const empName = new Map<string, string>()
     for (const e of employees as Record<string, unknown>[]) {
@@ -329,36 +326,33 @@ export function ResourceUtilisationPanel({
   return (
     <div className="space-y-4 p-1" data-testid="proj-utilisation-panel">
       <div>
-        <h2 className="text-lg font-semibold">Utilisation</h2>
+        <h2 className="text-lg font-semibold">{t("projects.projectsClient.utilisation")}</h2>
         <p className="text-sm text-muted-foreground">
-          Available hours (calendar capacity) vs billable and non-billable timesheet hours.
-        </p>
+          {t("projects.projectsPanels.availableHoursCalendarCapacityVsBillableAndNonBillableTimesheetHours")}{" "}</p>
       </div>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No utilisation snapshots yet. Validate timesheets or refresh utilisation to materialise
-          rows.
-        </p>
+          {t("projects.projectsPanels.noUtilisationSnapshotsYetValidateTimesheetsOrRefreshUtilisationToMaterialise")}{" "}</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left">
-                <th className="px-3 py-2">Employee</th>
-                <th className="px-3 py-2 text-right">Available</th>
-                <th className="px-3 py-2 text-right">Billable</th>
-                <th className="px-3 py-2 text-right">Non-billable</th>
-                <th className="px-3 py-2 text-right">Util %</th>
-                <th className="px-3 py-2 text-right">Billable util %</th>
+                <th className="px-3 py-2">{t("projects.resourceAllocation.columns.employee")}</th>
+                <th className="px-3 py-2 text-right">{t("inventory.stockOnHand.columns.availableQuantity")}</th>
+                <th className="px-3 py-2 text-right">{t("projects.forms.logTimesheet.fields.invoiceTypes.billable")}</th>
+                <th className="px-3 py-2 text-right">{t("projects.forms.newProject.fields.billTypes.no")}</th>
+                <th className="px-3 py-2 text-right">{t("projects.projectsPanels.util")}</th>
+                <th className="px-3 py-2 text-right">{t("projects.projectsPanels.billableUtil")}</th>
               </tr>
             </thead>
             <tbody>
               {rowsPager.pageRows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2 font-medium">{row.employee}</td>
-                  <td className="px-3 py-2 text-right">{row.available.toFixed(1)}h</td>
-                  <td className="px-3 py-2 text-right">{row.billable.toFixed(1)}h</td>
-                  <td className="px-3 py-2 text-right">{row.nonBillable.toFixed(1)}h</td>
+                  <td className="px-3 py-2 text-right">{row.available.toFixed(1)}{t("projects.projectsPanels.h")}</td>
+                  <td className="px-3 py-2 text-right">{row.billable.toFixed(1)}{t("projects.projectsPanels.h")}</td>
+                  <td className="px-3 py-2 text-right">{row.nonBillable.toFixed(1)}{t("projects.projectsPanels.h")}</td>
                   <td className="px-3 py-2 text-right">{Math.round(row.utilisation)}%</td>
                   <td className="px-3 py-2 text-right">{Math.round(row.billableUtil)}%</td>
                 </tr>

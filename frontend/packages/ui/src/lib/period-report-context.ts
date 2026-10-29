@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { stbTimestampToExactIso } from "@lumiere/erp-shared/stb-timestamp"
 import { stbEnumTag } from "./accounting-move-utils"
@@ -64,7 +65,7 @@ export function periodReportContextState(context: PeriodReportContext | null, ar
   periodState: ModuleDataState
   reportState: ModuleDataState
 }): ModuleDataState {
-  const invalid: ModuleDataState = { status: "error", message: "The report period context does not match the active organization, company or accounting period. Return to period close and select the period again." }
+  const invalid: ModuleDataState = { status: "error", get message() { return uiI18n.t("reports.builtIn.periodReportContext.invalid.message", { defaultValue: "The report period context does not match the active organization, company or accounting period. Return to period close and select the period again." }) } }
   if (!context || positiveId(args.organizationId) !== context.organizationId || positiveId(args.companyId) !== context.companyId) return invalid
   const sources = mergeModuleStates([args.periodState, args.reportState])
   if (sources.status !== "ready") return sources

@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, type ReactNode } from "react"
 import Link from "next/link"
@@ -36,21 +38,22 @@ function sameCompany(row: Row, companyId: bigint): boolean {
 }
 
 const STAGE_LABELS: Record<OrderToCashStage, string> = {
-  to_deliver: "To deliver",
-  to_invoice: "To invoice",
-  to_collect: "To collect",
-  settled: "Settled",
+  get to_deliver() { return i18n.t("distributor.orderToCash.to_deliver") },
+  get to_invoice() { return i18n.t("distributor.orderToCash.to_invoice") },
+  get to_collect() { return i18n.t("distributor.orderToCash.to_collect") },
+  get settled() { return i18n.t("distributor.orderToCash.settled") },
 }
 
 const EXCEPTION_LABELS: Record<OrderToCashException, string> = {
-  no_delivery: "No delivery",
-  delivery_incomplete: "Delivery incomplete",
-  not_invoiced: "Not invoiced",
-  collection_overdue: "Overdue",
-  credit_hold: "Credit hold",
+  get no_delivery() { return i18n.t("distributor.orderToCash.no_delivery") },
+  get delivery_incomplete() { return i18n.t("distributor.orderToCash.delivery_incomplete") },
+  get not_invoiced() { return i18n.t("distributor.orderToCash.not_invoiced") },
+  get collection_overdue() { return i18n.t("distributor.orderToCash.collection_overdue") },
+  get credit_hold() { return i18n.t("distributor.orderToCash.credit_hold") },
 }
 
 export function DistributorClient() {
+  const { t } = useTranslation()
   const { organizationId } = useErpSession()
   const companyId = useDefaultOperatingCompanyBigInt(organizationId ?? 0) ?? 0n
   const organization = BigInt(organizationId ?? 0)
@@ -105,7 +108,7 @@ export function DistributorClient() {
     } catch (error) {
       showWorkflowToast({
         kind: "error",
-        title: enabled ? "Disable pack failed" : "Enable pack failed",
+        title: enabled ? t("distributor.distributorClient.disablePackFailed") : t("distributor.distributorClient.enablePackFailed"),
         description: error instanceof Error ? error.message : String(error),
       })
     }
@@ -118,39 +121,39 @@ export function DistributorClient() {
       data-hydrated={packs.isSuccess ? "true" : "false"}
     >
       <DashboardHeader
-        title="Distributor"
-        description="Cash, credit, order-to-cash and stock control for distribution companies"
+        title={t("nav.distributor")}
+        description={t("distributor.distributorClient.cashCreditOrderToCashAndStockControlForDistributionCompanies")}
       />
       <Card>
         <CardHeader>
           <div>
-            <div className="flex items-center gap-2"><CardTitle>Distributor workspace</CardTitle><Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Not enabled"}</Badge></div>
-            <CardDescription>Company-scoped cash, credit, order, and stock control built on the shared ERP workflows.</CardDescription>
+            <div className="flex items-center gap-2"><CardTitle>{t("distributor.distributorClient.distributorWorkspace")}</CardTitle><Badge variant={enabled ? "default" : "secondary"}>{enabled ? t("settings.formConfig.fieldDialog.enabled") : t("distributor.distributorClient.notEnabled")}</Badge></div>
+            <CardDescription>{t("distributor.distributorClient.companyScopedCashCreditOrderAndStockControlBuiltOnThe")}</CardDescription>
           </div>
-          <CardAction><Button size="sm" variant={enabled ? "outline" : "default"} disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>{enabled ? "Disable pack" : "Enable pack"}</Button></CardAction>
+          <CardAction><Button size="sm" variant={enabled ? "outline" : "default"} disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>{enabled ? t("distributor.distributorClient.disablePack") : t("distributor.distributorClient.enablePack")}</Button></CardAction>
         </CardHeader>
-        {!enabled ? <CardContent><Empty><EmptyHeader><EmptyMedia variant="icon"><StoreIcon /></EmptyMedia><EmptyTitle>Enable this company’s distributor pack</EmptyTitle><EmptyDescription>Enabling exposes the distributor control workspace without changing any operational records.</EmptyDescription></EmptyHeader><EmptyContent><Button disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>Enable distributor pack</Button></EmptyContent></Empty></CardContent> : null}
+        {!enabled ? <CardContent><Empty><EmptyHeader><EmptyMedia variant="icon"><StoreIcon /></EmptyMedia><EmptyTitle>{t("distributor.distributorClient.enableThisCompanySDistributorPack")}</EmptyTitle><EmptyDescription>{t("distributor.distributorClient.enablingExposesTheDistributorControlWorkspaceWithoutChangingAnyOperationalRecords")}</EmptyDescription></EmptyHeader><EmptyContent><Button disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>{t("distributor.distributorClient.enableDistributorPack")}</Button></EmptyContent></Empty></CardContent> : null}
       </Card>
       {enabled ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Open sales orders" value={metrics.openOrders} description="Orders requiring fulfilment or payment follow-up." icon={<ReceiptTextIcon />} href="/sales" />
-        <MetricCard title="Open customer balances" value={metrics.openInvoices} description="Posted customer invoices with a remaining balance." icon={<CircleDollarSignIcon />} href="/reports" />
-        <MetricCard title="Posted payments" value={metrics.postedPayments} description="Operational payments available for reconciliation." icon={<BoxesIcon />} href="/accounting" />
-        <MetricCard title="Low-stock alerts" value={metrics.lowStock} description="Current quants at or below zero, or marked outdated." icon={<PackageIcon />} href="/reports" destructive={metrics.lowStock > 0} />
+        <MetricCard title={t("distributor.distributorClient.openSalesOrders")} value={metrics.openOrders} description={t("distributor.distributorClient.ordersRequiringFulfilmentOrPaymentFollowUp")} icon={<ReceiptTextIcon />} href="/sales" />
+        <MetricCard title={t("distributor.distributorClient.openCustomerBalances")} value={metrics.openInvoices} description={t("distributor.distributorClient.postedCustomerInvoicesWithARemainingBalance")} icon={<CircleDollarSignIcon />} href="/reports" />
+        <MetricCard title={t("distributor.distributorClient.postedPayments")} value={metrics.postedPayments} description={t("distributor.distributorClient.operationalPaymentsAvailableForReconciliation")} icon={<BoxesIcon />} href="/accounting" />
+        <MetricCard title={t("financeReview.queues.lowStockProducts.title")} value={metrics.lowStock} description={t("distributor.distributorClient.currentQuantsAtOrBelowZeroOrMarkedOutdated")} icon={<PackageIcon />} href="/reports" destructive={metrics.lowStock > 0} />
       </div> : null}
       {enabled ? <Card data-testid="distributor-o2c">
         <CardHeader>
-          <CardTitle>Order-to-cash exceptions</CardTitle>
-          <CardDescription>Confirmed orders with a missing or unfinished delivery, no invoice, an overdue balance, or a customer on credit hold. Each links to the record that owns it.</CardDescription>
+          <CardTitle>{t("distributor.distributorClient.orderToCashExceptions")}</CardTitle>
+          <CardDescription>{t("distributor.distributorClient.confirmedOrdersWithAMissingOrUnfinishedDeliveryNoInvoiceAn")}</CardDescription>
         </CardHeader>
         <CardContent>
           {exceptionRows.length === 0
-            ? <p className="text-sm text-muted-foreground" data-testid="distributor-o2c-empty">No order-to-cash exceptions.</p>
+            ? <p className="text-sm text-muted-foreground" data-testid="distributor-o2c-empty">{t("distributor.distributorClient.noOrderToCashExceptions")}</p>
             : <table className="w-full text-sm" data-testid="distributor-o2c-table">
-              <thead><tr className="text-left text-muted-foreground"><th className="pb-2">Order</th><th className="pb-2">Customer</th><th className="pb-2">Stage</th><th className="pb-2">Exceptions</th><th className="pb-2">Deliveries &amp; invoices</th><th className="pb-2 text-right">Open balance</th></tr></thead>
+              <thead><tr className="text-left text-muted-foreground"><th className="pb-2">{t("helpdesk.stages.columns.sequence")}</th><th className="pb-2">{t("accounting.workflowGuide.customer")}</th><th className="pb-2">{t("crm.opportunities.columns.stageName")}</th><th className="pb-2">{t("workflows.dashboard.exceptions")}</th><th className="pb-2">{t("distributor.distributorClient.deliveriesAmpInvoices")}</th><th className="pb-2 text-right">{t("distributor.distributorClient.openBalance")}</th></tr></thead>
               <tbody>
                 {exceptionsPager.pageRows.map((row) => <tr key={String(row.orderId)} className="border-t align-top" data-testid={`distributor-o2c-row-${row.orderId}`}>
-                  <td className="py-2"><Link className="underline underline-offset-2" href={orderHref(row.orderId)} data-testid={`distributor-o2c-order-${row.orderId}`}>{row.reference || `Order #${row.orderId}`}</Link></td>
-                  <td className="py-2">{row.partnerId == null ? "—" : partnerNames.get(String(row.partnerId)) || `Partner ${row.partnerId}`}</td>
+                  <td className="py-2"><Link className="underline underline-offset-2" href={orderHref(row.orderId)} data-testid={`distributor-o2c-order-${row.orderId}`}>{row.reference || t("distributor.distributorClient.order", { value1: row.orderId })}</Link></td>
+                  <td className="py-2">{row.partnerId == null ? "—" : partnerNames.get(String(row.partnerId)) || t("distributor.distributorClient.partner", { value1: row.partnerId })}</td>
                   <td className="py-2" data-testid={`distributor-o2c-stage-${row.orderId}`}>{STAGE_LABELS[row.stage]}</td>
                   <td className="py-2"><div className="flex flex-wrap gap-1">{row.exceptions.map((exception) => <Badge key={exception} variant="destructive" data-testid={`distributor-o2c-exception-${row.orderId}-${exception}`}>{EXCEPTION_LABELS[exception]}</Badge>)}</div></td>
                   <td className="py-2"><OrderHandoffLinks handoffs={row.handoffs} testIdPrefix={`distributor-o2c-${row.orderId}`} /></td>
@@ -166,5 +169,6 @@ export function DistributorClient() {
 }
 
 function MetricCard({ title, value, description, icon, href, destructive = false }: { title: string; value: number; description: string; icon: ReactNode; href: string; destructive?: boolean }) {
-  return <Card><CardHeader><div className="flex items-center gap-2"><span className="text-muted-foreground">{icon}</span><CardTitle className="text-base">{title}</CardTitle></div></CardHeader><CardContent className="flex flex-col gap-3"><p className={destructive ? "text-3xl font-semibold text-destructive" : "text-3xl font-semibold"}>{value}</p><CardDescription>{description}</CardDescription><Link href={href}><Button size="sm" variant="outline">Open workflow</Button></Link></CardContent></Card>
+  const { t } = useTranslation()
+  return <Card><CardHeader><div className="flex items-center gap-2"><span className="text-muted-foreground">{icon}</span><CardTitle className="text-base">{title}</CardTitle></div></CardHeader><CardContent className="flex flex-col gap-3"><p className={destructive ? "text-3xl font-semibold text-destructive" : "text-3xl font-semibold"}>{value}</p><CardDescription>{description}</CardDescription><Link href={href}><Button size="sm" variant="outline">{t("distributor.distributorClient.openWorkflow")}</Button></Link></CardContent></Card>
 }

@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type { EntityInlineEdit } from "./entity-view-types"
 
 export type InlineParse = { ok: true; value: string | number } | { ok: false; error: string }
@@ -6,9 +7,9 @@ export type InlineParse = { ok: true; value: string | number } | { ok: false; er
 export function parseInlineValue(kind: EntityInlineEdit["kind"], raw: string): InlineParse {
   const text = raw.trim()
   if (kind === "number") {
-    if (text === "") return { ok: false, error: "Enter a number" }
+    if (text === "") return { ok: false, error: uiI18n.t("common.inlineEdit.enterNumber", { defaultValue: "Enter a number" }) }
     const value = Number(text)
-    if (!Number.isFinite(value)) return { ok: false, error: "Enter a number" }
+    if (!Number.isFinite(value)) return { ok: false, error: uiI18n.t("common.inlineEdit.enterNumber", { defaultValue: "Enter a number" }) }
     return { ok: true, value }
   }
   if (isMultilineInlineKind(kind)) return { ok: true, value: raw.replace(/\s+$/, "") }

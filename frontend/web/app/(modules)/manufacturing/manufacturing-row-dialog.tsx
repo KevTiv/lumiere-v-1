@@ -90,7 +90,7 @@ export function ManufacturingRowDialog({
 
   const iotDeviceOptions = useMemo(() => {
     if (iotReferenceStatus) {
-      return [{ value: "", label: `IoT devices: ${iotReferenceStatus}`, disabled: true as const }]
+      return [{ value: "", label: t("manufacturing.manufacturingRowDialog.ioTDevices", { value1: iotReferenceStatus }), disabled: true as const }]
     }
     const sorted = [...iotDevices].sort((a, b) =>
       String(a.name ?? "").localeCompare(String(b.name ?? "")),

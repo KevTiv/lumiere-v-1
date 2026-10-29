@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { riskClassLabel } from "../ai-harness/enum-labels"
 import { useTranslation } from "@lumiere/i18n"
 
 import {
@@ -320,7 +321,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                     >
                       <div>
                         <p className="font-medium">
-                          v{version.version} · {String(version.risk ?? "").toLowerCase()}
+                          {t("ai-harness.evidenceReviewQueuePanel.v")}{version.version} · {riskClassLabel(t, String(version.risk ?? "").toLowerCase())}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {workflowStatusLabel(t, status)}
@@ -440,7 +441,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                                 })
                               }
                             >
-                              {label} · v{version.version}
+                              {label} {" "}{t("reports.ownerReportsPanel.v")}{version.version}
                             </Button>
                           )
                         })}
@@ -515,7 +516,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                       skillId: BigInt(effectiveSkillId),
                       fixtureKey,
                       name: fixtureName,
-                      description: "Created from AI Skills admin",
+                      description: t("ai-skills.skillRegistryPanel.createdFromAISkillsAdmin"),
                       inputJson: fixtureInputJson,
                       expectedOutputJson: fixtureExpectedJson,
                       metadata: undefined,

@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Proposal / Tender Workspace Types
 
 export type ProposalStatus = "draft" | "review" | "submitted" | "awarded" | "rejected" | "archived"
@@ -145,56 +146,48 @@ export type WorkspaceAction =
 export const SECTION_TEMPLATES: { id: string; title: string; placeholder: string }[] = [
   {
     id: "executive-summary",
-    title: "Executive Summary",
-    placeholder:
-      "Provide a concise overview of your proposal, highlighting your understanding of the requirements and your key value proposition...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.executiveSummary.title", { defaultValue: "Executive Summary" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.executiveSummary.placeholder", { defaultValue: "Provide a concise overview of your proposal, highlighting your understanding of the requirements and your key value proposition..." }) },
   },
   {
     id: "company-profile",
-    title: "Company Profile",
-    placeholder:
-      "Describe your organisation, its history, size, capabilities, and relevant experience in this domain...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.companyProfile.title", { defaultValue: "Company Profile" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.companyProfile.placeholder", { defaultValue: "Describe your organisation, its history, size, capabilities, and relevant experience in this domain..." }) },
   },
   {
     id: "technical-approach",
-    title: "Technical Approach",
-    placeholder:
-      "Detail your methodology, technical solution, and how it addresses each stated requirement...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.technicalApproach.title", { defaultValue: "Technical Approach" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.technicalApproach.placeholder", { defaultValue: "Detail your methodology, technical solution, and how it addresses each stated requirement..." }) },
   },
   {
     id: "project-timeline",
-    title: "Project Timeline & Milestones",
-    placeholder:
-      "Outline the proposed schedule, key milestones, deliverables, and dependencies...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.projectTimeline.title", { defaultValue: "Project Timeline & Milestones" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.projectTimeline.placeholder", { defaultValue: "Outline the proposed schedule, key milestones, deliverables, and dependencies..." }) },
   },
   {
     id: "team-qualifications",
-    title: "Team & Qualifications",
-    placeholder:
-      "Present the project team, their roles, relevant credentials, and prior experience...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.teamQualifications.title", { defaultValue: "Team & Qualifications" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.teamQualifications.placeholder", { defaultValue: "Present the project team, their roles, relevant credentials, and prior experience..." }) },
   },
   {
     id: "pricing",
-    title: "Pricing & Commercial Terms",
-    placeholder:
-      "Provide itemised pricing, payment schedule, and any commercial assumptions...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.pricing.title", { defaultValue: "Pricing & Commercial Terms" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.pricing.placeholder", { defaultValue: "Provide itemised pricing, payment schedule, and any commercial assumptions..." }) },
   },
   {
     id: "compliance",
-    title: "Compliance & Certifications",
-    placeholder:
-      "List relevant certifications, compliance standards met, and regulatory adherence...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.compliance.title", { defaultValue: "Compliance & Certifications" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.compliance.placeholder", { defaultValue: "List relevant certifications, compliance standards met, and regulatory adherence..." }) },
   },
   {
     id: "risk-management",
-    title: "Risk Management",
-    placeholder:
-      "Identify key risks and your mitigation strategies for each...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.riskManagement.title", { defaultValue: "Risk Management" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.riskManagement.placeholder", { defaultValue: "Identify key risks and your mitigation strategies for each..." }) },
   },
   {
     id: "annexes",
-    title: "Annexes & Supporting Documents",
-    placeholder: "Reference any supporting documents, case studies, or appendices included...",
+    get title() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.annexes.title", { defaultValue: "Annexes & Supporting Documents" }) },
+    get placeholder() { return uiI18n.t("proposals.builtIn.proposalWorkspaceTypes.sectionTemplates.annexes.placeholder", { defaultValue: "Reference any supporting documents, case studies, or appendices included..." }) },
   },
 ]
 

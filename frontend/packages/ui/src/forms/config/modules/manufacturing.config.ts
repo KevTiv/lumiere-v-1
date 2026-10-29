@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Manufacturing Module Form Configurations
 //!
 //! This module provides form configurations for Manufacturing.
@@ -10,23 +12,23 @@ export const manufacturingForms: FormRegistryEntry[] = [
   {
     moduleId: "manufacturing",
     formId: "new-bom",
-    name: "New Bill of Materials",
-    description: "Create a bill of materials for a product",
+    get name() { return i18n.t("manufacturing.forms.newBom.title") },
+    get description() { return i18n.t("forms.defaults.manufacturing.createABillOfMaterialsForAProduct") },
     icon: "ClipboardList",
-    category: "BOM",
+    get category() { return i18n.t("manufacturing.bomLines.columns.bomId") },
     defaultConfig: () => ({
       moduleId: "manufacturing",
       formId: "new-bom",
-      name: "New Bill of Materials",
-      description: "Create a bill of materials for a product",
+      get name() { return i18n.t("manufacturing.forms.newBom.title") },
+      get description() { return i18n.t("forms.defaults.manufacturing.createABillOfMaterialsForAProduct") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "name",
           name: "name",
-          label: "BOM Name",
+          get label() { return i18n.t("forms.defaults.manufacturing.bomName") },
           fieldType: "Text",
-          placeholder: "e.g., Widget BOM v1",
+          get placeholder() { return i18n.t("forms.defaults.manufacturing.eGWidgetBOMV1") },
           validation: { required: true },
           aiSuggestions: [],
           order: 1,
@@ -38,9 +40,9 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "product",
           name: "product",
-          label: "Finished Product",
+          get label() { return i18n.t("forms.defaults.manufacturing.finishedProduct") },
           fieldType: "Text",
-          placeholder: "Product name",
+          get placeholder() { return i18n.t("forms.defaults.manufacturing.productName") },
           validation: { required: true },
           aiSuggestions: [],
           order: 2,
@@ -52,7 +54,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "quantity",
           name: "quantity",
-          label: "Batch Quantity",
+          get label() { return i18n.t("forms.defaults.manufacturing.batchQuantity") },
           fieldType: "Number",
           placeholder: "1",
           validation: { required: true, min: 1 },
@@ -66,7 +68,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "version",
           name: "version",
-          label: "Version",
+          get label() { return i18n.t("forms.defaults.manufacturing.version") },
           fieldType: "Text",
           placeholder: "e.g., 1.0",
           validation: { required: false },
@@ -80,7 +82,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "is_active",
           name: "is_active",
-          label: "Active",
+          get label() { return i18n.t("common.active") },
           fieldType: "Switch",
           validation: { required: false },
           aiSuggestions: [],
@@ -93,7 +95,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Notes",
+          get label() { return i18n.t("common.notes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -119,21 +121,21 @@ export const manufacturingForms: FormRegistryEntry[] = [
   {
     moduleId: "manufacturing",
     formId: "new-work-order",
-    name: "New Work Order",
-    description: "Create a manufacturing work order",
+    get name() { return i18n.t("forms.defaults.manufacturing.newWorkOrder") },
+    get description() { return i18n.t("forms.defaults.manufacturing.createAManufacturingWorkOrder") },
     icon: "Wrench",
-    category: "Work Orders",
+    get category() { return i18n.t("manufacturing.workOrders.title") },
     defaultConfig: () => ({
       moduleId: "manufacturing",
       formId: "new-work-order",
-      name: "New Work Order",
-      description: "Create a manufacturing work order",
+      get name() { return i18n.t("forms.defaults.manufacturing.newWorkOrder") },
+      get description() { return i18n.t("forms.defaults.manufacturing.createAManufacturingWorkOrder") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "work_order_number",
           name: "work_order_number",
-          label: "Work Order Number",
+          get label() { return i18n.t("forms.defaults.manufacturing.workOrderNumber") },
           fieldType: "Text",
           validation: { required: false },
           aiSuggestions: [],
@@ -146,7 +148,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "product",
           name: "product",
-          label: "Product",
+          get label() { return i18n.t("manufacturing.manufacturingOrders.columns.productId") },
           fieldType: "Text",
           validation: { required: true },
           aiSuggestions: [],
@@ -159,7 +161,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "quantity",
           name: "quantity",
-          label: "Quantity to Produce",
+          get label() { return i18n.t("forms.defaults.manufacturing.quantityToProduce") },
           fieldType: "Number",
           validation: { required: true, min: 1 },
           aiSuggestions: [],
@@ -172,14 +174,14 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "status",
           name: "status",
-          label: "Status",
+          get label() { return i18n.t("manufacturing.manufacturingOrders.columns.state") },
           fieldType: "Select",
           options: [
-            { value: "planned", label: "Planned", color: "gray" },
-            { value: "in-progress", label: "In Progress", color: "blue" },
-            { value: "on-hold", label: "On Hold", color: "yellow" },
-            { value: "completed", label: "Completed", color: "green" },
-            { value: "cancelled", label: "Cancelled", color: "red" },
+            { value: "planned", get label() { return i18n.t("forms.defaults.manufacturing.planned") }, color: "gray" },
+            { value: "in-progress", get label() { return i18n.t("manufacturing.manufacturingOrders.filters.state.options.Progress") }, color: "blue" },
+            { value: "on-hold", get label() { return i18n.t("forms.defaults.manufacturing.onHold") }, color: "yellow" },
+            { value: "completed", get label() { return i18n.t("forms.defaults.manufacturing.completed") }, color: "green" },
+            { value: "cancelled", get label() { return i18n.t("manufacturing.manufacturingOrders.filters.state.options.Cancelled") }, color: "red" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -192,13 +194,13 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "priority",
           name: "priority",
-          label: "Priority",
+          get label() { return i18n.t("forms.defaults.manufacturing.priority") },
           fieldType: "Select",
           options: [
-            { value: "low", label: "Low", color: "gray" },
-            { value: "normal", label: "Normal", color: "blue" },
-            { value: "high", label: "High", color: "orange" },
-            { value: "urgent", label: "Urgent", color: "red" },
+            { value: "low", get label() { return i18n.t("forms.defaults.manufacturing.low") }, color: "gray" },
+            { value: "normal", get label() { return i18n.t("forms.defaults.manufacturing.normal") }, color: "blue" },
+            { value: "high", get label() { return i18n.t("forms.defaults.manufacturing.high") }, color: "orange" },
+            { value: "urgent", get label() { return i18n.t("forms.defaults.manufacturing.urgent") }, color: "red" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -211,7 +213,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "due_date",
           name: "due_date",
-          label: "Due Date",
+          get label() { return i18n.t("forms.defaults.manufacturing.dueDate") },
           fieldType: "Date",
           validation: { required: false },
           aiSuggestions: [],
@@ -224,7 +226,7 @@ export const manufacturingForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Notes",
+          get label() { return i18n.t("common.notes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],

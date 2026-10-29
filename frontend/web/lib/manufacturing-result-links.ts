@@ -1,3 +1,4 @@
+import { i18n } from "@lumiere/i18n"
 import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import type { CanonicalRecordRef } from "@lumiere/query-hooks/hooks/operation-effect"
@@ -10,10 +11,10 @@ export interface ManufacturingResultLink {
 }
 
 const destinations: Record<string, { module: string; tab: string; label: string }> = {
-  "mrp-productions": { module: "manufacturing", tab: "orders", label: "Manufacturing order" },
-  "mrp-bom-byproducts": { module: "manufacturing", tab: "bom-byproducts", label: "BOM byproduct" },
-  "stock-moves": { module: "inventory", tab: "stock-moves", label: "Stock move" },
-  "stock-quants": { module: "inventory", tab: "stock", label: "Stock quantity" },
+  "mrp-productions": { module: "manufacturing", tab: "orders", get label() { return i18n.t("manufacturing.resultLinks.order") } },
+  "mrp-bom-byproducts": { module: "manufacturing", tab: "bom-byproducts", get label() { return i18n.t("manufacturing.resultLinks.byproduct") } },
+  "stock-moves": { module: "inventory", tab: "stock-moves", get label() { return i18n.t("manufacturing.resultLinks.stockMove") } },
+  "stock-quants": { module: "inventory", tab: "stock", get label() { return i18n.t("manufacturing.resultLinks.stockQuantity") } },
 }
 
 /** Link only resolved canonical IDs to real module tabs; never trust an arbitrary ref href. */

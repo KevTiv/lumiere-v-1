@@ -208,23 +208,23 @@ const forensicForms: FormRegistryEntry[] = [
   {
     moduleId: "forensic",
     formId: "incident-report",
-    name: "Incident Report",
-    description: "Forensic incident report for tracking and analyzing issues",
+    get name() { return i18n.t("forms.defaults.registry.incidentReport") },
+    get description() { return i18n.t("forms.defaults.registry.forensicIncidentReportForTrackingAndAnalyzingIssues") },
     icon: "FileSearch",
-    category: "Compliance",
+    get category() { return i18n.t("forms.defaults.registry.compliance") },
     defaultConfig: () => ({
       moduleId: "forensic",
       formId: "incident-report",
-      name: "Incident Report",
-      description: "Forensic incident report for tracking and analyzing issues",
+      get name() { return i18n.t("forms.defaults.registry.incidentReport") },
+      get description() { return i18n.t("forms.defaults.registry.forensicIncidentReportForTrackingAndAnalyzingIssues") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "title",
           name: "title",
-          label: "Incident Title",
+          get label() { return i18n.t("forms.defaults.registry.incidentTitle") },
           fieldType: "Text",
-          placeholder: "Brief description of the incident",
+          get placeholder() { return i18n.t("forms.defaults.registry.briefDescriptionOfTheIncident") },
           validation: { required: true, minLength: 5, maxLength: 100 },
           aiSuggestions: [],
           order: 1,
@@ -236,19 +236,19 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "category",
           name: "category",
-          label: "Category",
+          get label() { return i18n.t("forms.defaults.registry.category") },
           fieldType: "Select",
           options: [
-            { value: "process-failure", label: "Process Failure", color: "orange" },
-            { value: "system-error", label: "System Error", color: "red" },
-            { value: "data-discrepancy", label: "Data Discrepancy", color: "yellow" },
-            { value: "compliance-issue", label: "Compliance Issue", color: "purple" },
-            { value: "security-incident", label: "Security Incident", color: "red" },
-            { value: "performance-issue", label: "Performance Issue", color: "blue" },
-            { value: "customer-complaint", label: "Customer Complaint", color: "amber" },
-            { value: "quality-defect", label: "Quality Defect", color: "orange" },
-            { value: "supply-chain", label: "Supply Chain", color: "teal" },
-            { value: "other", label: "Other", color: "gray" },
+            { value: "process-failure", get label() { return i18n.t("forms.defaults.registry.processFailure") }, color: "orange" },
+            { value: "system-error", get label() { return i18n.t("forms.defaults.registry.systemError") }, color: "red" },
+            { value: "data-discrepancy", get label() { return i18n.t("forms.defaults.registry.dataDiscrepancy") }, color: "yellow" },
+            { value: "compliance-issue", get label() { return i18n.t("forms.defaults.registry.complianceIssue") }, color: "purple" },
+            { value: "security-incident", get label() { return i18n.t("forms.defaults.registry.securityIncident") }, color: "red" },
+            { value: "performance-issue", get label() { return i18n.t("forms.defaults.registry.performanceIssue") }, color: "blue" },
+            { value: "customer-complaint", get label() { return i18n.t("forms.defaults.registry.customerComplaint") }, color: "amber" },
+            { value: "quality-defect", get label() { return i18n.t("forms.defaults.registry.qualityDefect") }, color: "orange" },
+            { value: "supply-chain", get label() { return i18n.t("forms.defaults.registry.supplyChain") }, color: "teal" },
+            { value: "other", get label() { return i18n.t("common.entityView.otherColumn") }, color: "gray" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -261,13 +261,13 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "severity",
           name: "severity",
-          label: "Severity",
+          get label() { return i18n.t("forms.defaults.registry.severity") },
           fieldType: "Radio",
           options: [
-            { value: "critical", label: "Critical", color: "red" },
-            { value: "high", label: "High", color: "orange" },
-            { value: "medium", label: "Medium", color: "yellow" },
-            { value: "low", label: "Low", color: "green" },
+            { value: "critical", get label() { return i18n.t("forms.defaults.registry.critical") }, color: "red" },
+            { value: "high", get label() { return i18n.t("forms.defaults.registry.high") }, color: "orange" },
+            { value: "medium", get label() { return i18n.t("forms.defaults.registry.medium") }, color: "yellow" },
+            { value: "low", get label() { return i18n.t("forms.defaults.registry.low") }, color: "green" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -280,7 +280,7 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "incident_date",
           name: "incident_date",
-          label: "Incident Date",
+          get label() { return i18n.t("forms.defaults.registry.incidentDate") },
           fieldType: "DateTime",
           validation: { required: true },
           aiSuggestions: [],
@@ -293,9 +293,9 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("forms.defaults.registry.description") },
           fieldType: "Textarea",
-          placeholder: "Detailed description of the incident...",
+          get placeholder() { return i18n.t("forms.defaults.registry.detailedDescriptionOfTheIncident") },
           validation: { required: true, minLength: 50 },
           aiSuggestions: [],
           order: 5,
@@ -307,16 +307,16 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "affected_area",
           name: "affected_area",
-          label: "Affected Area",
+          get label() { return i18n.t("forms.defaults.registry.affectedArea") },
           fieldType: "MultiSelect",
           options: [
-            { value: "production", label: "Production" },
-            { value: "warehouse", label: "Warehouse" },
-            { value: "sales", label: "Sales" },
-            { value: "customer-service", label: "Customer Service" },
-            { value: "finance", label: "Finance" },
-            { value: "it", label: "IT Systems" },
-            { value: "logistics", label: "Logistics" },
+            { value: "production", get label() { return i18n.t("forms.defaults.registry.production") } },
+            { value: "warehouse", get label() { return i18n.t("forms.defaults.registry.warehouse") } },
+            { value: "sales", get label() { return i18n.t("forms.defaults.registry.sales") } },
+            { value: "customer-service", get label() { return i18n.t("forms.defaults.registry.customerService") } },
+            { value: "finance", get label() { return i18n.t("forms.defaults.registry.finance") } },
+            { value: "it", get label() { return i18n.t("forms.defaults.registry.itSystems") } },
+            { value: "logistics", get label() { return i18n.t("forms.defaults.registry.logistics") } },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -329,11 +329,11 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "immediate_actions",
           name: "immediate_actions",
-          label: "Immediate Actions Taken",
+          get label() { return i18n.t("forms.defaults.registry.immediateActionsTaken") },
           fieldType: "Textarea",
-          placeholder: "What actions were taken immediately...",
+          get placeholder() { return i18n.t("forms.defaults.registry.whatActionsWereTakenImmediately") },
           validation: { required: false },
-          aiSuggestions: ["Isolated affected system", "Notified stakeholders", "Initiated backup procedures", "Documented initial findings"],
+          get aiSuggestions() { return [i18n.t("forms.defaults.registry.suggestions.isolatedAffectedSystem"), i18n.t("forms.defaults.registry.suggestions.notifiedStakeholders"), i18n.t("forms.defaults.registry.suggestions.initiatedBackupProcedures"), i18n.t("forms.defaults.registry.suggestions.documentedInitialFindings")] },
           order: 7,
           isSystem: true,
           isEnabled: true,
@@ -343,11 +343,11 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "root_cause",
           name: "root_cause",
-          label: "Root Cause Analysis",
+          get label() { return i18n.t("forms.defaults.registry.rootCauseAnalysis") },
           fieldType: "Textarea",
-          placeholder: "Initial assessment of root cause...",
+          get placeholder() { return i18n.t("forms.defaults.registry.initialAssessmentOfRootCause") },
           validation: { required: false },
-          aiSuggestions: ["Human error", "System malfunction", "Process gap", "External factor", "Communication breakdown"],
+          get aiSuggestions() { return [i18n.t("forms.defaults.registry.suggestions.humanError"), i18n.t("forms.defaults.registry.suggestions.systemMalfunction"), i18n.t("forms.defaults.registry.suggestions.processGap"), i18n.t("forms.defaults.registry.suggestions.externalFactor"), i18n.t("forms.defaults.registry.suggestions.communicationBreakdown")] },
           order: 8,
           isSystem: true,
           isEnabled: true,
@@ -357,9 +357,9 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "financial_impact",
           name: "financial_impact",
-          label: "Estimated Financial Impact",
+          get label() { return i18n.t("forms.defaults.registry.estimatedFinancialImpact") },
           fieldType: "Number",
-          placeholder: "Enter amount in dollars",
+          get placeholder() { return i18n.t("forms.defaults.registry.enterAmountInDollars") },
           validation: { required: false, min: 0 },
           aiSuggestions: [],
           order: 9,
@@ -371,9 +371,9 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "customers_affected",
           name: "customers_affected",
-          label: "Customers Affected",
+          get label() { return i18n.t("forms.defaults.registry.customersAffected") },
           fieldType: "Number",
-          placeholder: "Number of affected customers",
+          get placeholder() { return i18n.t("forms.defaults.registry.numberOfAffectedCustomers") },
           validation: { required: false, min: 0 },
           aiSuggestions: [],
           order: 10,
@@ -385,7 +385,7 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "assigned_to",
           name: "assigned_to",
-          label: "Assign To",
+          get label() { return i18n.t("forms.defaults.registry.assignTo") },
           fieldType: "UserSelect",
           validation: { required: true },
           aiSuggestions: [],
@@ -398,16 +398,16 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "department",
           name: "department",
-          label: "Department",
+          get label() { return i18n.t("forms.defaults.registry.department") },
           fieldType: "Select",
           options: [
-            { value: "operations", label: "Operations" },
-            { value: "it", label: "IT" },
-            { value: "sales", label: "Sales" },
-            { value: "warehouse", label: "Warehouse" },
-            { value: "quality", label: "Quality Assurance" },
-            { value: "finance", label: "Finance" },
-            { value: "hr", label: "Human Resources" },
+            { value: "operations", get label() { return i18n.t("forms.defaults.registry.operations") } },
+            { value: "it", get label() { return i18n.t("forms.defaults.registry.it") } },
+            { value: "sales", get label() { return i18n.t("forms.defaults.registry.sales") } },
+            { value: "warehouse", get label() { return i18n.t("forms.defaults.registry.warehouse") } },
+            { value: "quality", get label() { return i18n.t("forms.defaults.registry.qualityAssurance") } },
+            { value: "finance", get label() { return i18n.t("forms.defaults.registry.finance") } },
+            { value: "hr", get label() { return i18n.t("forms.defaults.registry.humanResources") } },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -420,9 +420,9 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("forms.defaults.registry.tags") },
           fieldType: "Tags",
-          placeholder: "Add relevant tags...",
+          get placeholder() { return i18n.t("forms.defaults.registry.addRelevantTags") },
           validation: { required: false },
           aiSuggestions: [],
           order: 13,
@@ -434,7 +434,7 @@ const forensicForms: FormRegistryEntry[] = [
         {
           fieldId: "attachments",
           name: "attachments",
-          label: "Attachments",
+          get label() { return i18n.t("forms.defaults.registry.attachments") },
           fieldType: "File",
           validation: { required: false },
           aiSuggestions: [],
@@ -494,8 +494,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "journal",
-      name: "Journal",
-      description: i18n.t("journal.formDefaults.dailyWorkJournalsAndNotes"),
+      get name() { return i18n.t("forms.defaults.registry.journal") },
+      get description() { return i18n.t("journal.formDefaults.dailyWorkJournalsAndNotes") },
       icon: "BookMarked",
       color: "blue",
       forms: journalForms,
@@ -507,8 +507,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "forensic",
-      name: "Forensic Reports",
-      description: "Incident tracking and forensic analysis",
+      get name() { return i18n.t("forms.defaults.registry.forensicReports") },
+      get description() { return i18n.t("forms.defaults.registry.incidentTrackingAndForensicAnalysis") },
       icon: "FileSearch",
       color: "red",
       forms: forensicForms,
@@ -520,8 +520,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "crm",
-      name: "CRM",
-      description: "Customer relationship management",
+      get name() { return i18n.t("forms.defaults.registry.crm") },
+      get description() { return i18n.t("forms.defaults.registry.customerRelationshipManagement") },
       icon: "Users",
       color: "green",
       forms: crmForms,
@@ -533,8 +533,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "sales",
-      name: "Sales",
-      description: "Sales orders and price management",
+      get name() { return i18n.t("forms.defaults.registry.sales") },
+      get description() { return i18n.t("forms.defaults.registry.salesOrdersAndPriceManagement") },
       icon: "ShoppingCart",
       color: "purple",
       forms: salesForms,
@@ -546,8 +546,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "inventory",
-      name: "Inventory",
-      description: "Product and stock management",
+      get name() { return i18n.t("forms.defaults.registry.inventory") },
+      get description() { return i18n.t("forms.defaults.registry.productAndStockManagement") },
       icon: "Package",
       color: "orange",
       forms: inventoryForms,
@@ -559,8 +559,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "accounting",
-      name: "Accounting",
-      description: i18n.t("journal.formDefaults.invoicesAndFinancialManagement"),
+      get name() { return i18n.t("forms.defaults.registry.accounting") },
+      get description() { return i18n.t("journal.formDefaults.invoicesAndFinancialManagement") },
       icon: "Landmark",
       color: "yellow",
       forms: accountingForms,
@@ -572,8 +572,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "hr",
-      name: "HR",
-      description: "Human resources management",
+      get name() { return i18n.t("forms.defaults.registry.hr") },
+      get description() { return i18n.t("forms.defaults.registry.humanResourcesManagement") },
       icon: "Users",
       color: "pink",
       forms: hrForms,
@@ -585,8 +585,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "purchasing",
-      name: "Purchasing",
-      description: "Purchase orders and requisitions",
+      get name() { return i18n.t("forms.defaults.registry.purchasing") },
+      get description() { return i18n.t("forms.defaults.registry.purchaseOrdersAndRequisitions") },
       icon: "ShoppingBag",
       color: "teal",
       forms: purchasingForms,
@@ -598,8 +598,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "projects",
-      name: "Projects",
-      description: "Project and task management",
+      get name() { return i18n.t("forms.defaults.registry.projects") },
+      get description() { return i18n.t("forms.defaults.registry.projectAndTaskManagement") },
       icon: "FolderKanban",
       color: "cyan",
       forms: projectsForms,
@@ -611,8 +611,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "documents",
-      name: "Documents",
-      description: i18n.t("journal.formDefaults.documentManagement"),
+      get name() { return i18n.t("forms.defaults.registry.documents") },
+      get description() { return i18n.t("journal.formDefaults.documentManagement") },
       icon: "File",
       color: "indigo",
       forms: documentsForms,
@@ -624,8 +624,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "manufacturing",
-      name: "Manufacturing",
-      description: "BOM and work orders",
+      get name() { return i18n.t("forms.defaults.registry.manufacturing") },
+      get description() { return i18n.t("forms.defaults.registry.bomAndWorkOrders") },
       icon: "Wrench",
       color: "amber",
       forms: manufacturingForms,
@@ -637,8 +637,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "helpdesk",
-      name: "Helpdesk",
-      description: "Support tickets",
+      get name() { return i18n.t("forms.defaults.registry.helpdesk") },
+      get description() { return i18n.t("forms.defaults.registry.supportTickets") },
       icon: "LifeBuoy",
       color: "rose",
       forms: helpdeskForms,
@@ -650,8 +650,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "expenses",
-      name: "Expenses",
-      description: i18n.t("journal.formDefaults.expenseTracking"),
+      get name() { return i18n.t("forms.defaults.registry.expenses") },
+      get description() { return i18n.t("journal.formDefaults.expenseTracking") },
       icon: "Receipt",
       color: "emerald",
       forms: expensesForms,
@@ -663,8 +663,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "calendar",
-      name: "Calendar",
-      description: i18n.t("journal.formDefaults.eventsAndScheduling"),
+      get name() { return i18n.t("forms.defaults.registry.calendar") },
+      get description() { return i18n.t("journal.formDefaults.eventsAndScheduling") },
       icon: "Calendar",
       color: "sky",
       forms: calendarForms,
@@ -676,8 +676,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "subscriptions",
-      name: "Subscriptions",
-      description: "Subscription management",
+      get name() { return i18n.t("forms.defaults.registry.subscriptions") },
+      get description() { return i18n.t("forms.defaults.registry.subscriptionManagement") },
       icon: "RefreshCw",
       color: "violet",
       forms: subscriptionsForms,
@@ -689,8 +689,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "proposals",
-      name: "Proposals",
-      description: "Proposal management",
+      get name() { return i18n.t("forms.defaults.registry.proposals") },
+      get description() { return i18n.t("forms.defaults.registry.proposalManagement") },
       icon: "FileText",
       color: "fuchsia",
       forms: proposalsForms,
@@ -702,8 +702,8 @@ class FormRegistry {
     }
     this.registerModule({
       id: "reports",
-      name: "Reports",
-      description: i18n.t("journal.formDefaults.reportGeneration"),
+      get name() { return i18n.t("forms.defaults.registry.reports") },
+      get description() { return i18n.t("journal.formDefaults.reportGeneration") },
       icon: "BarChart",
       color: "slate",
       forms: reportsForms,

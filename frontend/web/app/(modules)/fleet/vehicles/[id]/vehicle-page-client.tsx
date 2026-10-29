@@ -164,20 +164,20 @@ function VehiclePageLoaded({
     (rows as Row[]).map((row) => ({ value: String(row.id), label: String(row.name ?? row.display_name ?? row.displayName ?? `${fallback} ${row.id}`) }));
   const thisVehicle = [{ value: vehicleId, label }];
   const forms: Record<FormKind, FormConfig> = {
-    assign: mergeFieldDefaultValues(assignFleetDriverForm(t, thisVehicle, option(employees as unknown[], 'Employee')), {
+    assign: mergeFieldDefaultValues(assignFleetDriverForm(t, thisVehicle, option(employees as unknown[], t("fleet.vehiclePageClient.employee"))), {
       vehicle_id: vehicleId,
     }),
     service: mergeFieldDefaultValues(
       recordFleetServiceForm(
         t,
         thisVehicle,
-        option(serviceTypes as unknown[], 'Service type'),
+        option(serviceTypes as unknown[], t("fleet.vehiclePageClient.serviceType")),
         accountJournalRowsToSelectOptions(journals as unknown as Row[]),
         accountAccountRowsToSelectOptions(accounts as unknown as Row[]),
       ),
       { vehicle_id: vehicleId },
     ),
-    inspection: mergeFieldDefaultValues(recordFleetInspectionForm(t, thisVehicle, option(employees as unknown[], 'Employee')), {
+    inspection: mergeFieldDefaultValues(recordFleetInspectionForm(t, thisVehicle, option(employees as unknown[], t("fleet.vehiclePageClient.employee"))), {
       vehicle_id: vehicleId,
     }),
   };

@@ -22,6 +22,7 @@ export function I18nProvider({ children, language }: I18nProviderProps) {
     if (language) void i18n.changeLanguage(normalizeLanguage(language))
   }, [language])
   useEffect(() => {
+    if (typeof document === "undefined") return
     document.documentElement.lang = languagePreference(activeI18n.language).language
     document.documentElement.dir = "ltr"
   }, [activeI18n.language])

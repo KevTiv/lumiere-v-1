@@ -17,7 +17,7 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
           label: t("workflows.forms.newWorkflow.fields.workflowKey", {
             defaultValue: "Workflow key",
           }),
-          placeholder: "po_confirm",
+          placeholder: t("workflows.builtIn.workflowsFormConfigs.newWorkflowForm.workflowKey.placeholder", { defaultValue: "po_confirm" }),
           required: true,
           width: "1/2",
         },
@@ -48,10 +48,10 @@ export const newWorkflowForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           defaultValue: "Manual",
           options: [
-            { value: "Manual", label: "Manual" },
-            { value: "RecordCreated", label: "Record created" },
-            { value: "RecordChanged", label: "Record changed" },
-            { value: "Signal", label: "Signal" },
+            { value: "Manual", label: t("workflows.builtIn.workflowsFormConfigs.newWorkflowForm.manual.label", { defaultValue: "Manual" }) },
+            { value: "RecordCreated", label: t("workflows.builtIn.workflowsFormConfigs.newWorkflowForm.recordCreated.label", { defaultValue: "Record created" }) },
+            { value: "RecordChanged", label: t("workflows.builtIn.workflowsFormConfigs.newWorkflowForm.recordChanged.label", { defaultValue: "Record changed" }) },
+            { value: "Signal", label: t("workflows.builtIn.workflowsFormConfigs.newWorkflowForm.signal.label", { defaultValue: "Signal" }) },
           ],
         },
         {
@@ -145,7 +145,7 @@ export const workflowAddActivityForm = (
 ): FormConfig => ({
   id: "workflow-add-activity",
   title: t("workflows.forms.addActivity.title", { defaultValue: "Add node" }),
-  description: "Use upsert_workflow_node on a draft version (designer WIP).",
+  description: t("workflows.builtIn.workflowsFormConfigs.workflowAddActivityForm.workflowAddActivity.description", { defaultValue: "Use upsert_workflow_node on a draft version (designer WIP)." }),
   sections: [],
 })
 
@@ -157,7 +157,7 @@ export const workflowAddTransitionForm = (
 ): FormConfig => ({
   id: "workflow-add-transition",
   title: t("workflows.forms.addTransition.title", { defaultValue: "Add edge" }),
-  description: "Use upsert_workflow_edge on a draft version (designer WIP).",
+  description: t("workflows.builtIn.workflowsFormConfigs.workflowAddTransitionForm.workflowAddTransition.description", { defaultValue: "Use upsert_workflow_edge on a draft version (designer WIP)." }),
   sections: [],
 })
 

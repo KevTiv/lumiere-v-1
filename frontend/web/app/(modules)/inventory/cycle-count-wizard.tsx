@@ -156,7 +156,7 @@ export function CycleCountWizard({
     const id = strId(c.id);
     return (
       <SelectItem key={id} value={id}>
-        {`${id} — ${String(c.name ?? 'Count')} (${String(c.state ?? '—')})`}
+        {`${id} — ${String(c.name ?? t("inventory.cycleCountWizard.countFallback"))} (${String(c.state ?? '—')})`}
       </SelectItem>
     );
   });
@@ -624,7 +624,7 @@ function LocationTreeRow({
           <button
             type="button"
             className="text-muted-foreground"
-            aria-label={open ? 'Collapse' : 'Expand'}
+            aria-label={open ? t("inventory.cycleCountWizard.collapse") : t("inventory.cycleCountWizard.expand")}
             onClick={() => setOpen((v) => !v)}
           >
             <ChevronRight

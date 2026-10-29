@@ -23,6 +23,26 @@ const values = [
 ]
 const series = [{ name: "revenue", color: "hsl(var(--chart-1))" }]
 
+test.each([
+  ["line", LineChartWidget, ".recharts-line-curve"],
+  ["area", AreaChartWidget, ".recharts-area-area"],
+  ["bar", BarChartWidget, ".recharts-bar-rectangle"],
+] as const)("%s chart uses translated labels with stable data keys", (_kind, Widget, shape) => {
+  const data = {
+    xAxisKey: "month", categoryKey: "month",
+    series: [
+      { name: "revenue", label: "Chiffre d’affaires", color: "red" },
+      { name: "cost", label: "Coût", color: "blue" },
+    ],
+    values: [{ month: "Jan", revenue: 100, cost: 40 }, { month: "Feb", revenue: 140, cost: 50 }],
+  }
+  const html = renderToStaticMarkup(<Widget data={data} />)
+  const document = new DOMParser().parseFromString(html, "text/html")
+  expect(document.querySelectorAll(shape).length).toBeGreaterThanOrEqual(2)
+  expect(document.body.textContent).toContain("Chiffre d’affaires")
+  expect(document.body.textContent).toContain("Coût")
+})
+
 // Regression: recharts@2 with a mismatched react-is drops Fragment-wrapped chart
 // children, so axes and series silently disappear.
 test("line chart renders axes and series", () => {

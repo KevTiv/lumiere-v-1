@@ -750,8 +750,8 @@ export const salesDashboard: DashboardConfig = {
           data: {
             xAxisKey: "month",
             series: [
-              { name: "Revenue", color: "#6366f1" },
-              { name: "Target", color: "#94a3b8" },
+              { name: "Revenue", get label() { return uiI18n.t("sales.dashboard.series.revenue") }, color: "#6366f1" },
+              { name: "Target", get label() { return uiI18n.t("sales.dashboard.series.target") }, color: "#94a3b8" },
             ],
             values: [],
           },
@@ -783,7 +783,7 @@ export const salesDashboard: DashboardConfig = {
           width: "full",
           data: {
             categoryKey: "product",
-            series: [{ name: "Revenue", color: "#6366f1" }],
+            series: [{ name: "Revenue", get label() { return uiI18n.t("sales.dashboard.series.revenue") }, color: "#6366f1" }],
             values: [],
           },
         },
@@ -991,7 +991,7 @@ export const crmDashboard: DashboardConfig = {
           data: {
             categoryKey: "stage",
             layout: "horizontal",
-            series: [{ name: "Count", color: "#6366f1" }],
+            series: [{ name: "Count", get label() { return uiI18n.t("crm.dashboard.series.count") }, color: "#6366f1" }],
             values: [],
           },
         },
@@ -1103,8 +1103,8 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const inventoryDashboard: DashboardConfig = {
   id: "inventory",
-  title: "Inventory",
-  description: "Stock levels, movements, valuations, and reorder alerts",
+  get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.inventory.title") },
+  get description() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.inventory.description") },
   sections: [
     {
       id: "inv-quick-actions-section",
@@ -1112,15 +1112,15 @@ export const inventoryDashboard: DashboardConfig = {
         {
           id: "inv-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_product", label: "Add Product", icon: "package", color: "blue" },
-              { id: "create_transfer", label: "New Transfer", icon: "upload", color: "green" },
-              { id: "create_adjustment", label: "Adjust Inventory", icon: "refresh", color: "orange" },
-              { id: "view_warehouses", label: "View Warehouses", icon: "settings", color: "teal" },
+              { id: "create_product", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.createProduct.label") }, icon: "package", color: "blue" },
+              { id: "create_transfer", get label() { return uiI18n.t("inventory.forms.newTransfer.title") }, icon: "upload", color: "green" },
+              { id: "create_adjustment", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.createAdjustment.label") }, icon: "refresh", color: "orange" },
+              { id: "view_warehouses", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.viewWarehouses.label") }, icon: "settings", color: "teal" },
             ],
           },
         },
@@ -1132,14 +1132,14 @@ export const inventoryDashboard: DashboardConfig = {
         {
           id: "inv-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Total SKUs", value: "—", icon: "Package" },
-              { label: "Stock Value", value: "—", icon: "DollarSign" },
-              { label: "Low Stock Alerts", value: "—", icon: "AlertTriangle" },
-              { label: "Inventory Turnover", value: "—", icon: "RefreshCw" },
+              { get label() { return uiI18n.t("inventory.dashboard.totalSKUs") }, value: "—", icon: "Package" },
+              { get label() { return uiI18n.t("inventory.dashboard.stockValue") }, value: "—", icon: "DollarSign" },
+              { get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invStatCards.label") }, value: "—", icon: "AlertTriangle" },
+              { get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invStatCards.labelinventoryTurnover") }, value: "—", icon: "RefreshCw" },
             ],
           },
         },
@@ -1147,25 +1147,25 @@ export const inventoryDashboard: DashboardConfig = {
     },
     {
       id: "inv-breakdown",
-      title: "Stock Distribution",
+      get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invBreakdown.title") },
       widgets: [
         {
           id: "inv-by-category",
           type: "metrics",
-          title: "Stock by Category",
+          get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invByCategory.title") },
           width: "1/2",
           data: { metrics: [] },
         },
         {
           id: "inv-movements",
           type: "bar-chart",
-          title: "Stock Movements (Last 7 Days)",
+          get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invMovements.title") },
           width: "1/2",
           data: {
             categoryKey: "day",
             series: [
-              { name: "In", color: "#22c55e" },
-              { name: "Out", color: "#ef4444" },
+              { name: "In", get label() { return uiI18n.t("inventory.dashboard.series.in") }, color: "#22c55e" },
+              { name: "Out", get label() { return uiI18n.t("inventory.dashboard.series.out") }, color: "#ef4444" },
             ],
             stacked: false,
             values: [],
@@ -1174,11 +1174,11 @@ export const inventoryDashboard: DashboardConfig = {
         {
           id: "inventory-stock-turnover",
           type: "bar-chart",
-          title: "Top Products by Stock Movement",
+          get title() { return uiI18n.t("inventory.dashboard.stockTurnover") },
           width: "1/2",
           data: {
             categoryKey: "product",
-            series: [{ name: "Moves", color: "#6366f1" }],
+            series: [{ name: "Moves", get label() { return uiI18n.t("inventory.dashboard.series.moves") }, color: "#6366f1" }],
             values: [],
           },
         },
@@ -1186,20 +1186,20 @@ export const inventoryDashboard: DashboardConfig = {
     },
     {
       id: "inv-alerts",
-      title: "Reorder Alerts",
+      get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invAlerts.title") },
       widgets: [
         {
           id: "inv-low-stock-table",
           type: "table",
-          title: "Low Stock Items",
+          get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.invLowStockTable.title") },
           width: "full",
           data: {
             columns: [
-              { key: "sku", label: "SKU" },
-              { key: "name", label: "Product" },
-              { key: "qty", label: "Qty On Hand", align: "right" },
-              { key: "reorder", label: "Reorder Point", align: "right" },
-              { key: "status", label: "Status" },
+              { key: "sku", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.sku.label") } },
+              { key: "name", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.name.label") } },
+              { key: "qty", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.qty.label") }, align: "right" },
+              { key: "reorder", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.reorder.label") }, align: "right" },
+              { key: "status", get label() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.status.label") } },
             ],
             rows: [],
           },
@@ -1208,29 +1208,29 @@ export const inventoryDashboard: DashboardConfig = {
     },
     {
       id: "inventory-exception-queues",
-      title: "Exception queues",
+      get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.inventoryExceptionQueues.title") },
       widgets: [
         {
           id: "inventory-exception-queue-cards",
           type: "stat-cards",
-          title: "Live exceptions",
+          get title() { return uiI18n.t("inventory.builtIn.moduleDashboardConfigs.inventoryDashboard.inventoryExceptionQueueCards.title") },
           width: "full",
           data: {
             stats: [
               {
-                label: "Short ATP",
+                get label() { return uiI18n.t("inventory.inventoryClient.shortATP") },
                 value: "—",
                 icon: "AlertTriangle",
                 testId: "inventory-queue-short-atp",
               },
               {
-                label: "Expired lots",
+                get label() { return uiI18n.t("inventory.inventoryClient.expiredLots") },
                 value: "—",
                 icon: "AlertCircle",
                 testId: "inventory-queue-expired-lots",
               },
               {
-                label: "Open QC fails",
+                get label() { return uiI18n.t("inventory.inventoryClient.openQCFails") },
                 value: "—",
                 icon: "ShieldAlert",
                 testId: "inventory-queue-open-qc",
@@ -1247,8 +1247,8 @@ export const inventoryDashboard: DashboardConfig = {
 
 export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "inventory",
-  title: "Inventory",
-  description: "Stock levels, movements, valuations, and reorder alerts",
+  title: t("inventory.builtIn.moduleDashboardConfigs.inventoryModuleConfig.inventory.title"),
+  description: t("inventory.builtIn.moduleDashboardConfigs.inventoryModuleConfig.inventory.description"),
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
@@ -1260,7 +1260,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("inventory.builtIn.moduleDashboardConfigs.inventoryModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: inventoryDashboard.sections,
     },
@@ -1271,13 +1271,13 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "products",
-      label: "Products",
+      label: t("inventory.products.title"),
       type: "entity",
       entityConfig: productsTableConfig(t, {
         formatProductDisplayName: inventoryProductPrimaryLabel,
       }),
       createForm: newProductForm(t),
-      createLabel: "New Product",
+      createLabel: t("inventory.forms.newProduct.title"),
       createAction: "createProduct",
       createPermission: { resource: "product", action: "create" },
     },
@@ -1292,7 +1292,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "stock",
-      label: "Stock On Hand",
+      label: t("inventory.stockOnHand.title"),
       type: "entity",
       entityConfig: stockQuantsTableConfig(t),
       createForm: newStockQuantForm(t),
@@ -1301,11 +1301,11 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "transfers",
-      label: "Transfers",
+      label: t("inventory.transfers.title"),
       type: "entity",
       entityConfig: transfersTableConfig(t),
       createForm: newTransferForm(t),
-      createLabel: "New Transfer",
+      createLabel: t("inventory.forms.newTransfer.title"),
       createAction: "createStockPicking",
       createPermission: { resource: "stock_picking", action: "create" },
     },
@@ -1317,7 +1317,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "warehouses",
-      label: "Warehouses",
+      label: t("inventory.warehouses.title"),
       type: "entity",
       entityConfig: warehousesTableConfig(t),
       createForm: newWarehouseForm(t),
@@ -1326,16 +1326,16 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "adjustments",
-      label: "Adjustments",
+      label: t("inventory.builtIn.moduleDashboardConfigs.inventoryModuleConfig.adjustments.label"),
       type: "entity",
       entityConfig: inventoryAdjustmentsTableConfig(t),
       createForm: newInventoryAdjustmentForm(t),
-      createLabel: "New Adjustment",
+      createLabel: t("inventory.builtIn.moduleDashboardConfigs.inventoryModuleConfig.adjustments.createLabel"),
       createAction: "createInventoryAdjustment",
     },
     {
       id: "locations",
-      label: "Locations",
+      label: t("inventory.stockLocations.title"),
       type: "entity",
       entityConfig: stockLocationsTableConfig(t),
       createForm: newStockLocationForm(t),
@@ -1344,7 +1344,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "lots",
-      label: "Lots & Serials",
+      label: t("inventory.productionLots.title"),
       type: "entity",
       entityConfig: productionLotsTableConfig(t),
     },
@@ -1356,7 +1356,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "quality",
-      label: "Quality Checks",
+      label: t("inventory.qualityChecks.title"),
       type: "entity",
       entityConfig: qualityChecksTableConfig(t),
     },
@@ -1527,7 +1527,7 @@ export const purchasingDashboard: DashboardConfig = {
           data: {
             categoryKey: "vendor",
             layout: "horizontal",
-            series: [{ name: "Spend", color: "#6366f1" }],
+            series: [{ name: "Spend", get label() { return uiI18n.t("purchasing.dashboard.series.spend") }, color: "#6366f1" }],
             values: [],
           },
         },
@@ -1627,8 +1627,8 @@ export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const hrDashboard: DashboardConfig = {
   id: "hr",
-  title: "HR & People",
-  description: "Workforce overview, recruitment, attendance, and performance",
+  get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hr.title") },
+  get description() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hr.description") },
   sections: [
     {
       id: "hr-quick-actions-section",
@@ -1636,15 +1636,15 @@ export const hrDashboard: DashboardConfig = {
         {
           id: "hr-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_employee", label: "Add Employee", icon: "users", color: "blue" },
-              { id: "create_leave", label: "Request Leave", icon: "plus", color: "green" },
-              { id: "create_contract", label: "New Contract", icon: "file", color: "orange" },
-              { id: "create_payslip", label: "Generate Payslip", icon: "download", color: "purple" },
+              { id: "create_employee", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.createEmployee.label") }, icon: "users", color: "blue" },
+              { id: "create_leave", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.createLeave.label") }, icon: "plus", color: "green" },
+              { id: "create_contract", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.createContract.label") }, icon: "file", color: "orange" },
+              { id: "create_payslip", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.createPayslip.label") }, icon: "download", color: "purple" },
             ],
           },
         },
@@ -1656,14 +1656,14 @@ export const hrDashboard: DashboardConfig = {
         {
           id: "hr-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Total Headcount", value: "—", icon: "Users" },
-              { label: "Open Positions", value: "—", icon: "UserPlus" },
-              { label: "Turnover Rate", value: "—", icon: "UserMinus" },
-              { label: "Satisfaction Score", value: "—", icon: "Star" },
+              { get label() { return uiI18n.t("hr.dashboard.totalHeadcount") }, value: "—", icon: "Users" },
+              { get label() { return uiI18n.t("hr.dashboard.openPositions") }, value: "—", icon: "UserPlus" },
+              { get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrStatCards.label") }, value: "—", icon: "UserMinus" },
+              { get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrStatCards.labelsatisfactionScore") }, value: "—", icon: "Star" },
             ],
           },
         },
@@ -1671,34 +1671,34 @@ export const hrDashboard: DashboardConfig = {
     },
     {
       id: "hr-workforce",
-      title: "Workforce Distribution",
+      get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrWorkforce.title") },
       widgets: [
         {
           id: "hr-by-department",
           type: "bar-chart",
-          title: "Headcount by Department",
+          get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrByDepartment.title") },
           width: "1/2",
           data: {
             categoryKey: "dept",
-            series: [{ name: "Employees", color: "#6366f1" }],
+            series: [{ name: "Employees", get label() { return uiI18n.t("hr.dashboard.series.employees") }, color: "#6366f1" }],
             values: [],
           },
         },
         {
           id: "hr-leave-usage",
           type: "metrics",
-          title: "Leave Balance Usage",
+          get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrLeaveUsage.title") },
           width: "1/2",
           data: { metrics: [] },
         },
         {
           id: "hr-headcount-trend",
           type: "line-chart",
-          title: "Headcount Trend",
+          get title() { return uiI18n.t("hr.dashboard.headcountTrend") },
           width: "1/2",
           data: {
             xAxisKey: "month",
-            series: [{ name: "Headcount", color: "#6366f1" }],
+            series: [{ name: "Headcount", get label() { return uiI18n.t("hr.dashboard.series.headcount") }, color: "#6366f1" }],
             values: [],
           },
         },
@@ -1706,20 +1706,20 @@ export const hrDashboard: DashboardConfig = {
     },
     {
       id: "hr-hiring",
-      title: "Active Recruitment",
+      get title() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.hrHiring.title") },
       widgets: [
         {
           id: "hr-open-roles",
           type: "table",
-          title: "Open Positions",
+          get title() { return uiI18n.t("hr.dashboard.openPositions") },
           width: "full",
           data: {
             columns: [
-              { key: "role", label: "Role" },
-              { key: "dept", label: "Department" },
-              { key: "candidates", label: "Candidates", align: "right" },
-              { key: "stage", label: "Stage" },
-              { key: "posted", label: "Posted" },
+              { key: "role", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.role.label") } },
+              { key: "dept", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.dept.label") } },
+              { key: "candidates", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.candidates.label") }, align: "right" },
+              { key: "stage", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.stage.label") } },
+              { key: "posted", get label() { return uiI18n.t("hr.builtIn.moduleDashboardConfigs.hrDashboard.posted.label") } },
             ],
             rows: [],
           },
@@ -1731,8 +1731,8 @@ export const hrDashboard: DashboardConfig = {
 
 export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "hr",
-  title: "HR & People",
-  description: "Workforce overview, recruitment, attendance, and performance",
+  title: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.hr.title"),
+  description: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.hr.description"),
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.people", { defaultValue: "People" }), tabIds: ["employees", "departments", "org-chart", "job-positions", "recruitment", "onboarding-templates", "performance"] },
@@ -1742,33 +1742,33 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: hrDashboard.sections,
     },
     {
       id: "employees",
-      label: "Employees",
+      label: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.employees.label"),
       type: "entity",
       entityConfig: employeesTableConfig(t),
       createForm: newEmployeeForm(t),
-      createLabel: "New Employee",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.employees.createLabel"),
       createAction: "createEmployee",
       createPermission: { resource: "hr_employee", action: "create" },
     },
     {
       id: "departments",
-      label: "Departments",
+      label: t("hr.departments.title"),
       type: "entity",
       entityConfig: departmentsTableConfig(t),
     },
     {
       id: "leaves",
-      label: "Leave Requests",
+      label: t("hr.leaveRequests.title"),
       type: "entity",
       entityConfig: leaveRequestsTableConfig(t),
       createForm: newLeaveRequestForm(t),
-      createLabel: "New Request",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.leaves.createLabel"),
       createAction: "createLeaveRequest",
     },
     {
@@ -1779,82 +1779,82 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "attendance",
-      label: "Attendance",
+      label: t("hr.attendance.title"),
       type: "entity",
       entityConfig: attendanceTableConfig(t),
       createForm: newAttendancePunchForm(t),
-      createLabel: "Record Punch",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.attendance.createLabel"),
       createAction: "createAttendancePunch",
     },
     {
       id: "contracts",
-      label: "Contracts",
+      label: t("hr.contracts.title"),
       type: "entity",
       entityConfig: contractsTableConfig(t),
       createForm: newContractForm(t),
-      createLabel: "New Contract",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.contracts.createLabel"),
       createAction: "createContract",
     },
     {
       id: "payslips",
-      label: "Payslips",
+      label: t("hr.payslips.title"),
       type: "entity",
       entityConfig: payslipsTableConfig(t),
       createForm: newPayslipForm(t),
-      createLabel: "New Payslip",
+      createLabel: t("hr.forms.newPayslip.title"),
       createAction: "createPayslip",
     },
     {
       id: "job-positions",
-      label: "Job Positions",
+      label: t("hr.jobPositions.title"),
       type: "entity",
       entityConfig: jobPositionsTableConfig(t),
       createForm: newJobPositionForm(t),
-      createLabel: "New Position",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.jobPositions.createLabel"),
       createAction: "createJobPosition",
     },
     {
       id: "recruitment",
-      label: "Recruitment",
+      label: t("hr.hrClient.recruitment"),
       type: "entity",
       entityConfig: jobPositionsTableConfig(t),
       createForm: newJobPositionForm(t),
-      createLabel: "New Position",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.recruitment.createLabel"),
       createAction: "createJobPosition",
     },
     {
       id: "leave-types",
-      label: "Leave Types",
+      label: t("hr.leaveTypes.title"),
       type: "entity",
       entityConfig: leaveTypesTableConfig(t),
       createForm: newLeaveTypeForm(t),
-      createLabel: "New Leave Type",
+      createLabel: t("hr.forms.newLeaveType.title"),
       createAction: "createLeaveType",
     },
     {
       id: "payroll-structures",
-      label: "Payroll Structures",
+      label: t("hr.payrollStructures.title"),
       type: "entity",
       entityConfig: payrollStructuresTableConfig(t),
       createForm: newPayrollStructureForm(t),
-      createLabel: "New Structure",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.payrollStructures.createLabel"),
       createAction: "createPayrollStructure",
     },
     {
       id: "salary-rules",
-      label: "Salary Rules",
+      label: t("hr.salaryRules.title"),
       type: "entity",
       entityConfig: salaryRulesTableConfig(t),
       createForm: newSalaryRuleForm(t),
-      createLabel: "New Rule",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.salaryRules.createLabel"),
       createAction: "createSalaryRule",
     },
     {
       id: "onboarding-templates",
-      label: "Onboarding",
+      label: t("hr.hrClient.onboarding"),
       type: "entity",
       entityConfig: onboardingTemplatesTableConfig(t),
-      createLabel: "New template",
+      createLabel: t("hr.builtIn.moduleDashboardConfigs.hrModuleConfig.onboardingTemplates.createLabel"),
       createAction: "createOnboardingTemplate",
     },
   ],
@@ -1864,8 +1864,8 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const manufacturingDashboard: DashboardConfig = {
   id: "manufacturing",
-  title: "Manufacturing",
-  description: "Production orders, work center utilization, and quality metrics",
+  get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.manufacturing.title") },
+  get description() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.manufacturing.description") },
   sections: [
     {
       id: "mfg-quick-actions-section",
@@ -1873,15 +1873,15 @@ export const manufacturingDashboard: DashboardConfig = {
         {
           id: "mfg-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_mo", label: "New Mfg Order", icon: "settings", color: "blue" },
-              { id: "create_bom", label: "New BOM", icon: "file", color: "green" },
-              { id: "create_workcenter", label: "New Work Center", icon: "trending", color: "purple" },
-              { id: "schedule_production", label: "Schedule Production", icon: "refresh", color: "teal" },
+              { id: "create_mo", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.createMo.label") }, icon: "settings", color: "blue" },
+              { id: "create_bom", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.createBom.label") }, icon: "file", color: "green" },
+              { id: "create_workcenter", get label() { return uiI18n.t("manufacturing.forms.newWorkcenter.title") }, icon: "trending", color: "purple" },
+              { id: "schedule_production", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.scheduleProduction.label") }, icon: "refresh", color: "teal" },
             ],
           },
         },
@@ -1893,14 +1893,14 @@ export const manufacturingDashboard: DashboardConfig = {
         {
           id: "mfg-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Active Orders", value: "—", icon: "Factory" },
-              { label: "On-Time Rate", value: "—", icon: "CheckCircle" },
-              { label: "OEE Efficiency", value: "—", icon: "Settings" },
-              { label: "Scrap Rate", value: "—", icon: "Trash2" },
+              { get label() { return uiI18n.t("manufacturing.dashboard.activeOrders") }, value: "—", icon: "Factory" },
+              { get label() { return uiI18n.t("manufacturing.dashboard.onTimeRate") }, value: "—", icon: "CheckCircle" },
+              { get label() { return uiI18n.t("manufacturing.dashboard.oeeEfficiency") }, value: "—", icon: "Settings" },
+              { get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgStatCards.label") }, value: "—", icon: "Trash2" },
             ],
           },
         },
@@ -1908,18 +1908,18 @@ export const manufacturingDashboard: DashboardConfig = {
     },
     {
       id: "mfg-output",
-      title: "Production Output",
+      get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgOutput.title") },
       widgets: [
         {
           id: "mfg-output-trend",
           type: "area-chart",
-          title: "Weekly Production Output",
+          get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgOutputTrend.title") },
           width: "2/3",
           data: {
             xAxisKey: "week",
             series: [
-              { name: "Planned", color: "#94a3b8" },
-              { name: "Actual", color: "#6366f1" },
+              { name: "Planned", get label() { return uiI18n.t("manufacturing.dashboard.series.planned") }, color: "#94a3b8" },
+              { name: "Actual", get label() { return uiI18n.t("manufacturing.dashboard.series.actual") }, color: "#6366f1" },
             ],
             values: [],
           },
@@ -1927,7 +1927,7 @@ export const manufacturingDashboard: DashboardConfig = {
         {
           id: "mfg-work-centers",
           type: "metrics",
-          title: "Work Center Utilization",
+          get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgWorkCenters.title") },
           width: "1/3",
           data: { metrics: [] },
         },
@@ -1935,21 +1935,21 @@ export const manufacturingDashboard: DashboardConfig = {
     },
     {
       id: "mfg-orders",
-      title: "Active Orders",
+      get title() { return uiI18n.t("manufacturing.dashboard.activeOrders") },
       widgets: [
         {
           id: "mfg-orders-table",
           type: "table",
-          title: "Production Orders",
+          get title() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.mfgOrdersTable.title") },
           width: "full",
           data: {
             columns: [
-              { key: "ref", label: "Order" },
-              { key: "product", label: "Product" },
-              { key: "qty", label: "Qty", align: "right" },
-              { key: "progress", label: "Progress", align: "right" },
-              { key: "due", label: "Due Date" },
-              { key: "status", label: "Status" },
+              { key: "ref", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.ref.label") } },
+              { key: "product", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.product.label") } },
+              { key: "qty", get label() { return uiI18n.t("manufacturing.manufacturingOrders.columns.productQty") }, align: "right" },
+              { key: "progress", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.progress.label") }, align: "right" },
+              { key: "due", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.due.label") } },
+              { key: "status", get label() { return uiI18n.t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingDashboard.status.label") } },
             ],
             rows: [],
           },
@@ -1961,33 +1961,33 @@ export const manufacturingDashboard: DashboardConfig = {
 
 export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "manufacturing",
-  title: "Manufacturing",
-  description: "Production orders, work center utilization, and quality metrics",
+  title: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.manufacturing.title"),
+  description: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.manufacturing.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: manufacturingDashboard.sections,
     },
     {
       id: "orders",
-      label: "Manufacturing Orders",
+      label: t("manufacturing.manufacturingOrders.title"),
       type: "entity",
       entityConfig: manufacturingOrdersTableConfig(t),
       createForm: newManufacturingOrderForm(t),
-      createLabel: "New Order",
+      createLabel: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.orders.createLabel"),
       createAction: "createManufacturingOrder",
       createPermission: { resource: "mrp_production", action: "create" },
     },
     {
       id: "boms",
-      label: "Bills of Materials",
+      label: t("manufacturing.billsOfMaterials.title"),
       type: "entity",
       entityConfig: bomsTableConfig(t),
       createForm: newBomForm(t),
-      createLabel: "New BOM",
+      createLabel: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.boms.createLabel"),
       createAction: "createBom",
     },
     {
@@ -1998,23 +1998,23 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "bom-byproducts",
-      label: "BOM Byproducts",
+      label: t("manufacturing.builtIn.manufacturingEntityConfigs.bomByproductsTableConfig.bomByproductsTable.title"),
       type: "entity",
       entityConfig: bomByproductsTableConfig(t),
     },
     {
       id: "workorders",
-      label: "Work Orders",
+      label: t("manufacturing.workOrders.title"),
       type: "entity",
       entityConfig: workordersTableConfig(t),
     },
     {
       id: "workcenters",
-      label: "Work Centers",
+      label: t("manufacturing.workCenters.title"),
       type: "entity",
       entityConfig: workcentersTableConfig(t),
       createForm: newWorkcenterForm(t),
-      createLabel: "New Work Center",
+      createLabel: t("manufacturing.forms.newWorkcenter.title"),
       createAction: "createWorkcenter",
     },
     {
@@ -2025,13 +2025,13 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "quality",
-      label: "Quality Checks",
+      label: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.quality.label"),
       type: "entity",
       entityConfig: qualityChecksTableConfig(t),
     },
     {
       id: "cost-settings",
-      label: "Costing & Valuation",
+      label: t("manufacturing.builtIn.moduleDashboardConfigs.manufacturingModuleConfig.costSettings.label"),
       type: "custom",
     },
   ],
@@ -2041,8 +2041,8 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const projectsDashboard: DashboardConfig = {
   id: "projects",
-  title: "Projects",
-  description: "Project portfolio, milestones, team utilization, and budget health",
+  get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projects.title") },
+  get description() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projects.description") },
   sections: [
     {
       id: "proj-quick-actions-section",
@@ -2050,15 +2050,15 @@ export const projectsDashboard: DashboardConfig = {
         {
           id: "proj-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_project", label: "New Project", icon: "file", color: "blue" },
-              { id: "create_task", label: "New Task", icon: "plus", color: "green" },
-              { id: "log_timesheet", label: "Log Time", icon: "refresh", color: "orange" },
-              { id: "start_timer", label: "Start Timer", icon: "trending", color: "teal" },
+              { id: "create_project", get label() { return uiI18n.t("projects.forms.newProject.title") }, icon: "file", color: "blue" },
+              { id: "create_task", get label() { return uiI18n.t("projects.forms.newTask.title") }, icon: "plus", color: "green" },
+              { id: "log_timesheet", get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.logTimesheet.label") }, icon: "refresh", color: "orange" },
+              { id: "start_timer", get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.startTimer.label") }, icon: "trending", color: "teal" },
             ],
           },
         },
@@ -2070,14 +2070,14 @@ export const projectsDashboard: DashboardConfig = {
         {
           id: "proj-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Active Projects", value: "—", icon: "FolderKanban" },
-              { label: "To validate", value: "—", icon: "CheckSquare" },
-              { label: "Unbilled hours", value: "—", icon: "AlertCircle" },
-              { label: "Hours logged", value: "—", icon: "Clock" },
+              { get label() { return uiI18n.t("projects.dashboard.activeProjects") }, value: "—", icon: "FolderKanban" },
+              { get label() { return uiI18n.t("projects.projectsClient.toValidate") }, value: "—", icon: "CheckSquare" },
+              { get label() { return uiI18n.t("projects.projectsClient.unbilledHours") }, value: "—", icon: "AlertCircle" },
+              { get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projStatCards.label") }, value: "—", icon: "Clock" },
             ],
           },
         },
@@ -2085,25 +2085,25 @@ export const projectsDashboard: DashboardConfig = {
     },
     {
       id: "proj-progress",
-      title: "Portfolio Health",
+      get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projProgress.title") },
       widgets: [
         {
           id: "proj-progress-bars",
           type: "metrics",
-          title: "Project Progress",
+          get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projProgressBars.title") },
           width: "1/2",
           data: { metrics: [] },
         },
         {
           id: "proj-budget-health",
           type: "bar-chart",
-          title: "Budget vs Spent",
+          get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projBudgetHealth.title") },
           width: "1/2",
           data: {
             categoryKey: "project",
             series: [
-              { name: "Budget", color: "#94a3b8" },
-              { name: "Spent", color: "#6366f1" },
+              { name: "Budget", get label() { return uiI18n.t("projects.dashboard.series.budget") }, color: "#94a3b8" },
+              { name: "Spent", get label() { return uiI18n.t("projects.dashboard.series.spent") }, color: "#6366f1" },
             ],
             values: [],
           },
@@ -2112,20 +2112,20 @@ export const projectsDashboard: DashboardConfig = {
     },
     {
       id: "proj-milestones",
-      title: "Upcoming Milestones",
+      get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projMilestones.title") },
       widgets: [
         {
           id: "proj-milestones-table",
           type: "table",
-          title: "Next 14 Days",
+          get title() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.projMilestonesTable.title") },
           width: "full",
           data: {
             columns: [
-              { key: "milestone", label: "Milestone" },
-              { key: "project", label: "Project" },
-              { key: "owner", label: "Owner" },
-              { key: "due", label: "Due" },
-              { key: "status", label: "Status" },
+              { key: "milestone", get label() { return uiI18n.t("projects.builtIn.projectsFormConfigs.newTaskForm.milestoneId.label") } },
+              { key: "project", get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.project.label") } },
+              { key: "owner", get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.owner.label") } },
+              { key: "due", get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.due.label") } },
+              { key: "status", get label() { return uiI18n.t("projects.builtIn.moduleDashboardConfigs.projectsDashboard.status.label") } },
             ],
             rows: [],
           },
@@ -2137,53 +2137,53 @@ export const projectsDashboard: DashboardConfig = {
 
 export const projectsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "projects",
-  title: "Projects",
-  description: "Project portfolio, milestones, team utilization, and budget health",
+  title: t("projects.builtIn.moduleDashboardConfigs.projectsModuleConfig.projects.title"),
+  description: t("projects.builtIn.moduleDashboardConfigs.projectsModuleConfig.projects.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("projects.builtIn.moduleDashboardConfigs.projectsModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: projectsDashboard.sections,
     },
     {
       id: "projects",
-      label: "Projects",
+      label: t("projects.builtIn.moduleDashboardConfigs.projectsModuleConfig.projects.label"),
       type: "entity",
       entityConfig: projectsTableConfig(t),
       createForm: newProjectForm(t),
-      createLabel: "New Project",
+      createLabel: t("projects.forms.newProject.title"),
       createAction: "createProject",
       createPermission: { resource: "project_project", action: "create" },
     },
     {
       id: "tasks",
-      label: "Tasks",
+      label: t("projects.builtIn.moduleDashboardConfigs.projectsModuleConfig.tasks.label"),
       type: "entity",
       entityConfig: tasksTableConfig(t),
       createForm: newTaskForm(t),
-      createLabel: "New Task",
+      createLabel: t("projects.forms.newTask.title"),
       createAction: "createTask",
     },
     {
       id: "timesheets",
-      label: "Timesheets",
+      label: t("projects.timesheets.title"),
       type: "entity",
       entityConfig: timesheetsTableConfig(t),
     },
     {
       id: "rate-cards",
-      label: "Rate cards",
+      label: t("projects.builtIn.projectsEntityConfigs.rateCardsTableConfig.rateCardsTable.title"),
       type: "entity",
       entityConfig: rateCardsTableConfig(t),
       createForm: newProjectRateCardForm(t),
-      createLabel: "New rate card",
+      createLabel: t("projects.builtIn.projectsFormConfigs.newProjectRateCardForm.newProjectRateCard.title"),
       createAction: "createRateCard",
     },
     {
       id: "resources",
-      label: "Resources",
+      label: t("projects.builtIn.moduleDashboardConfigs.projectsModuleConfig.resources.label"),
       type: "entity",
       entityConfig: employeesTableConfig(t),
     },
@@ -2196,8 +2196,8 @@ export const projectsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const iotDashboard: DashboardConfig = {
   id: "iot",
-  title: "IoT",
-  description: "Connected devices, sensor streams, alerts, and hub status",
+  get title() { return uiI18n.t("iot.title") },
+  get description() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iot.description") },
   sections: [
     {
       id: "iot-quick-actions-section",
@@ -2205,20 +2205,20 @@ export const iotDashboard: DashboardConfig = {
         {
           id: "iot-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotQuickActions.title") },
           width: "full",
           data: {
             columns: 3,
             actions: [
               {
                 id: "generate_pairing_token",
-                label: "Generate pairing token",
+                get label() { return uiI18n.t("iot.hubs.generatePairing") },
                 icon: "refresh",
                 color: "blue",
               },
-              { id: "register_hub", label: "Register hub", icon: "plus", color: "green" },
-              { id: "register_device", label: "Register device", icon: "package", color: "purple" },
-              { id: "sync_devices_dev", label: "Sync devices", icon: "template", color: "teal" },
+              { id: "register_hub", get label() { return uiI18n.t("iot.forms.newHub.title") }, icon: "plus", color: "green" },
+              { id: "register_device", get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.registerDevice.label") }, icon: "package", color: "purple" },
+              { id: "sync_devices_dev", get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.syncDevicesDev.label") }, icon: "template", color: "teal" },
             ],
           },
         },
@@ -2230,14 +2230,14 @@ export const iotDashboard: DashboardConfig = {
         {
           id: "iot-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Total Devices", value: "0", icon: "Cpu" },
-              { label: "Hubs", value: "0", icon: "Wifi" },
-              { label: "Pending actions", value: "0", icon: "Bell" },
-              { label: "Pairing tokens (unused)", value: "0", icon: "Activity" },
+              { get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotStatCards.label") }, value: "0", icon: "Cpu" },
+              { get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotStatCards.labelhubs") }, value: "0", icon: "Wifi" },
+              { get label() { return uiI18n.t("iot.dashboard.stats.pendingActions") }, value: "0", icon: "Bell" },
+              { get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotStatCards.labelpairingTokensUnused") }, value: "0", icon: "Activity" },
             ],
           },
         },
@@ -2245,18 +2245,18 @@ export const iotDashboard: DashboardConfig = {
     },
     {
       id: "iot-activity",
-      title: "Activity",
+      get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotActivity.title") },
       widgets: [
         {
           id: "iot-events-trend",
           type: "area-chart",
-          title: "Events (Last 24h)",
+          get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotEventsTrend.title") },
           width: "2/3",
           data: {
             xAxisKey: "time",
             series: [
-              { name: "Events", color: "#6366f1" },
-              { name: "Alerts", color: "#ef4444" },
+              { name: "Events", get label() { return uiI18n.t("iot.dashboard.series.events") }, color: "#6366f1" },
+              { name: "Alerts", get label() { return uiI18n.t("iot.dashboard.series.alerts") }, color: "#ef4444" },
             ],
             values: [],
           },
@@ -2264,7 +2264,7 @@ export const iotDashboard: DashboardConfig = {
         {
           id: "iot-hub-status",
           type: "metrics",
-          title: "Hub Connectivity",
+          get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotHubStatus.title") },
           width: "1/3",
           data: { metrics: [] },
         },
@@ -2272,21 +2272,21 @@ export const iotDashboard: DashboardConfig = {
     },
     {
       id: "iot-alerts",
-      title: "Active Alerts",
+      get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotAlerts.title") },
       widgets: [
         {
           id: "iot-alerts-table",
           type: "table",
-          title: "Recent Alerts",
+          get title() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.iotAlertsTable.title") },
           width: "full",
           data: {
             columns: [
-              { key: "device", label: "Device" },
-              { key: "hub", label: "Hub" },
-              { key: "type", label: "Type" },
-              { key: "message", label: "Message" },
-              { key: "time", label: "Time" },
-              { key: "severity", label: "Severity" },
+              { key: "device", get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.device.label") } },
+              { key: "hub", get label() { return uiI18n.t("iot.entities.devices.hub") } },
+              { key: "type", get label() { return uiI18n.t("iot.table.type") } },
+              { key: "message", get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.message.label") } },
+              { key: "time", get label() { return uiI18n.t("iot.builtIn.moduleDashboardConfigs.iotDashboard.time.label") } },
+              { key: "severity", get label() { return uiI18n.t("iot.builtIn.iotEntityConfigs.iotAlertsTableConfig.severity.label") } },
             ],
             rows: [],
           },
@@ -2340,7 +2340,7 @@ export const iotModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "iot-alerts",
-      label: "Alerts",
+      label: t("iot.builtIn.moduleDashboardConfigs.iotModuleConfig.iotAlerts.label"),
       type: "entity",
       entityConfig: iotAlertsTableConfig(t),
     },
@@ -2352,7 +2352,7 @@ export const iotModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "iot-thresholds",
-      label: "Thresholds",
+      label: t("iot.builtIn.moduleDashboardConfigs.iotModuleConfig.iotThresholds.label"),
       type: "entity",
       entityConfig: iotThresholdsTableConfig(t),
     },
@@ -3129,13 +3129,13 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "helpdesk",
-  title: "Helpdesk",
-  description: "Customer support tickets and SLA management",
+  title: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.helpdesk.title"),
+  description: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.helpdesk.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -3144,12 +3144,12 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "hd-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.hdQuickActions.title"),
               width: "full",
               data: {
                 columns: undefined,
                 actions: [
-                  { id: "new_ticket", label: "New Ticket", icon: "plus", color: "red" },
+                  { id: "new_ticket", label: t("helpdesk.forms.newTicket.title"), icon: "plus", color: "red" },
                   { id: "import_tickets_csv", label: t("helpdesk.actions.importTicketsCsv"), icon: "upload", color: "teal" },
                 ],
               },
@@ -3162,14 +3162,14 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "hd-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.hdStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Open Tickets", value: "0", icon: "HelpCircle" },
-                  { label: "Solved Today", value: "0", icon: "CheckCircle" },
-                  { label: "SLA Breached", value: "0", icon: "AlertTriangle" },
-                  { label: "Urgent", value: "0", icon: "Zap" },
+                  { label: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.hdStatCards.label"), value: "0", icon: "HelpCircle" },
+                  { label: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.hdStatCards.labelsolvedToday"), value: "0", icon: "CheckCircle" },
+                  { label: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.hdStatCards.labelsLABreached"), value: "0", icon: "AlertTriangle" },
+                  { label: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.hdStatCards.labelurgent"), value: "0", icon: "Zap" },
                 ],
               },
             },
@@ -3179,11 +3179,11 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "tickets",
-      label: "Tickets",
+      label: t("helpdesk.builtIn.moduleDashboardConfigs.helpdeskModuleConfig.tickets.label"),
       type: "entity",
       entityConfig: helpdeskTicketsTableConfig(t),
       createForm: newHelpdeskTicketForm(t),
-      createLabel: "New Ticket",
+      createLabel: t("helpdesk.forms.newTicket.title"),
       createAction: "createTicket",
       createPermission: { resource: "helpdesk_ticket", action: "create" },
     },
@@ -3221,13 +3221,13 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "workflows",
-  title: "Workflows",
-  description: "Automated business processes and workflow orchestration",
+  title: t("workflows.workflows.title"),
+  description: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.workflows.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -3236,13 +3236,13 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "wf-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.wfQuickActions.title"),
               width: "full",
               data: {
                 columns: undefined,
                 actions: [
-                  { id: "new_workflow", label: "New Workflow", icon: "plus", color: "purple" },
-                  { id: "import_workflow_csv", label: "Import CSV", icon: "upload", color: "teal" },
+                  { id: "new_workflow", label: t("workflows.forms.newWorkflow.title"), icon: "plus", color: "purple" },
+                  { id: "import_workflow_csv", label: t("workflows.rowDialog.importCsv"), icon: "upload", color: "teal" },
                 ],
               },
             },
@@ -3254,14 +3254,14 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "wf-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.wfStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Active Workflows", value: "0", icon: "GitBranch" },
-                  { label: "Running Instances", value: "0", icon: "Play" },
-                  { label: "Completed", value: "0", icon: "CheckCircle" },
-                  { label: "Cancelled", value: "0", icon: "XCircle" },
+                  { label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.wfStatCards.label"), value: "0", icon: "GitBranch" },
+                  { label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.wfStatCards.labelrunningInstances"), value: "0", icon: "Play" },
+                  { label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.wfStatCards.labelcompleted"), value: "0", icon: "CheckCircle" },
+                  { label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.wfStatCards.labelcancelled"), value: "0", icon: "XCircle" },
                 ],
               },
             },
@@ -3271,49 +3271,49 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "workflows",
-      label: "Workflows",
+      label: t("workflows.workflows.title"),
       type: "entity",
       entityConfig: workflowsTableConfig(t),
       createForm: newWorkflowForm(t),
-      createLabel: "New Workflow",
+      createLabel: t("workflows.forms.newWorkflow.title"),
       createAction: "createWorkflow",
     },
     {
       id: "versions",
-      label: "Versions",
+      label: t("workflows.versions.title"),
       type: "entity",
       entityConfig: workflowVersionsTableConfig(t),
     },
     {
       id: "instances",
-      label: "Instances",
+      label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.instances.label"),
       type: "entity",
       entityConfig: workflowInstancesTableConfig(t),
     },
     {
       id: "operations",
-      label: "Operations",
+      label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.operations.label"),
       type: "entity",
       entityConfig: workflowTimersLateTableConfig(t),
     },
     {
       id: "deadLetters",
-      label: "Dead letters",
+      label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.deadLetters.label"),
       type: "entity",
       entityConfig: workflowOutboxDeadTableConfig(t),
     },
     {
       id: "migrations",
-      label: "Migrations",
+      label: t("workflows.builtIn.moduleDashboardConfigs.workflowsModuleConfig.migrations.label"),
       type: "entity",
       entityConfig: workflowMigrationPlansTableConfig(t),
       createForm: newWorkflowMigrationPlanForm(t),
-      createLabel: "New migration plan",
+      createLabel: t("workflows.forms.migrationPlan.title"),
       createAction: "createMigrationPlan",
     },
     {
       id: "migrationResults",
-      label: "Migration results",
+      label: t("workflows.migration.resultsTitle"),
       type: "entity",
       entityConfig: workflowMigrationResultsTableConfig(t),
     },
@@ -3410,13 +3410,13 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "proposals",
-  title: "Proposals",
-  description: "Business proposals, tenders, and RFP responses — AI-powered drafting and analysis",
+  title: t("proposals.proposals.title"),
+  description: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.proposals.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -3425,14 +3425,14 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "proposals-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.proposalsQuickActions.title"),
               width: "full",
               data: {
                 columns: 3,
                 actions: [
-                  { id: "new_proposal", label: "New Proposal", icon: "plus", color: "blue" },
-                  { id: "use_template", label: "Use Template", icon: "file", color: "green" },
-                  { id: "review_pending", label: "Review Pending", icon: "eye", color: "purple" },
+                  { id: "new_proposal", label: t("proposals.forms.newProposal.title"), icon: "plus", color: "blue" },
+                  { id: "use_template", label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.useTemplate.label"), icon: "file", color: "green" },
+                  { id: "review_pending", label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.reviewPending.label"), icon: "eye", color: "purple" },
                 ],
               },
             },
@@ -3444,14 +3444,14 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "proposals-stat-cards",
               type: "stat-cards",
-              title: "Overview",
+              title: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.proposalsStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Active Proposals", value: "0", icon: "ClipboardList" },
-                  { label: "Submitted", value: "0", icon: "Send" },
-                  { label: "Awarded", value: "0", icon: "Award" },
-                  { label: "Pipeline Value", value: "$0", icon: "TrendingUp" },
+                  { label: t("proposals.proposalsClient.activeProposals"), value: "0", icon: "ClipboardList" },
+                  { label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.proposalsStatCards.label"), value: "0", icon: "Send" },
+                  { label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.proposalsStatCards.labelawarded"), value: "0", icon: "Award" },
+                  { label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.proposalsStatCards.labelpipelineValue"), value: "$0", icon: "TrendingUp" },
                 ],
               },
             },
@@ -3461,18 +3461,18 @@ export const proposalsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "proposals",
-      label: "Proposals",
+      label: t("proposals.proposals.title"),
       type: "entity",
       entityConfig: proposalsTableConfig(t, {
         formatProposalDisplayName: proposalPrimaryLabel,
       }),
       createForm: newProposalForm(t),
-      createLabel: "New Proposal",
+      createLabel: t("proposals.forms.newProposal.title"),
       createAction: "createProposal",
     },
     {
       id: "templates",
-      label: "Templates",
+      label: t("proposals.builtIn.moduleDashboardConfigs.proposalsModuleConfig.templates.label"),
       type: "entity",
       entityConfig: proposalTemplatesTableConfig(t),
     },

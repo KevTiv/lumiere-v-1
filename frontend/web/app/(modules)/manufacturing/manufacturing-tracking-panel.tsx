@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -33,6 +35,7 @@ const valueOf = (row: TrackingRow, camel: string, snake: string) => row[camel] ?
 export function ManufacturingTrackingPanel({ order, organizationId, companyId }: {
   order: TrackingRow; organizationId: bigint; companyId: bigint
 }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [selections, setSelections] = useState<Record<string, TrackingSelection>>({})
@@ -48,8 +51,8 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
   const [links, setLinks] = useState<ManufacturingResultLink[]>([])
   const state = trackingState(order)
   const mode = state === "toclose" ? "close" : state === "done" ? "output" : "material"
-  const title = mode === "close" ? "Close with lot or serial attribution"
-    : mode === "output" ? "Scrap tracked output" : "Record material wastage"
+  const title = mode === "close" ? t("manufacturing.manufacturingTrackingPanel.closeWithLotOrSerialAttribution")
+    : mode === "output" ? t("manufacturing.manufacturingTrackingPanel.scrapTrackedOutput") : t("manufacturing.manufacturingTrackingPanel.recordMaterialWastage")
   const queryKey = ["manufacturing-tracking-refs", organizationId.toString(), companyId.toString(), trackingId(order.id)]
   const references = useQuery({ queryKey, enabled: open, queryFn: async (): Promise<ManufacturingTrackingSnapshot> => {
     const api = getLumiereApiClientOrThrow()
@@ -78,7 +81,8 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
     const lot = snapshot.lots.find((lot) => trackingId(lot.id) === trackingId(valueOf(row, "lotId", "lot_id")))
     const serial = snapshot.serials.find((serial) => trackingId(serial.id) === trackingId(valueOf(row, "serialId", "serial_id")))
     const qty = mode === "output" ? valueOf(row, "quantityDone", "quantity_done") : valueOf(row, "availableQuantity", "available_quantity")
-    return [product ? labelOf(product) : "Product unavailable", serial ? labelOf(serial) : lot ? labelOf(lot) : "Untracked", `${qty} units`].join(" · ")
+    const numericQuantity = typeof qty === "number" ? qty : typeof qty === "string" || typeof qty === "bigint" ? Number(qty) : NaN
+    return [product ? labelOf(product) : t("manufacturing.manufacturingTrackingPanel.productUnavailable"), serial ? labelOf(serial) : lot ? labelOf(lot) : t("manufacturing.manufacturingTrackingPanel.untracked"), t("manufacturing.manufacturingTrackingPanel.unitCount", { count: Number.isFinite(numericQuantity) ? numericQuantity : 2, quantity: String(qty) })].join(" · ")
   }
   const submit = async () => {
     if (inFlight.current || pendingUnknown || !references.data) return
@@ -88,8 +92,8 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
       const api = getLumiereApiClientOrThrow()
       const snapshot = references.data
       const readOrdersAndMoves = async () => Promise.all([
-        api.fetchQueryList("/api/query/mrp-productions", "Unable to read completed order"),
-        api.fetchQueryList("/api/query/stock-moves", "Unable to read completed stock effects"),
+        api.fetchQueryList("/api/query/mrp-productions", t("manufacturing.errors.unableToReadCompletedOrder")),
+        api.fetchQueryList("/api/query/stock-moves", t("manufacturing.errors.unableToReadCompletedStockEffects")),
       ])
       const refresh = async () => {
         invalidateResourceQueries(qc, organizationId, ["mrp-productions", "stock-moves", "stock-quants", "stock-production-serials", "mrp-production-costs", "account-moves"])
@@ -105,7 +109,7 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
         const result = requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
           dispatch: async () => {
             const request = stdbBffCommandPost("finish_manufacturing_order_with_tracking", input)
-            return decodeOperationDispatch(await api.apiFetch(request.urlPath, request.init), "Unable to close attributed output")
+            return decodeOperationDispatch(await api.apiFetch(request.urlPath, request.init), t("manufacturing.errors.unableToCloseAttributedOutput"))
           },
           resolveEffect, afterDispatch: refresh, readbackAttempts: 6,
         }))
@@ -118,14 +122,14 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
         const input = buildManufacturingScrapIntent(mode, order, snapshot, organizationId, companyId,
           sourceId, locationId, Number(quantity), key)
         const resolveEffect = async () => resolveTrackingScrapEffect(mode, order, organizationId, companyId, input,
-          await api.fetchQueryList("/api/query/stock-moves", "Unable to read completed scrap"))
+          await api.fetchQueryList("/api/query/stock-moves", t("manufacturing.errors.unableToReadCompletedScrap")))
         pendingReadback.current = resolveEffect
         const result = requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
           dispatch: async () => {
             const request = "outputMoveId" in input
               ? stdbBffCommandPost("scrap_tracked_manufacturing_output", input)
               : stdbBffCommandPost("scrap_manufacturing_material", input)
-            return decodeOperationDispatch(await api.apiFetch(request.urlPath, request.init), "Unable to record manufacturing waste")
+            return decodeOperationDispatch(await api.apiFetch(request.urlPath, request.init), t("manufacturing.errors.unableToRecordManufacturingWaste"))
           }, resolveEffect,
           afterDispatch: refresh, readbackAttempts: 6,
         }))
@@ -144,7 +148,7 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
     inFlight.current = true; setBusy(true)
     try {
       const ref = await pendingReadback.current()
-      if (!ref) { setError("The previous action has not appeared in the canonical records yet. Check again after refresh."); return }
+      if (!ref) { setError(t("manufacturing.manufacturingTrackingPanel.thePreviousActionHasNotAppearedInTheCanonicalRecordsYet")); return }
       setLinks(manufacturingResultLinks(ref)); setPendingUnknown(false); setError(null)
       setRequestId(""); setQuantity(""); pendingReadback.current = null
       invalidateResourceQueries(qc, organizationId, ["mrp-productions", "stock-moves", "stock-quants", "stock-production-serials"])
@@ -156,46 +160,46 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
     <Button variant="outline" size="sm" onClick={() => setOpen(!open)} aria-expanded={open}>{title}</Button>
     <ManufacturingActionResult links={links} onDismiss={() => setLinks([])} />
     {open ? <div className="mt-3 space-y-3">
-      {mode === "material" ? <p className="text-sm text-muted-foreground">Dispose of additional unconsumed BOM material. This leaves the original BOM consumption requirement unchanged.</p> : null}
-      {references.isLoading ? <p role="status">Loading company references…</p> : null}
+      {mode === "material" ? <p className="text-sm text-muted-foreground">{t("manufacturing.manufacturingTrackingPanel.disposeOfAdditionalUnconsumedBOMMaterialThisLeavesTheOriginalBOM")}</p> : null}
+      {references.isLoading ? <p role="status">{t("manufacturing.manufacturingTrackingPanel.loadingCompanyReferences")}</p> : null}
       {references.error || choices?.error ? <p role="alert">{references.error?.message ?? choices?.error}</p> : null}
       {mode === "close" ? choices?.requirements.map((requirement) => <label className="block space-y-1 text-sm" key={requirement.key}>
-        <span>{labelOf(requirement.product)} · {requirement.quantity} units · {requirement.tracking}</span>
+        <span>{labelOf(requirement.product)} · {requirement.quantity} {" "}{t("manufacturing.manufacturingTrackingPanel.units")}{" "}{requirement.tracking}</span>
         <Select disabled={busy} value={(requirement.tracking === "serial" ? selections[requirement.key]?.serialId : selections[requirement.key]?.lotId) ?? ""} onValueChange={(value) => setSelections({ ...selections, [requirement.key]: requirement.tracking === "serial"
             ? { serialId: value } : { lotId: value } })}>
           <SelectTrigger aria-label={`${labelOf(requirement.product)} ${requirement.tracking}`}>
-            <SelectValue placeholder={<>Select {requirement.tracking}</>} />
+            <SelectValue placeholder={<>{t("settings.formConfig.fieldDialog.fieldTypes.Select")}{" "}{requirement.tracking}</>} />
           </SelectTrigger>
           <SelectContent>
             {outputIdentityOptions(requirement, references.data!, organizationId, companyId).map((identity) => <SelectItem key={trackingId(identity.id)} value={trackingId(identity.id)}>{labelOf(identity)}</SelectItem>)}
           </SelectContent>
         </Select>
       </label>) : <>
-        <label className="block space-y-1 text-sm"><span>{mode === "output" ? "Exact completed output" : "Available BOM material stock"}</span>
+        <label className="block space-y-1 text-sm"><span>{mode === "output" ? t("manufacturing.manufacturingTrackingPanel.exactCompletedOutput") : t("manufacturing.manufacturingTrackingPanel.availableBOMMaterialStock")}</span>
           <Select value={sourceId} onValueChange={setSourceId} disabled={busy}>
             <SelectTrigger>
-              <SelectValue placeholder="Select stock" />
+              <SelectValue placeholder={t("manufacturing.manufacturingTrackingPanel.selectStock")} />
             </SelectTrigger>
             <SelectContent>
               {choices?.sources.map((row) => <SelectItem key={trackingId(row.id)} value={trackingId(row.id)}>{sourceLabel(row)}</SelectItem>)}
             </SelectContent>
           </Select></label>
-        <label className="block space-y-1 text-sm"><span>Scrap location</span><Select value={locationId} onValueChange={setLocationId} disabled={busy}>
+        <label className="block space-y-1 text-sm"><span>{t("manufacturing.rowActions.form.scrapLocation")}</span><Select value={locationId} onValueChange={setLocationId} disabled={busy}>
           <SelectTrigger>
-            <SelectValue placeholder="Select scrap location" />
+            <SelectValue placeholder={t("manufacturing.manufacturingTrackingPanel.selectScrapLocation")} />
           </SelectTrigger>
           <SelectContent>
             {choices?.locations.map((row) => <SelectItem key={trackingId(row.id)} value={trackingId(row.id)}>{labelOf(row)}</SelectItem>)}
           </SelectContent>
         </Select></label>
-        <label className="block space-y-1 text-sm"><span>Quantity</span><input className={inputClass} type="number" min="0" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={busy} /></label>
+        <label className="block space-y-1 text-sm"><span>{t("manufacturing.billsOfMaterials.columns.productQty")}</span><input className={inputClass} type="number" min="0" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={busy} /></label>
       </>}
-      {mode === "close" && choices && !choices.error && choices.requirements.length === 0 ? <p className="text-sm">This order has no tracked outputs. Use the standard finish action.</p> : null}
+      {mode === "close" && choices && !choices.error && choices.requirements.length === 0 ? <p className="text-sm">{t("manufacturing.manufacturingTrackingPanel.thisOrderHasNoTrackedOutputsUseTheStandardFinishAction")}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
-      {pendingUnknown ? <Button variant="outline" disabled={busy} onClick={() => void checkPreviousAction()}>Check previous action</Button> : null}
+      {pendingUnknown ? <Button variant="outline" disabled={busy} onClick={() => void checkPreviousAction()}>{t("accounting.createInvoiceModal.checkPreviousAction")}</Button> : null}
       <Button disabled={busy || pendingUnknown || !choices || !!choices.error || !!references.error
         || (mode === "close" ? choices.requirements.length === 0 : !sourceId || !locationId || !quantity)} onClick={() => void submit()}>
-        {busy ? "Saving…" : title}
+        {busy ? t("common.saving") : title}
       </Button>
     </div> : null}
   </section>

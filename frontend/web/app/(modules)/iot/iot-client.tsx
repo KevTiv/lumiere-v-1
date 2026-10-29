@@ -6,7 +6,7 @@ import {
 
 import { useEffect, useMemo, useState } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
-import { useTranslation } from '@lumiere/i18n';
+import { i18n, useTranslation } from '@lumiere/i18n';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import {
   ModuleView,
@@ -124,8 +124,8 @@ type IotModalState =
 
 const createActionForm: FormConfig = {
   id: 'iot-create-action',
-  title: 'Create IoT Action',
-  submitLabel: 'Create action',
+  get title() { return i18n.t("iot.iotClient.createIoTAction") },
+  get submitLabel() { return i18n.t("iot.iotClient.createAction") },
   sections: [
     {
       id: 'action',
@@ -134,7 +134,7 @@ const createActionForm: FormConfig = {
           id: 'action-type',
           type: 'text',
           name: 'action_type',
-          label: 'Action type',
+          get label() { return i18n.t("settings.builtIn.settingsClient.settingsActionForms.action.label") },
           required: true,
           width: '1/2',
         },
@@ -142,7 +142,7 @@ const createActionForm: FormConfig = {
           id: 'triggered-by',
           type: 'text',
           name: 'triggered_by',
-          label: 'Triggered by',
+          get label() { return i18n.t("iot.iotClient.triggeredBy") },
           defaultValue: 'web',
           width: '1/2',
         },
@@ -150,7 +150,7 @@ const createActionForm: FormConfig = {
           id: 'payload',
           type: 'textarea',
           name: 'payload',
-          label: 'Payload JSON/string',
+          get label() { return i18n.t("iot.iotClient.payloadJSONString") },
           required: true,
           rows: 4,
           width: 'full',
@@ -162,8 +162,8 @@ const createActionForm: FormConfig = {
 
 const failActionForm: FormConfig = {
   id: 'iot-fail-action',
-  title: 'Fail IoT Action',
-  submitLabel: 'Mark failed',
+  get title() { return i18n.t("iot.iotClient.failIoTAction") },
+  get submitLabel() { return i18n.t("iot.iotClient.markFailed") },
   sections: [
     {
       id: 'failure',
@@ -172,7 +172,7 @@ const failActionForm: FormConfig = {
           id: 'reason',
           type: 'textarea',
           name: 'reason',
-          label: 'Reason',
+          get label() { return i18n.t("accounting.forms.reverseOperationalPayment.reason") },
           rows: 3,
           width: 'full',
         },
@@ -183,8 +183,8 @@ const failActionForm: FormConfig = {
 
 const createAlertForm: FormConfig = {
   id: 'iot-create-alert',
-  title: 'Create IoT Alert',
-  submitLabel: 'Create alert',
+  get title() { return i18n.t("iot.iotClient.createIoTAlert") },
+  get submitLabel() { return i18n.t("iot.iotClient.createAlert") },
   sections: [
     {
       id: 'alert',
@@ -193,7 +193,7 @@ const createAlertForm: FormConfig = {
           id: 'type',
           type: 'text',
           name: 'alert_type',
-          label: 'Alert type',
+          get label() { return i18n.t("iot.iotClient.alertType") },
           required: true,
           width: '1/2',
         },
@@ -201,7 +201,7 @@ const createAlertForm: FormConfig = {
           id: 'severity',
           type: 'text',
           name: 'severity',
-          label: 'Severity',
+          get label() { return i18n.t("documents.insights.columns.severity") },
           defaultValue: 'warning',
           width: '1/2',
         },
@@ -209,7 +209,7 @@ const createAlertForm: FormConfig = {
           id: 'message',
           type: 'textarea',
           name: 'message',
-          label: 'Message',
+          get label() { return i18n.t("common.importAssistant.message") },
           required: true,
           rows: 3,
           width: 'full',
@@ -221,8 +221,8 @@ const createAlertForm: FormConfig = {
 
 const setThresholdForm: FormConfig = {
   id: 'iot-set-threshold',
-  title: 'Set IoT Threshold',
-  submitLabel: 'Save threshold',
+  get title() { return i18n.t("iot.iotClient.setIoTThreshold") },
+  get submitLabel() { return i18n.t("iot.iotClient.saveThreshold") },
   sections: [
     {
       id: 'threshold',
@@ -231,7 +231,7 @@ const setThresholdForm: FormConfig = {
           id: 'sensor',
           type: 'text',
           name: 'sensor_type',
-          label: 'Sensor type',
+          get label() { return i18n.t("iot.forms.deviceRow.sensorType") },
           required: true,
           width: '1/2',
         },
@@ -239,7 +239,7 @@ const setThresholdForm: FormConfig = {
           id: 'severity',
           type: 'text',
           name: 'severity',
-          label: 'Severity',
+          get label() { return i18n.t("documents.insights.columns.severity") },
           defaultValue: 'warning',
           width: '1/2',
         },
@@ -247,14 +247,14 @@ const setThresholdForm: FormConfig = {
           id: 'min',
           type: 'number',
           name: 'min_value',
-          label: 'Min value',
+          get label() { return i18n.t("iot.iotClient.minValue") },
           width: '1/2',
         },
         {
           id: 'max',
           type: 'number',
           name: 'max_value',
-          label: 'Max value',
+          get label() { return i18n.t("iot.iotClient.maxValue") },
           width: '1/2',
         },
       ],
@@ -264,10 +264,9 @@ const setThresholdForm: FormConfig = {
 
 const telemetryBatchForm: FormConfig = {
   id: 'iot-record-telemetry-batch',
-  title: 'Record Telemetry Batch',
-  description:
-    'Provide an array of telemetry readings with sensor_type, value, unit, and quality.',
-  submitLabel: 'Record batch',
+  get title() { return i18n.t("iot.iotClient.recordTelemetryBatch") },
+  get description() { return i18n.t("iot.iotClient.provideAnArrayOfTelemetryReadingsWithSensorTypeValueUnit") },
+  get submitLabel() { return i18n.t("iot.iotClient.recordBatch") },
   sections: [
     {
       id: 'readings',
@@ -276,7 +275,7 @@ const telemetryBatchForm: FormConfig = {
           id: 'readings-json',
           type: 'textarea',
           name: 'readingsJson',
-          label: 'Readings JSON',
+          get label() { return i18n.t("iot.iotClient.readingsJSON") },
           required: true,
           rows: 8,
           width: 'full',
@@ -299,14 +298,14 @@ function selectedIds(
 
 function parseTelemetryReadings(value: unknown) {
   const parsed = JSON.parse(String(value ?? '')) as unknown;
-  if (!Array.isArray(parsed)) throw new Error('Readings JSON must be an array');
+  if (!Array.isArray(parsed)) throw new Error(i18n.t("iot.iotClient.readingsJSONMustBeAnArray"));
   return parsed.map((entry) => {
     if (!entry || typeof entry !== 'object')
-      throw new Error('Each reading must be an object');
+      throw new Error(i18n.t("iot.iotClient.eachReadingMustBeAnObject"));
     const row = entry as Record<string, unknown>;
     const value = Number(row.value);
     if (!Number.isFinite(value))
-      throw new Error('Each reading needs a numeric value');
+      throw new Error(i18n.t("iot.iotClient.eachReadingNeedsANumericValue"));
     return {
       sensor_type: String(row.sensor_type ?? row.sensorType ?? ''),
       value,
@@ -633,7 +632,7 @@ function IotClientLoaded({
                 },
                 {
                   id: 'ack-action',
-                  label: 'Acknowledge',
+                  label: t("documents.insights.actions.acknowledge"),
                   requiresSelection: true,
                   isApplicable: (rows) =>
                     rows.every((row) => str(row.status) === 'Sent'),
@@ -649,7 +648,7 @@ function IotClientLoaded({
                       () =>
                         setBanner({
                           kind: 'ok',
-                          text: 'IoT action acknowledged',
+                          text: t("iot.iotClient.ioTActionAcknowledged"),
                         }),
                       (e) =>
                         setToolbarError(
@@ -660,7 +659,7 @@ function IotClientLoaded({
                 },
                 {
                   id: 'retry-action',
-                  label: 'Retry',
+                  label: t("common.retry"),
                   requiresSelection: true,
                   selection: 'multiple',
                   isApplicable: (rows) =>
@@ -675,7 +674,7 @@ function IotClientLoaded({
                       () =>
                         setBanner({
                           kind: 'ok',
-                          text: 'IoT action retry queued',
+                          text: t("iot.iotClient.ioTActionRetryQueued"),
                         }),
                       (e) =>
                         setToolbarError(
@@ -686,7 +685,7 @@ function IotClientLoaded({
                 },
                 {
                   id: 'fail-action',
-                  label: 'Fail',
+                  label: t("inventory.qualityChecks.filters.qualityState.options.fail"),
                   requiresSelection: true,
                   selection: 'multiple',
                   variant: 'destructive',
@@ -708,7 +707,7 @@ function IotClientLoaded({
               entityConfig: withTableToolbar(tab.entityConfig, [
                 {
                   id: 'resolve-alert',
-                  label: 'Resolve',
+                  label: t("inventory.forms.solveQualityAlert.submitLabel"),
                   requiresSelection: true,
                   selection: 'multiple',
                   isApplicable: (rows) =>
@@ -721,7 +720,7 @@ function IotClientLoaded({
                       ),
                     ).then(
                       () =>
-                        setBanner({ kind: 'ok', text: 'IoT alert resolved' }),
+                        setBanner({ kind: 'ok', text: t("iot.iotClient.ioTAlertResolved") }),
                       (e) =>
                         setToolbarError(
                           e instanceof Error ? e.message : String(e),
@@ -793,7 +792,7 @@ function IotClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!actionUsable(action)) throw new Error('Required data is unavailable. Refresh and try again.');
+    if (!actionUsable(action)) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"));
     if (action === 'registerIotHub') {
       await registerHub.mutateAsync({
         name: String(formData.name ?? ''),
@@ -824,7 +823,7 @@ function IotClientLoaded({
   };
 
   const handleDeviceRowSubmit = async (formData: Record<string, unknown>) => {
-    if (!devicesUsable) throw new Error('Required data is unavailable. Refresh and try again.');
+    if (!devicesUsable) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"));
     setRowSubmitError(null);
     const deviceId = Number(formData.device_id);
     const op = String(formData.operation ?? '');
@@ -873,11 +872,11 @@ function IotClientLoaded({
 
   const handleIotModalSubmit = async (formData: Record<string, unknown>) => {
     if (iotModal.type === null) return;
-    if (!iotModalUsable) throw new Error('Required data is unavailable. Refresh and try again.');
+    if (!iotModalUsable) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"));
     setIotModalError(null);
     try {
       const ids = selectedIds(iotModal.rows);
-      if (ids.length === 0) throw new Error('Select at least one row');
+      if (ids.length === 0) throw new Error(t("iot.iotClient.selectAtLeastOneRow"));
       if (iotModal.type === 'createAction') {
         await Promise.all(
           ids.map((deviceId) =>
@@ -889,7 +888,7 @@ function IotClientLoaded({
             }),
           ),
         );
-        setBanner({ kind: 'ok', text: 'IoT action created' });
+        setBanner({ kind: 'ok', text: t("iot.iotClient.ioTActionCreated") });
       } else if (iotModal.type === 'failAction') {
         await Promise.all(
           ids.map((actionId) =>
@@ -899,7 +898,7 @@ function IotClientLoaded({
             }),
           ),
         );
-        setBanner({ kind: 'ok', text: 'IoT action failed' });
+        setBanner({ kind: 'ok', text: t("iot.iotClient.ioTActionFailed") });
       } else if (iotModal.type === 'createAlert') {
         await Promise.all(
           ids.map((deviceId) =>
@@ -911,7 +910,7 @@ function IotClientLoaded({
             }),
           ),
         );
-        setBanner({ kind: 'ok', text: 'IoT alert created' });
+        setBanner({ kind: 'ok', text: t("iot.iotClient.ioTAlertCreated") });
       } else if (iotModal.type === 'setThreshold') {
         const minRaw = formData.min_value;
         const maxRaw = formData.max_value;
@@ -932,7 +931,7 @@ function IotClientLoaded({
             }),
           ),
         );
-        setBanner({ kind: 'ok', text: 'IoT threshold saved' });
+        setBanner({ kind: 'ok', text: t("iot.iotClient.ioTThresholdSaved") });
       } else if (iotModal.type === 'telemetryBatch') {
         const readings = parseTelemetryReadings(formData.readingsJson);
         await Promise.all(
@@ -940,7 +939,7 @@ function IotClientLoaded({
             recordTelemetryBatch.mutateAsync({ deviceId, readings }),
           ),
         );
-        setBanner({ kind: 'ok', text: 'IoT telemetry batch recorded' });
+        setBanner({ kind: 'ok', text: t("iot.iotClient.ioTTelemetryBatchRecorded") });
       }
       setIotModal({ type: null });
     } catch (e) {

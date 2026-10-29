@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { Plus, FileText, ChevronDown, ChevronRight, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -107,8 +107,7 @@ export function SectionSidebar({
             {libraryTemplates.length > 0 && (
               <>
                 <p className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Library
-                </p>
+                  {i18n.t("proposalWorkspace.sectionSidebar.library")}</p>
                 {libraryTemplates.map((tmpl) => (
                   <button
                     key={tmpl.id}
@@ -124,8 +123,7 @@ export function SectionSidebar({
                 ))}
                 <div className="border-t border-border my-1" />
                 <p className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Quick titles
-                </p>
+                  {i18n.t("proposalWorkspace.sectionSidebar.quickTitles")}</p>
               </>
             )}
             {SECTION_TEMPLATES.map((tmpl) => (

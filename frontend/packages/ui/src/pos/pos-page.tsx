@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +31,7 @@ import {
   LayoutList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { posProductName, posCategoryName } from "./pos-display-labels"
 import {
   type POSProduct,
   type POSCartItem,
@@ -200,7 +201,7 @@ function ReceiptDialog({ order, onClose }: { order: POSOrder | null; onClose: ()
           {order.items.map((item) => (
             <div key={item.product.id} className="flex justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="truncate">{item.product.name}</p>
+                <p className="truncate">{posProductName(item.product)}</p>
                 <p className="text-muted-foreground text-xs">{item.quantity} x {fmt(item.product.price)}</p>
               </div>
               <span className="shrink-0">{fmt(item.lineTotal)}</span>
@@ -245,6 +246,8 @@ export interface POSPageProps {
   discountTotal: number
   total: number
   categories: string[]
+  /** Canonical category buckets that contain only unnamed categories. */
+  fallbackCategories?: readonly string[]
   terminals: Record<string, unknown>[]
   posLifecycleError: string | null
   isPosLifecyclePending: boolean
@@ -281,6 +284,7 @@ export function POSPage({
   discountTotal,
   total,
   categories,
+  fallbackCategories = [],
   terminals,
   posLifecycleError,
   isPosLifecyclePending,
@@ -347,7 +351,7 @@ export function POSPage({
                   : "bg-background text-muted-foreground border-border hover:border-primary/40"
               )}
             >
-              {cat === "All" ? t("pos.categories.all") : cat}
+              {cat === "All" ? t("pos.categories.all") : posCategoryName(cat, fallbackCategories.includes(cat))}
             </Button>
           ))}
         </div>
@@ -364,9 +368,9 @@ export function POSPage({
                   className="group rounded-xl border bg-background p-3 text-left hover:border-primary/50 hover:shadow-md transition-all active:scale-95"
                 >
                   <div className={cn("w-full aspect-square rounded-lg mb-3 flex items-center justify-center text-white font-bold text-2xl", product.imageColor)}>
-                    {product.name.slice(0, 1)}
+                    {posProductName(product).slice(0, 1)}
                   </div>
-                  <p className="text-sm font-semibold leading-tight truncate">{product.name}</p>
+                  <p className="text-sm font-semibold leading-tight truncate">{posProductName(product)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{product.sku}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-sm font-bold text-primary">{fmt(product.price)}</span>
@@ -385,11 +389,11 @@ export function POSPage({
                   className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background hover:border-primary/50 text-left transition-colors active:scale-[0.99]"
                 >
                   <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold shrink-0", product.imageColor)}>
-                    {product.name.slice(0, 1)}
+                    {posProductName(product).slice(0, 1)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">{product.sku} · {product.category}</p>
+                    <p className="text-sm font-semibold truncate">{posProductName(product)}</p>
+                    <p className="text-xs text-muted-foreground">{product.sku} · {posCategoryName(product.category, product.categoryIsFallback)}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-primary">{fmt(product.price)}</p>
@@ -427,41 +431,32 @@ export function POSPage({
         <div className="space-y-2 border-b p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Operations
-            </p>
+              {i18n.t("pos.admin.operations")}</p>
             <Badge variant="outline" className="text-[10px]">
-              {terminals.length} {terminals.length === 1 ? "terminal" : "terminals"}
+              {i18n.t("pos.posPage.terminalCount", { count: terminals.length })}
             </Badge>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("createTerminal")}>
-              Create terminal
-            </Button>
+              {i18n.t("pos.admin.forms.createTerminal.submit")}</Button>
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("createConfig")}>
-              Create config
-            </Button>
+              {i18n.t("pos.admin.forms.createConfig.submit")}</Button>
           </div>
           <Button size="sm" variant="outline" className="w-full" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("updateTerminal")}>
-            Update primary terminal
-          </Button>
+            {i18n.t("pos.posPage.updatePrimaryTerminal")}</Button>
           <div className="grid grid-cols-3 gap-1.5">
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("activateConfig")}>
-              Activate
-            </Button>
+              {i18n.t("pos.admin.forms.activateConfig.submit")}</Button>
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("deactivateConfig")}>
-              Deactivate
-            </Button>
+              {i18n.t("pos.admin.forms.deactivateConfig.submit")}</Button>
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("openSession")}>
-              Open
-            </Button>
+              {i18n.t("pos.session.states.opened")}</Button>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("computeTotals")}>
-              Compute totals
-            </Button>
+              {i18n.t("pos.admin.forms.computeTotals.submit")}</Button>
             <Button size="sm" variant="outline" disabled={isPosLifecyclePending} onClick={() => onOpenPosAction("closeSession")}>
-              Close session
-            </Button>
+              {i18n.t("pos.admin.forms.closeSession.submit")}</Button>
           </div>
           {posLifecycleError ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
@@ -483,10 +478,10 @@ export function POSPage({
               {cart.map((item) => (
                 <div key={item.product.id} className="flex gap-2 items-start p-2.5 rounded-lg bg-muted/40">
                   <div className={cn("w-8 h-8 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0", item.product.imageColor)}>
-                    {item.product.name.slice(0, 1)}
+                    {posProductName(item.product).slice(0, 1)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium leading-tight truncate">{item.product.name}</p>
+                    <p className="text-xs font-medium leading-tight truncate">{posProductName(item.product)}</p>
                     <p className="text-xs text-muted-foreground">{fmt(item.product.price)} {t("pos.cart.each")}</p>
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <button

@@ -95,7 +95,7 @@ function stdbTypeToModular(type: StdbFieldType): FormField["type"] {
     case "Hidden":
       return "hidden"
     default:
-      throw new Error(`Unsupported runtime field type: ${type}`)
+      throw new Error(uiI18n.t("common.builtIn.runtimeFormConfig.stdbTypeToModular.error", { defaultValue: "Unsupported runtime field type: {{type}}", type: type }))
   }
 }
 
@@ -124,7 +124,7 @@ export function parsedFieldToModularField(field: ParsedFormField): FormField {
   if (modularType === "multiselect") {
     if (field.defaultValue !== undefined &&
         (!Array.isArray(field.defaultValue) || !field.defaultValue.every((value) => typeof value === "string"))) {
-      throw new Error(`MultiSelect default must be an array of strings: ${field.fieldId}`)
+      throw new Error(uiI18n.t("common.builtIn.runtimeFormConfig.parsedFieldToModularField.error", { defaultValue: "MultiSelect default must be an array of strings: {{fieldId}}", fieldId: field.fieldId }))
     }
     return {
       ...base,
@@ -243,7 +243,7 @@ export function mergeRuntimeFormConfig(
             (inRoleOrEnabled.defaultValue === undefined || inRoleOrEnabled.defaultValue === "")
           if (legacyTextForPicker) return applyStdbOverrides(field, { ...inRoleOrEnabled, defaultValue: undefined })
           if (runtimeIsArray !== staticIsArray || invalidArrayDefault || (!staticIsArray && defaultIsArray)) {
-            bindingErrors.push(`Runtime field ${inRoleOrEnabled.fieldId} has incompatible cardinality for ${field.name}`)
+            bindingErrors.push(uiI18n.t("common.runtimeForms.incompatibleCardinality", { defaultValue: "Runtime field {{id}} has incompatible cardinality for {{name}}", id: inRoleOrEnabled.fieldId, name: field.name }))
             return field
           }
           // The static renderer remains authoritative, including Custom runtime metadata.
@@ -273,7 +273,7 @@ export function mergeRuntimeFormConfig(
       try {
         return [parsedFieldToModularField(field)]
       } catch (error) {
-        bindingErrors.push(`Runtime field ${field.fieldId}: ${error instanceof Error ? error.message : "Invalid field binding"}`)
+        bindingErrors.push(uiI18n.t("common.runtimeForms.invalidField", { defaultValue: "Runtime field {{id}}: {{message}}", id: field.fieldId, message: error instanceof Error ? error.message : uiI18n.t("common.runtimeForms.invalidBinding", { defaultValue: "Invalid field binding" }) }))
         return []
       }
     })

@@ -380,7 +380,11 @@
         "applyDomain": {
           "thisWidgetHasAnInvalidPersistedFilter": {
             "message": "Ibisobanuro bya filtre yabitswe kuri iyi widget ntibyemewe."
-          }
+          },
+          "message": "Akayunguruzo ka {{field}} ntikagira ikimenyetso cy’igikorwa.",
+          "messagetheInFilterForFieldMustUse": "Akayunguruzo $in ka {{field}} kagomba gukoresha urutonde.",
+          "messagethisWidgetHasANonNumericOperandFor": "Aka gace gafite agaciro katari umubare kagenewe {{operator}}.",
+          "messagethisWidgetUsesAnUnsupportedFilterOperator": "Aka gace gakoresha ikimenyetso cy’igikorwa cy’akayunguruzo kidashyigikiwe: {{operator}}."
         },
         "parseBinding": {
           "thisWidgetHasAnInvalidTimeOr": {
@@ -404,12 +408,14 @@
         "applyTimeRange": {
           "thisWidgetDoesNotDeclareATime": {
             "message": "Iyi widget ntigaragaza umwanya w’igihe ku matariki yatoranyijwe."
-          }
+          },
+          "message": "Aka gace gafite amakuru y’itariki n’isaha atuzuye muri {{timeField}}."
         },
         "applyMeasureCompleteness": {
           "thisWidgetDoesNotDeclareTheMeasure": {
             "message": "Iyi widget ntigaragaza igipimo ikoreshwa mu guhuriza hamwe amakuru yayo."
-          }
+          },
+          "message": "Aka gace gafite amakuru y’imibare atuzuye muri {{field}}."
         },
         "resolveStoredDashboard": {
           "theWidgetHasNoDataSource": {
@@ -417,13 +423,245 @@
           },
           "aChartWidgetRequiresAGroupByField": {
             "message": "Widget y’igishushanyo ikeneye umwanya wo gushyira amakuru mu matsinda."
-          }
+          },
+          "message": "Ubwoko bw’igishushanyo {{chartType}} ntibushyigikiwe.",
+          "messagetheWidgetTypeValue1IsNotSupported": "Ubwoko bw’agace {{value1}} ntibushyigikiwe."
+        },
+        "normalizeAggregation": {
+          "message": "Ihuriza hamwe {{aggregation}} ntirishyigikiwe."
         }
       },
       "runtimeFormConfig": {
         "mergeRuntimeFormConfig": {
           "runtimeExtraFields": {
             "title": "Imyanya y’inyongera"
+          }
+        },
+        "parsedFieldToModularField": {
+          "error": "Agaciro mburabuzi ka MultiSelect kagomba kuba urutonde rw’inyandiko: {{fieldId}}"
+        },
+        "stdbTypeToModular": {
+          "error": "Ubwoko bw’umwanya bwo mu gihe cyo gukora ntibushyigikiwe: {{type}}"
+        }
+      },
+      "formConfigs": {
+        "newCustomerForm": {
+          "basicInfo": {
+            "title": "Amakuru y’ibanze"
+          },
+          "company": {
+            "label": "Izina ry’ikigo",
+            "placeholder": "Acme Inc."
+          },
+          "companyInfo": {
+            "title": "Amakuru y’ikigo"
+          },
+          "contactMethod": {
+            "label": "Uburyo wifuza kuvugishwamo"
+          },
+          "email": {
+            "label": "Imeyili"
+          },
+          "finance": {
+            "label": "Imari"
+          },
+          "firstName": {
+            "label": "Izina ry’umuntu",
+            "placeholder": "John"
+          },
+          "healthcare": {
+            "label": "Ubuvuzi"
+          },
+          "industry": {
+            "label": "Urwego rw’ubucuruzi"
+          },
+          "lastName": {
+            "label": "Izina ry’umuryango",
+            "placeholder": "Doe"
+          },
+          "manufacturing": {
+            "label": "Inganda"
+          },
+          "marketing": {
+            "label": "Kwakira ubutumwa bwo kwamamaza"
+          },
+          "newCustomer": {
+            "description": "Andika umukiriya mushya muri sisitemu",
+            "submitLabel": "Ongeramo umukiriya",
+            "title": "Ongeramo umukiriya mushya"
+          },
+          "phone": {
+            "label": "Telefoni"
+          },
+          "preferences": {
+            "title": "Ibyo ukunda"
+          },
+          "retail": {
+            "label": "Ubucuruzi bwo kudandaza"
+          },
+          "sms": {
+            "label": "SMS"
+          },
+          "tech": {
+            "label": "Ikoranabuhanga"
+          },
+          "website": {
+            "label": "Urubuga"
+          }
+        },
+        "newOrderForm": {
+          "addonA": {
+            "label": "Igice cy’inyongera A - $50/ukwezi"
+          },
+          "annual": {
+            "label": "Buri mwaka (igabanyirizwa rya 15%)"
+          },
+          "billingCycle": {
+            "label": "Igihe cyo kwishyurana"
+          },
+          "customerCompany": {
+            "label": "Ikigo",
+            "placeholder": "Izina ry’ikigo"
+          },
+          "customerEmail": {
+            "label": "Aderesi ya imeyili"
+          },
+          "customerInfo": {
+            "title": "Amakuru y’umukiriya"
+          },
+          "customerName": {
+            "label": "Izina ry’umukiriya",
+            "placeholder": "Andika izina ry’umukiriya"
+          },
+          "customerPhone": {
+            "label": "Nimero ya telefoni"
+          },
+          "enterprise": {
+            "label": "Enterprise Suite - $200/ukwezi"
+          },
+          "expressShipping": {
+            "label": "Kohereza byihuse (+$25)"
+          },
+          "giftWrap": {
+            "label": "Gupfunyika impano (+$5)"
+          },
+          "high": {
+            "label": "Bwinshi"
+          },
+          "low": {
+            "label": "Buke"
+          },
+          "monthly": {
+            "label": "Buri kwezi"
+          },
+          "newOrder": {
+            "description": "Andika amakuru ya komande nshya y’umukiriya",
+            "submitLabel": "Kora komande",
+            "title": "Kora komande nshya"
+          },
+          "newsletter": {
+            "label": "Iyandikishe ku makuru yacu"
+          },
+          "normal": {
+            "label": "Busanzwe"
+          },
+          "notes": {
+            "label": "Ibisobanuro bya komande",
+            "placeholder": "Amabwiriza cyangwa ibisobanuro byihariye..."
+          },
+          "options": {
+            "title": "Andi mahitamo"
+          },
+          "orderDetails": {
+            "title": "Amakuru ya komande"
+          },
+          "priority": {
+            "label": "Ubwihutirwe"
+          },
+          "product": {
+            "label": "Igicuruzwa",
+            "placeholder": "Hitamo igicuruzwa"
+          },
+          "professional": {
+            "label": "Professional Plan - $150/ukwezi"
+          },
+          "quantity": {
+            "label": "Ingano"
+          },
+          "quarterly": {
+            "label": "Buri mezi atatu (igabanyirizwa rya 5%)"
+          },
+          "starter": {
+            "label": "Starter Kit - $50/ukwezi"
+          },
+          "support": {
+            "label": "Support Package - $100/ukwezi"
+          },
+          "terms": {
+            "label": "Nemeye amategeko n’amabwiriza"
+          },
+          "urgent": {
+            "label": "Bwihutirwa"
+          }
+        },
+        "reportForm": {
+          "csv": {
+            "label": "Dosiye ya CSV"
+          },
+          "customers": {
+            "label": "Isesengura ry’abakiriya"
+          },
+          "dateFrom": {
+            "label": "Itariki yo gutangiriraho"
+          },
+          "dateTo": {
+            "label": "Itariki yo kurangirizaho"
+          },
+          "excel": {
+            "label": "Urupapuro rw’ibaruramibare rwa Excel"
+          },
+          "financial": {
+            "label": "Incamake y’imari"
+          },
+          "format": {
+            "label": "Imiterere yo kohereza hanze"
+          },
+          "generateReport": {
+            "description": "Tegura kandi ukore raporo yihariye",
+            "submitLabel": "Kora",
+            "title": "Kora raporo"
+          },
+          "includeCharts": {
+            "label": "Shyiramo ibishushanyo"
+          },
+          "includeSummary": {
+            "label": "Shyiramo incamake y’ingenzi"
+          },
+          "inventory": {
+            "label": "Raporo y’ububiko"
+          },
+          "pdf": {
+            "label": "Inyandiko ya PDF"
+          },
+          "reportType": {
+            "label": "Ubwoko bwa raporo"
+          },
+          "sales": {
+            "label": "Incamake y’ibyagurishijwe"
+          }
+        }
+      },
+      "rbacContext": {
+        "checkPermission": {
+          "reason": "Nta mukoresha winjiye",
+          "reasonnoMatchingPolicyFound": "Nta tegeko rihuye ryabonetse",
+          "reasonplatformSuperuser": "Umuyobozi mukuru wa porogaramu"
+        }
+      },
+      "workspaceNavigation": {
+        "resolveWorkspaceNavigation": {
+          "additional": {
+            "label": "Byisumbuye"
           }
         }
       }
@@ -443,6 +681,32 @@
       "paymentNumber": "Ubwishyu #{{id}}",
       "delivery": "Ibyoherejwe",
       "invoice": "Facture"
+    },
+    "dashboard": {
+      "emptyWidgetType": "(nta kirimo)",
+      "exportBlocked": "Kohereza hanze ikibaho cy’amakuru birahagaritswe mu gihe amakuru ari {{state}}.",
+      "sourceDenied": "Kugera ku nkomoko {{model}} byanzwe.",
+      "sourceLoading": "Inkomoko {{model}} irimo gutegurwa.",
+      "sourcePartial": "Inkomoko {{model}} ntiyuzuye.",
+      "sourceUnavailable": "Inkomoko {{model}} ntiboneka.",
+      "widgetFallback": "Agace"
+    },
+    "inlineEdit": {
+      "enterNumber": "Andika umubare"
+    },
+    "permissions": {
+      "accessDenied": "Nta burenganzira ufite bwo kugera kuri aya makuru.",
+      "allowedByPolicy": "Byemejwe n’itegeko: {{id}}",
+      "deniedByPolicy": "Byanzwe n’itegeko: {{id}}"
+    },
+    "runtimeForms": {
+      "incompatibleCardinality": "Umwanya wo mu gihe cyo gukora {{id}} ufite umubare w’indangagaciro udahuje na {{name}}",
+      "invalidBinding": "Ihuza ry’umwanya ntiryemewe",
+      "invalidField": "Umwanya wo mu gihe cyo gukora {{id}}: {{message}}"
+    },
+    "workspaceNavigation": {
+      "more": "Ahandi hakorerwa",
+      "overview": "Incamake"
     }
   },
   "navigation": {

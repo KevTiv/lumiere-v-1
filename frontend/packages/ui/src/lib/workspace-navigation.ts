@@ -1,7 +1,8 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import { buildModuleTabRow, type ModuleConfig, type ModuleTab, type ModuleWorkspace, type ModuleWorkspaceNav } from "./module-types"
 
 /** One navigation model, including modules that have not supplied curated workspaces. */
-export function moduleWorkspaceNavigation(config: ModuleConfig, labels = { overview: "Overview", more: "More workspaces" }): ModuleWorkspaceNav {
+export function moduleWorkspaceNavigation(config: ModuleConfig, labels = { overview: uiI18n.t("common.workspaceNavigation.overview", { defaultValue: "Overview" }), more: uiI18n.t("common.workspaceNavigation.more", { defaultValue: "More workspaces" }) }): ModuleWorkspaceNav {
   if (config.workspaceNav) return config.workspaceNav
   const grouped = new Map<string, ModuleWorkspace>()
   config.tabGroups?.forEach((group, index) => {
@@ -48,7 +49,7 @@ export function resolveWorkspaceNavigation(tabs: readonly ModuleTab[], config: M
   const workspaces = resolve(config.workspaces)
   const overflow = resolve(config.overflow ?? [])
   const remaining = tabs.filter((tab) => !assigned.has(tab.id))
-  if (remaining.length) overflow.push({ id: "additional", label: "Advanced", tabIds: remaining.map((tab) => tab.id), tabs: remaining })
+  if (remaining.length) overflow.push({ id: "additional", get label() { return uiI18n.t("common.builtIn.workspaceNavigation.resolveWorkspaceNavigation.additional.label", { defaultValue: "Advanced" }) }, tabIds: remaining.map((tab) => tab.id), tabs: remaining })
   return { workspaces, overflow }
 }
 

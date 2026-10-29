@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Projects Module Form Configurations
 //!
 //! This module provides form configurations for Project Management.
@@ -10,23 +12,23 @@ export const projectsForms: FormRegistryEntry[] = [
   {
     moduleId: "projects",
     formId: "new-project",
-    name: "New Project",
-    description: "Create a new project",
+    get name() { return i18n.t("projects.forms.newProject.title") },
+    get description() { return i18n.t("projects.forms.newProject.description") },
     icon: "FolderKanban",
-    category: "Projects",
+    get category() { return i18n.t("projects.projects.title") },
     defaultConfig: () => ({
       moduleId: "projects",
       formId: "new-project",
-      name: "New Project",
-      description: "Create a new project",
+      get name() { return i18n.t("projects.forms.newProject.title") },
+      get description() { return i18n.t("projects.forms.newProject.description") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "name",
           name: "name",
-          label: "Project Name",
+          get label() { return i18n.t("projects.forms.newProject.fields.name") },
           fieldType: "Text",
-          placeholder: "Enter project name",
+          get placeholder() { return i18n.t("forms.defaults.projects.enterProjectName") },
           validation: { required: true, minLength: 3 },
           aiSuggestions: [],
           order: 1,
@@ -38,9 +40,9 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("projects.timesheets.columns.name") },
           fieldType: "Textarea",
-          placeholder: "Project description...",
+          get placeholder() { return i18n.t("forms.defaults.projects.projectDescription") },
           validation: { required: true, minLength: 20 },
           aiSuggestions: [],
           order: 2,
@@ -52,9 +54,9 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "client",
           name: "client",
-          label: "Client",
+          get label() { return i18n.t("forms.defaults.projects.client") },
           fieldType: "Text",
-          placeholder: "Client name",
+          get placeholder() { return i18n.t("forms.defaults.projects.clientName") },
           validation: { required: false },
           aiSuggestions: [],
           order: 3,
@@ -66,14 +68,14 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "status",
           name: "status",
-          label: "Status",
+          get label() { return i18n.t("projects.projects.columns.lastUpdateStatus") },
           fieldType: "Select",
           options: [
-            { value: "planning", label: "Planning", color: "gray" },
-            { value: "active", label: "Active", color: "blue" },
-            { value: "on-hold", label: "On Hold", color: "yellow" },
-            { value: "completed", label: "Completed", color: "green" },
-            { value: "cancelled", label: "Cancelled", color: "red" },
+            { value: "planning", get label() { return i18n.t("forms.defaults.projects.planning") }, color: "gray" },
+            { value: "active", get label() { return i18n.t("common.active") }, color: "blue" },
+            { value: "on-hold", get label() { return i18n.t("forms.defaults.projects.onHold") }, color: "yellow" },
+            { value: "completed", get label() { return i18n.t("forms.defaults.projects.completed") }, color: "green" },
+            { value: "cancelled", get label() { return i18n.t("projects.projects.filters.lastUpdateStatus.options.Cancelled") }, color: "red" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -86,7 +88,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "start_date",
           name: "start_date",
-          label: "Start Date",
+          get label() { return i18n.t("projects.forms.newProject.fields.dateStart") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -99,7 +101,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "end_date",
           name: "end_date",
-          label: "End Date",
+          get label() { return i18n.t("forms.defaults.projects.endDate") },
           fieldType: "Date",
           validation: { required: false },
           aiSuggestions: [],
@@ -112,9 +114,9 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "budget",
           name: "budget",
-          label: "Budget",
+          get label() { return i18n.t("forms.defaults.projects.budget") },
           fieldType: "Number",
-          placeholder: "Project budget",
+          get placeholder() { return i18n.t("forms.defaults.projects.projectBudget") },
           validation: { required: false, min: 0 },
           aiSuggestions: [],
           order: 7,
@@ -126,13 +128,13 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "priority",
           name: "priority",
-          label: "Priority",
+          get label() { return i18n.t("projects.tasks.columns.priority") },
           fieldType: "Select",
           options: [
-            { value: "low", label: "Low", color: "gray" },
-            { value: "medium", label: "Medium", color: "blue" },
-            { value: "high", label: "High", color: "orange" },
-            { value: "critical", label: "Critical", color: "red" },
+            { value: "low", get label() { return i18n.t("projects.tasks.priority.1") }, color: "gray" },
+            { value: "medium", get label() { return i18n.t("forms.defaults.projects.medium") }, color: "blue" },
+            { value: "high", get label() { return i18n.t("projects.tasks.priority.2") }, color: "orange" },
+            { value: "critical", get label() { return i18n.t("forms.defaults.projects.critical") }, color: "red" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -145,7 +147,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("forms.defaults.projects.tags") },
           fieldType: "Tags",
           validation: { required: false },
           aiSuggestions: [],
@@ -177,23 +179,23 @@ export const projectsForms: FormRegistryEntry[] = [
   {
     moduleId: "projects",
     formId: "new-task",
-    name: "New Task",
-    description: "Create a new project task",
+    get name() { return i18n.t("projects.forms.newTask.title") },
+    get description() { return i18n.t("forms.defaults.projects.createANewProjectTask") },
     icon: "CheckSquare",
-    category: "Tasks",
+    get category() { return i18n.t("projects.projects.columns.taskCount") },
     defaultConfig: () => ({
       moduleId: "projects",
       formId: "new-task",
-      name: "New Task",
-      description: "Create a new project task",
+      get name() { return i18n.t("projects.forms.newTask.title") },
+      get description() { return i18n.t("forms.defaults.projects.createANewProjectTask") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "title",
           name: "title",
-          label: "Task Title",
+          get label() { return i18n.t("forms.defaults.projects.taskTitle") },
           fieldType: "Text",
-          placeholder: "Enter task title",
+          get placeholder() { return i18n.t("forms.defaults.projects.enterTaskTitle") },
           validation: { required: true, minLength: 3 },
           aiSuggestions: [],
           order: 1,
@@ -205,7 +207,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("projects.timesheets.columns.name") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -218,7 +220,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "assignee",
           name: "assignee",
-          label: "Assignee",
+          get label() { return i18n.t("forms.defaults.projects.assignee") },
           fieldType: "UserSelect",
           validation: { required: false },
           aiSuggestions: [],
@@ -231,13 +233,13 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "status",
           name: "status",
-          label: "Status",
+          get label() { return i18n.t("projects.projects.columns.lastUpdateStatus") },
           fieldType: "Select",
           options: [
-            { value: "todo", label: "To Do", color: "gray" },
-            { value: "in-progress", label: "In Progress", color: "blue" },
-            { value: "review", label: "In Review", color: "yellow" },
-            { value: "done", label: "Done", color: "green" },
+            { value: "todo", get label() { return i18n.t("forms.defaults.projects.toDo") }, color: "gray" },
+            { value: "in-progress", get label() { return i18n.t("projects.projects.filters.lastUpdateStatus.options.InProgress") }, color: "blue" },
+            { value: "review", get label() { return i18n.t("forms.defaults.projects.inReview") }, color: "yellow" },
+            { value: "done", get label() { return i18n.t("projects.projects.filters.lastUpdateStatus.options.Done") }, color: "green" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -250,12 +252,12 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "priority",
           name: "priority",
-          label: "Priority",
+          get label() { return i18n.t("projects.tasks.columns.priority") },
           fieldType: "Select",
           options: [
-            { value: "low", label: "Low", color: "gray" },
-            { value: "medium", label: "Medium", color: "blue" },
-            { value: "high", label: "High", color: "orange" },
+            { value: "low", get label() { return i18n.t("projects.tasks.priority.1") }, color: "gray" },
+            { value: "medium", get label() { return i18n.t("forms.defaults.projects.medium") }, color: "blue" },
+            { value: "high", get label() { return i18n.t("projects.tasks.priority.2") }, color: "orange" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -268,7 +270,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "due_date",
           name: "due_date",
-          label: "Due Date",
+          get label() { return i18n.t("forms.defaults.projects.dueDate") },
           fieldType: "Date",
           validation: { required: false },
           aiSuggestions: [],
@@ -281,7 +283,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "estimated_hours",
           name: "estimated_hours",
-          label: "Estimated Hours",
+          get label() { return i18n.t("forms.defaults.projects.estimatedHours") },
           fieldType: "Number",
           placeholder: "0",
           validation: { required: false, min: 0 },
@@ -295,7 +297,7 @@ export const projectsForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("forms.defaults.projects.tags") },
           fieldType: "Tags",
           validation: { required: false },
           aiSuggestions: [],

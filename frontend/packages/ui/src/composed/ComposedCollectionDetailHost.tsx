@@ -36,7 +36,7 @@ function nodeFields(node: PageNode): readonly string[] {
 }
 
 function nodeTitle(node: PageNode): string {
-  return node.kind === "collection" ? "Collection" : "Detail"
+  return node.kind === "collection" ? i18n.t("ui.composed.collectionTitle") : i18n.t("ui.composed.detailTitle")
 }
 
 function CollectionPreview({

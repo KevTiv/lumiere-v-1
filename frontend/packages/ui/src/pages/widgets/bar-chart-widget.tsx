@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { useCurrencyFormat } from "../../lib/currency-context"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "../../components/chart"
@@ -8,10 +9,11 @@ import { seriesChartConfig } from "../../charts/chart-kit"
 import type { BarChartWidget as BarChartWidgetType } from "../../lib/dashboard-types"
 
 export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
+  useTranslation()
   const { locale } = useCurrencyFormat()
   const isHorizontal = data.layout === "horizontal"
   const clickable = Boolean(data.onCategoryClick || data.onSegmentClick)
-  const config = seriesChartConfig(data.series.map((s) => ({ key: s.name, label: s.name })))
+  const config = seriesChartConfig(data.series.map((s) => ({ key: s.name, label: s.label ?? s.name })))
 
   return (
     <ChartContainer config={config} className="aspect-auto h-[300px] w-full">
@@ -38,6 +40,7 @@ export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
           <Bar
             key={s.name}
             dataKey={s.name}
+            name={s.label ?? s.name}
             fill={s.color}
             radius={isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
             maxBarSize={40}

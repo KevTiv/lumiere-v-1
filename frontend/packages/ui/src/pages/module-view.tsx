@@ -414,7 +414,7 @@ export function ModuleView({
                       ? {
                           ...tab.entityConfig,
                           view: withTabCreateCta(tab.entityConfig.view, {
-                            label: tab.createLabel ?? "New",
+                            label: tab.createLabel ?? i18n.t("ui.pages.moduleView.new"),
                             onClick: () => openCreateForm(tab.id),
                             // Not gated until permissions load, so the empty state never flashes read-only.
                             permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,

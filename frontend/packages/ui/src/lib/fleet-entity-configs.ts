@@ -9,10 +9,10 @@ export const fleetVehiclesTableConfig = (t: TFunction): EntityViewConfig => ({
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: `${t("fleet.table.name")}, ${t("fleet.table.licensePlate")}…`,
+    searchPlaceholder: t("fleet.builtIn.fleetEntityConfigs.fleetVehiclesTableConfig.view.searchPlaceholder", { defaultValue: "{{value1}}, {{value2}}…", value1: t("fleet.table.name"), value2: t("fleet.table.licensePlate") }),
     searchKeys: ["name", "license_plate", "vehicle_type", "driver_name", "status"],
     columns: [
-      { key: "id", label: "ID", type: "number", align: "right", width: "min-w-16" },
+      { key: "id", label: t("fleet.builtIn.fleetEntityConfigs.fleetVehiclesTableConfig.id.label", { defaultValue: "ID" }), type: "number", align: "right", width: "min-w-16" },
       { key: "name", label: t("fleet.table.name"), width: "min-w-36" },
       { key: "vehicle_type", label: t("fleet.table.vehicleType"), width: "min-w-24" },
       { key: "license_plate", label: t("fleet.table.licensePlate"), width: "min-w-28" },

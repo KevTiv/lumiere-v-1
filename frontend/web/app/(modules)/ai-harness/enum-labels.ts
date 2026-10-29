@@ -165,3 +165,26 @@ export const policyOutcomeLabel = (t: TFunction, value: string) =>
 
 export const riskClassLabel = (t: TFunction, value: string) =>
   labelFromMap(t, value, RISK_CLASS_KEYS)
+
+const ATTEMPT_STATUS_KEYS: Record<string, string> = {
+  accepted: "aiHarness.enums.attemptStatuses.accepted",
+  dispatched: "aiHarness.enums.attemptStatuses.dispatched",
+  succeeded: "aiHarness.enums.attemptStatuses.succeeded",
+  failed: "aiHarness.enums.attemptStatuses.failed",
+  outcome_unknown: "aiHarness.enums.attemptStatuses.outcome_unknown",
+  abandoned: "aiHarness.enums.attemptStatuses.abandoned",
+}
+export const attemptStatusLabel = (t: TFunction, value: string) => labelFromMap(t, value, ATTEMPT_STATUS_KEYS)
+
+const RESERVATION_STATUS_KEYS: Record<string, string> = {
+  reserved: "aiHarness.enums.reservationStatuses.reserved",
+  settled: "aiHarness.enums.reservationStatuses.settled",
+  released: "aiHarness.enums.reservationStatuses.released",
+}
+export const reservationStatusLabel = (t: TFunction, value: string) => labelFromMap(t, value, RESERVATION_STATUS_KEYS)
+
+export function runStepOutcomeLabel(t: TFunction, step: { error: boolean; outputRowCount: number | null }): string {
+  if (step.error) return t("aiHarness.runLifecycle.failed")
+  if (step.outputRowCount === null) return t("aiHarness.runLifecycle.completed")
+  return t("aiHarness.runMetrics.rows", { count: step.outputRowCount })
+}

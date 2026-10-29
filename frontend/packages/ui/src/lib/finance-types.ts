@@ -601,10 +601,14 @@ export type POSPaymentMethod = "cash" | "card" | "split" | "voucher"
 export interface POSProduct {
   id: string
   name: string
+  /** UI fallback marker; the canonical name remains stable. */
+  nameIsFallback?: boolean
   sku: string
   price: number
   taxRate: number
   category: string
+  /** UI fallback marker; the canonical category remains stable. */
+  categoryIsFallback?: boolean
   stock: number
   imageColor: string // tailwind bg colour class for placeholder
 }

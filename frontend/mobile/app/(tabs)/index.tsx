@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from '@lumiere/i18n';
 import { Image } from 'expo-image';
 import { Platform, StyleSheet } from 'react-native';
 
@@ -10,11 +11,12 @@ import { getLumiereApiBaseUrl, mobileApi } from '@/lib/lumiere-api';
 import { Link } from 'expo-router';
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const apiBase = getLumiereApiBaseUrl();
   const rolesQuery = useQuery({
     queryKey: ['lumiere-api', 'roles', apiBase],
     enabled: Boolean(apiBase),
-    queryFn: () => mobileApi.fetchQueryList('/api/query/roles', 'Could not load roles'),
+    queryFn: () => mobileApi.fetchQueryList('/api/query/roles', t('mobile.roles.loadFailed')),
   });
 
   return (
@@ -38,12 +40,12 @@ export default function HomeScreen() {
             origin (e.g. http://192.168.1.2:3000) to probe <ThemedText type="defaultSemiBold">GET /api/query/roles</ThemedText> through the authorized API boundary.
           </ThemedText>
         ) : rolesQuery.isPending ? (
-          <ThemedText>Loading roles…</ThemedText>
+          <ThemedText>{t('mobile.roles.loading')}</ThemedText>
         ) : rolesQuery.isError ? (
-          <ThemedText>{rolesQuery.error instanceof Error ? rolesQuery.error.message : 'Request failed'}</ThemedText>
+          <ThemedText>{rolesQuery.error instanceof Error ? rolesQuery.error.message : t('mobile.roles.requestFailed')}</ThemedText>
         ) : (
           <ThemedText>
-            Roles from API: <ThemedText type="defaultSemiBold">{rolesQuery.data?.length ?? 0}</ThemedText>
+            {t('mobile.roles.loadedCount', { count: rolesQuery.data?.length ?? 0 })}
           </ThemedText>
         )}
       </ThemedView>

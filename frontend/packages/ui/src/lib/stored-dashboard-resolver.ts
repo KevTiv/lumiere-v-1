@@ -127,14 +127,14 @@ function applyDomain(
     if (!isRecord(expected)) continue
     const entries = Object.entries(expected)
     if (entries.length === 0) {
-      return { ok: false, code: "invalid-filter", message: `The filter for ${field} has no operator.` }
+      return { ok: false, code: "invalid-filter", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.message", { defaultValue: "The filter for {{field}} has no operator.", field: field }) } }
     }
     for (const [operator, operand] of entries) {
       if (!DOMAIN_OPERATORS.has(operator)) {
-        return { ok: false, code: "invalid-operator", message: `This widget uses an unsupported filter operator: ${operator}.` }
+        return { ok: false, code: "invalid-operator", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.messagethisWidgetUsesAnUnsupportedFilterOperator", { defaultValue: "This widget uses an unsupported filter operator: {{operator}}.", operator: operator }) } }
       }
       if (operator === "$in" && !Array.isArray(operand)) {
-        return { ok: false, code: "invalid-filter", message: `The $in filter for ${field} must use an array.` }
+        return { ok: false, code: "invalid-filter", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.messagetheInFilterForFieldMustUse", { defaultValue: "The $in filter for {{field}} must use an array.", field: field }) } }
       }
       if (
         ["$gte", "$lte", "$gt", "$lt"].includes(operator) &&
@@ -143,7 +143,7 @@ function applyDomain(
         return {
           ok: false,
           code: "invalid-filter",
-          message: `This widget has a non-numeric operand for ${operator}.`,
+          get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyDomain.messagethisWidgetHasANonNumericOperandFor", { defaultValue: "This widget has a non-numeric operand for {{operator}}.", operator: operator }) },
         }
       }
     }
@@ -311,7 +311,7 @@ function applyTimeRange(
     return {
       ok: false,
       code: "invalid-timestamp",
-      message: `This widget has incomplete timestamp data in ${timeField}.`,
+      get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyTimeRange.message", { defaultValue: "This widget has incomplete timestamp data in {{timeField}}.", timeField: timeField }) },
       rejectedRows,
     }
   }
@@ -332,7 +332,7 @@ function normalizeAggregation(raw: unknown): ParseResult<string> {
   const aggregation = String(raw ?? "count").toLowerCase()
   return AGGREGATIONS.has(aggregation)
     ? { ok: true, value: aggregation }
-    : { ok: false, code: "invalid-aggregation", message: `The aggregation ${aggregation} is not supported.` }
+    : { ok: false, code: "invalid-aggregation", get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.normalizeAggregation.message", { defaultValue: "The aggregation {{aggregation}} is not supported.", aggregation: aggregation }) } }
 }
 
 function applyMeasureCompleteness(
@@ -357,7 +357,7 @@ function applyMeasureCompleteness(
     return {
       ok: false,
       code: "missing-measure",
-      message: `This widget has incomplete numeric data in ${field}.`,
+      get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.applyMeasureCompleteness.message", { defaultValue: "This widget has incomplete numeric data in {{field}}.", field: field }) },
       rejectedRows,
     }
   }
@@ -442,16 +442,16 @@ function sourceIssue(
   state: StoredDashboardSourceState,
 ): StoredDashboardResolutionIssue | null {
   if (state.status === "loading") {
-    return { kind: "source-loading", widgetId, model, message: state.message ?? `Source ${model} is loading.` }
+    return { kind: "source-loading", widgetId, model, message: state.message ?? uiI18n.t("common.dashboard.sourceLoading", { defaultValue: "Source {{model}} is loading.", model: model }) }
   }
   if (state.status === "denied") {
-    return { kind: "source-denied", widgetId, model, message: state.message ?? `Access to source ${model} was denied.` }
+    return { kind: "source-denied", widgetId, model, message: state.message ?? uiI18n.t("common.dashboard.sourceDenied", { defaultValue: "Access to source {{model}} was denied.", model: model }) }
   }
   if (state.status === "unavailable") {
-    return { kind: "source-unavailable", widgetId, model, message: state.message ?? `Source ${model} is unavailable.` }
+    return { kind: "source-unavailable", widgetId, model, message: state.message ?? uiI18n.t("common.dashboard.sourceUnavailable", { defaultValue: "Source {{model}} is unavailable.", model: model }) }
   }
   if (state.status === "partial") {
-    return { kind: "source-partial", widgetId, model, message: state.message ?? `Source ${model} is partial.` }
+    return { kind: "source-partial", widgetId, model, message: state.message ?? uiI18n.t("common.dashboard.sourcePartial", { defaultValue: "Source {{model}} is partial.", model: model }) }
   }
   return null
 }
@@ -504,7 +504,7 @@ export function resolveStoredDashboard(
   storedWidgets.forEach((row, index) => {
     const widgetId = String(row.id ?? index)
     const model = String(row.model ?? "").trim()
-    const title = String(row.name ?? "Widget")
+    const title = String(row.name ?? uiI18n.t("common.dashboard.widgetFallback", { defaultValue: "Widget" }))
     const width = gridWidthFromColumns(Number(row.width ?? 6))
     const pushDiagnostic = (failure: ResolutionFailure) => {
       widgets.push(diagnosticWidget(widgetId, title, width, failure))
@@ -680,7 +680,7 @@ export function resolveStoredDashboard(
       if (chartType !== "bar") {
         pushDiagnostic({
           code: "invalid-chart-type",
-          message: `The chart type ${chartType} is not supported.`,
+          get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.resolveStoredDashboard.message", { defaultValue: "The chart type {{chartType}} is not supported.", chartType: chartType }) },
         })
         return
       }
@@ -726,7 +726,7 @@ export function resolveStoredDashboard(
 
     pushDiagnostic({
       code: "invalid-widget-type",
-      message: `The widget type ${widgetType || "(empty)"} is not supported.`,
+      get message() { return uiI18n.t("common.builtIn.storedDashboardResolver.resolveStoredDashboard.messagetheWidgetTypeValue1IsNotSupported", { defaultValue: "The widget type {{value1}} is not supported.", value1: widgetType || uiI18n.t("common.dashboard.emptyWidgetType", { defaultValue: "(empty)" }) }) },
     })
   })
 
@@ -754,7 +754,7 @@ export function storedDashboardExportGate(
   if (resolution.state === "ready" || resolution.state === "empty") return { allowed: true }
   return {
     allowed: false,
-    reason: resolution.issues[0]?.message ?? `Dashboard export is blocked while data is ${resolution.state}.`,
+    reason: resolution.issues[0]?.message ?? uiI18n.t("common.dashboard.exportBlocked", { defaultValue: "Dashboard export is blocked while data is {{state}}.", state: resolution.state }),
   }
 }
 

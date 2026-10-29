@@ -1,8 +1,8 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useEffect, useMemo, useState } from "react"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import {
   FormModal,
   MapLayerLegend,
@@ -27,7 +27,7 @@ import { useMapModuleSubscription } from "@/lib/module-subscription-hooks"
 // SSR-safe: import directly from file, not the barrel (leaflet needs browser APIs)
 const MapView = dynamic(
   () => import("@lumiere/ui/map-components/map-view").then((m) => m.MapView),
-  { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading map…</div> }
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{i18n.t("map.loading")}</div> }
 )
 
 type FleetMapAction = "createVehicle" | "updatePosition"
@@ -53,10 +53,10 @@ function fleetMapForms(t: (key: string) => string): Record<FleetMapAction, FormC
         {
           id: "vehicle",
           fields: [
-            { id: "vehicle-name", type: "text", name: "name", label: "Name", required: true },
-            { id: "vehicle-type", type: "text", name: "vehicleType", label: "Vehicle type", required: true },
-            { id: "license-plate", type: "text", name: "licensePlate", label: "License plate", width: "1/2" },
-            { id: "driver-name", type: "text", name: "driverName", label: "Driver name", width: "1/2" },
+            { id: "vehicle-name", type: "text", name: "name", label: t("demo.tables.customers.columns.name"), required: true },
+            { id: "vehicle-type", type: "text", name: "vehicleType", label: t("recordHeader.vehicleType"), required: true },
+            { id: "license-plate", type: "text", name: "licensePlate", label: t("map.fleet.table.licensePlate"), width: "1/2" },
+            { id: "driver-name", type: "text", name: "driverName", label: t("recordHeader.driverName"), width: "1/2" },
           ],
         },
       ],
@@ -83,11 +83,11 @@ function fleetMapForms(t: (key: string) => string): Record<FleetMapAction, FormC
         {
           id: "position",
           fields: [
-            { id: "vehicle-lat", type: "number", name: "latitude", label: "Latitude", required: true, width: "1/2" },
-            { id: "vehicle-lng", type: "number", name: "longitude", label: "Longitude", required: true, width: "1/2" },
-            { id: "vehicle-speed", type: "number", name: "speedKmh", label: "Speed km/h", width: "1/3" },
-            { id: "vehicle-heading", type: "number", name: "heading", label: "Heading", width: "1/3" },
-            { id: "vehicle-status", type: "text", name: "status", label: "Status", required: true, width: "1/3" },
+            { id: "vehicle-lat", type: "number", name: "latitude", label: t("inventory.warehouseActions.geoLatPrompt"), required: true, width: "1/2" },
+            { id: "vehicle-lng", type: "number", name: "longitude", label: t("inventory.warehouseActions.geoLngPrompt"), required: true, width: "1/2" },
+            { id: "vehicle-speed", type: "number", name: "speedKmh", label: t("map.mapClient.speedKmH"), width: "1/3" },
+            { id: "vehicle-heading", type: "number", name: "heading", label: t("documents.studio.blockLabels.heading"), width: "1/3" },
+            { id: "vehicle-status", type: "text", name: "status", label: t("map.fleet.table.status"), required: true, width: "1/3" },
           ],
         },
       ],
@@ -100,6 +100,8 @@ interface MapClientProps {
 }
 
 export function MapClient(props: MapClientProps) {
+  const { t } = useTranslation()
+  useEffect(() => { document.title = t("map.mapClient.documentTitle") }, [t])
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
   }
@@ -246,7 +248,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
         throw new Error(t("map.fleet.companyRequired"))
       }
       await createFleetVehicle.mutateAsync({
-        name: String(data.name ?? "Fleet Vehicle"),
+        name: String(data.name ?? t("map.mapClient.fleetVehicle")),
         vehicleType: String(data.vehicleType ?? "truck"),
         licensePlate: data.licensePlate != null && String(data.licensePlate).trim() !== "" ? String(data.licensePlate) : null,
         driverName: data.driverName != null && String(data.driverName).trim() !== "" ? String(data.driverName) : null,
@@ -301,8 +303,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
   if (isResourceLoading) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground" role="status">
-        Loading map resources…
-      </div>
+        {t("map.mapClient.loadingMapResources")}{" "}</div>
     )
   }
 
@@ -317,7 +318,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           role="alert"
         >
           <p className="font-semibold">
-            {denied ? "Map data access denied" : "Map data unavailable"}
+            {denied ? t("map.mapClient.mapDataAccessDenied") : t("map.mapClient.mapDataUnavailable")}
           </p>
           <p className="mt-1">{state?.message}</p>
         </div>
@@ -396,7 +397,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
                   >
                     <span className="truncate font-medium">{String(vehicle.name ?? vehicle.id)}</span>
                     <span className="ml-2 shrink-0 text-muted-foreground">
-                      {String(vehicle.status ?? "idle")}
+                      {String(vehicle.status ?? t("map.mapClient.idle"))}
                     </span>
                   </button>
                 ))

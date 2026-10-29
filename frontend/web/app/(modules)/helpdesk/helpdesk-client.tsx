@@ -497,7 +497,7 @@ function HelpdeskClientLoaded({
   }, [quickActionUsable, ticketsUsable])
 
   const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {
-    if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!actionUsable(action)) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "createTicket") {
       const params = toCreateTicketParams(formData)
       if (!params) return
@@ -548,7 +548,7 @@ function HelpdeskClientLoaded({
 
   const handleTicketSave = async (formData: Record<string, unknown>) => {
     if (!selectedTicket) return
-    if (!ticketsUsable) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!ticketsUsable) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     const ticketId = Number(selectedTicket.id)
     const origName = String(selectedTicket.name ?? "")
     const origDesc = selectedTicket.description != null ? String(selectedTicket.description) : ""

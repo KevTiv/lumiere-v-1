@@ -242,9 +242,9 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           defaultValue: "PDF",
           options: [
-            { value: "PDF", label: "PDF" },
+            { value: "PDF", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.pDF.label", { defaultValue: "PDF" }) },
             { value: "Excel", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.reportType.label") },
-            { value: "CSV", label: "CSV" },
+            { value: "CSV", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.cSV.label", { defaultValue: "CSV" }) },
             { value: "HTML", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.reportType.labelhTML") },
           ],
         },
@@ -475,9 +475,9 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           defaultValue: "PDF",
           options: [
-            { value: "PDF", label: "PDF" },
+            { value: "PDF", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.pDF.label", { defaultValue: "PDF" }) },
             { value: "Excel", label: t("reports.builtIn.reportsFormConfigs.newScheduledReportForm.attachmentFormat.label") },
-            { value: "CSV", label: "CSV" },
+            { value: "CSV", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.cSV.label", { defaultValue: "CSV" }) },
           ],
         },
       ],

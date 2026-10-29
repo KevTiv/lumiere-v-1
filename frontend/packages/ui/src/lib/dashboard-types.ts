@@ -79,7 +79,7 @@ export interface DiagnosticWidget extends BaseWidget {
 export interface AreaChartWidget extends BaseWidget {
   type: "area-chart"
   data: {
-    series: { name: string; color: string }[]
+    series: { name: string; label?: string; color: string }[]
     values: Array<{ [key: string]: string | number }>
     xAxisKey: string
     /** False for counts; omitted for continuous monetary measures. */
@@ -90,7 +90,7 @@ export interface AreaChartWidget extends BaseWidget {
 export interface LineChartWidget extends BaseWidget {
   type: "line-chart"
   data: {
-    series: { name: string; color: string }[]
+    series: { name: string; label?: string; color: string }[]
     values: Array<{ [key: string]: string | number }>
     xAxisKey: string
   }
@@ -99,7 +99,7 @@ export interface LineChartWidget extends BaseWidget {
 export interface BarChartWidget extends BaseWidget {
   type: "bar-chart"
   data: {
-    series: { name: string; color: string }[]
+    series: { name: string; label?: string; color: string }[]
     values: Array<{ [key: string]: string | number }>
     categoryKey: string
     /** False for counts; omitted for continuous monetary measures. */

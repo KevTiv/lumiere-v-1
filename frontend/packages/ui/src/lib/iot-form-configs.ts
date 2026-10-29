@@ -234,11 +234,11 @@ export function iotDeviceRowForm(t: TFunction, deviceId: string): FormConfig {
             label: t("iot.table.status"),
             width: "full",
             options: [
-              { value: "Online", label: "Online" },
-              { value: "Offline", label: "Offline" },
-              { value: "Error", label: "Error" },
-              { value: "Pairing", label: "Pairing" },
-              { value: "ConnectedNoServer", label: "ConnectedNoServer" },
+              { value: "Online", label: t("iot.builtIn.iotFormConfigs.iotDeviceRowForm.online.label", { defaultValue: "Online" }) },
+              { value: "Offline", label: t("iot.builtIn.iotFormConfigs.iotDeviceRowForm.offline.label", { defaultValue: "Offline" }) },
+              { value: "Error", label: t("common.error.title", { defaultValue: "Error" }) },
+              { value: "Pairing", label: t("iot.builtIn.iotFormConfigs.iotDeviceRowForm.pairing.label", { defaultValue: "Pairing" }) },
+              { value: "ConnectedNoServer", label: t("iot.builtIn.iotFormConfigs.iotDeviceRowForm.connectedNoServer.label", { defaultValue: "ConnectedNoServer" }) },
             ],
           },
           {

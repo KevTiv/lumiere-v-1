@@ -566,9 +566,9 @@ export function ProposalWorkspace({
         })
         .map((row) => ({
           id: String((row as { id?: unknown }).id),
-          name: String((row as { name?: unknown }).name ?? "Template"),
+          name: String((row as { name?: unknown }).name ?? t("proposalWorkspace.templateDefaultName")),
         })),
-    [templatesList, _companyId],
+    [templatesList, _companyId, t],
   )
 
   const sourceDispatch = useCallback(

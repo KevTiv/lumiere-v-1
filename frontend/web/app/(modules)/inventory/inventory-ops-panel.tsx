@@ -1,4 +1,6 @@
 'use client'
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useState } from 'react'
 import { useErpSession } from '@lumiere/erp-session'
@@ -27,9 +29,9 @@ export type InventoryOpsQueueId = 'short_atp' | 'expired_lots' | 'open_qc'
 const QUEUE_IDS: InventoryOpsQueueId[] = ['short_atp', 'expired_lots', 'open_qc']
 
 const QUEUE_LABELS: Record<InventoryOpsQueueId, string> = {
-  short_atp: 'Short ATP',
-  expired_lots: 'Expired lots',
-  open_qc: 'Open QC fails',
+  get short_atp() { return i18n.t("inventory.opsQueues.short_atp") },
+  get expired_lots() { return i18n.t("inventory.opsQueues.expired_lots") },
+  get open_qc() { return i18n.t("inventory.opsQueues.open_qc") },
 }
 
 function rowId(row: Record<string, unknown>): string {
@@ -45,6 +47,7 @@ export function InventoryOpsPanel({
   activeQueue: controlledQueue,
   onQueueChange,
 }: InventoryOpsPanelProps) {
+  const { t } = useTranslation()
   const { organizationId } = useErpSession()
   const orgIdNum =
     organizationId != null && organizationId > 0 ? organizationId : 0
@@ -181,7 +184,7 @@ export function InventoryOpsPanel({
               }
             }}
           >
-            {refresh.isPending ? 'Refreshing…' : 'Refresh queues'}
+            {refresh.isPending ? t("sales.salesOpsPanel.refreshing") : t("inventory.inventoryOpsPanel.refreshQueues")}
           </Button>
         </div>
 
@@ -195,18 +198,17 @@ export function InventoryOpsPanel({
           <table className="w-full text-left text-sm">
             <thead className="border-b bg-muted/40">
               <tr>
-                <th className="px-3 py-2 font-medium">Summary</th>
-                <th className="px-3 py-2 font-medium">Product</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Action</th>
+                <th className="px-3 py-2 font-medium">{t("common.entityView.pivot")}</th>
+                <th className="px-3 py-2 font-medium">{t("inventory.transfers.ops.product")}</th>
+                <th className="px-3 py-2 font-medium">{t("inventory.products.columns.type")}</th>
+                <th className="px-3 py-2 font-medium">{t("inventory.stockRules.columns.action")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
                   <td className="px-3 py-4 text-muted-foreground" colSpan={4}>
-                    No open exceptions in this queue.
-                  </td>
+                    {t("inventory.inventoryOpsPanel.noOpenExceptionsInThisQueue")}{" "}</td>
                 </tr>
               ) : (
                 rowsPager.pageRows.map((row) => {
@@ -239,8 +241,7 @@ export function InventoryOpsPanel({
                             }
                           }}
                         >
-                          Resolve
-                        </Button>
+                          {t("inventory.forms.solveQualityAlert.submitLabel")}{" "}</Button>
                       </td>
                     </tr>
                   )
@@ -258,10 +259,9 @@ export function InventoryOpsPanel({
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-medium">Remote warehouse sync</h3>
+            <h3 className="text-sm font-medium">{t("inventory.inventoryOpsPanel.remoteWarehouseSync")}</h3>
             <p className="text-xs text-muted-foreground">
-              Local outbox ({localQueued.length}) · server pending (
-              {pendingSync.data?.length ?? 0}) · device {deviceId.slice(0, 8)}
+              {t("inventory.inventoryOpsPanel.localOutbox")}{localQueued.length}{t("inventory.inventoryOpsPanel.serverPending")}{" "}{pendingSync.data?.length ?? 0}{t("inventory.inventoryOpsPanel.device")}{" "}{deviceId.slice(0, 8)}
             </p>
           </div>
           <Button
@@ -270,25 +270,24 @@ export function InventoryOpsPanel({
             disabled={!operatingCompanyId || syncBusy}
             onClick={() => void flushLocalOutbox()}
           >
-            {syncBusy ? 'Flushing…' : 'Flush outbox + apply'}
+            {syncBusy ? t("inventory.inventoryOpsPanel.flushing") : t("inventory.inventoryOpsPanel.flushOutboxApply")}
           </Button>
         </div>
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-left text-sm">
             <thead className="border-b bg-muted/40">
               <tr>
-                <th className="px-3 py-2 font-medium">Key</th>
-                <th className="px-3 py-2 font-medium">Op</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Action</th>
+                <th className="px-3 py-2 font-medium">{t("workflows.workflows.columns.key")}</th>
+                <th className="px-3 py-2 font-medium">{t("sales.deliveryPriceRules.columns.operator")}</th>
+                <th className="px-3 py-2 font-medium">{t("inventory.transfers.columns.state")}</th>
+                <th className="px-3 py-2 font-medium">{t("inventory.stockRules.columns.action")}</th>
               </tr>
             </thead>
             <tbody>
               {(pendingSync.data ?? []).length === 0 ? (
                 <tr>
                   <td className="px-3 py-4 text-muted-foreground" colSpan={4}>
-                    No pending server sync intents.
-                  </td>
+                    {t("inventory.inventoryOpsPanel.noPendingServerSyncIntents")}{" "}</td>
                 </tr>
               ) : (
                 pendingPager.pageRows.map((row) => {
@@ -321,8 +320,7 @@ export function InventoryOpsPanel({
                             }
                           }}
                         >
-                          Apply
-                        </Button>
+                          {t("purchasing.actions.applySelected")}{" "}</Button>
                       </td>
                     </tr>
                   )

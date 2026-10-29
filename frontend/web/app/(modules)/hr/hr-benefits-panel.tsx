@@ -124,8 +124,8 @@ export function HrBenefitsPanel({ organizationId, companyId, employees }: HrBene
             return (
               <li key={String(r.id)}>
                 {String(r.name ?? r.id)} (
-                {planTypeLabels[String(r.planType ?? r.plan_type ?? "other") as keyof typeof planTypeLabels] ??
-                  String(r.planType ?? r.plan_type ?? "other")}
+                {planTypeLabels[String(r.planType ?? r.plan_type ?? t("hr.hrBenefitsPanel.other")) as keyof typeof planTypeLabels] ??
+                  String(r.planType ?? r.plan_type ?? t("hr.hrBenefitsPanel.other"))}
                 )
               </li>
             )

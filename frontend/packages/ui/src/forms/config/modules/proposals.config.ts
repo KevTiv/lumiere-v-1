@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Proposals Module Form Configurations
 //!
 //! This module provides form configurations for Proposals.
@@ -9,23 +11,23 @@ export const proposalsForms: FormRegistryEntry[] = [
   {
     moduleId: "proposals",
     formId: "new-proposal",
-    name: "New Proposal",
-    description: "Create a new proposal",
+    get name() { return i18n.t("proposals.forms.newProposal.title") },
+    get description() { return i18n.t("forms.defaults.proposals.createANewProposal") },
     icon: "FileText",
-    category: "Proposals",
+    get category() { return i18n.t("proposals.proposals.title") },
     defaultConfig: () => ({
       moduleId: "proposals",
       formId: "new-proposal",
-      name: "New Proposal",
-      description: "Create a new proposal",
+      get name() { return i18n.t("proposals.forms.newProposal.title") },
+      get description() { return i18n.t("forms.defaults.proposals.createANewProposal") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "title",
           name: "title",
-          label: "Proposal Title",
+          get label() { return i18n.t("proposals.forms.newProposal.fields.title") },
           fieldType: "Text",
-          placeholder: "Enter proposal title",
+          get placeholder() { return i18n.t("forms.defaults.proposals.enterProposalTitle") },
           validation: { required: true, minLength: 3 },
           aiSuggestions: [],
           order: 1,
@@ -37,7 +39,7 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "client",
           name: "client",
-          label: "Client",
+          get label() { return i18n.t("proposals.proposals.columns.clientName") },
           fieldType: "UserSelect",
           validation: { required: true },
           aiSuggestions: [],
@@ -50,15 +52,15 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "status",
           name: "status",
-          label: "Status",
+          get label() { return i18n.t("proposals.proposals.columns.status") },
           fieldType: "Select",
           options: [
-            { value: "draft", label: "Draft", color: "gray" },
-            { value: "review", label: "Review", color: "blue" },
-            { value: "submitted", label: "Submitted", color: "yellow" },
-            { value: "awarded", label: "Awarded", color: "green" },
-            { value: "rejected", label: "Rejected", color: "red" },
-            { value: "archived", label: "Archived", color: "gray" },
+            { value: "draft", get label() { return i18n.t("proposals.proposals.filters.status.options.Draft") }, color: "gray" },
+            { value: "review", get label() { return i18n.t("proposals.proposals.filters.status.options.Review") }, color: "blue" },
+            { value: "submitted", get label() { return i18n.t("proposals.proposals.filters.status.options.Submitted") }, color: "yellow" },
+            { value: "awarded", get label() { return i18n.t("proposals.proposals.filters.status.options.Awarded") }, color: "green" },
+            { value: "rejected", get label() { return i18n.t("proposals.proposals.filters.status.options.Rejected") }, color: "red" },
+            { value: "archived", get label() { return i18n.t("proposals.proposals.filters.status.options.Archived") }, color: "gray" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -71,7 +73,7 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "valid_until",
           name: "valid_until",
-          label: "Valid Until",
+          get label() { return i18n.t("forms.defaults.proposals.validUntil") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -84,7 +86,7 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "amount",
           name: "amount",
-          label: "Total Amount",
+          get label() { return i18n.t("forms.defaults.proposals.totalAmount") },
           fieldType: "Number",
           placeholder: "0.00",
           validation: { required: true, min: 0 },
@@ -98,9 +100,9 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("proposals.templates.columns.description") },
           fieldType: "Textarea",
-          placeholder: "Proposal description...",
+          get placeholder() { return i18n.t("forms.defaults.proposals.proposalDescription") },
           validation: { required: false },
           aiSuggestions: [],
           order: 6,
@@ -112,7 +114,7 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Internal Notes",
+          get label() { return i18n.t("forms.defaults.proposals.internalNotes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -125,7 +127,7 @@ export const proposalsForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("forms.defaults.proposals.tags") },
           fieldType: "Tags",
           validation: { required: false },
           aiSuggestions: [],
