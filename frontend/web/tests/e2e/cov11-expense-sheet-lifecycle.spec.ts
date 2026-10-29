@@ -12,7 +12,6 @@ import {
   gotoModule,
   isoDate,
   scalarQueryId,
-  selectEntityRowById,
   signIn,
   smokeName,
   submitForm,
@@ -149,7 +148,9 @@ async function openSheetAction(
 ) {
   await gotoModule(page, "/expenses", "expenses")
   await selectModuleTab(page, "expenses", "expense-sheets")
-  await selectEntityRowById(page, sheetId)
+  // Expense reports open on row click; only their checkbox selects the report
+  // and exposes the bulk workflow actions.
+  await page.getByTestId(`entity-select-row-${sheetId}`).check()
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeVisible()
   return action
@@ -288,13 +289,16 @@ test.describe(
         sheetId,
         "submit-sheets",
       )
+      await submitAction.click()
+      const submitConfirmation = page.getByTestId("expense-report-confirm")
+      await expect(submitConfirmation).toBeVisible()
       const [submitted] = await Promise.all([
         page.waitForResponse(
           (response) =>
             matchesOperationResponse(response, "submit_expense_sheet"),
           { timeout: 45_000 },
         ),
-        submitAction.click(),
+        submitConfirmation.getByRole("button", { name: "Submit report", exact: true }).click(),
       ])
       expect(submitted.ok(), await submitted.text()).toBe(true)
       await expect
@@ -395,13 +399,16 @@ test.describe(
           sheetId,
           "approve-sheets",
         )
+        await approveAction.click()
+        const approveConfirmation = financePage.getByTestId("expense-report-confirm")
+        await expect(approveConfirmation).toBeVisible()
         const [approved] = await Promise.all([
           financePage.waitForResponse(
             (response) =>
               matchesOperationResponse(response, "approve_expense_sheet"),
             { timeout: 45_000 },
           ),
-          approveAction.click(),
+          approveConfirmation.getByRole("button", { name: "Approve report", exact: true }).click(),
         ])
         expect(approved.ok(), await approved.text()).toBe(true)
         approvedRequest = approved.request()
