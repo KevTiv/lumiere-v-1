@@ -8,7 +8,7 @@ import { Badge } from "@lumiere/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@lumiere/ui/components/card"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
 import { mapRunObservation, type RunObservationView } from "./run-observation"
-import { runStatusLabel } from "./enum-labels"
+import { runStatusLabel, attemptStatusLabel, reservationStatusLabel, runStepOutcomeLabel } from "./enum-labels"
 
 export type ObservationState =
   | { status: "idle" }
@@ -84,15 +84,15 @@ export function RunObservation({ observation }: { observation: ObservationState 
         {run.economics ? (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
             {run.economics.providerModels.map((pair) => <Badge key={`${pair.provider}:${pair.model}`} variant="outline">{pair.provider} / {pair.model}</Badge>)}
-            {run.economics.providerModelsTruncated ? <Badge variant="outline">Provider list truncated</Badge> : null}
-            {run.economics.attemptCount !== null ? <span>{run.economics.attemptCount} provider attempt{run.economics.attemptCount === 1 ? "" : "s"}</span> : null}
-            {run.economics.inputTokens !== null && run.economics.outputTokens !== null ? <span>{run.economics.inputTokens.toLocaleString()} input / {run.economics.outputTokens.toLocaleString()} output tokens</span> : null}
-            {run.economics.reservedUnits !== null ? <span>{(run.economics.reservedUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} {run.economics.currency ?? "units"} reserved</span> : null}
-            {run.economics.settledUnits !== null ? <span>{(run.economics.settledUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} {run.economics.currency ?? "units"} settled</span> : null}
-            {run.economics.attemptStatuses.map((status) => <Badge key={`attempt:${status}`} variant="outline">attempt {status}</Badge>)}
-            {run.economics.reservationStatuses.map((status) => <Badge key={`reservation:${status}`} variant="outline">reservation {status}</Badge>)}
-            {run.economics.outcomeUnknown ? <Badge variant="destructive">Outcome unknown</Badge> : null}
-            {run.economics.truncated ? <Badge variant="outline">Economics truncated</Badge> : null}
+            {run.economics.providerModelsTruncated ? <Badge variant="outline">{t("ai-harness.runHistoryPanel.providerListTruncated")}</Badge> : null}
+            {run.economics.attemptCount !== null ? <span>{t("ai-harness.runObservationPanel.providerAttemptCount", { count: run.economics.attemptCount })}</span> : null}
+            {run.economics.inputTokens !== null && run.economics.outputTokens !== null ? <span>{t("aiHarness.runMetrics.inputOutputTokens", { input: run.economics.inputTokens.toLocaleString(), output: run.economics.outputTokens.toLocaleString() })}</span> : null}
+            {run.economics.reservedUnits !== null ? <span>{(run.economics.reservedUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} {run.economics.currency ?? t("ai-harness.runHistoryPanel.units")} {" "}{t("ai-harness.runHistoryPanel.reserved")}</span> : null}
+            {run.economics.settledUnits !== null ? <span>{(run.economics.settledUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} {run.economics.currency ?? t("ai-harness.runHistoryPanel.units")} {" "}{t("ai-harness.runHistoryPanel.settled")}</span> : null}
+            {run.economics.attemptStatuses.map((status) => <Badge key={`attempt:${status}`} variant="outline">{t("aiHarness.runMetrics.attemptState", { status: attemptStatusLabel(t, status) })}</Badge>)}
+            {run.economics.reservationStatuses.map((status) => <Badge key={`reservation:${status}`} variant="outline">{t("aiHarness.runMetrics.reservationState", { status: reservationStatusLabel(t, status) })}</Badge>)}
+            {run.economics.outcomeUnknown ? <Badge variant="destructive">{t("ai-harness.runHistoryPanel.outcomeUnknown")}</Badge> : null}
+            {run.economics.truncated ? <Badge variant="outline">{t("ai-harness.runHistoryPanel.economicsTruncated")}</Badge> : null}
           </div>
         ) : null}
         {run.transcript.length === 0 ? (
@@ -110,7 +110,7 @@ export function RunObservation({ observation }: { observation: ObservationState 
                   <span className="text-xs text-muted-foreground">{t("aiHarness.runLifecycle.durationMs", { duration: step.durationMs.toLocaleString() })}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>{step.resultSummary}</span>
+                  <span>{runStepOutcomeLabel(t, step)}</span>
                   {step.inputHash ? <span title={step.inputHash}>{t("aiHarness.runLifecycle.inputHash", { hash: `${step.inputHash.slice(0, 12)}…` })}</span> : null}
                 </div>
               </li>

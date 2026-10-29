@@ -5,7 +5,7 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/
 import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
@@ -192,8 +192,8 @@ function employeeRowId(row: Record<string, unknown>): number {
 
 const newOnboardingTemplateForm: FormConfig = {
   id: "new-onboarding-template",
-  title: "New onboarding template",
-  submitLabel: "Create template",
+  get title() { return i18n.t("hr.hrClient.newOnboardingTemplate") },
+  get submitLabel() { return i18n.t("documents.builtIn.documentsFormConfigs.newDocumentTemplateForm.newDocumentTemplate.submitLabel") },
   sections: [
     {
       id: "template-fields",
@@ -202,14 +202,14 @@ const newOnboardingTemplateForm: FormConfig = {
           id: "template-name",
           type: "text",
           name: "name",
-          label: "Template name",
+          get label() { return i18n.t("common.importAssistant.saveTemplatePlaceholder") },
           required: true,
         },
         {
           id: "template-description",
           type: "text",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("recordChanges.fields.name") },
         },
       ],
     },
@@ -218,20 +218,19 @@ const newOnboardingTemplateForm: FormConfig = {
 
 const archiveEmployeeForm: FormConfig = {
   id: "archive-employee",
-  title: "Archive Employee",
-  submitLabel: "Archive employee",
+  get title() { return i18n.t("hr.hrClient.archiveEmployee") },
+  get submitLabel() { return i18n.t("hr.hrClient.archiveEmployee2") },
   sections: [
     {
       id: "offboarding",
-      title: "Offboarding checklist",
-      description:
-        "Complete assets, access, and docs before archive. Unchecked items require an override reason.",
+      get title() { return i18n.t("hr.hrClient.offboardingChecklist") },
+      get description() { return i18n.t("hr.hrClient.completeAssetsAccessAndDocsBeforeArchiveUncheckedItemsRequireAn") },
       fields: [
         {
           id: "assets-returned",
           type: "switch",
           name: "assetsReturned",
-          label: "Assets returned",
+          get label() { return i18n.t("hr.offboarding.items.assetsReturned") },
           defaultValue: true,
           width: "1/2",
         },
@@ -239,7 +238,7 @@ const archiveEmployeeForm: FormConfig = {
           id: "access-revoked",
           type: "switch",
           name: "accessRevoked",
-          label: "Access revoked",
+          get label() { return i18n.t("hr.offboarding.items.accessRevoked") },
           defaultValue: true,
           width: "1/2",
         },
@@ -247,7 +246,7 @@ const archiveEmployeeForm: FormConfig = {
           id: "docs-collected",
           type: "switch",
           name: "docsCollected",
-          label: "Docs collected",
+          get label() { return i18n.t("hr.hrClient.docsCollected") },
           defaultValue: true,
           width: "1/2",
         },
@@ -255,13 +254,13 @@ const archiveEmployeeForm: FormConfig = {
           id: "override-reason",
           type: "text",
           name: "overrideReason",
-          label: "Override reason (if checklist incomplete)",
+          get label() { return i18n.t("hr.hrClient.overrideReasonIfChecklistIncomplete") },
         },
         {
           id: "termination-date",
           type: "date",
           name: "terminationDate",
-          label: "Termination date",
+          get label() { return i18n.t("hr.hrClient.terminationDate") },
         },
       ],
     },
@@ -270,8 +269,8 @@ const archiveEmployeeForm: FormConfig = {
 
 const approvePayslipForm: FormConfig = {
   id: "approve-payslip",
-  title: "Approve Payslip for Export",
-  submitLabel: "Approve for export",
+  get title() { return i18n.t("hr.hrClient.approvePayslipForExport") },
+  get submitLabel() { return i18n.t("hr.hrClient.approveForExport") },
   sections: [
     {
       id: "wages",
@@ -280,14 +279,14 @@ const approvePayslipForm: FormConfig = {
           id: "gross-wage",
           type: "number",
           name: "grossWage",
-          label: "Proposed gross wage",
+          get label() { return i18n.t("hr.hrClient.proposedGrossWage") },
           width: "1/2",
         },
         {
           id: "net-wage",
           type: "number",
           name: "netWage",
-          label: "Proposed net wage",
+          get label() { return i18n.t("hr.hrClient.proposedNetWage") },
           width: "1/2",
         },
       ],
@@ -297,8 +296,8 @@ const approvePayslipForm: FormConfig = {
 
 const postPayslipForm: FormConfig = {
   id: "post-payslip",
-  title: "Post Payslip to GL",
-  submitLabel: "Post to GL",
+  get title() { return i18n.t("hr.hrClient.postPayslipToGL") },
+  get submitLabel() { return i18n.t("hr.hrClient.postToGL") },
   sections: [
     {
       id: "accounts",
@@ -307,35 +306,35 @@ const postPayslipForm: FormConfig = {
           id: "journal-id",
           type: "number",
           name: "journalId",
-          label: "Journal ID",
+          get label() { return i18n.t("accounting.consolidation.forms.newElimination.fields.journalId") },
           width: "1/2",
         },
         {
           id: "accounting-date",
           type: "date",
           name: "accountingDate",
-          label: "Accounting date",
+          get label() { return i18n.t("expenses.expenseReports.columns.accountingDate") },
           width: "1/2",
         },
         {
           id: "expense-account-id",
           type: "number",
           name: "expenseAccountId",
-          label: "Payroll expense account ID",
+          get label() { return i18n.t("hr.hrClient.payrollExpenseAccountID") },
           width: "1/2",
         },
         {
           id: "payable-account-id",
           type: "number",
           name: "payableAccountId",
-          label: "Salaries payable account ID",
+          get label() { return i18n.t("hr.hrClient.salariesPayableAccountID") },
           width: "1/2",
         },
         {
           id: "tax-account-id",
           type: "number",
           name: "taxWithholdingAccountId",
-          label: "Tax withholding account ID (if gross ≠ net)",
+          get label() { return i18n.t("hr.hrClient.taxWithholdingAccountIDIfGrossNet") },
           width: "1/2",
         },
       ],
@@ -536,13 +535,13 @@ function HrClientLoaded({
     ) => {
       setToolbarError(null)
       if (rows.length !== 1) {
-        setToolbarError("Select one row to edit.")
+        setToolbarError(t("hr.hrClient.selectOneRowToEdit"))
         return
       }
       setRowActionError(null)
       setRowAction({ action, row: rows[0]!, form: buildForm(rows[0]!) })
     },
-    [],
+    [t],
   )
 
   const pricelistFieldOptions = useMemo(() => {
@@ -756,7 +755,7 @@ function HrClientLoaded({
       customTabs: [
         {
           id: "onboarding",
-          label: "Onboarding",
+          label: t("hr.hrClient.onboarding"),
           content: (record) => (
             <HrOnboardingPanel
               organizationId={orgId}
@@ -767,7 +766,7 @@ function HrClientLoaded({
         },
         {
           id: "documents",
-          label: "Documents",
+          label: t("nav.documents"),
           content: (record) => (
             <HrDocumentsPanel
               organizationId={orgId}
@@ -877,7 +876,7 @@ function HrClientLoaded({
   const orgChartTab = useMemo(
     () => ({
       id: "org-chart",
-      label: "Org Chart",
+      label: t("hr.hrClient.orgChart"),
       type: "custom" as const,
       customContent: (
         <OrgChartPanel
@@ -886,13 +885,13 @@ function HrClientLoaded({
         />
       ),
     }),
-    [departments, employees],
+    [departments, employees, t],
   )
 
   const performanceTab = useMemo(
     () => ({
       id: "performance",
-      label: "Performance",
+      label: t("hr.hrClient.performance"),
       type: "custom" as const,
       customContent: (
         <HrPerformancePanel
@@ -902,13 +901,13 @@ function HrClientLoaded({
         />
       ),
     }),
-    [orgId, operatingCompanyId, employees],
+    [orgId, operatingCompanyId, employees, t],
   )
 
   const benefitsTab = useMemo(
     () => ({
       id: "benefits",
-      label: "Benefits",
+      label: t("hr.hrClient.benefits"),
       type: "custom" as const,
       customContent: (
         <HrBenefitsPanel
@@ -918,13 +917,13 @@ function HrClientLoaded({
         />
       ),
     }),
-    [orgId, operatingCompanyId, employees],
+    [orgId, operatingCompanyId, employees, t],
   )
 
   const recruitmentTab = useMemo(
     () => ({
       id: "recruitment",
-      label: "Recruitment",
+      label: t("hr.hrClient.recruitment"),
       type: "custom" as const,
       customContent: (
         <HrRecruitmentPanel
@@ -933,7 +932,7 @@ function HrClientLoaded({
         />
       ),
     }),
-    [orgId, operatingCompanyId],
+    [orgId, operatingCompanyId, t],
   )
 
   const liveSections = useMemo(() => {
@@ -1021,7 +1020,7 @@ function HrClientLoaded({
               )
               const byType = groupBy(
                 leaves,
-                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || "Unspecified",
+                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || t("hr.hrClient.unspecified"),
               )
               const colors = ["#6366f1", "#f59e0b", "#22c55e", "#8b5cf6"]
               const totalDays = leaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
@@ -1115,7 +1114,7 @@ function HrClientLoaded({
             return {
               ...tab,
               createForm: newDepartmentForm(t),
-              createLabel: "New Department",
+              createLabel: t("hr.forms.newDepartment.title"),
               createAction: "createDepartment",
               entityConfig: addCsvToolbar(tab.entityConfig, [
                 {
@@ -1125,7 +1124,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "edit-department",
-                  label: "Edit",
+                  label: t("common.edit"),
                   requiresSelection: true,
                   onClick: (rows) => openEditRow(rows, "updateDepartment", buildEditDepartmentForm),
                 },
@@ -1151,7 +1150,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "submit-leave",
-                  label: "Submit",
+                  label: t("common.submit"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["Draft"].includes(hrRowState(row))),
@@ -1160,7 +1159,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "approve-leave",
-                  label: "Approve",
+                  label: t("purchasing.actions.approveSelected"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
@@ -1169,7 +1168,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "refuse-leave",
-                  label: "Refuse",
+                  label: t("expenses.workflow.refuseReport"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
@@ -1178,7 +1177,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "reset-leave",
-                  label: "Reset to draft",
+                  label: t("recordHeader.reset"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["Refused", "Confirm", "ValidatedOne"].includes(hrRowState(row))),
@@ -1229,13 +1228,13 @@ function HrClientLoaded({
                 },
                 {
                   id: "edit-contract",
-                  label: "Edit",
+                  label: t("common.edit"),
                   requiresSelection: true,
                   onClick: (rows) => openEditRow(rows, "updateContract", buildEditContractForm),
                 },
                 {
                   id: "open-contract",
-                  label: "Open",
+                  label: t("hr.jobPositions.filters.state.options.open"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["New"].includes(hrRowState(row))),
@@ -1244,7 +1243,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "expire-contract",
-                  label: "Expire",
+                  label: t("hr.hrClient.expire"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["Open"].includes(hrRowState(row))),
@@ -1253,7 +1252,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "cancel-contract",
-                  label: "Cancel",
+                  label: t("common.cancel"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => ["New", "Open"].includes(hrRowState(row))),
@@ -1287,7 +1286,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "approve-payslip",
-                  label: "Approve for export",
+                  label: t("hr.hrClient.approveForExport"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Draft"),
@@ -1295,7 +1294,7 @@ function HrClientLoaded({
                     setToolbarError(null)
                     const draftRows = rows.filter((row) => payslipState(row) === "Draft")
                     if (draftRows.length === 0) {
-                      setToolbarError("Select at least one draft payslip.")
+                      setToolbarError(t("hr.hrClient.selectAtLeastOneDraftPayslip"))
                       return
                     }
                     setRowActionError(null)
@@ -1304,7 +1303,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "create-stp-intent",
-                  label: "STP unavailable",
+                  label: t("hr.hrClient.sTPUnavailable"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
@@ -1312,7 +1311,7 @@ function HrClientLoaded({
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
-                      setToolbarError("Select Verify (approved) payslips for STP integration.")
+                      setToolbarError(t("hr.hrClient.selectVerifyApprovedPayslipsForSTPIntegration"))
                       return
                     }
                     setToolbarError(hrStpProviderState().reason)
@@ -1320,7 +1319,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "export-payslip",
-                  label: "Create export intent",
+                  label: t("hr.hrClient.createExportIntent"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
@@ -1329,7 +1328,7 @@ function HrClientLoaded({
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
-                      setToolbarError("Select Verify (approved) payslips to export.")
+                      setToolbarError(t("hr.hrClient.selectVerifyApprovedPayslipsToExport"))
                       return
                     }
                     try {
@@ -1353,7 +1352,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "post-payslip",
-                  label: "Post to GL",
+                  label: t("hr.hrClient.postToGL"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
@@ -1361,7 +1360,7 @@ function HrClientLoaded({
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
-                      setToolbarError("Select Verify (approved) payslips to post.")
+                      setToolbarError(t("hr.hrClient.selectVerifyApprovedPayslipsToPost"))
                       return
                     }
                     setRowActionError(null)
@@ -1370,7 +1369,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "cancel-payslip",
-                  label: "Cancel",
+                  label: t("common.cancel"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => !["Cancelled", "Done"].includes(hrRowState(row))),
@@ -1397,7 +1396,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "edit-job-position",
-                  label: "Edit",
+                  label: t("common.edit"),
                   requiresSelection: true,
                   onClick: (rows) => openEditRow(rows, "updateJobPosition", buildEditJobPositionForm),
                 },
@@ -1416,7 +1415,7 @@ function HrClientLoaded({
                 },
                 {
                   id: "edit-leave-type",
-                  label: "Edit",
+                  label: t("common.edit"),
                   requiresSelection: true,
                   onClick: (rows) => openEditRow(rows, "updateLeaveType", buildEditLeaveTypeForm),
                 },
@@ -1453,7 +1452,7 @@ function HrClientLoaded({
             return {
               ...tab,
               createForm: newOnboardingTemplateForm,
-              createLabel: "New template",
+              createLabel: t("documents.designer.createAction"),
               createAction: "createOnboardingTemplate",
             }
           }
@@ -1672,9 +1671,9 @@ function HrClientLoaded({
         description: formData.description ? String(formData.description) : undefined,
         active: true,
         items: [
-          { title: "HR paperwork", sequence: 10, required: true },
-          { title: "IT access & equipment", sequence: 20, required: true },
-          { title: "Team introduction", sequence: 30, required: false },
+          { title: t("hr.hrClient.hRPaperwork"), sequence: 10, required: true },
+          { title: t("hr.hrClient.iTAccessEquipment"), sequence: 20, required: true },
+          { title: t("hr.hrClient.teamIntroduction"), sequence: 30, required: false },
         ],
       })
     }

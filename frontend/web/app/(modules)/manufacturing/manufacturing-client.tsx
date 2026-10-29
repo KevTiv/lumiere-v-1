@@ -156,7 +156,7 @@ function ManufacturingClientLoaded({
   const iotReferenceStatus = iotDevicesQuery.status === "success"
     ? undefined
     : initialIotDevicesState?.status === "denied"
-      ? "Access denied"
+      ? t("aiHarness.reviewQueue.accessDenied")
       : iotDevicesQuery.status === "error" || initialIotDevicesState?.status === "unavailable"
         ? "Unavailable"
         : "Loading"
@@ -641,8 +641,7 @@ function ManufacturingClientLoaded({
       <ManufacturingActionResult links={resultLinks} onDismiss={() => setResultLinks([])} />
       {iotReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
-          IoT device reference data: {iotReferenceStatus}. Device linking requires IoT device read access; manufacturing order and BOM workflows remain available.
-        </p>
+          {t("manufacturing.manufacturingClient.ioTDeviceReferenceData")}{" "}{iotReferenceStatus}{t("manufacturing.manufacturingClient.deviceLinkingRequiresIoTDeviceReadAccessManufacturingOrderAndBOM")}{" "}</p>
       )}
       <ModuleView
         config={config}

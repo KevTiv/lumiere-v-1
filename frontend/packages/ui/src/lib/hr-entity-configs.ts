@@ -670,76 +670,76 @@ export const salaryRulesTableConfig = (t: TFunction): EntityViewConfig => ({
 
 export const onboardingTemplatesTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "onboarding-templates-table",
-  title: "Onboarding templates",
-  description: "Reusable hire checklists assigned to new employees",
+  title: t("hr.builtIn.hrEntityConfigs.onboardingTemplatesTableConfig.onboardingTemplatesTable.title", { defaultValue: "Onboarding templates" }),
+  description: t("hr.builtIn.hrEntityConfigs.onboardingTemplatesTableConfig.onboardingTemplatesTable.description", { defaultValue: "Reusable hire checklists assigned to new employees" }),
   view: {
     mode: "table",
     // Reviewed for generic CSV: sensitive columns are excluded from the file.
     allowExport: true,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search templates…",
+    searchPlaceholder: t("hr.builtIn.hrEntityConfigs.onboardingTemplatesTableConfig.view.searchPlaceholder", { defaultValue: "Search templates…" }),
     searchKeys: ["name", "description"],
     columns: [
-      { key: "name", label: "Name", width: "min-w-40", sortable: true },
-      { key: "description", type: "markdown", label: "Description", width: "min-w-48" },
-      { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
-      { key: "companyId", label: "Company", width: "min-w-24" },
+      { key: "name", label: t("hr.employees.columns.name", { defaultValue: "Name" }), width: "min-w-40", sortable: true },
+      { key: "description", type: "markdown", label: t("hr.builtIn.hrEntityConfigs.onboardingTemplatesTableConfig.description.label", { defaultValue: "Description" }), width: "min-w-48" },
+      { key: "active", label: t("common.active", { defaultValue: "Active" }), type: "boolean", width: "min-w-20" },
+      { key: "companyId", label: t("common.builtIn.formConfigs.newOrderForm.customerCompany.label", { defaultValue: "Company" }), width: "min-w-24" },
     ],
-    emptyMessage: "No onboarding templates yet — create one to assign on hire.",
+    emptyMessage: t("hr.builtIn.hrEntityConfigs.onboardingTemplatesTableConfig.view.emptyMessage", { defaultValue: "No onboarding templates yet — create one to assign on hire." }),
   },
 })
 
 export const performanceCyclesTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "performance-cycles-table",
-  title: "Performance cycles",
-  description: "Review periods for goals and employee evaluations",
+  title: t("hr.performance.cycles.title", { defaultValue: "Performance cycles" }),
+  description: t("hr.builtIn.hrEntityConfigs.performanceCyclesTableConfig.performanceCyclesTable.description", { defaultValue: "Review periods for goals and employee evaluations" }),
   view: {
     mode: "table",
     // Reviewed for generic CSV: sensitive columns are excluded from the file.
     allowExport: true,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search cycles…",
+    searchPlaceholder: t("hr.builtIn.hrEntityConfigs.performanceCyclesTableConfig.view.searchPlaceholder", { defaultValue: "Search cycles…" }),
     searchKeys: ["name", "state"],
     columns: [
-      { key: "name", label: "Name", width: "min-w-40", sortable: true },
-      { key: "state", label: "State", type: "badge", width: "min-w-24" },
-      { key: "startDate", label: "Start", type: "date", width: "min-w-28" },
-      { key: "endDate", label: "End", type: "date", width: "min-w-28" },
-      { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
+      { key: "name", label: t("hr.employees.columns.name", { defaultValue: "Name" }), width: "min-w-40", sortable: true },
+      { key: "state", label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }), type: "badge", width: "min-w-24" },
+      { key: "startDate", label: t("hr.contracts.columns.dateStart", { defaultValue: "Start" }), type: "date", width: "min-w-28" },
+      { key: "endDate", label: t("hr.contracts.columns.dateEnd", { defaultValue: "End" }), type: "date", width: "min-w-28" },
+      { key: "active", label: t("common.active", { defaultValue: "Active" }), type: "boolean", width: "min-w-20" },
     ],
-    emptyMessage: "No performance cycles — create one to start goal setting.",
+    emptyMessage: t("hr.builtIn.hrEntityConfigs.performanceCyclesTableConfig.view.emptyMessage", { defaultValue: "No performance cycles — create one to start goal setting." }),
   },
 })
 
 export const performanceGoalsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "performance-goals-table",
-  title: "Performance goals",
-  description: "Employee goals linked to review cycles",
+  title: t("hr.builtIn.hrEntityConfigs.performanceGoalsTableConfig.performanceGoalsTable.title", { defaultValue: "Performance goals" }),
+  description: t("hr.builtIn.hrEntityConfigs.performanceGoalsTableConfig.performanceGoalsTable.description", { defaultValue: "Employee goals linked to review cycles" }),
   view: {
     mode: "table",
     // Reviewed for generic CSV: sensitive columns are excluded from the file.
     allowExport: true,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search goals…",
+    searchPlaceholder: t("hr.builtIn.hrEntityConfigs.performanceGoalsTableConfig.view.searchPlaceholder", { defaultValue: "Search goals…" }),
     searchKeys: ["title", "employeeId", "cycleId"],
     columns: [
-      { key: "title", sensitive: true, label: "Goal", width: "min-w-40" },
-      { key: "employeeId", sensitive: true, label: "Employee", width: "min-w-28" },
-      { key: "cycleId", label: "Cycle", width: "min-w-24" },
-      { key: "state", label: "State", type: "badge", width: "min-w-24" },
-      { key: "weight", label: "Weight", type: "number", align: "right", width: "min-w-20" },
+      { key: "title", sensitive: true, label: t("hr.builtIn.hrEntityConfigs.performanceGoalsTableConfig.title.label", { defaultValue: "Goal" }), width: "min-w-40" },
+      { key: "employeeId", sensitive: true, label: t("hr.leaveRequests.columns.employeeId", { defaultValue: "Employee" }), width: "min-w-28" },
+      { key: "cycleId", label: t("hr.performance.cycles.selectPlaceholder", { defaultValue: "Cycle" }), width: "min-w-24" },
+      { key: "state", label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }), type: "badge", width: "min-w-24" },
+      { key: "weight", label: t("hr.builtIn.hrEntityConfigs.performanceGoalsTableConfig.weight.label", { defaultValue: "Weight" }), type: "number", align: "right", width: "min-w-20" },
     ],
-    emptyMessage: "No goals yet — add goals from a performance cycle.",
+    emptyMessage: t("hr.builtIn.hrEntityConfigs.performanceGoalsTableConfig.view.emptyMessage", { defaultValue: "No goals yet — add goals from a performance cycle." }),
   },
 })
 
 export const performanceReviewsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "performance-reviews-table",
-  title: "Performance reviews",
-  description: "Self and manager review workflow per employee and cycle",
+  title: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.performanceReviewsTable.title", { defaultValue: "Performance reviews" }),
+  description: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.performanceReviewsTable.description", { defaultValue: "Self and manager review workflow per employee and cycle" }),
   view: {
     mode: "table",
     // Individual ratings are personnel records.
@@ -747,57 +747,57 @@ export const performanceReviewsTableConfig = (t: TFunction): EntityViewConfig =>
     allowExport: false,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search reviews…",
+    searchPlaceholder: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.view.searchPlaceholder", { defaultValue: "Search reviews…" }),
     searchKeys: ["employeeId", "cycleId", "state"],
     filters: [
       {
         key: "state",
-        label: "State",
+        label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }),
         type: "select",
         options: [
-          { value: "draft", label: "Draft" },
-          { value: "submitted", label: "Submitted" },
-          { value: "completed", label: "Completed" },
+          { value: "draft", label: t("hr.leaveRequests.filters.state.options.Draft", { defaultValue: "Draft" }) },
+          { value: "submitted", label: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.submitted.label", { defaultValue: "Submitted" }) },
+          { value: "completed", label: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.completed.label", { defaultValue: "Completed" }) },
         ],
       },
     ],
     columns: [
-      { key: "employeeId", label: "Employee", width: "min-w-28" },
-      { key: "cycleId", label: "Cycle", width: "min-w-24" },
-      { key: "state", label: "State", type: "badge", width: "min-w-24" },
-      { key: "selfRating", label: "Self", type: "number", align: "right", width: "min-w-16" },
-      { key: "managerRating", label: "Manager", type: "number", align: "right", width: "min-w-20" },
+      { key: "employeeId", label: t("hr.leaveRequests.columns.employeeId", { defaultValue: "Employee" }), width: "min-w-28" },
+      { key: "cycleId", label: t("hr.performance.cycles.selectPlaceholder", { defaultValue: "Cycle" }), width: "min-w-24" },
+      { key: "state", label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }), type: "badge", width: "min-w-24" },
+      { key: "selfRating", label: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.selfRating.label", { defaultValue: "Self" }), type: "number", align: "right", width: "min-w-16" },
+      { key: "managerRating", label: t("hr.departments.columns.managerId", { defaultValue: "Manager" }), type: "number", align: "right", width: "min-w-20" },
     ],
-    emptyMessage: "Reviews appear when goals are added for an employee in a cycle.",
+    emptyMessage: t("hr.builtIn.hrEntityConfigs.performanceReviewsTableConfig.view.emptyMessage", { defaultValue: "Reviews appear when goals are added for an employee in a cycle." }),
   },
 })
 
 export const benefitPlansTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "benefit-plans-table",
-  title: "Benefit plans",
-  description: "Catalog of benefit offerings for employee enrollment",
+  title: t("hr.benefits.plans.title", { defaultValue: "Benefit plans" }),
+  description: t("hr.builtIn.hrEntityConfigs.benefitPlansTableConfig.benefitPlansTable.description", { defaultValue: "Catalog of benefit offerings for employee enrollment" }),
   view: {
     mode: "table",
     // Reviewed for generic CSV: sensitive columns are excluded from the file.
     allowExport: true,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search plans…",
+    searchPlaceholder: t("hr.builtIn.hrEntityConfigs.benefitPlansTableConfig.view.searchPlaceholder", { defaultValue: "Search plans…" }),
     searchKeys: ["name", "planType"],
     columns: [
-      { key: "name", label: "Name", width: "min-w-40", sortable: true },
-      { key: "planType", label: "Type", width: "min-w-24" },
-      { key: "description", type: "markdown", label: "Description", width: "min-w-48" },
-      { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
+      { key: "name", label: t("hr.employees.columns.name", { defaultValue: "Name" }), width: "min-w-40", sortable: true },
+      { key: "planType", label: t("hr.employees.columns.employmentType", { defaultValue: "Type" }), width: "min-w-24" },
+      { key: "description", type: "markdown", label: t("hr.builtIn.hrEntityConfigs.onboardingTemplatesTableConfig.description.label", { defaultValue: "Description" }), width: "min-w-48" },
+      { key: "active", label: t("common.active", { defaultValue: "Active" }), type: "boolean", width: "min-w-20" },
     ],
-    emptyMessage: "No benefit plans — create a plan to enroll employees.",
+    emptyMessage: t("hr.builtIn.hrEntityConfigs.benefitPlansTableConfig.view.emptyMessage", { defaultValue: "No benefit plans — create a plan to enroll employees." }),
   },
 })
 
 export const benefitEnrollmentsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "benefit-enrollments-table",
-  title: "Benefit enrollments",
-  description: "Active and terminated employee benefit assignments",
+  title: t("hr.builtIn.hrEntityConfigs.benefitEnrollmentsTableConfig.benefitEnrollmentsTable.title", { defaultValue: "Benefit enrollments" }),
+  description: t("hr.builtIn.hrEntityConfigs.benefitEnrollmentsTableConfig.benefitEnrollmentsTable.description", { defaultValue: "Active and terminated employee benefit assignments" }),
   view: {
     mode: "table",
     // Benefit participation is individual personnel information.
@@ -805,27 +805,27 @@ export const benefitEnrollmentsTableConfig = (t: TFunction): EntityViewConfig =>
     allowExport: false,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search enrollments…",
+    searchPlaceholder: t("hr.builtIn.hrEntityConfigs.benefitEnrollmentsTableConfig.view.searchPlaceholder", { defaultValue: "Search enrollments…" }),
     searchKeys: ["employeeId", "planId", "state"],
     filters: [
       {
         key: "state",
-        label: "State",
+        label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }),
         type: "select",
         options: [
-          { value: "enrolled", label: "Enrolled" },
-          { value: "terminated", label: "Terminated" },
+          { value: "enrolled", label: t("hr.builtIn.hrEntityConfigs.benefitEnrollmentsTableConfig.enrolled.label", { defaultValue: "Enrolled" }) },
+          { value: "terminated", label: t("hr.builtIn.hrEntityConfigs.benefitEnrollmentsTableConfig.terminated.label", { defaultValue: "Terminated" }) },
         ],
       },
     ],
     columns: [
-      { key: "employeeId", label: "Employee", width: "min-w-28" },
-      { key: "planId", label: "Plan", width: "min-w-24" },
-      { key: "state", label: "State", type: "badge", width: "min-w-24" },
-      { key: "effectiveFrom", label: "From", type: "date", width: "min-w-28" },
-      { key: "effectiveTo", label: "To", type: "date", width: "min-w-28" },
+      { key: "employeeId", label: t("hr.leaveRequests.columns.employeeId", { defaultValue: "Employee" }), width: "min-w-28" },
+      { key: "planId", label: t("hr.benefits.planPlaceholder", { defaultValue: "Plan" }), width: "min-w-24" },
+      { key: "state", label: t("hr.leaveAllocations.columns.state", { defaultValue: "State" }), type: "badge", width: "min-w-24" },
+      { key: "effectiveFrom", label: t("hr.leaveRequests.columns.dateFrom", { defaultValue: "From" }), type: "date", width: "min-w-28" },
+      { key: "effectiveTo", label: t("hr.leaveRequests.columns.dateTo", { defaultValue: "To" }), type: "date", width: "min-w-28" },
     ],
-    emptyMessage: "No enrollments — assign employees to benefit plans.",
+    emptyMessage: t("hr.builtIn.hrEntityConfigs.benefitEnrollmentsTableConfig.view.emptyMessage", { defaultValue: "No enrollments — assign employees to benefit plans." }),
   },
 })
 

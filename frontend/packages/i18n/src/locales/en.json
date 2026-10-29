@@ -526,7 +526,11 @@
         "applyDomain": {
           "thisWidgetHasAnInvalidPersistedFilter": {
             "message": "This widget has an invalid persisted filter definition."
-          }
+          },
+          "message": "The filter for {{field}} has no operator.",
+          "messagetheInFilterForFieldMustUse": "The $in filter for {{field}} must use an array.",
+          "messagethisWidgetHasANonNumericOperandFor": "This widget has a non-numeric operand for {{operator}}.",
+          "messagethisWidgetUsesAnUnsupportedFilterOperator": "This widget uses an unsupported filter operator: {{operator}}."
         },
         "parseBinding": {
           "thisWidgetHasAnInvalidTimeOr": {
@@ -550,12 +554,14 @@
         "applyTimeRange": {
           "thisWidgetDoesNotDeclareATime": {
             "message": "This widget does not declare a time field for the selected date range."
-          }
+          },
+          "message": "This widget has incomplete timestamp data in {{timeField}}."
         },
         "applyMeasureCompleteness": {
           "thisWidgetDoesNotDeclareTheMeasure": {
             "message": "This widget does not declare the measure used by its aggregation."
-          }
+          },
+          "message": "This widget has incomplete numeric data in {{field}}."
         },
         "resolveStoredDashboard": {
           "theWidgetHasNoDataSource": {
@@ -563,13 +569,245 @@
           },
           "aChartWidgetRequiresAGroupByField": {
             "message": "A chart widget requires a group-by field."
-          }
+          },
+          "message": "The chart type {{chartType}} is not supported.",
+          "messagetheWidgetTypeValue1IsNotSupported": "The widget type {{value1}} is not supported."
+        },
+        "normalizeAggregation": {
+          "message": "The aggregation {{aggregation}} is not supported."
         }
       },
       "runtimeFormConfig": {
         "mergeRuntimeFormConfig": {
           "runtimeExtraFields": {
             "title": "Additional fields"
+          }
+        },
+        "stdbTypeToModular": {
+          "error": "Unsupported runtime field type: {{type}}"
+        },
+        "parsedFieldToModularField": {
+          "error": "MultiSelect default must be an array of strings: {{fieldId}}"
+        }
+      },
+      "formConfigs": {
+        "newOrderForm": {
+          "newOrder": {
+            "title": "Create New Order",
+            "description": "Enter the details for the new sales order",
+            "submitLabel": "Create Order"
+          },
+          "customerInfo": {
+            "title": "Customer Information"
+          },
+          "customerName": {
+            "label": "Customer Name",
+            "placeholder": "Enter customer name"
+          },
+          "customerEmail": {
+            "label": "Email Address"
+          },
+          "customerPhone": {
+            "label": "Phone Number"
+          },
+          "customerCompany": {
+            "label": "Company",
+            "placeholder": "Company name"
+          },
+          "orderDetails": {
+            "title": "Order Details"
+          },
+          "product": {
+            "label": "Product",
+            "placeholder": "Select a product"
+          },
+          "enterprise": {
+            "label": "Enterprise Suite - $200/mo"
+          },
+          "professional": {
+            "label": "Professional Plan - $150/mo"
+          },
+          "starter": {
+            "label": "Starter Kit - $50/mo"
+          },
+          "addonA": {
+            "label": "Add-on Module A - $50/mo"
+          },
+          "support": {
+            "label": "Support Package - $100/mo"
+          },
+          "quantity": {
+            "label": "Quantity"
+          },
+          "priority": {
+            "label": "Priority"
+          },
+          "low": {
+            "label": "Low"
+          },
+          "normal": {
+            "label": "Normal"
+          },
+          "high": {
+            "label": "High"
+          },
+          "urgent": {
+            "label": "Urgent"
+          },
+          "billingCycle": {
+            "label": "Billing Cycle"
+          },
+          "monthly": {
+            "label": "Monthly"
+          },
+          "quarterly": {
+            "label": "Quarterly (5% off)"
+          },
+          "annual": {
+            "label": "Annual (15% off)"
+          },
+          "notes": {
+            "label": "Order Notes",
+            "placeholder": "Any special instructions or notes..."
+          },
+          "options": {
+            "title": "Additional Options"
+          },
+          "expressShipping": {
+            "label": "Express Shipping (+$25)"
+          },
+          "giftWrap": {
+            "label": "Gift Wrap (+$5)"
+          },
+          "terms": {
+            "label": "I agree to the terms and conditions"
+          },
+          "newsletter": {
+            "label": "Subscribe to our newsletter"
+          }
+        },
+        "newCustomerForm": {
+          "newCustomer": {
+            "title": "Add New Customer",
+            "description": "Register a new customer in the system",
+            "submitLabel": "Add Customer"
+          },
+          "basicInfo": {
+            "title": "Basic Information"
+          },
+          "firstName": {
+            "label": "First Name",
+            "placeholder": "John"
+          },
+          "lastName": {
+            "label": "Last Name",
+            "placeholder": "Doe"
+          },
+          "email": {
+            "label": "Email"
+          },
+          "phone": {
+            "label": "Phone"
+          },
+          "companyInfo": {
+            "title": "Company Details"
+          },
+          "company": {
+            "label": "Company Name",
+            "placeholder": "Acme Inc."
+          },
+          "industry": {
+            "label": "Industry"
+          },
+          "tech": {
+            "label": "Technology"
+          },
+          "finance": {
+            "label": "Finance"
+          },
+          "healthcare": {
+            "label": "Healthcare"
+          },
+          "retail": {
+            "label": "Retail"
+          },
+          "manufacturing": {
+            "label": "Manufacturing"
+          },
+          "website": {
+            "label": "Website"
+          },
+          "preferences": {
+            "title": "Preferences"
+          },
+          "contactMethod": {
+            "label": "Preferred Contact Method"
+          },
+          "sms": {
+            "label": "SMS"
+          },
+          "marketing": {
+            "label": "Receive marketing communications"
+          }
+        },
+        "reportForm": {
+          "generateReport": {
+            "title": "Generate Report",
+            "description": "Configure and generate a custom report",
+            "submitLabel": "Generate"
+          },
+          "reportType": {
+            "label": "Report Type"
+          },
+          "sales": {
+            "label": "Sales Summary"
+          },
+          "inventory": {
+            "label": "Inventory Report"
+          },
+          "customers": {
+            "label": "Customer Analysis"
+          },
+          "financial": {
+            "label": "Financial Overview"
+          },
+          "format": {
+            "label": "Export Format"
+          },
+          "pdf": {
+            "label": "PDF Document"
+          },
+          "excel": {
+            "label": "Excel Spreadsheet"
+          },
+          "csv": {
+            "label": "CSV File"
+          },
+          "dateFrom": {
+            "label": "From Date"
+          },
+          "dateTo": {
+            "label": "To Date"
+          },
+          "includeCharts": {
+            "label": "Include visual charts"
+          },
+          "includeSummary": {
+            "label": "Include executive summary"
+          }
+        }
+      },
+      "rbacContext": {
+        "checkPermission": {
+          "reason": "No user logged in",
+          "reasonplatformSuperuser": "Platform superuser",
+          "reasonnoMatchingPolicyFound": "No matching policy found"
+        }
+      },
+      "workspaceNavigation": {
+        "resolveWorkspaceNavigation": {
+          "additional": {
+            "label": "Advanced"
           }
         }
       }
@@ -589,6 +827,32 @@
       "paymentNumber": "Payment #{{id}}",
       "delivery": "Delivery",
       "invoice": "Invoice"
+    },
+    "permissions": {
+      "allowedByPolicy": "Allowed by policy: {{id}}",
+      "deniedByPolicy": "Denied by policy: {{id}}",
+      "accessDenied": "You don't have permission to access this resource."
+    },
+    "workspaceNavigation": {
+      "overview": "Overview",
+      "more": "More workspaces"
+    },
+    "inlineEdit": {
+      "enterNumber": "Enter a number"
+    },
+    "dashboard": {
+      "widgetFallback": "Widget",
+      "emptyWidgetType": "(empty)",
+      "sourceLoading": "Source {{model}} is loading.",
+      "sourceDenied": "Access to source {{model}} was denied.",
+      "sourceUnavailable": "Source {{model}} is unavailable.",
+      "sourcePartial": "Source {{model}} is partial.",
+      "exportBlocked": "Dashboard export is blocked while data is {{state}}."
+    },
+    "runtimeForms": {
+      "incompatibleCardinality": "Runtime field {{id}} has incompatible cardinality for {{name}}",
+      "invalidBinding": "Invalid field binding",
+      "invalidField": "Runtime field {{id}}: {{message}}"
     }
   },
   "navigation": {
@@ -859,7 +1123,12 @@
           "customers": "Customers",
           "conversion": "Conversion",
           "avgOrder": "Avg Order",
-          "retention": "Retention"
+          "retention": "Retention",
+          "monthlyChange": "+12.5% this month",
+          "growth": "+8.2% growth",
+          "newThisMonth": "New this month",
+          "aboveTarget": "Above target",
+          "thirtyDayRate": "30-day rate"
         },
         "countdown": {
           "completed": "Completed",
@@ -4357,7 +4626,20 @@
         "accountingImportReview": {
           "duplicateColumnNamesMakeSourceTotalsAmbiguous": {
             "message": "Duplicate column names make source totals ambiguous. Use each column once."
-          }
+          },
+          "message": "Row {{rowNumber}}: duplicate document reference {{reference}}.",
+          "error": "is required",
+          "errorcannotBeNegative": "cannot be negative",
+          "errorexceedsTheSupportedMonetaryTotal": "exceeds the supported monetary total",
+          "messagerowRowNumberFieldValue3": "Row {{rowNumber}}, {{field}}: {{value3}}.",
+          "messagerowRowNumberOpeningResidualExceedsTheSource": "Row {{rowNumber}}: opening residual exceeds the source total."
+        },
+        "decimalUnits": {
+          "error": "supports at most 12 decimal places"
+        },
+        "exactAmount": {
+          "error": "has an unsupported decimal format",
+          "errorexceedsSupportedMonetaryMagnitudeOrPrecision": "exceeds supported monetary magnitude or precision"
         }
       },
       "moduleDashboardConfigs": {
@@ -5175,7 +5457,10 @@
       "opportunityFunnel": "Opportunity Funnel",
       "weightedPipeline": "Weighted pipeline",
       "forecastSnapshot": "Last forecast",
-      "pipelineHealthAttribution": "Pipeline & attribution"
+      "pipelineHealthAttribution": "Pipeline & attribution",
+      "series": {
+        "count": "Count"
+      }
     },
     "leads": {
       "title": "Leads",
@@ -6294,6 +6579,10 @@
         "hubs": "Hubs",
         "pendingActions": "Pending actions",
         "unusedTokens": "Unused pairing tokens"
+      },
+      "series": {
+        "events": "Events",
+        "alerts": "Alerts"
       }
     },
     "entities": {
@@ -6461,6 +6750,151 @@
       "syncTitle": "Sync hub devices (JSON)",
       "syncSubmit": "Run sync",
       "syncOk": "Device list synced."
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "iotDashboard": {
+          "iot": {
+            "description": "Connected devices, sensor streams, alerts, and hub status"
+          },
+          "iotQuickActions": {
+            "title": "Quick Actions"
+          },
+          "registerDevice": {
+            "label": "Register device"
+          },
+          "syncDevicesDev": {
+            "label": "Sync devices"
+          },
+          "iotStatCards": {
+            "title": "Key Metrics",
+            "label": "Total Devices",
+            "labelhubs": "Hubs",
+            "labelpairingTokensUnused": "Pairing tokens (unused)"
+          },
+          "iotActivity": {
+            "title": "Activity"
+          },
+          "iotEventsTrend": {
+            "title": "Events (Last 24h)"
+          },
+          "iotHubStatus": {
+            "title": "Hub Connectivity"
+          },
+          "iotAlerts": {
+            "title": "Active Alerts"
+          },
+          "iotAlertsTable": {
+            "title": "Recent Alerts"
+          },
+          "device": {
+            "label": "Device"
+          },
+          "message": {
+            "label": "Message"
+          },
+          "time": {
+            "label": "Time"
+          }
+        },
+        "iotModuleConfig": {
+          "iotAlerts": {
+            "label": "Alerts"
+          },
+          "iotThresholds": {
+            "label": "Thresholds"
+          }
+        }
+      },
+      "iotEntityConfigs": {
+        "iotHubsTableConfig": {
+          "id": {
+            "label": "ID"
+          }
+        },
+        "iotAlertsTableConfig": {
+          "iotAlertsTable": {
+            "title": "IoT Alerts",
+            "description": "Device alerts generated by thresholds and hub events."
+          },
+          "view": {
+            "searchPlaceholder": "Search alerts",
+            "emptyMessage": "No IoT alerts"
+          },
+          "severity": {
+            "label": "Severity"
+          },
+          "resolved": {
+            "label": "Resolved"
+          }
+        },
+        "iotThresholdsTableConfig": {
+          "iotThresholdsTable": {
+            "title": "IoT Thresholds",
+            "description": "Sensor threshold rules used to create alerts."
+          },
+          "view": {
+            "searchPlaceholder": "Search thresholds",
+            "emptyMessage": "No IoT thresholds"
+          },
+          "minValue": {
+            "label": "Min"
+          },
+          "maxValue": {
+            "label": "Max"
+          },
+          "updatedAt": {
+            "label": "Updated"
+          }
+        }
+      },
+      "iotFormConfigs": {
+        "iotDeviceRowForm": {
+          "online": {
+            "label": "Online"
+          },
+          "offline": {
+            "label": "Offline"
+          },
+          "pairing": {
+            "label": "Pairing"
+          },
+          "connectedNoServer": {
+            "label": "ConnectedNoServer"
+          }
+        }
+      }
+    },
+    "iotClient": {
+      "createIoTAction": "Create IoT Action",
+      "createAction": "Create action",
+      "triggeredBy": "Triggered by",
+      "payloadJSONString": "Payload JSON/string",
+      "failIoTAction": "Fail IoT Action",
+      "markFailed": "Mark failed",
+      "createIoTAlert": "Create IoT Alert",
+      "createAlert": "Create alert",
+      "alertType": "Alert type",
+      "setIoTThreshold": "Set IoT Threshold",
+      "saveThreshold": "Save threshold",
+      "minValue": "Min value",
+      "maxValue": "Max value",
+      "recordTelemetryBatch": "Record Telemetry Batch",
+      "provideAnArrayOfTelemetryReadingsWithSensorTypeValueUnit": "Provide an array of telemetry readings with sensor_type, value, unit, and quality.",
+      "recordBatch": "Record batch",
+      "readingsJSON": "Readings JSON",
+      "readingsJSONMustBeAnArray": "Readings JSON must be an array",
+      "eachReadingMustBeAnObject": "Each reading must be an object",
+      "eachReadingNeedsANumericValue": "Each reading needs a numeric value",
+      "selectAtLeastOneRow": "Select at least one row",
+      "ioTActionAcknowledged": "IoT action acknowledged",
+      "ioTActionRetryQueued": "IoT action retry queued",
+      "ioTAlertResolved": "IoT alert resolved",
+      "ioTActionCreated": "IoT action created",
+      "ioTActionFailed": "IoT action failed",
+      "ioTAlertCreated": "IoT alert created",
+      "ioTThresholdSaved": "IoT threshold saved",
+      "ioTTelemetryBatchRecorded": "IoT telemetry batch recorded"
     }
   },
   "hr": {
@@ -6470,7 +6904,11 @@
       "pendingLeaveRequests": "Pending Leave Requests",
       "runningContracts": "Running Contracts",
       "headcountTrend": "Headcount Trend",
-      "payslipsToExport": "Payslips to export"
+      "payslipsToExport": "Payslips to export",
+      "series": {
+        "employees": "Employees",
+        "headcount": "Headcount"
+      }
     },
     "employees": {
       "title": "Employees",
@@ -7170,6 +7608,240 @@
       "fallbackTitle": "Document",
       "metadata": "{{type}} · purpose: {{purpose}} · attachment: {{attachmentId}}",
       "remove": "Remove"
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "hrDashboard": {
+          "hr": {
+            "title": "HR & People",
+            "description": "Workforce overview, recruitment, attendance, and performance"
+          },
+          "hrQuickActions": {
+            "title": "Quick Actions"
+          },
+          "createEmployee": {
+            "label": "Add Employee"
+          },
+          "createLeave": {
+            "label": "Request Leave"
+          },
+          "createContract": {
+            "label": "New Contract"
+          },
+          "createPayslip": {
+            "label": "Generate Payslip"
+          },
+          "hrStatCards": {
+            "title": "Key Metrics",
+            "label": "Turnover Rate",
+            "labelsatisfactionScore": "Satisfaction Score"
+          },
+          "hrWorkforce": {
+            "title": "Workforce Distribution"
+          },
+          "hrByDepartment": {
+            "title": "Headcount by Department"
+          },
+          "hrLeaveUsage": {
+            "title": "Leave Balance Usage"
+          },
+          "hrHiring": {
+            "title": "Active Recruitment"
+          },
+          "role": {
+            "label": "Role"
+          },
+          "dept": {
+            "label": "Department"
+          },
+          "candidates": {
+            "label": "Candidates"
+          },
+          "stage": {
+            "label": "Stage"
+          },
+          "posted": {
+            "label": "Posted"
+          }
+        },
+        "hrModuleConfig": {
+          "hr": {
+            "title": "HR & People",
+            "description": "Workforce overview, recruitment, attendance, and performance"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "employees": {
+            "label": "Employees",
+            "createLabel": "New Employee"
+          },
+          "leaves": {
+            "createLabel": "New Request"
+          },
+          "attendance": {
+            "createLabel": "Record Punch"
+          },
+          "contracts": {
+            "createLabel": "New Contract"
+          },
+          "jobPositions": {
+            "createLabel": "New Position"
+          },
+          "recruitment": {
+            "createLabel": "New Position"
+          },
+          "payrollStructures": {
+            "createLabel": "New Structure"
+          },
+          "salaryRules": {
+            "createLabel": "New Rule"
+          },
+          "onboardingTemplates": {
+            "createLabel": "New template"
+          }
+        }
+      },
+      "hrEntityConfigs": {
+        "onboardingTemplatesTableConfig": {
+          "onboardingTemplatesTable": {
+            "title": "Onboarding templates",
+            "description": "Reusable hire checklists assigned to new employees"
+          },
+          "view": {
+            "searchPlaceholder": "Search templates…",
+            "emptyMessage": "No onboarding templates yet — create one to assign on hire."
+          },
+          "description": {
+            "label": "Description"
+          }
+        },
+        "performanceCyclesTableConfig": {
+          "performanceCyclesTable": {
+            "description": "Review periods for goals and employee evaluations"
+          },
+          "view": {
+            "searchPlaceholder": "Search cycles…",
+            "emptyMessage": "No performance cycles — create one to start goal setting."
+          }
+        },
+        "performanceGoalsTableConfig": {
+          "performanceGoalsTable": {
+            "title": "Performance goals",
+            "description": "Employee goals linked to review cycles"
+          },
+          "view": {
+            "searchPlaceholder": "Search goals…",
+            "emptyMessage": "No goals yet — add goals from a performance cycle."
+          },
+          "title": {
+            "label": "Goal"
+          },
+          "weight": {
+            "label": "Weight"
+          }
+        },
+        "performanceReviewsTableConfig": {
+          "performanceReviewsTable": {
+            "title": "Performance reviews",
+            "description": "Self and manager review workflow per employee and cycle"
+          },
+          "view": {
+            "searchPlaceholder": "Search reviews…",
+            "emptyMessage": "Reviews appear when goals are added for an employee in a cycle."
+          },
+          "submitted": {
+            "label": "Submitted"
+          },
+          "completed": {
+            "label": "Completed"
+          },
+          "selfRating": {
+            "label": "Self"
+          }
+        },
+        "benefitPlansTableConfig": {
+          "benefitPlansTable": {
+            "description": "Catalog of benefit offerings for employee enrollment"
+          },
+          "view": {
+            "searchPlaceholder": "Search plans…",
+            "emptyMessage": "No benefit plans — create a plan to enroll employees."
+          }
+        },
+        "benefitEnrollmentsTableConfig": {
+          "benefitEnrollmentsTable": {
+            "title": "Benefit enrollments",
+            "description": "Active and terminated employee benefit assignments"
+          },
+          "view": {
+            "searchPlaceholder": "Search enrollments…",
+            "emptyMessage": "No enrollments — assign employees to benefit plans."
+          },
+          "enrolled": {
+            "label": "Enrolled"
+          },
+          "terminated": {
+            "label": "Terminated"
+          }
+        }
+      }
+    },
+    "hrBenefitsPanel": {
+      "other": "other"
+    },
+    "hrClient": {
+      "newOnboardingTemplate": "New onboarding template",
+      "archiveEmployee": "Archive Employee",
+      "archiveEmployee2": "Archive employee",
+      "offboardingChecklist": "Offboarding checklist",
+      "completeAssetsAccessAndDocsBeforeArchiveUncheckedItemsRequireAn": "Complete assets, access, and docs before archive. Unchecked items require an override reason.",
+      "docsCollected": "Docs collected",
+      "overrideReasonIfChecklistIncomplete": "Override reason (if checklist incomplete)",
+      "terminationDate": "Termination date",
+      "approvePayslipForExport": "Approve Payslip for Export",
+      "approveForExport": "Approve for export",
+      "proposedGrossWage": "Proposed gross wage",
+      "proposedNetWage": "Proposed net wage",
+      "postPayslipToGL": "Post Payslip to GL",
+      "postToGL": "Post to GL",
+      "payrollExpenseAccountID": "Payroll expense account ID",
+      "salariesPayableAccountID": "Salaries payable account ID",
+      "taxWithholdingAccountIDIfGrossNet": "Tax withholding account ID (if gross ≠ net)",
+      "selectOneRowToEdit": "Select one row to edit.",
+      "onboarding": "Onboarding",
+      "orgChart": "Org Chart",
+      "performance": "Performance",
+      "benefits": "Benefits",
+      "recruitment": "Recruitment",
+      "expire": "Expire",
+      "selectAtLeastOneDraftPayslip": "Select at least one draft payslip.",
+      "sTPUnavailable": "STP unavailable",
+      "selectVerifyApprovedPayslipsForSTPIntegration": "Select Verify (approved) payslips for STP integration.",
+      "createExportIntent": "Create export intent",
+      "selectVerifyApprovedPayslipsToExport": "Select Verify (approved) payslips to export.",
+      "selectVerifyApprovedPayslipsToPost": "Select Verify (approved) payslips to post.",
+      "hRPaperwork": "HR paperwork",
+      "iTAccessEquipment": "IT access & equipment",
+      "teamIntroduction": "Team introduction",
+      "unspecified": "Unspecified"
+    },
+    "hrPanels": {
+      "more": "more",
+      "noCompensationChangesRecordedForThisContractYet": "No compensation changes recorded for this contract yet.",
+      "wage": "Wage:",
+      "firstApprover": "First approver",
+      "secondApprover": "Second approver",
+      "currentState": "Current state",
+      "fullMutationHistoryIsOnTheAuditTab": "Full mutation history is on the Audit tab.",
+      "workQueues": "Work queues",
+      "leaveRequestsToApprove": "Leave requests to approve",
+      "pendingPayrollIntegrations": "Pending payroll integrations",
+      "workforcePlanning": "Workforce planning",
+      "laborCostSnapshots": "Labor cost snapshots",
+      "shiftOptimizationJobs": "Shift optimization jobs",
+      "globalAssignments": "Global assignments",
+      "capacityForecastEntries": "Capacity forecast entries"
     }
   },
   "inventory": {
@@ -7202,7 +7874,12 @@
       "pendingTransfers": "Pending Transfers",
       "stockTurnover": "Top Products by Stock Movement",
       "skuFallback": "SKU-{{id}}",
-      "productFallback": "Product {{id}}"
+      "productFallback": "Product {{id}}",
+      "series": {
+        "in": "In",
+        "out": "Out",
+        "moves": "Moves"
+      }
     },
     "tabs": {
       "productCategories": "Categories",
@@ -7787,7 +8464,10 @@
       "uomId": "UOM",
       "recordLine": "Record line",
       "validate": "Validate",
-      "post": "Post adjustments"
+      "post": "Post adjustments",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "countFallback": "Count"
     },
     "productActions": {
       "confirmDelete": "Delete this product? This cannot be undone.",
@@ -8549,6 +9229,128 @@
       "description": "Packed shipments awaiting confirmation or dispatch",
       "emptyMessage": "No packages found.",
       "title": "Packages"
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "inventoryDashboard": {
+          "inventory": {
+            "title": "Inventory",
+            "description": "Stock levels, movements, valuations, and reorder alerts"
+          },
+          "invQuickActions": {
+            "title": "Quick Actions"
+          },
+          "createProduct": {
+            "label": "Add Product"
+          },
+          "createAdjustment": {
+            "label": "Adjust Inventory"
+          },
+          "viewWarehouses": {
+            "label": "View Warehouses"
+          },
+          "invStatCards": {
+            "title": "Key Metrics",
+            "label": "Low Stock Alerts",
+            "labelinventoryTurnover": "Inventory Turnover"
+          },
+          "invBreakdown": {
+            "title": "Stock Distribution"
+          },
+          "invByCategory": {
+            "title": "Stock by Category"
+          },
+          "invMovements": {
+            "title": "Stock Movements (Last 7 Days)"
+          },
+          "invAlerts": {
+            "title": "Reorder Alerts"
+          },
+          "invLowStockTable": {
+            "title": "Low Stock Items"
+          },
+          "sku": {
+            "label": "SKU"
+          },
+          "name": {
+            "label": "Product"
+          },
+          "qty": {
+            "label": "Qty On Hand"
+          },
+          "reorder": {
+            "label": "Reorder Point"
+          },
+          "status": {
+            "label": "Status"
+          },
+          "inventoryExceptionQueues": {
+            "title": "Exception queues"
+          },
+          "inventoryExceptionQueueCards": {
+            "title": "Live exceptions"
+          }
+        },
+        "inventoryModuleConfig": {
+          "inventory": {
+            "title": "Inventory",
+            "description": "Stock levels, movements, valuations, and reorder alerts"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "adjustments": {
+            "label": "Adjustments",
+            "createLabel": "New Adjustment"
+          }
+        }
+      },
+      "inventoryFormConfigs": {
+        "newBarcodeRuleForm": {
+          "ean13": {
+            "label": "EAN-13"
+          },
+          "ean8": {
+            "label": "EAN-8"
+          },
+          "upca": {
+            "label": "UPC-A"
+          },
+          "code39": {
+            "label": "Code 39"
+          },
+          "code128": {
+            "label": "Code 128"
+          }
+        }
+      }
+    },
+    "inventoryClient": {
+      "loading3DViewer": "Loading 3D viewer…",
+      "shortATP": "Short ATP",
+      "expiredLots": "Expired lots",
+      "openQCFails": "Open QC fails",
+      "gREEN": "GREEN",
+      "yELLOW": "YELLOW",
+      "rED": "RED",
+      "uNKNOWN": "UNKNOWN",
+      "pricelist": "Pricelist"
+    },
+    "inventoryOpsPanel": {
+      "refreshQueues": "Refresh queues",
+      "noOpenExceptionsInThisQueue": "No open exceptions in this queue.",
+      "remoteWarehouseSync": "Remote warehouse sync",
+      "localOutbox": "Local outbox (",
+      "serverPending": ") · server pending (",
+      "device": ") · device",
+      "flushing": "Flushing…",
+      "flushOutboxApply": "Flush outbox + apply",
+      "noPendingServerSyncIntents": "No pending server sync intents."
+    },
+    "opsQueues": {
+      "short_atp": "Short ATP",
+      "expired_lots": "Expired lots",
+      "open_qc": "Open QC fails"
     }
   },
   "purchasing": {
@@ -8568,7 +9370,10 @@
       "vendorLabel": "Vendor {{id}}",
       "onTimePct": "On-time %",
       "overBilled": "Over-billed lines",
-      "partialReceipt": "Partial receipt"
+      "partialReceipt": "Partial receipt",
+      "series": {
+        "spend": "Spend"
+      }
     },
     "handoffs": {
       "title": "Receipts and vendor bills",
@@ -9795,6 +10600,10 @@
       },
       "widgets": {
         "revenue": "Revenue"
+      },
+      "series": {
+        "revenue": "Revenue",
+        "target": "Target"
       }
     },
     "ops": {
@@ -10888,10 +11697,19 @@
       "oeeEfficiency": "OEE Efficiency",
       "readyWorkOrders": "Ready Work Orders",
       "workCenterFallback": "Work Center {{number}}",
-      "productFallback": "Product {{id}}"
+      "productFallback": "Product {{id}}",
+      "series": {
+        "planned": "Planned",
+        "actual": "Actual"
+      }
     },
     "errors": {
-      "noActiveCompany": "Select an active company before continuing."
+      "noActiveCompany": "Select an active company before continuing.",
+      "unableToReadCompletedOrder": "Unable to read completed order",
+      "unableToReadCompletedStockEffects": "Unable to read completed stock effects",
+      "unableToCloseAttributedOutput": "Unable to close attributed output",
+      "unableToReadCompletedScrap": "Unable to read completed scrap",
+      "unableToRecordManufacturingWaste": "Unable to record manufacturing waste"
     },
     "manufacturingOrders": {
       "title": "Manufacturing Orders",
@@ -11254,6 +12072,176 @@
         "finishConfirm": "Stop the clock and mark this work order done. Open quality checks must already pass.",
         "start": "Start work order"
       }
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "manufacturingDashboard": {
+          "manufacturing": {
+            "title": "Manufacturing",
+            "description": "Production orders, work center utilization, and quality metrics"
+          },
+          "mfgQuickActions": {
+            "title": "Quick Actions"
+          },
+          "createMo": {
+            "label": "New Mfg Order"
+          },
+          "createBom": {
+            "label": "New BOM"
+          },
+          "scheduleProduction": {
+            "label": "Schedule Production"
+          },
+          "mfgStatCards": {
+            "title": "Key Metrics",
+            "label": "Scrap Rate"
+          },
+          "mfgOutput": {
+            "title": "Production Output"
+          },
+          "mfgOutputTrend": {
+            "title": "Weekly Production Output"
+          },
+          "mfgWorkCenters": {
+            "title": "Work Center Utilization"
+          },
+          "mfgOrdersTable": {
+            "title": "Production Orders"
+          },
+          "ref": {
+            "label": "Order"
+          },
+          "product": {
+            "label": "Product"
+          },
+          "progress": {
+            "label": "Progress"
+          },
+          "due": {
+            "label": "Due Date"
+          },
+          "status": {
+            "label": "Status"
+          }
+        },
+        "manufacturingModuleConfig": {
+          "manufacturing": {
+            "title": "Manufacturing",
+            "description": "Production orders, work center utilization, and quality metrics"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "orders": {
+            "createLabel": "New Order"
+          },
+          "boms": {
+            "createLabel": "New BOM"
+          },
+          "quality": {
+            "label": "Quality Checks"
+          },
+          "costSettings": {
+            "label": "Costing & Valuation"
+          }
+        }
+      },
+      "manufacturingEntityConfigs": {
+        "bomByproductsTableConfig": {
+          "bomByproductsTable": {
+            "title": "BOM Byproducts"
+          }
+        }
+      },
+      "manufacturingRowActionForms": {
+        "manufacturingWorkcenterRowActionForm": {
+          "configureCostRate": {
+            "label": "Configure hourly cost rate"
+          },
+          "wcHourlyRate": {
+            "label": "Hourly cost rate (company currency)"
+          }
+        }
+      }
+    },
+    "resultLinks": {
+      "order": "Manufacturing order",
+      "byproduct": "BOM byproduct",
+      "stockMove": "Stock move",
+      "stockQuantity": "Stock quantity"
+    },
+    "manufacturingActionResult": {
+      "resultingRecords": "Resulting records:",
+      "dismissResultingRecords": "Dismiss resulting records"
+    },
+    "manufacturingClient": {
+      "ioTDeviceReferenceData": "IoT device reference data:",
+      "deviceLinkingRequiresIoTDeviceReadAccessManufacturingOrderAndBOM": ". Device linking requires IoT device read access; manufacturing order and BOM workflows remain available."
+    },
+    "manufacturingCostReadback": {
+      "productivityCostSnapshots": "Productivity cost snapshots",
+      "timeRecord": "Time record",
+      "workorder": "Workorder",
+      "workcenter": "Workcenter",
+      "hourlyRate": "Hourly rate",
+      "rateConfigured": "Rate configured",
+      "noProductivityCostSnapshotsRecordedForThisOrder": "No productivity cost snapshots recorded for this order.",
+      "actualManufacturingCost": "Actual manufacturing cost",
+      "loadingManufacturingCostSnapshot": "Loading manufacturing cost snapshot…",
+      "noCloseCostSnapshotRecordedCostsAreFinalizedWhenTheManufacturing": "No close cost snapshot recorded. Costs are finalized when the manufacturing order closes.",
+      "companyCurrency": "Company currency #",
+      "recordedCostsDoNotChangeWhenRatesOrValuationConfigurationChange": ". Recorded costs do not change when rates or valuation configuration change.",
+      "outputStockMove": "Output stock move #",
+      "valuationJournalEntry": "Valuation journal entry #",
+      "noValuationJournalEntryRecorded": "No valuation journal entry recorded."
+    },
+    "manufacturingCostSettings": {
+      "valuationJournal": "Valuation journal",
+      "materialInventoryAccount": "Material inventory account",
+      "outputInventoryAccount": "Output inventory account",
+      "workcenterAbsorptionAccount": "Workcenter absorption account",
+      "manufacturingVarianceAccount": "Manufacturing variance account",
+      "configureManufacturingValuation": "Configure manufacturing valuation",
+      "futureManufacturingClosesWillPostAnEntryUsingTheseCompanyCurrency": "Future manufacturing closes will post an entry using these company-currency accounts. Existing cost snapshots are immutable.",
+      "saveValuationConfiguration": "Save valuation configuration",
+      "configuredWorkcenterRates": "Configured workcenter rates",
+      "noWorkcenterRatesConfiguredUseConfigureHourlyCostRateOnA": "No workcenter rates configured. Use Configure hourly cost rate on a workcenter.",
+      "ratesAreSavedInCompanyCurrencyProductivityRecordsRetainTheRate": "Rates are saved in company currency. Productivity records retain the rate used when time is logged; missing rates remain explicitly unconfigured.",
+      "manufacturingValuation": "Manufacturing valuation",
+      "configuredForCompanyCurrencyJournal": "Configured for company {{value1}}, currency {{value2}}, journal {{value3}}.",
+      "notConfiguredManufacturingClosesRecordCostsWithoutAJournalEntry": "Not configured. Manufacturing closes record costs without a journal entry.",
+      "configureValuation": "Configure valuation",
+      "createAnActiveJournalAndValuationAccountsBeforeConfiguringManufacturingValuation": "Create an active journal and valuation accounts before configuring manufacturing valuation.",
+      "valuationConfigurationSavedAndReadBackForThisCompany": "Valuation configuration saved and read back for this company."
+    },
+    "manufacturingRowDialog": {
+      "ioTDevices": "IoT devices: {{value1}}"
+    },
+    "manufacturingTrackingPanel": {
+      "closeWithLotOrSerialAttribution": "Close with lot or serial attribution",
+      "scrapTrackedOutput": "Scrap tracked output",
+      "recordMaterialWastage": "Record material wastage",
+      "productUnavailable": "Product unavailable",
+      "thePreviousActionHasNotAppearedInTheCanonicalRecordsYet": "The previous action has not appeared in the canonical records yet. Check again after refresh.",
+      "disposeOfAdditionalUnconsumedBOMMaterialThisLeavesTheOriginalBOM": "Dispose of additional unconsumed BOM material. This leaves the original BOM consumption requirement unchanged.",
+      "loadingCompanyReferences": "Loading company references…",
+      "units": "units ·",
+      "exactCompletedOutput": "Exact completed output",
+      "availableBOMMaterialStock": "Available BOM material stock",
+      "selectStock": "Select stock",
+      "selectScrapLocation": "Select scrap location",
+      "thisOrderHasNoTrackedOutputsUseTheStandardFinishAction": "This order has no tracked outputs. Use the standard finish action.",
+      "untracked": "Untracked",
+      "unitCount": "{{quantity}} unit",
+      "unitCount_one": "{{quantity}} unit",
+      "unitCount_other": "{{quantity}} units"
+    },
+    "costReadback": {
+      "materialValue": "Material cost",
+      "workcenterValue": "Workcenter cost",
+      "totalValue": "Total actual cost",
+      "inventoryValue": "Output inventory value",
+      "varianceValue": "Manufacturing variance"
     }
   },
   "projects": {
@@ -11262,7 +12250,11 @@
       "openTasks": "Open Tasks",
       "overdueTasks": "Overdue Tasks",
       "hoursLogged": "Hours Logged",
-      "projectFallback": "Project {{number}}"
+      "projectFallback": "Project {{number}}",
+      "series": {
+        "budget": "Budget",
+        "spent": "Spent"
+      }
     },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
@@ -11575,6 +12567,370 @@
     },
     "inlineEdit": {
       "nameRequired": "A project needs a name"
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "projectsDashboard": {
+          "projects": {
+            "title": "Projects",
+            "description": "Project portfolio, milestones, team utilization, and budget health"
+          },
+          "projQuickActions": {
+            "title": "Quick Actions"
+          },
+          "logTimesheet": {
+            "label": "Log Time"
+          },
+          "startTimer": {
+            "label": "Start Timer"
+          },
+          "projStatCards": {
+            "title": "Key Metrics",
+            "label": "Hours logged"
+          },
+          "projProgress": {
+            "title": "Portfolio Health"
+          },
+          "projProgressBars": {
+            "title": "Project Progress"
+          },
+          "projBudgetHealth": {
+            "title": "Budget vs Spent"
+          },
+          "projMilestones": {
+            "title": "Upcoming Milestones"
+          },
+          "projMilestonesTable": {
+            "title": "Next 14 Days"
+          },
+          "project": {
+            "label": "Project"
+          },
+          "owner": {
+            "label": "Owner"
+          },
+          "due": {
+            "label": "Due"
+          },
+          "status": {
+            "label": "Status"
+          }
+        },
+        "projectsModuleConfig": {
+          "projects": {
+            "title": "Projects",
+            "description": "Project portfolio, milestones, team utilization, and budget health",
+            "label": "Projects"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "tasks": {
+            "label": "Tasks"
+          },
+          "resources": {
+            "label": "Resources"
+          }
+        }
+      },
+      "projectsEntityConfigs": {
+        "rateCardsTableConfig": {
+          "rateCardsTable": {
+            "title": "Rate cards",
+            "description": "Project / employee / task cost and sell rates"
+          },
+          "view": {
+            "searchPlaceholder": "Search rate cards…",
+            "emptyMessage": "No rate cards yet"
+          },
+          "name": {
+            "label": "Name"
+          }
+        },
+        "rateCardLinesTableConfig": {
+          "rateCardLinesTable": {
+            "title": "Rate card lines",
+            "description": "Scoped rate lines"
+          },
+          "view": {
+            "searchPlaceholder": "Search lines…",
+            "emptyMessage": "No rate card lines yet"
+          },
+          "rateCardId": {
+            "label": "Card"
+          },
+          "scope": {
+            "label": "Scope"
+          },
+          "costRate": {
+            "label": "Cost"
+          },
+          "sellRate": {
+            "label": "Sell"
+          }
+        }
+      },
+      "projectsFormConfigs": {
+        "newTaskForm": {
+          "wbsCode": {
+            "label": "WBS code"
+          },
+          "milestoneId": {
+            "label": "Milestone"
+          }
+        },
+        "newProjectRateCardForm": {
+          "newProjectRateCard": {
+            "title": "New rate card",
+            "description": "Cost and sell rates for project timesheets"
+          },
+          "rateCardInfo": {
+            "title": "Rate card"
+          },
+          "projectId": {
+            "label": "Project (optional)"
+          }
+        },
+        "newProjectRateCardLineForm": {
+          "newProjectRateCardLine": {
+            "title": "New rate card line",
+            "description": "Scoped employee, task, or project rates"
+          },
+          "lineInfo": {
+            "title": "Line"
+          },
+          "sellRate": {
+            "label": "Sell rate"
+          }
+        },
+        "newResourceAllocationForm": {
+          "newResourceAllocation": {
+            "title": "Book resource allocation",
+            "description": "Reserve employee or HR resource capacity on a project/task"
+          },
+          "allocation": {
+            "title": "Allocation"
+          },
+          "resourceId": {
+            "label": "HR resource"
+          },
+          "taskId": {
+            "label": "Task (optional)"
+          },
+          "dateFrom": {
+            "label": "From"
+          },
+          "dateTo": {
+            "label": "To"
+          },
+          "allocationPercent": {
+            "label": "Percent (alt)"
+          },
+          "enforceCapacity": {
+            "label": "Reject if over-allocated"
+          },
+          "skillHint": {
+            "label": "Skill match hint (optional)",
+            "placeholder": "Soft match against HR skills matrix"
+          }
+        },
+        "newProjectMilestoneForm": {
+          "newProjectMilestone": {
+            "title": "New milestone",
+            "description": "Delivery milestone linked to project tasks"
+          },
+          "sequence": {
+            "label": "Sequence"
+          },
+          "billAmount": {
+            "label": "Bill amount"
+          },
+          "percentComplete": {
+            "label": "% complete"
+          }
+        },
+        "projectExpenseRebillForm": {
+          "projectExpenseRebill": {
+            "title": "Rebill project expense",
+            "description": "Create a client invoice from a posted expense sheet linked to a project"
+          },
+          "rebill": {
+            "title": "Rebill"
+          },
+          "sheetId": {
+            "label": "Expense sheet"
+          },
+          "invoiceDate": {
+            "label": "Invoice date"
+          },
+          "journalId": {
+            "label": "Journal"
+          },
+          "receivableAccountId": {
+            "label": "Receivable account"
+          },
+          "incomeAccountId": {
+            "label": "Income account"
+          }
+        },
+        "newProjectChangeOrderForm": {
+          "newProjectChangeOrder": {
+            "title": "New change order",
+            "description": "Capture scope, budget, and rate deltas; apply to rebaseline"
+          },
+          "changeOrder": {
+            "title": "Change order"
+          },
+          "scopeDelta": {
+            "label": "Scope delta"
+          },
+          "budgetDelta": {
+            "label": "Budget delta"
+          },
+          "plannedHoursDelta": {
+            "label": "Planned hours delta"
+          },
+          "rateDeltaPercent": {
+            "label": "Rate delta %"
+          }
+        },
+        "linkSubcontractorCostForm": {
+          "linkSubcontractorCost": {
+            "title": "Link subcontractor cost",
+            "description": "Attribute a vendor PO or bill amount to a project for margin"
+          },
+          "subcon": {
+            "title": "Cost link"
+          },
+          "purchaseOrderId": {
+            "label": "Purchase order ID"
+          },
+          "purchaseOrderLineId": {
+            "label": "PO line ID"
+          },
+          "currencyId": {
+            "label": "Currency ID"
+          },
+          "name": {
+            "label": "Label"
+          }
+        },
+        "newProjectIntegrationIntentForm": {
+          "newProjectIntegrationIntent": {
+            "title": "New project integration intent",
+            "description": "Queue payroll export, calendar sync, or e-invoice for the worker"
+          },
+          "intent": {
+            "title": "Intent"
+          },
+          "intentType": {
+            "label": "Type"
+          },
+          "payrollExport": {
+            "label": "Payroll export"
+          },
+          "calendarSync": {
+            "label": "Calendar sync"
+          },
+          "eInvoice": {
+            "label": "E-invoice"
+          },
+          "idempotencyKey": {
+            "label": "Idempotency key"
+          },
+          "payload": {
+            "label": "Payload (JSON)"
+          }
+        }
+      }
+    },
+    "projectPageClient": {
+      "h": "{{value1}} h"
+    },
+    "advancedPsaPanel": {
+      "noRowsYet": "No rows yet.",
+      "newChangeOrder": "New change order",
+      "linkSubcontractorCost": "Link subcontractor cost",
+      "refreshForecast": "Refresh forecast",
+      "refreshEVM": "Refresh EVM",
+      "capacityForecast": "Capacity forecast",
+      "changeOrders": "Change orders",
+      "budget": "Budget Δ",
+      "revisedBudget": "Revised budget",
+      "earnedValuePVEVACSPICPI": "Earned value (PV / EV / AC / SPI / CPI)",
+      "pV": "PV",
+      "eV": "EV",
+      "aC": "AC",
+      "sPI": "SPI",
+      "cPI": "CPI",
+      "complete": "% complete",
+      "integrationIntents": "Integration intents"
+    },
+    "projectsClient": {
+      "updateTaskState": "Update Task State",
+      "updateState": "Update state",
+      "assignTaskUsers": "Assign Task Users",
+      "assignUsers": "Assign users",
+      "chooseActiveMembersOfThisCompanyAnEmptySelectionClearsThe": "Choose active members of this company. An empty selection clears the assignment on the selected tasks.",
+      "assignees": "Assignees",
+      "billTimesheets": "Bill Timesheets",
+      "billTimesheets2": "Bill timesheets",
+      "setTaskParent": "Set Task Parent",
+      "setParent": "Set parent",
+      "parentTask": "Parent task",
+      "contacts": "Contacts: {{value1}}",
+      "noHRResources": "No HR resources",
+      "utilisation": "Utilisation",
+      "advancedPSA": "Advanced PSA",
+      "capacityForecastRefreshFailed": "Capacity forecast refresh failed",
+      "earnedValueRefreshFailed": "Earned value refresh failed",
+      "approvalTimeline": "Approval Timeline",
+      "timesheetID": "Timesheet ID",
+      "noApprovalEventsYet": "No approval events yet.",
+      "noRateCards": "No rate cards",
+      "noPostedSheetsToRebill": "No posted sheets to rebill",
+      "toValidate": "To validate",
+      "unbilledHours": "Unbilled hours",
+      "budgetVsActualMargin": "Budget vs actual / margin",
+      "addRateLine": "Add rate line",
+      "stopTimer": "Stop timer",
+      "partnerSelectionRequiresCRMContactReadAccessProjectAndTimesheetWorkflows": ". Partner selection requires CRM contact read access; project and timesheet workflows remain available.",
+      "taskAssignmentPermissionIsRequired": "Task assignment permission is required",
+      "connectToTheNetworkToChangeAssignments": "Connect to the network to change assignments",
+      "selectAnActiveCompany": "Select an active company",
+      "eligiblePeopleCouldNotBeLoadedCloseAndReopenTheForm": "Eligible people could not be loaded. Close and reopen the form to retry.",
+      "selectTasksFromTheCurrentCompany": "Select tasks from the current company",
+      "selectActiveMembersOfThisCompany": "Select active members of this company",
+      "selectAtLeastOneTimesheet": "Select at least one timesheet",
+      "invoiceDateIsRequired": "Invoice date is required",
+      "timesheetsBilled": "Timesheets billed",
+      "createdAccountingInvoice": "Created accounting invoice {{value1}}.",
+      "openInvoice": "Open invoice",
+      "sheetJournalAccountsAndInvoiceDateAreRequired": "Sheet, journal, accounts, and invoice date are required",
+      "projectDateFromAndDateToAreRequired": "Project, date from, and date to are required",
+      "budgetSeries": "Budget",
+      "spentSeries": "Spent"
+    },
+    "projectsPanels": {
+      "wBS": "WBS",
+      "liveCapacityAvailableLeaveAllocationsActualTimesheetHoursSnapshotTable": "Live capacity = available − leave − allocations − actual timesheet hours (snapshot table).",
+      "bookAllocation": "Book allocation",
+      "noCapacitySnapshotsYetBookAnAllocationOrApproveLeaveTo": "No capacity snapshots yet. Book an allocation or approve leave to materialise remaining hours.",
+      "leave": "Leave",
+      "skillsSoftMatch": "Skills (soft match)",
+      "h": "h",
+      "bookings": "Bookings",
+      "hours": "Hours / %",
+      "h2": "{{value1}}h",
+      "availableHoursCalendarCapacityVsBillableAndNonBillableTimesheetHours": "Available hours (calendar capacity) vs billable and non-billable timesheet hours.",
+      "noUtilisationSnapshotsYetValidateTimesheetsOrRefreshUtilisationToMaterialise": "No utilisation snapshots yet. Validate timesheets or refresh utilisation to materialise rows.",
+      "util": "Util %",
+      "billableUtil": "Billable util %",
+      "skill": "Skill"
+    },
+    "timesheetCapturePanel": {
+      "noQueuedOfflineTimesheetsFailedLogAttemptsAppearHereForRetry": "No queued offline timesheets. Failed log attempts appear here for retry.",
+      "timesheetSyncQueue": "Timesheet sync queue"
     }
   },
   "calendar": {
@@ -12674,6 +14030,34 @@
             "createLabel": "New mail template"
           }
         }
+      },
+      "documentTemplateDesigner": {
+        "assertBoundedJson": {
+          "error": "Template data is not valid JSON.",
+          "errortemplateDataExceedsThe1MBLimit": "Template data exceeds the 1 MB limit."
+        },
+        "visit": {
+          "error": "Template data is nested too deeply."
+        },
+        "sanitizeTemplateHtml": {
+          "error": "Template content exceeds the 1 MB limit."
+        },
+        "normalizeProject": {
+          "error": "This template contains unsupported project data. Only built-in text and page blocks are supported.",
+          "errortheTemplateMustContainOnePageWrapper": "The template must contain one page wrapper."
+        },
+        "normalize": {
+          "error": "This template has too many nested blocks.",
+          "erroraTextTemplateCannotContainPageLayout": "A text template cannot contain page layout blocks."
+        },
+        "readMetadata": {
+          "error": "Template metadata exceeds the 1 MB limit.",
+          "errortemplateMetadataIsNotValidJSON": "Template metadata is not valid JSON.",
+          "errortemplateMetadataMustBeAJSONObject": "Template metadata must be a JSON object."
+        },
+        "readDocumentDesignerMetadata": {
+          "error": "This template uses an unsupported designer format."
+        }
       }
     },
     "documentPageClient": {
@@ -12946,6 +14330,32 @@
     "kpi": {
       "open": "Open tickets",
       "slaBreached": "SLA breached"
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "helpdeskModuleConfig": {
+          "helpdesk": {
+            "title": "Helpdesk",
+            "description": "Customer support tickets and SLA management"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "hdQuickActions": {
+            "title": "Quick Actions"
+          },
+          "hdStatCards": {
+            "title": "Key Metrics",
+            "label": "Open Tickets",
+            "labelsolvedToday": "Solved Today",
+            "labelsLABreached": "SLA Breached",
+            "labelurgent": "Urgent"
+          },
+          "tickets": {
+            "label": "Tickets"
+          }
+        }
+      }
     }
   },
   "subscriptions": {
@@ -14646,7 +16056,8 @@
         "Running": "Running",
         "Completed": "Completed",
         "Cancelled": "Cancelled",
-        "Error": "Error"
+        "Error": "Error",
+        "Failed": "Failed"
       }
     },
     "forms": {
@@ -14782,6 +16193,180 @@
         "Retired": "Retired"
       },
       "title": "Versions"
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "workflowsModuleConfig": {
+          "workflows": {
+            "description": "Automated business processes and workflow orchestration"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "wfQuickActions": {
+            "title": "Quick Actions"
+          },
+          "wfStatCards": {
+            "title": "Key Metrics",
+            "label": "Active Workflows",
+            "labelrunningInstances": "Running Instances",
+            "labelcompleted": "Completed",
+            "labelcancelled": "Cancelled"
+          },
+          "instances": {
+            "label": "Instances"
+          },
+          "operations": {
+            "label": "Operations"
+          },
+          "deadLetters": {
+            "label": "Dead letters"
+          },
+          "migrations": {
+            "label": "Migrations"
+          }
+        }
+      },
+      "workflowsEntityConfigs": {
+        "workflowVersionsTableConfig": {
+          "draftRevision": {
+            "label": "Draft rev"
+          },
+          "schemaVersion": {
+            "label": "Schema"
+          }
+        },
+        "workflowInstancesTableConfig": {
+          "failed": {
+            "label": "Failed"
+          },
+          "revision": {
+            "label": "Revision"
+          }
+        },
+        "workflowTimersLateTableConfig": {
+          "id": {
+            "label": "Timer"
+          },
+          "dueAt": {
+            "label": "Due"
+          },
+          "revision": {
+            "label": "Rev"
+          }
+        },
+        "workflowOutboxDeadTableConfig": {
+          "id": {
+            "label": "Outbox"
+          },
+          "actionKey": {
+            "label": "Action"
+          }
+        },
+        "workflowMigrationPlansTableConfig": {
+          "id": {
+            "label": "Plan"
+          },
+          "sourceWorkflowVersionId": {
+            "label": "From version"
+          },
+          "targetWorkflowVersionId": {
+            "label": "To version"
+          },
+          "compatibilityTag": {
+            "label": "Compatibility"
+          }
+        },
+        "workflowMigrationResultsTableConfig": {
+          "id": {
+            "label": "Result"
+          },
+          "outcomeTag": {
+            "label": "Outcome"
+          },
+          "reason": {
+            "label": "Reason"
+          },
+          "priorInstanceRevision": {
+            "label": "Prior rev"
+          },
+          "nextInstanceRevision": {
+            "label": "Next rev"
+          }
+        }
+      },
+      "workflowsFormConfigs": {
+        "newWorkflowForm": {
+          "workflowKey": {
+            "placeholder": "po_confirm"
+          },
+          "manual": {
+            "label": "Manual"
+          },
+          "recordCreated": {
+            "label": "Record created"
+          },
+          "recordChanged": {
+            "label": "Record changed"
+          },
+          "signal": {
+            "label": "Signal"
+          }
+        },
+        "workflowAddActivityForm": {
+          "workflowAddActivity": {
+            "description": "Use upsert_workflow_node on a draft version (designer WIP)."
+          }
+        },
+        "workflowAddTransitionForm": {
+          "workflowAddTransition": {
+            "description": "Use upsert_workflow_edge on a draft version (designer WIP)."
+          }
+        }
+      }
+    },
+    "workflowsClient": {
+      "mapAPublishedSourceVersionToAPublishedTargetIdentityNode": "Map a published source version to a published target. Identity node/edge mappings are generated from the source graph.",
+      "workflowId": "Workflow id",
+      "sourceVersionId": "Source version id",
+      "targetVersionId": "Target version id",
+      "activateImmediately": "Activate immediately"
+    },
+    "workflowsRowDialog": {
+      "timer": "Timer #{{value1}}",
+      "outbox": "Outbox #{{value1}}",
+      "migrationPlan": "Migration plan #{{value1}}",
+      "migrationResult": "Migration result #{{value1}}",
+      "publishCloneSimulateOrRetireThisVersion": "Publish, clone, simulate, or retire this version.",
+      "cancelInspectHistoryOrMigrateWithAnActivePlan": "Cancel, inspect history, or migrate with an active plan.",
+      "fireOrCancelAPendingTimer": "Fire or cancel a pending timer.",
+      "cancelADeadLetteredOrReconciliationOutboxRow": "Cancel a dead-lettered or reconciliation outbox row.",
+      "activateThePlanOrLeaveItInactive": "Activate the plan or leave it inactive.",
+      "workflowDefinitionAndRuntimeDetail": "Workflow definition and runtime detail.",
+      "draftRevision": "Draft revision",
+      "subjectId": "Subject id (",
+      "singletonTriggerKeyOptional": "Singleton trigger key (optional)",
+      "cloneToDraft": "Clone to draft",
+      "simulate": "Simulate",
+      "retire": "Retire",
+      "signalInstance": "Signal instance",
+      "signal": "Signal",
+      "selectSignal": "Select signal…",
+      "migrateInstance": "Migrate instance",
+      "activePlanId": "Active plan id",
+      "selectPlan": "Select plan…",
+      "wf": "· wf",
+      "preflight": "Preflight",
+      "migrate": "Migrate",
+      "cancelInstance": "Cancel instance",
+      "decisionHistory": "Decision history",
+      "noDecisionEventsForThisInstance": "No decision events for this instance.",
+      "event": "event",
+      "fireTimer": "Fire timer",
+      "cancelTimer": "Cancel timer",
+      "cancelOutbox": "Cancel outbox",
+      "subjectIdForModel": "Subject id ({{model}})",
+      "revision": "rev"
     }
   },
   "proposals": {
@@ -14879,6 +16464,108 @@
         "title": "Edit Proposal",
         "description": "Update proposal details"
       }
+    },
+    "builtIn": {
+      "moduleDashboardConfigs": {
+        "proposalsModuleConfig": {
+          "proposals": {
+            "description": "Business proposals, tenders, and RFP responses — AI-powered drafting and analysis"
+          },
+          "dashboard": {
+            "label": "Dashboard"
+          },
+          "proposalsQuickActions": {
+            "title": "Quick Actions"
+          },
+          "useTemplate": {
+            "label": "Use Template"
+          },
+          "reviewPending": {
+            "label": "Review Pending"
+          },
+          "proposalsStatCards": {
+            "title": "Overview",
+            "label": "Submitted",
+            "labelawarded": "Awarded",
+            "labelpipelineValue": "Pipeline Value"
+          },
+          "templates": {
+            "label": "Templates"
+          }
+        }
+      },
+      "proposalWorkspaceTypes": {
+        "sectionTemplates": {
+          "executiveSummary": {
+            "title": "Executive Summary",
+            "placeholder": "Provide a concise overview of your proposal, highlighting your understanding of the requirements and your key value proposition..."
+          },
+          "companyProfile": {
+            "title": "Company Profile",
+            "placeholder": "Describe your organisation, its history, size, capabilities, and relevant experience in this domain..."
+          },
+          "technicalApproach": {
+            "title": "Technical Approach",
+            "placeholder": "Detail your methodology, technical solution, and how it addresses each stated requirement..."
+          },
+          "projectTimeline": {
+            "title": "Project Timeline & Milestones",
+            "placeholder": "Outline the proposed schedule, key milestones, deliverables, and dependencies..."
+          },
+          "teamQualifications": {
+            "title": "Team & Qualifications",
+            "placeholder": "Present the project team, their roles, relevant credentials, and prior experience..."
+          },
+          "pricing": {
+            "title": "Pricing & Commercial Terms",
+            "placeholder": "Provide itemised pricing, payment schedule, and any commercial assumptions..."
+          },
+          "compliance": {
+            "title": "Compliance & Certifications",
+            "placeholder": "List relevant certifications, compliance standards met, and regulatory adherence..."
+          },
+          "riskManagement": {
+            "title": "Risk Management",
+            "placeholder": "Identify key risks and your mitigation strategies for each..."
+          },
+          "annexes": {
+            "title": "Annexes & Supporting Documents",
+            "placeholder": "Reference any supporting documents, case studies, or appendices included..."
+          }
+        }
+      },
+      "proposalsFormConfigs": {
+        "newProposalForm": {
+          "currencyId": {
+            "label": "Currency"
+          }
+        }
+      }
+    },
+    "workspaceClient": {
+      "analysisRequestFailed": "Analysis request failed"
+    },
+    "proposalsClient": {
+      "executiveSummaryScopeTimelinePricingAndTerms": "Executive summary, scope, timeline, pricing, and terms",
+      "complianceMatrixMethodologyTeamAndBidPricing": "Compliance matrix, methodology, team, and bid pricing",
+      "needStatementOutcomesBudgetAndEvaluationCriteria": "Need statement, outcomes, budget, and evaluation criteria",
+      "activeProposals": "Active Proposals",
+      "proposalWasCreatedButDidNotAppearInTheProposalsQuery": "Proposal \"{{value1}}\" was created but did not appear in the proposals query",
+      "currencyOptionsReady": "Currency options ready",
+      "linkedSalesUnavailable": "Linked sales records are unavailable"
+    },
+    "dataAccessDenied": "Access to proposal data is denied",
+    "dataUnavailable": "Proposal data is unavailable",
+    "builtInTemplates": {
+      "commercialProposal": "Commercial Proposal",
+      "commercial": "Commercial",
+      "tenderResponse": "Tender Response",
+      "tender": "Tender",
+      "grantApplication": "Grant Application",
+      "grant": "Grant"
+    },
+    "errors": {
+      "failedToFetchProposals": "Failed to fetch proposals"
     }
   },
   "messages": {
@@ -15348,6 +17035,25 @@
       "loadMoreHint": "No orders for this session in the pages loaded so far.",
       "searchPlaceholder": "Search orders",
       "title": "Orders"
+    },
+    "usePos": {
+      "createOrSelectAPOSTerminalFirst": "Create or select a POS terminal first",
+      "configId": "Config ID",
+      "sessionId": "Session ID"
+    },
+    "posClient": {
+      "loyaltyProgramCount": "{{count}} loyalty program available. Manage under Sales → Loyalty.",
+      "loyaltyProgramCount_one": "{{count}} loyalty program available. Manage under Sales → Loyalty.",
+      "loyaltyProgramCount_other": "{{count}} loyalty programs available. Manage under Sales → Loyalty."
+    },
+    "posPage": {
+      "updatePrimaryTerminal": "Update primary terminal",
+      "terminalCount_one": "{{count}} terminal",
+      "terminalCount_other": "{{count}} terminals"
+    },
+    "fallback": {
+      "product": "Product",
+      "category": "General"
     }
   },
   "aiChat": {
@@ -15520,6 +17226,19 @@
         "green": "Green risk",
         "amber": "Amber risk",
         "red": "Red risk"
+      },
+      "attemptStatuses": {
+        "accepted": "Accepted",
+        "dispatched": "Dispatched",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "outcome_unknown": "Outcome unknown",
+        "abandoned": "Abandoned"
+      },
+      "reservationStatuses": {
+        "reserved": "Reserved",
+        "settled": "Settled",
+        "released": "Released"
       }
     },
     "tabs": {
@@ -15851,6 +17570,21 @@
       "customer_balances_v1": "Customer balances",
       "supplier_payables_v1": "Supplier payables",
       "failed": "The review could not be confirmed. Check the selected skill’s active release and your source access; inspect saved runs before starting again."
+    },
+    "runMetrics": {
+      "rows_one": "{{count}} row",
+      "rows_other": "{{count}} rows",
+      "steps_one": "{{count}} step",
+      "steps_other": "{{count}} steps",
+      "tokens_one": "{{count}} token",
+      "tokens_other": "{{count}} tokens",
+      "inputOutputTokens": "{{input}} input · {{output}} output tokens",
+      "historySummary": "{{steps}} · {{tokens}} · started {{time}}",
+      "comparisonSide": "{{side}} {{status}}, {{steps}} · {{tokens}}",
+      "settledAmount": "{{amount}} {{currency}} settled",
+      "reservedAmount": "{{amount}} {{currency}} reserved",
+      "reservationState": "Reservation {{status}}",
+      "attemptState": "Attempt {{status}}"
     }
   },
   "map": {
@@ -15932,6 +17666,68 @@
           "passed": "Passed",
           "failed": "Failed",
           "attentionRequired": "Attention required"
+        }
+      }
+    },
+    "mapClient": {
+      "speedKmH": "Speed km/h",
+      "fleetVehicle": "Fleet Vehicle",
+      "loadingMapResources": "Loading map resources…",
+      "mapDataAccessDenied": "Map data access denied",
+      "mapDataUnavailable": "Map data unavailable",
+      "idle": "idle",
+      "documentTitle": "Map Overview"
+    },
+    "builtIn": {
+      "mapPinConfigs": {
+        "warehouseLayer": {
+          "warehouse": {
+            "label": "Warehouses"
+          },
+          "name": {
+            "label": "Name"
+          },
+          "city": {
+            "label": "City"
+          },
+          "totalProducts": {
+            "label": "SKUs"
+          },
+          "stockValue": {
+            "label": "Stock Value"
+          },
+          "manager": {
+            "label": "Manager"
+          }
+        },
+        "vehicleLayer": {
+          "speed": {
+            "label": "Speed (km/h)"
+          },
+          "lastUpdated": {
+            "label": "Last Update"
+          }
+        },
+        "posLayer": {
+          "pos": {
+            "label": "POS Terminals"
+          },
+          "name": {
+            "label": "Terminal"
+          },
+          "location": {
+            "label": "Location"
+          },
+          "badgeLabels": {
+            "open": "Open",
+            "closed": "Closed"
+          },
+          "dailyRevenue": {
+            "label": "Today's Revenue"
+          },
+          "openOrders": {
+            "label": "Open Orders"
+          }
         }
       }
     }
@@ -16018,6 +17814,22 @@
       "discussion": "Discussion",
       "notFound": "Vehicle not found",
       "notFoundHint": "It may have been deleted, or belong to another company."
+    },
+    "vehiclePageClient": {
+      "serviceType": "Service type",
+      "employee": "Employee"
+    },
+    "builtIn": {
+      "fleetEntityConfigs": {
+        "fleetVehiclesTableConfig": {
+          "view": {
+            "searchPlaceholder": "{{value1}}, {{value2}}…"
+          },
+          "id": {
+            "label": "ID"
+          }
+        }
+      }
     }
   },
   "tasks": {
@@ -18874,6 +20686,12 @@
           "reportType": {
             "label": "Excel",
             "labelhTML": "HTML"
+          },
+          "pDF": {
+            "label": "PDF"
+          },
+          "cSV": {
+            "label": "CSV"
           }
         },
         "newScheduledReportForm": {
@@ -19019,6 +20837,11 @@
           "replenishmentReview": {
             "title": "Replenishment review"
           }
+        }
+      },
+      "periodReportContext": {
+        "invalid": {
+          "message": "The report period context does not match the active organization, company or accounting period. Return to period close and select the period again."
         }
       }
     },
@@ -19318,7 +21141,9 @@
       "customSectionAdd": "Add section",
       "customSectionDescription": "Name the new proposal section.",
       "customSectionPlaceholder": "Section title",
-      "customSectionTitle": "Section title"
+      "customSectionTitle": "Section title",
+      "library": "Library",
+      "quickTitles": "Quick titles"
     },
     "sectionEditor": {
       "statusEmpty": "Empty",
@@ -19534,7 +21359,12 @@
       "revision": "Revision",
       "theirs": "Server version",
       "title": "This section was changed by someone else"
-    }
+    },
+    "complianceChecklist": {
+      "openCount_one": "{{count}} open",
+      "openCount_other": "{{count}} open"
+    },
+    "templateDefaultName": "Template"
   },
   "forensics": {
     "page": {
@@ -19660,6 +21490,82 @@
       "moveTo": "Move to {{status}}",
       "close": "Close",
       "byActor": "by {{actor}}"
+    },
+    "builtIn": {
+      "forensicReportTypes": {
+        "incidentCategories": {
+          "processFailure": {
+            "label": "Process Failure",
+            "description": "Breakdown in standard operating procedures"
+          },
+          "systemError": {
+            "label": "System Error",
+            "description": "Technical system malfunction or bug"
+          },
+          "dataDiscrepancy": {
+            "label": "Data Discrepancy",
+            "description": "Inconsistent or incorrect data"
+          },
+          "complianceIssue": {
+            "label": "Compliance Issue",
+            "description": "Regulatory or policy violation"
+          },
+          "securityIncident": {
+            "label": "Security Incident",
+            "description": "Security breach or vulnerability"
+          },
+          "performanceIssue": {
+            "label": "Performance Issue",
+            "description": "System or process performance degradation"
+          },
+          "customerComplaint": {
+            "label": "Customer Complaint",
+            "description": "Customer-reported issue"
+          },
+          "qualityDefect": {
+            "label": "Quality Defect",
+            "description": "Product or service quality issue"
+          },
+          "supplyChain": {
+            "label": "Supply Chain",
+            "description": "Supply chain disruption or issue"
+          },
+          "other": {
+            "description": "Uncategorized incident"
+          }
+        },
+        "severityConfig": {
+          "critical": {
+            "description": "Immediate action required, major business impact"
+          },
+          "high": {
+            "description": "Urgent attention needed, significant impact"
+          },
+          "medium": {
+            "description": "Requires timely resolution, moderate impact"
+          },
+          "low": {
+            "description": "Can be scheduled, minor impact"
+          }
+        },
+        "reportTemplates": {
+          "tplInventory": {
+            "name": "Inventory Discrepancy",
+            "description": "Template for inventory count variances"
+          },
+          "tplSystem": {
+            "name": "System Outage",
+            "description": "Template for system failures and outages"
+          },
+          "tplQuality": {
+            "name": "Quality Issue",
+            "description": "Template for product quality problems"
+          },
+          "tplCustomer": {
+            "description": "Template for customer-reported issues"
+          }
+        }
+      }
     }
   },
   "auth": {
@@ -19895,6 +21801,27 @@
     "landing": {
       "heading": "Run your operations from one modular workspace.",
       "description": "Connect sales, inventory, accounting, projects, and service teams with a real-time ERP shell built for modern workflows."
+    },
+    "builtIn": {
+      "authFormConfigs": {
+        "newUserInviteForm": {
+          "1": {
+            "label": "1 day"
+          },
+          "3": {
+            "label": "3 days"
+          },
+          "7": {
+            "label": "7 days"
+          },
+          "14": {
+            "label": "14 days"
+          },
+          "30": {
+            "label": "30 days"
+          }
+        }
+      }
     }
   },
   "modules": {
@@ -20611,7 +22538,9 @@
         "selectARecordToInspectIt": "Select a record to inspect it.",
         "loadingPreview": "Loading preview…",
         "noPreviewAvailable": "No preview available."
-      }
+      },
+      "collectionTitle": "Collection",
+      "detailTitle": "Detail"
     },
     "entityViews": {
       "entityFacetFilter": {
@@ -20845,6 +22774,11 @@
         "editEntry": "Edit Entry",
         "pageOf": "Page {{page}} of {{totalPages}}"
       }
+    },
+    "linkedOptions": {
+      "noRecords": "No records",
+      "vendorReference": "Vendor #{{id}}",
+      "workflowReference": "Workflow #{{id}}"
     }
   },
   "workspace": {
@@ -21584,7 +23518,8 @@
         "taxes": "Taxes",
         "budgetPosition": "Budget position",
         "budgets": "Budgets",
-        "budgetLineActuals": "Budget line actuals"
+        "budgetLineActuals": "Budget line actuals",
+        "usd": "USD"
       },
       "calendar": {
         "createANewCalendarEvent": "Create a new calendar event",
@@ -21639,7 +23574,8 @@
         "newExpense": "New Expense",
         "expenses": "Expenses",
         "newExpenseReport": "New Expense Report",
-        "reports": "Reports"
+        "reports": "Reports",
+        "usd": "USD"
       },
       "reports": {
         "generateANewReport": "Generate a new report",
@@ -21824,7 +23760,422 @@
         "expired": "Expired",
         "createANewSubscriptionPlan": "Create a new subscription plan",
         "eGPremiumPlan": "e.g., Premium Plan"
+      },
+      "helpdesk": {
+        "createANewSupportTicket": "Create a new support ticket",
+        "detailedDescriptionOfYourIssue": "Detailed description of your issue...",
+        "category": "Category",
+        "technicalIssue": "Technical Issue",
+        "billing": "Billing",
+        "account": "Account",
+        "featureRequest": "Feature Request",
+        "medium": "Medium",
+        "attachments": "Attachments",
+        "tags": "Tags",
+        "tickets": "Tickets"
+      },
+      "hr": {
+        "addANewEmployeeToTheSystem": "Add a new employee to the system",
+        "firstName": "First Name",
+        "lastName": "Last Name",
+        "phone": "Phone",
+        "engineering": "Engineering",
+        "sales": "Sales",
+        "marketing": "Marketing",
+        "humanResources": "Human Resources",
+        "finance": "Finance",
+        "position": "Position",
+        "jobTitle": "Job title",
+        "fullTime": "Full-time",
+        "partTime": "Part-time",
+        "reportsTo": "Reports To",
+        "address": "Address",
+        "submitALeaveOrTimeOffRequest": "Submit a leave or time-off request",
+        "vacation": "Vacation",
+        "sickLeave": "Sick Leave",
+        "personal": "Personal",
+        "parentalLeave": "Parental Leave",
+        "bereavement": "Bereavement",
+        "unpaidLeave": "Unpaid Leave",
+        "halfDay": "Half Day",
+        "provideAReasonForYourLeaveRequest": "Provide a reason for your leave request...",
+        "additionalNotes": "Additional Notes",
+        "contractType": "Contract Type",
+        "permanent": "Permanent",
+        "fixedTerm": "Fixed Term",
+        "contractor": "Contractor",
+        "salary": "Salary",
+        "annualSalary": "Annual salary",
+        "currency": "Currency",
+        "usd": "USD",
+        "eur": "EUR",
+        "gbp": "GBP",
+        "rwf": "RWF",
+        "leave": "Leave"
+      },
+      "inventory": {
+        "createANewProductInInventory": "Create a new product in inventory",
+        "productSKU": "Product SKU",
+        "enterProductName": "Enter product name",
+        "selectCategory": "Select category…",
+        "productDescription": "Product description...",
+        "unitCost": "Unit Cost",
+        "unitPrice": "Unit Price",
+        "reorderLevel": "Reorder Level",
+        "minimumStockLevel": "Minimum stock level",
+        "reorderQuantity": "Reorder Quantity",
+        "quantityToReorder": "Quantity to reorder",
+        "weightKg": "Weight (kg)",
+        "dimensionsLxWxH": "Dimensions (LxWxH)",
+        "eG10x20x5Cm": "e.g., 10x20x5 cm",
+        "trackSerialNumbers": "Track Serial Numbers",
+        "tags": "Tags",
+        "createAStockTransferBetweenWarehouses": "Create a stock transfer between warehouses",
+        "transferNumber": "Transfer Number",
+        "autoGenerated": "Auto-generated",
+        "fromWarehouse": "From Warehouse",
+        "warehouseA": "Warehouse A",
+        "warehouseB": "Warehouse B",
+        "warehouseC": "Warehouse C",
+        "toWarehouse": "To Warehouse",
+        "transferDate": "Transfer Date",
+        "inTransit": "In Transit",
+        "completed": "Completed",
+        "transferNotes": "Transfer notes...",
+        "recordInventoryAdjustmentsDamagedLostFound": "Record inventory adjustments (damaged, lost, found)",
+        "adjustmentNumber": "Adjustment Number",
+        "damagedGoods": "Damaged Goods",
+        "lostMissing": "Lost/Missing",
+        "foundItems": "Found Items",
+        "expired": "Expired",
+        "cycleCount": "Cycle Count",
+        "theft": "Theft",
+        "adjustmentDate": "Adjustment Date",
+        "detailedExplanation": "Detailed explanation...",
+        "newAdjustment": "New Adjustment",
+        "adjustments": "Adjustments"
+      },
+      "manufacturing": {
+        "createABillOfMaterialsForAProduct": "Create a bill of materials for a product",
+        "bomName": "BOM Name",
+        "eGWidgetBOMV1": "e.g., Widget BOM v1",
+        "finishedProduct": "Finished Product",
+        "productName": "Product name",
+        "batchQuantity": "Batch Quantity",
+        "version": "Version",
+        "createAManufacturingWorkOrder": "Create a manufacturing work order",
+        "workOrderNumber": "Work Order Number",
+        "quantityToProduce": "Quantity to Produce",
+        "planned": "Planned",
+        "onHold": "On Hold",
+        "completed": "Completed",
+        "priority": "Priority",
+        "low": "Low",
+        "normal": "Normal",
+        "high": "High",
+        "urgent": "Urgent",
+        "dueDate": "Due Date",
+        "newWorkOrder": "New Work Order"
+      },
+      "projects": {
+        "enterProjectName": "Enter project name",
+        "projectDescription": "Project description...",
+        "client": "Client",
+        "clientName": "Client name",
+        "planning": "Planning",
+        "onHold": "On Hold",
+        "completed": "Completed",
+        "endDate": "End Date",
+        "budget": "Budget",
+        "projectBudget": "Project budget",
+        "medium": "Medium",
+        "critical": "Critical",
+        "tags": "Tags",
+        "createANewProjectTask": "Create a new project task",
+        "taskTitle": "Task Title",
+        "enterTaskTitle": "Enter task title",
+        "assignee": "Assignee",
+        "toDo": "To Do",
+        "inReview": "In Review",
+        "dueDate": "Due Date",
+        "estimatedHours": "Estimated Hours"
+      },
+      "proposals": {
+        "createANewProposal": "Create a new proposal",
+        "enterProposalTitle": "Enter proposal title",
+        "validUntil": "Valid Until",
+        "totalAmount": "Total Amount",
+        "proposalDescription": "Proposal description...",
+        "internalNotes": "Internal Notes",
+        "tags": "Tags"
+      },
+      "registry": {
+        "forensicIncidentReportForTrackingAndAnalyzingIssues": "Forensic incident report for tracking and analyzing issues",
+        "incidentTitle": "Incident Title",
+        "briefDescriptionOfTheIncident": "Brief description of the incident",
+        "category": "Category",
+        "processFailure": "Process Failure",
+        "systemError": "System Error",
+        "dataDiscrepancy": "Data Discrepancy",
+        "complianceIssue": "Compliance Issue",
+        "securityIncident": "Security Incident",
+        "performanceIssue": "Performance Issue",
+        "customerComplaint": "Customer Complaint",
+        "qualityDefect": "Quality Defect",
+        "supplyChain": "Supply Chain",
+        "severity": "Severity",
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "incidentDate": "Incident Date",
+        "description": "Description",
+        "detailedDescriptionOfTheIncident": "Detailed description of the incident...",
+        "affectedArea": "Affected Area",
+        "production": "Production",
+        "warehouse": "Warehouse",
+        "sales": "Sales",
+        "customerService": "Customer Service",
+        "finance": "Finance",
+        "itSystems": "IT Systems",
+        "logistics": "Logistics",
+        "immediateActionsTaken": "Immediate Actions Taken",
+        "whatActionsWereTakenImmediately": "What actions were taken immediately...",
+        "rootCauseAnalysis": "Root Cause Analysis",
+        "initialAssessmentOfRootCause": "Initial assessment of root cause...",
+        "estimatedFinancialImpact": "Estimated Financial Impact",
+        "enterAmountInDollars": "Enter amount in dollars",
+        "customersAffected": "Customers Affected",
+        "numberOfAffectedCustomers": "Number of affected customers",
+        "assignTo": "Assign To",
+        "department": "Department",
+        "operations": "Operations",
+        "it": "IT",
+        "qualityAssurance": "Quality Assurance",
+        "humanResources": "Human Resources",
+        "tags": "Tags",
+        "addRelevantTags": "Add relevant tags...",
+        "attachments": "Attachments",
+        "incidentTrackingAndForensicAnalysis": "Incident tracking and forensic analysis",
+        "customerRelationshipManagement": "Customer relationship management",
+        "salesOrdersAndPriceManagement": "Sales orders and price management",
+        "productAndStockManagement": "Product and stock management",
+        "humanResourcesManagement": "Human resources management",
+        "purchaseOrdersAndRequisitions": "Purchase orders and requisitions",
+        "projectAndTaskManagement": "Project and task management",
+        "bomAndWorkOrders": "BOM and work orders",
+        "supportTickets": "Support tickets",
+        "subscriptionManagement": "Subscription management",
+        "proposalManagement": "Proposal management",
+        "incidentReport": "Incident Report",
+        "compliance": "Compliance",
+        "suggestions": {
+          "isolatedAffectedSystem": "Isolated affected system",
+          "notifiedStakeholders": "Notified stakeholders",
+          "initiatedBackupProcedures": "Initiated backup procedures",
+          "documentedInitialFindings": "Documented initial findings",
+          "humanError": "Human error",
+          "systemMalfunction": "System malfunction",
+          "processGap": "Process gap",
+          "externalFactor": "External factor",
+          "communicationBreakdown": "Communication breakdown"
+        },
+        "journal": "Journal",
+        "forensicReports": "Forensic Reports",
+        "crm": "CRM",
+        "inventory": "Inventory",
+        "accounting": "Accounting",
+        "hr": "HR",
+        "purchasing": "Purchasing",
+        "projects": "Projects",
+        "documents": "Documents",
+        "manufacturing": "Manufacturing",
+        "helpdesk": "Helpdesk",
+        "expenses": "Expenses",
+        "calendar": "Calendar",
+        "subscriptions": "Subscriptions",
+        "proposals": "Proposals",
+        "reports": "Reports"
       }
+    }
+  },
+  "ai-action-drafts": {
+    "aiActionDraftsClient": {
+      "aIActionApprovals": "AI Action Approvals",
+      "reviewPendingAIProposedERPMutationsBeforeTheyExecuteElevatedDrafts": "Review pending AI-proposed ERP mutations before they execute. Elevated drafts require a different approver than the proposer.",
+      "pendingDraft": "pending draft",
+      "inAppAndEmailNotificationsWerePostedToTheMessagesFeed": "In-app and email notifications were posted to the Messages feed for pending drafts.",
+      "loadingApprovalInbox": "Loading approval inbox…",
+      "unableToLoadApprovalInbox": "Unable to load approval inbox",
+      "unableToExpireStaleDrafts": "Unable to expire stale drafts",
+      "noPendingAIActionDraftsAskTheERPAssistantToPropose": "No pending AI action drafts. Ask the ERP Assistant to propose a task or order, then return here to approve it.",
+      "workflowInstance": "Workflow instance #",
+      "pendingDraftCount": "{{count}} pending draft",
+      "pendingDraftCount_one": "{{count}} pending draft",
+      "pendingDraftCount_other": "{{count}} pending drafts",
+      "messageAlertCount": "Messages ({{count}} draft alert)",
+      "messageAlertCount_one": "Messages ({{count}} draft alert)",
+      "messageAlertCount_other": "Messages ({{count}} draft alerts)"
+    }
+  },
+  "ai-harness": {
+    "evidenceReviewQueuePanel": {
+      "v": "v"
+    },
+    "runHistoryPanel": {
+      "theCurrentSessionIsNotAuthorizedToListGovernedRuns": "The current session is not authorized to list governed runs.",
+      "runHistoryIsTemporarilyUnavailable": "Run history is temporarily unavailable.",
+      "theRunHistoryResponseWasIncomplete": "The run history response was incomplete.",
+      "recentGovernedRuns": "Recent governed runs",
+      "newestFirstScopedToTheSelectedCompanyAndCurrentActorGrant": "Newest first, scoped to the selected company and current actor grant.",
+      "loadHistory": "Load history",
+      "loadAuthorizedHistoryToChooseAnExactRun": "Load authorized history to choose an exact run.",
+      "historyUnavailable": "History unavailable",
+      "noGovernedRunsWereReturned": "No governed runs were returned.",
+      "run": "Run #",
+      "skill": "skill",
+      "agent": "· agent",
+      "providerListTruncated": "Provider list truncated",
+      "units": "units",
+      "settled": "settled",
+      "reserved": "reserved",
+      "outcomeUnknown": "Outcome unknown",
+      "economicsTruncated": "Economics truncated",
+      "loadOlderRuns": "Load older runs"
+    },
+    "runLifecyclePanel": {
+      "left": "Left:",
+      "right": "Right:",
+      "onlyLeft": "Only left:",
+      "onlyRight": "Only right:",
+      "toolDifferenceTruncated": "Tool difference truncated",
+      "noBoundedComparisonDetailsWereAvailable": "No bounded comparison details were available."
+    },
+    "runObservationPanel": {
+      "providerAttempt": "provider attempt",
+      "providerAttemptCount": "{{count}} provider attempt",
+      "providerAttemptCount_one": "{{count}} provider attempt",
+      "providerAttemptCount_other": "{{count}} provider attempts"
+    }
+  },
+  "ai-skills": {
+    "skillRegistryPanel": {
+      "createdFromAISkillsAdmin": "Created from AI Skills admin"
+    }
+  },
+  "distributor": {
+    "distributorClient": {
+      "disablePackFailed": "Disable pack failed",
+      "enablePackFailed": "Enable pack failed",
+      "cashCreditOrderToCashAndStockControlForDistributionCompanies": "Cash, credit, order-to-cash and stock control for distribution companies",
+      "distributorWorkspace": "Distributor workspace",
+      "notEnabled": "Not enabled",
+      "companyScopedCashCreditOrderAndStockControlBuiltOnThe": "Company-scoped cash, credit, order, and stock control built on the shared ERP workflows.",
+      "disablePack": "Disable pack",
+      "enablePack": "Enable pack",
+      "enableThisCompanySDistributorPack": "Enable this company’s distributor pack",
+      "enablingExposesTheDistributorControlWorkspaceWithoutChangingAnyOperationalRecords": "Enabling exposes the distributor control workspace without changing any operational records.",
+      "enableDistributorPack": "Enable distributor pack",
+      "openSalesOrders": "Open sales orders",
+      "ordersRequiringFulfilmentOrPaymentFollowUp": "Orders requiring fulfilment or payment follow-up.",
+      "openCustomerBalances": "Open customer balances",
+      "postedCustomerInvoicesWithARemainingBalance": "Posted customer invoices with a remaining balance.",
+      "postedPayments": "Posted payments",
+      "operationalPaymentsAvailableForReconciliation": "Operational payments available for reconciliation.",
+      "currentQuantsAtOrBelowZeroOrMarkedOutdated": "Current quants at or below zero, or marked outdated.",
+      "orderToCashExceptions": "Order-to-cash exceptions",
+      "confirmedOrdersWithAMissingOrUnfinishedDeliveryNoInvoiceAn": "Confirmed orders with a missing or unfinished delivery, no invoice, an overdue balance, or a customer on credit hold. Each links to the record that owns it.",
+      "noOrderToCashExceptions": "No order-to-cash exceptions.",
+      "deliveriesAmpInvoices": "Deliveries &amp; invoices",
+      "openBalance": "Open balance",
+      "order": "Order #{{value1}}",
+      "partner": "Partner {{value1}}",
+      "openWorkflow": "Open workflow"
+    },
+    "orderToCash": {
+      "to_deliver": "To deliver",
+      "to_invoice": "To invoice",
+      "to_collect": "To collect",
+      "settled": "Settled",
+      "no_delivery": "No delivery",
+      "delivery_incomplete": "Delivery incomplete",
+      "not_invoiced": "Not invoiced",
+      "collection_overdue": "Overdue",
+      "credit_hold": "Credit hold"
+    }
+  },
+  "presentation-preview": {
+    "previewComposer": {
+      "savedDraftModuleKeyMismatch": "Saved draft module key mismatch",
+      "unableToLoadDrafts": "Unable to load drafts",
+      "unableToReopenSavedDraft": "Unable to reopen saved draft",
+      "unableToLoadPreview": "Unable to load preview",
+      "evidenceDecisionAndClaimIDsMustBePositiveCommaSeparatedIntegers": "Evidence decision and claim IDs must be positive comma-separated integers.",
+      "evidenceClaimsCannotBeBoundWithoutAtLeastOneAcceptedDecision": "Evidence claims cannot be bound without at least one accepted decision.",
+      "unableToSaveDraft": "Unable to save draft",
+      "loadingSavedDrafts": "Loading saved drafts…",
+      "modulePreview": "Module preview",
+      "chooseFieldsForAccountingEntriesInYourActiveCompanySavedDefinitions": "Choose fields for accounting entries in your active company. Saved definitions are visible only to you in this organization.",
+      "selectAnActiveCompanyToPreviewThisDraft": "Select an active company to preview this draft.",
+      "thisDraftChangedElsewhereYourEditsArePreserved": "This draft changed elsewhere. Your edits are preserved.",
+      "reloadSavedDraft": "Reload saved draft",
+      "aNewerSavedDraftIsAvailable": "A newer saved draft is available.",
+      "loadSavedDraft": "Load saved draft",
+      "moduleTitle": "Module title",
+      "collectionFields": "Collection fields",
+      "detailFields": "Detail fields",
+      "acceptedDecisionIDs": "Accepted decision IDs",
+      "linkedClaimIDsOptional": "Linked claim IDs (optional)",
+      "previewModule": "Preview module",
+      "reopenSavedDraft": "Reopen saved draft",
+      "requestFailed": "Presentation request failed"
+    }
+  },
+  "demoReadiness": {
+    "backToWorkspace": "Back to workspace",
+    "previewLabel": "Alpha · administrator preview",
+    "title": "Demo data & module gaps",
+    "scopeNotice": "These are live, permission-checked reads. Data present does not mean a module is U5 or fully tested. Empty approval queues can be expected until you submit a business action.",
+    "syntheticDataNotice": "All Alpha demo records are synthetic. Invoices, payroll, manufacturing and subscriptions are drafts or inactive; no payment, tax filing, email or AI-provider execution is seeded.",
+    "queryFailed": "Query failed (HTTP {{status}})",
+    "unexpectedResponse": "Unexpected query response",
+    "queryUnavailable": "Query unavailable — inspect service or permissions",
+    "empty": "Empty — inspect setup or workflow state",
+    "rowsReturned_one": "{{count}} row returned",
+    "rowsReturned_other": "{{count}} rows returned",
+    "modules": {
+      "crm": "CRM",
+      "sales": "Sales",
+      "purchasing": "Purchasing",
+      "inventory": "Inventory / WMS",
+      "manufacturing": "Manufacturing",
+      "accounting": "Accounting",
+      "hr": "HR / Payroll",
+      "projects": "Projects / Tasks",
+      "expenses": "Expenses",
+      "reports": "Reports",
+      "documents": "Documents",
+      "workflows": "Approvals / Workflows",
+      "forms": "Forms / Imports",
+      "settings": "Settings / Auth",
+      "helpdesk": "Helpdesk",
+      "fleet": "Fleet",
+      "pos": "POS",
+      "subscriptions": "Subscriptions"
+    }
+  },
+  "mobile": {
+    "navigation": {
+      "home": "Home",
+      "explore": "Explore",
+      "modal": "Modal"
+    },
+    "roles": {
+      "loadFailed": "Could not load roles",
+      "loading": "Loading roles…",
+      "requestFailed": "Request failed",
+      "loadedCount_one": "Roles from API: {{count}}",
+      "loadedCount_other": "Roles from API: {{count}}"
     }
   }
 }

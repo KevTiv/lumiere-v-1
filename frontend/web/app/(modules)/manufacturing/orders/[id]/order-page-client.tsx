@@ -202,7 +202,7 @@ function ManufacturingOrderPageLoaded({
     mode: 'detail' as const,
     sections: [{ id: 'order', fields: columns.filter((column) => column.key !== 'name').map(({ width: _width, ...field }) => field) }],
   };
-  const iotReferenceStatus = iotDevicesQuery.status === 'success' ? undefined : iotDevicesQuery.status === 'error' ? 'Unavailable' : 'Loading';
+  const iotReferenceStatus = iotDevicesQuery.status === 'success' ? undefined : iotDevicesQuery.status === 'error' ? t("purchasing.purchasingClient.unavailable") : t("purchasing.purchasingClient.loading");
 
   const busy =
     confirmMo.isPending ||

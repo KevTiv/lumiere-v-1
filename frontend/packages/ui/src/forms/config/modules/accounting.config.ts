@@ -104,7 +104,7 @@ export const accountingForms: FormRegistryEntry[] = [
           get label() { return i18n.t("accounting.overview.currency") },
           fieldType: "Select",
           options: [
-            { value: "USD", label: "USD", color: "blue" },
+            { value: "USD", get label() { return i18n.t("forms.defaults.accounting.usd") }, color: "blue" },
             { value: "EUR", get label() { return i18n.t("forms.defaults.accounting.eur") }, color: "green" },
             { value: "GBP", get label() { return i18n.t("forms.defaults.accounting.gbp") }, color: "purple" },
             { value: "RWF", get label() { return i18n.t("forms.defaults.accounting.rwf") }, color: "yellow" },

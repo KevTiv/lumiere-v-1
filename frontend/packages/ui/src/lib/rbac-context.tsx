@@ -1,5 +1,7 @@
 "use client"
 
+import { i18n as uiI18n, useTranslation } from "@lumiere/i18n"
+
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react"
 import type { 
   User, 
@@ -92,10 +94,10 @@ export function RBACProvider({
     action: Action
   ): PermissionCheckResult => {
     if (!currentUser) {
-      return { allowed: false, reason: "No user logged in" }
+      return { allowed: false, get reason() { return uiI18n.t("common.builtIn.rbacContext.checkPermission.reason", { defaultValue: "No user logged in" }) } }
     }
 
-    if (currentUser.isSuperuser) return { allowed: true, reason: "Platform superuser" }
+    if (currentUser.isSuperuser) return { allowed: true, get reason() { return uiI18n.t("common.builtIn.rbacContext.checkPermission.reasonplatformSuperuser", { defaultValue: "Platform superuser" }) } }
 
     const applicablePolicies = getUserPolicies(currentUser)
     
@@ -121,14 +123,14 @@ export function RBACProvider({
           allowed: rule.effect === "allow",
           rule,
           reason: rule.effect === "allow" 
-            ? `Allowed by policy: ${rule.id}` 
-            : `Denied by policy: ${rule.id}`
+            ? uiI18n.t("common.permissions.allowedByPolicy", { defaultValue: "Allowed by policy: {{id}}", id: rule.id })
+            : uiI18n.t("common.permissions.deniedByPolicy", { defaultValue: "Denied by policy: {{id}}", id: rule.id })
         }
       }
     }
 
     // Default deny
-    return { allowed: false, reason: "No matching policy found" }
+    return { allowed: false, get reason() { return uiI18n.t("common.builtIn.rbacContext.checkPermission.reasonnoMatchingPolicyFound", { defaultValue: "No matching policy found" }) } }
   }, [currentUser, getUserPolicies])
 
   // Check if user has a specific role
@@ -199,13 +201,14 @@ export function withPermission<P extends object>(
   action: Action
 ) {
   return function ProtectedComponent(props: P) {
+    const { t } = useTranslation()
     const { checkPermission } = useRBAC()
     const result = checkPermission(resource, action)
     
     if (!result.allowed) {
       return (
         <div className="p-8 text-center text-muted-foreground">
-          <p>You don&apos;t have permission to access this resource.</p>
+          <p>{t("common.permissions.accessDenied", { defaultValue: "You don't have permission to access this resource." })}</p>
           <p className="text-sm mt-2">{result.reason}</p>
         </div>
       )

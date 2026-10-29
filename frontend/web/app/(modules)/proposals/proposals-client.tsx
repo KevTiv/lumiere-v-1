@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { canUseModuleData, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import {
   ModuleView,
@@ -63,28 +63,28 @@ type ProposalsClientLoadedProps = Omit<ProposalsClientProps, "organizationId"> &
 const BUILTIN_PROPOSAL_TEMPLATES: Record<string, unknown>[] = [
   {
     id: "tpl-commercial",
-    name: "Commercial Proposal",
-    category: "Commercial",
+    get name() { return i18n.t("proposals.builtInTemplates.commercialProposal") },
+    get category() { return i18n.t("proposals.builtInTemplates.commercial") },
     sectionCount: 5,
-    description: "Executive summary, scope, timeline, pricing, and terms",
+    get description() { return i18n.t("proposals.proposalsClient.executiveSummaryScopeTimelinePricingAndTerms") },
     usageCount: 0,
     createdAt: new Date().toISOString(),
   },
   {
     id: "tpl-tender",
-    name: "Tender Response",
-    category: "Tender",
+    get name() { return i18n.t("proposals.builtInTemplates.tenderResponse") },
+    get category() { return i18n.t("proposals.builtInTemplates.tender") },
     sectionCount: 7,
-    description: "Compliance matrix, methodology, team, and bid pricing",
+    get description() { return i18n.t("proposals.proposalsClient.complianceMatrixMethodologyTeamAndBidPricing") },
     usageCount: 0,
     createdAt: new Date().toISOString(),
   },
   {
     id: "tpl-grant",
-    name: "Grant Application",
-    category: "Grant",
+    get name() { return i18n.t("proposals.builtInTemplates.grantApplication") },
+    get category() { return i18n.t("proposals.builtInTemplates.grant") },
     sectionCount: 6,
-    description: "Need statement, outcomes, budget, and evaluation criteria",
+    get description() { return i18n.t("proposals.proposalsClient.needStatementOutcomesBudgetAndEvaluationCriteria") },
     usageCount: 0,
     createdAt: new Date().toISOString(),
   },
@@ -354,11 +354,11 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
             ...w,
             data: {
               stats: [
-                { label: "Active Proposals", value: String(activeCount), icon: "ClipboardList" },
-                { label: "Submitted", value: String(submittedCount), icon: "Send" },
-                { label: "Awarded", value: String(awardedCount), icon: "Award" },
+                { label: t("proposals.proposalsClient.activeProposals"), value: String(activeCount), icon: "ClipboardList" },
+                { label: t("proposals.proposals.filters.status.options.Submitted"), value: String(submittedCount), icon: "Send" },
+                { label: t("proposals.proposals.filters.status.options.Awarded"), value: String(awardedCount), icon: "Award" },
                 {
-                  label: "Pipeline Value",
+                  label: t("crm.dashboard.pipelineValue"),
                   value: pipelineValueLabel,
                   icon: "TrendingUp",
                 },
@@ -385,7 +385,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         }
         return w
           })
-  }, [activeCount, submittedCount, awardedCount, pipelineValueLabel, proposals, router, moduleConfig, proposalCreateForm])
+  }, [activeCount, submittedCount, awardedCount, pipelineValueLabel, proposals, router, moduleConfig, proposalCreateForm, t])
 
   const config = useMemo(
     (): ModuleConfig => ({
@@ -409,11 +409,11 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
               ] }] },
               customTabs: [{
                 id: "handoffs",
-                label: "Sale order",
-                content: (record) => saleOrdersLoading ? <p>Loading linked records…</p> : (
+                label: t("proposals.proposals.columns.saleOrderId"),
+                content: (record) => saleOrdersLoading ? <p>{t("subscriptions.subscriptionsClient.loadingLinkedRecords")}</p> : (
                   <CrossRecordLinks testIdPrefix="proposal-handoff"
                     result={saleOrdersError
-                      ? { status: "unavailable", links: [], reason: "Linked sales records are unavailable" }
+                      ? { status: "unavailable", links: [], reason: t("proposals.proposalsClient.linkedSalesUnavailable") }
                       : proposalOrderLinks(record, { organizationId: orgId, companyId: operatingCompanyId }, saleOrders)}
                   />
                 ),
@@ -450,7 +450,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!proposalsUsable) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!proposalsUsable) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "createProposal") {
       const title = String(formData.title ?? "").trim()
       if (!title) return
@@ -477,7 +477,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       for (let attempt = 0; attempt < 40; attempt += 1) {
         const rows = await queryClient.fetchQuery({
           queryKey: ["proposals", rqBigIntKey(orgId)],
-          queryFn: () => fetchQueryList("/api/query/proposals", "Failed to fetch proposals"),
+          queryFn: () => fetchQueryList("/api/query/proposals", t("proposals.errors.failedToFetchProposals")),
         })
         created = [...rows]
           .filter((row) => String(row.title ?? "") === title)
@@ -487,7 +487,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
       }
 
       if (created?.id == null) {
-        throw new Error(`Proposal "${title}" was created but did not appear in the proposals query`)
+        throw new Error(t("proposals.proposalsClient.proposalWasCreatedButDidNotAppearInTheProposalsQuery", { value1: title }))
       }
 
       router.push(
@@ -512,8 +512,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     <>
       {currencyOptions.length > 0 ? (
         <span className="sr-only" data-testid="proposal-currencies-ready">
-          Currency options ready
-        </span>
+          {t("proposals.proposalsClient.currencyOptionsReady")}{" "}</span>
       ) : null}
       <ModuleView
         config={config}

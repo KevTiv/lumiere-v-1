@@ -9,7 +9,7 @@ import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-param
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import dynamic from 'next/dynamic';
-import { useTranslation } from '@lumiere/i18n';
+import { i18n, useTranslation } from '@lumiere/i18n';
 import {
   ModuleView,
   FormModal,
@@ -408,8 +408,7 @@ const WarehouseViewer = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center h-full text-muted-foreground">
-        Loading 3D viewer…
-      </div>
+        {i18n.t("inventory.inventoryClient.loading3DViewer")}{" "}</div>
     ),
   },
 );
@@ -1853,7 +1852,7 @@ function InventoryClientLoaded({
       seen.add(n);
       opts.push({
         value: String(n),
-        label: `${String(p.name ?? 'Pricelist')} (${n})`,
+        label: `${String(p.name ?? t("inventory.inventoryClient.pricelist"))} (${n})`,
       });
     }
     return opts.length > 0
@@ -2014,7 +2013,6 @@ function InventoryClientLoaded({
         return { ...w, data: { metrics } };
       }
       if (w.id === 'inv-movements') {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const nowMs = Date.now();
         const sevenDaysAgo = nowMs - 7 * 86400000;
         const dayIn: Record<string, number> = {};
@@ -2022,7 +2020,7 @@ function InventoryClientLoaded({
         const orderedDays: string[] = [];
         for (let i = 6; i >= 0; i--) {
           const d = new Date(nowMs - i * 86400000);
-          const label = days[d.getDay()];
+          const label = d.toLocaleDateString(i18n.language, { weekday: "short" });
           if (!orderedDays.includes(label)) orderedDays.push(label);
           dayIn[label] = 0;
           dayOut[label] = 0;
@@ -2030,7 +2028,7 @@ function InventoryClientLoaded({
         for (const t of transfers) {
           const ms = Number(t.scheduledDate ?? 0) / 1000;
           if (ms < sevenDaysAgo || ms > nowMs) continue;
-          const label = days[new Date(ms).getDay()];
+          const label = new Date(ms).toLocaleDateString(i18n.language, { weekday: "short" });
           if (
             String(t.pickingCode ?? '')
               .toLowerCase()
@@ -2108,19 +2106,19 @@ function InventoryClientLoaded({
           data: {
             stats: [
               {
-                label: 'Short ATP',
+                label: t("inventory.inventoryClient.shortATP"),
                 value: String(shortAtpExceptions.length),
                 icon: 'AlertTriangle',
                 testId: 'inventory-queue-short-atp',
               },
               {
-                label: 'Expired lots',
+                label: t("inventory.inventoryClient.expiredLots"),
                 value: String(expiredLotExceptions.length),
                 icon: 'AlertCircle',
                 testId: 'inventory-queue-expired-lots',
               },
               {
-                label: 'Open QC fails',
+                label: t("inventory.inventoryClient.openQCFails"),
                 value: String(openQcExceptions.length),
                 icon: 'ShieldAlert',
                 testId: 'inventory-queue-open-qc',
@@ -2345,7 +2343,7 @@ function InventoryClientLoaded({
         />
       ),
     }),
-    [organizationId, operatingCompanyId, selectedOperatingCompanyId],
+    [organizationId, operatingCompanyId, selectedOperatingCompanyId, t],
   );
 
   const config = useMemo(() => {
@@ -2502,7 +2500,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'ask-ai',
-                  label: 'Ask AI',
+                  label: t("documents.documentsClient.askAI"),
                   icon: Sparkles,
                   requiresSelection: true,
                   onClick: (rows) => {
@@ -4490,10 +4488,10 @@ function InventoryClientLoaded({
                           required: true,
                           defaultValue: 'UNKNOWN',
                           options: [
-                            { value: 'GREEN', label: 'GREEN' },
-                            { value: 'YELLOW', label: 'YELLOW' },
-                            { value: 'RED', label: 'RED' },
-                            { value: 'UNKNOWN', label: 'UNKNOWN' },
+                            { value: 'GREEN', label: t("inventory.inventoryClient.gREEN") },
+                            { value: 'YELLOW', label: t("inventory.inventoryClient.yELLOW") },
+                            { value: 'RED', label: t("inventory.inventoryClient.rED") },
+                            { value: 'UNKNOWN', label: t("inventory.inventoryClient.uNKNOWN") },
                           ],
                         },
                       ],
@@ -5206,7 +5204,7 @@ function InventoryClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
+    if (!tabUsable(actionTabs[action])) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"));
     if (action === 'createProduct') {
       const pricelistRaw = formData.pricelistId;
       if (pricelistRaw === '' || pricelistRaw == null) return;

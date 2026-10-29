@@ -57,7 +57,7 @@ export const expensesForms: FormRegistryEntry[] = [
           get label() { return i18n.t("expenses.workflowUi.currency") },
           fieldType: "Select",
           options: [
-            { value: "USD", label: "USD", color: "blue" },
+            { value: "USD", get label() { return i18n.t("forms.defaults.expenses.usd") }, color: "blue" },
             { value: "EUR", get label() { return i18n.t("forms.defaults.expenses.eur") }, color: "green" },
             { value: "GBP", get label() { return i18n.t("forms.defaults.expenses.gbp") }, color: "purple" },
             { value: "RWF", get label() { return i18n.t("forms.defaults.expenses.rwf") }, color: "yellow" },

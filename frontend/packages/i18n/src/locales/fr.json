@@ -380,7 +380,11 @@
         "applyDomain": {
           "thisWidgetHasAnInvalidPersistedFilter": {
             "message": "La définition du filtre enregistré de ce widget est invalide."
-          }
+          },
+          "message": "Le filtre de {{field}} n’a pas d’opérateur.",
+          "messagetheInFilterForFieldMustUse": "Le filtre $in de {{field}} doit utiliser un tableau.",
+          "messagethisWidgetHasANonNumericOperandFor": "Ce widget a un opérande non numérique pour {{operator}}.",
+          "messagethisWidgetUsesAnUnsupportedFilterOperator": "Ce widget utilise un opérateur de filtre non pris en charge : {{operator}}."
         },
         "parseBinding": {
           "thisWidgetHasAnInvalidTimeOr": {
@@ -404,12 +408,14 @@
         "applyTimeRange": {
           "thisWidgetDoesNotDeclareATime": {
             "message": "Ce widget ne définit pas de champ temporel pour la période sélectionnée."
-          }
+          },
+          "message": "Ce widget a des données d’horodatage incomplètes dans {{timeField}}."
         },
         "applyMeasureCompleteness": {
           "thisWidgetDoesNotDeclareTheMeasure": {
             "message": "Ce widget ne définit pas la mesure utilisée pour son agrégation."
-          }
+          },
+          "message": "Ce widget a des données numériques incomplètes dans {{field}}."
         },
         "resolveStoredDashboard": {
           "theWidgetHasNoDataSource": {
@@ -417,13 +423,245 @@
           },
           "aChartWidgetRequiresAGroupByField": {
             "message": "Un widget graphique nécessite un champ de regroupement."
-          }
+          },
+          "message": "Le type de graphique {{chartType}} n’est pas pris en charge.",
+          "messagetheWidgetTypeValue1IsNotSupported": "Le type de widget {{value1}} n’est pas pris en charge."
+        },
+        "normalizeAggregation": {
+          "message": "L’agrégation {{aggregation}} n’est pas prise en charge."
         }
       },
       "runtimeFormConfig": {
         "mergeRuntimeFormConfig": {
           "runtimeExtraFields": {
             "title": "Champs supplémentaires"
+          }
+        },
+        "parsedFieldToModularField": {
+          "error": "La valeur par défaut de MultiSelect doit être un tableau de chaînes : {{fieldId}}"
+        },
+        "stdbTypeToModular": {
+          "error": "Type de champ d’exécution non pris en charge : {{type}}"
+        }
+      },
+      "formConfigs": {
+        "newCustomerForm": {
+          "basicInfo": {
+            "title": "Informations de base"
+          },
+          "company": {
+            "label": "Nom de la société",
+            "placeholder": "Acme Inc."
+          },
+          "companyInfo": {
+            "title": "Coordonnées de la société"
+          },
+          "contactMethod": {
+            "label": "Mode de contact préféré"
+          },
+          "email": {
+            "label": "E-mail"
+          },
+          "finance": {
+            "label": "Finance"
+          },
+          "firstName": {
+            "label": "Prénom",
+            "placeholder": "John"
+          },
+          "healthcare": {
+            "label": "Santé"
+          },
+          "industry": {
+            "label": "Secteur d’activité"
+          },
+          "lastName": {
+            "label": "Nom de famille",
+            "placeholder": "Doe"
+          },
+          "manufacturing": {
+            "label": "Fabrication"
+          },
+          "marketing": {
+            "label": "Recevoir des communications commerciales"
+          },
+          "newCustomer": {
+            "description": "Enregistrer un nouveau client dans le système",
+            "submitLabel": "Ajouter un client",
+            "title": "Ajouter un nouveau client"
+          },
+          "phone": {
+            "label": "Téléphone"
+          },
+          "preferences": {
+            "title": "Préférences"
+          },
+          "retail": {
+            "label": "Commerce de détail"
+          },
+          "sms": {
+            "label": "SMS"
+          },
+          "tech": {
+            "label": "Technologie"
+          },
+          "website": {
+            "label": "Site web"
+          }
+        },
+        "newOrderForm": {
+          "addonA": {
+            "label": "Module complémentaire A - $50/mois"
+          },
+          "annual": {
+            "label": "Annuel (15% de réduction)"
+          },
+          "billingCycle": {
+            "label": "Cycle de facturation"
+          },
+          "customerCompany": {
+            "label": "Société",
+            "placeholder": "Nom de la société"
+          },
+          "customerEmail": {
+            "label": "Adresse e-mail"
+          },
+          "customerInfo": {
+            "title": "Informations sur le client"
+          },
+          "customerName": {
+            "label": "Nom du client",
+            "placeholder": "Saisissez le nom du client"
+          },
+          "customerPhone": {
+            "label": "Numéro de téléphone"
+          },
+          "enterprise": {
+            "label": "Enterprise Suite - $200/mois"
+          },
+          "expressShipping": {
+            "label": "Livraison express (+$25)"
+          },
+          "giftWrap": {
+            "label": "Emballage cadeau (+$5)"
+          },
+          "high": {
+            "label": "Élevée"
+          },
+          "low": {
+            "label": "Faible"
+          },
+          "monthly": {
+            "label": "Mensuel"
+          },
+          "newOrder": {
+            "description": "Saisissez les détails de la nouvelle commande client",
+            "submitLabel": "Créer une commande",
+            "title": "Créer une nouvelle commande"
+          },
+          "newsletter": {
+            "label": "S’abonner à notre lettre d’information"
+          },
+          "normal": {
+            "label": "Normale"
+          },
+          "notes": {
+            "label": "Notes de commande",
+            "placeholder": "Instructions ou remarques particulières..."
+          },
+          "options": {
+            "title": "Options supplémentaires"
+          },
+          "orderDetails": {
+            "title": "Détails de la commande"
+          },
+          "priority": {
+            "label": "Priorité"
+          },
+          "product": {
+            "label": "Produit",
+            "placeholder": "Sélectionnez un produit"
+          },
+          "professional": {
+            "label": "Professional Plan - $150/mois"
+          },
+          "quantity": {
+            "label": "Quantité"
+          },
+          "quarterly": {
+            "label": "Trimestriel (5% de réduction)"
+          },
+          "starter": {
+            "label": "Starter Kit - $50/mois"
+          },
+          "support": {
+            "label": "Support Package - $100/mois"
+          },
+          "terms": {
+            "label": "J’accepte les conditions générales"
+          },
+          "urgent": {
+            "label": "Urgente"
+          }
+        },
+        "reportForm": {
+          "csv": {
+            "label": "Fichier CSV"
+          },
+          "customers": {
+            "label": "Analyse des clients"
+          },
+          "dateFrom": {
+            "label": "Date de début"
+          },
+          "dateTo": {
+            "label": "Date de fin"
+          },
+          "excel": {
+            "label": "Feuille de calcul Excel"
+          },
+          "financial": {
+            "label": "Vue d’ensemble financière"
+          },
+          "format": {
+            "label": "Format d’exportation"
+          },
+          "generateReport": {
+            "description": "Configurer et générer un rapport personnalisé",
+            "submitLabel": "Générer",
+            "title": "Générer un rapport"
+          },
+          "includeCharts": {
+            "label": "Inclure des graphiques"
+          },
+          "includeSummary": {
+            "label": "Inclure une synthèse"
+          },
+          "inventory": {
+            "label": "Rapport de stock"
+          },
+          "pdf": {
+            "label": "Document PDF"
+          },
+          "reportType": {
+            "label": "Type de rapport"
+          },
+          "sales": {
+            "label": "Synthèse des ventes"
+          }
+        }
+      },
+      "rbacContext": {
+        "checkPermission": {
+          "reason": "Aucun utilisateur connecté",
+          "reasonnoMatchingPolicyFound": "Aucune règle correspondante trouvée",
+          "reasonplatformSuperuser": "Superutilisateur de la plateforme"
+        }
+      },
+      "workspaceNavigation": {
+        "resolveWorkspaceNavigation": {
+          "additional": {
+            "label": "Avancé"
           }
         }
       }
@@ -443,6 +681,32 @@
       "paymentNumber": "Paiement nº {{id}}",
       "delivery": "Livraison",
       "invoice": "Facture"
+    },
+    "dashboard": {
+      "emptyWidgetType": "(vide)",
+      "exportBlocked": "L’exportation du tableau de bord est bloquée tant que l’état des données est {{state}}.",
+      "sourceDenied": "L’accès à la source {{model}} a été refusé.",
+      "sourceLoading": "La source {{model}} est en cours de chargement.",
+      "sourcePartial": "La source {{model}} est partielle.",
+      "sourceUnavailable": "La source {{model}} est indisponible.",
+      "widgetFallback": "Widget"
+    },
+    "inlineEdit": {
+      "enterNumber": "Saisissez un nombre"
+    },
+    "permissions": {
+      "accessDenied": "Vous n’avez pas l’autorisation d’accéder à cette ressource.",
+      "allowedByPolicy": "Autorisé par la règle : {{id}}",
+      "deniedByPolicy": "Refusé par la règle : {{id}}"
+    },
+    "runtimeForms": {
+      "incompatibleCardinality": "Le champ d’exécution {{id}} a une cardinalité incompatible avec {{name}}",
+      "invalidBinding": "Liaison de champ non valide",
+      "invalidField": "Champ d’exécution {{id}} : {{message}}"
+    },
+    "workspaceNavigation": {
+      "more": "Autres espaces de travail",
+      "overview": "Vue d’ensemble"
     }
   },
   "navigation": {

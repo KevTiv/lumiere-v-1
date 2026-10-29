@@ -1,3 +1,4 @@
+import { i18n } from "@lumiere/i18n"
 import type { FormConfig } from "@lumiere/ui"
 import { versionStatusTag } from "./workflow-enum"
 
@@ -33,8 +34,8 @@ export function pickerOptions(
   linked: ReadonlyArray<LinkedOption>,
   required: boolean,
 ): Array<LinkedOption & { disabled?: boolean }> {
-  if (linked.length === 0) return [{ value: "", label: "No records", disabled: true }]
-  return required ? [...linked] : [{ value: "", label: "None" }, ...linked]
+  if (linked.length === 0) return [{ value: "", get label() { return i18n.t("ui.linkedOptions.noRecords") }, disabled: true }]
+  return required ? [...linked] : [{ value: "", get label() { return i18n.t("common.none") } }, ...linked]
 }
 
 /**
@@ -77,7 +78,7 @@ export function awardBidOptions(
     bidId: recordOptions(bids, (row) => {
       const rfqId = String(row.rfqId ?? "")
       const rfq = rfqNameById.get(rfqId) || (rfqId ? `RFQ #${rfqId}` : "")
-      const vendor = vendorNameById.get(String(row.partnerId ?? "")) || (row.partnerId != null ? `Vendor #${String(row.partnerId)}` : "")
+      const vendor = vendorNameById.get(String(row.partnerId ?? "")) || (row.partnerId != null ? i18n.t("ui.linkedOptions.vendorReference", { id: String(row.partnerId) }) : "")
       const state = String(row.state ?? "").trim()
       return [rfq, vendor, state].filter(Boolean).join(" · ")
     }),
@@ -95,7 +96,7 @@ export function workflowVersionOptions(
     workflowId: recordOptions(workflows, workflowLabel),
     versionId: recordOptions(versions, (row) => {
       const workflowId = String(row.workflowId ?? row.workflow_id ?? "")
-      const workflow = nameById.get(workflowId) || (workflowId ? `Workflow #${workflowId}` : "")
+      const workflow = nameById.get(workflowId) || (workflowId ? i18n.t("ui.linkedOptions.workflowReference", { id: workflowId }) : "")
       const version = row.version
       return [workflow, version != null && version !== "" ? `v${String(version)}` : "", versionStatusTag(row.status)]
         .filter(Boolean)

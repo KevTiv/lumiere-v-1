@@ -475,7 +475,7 @@ function InspectionResult({ inspection }: { inspection: EvidenceInspectionView }
             <ol className="flex flex-col gap-1 text-sm">
               {inspection.revisions.map((revision) => (
                 <li key={revision.id} data-testid={`inspection-revision-${revision.id}`}>
-                  v{revision.version} · {revision.artifactRef} · {revision.componentKey} · {linkStateLabel(t, revision.linkState)} · {evidenceStatusLabel(t, revision.status)}
+                  {t("ai-harness.evidenceReviewQueuePanel.v")}{revision.version} · {revision.artifactRef} · {revision.componentKey} · {linkStateLabel(t, revision.linkState)} · {evidenceStatusLabel(t, revision.status)}
                   {revision.parentComponentId ? t("aiHarness.evidenceReviewer.fromRevision", { id: revision.parentComponentId }) : t("aiHarness.evidenceReviewer.originalRevision")}
                 </li>
               ))}

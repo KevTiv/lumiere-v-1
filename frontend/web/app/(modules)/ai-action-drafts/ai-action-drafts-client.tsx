@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -27,6 +29,7 @@ export function AiActionDraftsClient({ organizationId }: { organizationId?: numb
 }
 
 function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
+  const { t } = useTranslation()
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
   const inboxQuery = useAiActionDraftInbox(organizationId, operatingCompanyId != null)
@@ -72,13 +75,13 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
   return (
     <div className="space-y-6" data-testid="module-view-ai-action-drafts">
       <DashboardHeader
-        title="AI Action Approvals"
-        description="Review pending AI-proposed ERP mutations before they execute. Elevated drafts require a different approver than the proposer."
+        title={t("ai-action-drafts.aiActionDraftsClient.aIActionApprovals")}
+        description={t("ai-action-drafts.aiActionDraftsClient.reviewPendingAIProposedERPMutationsBeforeTheyExecuteElevatedDrafts")}
       />
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>
-          {pendingDrafts.length} pending draft{pendingDrafts.length === 1 ? "" : "s"}
+          {t("ai-action-drafts.aiActionDraftsClient.pendingDraftCount", { count: pendingDrafts.length })}
         </span>
         {inboxQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         <Link
@@ -86,31 +89,27 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
           <GitBranch className="h-3.5 w-3.5" />
-          Workflow definitions
-        </Link>
+          {t("approvals.approvalsClient.workflowDefinitions")}{" "}</Link>
         <Link href="/messages" className="text-primary hover:underline">
-          Messages ({notificationsQuery.data?.length ?? 0} draft alerts)
-        </Link>
+          {t("ai-action-drafts.aiActionDraftsClient.messageAlertCount", { count: notificationsQuery.data?.length ?? 0 })}{" "}</Link>
       </div>
 
       {(notificationsQuery.data?.length ?? 0) > 0 ? (
         <p className="text-sm text-muted-foreground">
-          In-app and email notifications were posted to the Messages feed for pending drafts.
-        </p>
+          {t("ai-action-drafts.aiActionDraftsClient.inAppAndEmailNotificationsWerePostedToTheMessagesFeed")}{" "}</p>
       ) : null}
 
       {inboxQuery.isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading approval inbox…
-        </div>
+          {t("ai-action-drafts.aiActionDraftsClient.loadingApprovalInbox")}{" "}</div>
       ) : null}
 
       {inboxQuery.isError ? (
         <p className="text-sm text-destructive">
           {inboxQuery.error instanceof Error
             ? inboxQuery.error.message
-            : "Unable to load approval inbox"}
+            : t("ai-action-drafts.aiActionDraftsClient.unableToLoadApprovalInbox")}
         </p>
       ) : null}
 
@@ -118,15 +117,13 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
         <p className="text-sm text-destructive">
           {expireDrafts.error instanceof Error
             ? expireDrafts.error.message
-            : "Unable to expire stale drafts"}
+            : t("ai-action-drafts.aiActionDraftsClient.unableToExpireStaleDrafts")}
         </p>
       ) : null}
 
       {!inboxQuery.isLoading && pendingDrafts.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-          No pending AI action drafts. Ask the ERP Assistant to propose a task or order, then return
-          here to approve it.
-        </div>
+          {t("ai-action-drafts.aiActionDraftsClient.noPendingAIActionDraftsAskTheERPAssistantToPropose")}{" "}</div>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -137,7 +134,7 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
                 href={`/workflows?tab=instances&instance=${draft.workflowInstanceId}`}
                 className="inline-flex text-xs text-primary hover:underline"
               >
-                Workflow instance #{draft.workflowInstanceId}
+                {t("ai-action-drafts.aiActionDraftsClient.workflowInstance")}{draft.workflowInstanceId}
               </Link>
             ) : null}
             <AiActionDraftCard

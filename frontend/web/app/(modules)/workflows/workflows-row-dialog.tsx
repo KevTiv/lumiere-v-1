@@ -206,29 +206,29 @@ export function WorkflowsRowDialog({
               : tabId === "instances"
                 ? t("workflows.rowDialog.instanceTitle", { defaultValue: `Instance #${id}` })
                 : tabId === "operations"
-                  ? `Timer #${id}`
+                  ? t("workflows.workflowsRowDialog.timer", { value1: id })
                   : tabId === "deadLetters"
-                    ? `Outbox #${id}`
+                    ? t("workflows.workflowsRowDialog.outbox", { value1: id })
                     : tabId === "migrations"
-                      ? `Migration plan #${id}`
+                      ? t("workflows.workflowsRowDialog.migrationPlan", { value1: id })
                       : tabId === "migrationResults"
-                        ? `Migration result #${id}`
+                        ? t("workflows.workflowsRowDialog.migrationResult", { value1: id })
                         : t("workflows.rowDialog.workflowTitle", {
                             defaultValue: `Workflow #${id}`,
                           })}
           </DialogTitle>
           <DialogDescription>
             {tabId === "versions"
-              ? "Publish, clone, simulate, or retire this version."
+              ? t("workflows.workflowsRowDialog.publishCloneSimulateOrRetireThisVersion")
               : tabId === "instances"
-                ? "Cancel, inspect history, or migrate with an active plan."
+                ? t("workflows.workflowsRowDialog.cancelInspectHistoryOrMigrateWithAnActivePlan")
                 : tabId === "operations"
-                  ? "Fire or cancel a pending timer."
+                  ? t("workflows.workflowsRowDialog.fireOrCancelAPendingTimer")
                   : tabId === "deadLetters"
-                    ? "Cancel a dead-lettered or reconciliation outbox row."
+                    ? t("workflows.workflowsRowDialog.cancelADeadLetteredOrReconciliationOutboxRow")
                     : tabId === "migrations"
-                      ? "Activate the plan or leave it inactive."
-                      : "Workflow definition and runtime detail."}
+                      ? t("workflows.workflowsRowDialog.activateThePlanOrLeaveItInactive")
+                      : t("workflows.workflowsRowDialog.workflowDefinitionAndRuntimeDetail")}
           </DialogDescription>
         </DialogHeader>
 
@@ -244,9 +244,9 @@ export function WorkflowsRowDialog({
 
           {tabId === "workflows" ? (
             <dl className="grid grid-cols-2 gap-2">
-              <dt className="text-muted-foreground">Key</dt>
+              <dt className="text-muted-foreground">{t("workflows.workflows.columns.key")}</dt>
               <dd>{String(row.workflowKey ?? row.workflow_key ?? "—")}</dd>
-              <dt className="text-muted-foreground">Model</dt>
+              <dt className="text-muted-foreground">{t("workflows.workflows.columns.model")}</dt>
               <dd>{String(row.model ?? "—")}</dd>
             </dl>
           ) : null}
@@ -254,11 +254,11 @@ export function WorkflowsRowDialog({
           {tabId === "versions" ? (
             <>
               <dl className="grid grid-cols-2 gap-2">
-                <dt className="text-muted-foreground">Name</dt>
+                <dt className="text-muted-foreground">{t("workflows.workflows.columns.name")}</dt>
                 <dd>{String(row.name ?? "—")}</dd>
-                <dt className="text-muted-foreground">Status</dt>
-                <dd>{versionStatusTag(row.status) || String(row.statusTag ?? "—")}</dd>
-                <dt className="text-muted-foreground">Draft revision</dt>
+                <dt className="text-muted-foreground">{t("workflows.workflows.columns.state")}</dt>
+                <dd>{t(`workflows.versions.states.${versionStatusTag(row.status)}`, { defaultValue: versionStatusTag(row.status) || String(row.statusTag ?? "—") })}</dd>
+                <dt className="text-muted-foreground">{t("workflows.workflowsRowDialog.draftRevision")}</dt>
                 <dd>{String(row.draftRevision ?? row.draft_revision ?? "—")}</dd>
               </dl>
               {isPublished &&
@@ -268,10 +268,10 @@ export function WorkflowsRowDialog({
               workflowVersionId > 0 &&
               subjectModel ? (
                 <div className="space-y-3 rounded border p-3">
-                  <p className="font-medium">Start workflow</p>
+                  <p className="font-medium">{t("workflows.rowDialog.start")}</p>
                   <div className="space-y-2">
                     <Label htmlFor="workflow-version-start-subject-id">
-                      Subject id ({subjectModel})
+                      {t("workflows.workflowsRowDialog.subjectIdForModel", { model: subjectModel })}
                     </Label>
                     <Input
                       id="workflow-version-start-subject-id"
@@ -283,8 +283,7 @@ export function WorkflowsRowDialog({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="workflow-version-start-singleton-key">
-                      Singleton trigger key (optional)
-                    </Label>
+                      {t("workflows.workflowsRowDialog.singletonTriggerKeyOptional")}{" "}</Label>
                     <Input
                       id="workflow-version-start-singleton-key"
                       value={singletonTriggerKey}
@@ -314,8 +313,7 @@ export function WorkflowsRowDialog({
                       )
                     }
                   >
-                    Start
-                  </Button>
+                    {t("accounting.amortization.form.fields.startDate")}{" "}</Button>
                 </div>
               ) : null}
               <div className="flex flex-wrap gap-2 pt-2">
@@ -335,8 +333,7 @@ export function WorkflowsRowDialog({
                     }
                     disabled={mutations.publishVersion.isPending}
                   >
-                    Publish
-                  </Button>
+                    {t("documents.documentsClient.publish")}{" "}</Button>
                 ) : null}
                 <Button
                   size="sm"
@@ -354,8 +351,7 @@ export function WorkflowsRowDialog({
                   }
                   disabled={mutations.cloneVersion.isPending}
                 >
-                  Clone to draft
-                </Button>
+                  {t("workflows.workflowsRowDialog.cloneToDraft")}{" "}</Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -380,8 +376,7 @@ export function WorkflowsRowDialog({
                   }
                   disabled={mutations.simulateWorkflow.isPending}
                 >
-                  Simulate
-                </Button>
+                  {t("workflows.workflowsRowDialog.simulate")}{" "}</Button>
                 {versionStatusTag(row.status) === "Published" ||
                 row.statusTag === "Published" ? (
                   <Button
@@ -400,8 +395,7 @@ export function WorkflowsRowDialog({
                     }
                     disabled={mutations.retireVersion.isPending}
                   >
-                    Retire
-                  </Button>
+                    {t("workflows.workflowsRowDialog.retire")}{" "}</Button>
                 ) : null}
               </div>
             </>
@@ -410,27 +404,27 @@ export function WorkflowsRowDialog({
           {tabId === "instances" ? (
             <>
               <dl className="grid grid-cols-2 gap-2">
-                <dt className="text-muted-foreground">Subject</dt>
+                <dt className="text-muted-foreground">{t("accounting.invoiceEmailReviewDialog.subject")}</dt>
                 <dd>
                   {String(row.subjectModel ?? row.subject_model ?? "—")} #
                   {String(row.subjectId ?? row.subject_id ?? "—")}
                 </dd>
-                <dt className="text-muted-foreground">State</dt>
-                <dd>{instanceStateTag(row.state) || String(row.stateTag ?? "—")}</dd>
-                <dt className="text-muted-foreground">Version</dt>
+                <dt className="text-muted-foreground">{t("moduleInsights.state")}</dt>
+                <dd>{t(`workflows.instances.states.${instanceStateTag(row.state)}`, { defaultValue: instanceStateTag(row.state) || String(row.stateTag ?? "—") })}</dd>
+                <dt className="text-muted-foreground">{t("workflows.instances.columns.versionId")}</dt>
                 <dd>{String(row.workflowVersionId ?? row.workflow_version_id ?? "—")}</dd>
-                <dt className="text-muted-foreground">Revision</dt>
+                <dt className="text-muted-foreground">{t("proposalWorkspace.sectionConflict.revision")}</dt>
                 <dd>{String(row.revision ?? "—")}</dd>
               </dl>
 
               {isActive && canSignalWorkflow.allowed && signalKeys.length > 0 ? (
                 <div className="space-y-3 rounded border p-3">
-                  <p className="font-medium">Signal instance</p>
+                  <p className="font-medium">{t("workflows.workflowsRowDialog.signalInstance")}</p>
                   <div className="space-y-2">
-                    <Label htmlFor="workflow-instance-signal-key">Signal</Label>
+                    <Label htmlFor="workflow-instance-signal-key">{t("workflows.workflowsRowDialog.signal")}</Label>
                     <Select value={signalKey} onValueChange={setSignalKey}>
                       <SelectTrigger id="workflow-instance-signal-key" data-testid="workflow-instance-signal-key">
-                        <SelectValue placeholder="Select signal…" />
+                        <SelectValue placeholder={t("workflows.workflowsRowDialog.selectSignal")} />
                       </SelectTrigger>
                       <SelectContent>
                         {signalKeys.map((key) => (
@@ -461,24 +455,23 @@ export function WorkflowsRowDialog({
                       )
                     }
                   >
-                    Signal
-                  </Button>
+                    {t("workflows.workflowsRowDialog.signal")}{" "}</Button>
                 </div>
               ) : null}
 
               {isActive ? (
                 <div className="space-y-3 rounded border p-3">
-                  <p className="font-medium">Migrate instance</p>
+                  <p className="font-medium">{t("workflows.workflowsRowDialog.migrateInstance")}</p>
                   <div className="space-y-2">
-                    <Label htmlFor="mig-plan">Active plan id</Label>
+                    <Label htmlFor="mig-plan">{t("workflows.workflowsRowDialog.activePlanId")}</Label>
                     <Select value={migratePlanId} onValueChange={setMigratePlanId}>
                       <SelectTrigger id="mig-plan" data-testid="workflow-instance-migrate-plan">
-                        <SelectValue placeholder="Select plan…" />
+                        <SelectValue placeholder={t("workflows.workflowsRowDialog.selectPlan")} />
                       </SelectTrigger>
                       <SelectContent>
                         {activePlans.map((p) => (
                           <SelectItem key={String(p.id)} value={String(p.id)}>
-                            #{String(p.id)} · wf {String(p.workflowId ?? p.workflow_id)} ·{" "}
+                            #{String(p.id)} {" "}{t("workflows.workflowsRowDialog.wf")}{" "}{String(p.workflowId ?? p.workflow_id)} ·{" "}
                             {String(p.sourceWorkflowVersionId ?? p.source_workflow_version_id)} →{" "}
                             {String(p.targetWorkflowVersionId ?? p.target_workflow_version_id)}
                           </SelectItem>
@@ -487,7 +480,7 @@ export function WorkflowsRowDialog({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="mig-reason">Reason</Label>
+                    <Label htmlFor="mig-reason">{t("accounting.forms.reverseOperationalPayment.reason")}</Label>
                     <Input
                       id="mig-reason"
                       value={migrateReason}
@@ -511,8 +504,7 @@ export function WorkflowsRowDialog({
                         )
                       }
                     >
-                      Preflight
-                    </Button>
+                      {t("workflows.workflowsRowDialog.preflight")}{" "}</Button>
                     <Button
                       size="sm"
                       data-testid="workflow-instance-migrate"
@@ -534,8 +526,7 @@ export function WorkflowsRowDialog({
                         )
                       }
                     >
-                      Migrate
-                    </Button>
+                      {t("workflows.workflowsRowDialog.migrate")}{" "}</Button>
                     <Button
                       size="sm"
                       variant="destructive"
@@ -555,16 +546,15 @@ export function WorkflowsRowDialog({
                       }
                       disabled={mutations.cancelWorkflow.isPending}
                     >
-                      Cancel instance
-                    </Button>
+                      {t("workflows.workflowsRowDialog.cancelInstance")}{" "}</Button>
                   </div>
                 </div>
               ) : null}
 
               <div className="space-y-2" data-testid="workflow-instance-decision-history">
-                <p className="font-medium">Decision history</p>
+                <p className="font-medium">{t("workflows.workflowsRowDialog.decisionHistory")}</p>
                 {instanceEvents.length === 0 ? (
-                  <p className="text-muted-foreground">No decision events for this instance.</p>
+                  <p className="text-muted-foreground">{t("workflows.workflowsRowDialog.noDecisionEventsForThisInstance")}</p>
                 ) : (
                   <ul className="space-y-1 text-xs">
                     {instanceEvents.map((ev) => (
@@ -576,10 +566,10 @@ export function WorkflowsRowDialog({
                               ev.commandKind &&
                               "tag" in (ev.commandKind as object)
                                 ? (ev.commandKind as { tag: string }).tag
-                                : ev.command_kind ?? "event"),
+                                : ev.command_kind ?? t("workflows.workflowsRowDialog.event")),
                           )}
                         </span>
-                        {" · rev "}
+                        {" · "}{t("workflows.workflowsRowDialog.revision")}{" "}
                         {String(ev.priorRevision ?? ev.prior_revision ?? "?")}→
                         {String(ev.nextRevision ?? ev.next_revision ?? "?")}
                         {ev.reason ? ` · ${String(ev.reason)}` : ""}
@@ -613,8 +603,7 @@ export function WorkflowsRowDialog({
                 }
                 disabled={mutations.fireTimer.isPending}
               >
-                Fire timer
-              </Button>
+                {t("workflows.workflowsRowDialog.fireTimer")}{" "}</Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -632,17 +621,16 @@ export function WorkflowsRowDialog({
                 }
                 disabled={mutations.cancelTimer.isPending}
               >
-                Cancel timer
-              </Button>
+                {t("workflows.workflowsRowDialog.cancelTimer")}{" "}</Button>
             </div>
           ) : null}
 
           {tabId === "deadLetters" ? (
             <div className="space-y-3">
               <dl className="grid grid-cols-2 gap-2">
-                <dt className="text-muted-foreground">Action</dt>
+                <dt className="text-muted-foreground">{t("accounting.amortization.colRecognize")}</dt>
                 <dd>{String(row.actionKey ?? row.action_key ?? "—")}</dd>
-                <dt className="text-muted-foreground">Error</dt>
+                <dt className="text-muted-foreground">{t("common.error.title")}</dt>
                 <dd>{String(row.errorSummary ?? row.error_summary ?? "—")}</dd>
               </dl>
               <Button
@@ -663,8 +651,7 @@ export function WorkflowsRowDialog({
                 }
                 disabled={mutations.cancelOutbox.isPending}
               >
-                Cancel outbox
-              </Button>
+                {t("workflows.workflowsRowDialog.cancelOutbox")}{" "}</Button>
             </div>
           ) : null}
 
@@ -683,18 +670,18 @@ export function WorkflowsRowDialog({
                 }
                 disabled={mutations.setPlanActive.isPending}
               >
-                {row.active === true || row.active === "true" ? "Deactivate" : "Activate"}
+                {row.active === true || row.active === "true" ? t("workflows.rowDialog.toggleDeactivate") : t("workflows.rowDialog.toggleActivate")}
               </Button>
             </div>
           ) : null}
 
           {tabId === "migrationResults" ? (
             <dl className="grid grid-cols-2 gap-2">
-              <dt className="text-muted-foreground">Outcome</dt>
+              <dt className="text-muted-foreground">{t("aiHarness.evidenceReviewer.outcome")}</dt>
               <dd>{String(row.outcomeTag ?? row.outcome ?? "—")}</dd>
-              <dt className="text-muted-foreground">Reason</dt>
+              <dt className="text-muted-foreground">{t("accounting.forms.reverseOperationalPayment.reason")}</dt>
               <dd>{String(row.reason ?? "—")}</dd>
-              <dt className="text-muted-foreground">Error</dt>
+              <dt className="text-muted-foreground">{t("common.error.title")}</dt>
               <dd>{String(row.errorSummary ?? row.error_summary ?? "—")}</dd>
             </dl>
           ) : null}

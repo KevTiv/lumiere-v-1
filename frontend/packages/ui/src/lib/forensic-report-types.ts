@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Forensic Report Types for ERP Incident Analysis
 
 export type IncidentSeverity = "critical" | "high" | "medium" | "low"
@@ -120,30 +121,30 @@ export interface ForensicReport {
 
 // Category configuration with icons and colors
 export const incidentCategories: Record<IncidentCategory, { label: string; color: string; description: string }> = {
-  "process-failure": { label: "Process Failure", color: "orange", description: "Breakdown in standard operating procedures" },
-  "system-error": { label: "System Error", color: "red", description: "Technical system malfunction or bug" },
-  "data-discrepancy": { label: "Data Discrepancy", color: "yellow", description: "Inconsistent or incorrect data" },
-  "compliance-issue": { label: "Compliance Issue", color: "purple", description: "Regulatory or policy violation" },
-  "security-incident": { label: "Security Incident", color: "red", description: "Security breach or vulnerability" },
-  "performance-issue": { label: "Performance Issue", color: "blue", description: "System or process performance degradation" },
-  "customer-complaint": { label: "Customer Complaint", color: "amber", description: "Customer-reported issue" },
-  "quality-defect": { label: "Quality Defect", color: "orange", description: "Product or service quality issue" },
-  "supply-chain": { label: "Supply Chain", color: "teal", description: "Supply chain disruption or issue" },
-  "other": { label: "Other", color: "gray", description: "Uncategorized incident" },
+  "process-failure": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.processFailure.label", { defaultValue: "Process Failure" }) }, color: "orange", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.processFailure.description", { defaultValue: "Breakdown in standard operating procedures" }) } },
+  "system-error": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.systemError.label", { defaultValue: "System Error" }) }, color: "red", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.systemError.description", { defaultValue: "Technical system malfunction or bug" }) } },
+  "data-discrepancy": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.dataDiscrepancy.label", { defaultValue: "Data Discrepancy" }) }, color: "yellow", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.dataDiscrepancy.description", { defaultValue: "Inconsistent or incorrect data" }) } },
+  "compliance-issue": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.complianceIssue.label", { defaultValue: "Compliance Issue" }) }, color: "purple", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.complianceIssue.description", { defaultValue: "Regulatory or policy violation" }) } },
+  "security-incident": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.securityIncident.label", { defaultValue: "Security Incident" }) }, color: "red", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.securityIncident.description", { defaultValue: "Security breach or vulnerability" }) } },
+  "performance-issue": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.performanceIssue.label", { defaultValue: "Performance Issue" }) }, color: "blue", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.performanceIssue.description", { defaultValue: "System or process performance degradation" }) } },
+  "customer-complaint": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.customerComplaint.label", { defaultValue: "Customer Complaint" }) }, color: "amber", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.customerComplaint.description", { defaultValue: "Customer-reported issue" }) } },
+  "quality-defect": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.qualityDefect.label", { defaultValue: "Quality Defect" }) }, color: "orange", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.qualityDefect.description", { defaultValue: "Product or service quality issue" }) } },
+  "supply-chain": { get label() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.supplyChain.label", { defaultValue: "Supply Chain" }) }, color: "teal", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.supplyChain.description", { defaultValue: "Supply chain disruption or issue" }) } },
+  "other": { get label() { return uiI18n.t("common.entityView.otherColumn", { defaultValue: "Other" }) }, color: "gray", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.other.description", { defaultValue: "Uncategorized incident" }) } },
 }
 
 export const severityConfig: Record<IncidentSeverity, { label: string; color: string; description: string }> = {
-  critical: { label: "Critical", color: "red", description: "Immediate action required, major business impact" },
-  high: { label: "High", color: "orange", description: "Urgent attention needed, significant impact" },
-  medium: { label: "Medium", color: "yellow", description: "Requires timely resolution, moderate impact" },
-  low: { label: "Low", color: "green", description: "Can be scheduled, minor impact" },
+  critical: { get label() { return uiI18n.t("forensics.view.critical", { defaultValue: "Critical" }) }, color: "red", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.severityConfig.critical.description", { defaultValue: "Immediate action required, major business impact" }) } },
+  high: { get label() { return uiI18n.t("forensics.view.filterSeverityHigh", { defaultValue: "High" }) }, color: "orange", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.severityConfig.high.description", { defaultValue: "Urgent attention needed, significant impact" }) } },
+  medium: { get label() { return uiI18n.t("forensics.view.filterSeverityMedium", { defaultValue: "Medium" }) }, color: "yellow", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.severityConfig.medium.description", { defaultValue: "Requires timely resolution, moderate impact" }) } },
+  low: { get label() { return uiI18n.t("forensics.view.filterSeverityLow", { defaultValue: "Low" }) }, color: "green", get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.severityConfig.low.description", { defaultValue: "Can be scheduled, minor impact" }) } },
 }
 
 export const statusConfig: Record<IncidentStatus, { label: string; color: string }> = {
-  open: { label: "Open", color: "red" },
-  investigating: { label: "Investigating", color: "yellow" },
-  resolved: { label: "Resolved", color: "blue" },
-  closed: { label: "Closed", color: "green" },
+  open: { get label() { return uiI18n.t("forensics.view.filterStatusOpen", { defaultValue: "Open" }) }, color: "red" },
+  investigating: { get label() { return uiI18n.t("forensics.view.filterStatusInvestigating", { defaultValue: "Investigating" }) }, color: "yellow" },
+  resolved: { get label() { return uiI18n.t("forensics.view.filterStatusResolved", { defaultValue: "Resolved" }) }, color: "blue" },
+  closed: { get label() { return uiI18n.t("forensics.view.filterStatusClosed", { defaultValue: "Closed" }) }, color: "green" },
 }
 
 // Sample reports for demo
@@ -327,9 +328,9 @@ export interface ReportTemplate {
 export const reportTemplates: ReportTemplate[] = [
   {
     id: "tpl-inventory",
-    name: "Inventory Discrepancy",
+    get name() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplInventory.name", { defaultValue: "Inventory Discrepancy" }) },
     category: "data-discrepancy",
-    description: "Template for inventory count variances",
+    get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplInventory.description", { defaultValue: "Template for inventory count variances" }) },
     defaultSeverity: "medium",
     suggestedRootCauses: [
       "System sync failure",
@@ -347,9 +348,9 @@ export const reportTemplates: ReportTemplate[] = [
   },
   {
     id: "tpl-system",
-    name: "System Outage",
+    get name() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplSystem.name", { defaultValue: "System Outage" }) },
     category: "system-error",
-    description: "Template for system failures and outages",
+    get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplSystem.description", { defaultValue: "Template for system failures and outages" }) },
     defaultSeverity: "high",
     suggestedRootCauses: [
       "Hardware failure",
@@ -367,9 +368,9 @@ export const reportTemplates: ReportTemplate[] = [
   },
   {
     id: "tpl-quality",
-    name: "Quality Issue",
+    get name() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplQuality.name", { defaultValue: "Quality Issue" }) },
     category: "quality-defect",
-    description: "Template for product quality problems",
+    get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplQuality.description", { defaultValue: "Template for product quality problems" }) },
     defaultSeverity: "high",
     suggestedRootCauses: [
       "Material defect",
@@ -387,9 +388,9 @@ export const reportTemplates: ReportTemplate[] = [
   },
   {
     id: "tpl-customer",
-    name: "Customer Complaint",
+    get name() { return uiI18n.t("forensics.builtIn.forensicReportTypes.incidentCategories.customerComplaint.label", { defaultValue: "Customer Complaint" }) },
     category: "customer-complaint",
-    description: "Template for customer-reported issues",
+    get description() { return uiI18n.t("forensics.builtIn.forensicReportTypes.reportTemplates.tplCustomer.description", { defaultValue: "Template for customer-reported issues" }) },
     defaultSeverity: "medium",
     suggestedRootCauses: [
       "Product defect",

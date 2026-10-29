@@ -380,7 +380,11 @@
         "applyDomain": {
           "thisWidgetHasAnInvalidPersistedFilter": {
             "message": "Ufafanuzi wa kichujio kilichohifadhiwa cha wijeti hii si sahihi."
-          }
+          },
+          "message": "Kichujio cha {{field}} hakina opereta.",
+          "messagetheInFilterForFieldMustUse": "Kichujio cha $in cha {{field}} lazima kitumie safu.",
+          "messagethisWidgetHasANonNumericOperandFor": "Wijeti hii ina operandi isiyo ya nambari kwa {{operator}}.",
+          "messagethisWidgetUsesAnUnsupportedFilterOperator": "Wijeti hii inatumia opereta ya kichujio isiyotumika: {{operator}}."
         },
         "parseBinding": {
           "thisWidgetHasAnInvalidTimeOr": {
@@ -404,12 +408,14 @@
         "applyTimeRange": {
           "thisWidgetDoesNotDeclareATime": {
             "message": "Wijeti hii haijabainisha sehemu ya muda kwa kipindi kilichochaguliwa."
-          }
+          },
+          "message": "Wijeti hii ina data ya tarehe na saa isiyokamilika katika {{timeField}}."
         },
         "applyMeasureCompleteness": {
           "thisWidgetDoesNotDeclareTheMeasure": {
             "message": "Wijeti hii haijabainisha kipimo kinachotumiwa katika ujumlishaji wake."
-          }
+          },
+          "message": "Wijeti hii ina data ya nambari isiyokamilika katika {{field}}."
         },
         "resolveStoredDashboard": {
           "theWidgetHasNoDataSource": {
@@ -417,13 +423,245 @@
           },
           "aChartWidgetRequiresAGroupByField": {
             "message": "Wijeti ya chati inahitaji sehemu ya kupanga data katika vikundi."
-          }
+          },
+          "message": "Aina ya chati ya {{chartType}} haitumiki.",
+          "messagetheWidgetTypeValue1IsNotSupported": "Aina ya wijeti ya {{value1}} haitumiki."
+        },
+        "normalizeAggregation": {
+          "message": "Ujumlishaji wa {{aggregation}} hautumiki."
         }
       },
       "runtimeFormConfig": {
         "mergeRuntimeFormConfig": {
           "runtimeExtraFields": {
             "title": "Sehemu za ziada"
+          }
+        },
+        "parsedFieldToModularField": {
+          "error": "Thamani chaguomsingi ya MultiSelect lazima iwe safu ya mifuatano ya herufi: {{fieldId}}"
+        },
+        "stdbTypeToModular": {
+          "error": "Aina ya sehemu ya wakati wa utekelezaji haitumiki: {{type}}"
+        }
+      },
+      "formConfigs": {
+        "newCustomerForm": {
+          "basicInfo": {
+            "title": "Taarifa za msingi"
+          },
+          "company": {
+            "label": "Jina la kampuni",
+            "placeholder": "Acme Inc."
+          },
+          "companyInfo": {
+            "title": "Maelezo ya kampuni"
+          },
+          "contactMethod": {
+            "label": "Njia unayopendelea ya mawasiliano"
+          },
+          "email": {
+            "label": "Barua pepe"
+          },
+          "finance": {
+            "label": "Fedha"
+          },
+          "firstName": {
+            "label": "Jina la kwanza",
+            "placeholder": "John"
+          },
+          "healthcare": {
+            "label": "Huduma za afya"
+          },
+          "industry": {
+            "label": "Sekta"
+          },
+          "lastName": {
+            "label": "Jina la ukoo",
+            "placeholder": "Doe"
+          },
+          "manufacturing": {
+            "label": "Uzalishaji"
+          },
+          "marketing": {
+            "label": "Pokea ujumbe wa masoko"
+          },
+          "newCustomer": {
+            "description": "Sajili mteja mpya kwenye mfumo",
+            "submitLabel": "Ongeza mteja",
+            "title": "Ongeza mteja mpya"
+          },
+          "phone": {
+            "label": "Simu"
+          },
+          "preferences": {
+            "title": "Mapendeleo"
+          },
+          "retail": {
+            "label": "Uuzaji wa rejareja"
+          },
+          "sms": {
+            "label": "SMS"
+          },
+          "tech": {
+            "label": "Teknolojia"
+          },
+          "website": {
+            "label": "Tovuti"
+          }
+        },
+        "newOrderForm": {
+          "addonA": {
+            "label": "Moduli ya ziada A - $50/mwezi"
+          },
+          "annual": {
+            "label": "Kila mwaka (punguzo la 15%)"
+          },
+          "billingCycle": {
+            "label": "Kipindi cha utozaji"
+          },
+          "customerCompany": {
+            "label": "Kampuni",
+            "placeholder": "Jina la kampuni"
+          },
+          "customerEmail": {
+            "label": "Anwani ya barua pepe"
+          },
+          "customerInfo": {
+            "title": "Taarifa za mteja"
+          },
+          "customerName": {
+            "label": "Jina la mteja",
+            "placeholder": "Weka jina la mteja"
+          },
+          "customerPhone": {
+            "label": "Nambari ya simu"
+          },
+          "enterprise": {
+            "label": "Enterprise Suite - $200/mwezi"
+          },
+          "expressShipping": {
+            "label": "Usafirishaji wa haraka (+$25)"
+          },
+          "giftWrap": {
+            "label": "Ufungaji wa zawadi (+$5)"
+          },
+          "high": {
+            "label": "Juu"
+          },
+          "low": {
+            "label": "Chini"
+          },
+          "monthly": {
+            "label": "Kila mwezi"
+          },
+          "newOrder": {
+            "description": "Weka maelezo ya agizo jipya la mauzo",
+            "submitLabel": "Unda agizo",
+            "title": "Unda agizo jipya"
+          },
+          "newsletter": {
+            "label": "Jiandikishe kupokea jarida letu"
+          },
+          "normal": {
+            "label": "Kawaida"
+          },
+          "notes": {
+            "label": "Maelezo ya agizo",
+            "placeholder": "Maagizo au maelezo maalum..."
+          },
+          "options": {
+            "title": "Chaguo za ziada"
+          },
+          "orderDetails": {
+            "title": "Maelezo ya agizo"
+          },
+          "priority": {
+            "label": "Kipaumbele"
+          },
+          "product": {
+            "label": "Bidhaa",
+            "placeholder": "Chagua bidhaa"
+          },
+          "professional": {
+            "label": "Professional Plan - $150/mwezi"
+          },
+          "quantity": {
+            "label": "Kiasi"
+          },
+          "quarterly": {
+            "label": "Kila miezi mitatu (punguzo la 5%)"
+          },
+          "starter": {
+            "label": "Starter Kit - $50/mwezi"
+          },
+          "support": {
+            "label": "Support Package - $100/mwezi"
+          },
+          "terms": {
+            "label": "Ninakubali masharti na vigezo"
+          },
+          "urgent": {
+            "label": "Dharura"
+          }
+        },
+        "reportForm": {
+          "csv": {
+            "label": "Faili ya CSV"
+          },
+          "customers": {
+            "label": "Uchambuzi wa wateja"
+          },
+          "dateFrom": {
+            "label": "Tarehe ya kuanzia"
+          },
+          "dateTo": {
+            "label": "Tarehe ya mwisho"
+          },
+          "excel": {
+            "label": "Lahajedwali la Excel"
+          },
+          "financial": {
+            "label": "Muhtasari wa kifedha"
+          },
+          "format": {
+            "label": "Umbizo la kuhamisha"
+          },
+          "generateReport": {
+            "description": "Sanidi na utengeneze ripoti maalum",
+            "submitLabel": "Tengeneza",
+            "title": "Tengeneza ripoti"
+          },
+          "includeCharts": {
+            "label": "Jumuisha chati"
+          },
+          "includeSummary": {
+            "label": "Jumuisha muhtasari mkuu"
+          },
+          "inventory": {
+            "label": "Ripoti ya bidhaa zilizopo"
+          },
+          "pdf": {
+            "label": "Hati ya PDF"
+          },
+          "reportType": {
+            "label": "Aina ya ripoti"
+          },
+          "sales": {
+            "label": "Muhtasari wa mauzo"
+          }
+        }
+      },
+      "rbacContext": {
+        "checkPermission": {
+          "reason": "Hakuna mtumiaji aliyeingia",
+          "reasonnoMatchingPolicyFound": "Hakuna sera inayolingana iliyopatikana",
+          "reasonplatformSuperuser": "Mtumiaji mkuu wa jukwaa"
+        }
+      },
+      "workspaceNavigation": {
+        "resolveWorkspaceNavigation": {
+          "additional": {
+            "label": "Ya kina"
           }
         }
       }
@@ -443,6 +681,32 @@
       "paymentNumber": "Malipo #{{id}}",
       "delivery": "Uwasilishaji",
       "invoice": "Ankara"
+    },
+    "dashboard": {
+      "emptyWidgetType": "(tupu)",
+      "exportBlocked": "Uhamishaji wa dashibodi umezuiwa wakati hali ya data ni {{state}}.",
+      "sourceDenied": "Ufikiaji wa chanzo {{model}} umekataliwa.",
+      "sourceLoading": "Chanzo {{model}} kinapakiwa.",
+      "sourcePartial": "Chanzo {{model}} hakijakamilika.",
+      "sourceUnavailable": "Chanzo {{model}} hakipatikani.",
+      "widgetFallback": "Wijeti"
+    },
+    "inlineEdit": {
+      "enterNumber": "Weka nambari"
+    },
+    "permissions": {
+      "accessDenied": "Huna ruhusa ya kufikia rasilimali hii.",
+      "allowedByPolicy": "Imeruhusiwa na sera: {{id}}",
+      "deniedByPolicy": "Imekataliwa na sera: {{id}}"
+    },
+    "runtimeForms": {
+      "incompatibleCardinality": "Sehemu ya wakati wa utekelezaji {{id}} ina idadi ya thamani isiyooana na {{name}}",
+      "invalidBinding": "Uunganishaji batili wa sehemu",
+      "invalidField": "Sehemu ya wakati wa utekelezaji {{id}}: {{message}}"
+    },
+    "workspaceNavigation": {
+      "more": "Nafasi zaidi za kazi",
+      "overview": "Muhtasari"
     }
   },
   "navigation": {

@@ -147,7 +147,7 @@ export function HrPerformancePanel({ organizationId, companyId, employees }: HrP
                       id: rowId(r),
                     }),
                 )}{" "}
-                — {cycleStateLabels[String(r.state ?? "draft")] ?? String(r.state ?? "draft")}
+                — {cycleStateLabels[String(r.state ?? t("purchasing.purchasingBlanketWorkspace.draft"))] ?? String(r.state ?? t("purchasing.purchasingBlanketWorkspace.draft"))}
               </li>
             )
           })}

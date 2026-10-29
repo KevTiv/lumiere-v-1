@@ -1,5 +1,6 @@
 "use client"
-import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
+import { projectMarginChartData } from "./project-margin-chart"
+import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -8,7 +9,7 @@ import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import type { QueryResourceState } from "@lumiere/api-client"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
@@ -176,8 +177,8 @@ type LifecycleModalState =
 
 const taskStateForm: FormConfig = {
   id: "projects-update-task-state",
-  title: "Update Task State",
-  submitLabel: "Update state",
+  get title() { return i18n.t("projects.projectsClient.updateTaskState") },
+  get submitLabel() { return i18n.t("projects.projectsClient.updateState") },
   sections: [
     {
       id: "state",
@@ -186,14 +187,14 @@ const taskStateForm: FormConfig = {
           id: "state",
           type: "select",
           name: "state",
-          label: "State",
+          get label() { return i18n.t("moduleInsights.state") },
           required: true,
           width: "full",
           options: [
-            { value: "normal", label: "Normal" },
-            { value: "blocked", label: "Blocked" },
-            { value: "done", label: "Done" },
-            { value: "cancelled", label: "Cancelled" },
+            { value: "normal", get label() { return i18n.t("projects.tasks.priority.0") } },
+            { value: "blocked", get label() { return i18n.t("projects.forms.editTask.fields.states.blocked") } },
+            { value: "done", get label() { return i18n.t("projects.projects.filters.lastUpdateStatus.options.Done") } },
+            { value: "cancelled", get label() { return i18n.t("projects.projects.filters.lastUpdateStatus.options.Cancelled") } },
           ],
         },
       ],
@@ -203,9 +204,9 @@ const taskStateForm: FormConfig = {
 
 const assignUsersForm = (userOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig => ({
   id: "projects-assign-task-users",
-  title: "Assign Task Users",
-  submitLabel: "Assign users",
-  description: "Choose active members of this company. An empty selection clears the assignment on the selected tasks.",
+  get title() { return i18n.t("projects.projectsClient.assignTaskUsers") },
+  get submitLabel() { return i18n.t("projects.projectsClient.assignUsers") },
+  get description() { return i18n.t("projects.projectsClient.chooseActiveMembersOfThisCompanyAnEmptySelectionClearsThe") },
   sections: [
     {
       id: "users",
@@ -214,7 +215,7 @@ const assignUsersForm = (userOptions: Array<{ value: string; label: string; disa
           id: "user-ids",
           type: "multiselect",
           name: "userIds",
-          label: "Assignees",
+          get label() { return i18n.t("projects.projectsClient.assignees") },
           defaultValue: [],
           width: "full",
           options: userOptions,
@@ -231,16 +232,16 @@ function buildBillTimesheetsForm(
 ): FormConfig {
   return {
     id: "projects-bill-timesheets",
-    title: "Bill Timesheets",
-    submitLabel: "Bill timesheets",
+    title: i18n.t("projects.projectsClient.billTimesheets"),
+    submitLabel: i18n.t("projects.projectsClient.billTimesheets2"),
     sections: [
       {
         id: "billing",
         fields: [
-          { id: "journal", type: "select", name: "journalId", label: "Journal", required: true, width: "1/3", options: journalOptions },
-          { id: "income-account", type: "select", name: "incomeAccountId", label: "Income account", required: true, width: "1/3", options: accountOptions },
-          { id: "partner", type: "select", name: "partnerId", label: "Partner", required: true, width: "1/3", options: partnerOptions },
-          { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", required: true, width: "1/2" },
+          { id: "journal", type: "select", name: "journalId", label: i18n.t("nav.journal"), required: true, width: "1/3", options: journalOptions },
+          { id: "income-account", type: "select", name: "incomeAccountId", label: i18n.t("accounting.readiness.items.income-account.label"), required: true, width: "1/3", options: accountOptions },
+          { id: "partner", type: "select", name: "partnerId", label: i18n.t("accounting.glDrilldown.columns.partner"), required: true, width: "1/3", options: partnerOptions },
+          { id: "invoice-date", type: "date", name: "invoiceDate", label: i18n.t("subscriptions.forms.generateInvoice.fields.invoiceDate"), required: true, width: "1/2" },
         ],
       },
     ],
@@ -250,8 +251,8 @@ function buildBillTimesheetsForm(
 function taskParentForm(taskOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig {
   return {
     id: "projects-set-task-parent",
-    title: "Set Task Parent",
-    submitLabel: "Set parent",
+    title: i18n.t("projects.projectsClient.setTaskParent"),
+    submitLabel: i18n.t("projects.projectsClient.setParent"),
     sections: [
       {
         id: "parent",
@@ -260,7 +261,7 @@ function taskParentForm(taskOptions: Array<{ value: string; label: string; disab
             id: "parent-id",
             type: "select",
             name: "parentId",
-            label: "Parent task",
+            label: i18n.t("projects.projectsClient.parentTask"),
             width: "full",
             options: taskOptions,
           },
@@ -287,7 +288,7 @@ function withTimesheetLifecycleColumns(config: EntityViewConfig): EntityViewConf
   if (!existing.has("validationStatus")) {
     columns.push({
       key: "validationStatus",
-      label: "Validation",
+      label: i18n.t("accounting.bankStatementImportLines.validationError"),
       type: "badge",
       badgeVariants: {
         draft: "secondary",
@@ -300,7 +301,7 @@ function withTimesheetLifecycleColumns(config: EntityViewConfig): EntityViewConf
   if (!existing.has("timesheetInvoiceId")) {
     columns.push({
       key: "timesheetInvoiceId",
-      label: "Invoice",
+      label: i18n.t("common.recordLinks.invoice"),
       render: (value, row) => {
         const invoiceId = value ?? row.timesheet_invoice_id
         if (invoiceId == null || String(invoiceId).trim() === "") return "—"
@@ -310,7 +311,7 @@ function withTimesheetLifecycleColumns(config: EntityViewConfig): EntityViewConf
             className="font-medium text-primary underline-offset-4 hover:underline"
             onClick={(event) => event.stopPropagation()}
           >
-            Invoice {String(invoiceId)}
+            {i18n.t("common.recordLinks.invoice")}{" "}{String(invoiceId)}
           </Link>
         )
       },
@@ -411,7 +412,7 @@ function ProjectsClientLoaded({
   const contactsReferenceStatus = contactsQuery.status === "success"
     ? undefined
     : initialContactsState?.status === "denied"
-      ? "Access denied"
+      ? t("aiHarness.reviewQueue.accessDenied")
       : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
         ? "Unavailable"
         : "Loading"
@@ -477,7 +478,7 @@ function ProjectsClientLoaded({
 
   const partnerFieldOptions = useMemo(() => {
     if (contactsReferenceStatus) {
-      return [{ value: "", label: `Contacts: ${contactsReferenceStatus}`, disabled: true }]
+      return [{ value: "", label: t("projects.projectsClient.contacts", { value1: contactsReferenceStatus }), disabled: true }]
     }
     const fromApi = contactRowsToPartnerSelectOptions(contacts)
     const optional = { value: "", label: "—" }
@@ -567,7 +568,7 @@ function ProjectsClientLoaded({
                 value: String(r.id),
                 label: String(r.name ?? r.id),
               }))
-            : [{ value: "", label: "No HR resources", disabled: true }],
+            : [{ value: "", label: t("projects.projectsClient.noHRResources"), disabled: true }],
         projectId: projectFieldOptions,
         taskId: taskFieldOptions,
       }),
@@ -654,7 +655,7 @@ function ProjectsClientLoaded({
   const utilisationTab = useMemo(
     () => ({
       id: "utilisation",
-      label: "Utilisation",
+      label: t("projects.projectsClient.utilisation"),
       type: "custom" as const,
       customContent: (
         <ResourceUtilisationPanel
@@ -663,13 +664,13 @@ function ProjectsClientLoaded({
         />
       ),
     }),
-    [employees, utilisation],
+    [employees, utilisation, t],
   )
 
   const advancedTab = useMemo(
     () => ({
       id: "advanced-psa",
-      label: "Advanced PSA",
+      label: t("projects.projectsClient.advancedPSA"),
       type: "custom" as const,
       customContent: (
         <div className="space-y-6">
@@ -710,7 +711,7 @@ function ProjectsClientLoaded({
               } catch (error) {
                 showWorkflowToast({
                   kind: "error",
-                  title: "Capacity forecast refresh failed",
+                  title: t("projects.projectsClient.capacityForecastRefreshFailed"),
                   description: error instanceof Error ? error.message : String(error),
                 })
               }
@@ -724,7 +725,7 @@ function ProjectsClientLoaded({
               } catch (error) {
                 showWorkflowToast({
                   kind: "error",
-                  title: "Earned value refresh failed",
+                  title: t("projects.projectsClient.earnedValueRefreshFailed"),
                   description: error instanceof Error ? error.message : String(error),
                 })
               }
@@ -745,13 +746,13 @@ function ProjectsClientLoaded({
       refreshForecast,
       refreshEvm,
       organizationId,
-    ],
+    , t],
   )
 
   const approvalTab = useMemo(
     () => ({
       id: "timesheet-approvals",
-      label: "Approval Timeline",
+      label: t("projects.projectsClient.approvalTimeline"),
       type: "entity" as const,
       entityConfig: {
         id: "timesheet-approvals-table",
@@ -761,10 +762,10 @@ function ProjectsClientLoaded({
           searchable: true,
           searchKeys: ["decision", "reason"],
           columns: [
-            { key: "timesheetId", label: "Timesheet ID" },
+            { key: "timesheetId", label: t("projects.projectsClient.timesheetID") },
             {
               key: "decision",
-              label: "Decision",
+              label: t("crm.consent.decision"),
               type: "badge" as const,
               badgeVariants: {
                 validated: "success",
@@ -772,15 +773,15 @@ function ProjectsClientLoaded({
                 reopened: "warning",
               },
             },
-            { key: "hours", label: "Hours", type: "number" as const, align: "right" as const },
-            { key: "reason", label: "Reason" },
-            { key: "decidedAt", label: "Date", type: "datetime" as const },
+            { key: "hours", label: t("projects.timesheets.columns.unitAmount"), type: "number" as const, align: "right" as const },
+            { key: "reason", label: t("accounting.forms.reverseOperationalPayment.reason") },
+            { key: "decidedAt", label: t("projects.timesheets.columns.date"), type: "datetime" as const },
           ],
-          emptyMessage: "No approval events yet.",
+          emptyMessage: t("projects.projectsClient.noApprovalEventsYet"),
         },
       } as EntityViewConfig,
     }),
-    [],
+    [t],
   )
 
   const taskStageFieldOptions = useMemo(() => {
@@ -844,8 +845,8 @@ function ProjectsClientLoaded({
       label: String(r.name ?? r.id ?? ""),
     }))
     if (opts.length > 0) return opts
-    return [{ value: "", label: "No rate cards", disabled: true }]
-  }, [rateCards])
+    return [{ value: "", label: t("projects.projectsClient.noRateCards"), disabled: true }]
+  }, [rateCards, t])
 
   const rateCardLineFormConfig = useMemo(
     () =>
@@ -869,8 +870,8 @@ function ProjectsClientLoaded({
         label: String(s.name ?? s.id ?? ""),
       }))
     if (opts.length > 0) return opts
-    return [{ value: "", label: "No posted sheets to rebill", disabled: true }]
-  }, [expenseSheets])
+    return [{ value: "", label: t("projects.projectsClient.noPostedSheetsToRebill"), disabled: true }]
+  }, [expenseSheets, t])
 
   const expenseRebillFormConfig = useMemo(
     () =>
@@ -968,8 +969,8 @@ function ProjectsClientLoaded({
             data: {
               stats: [
                 { label: t("projects.dashboard.activeProjects"), value: String(activeProjects), icon: "FolderKanban" },
-                { label: "To validate", value: String(toValidateCount), icon: "CheckSquare", testId: "proj-queue-to-validate" },
-                { label: "Unbilled hours", value: `${Math.round(unbilledHours * 10) / 10}h`, icon: "AlertCircle", testId: "proj-queue-unbilled" },
+                { label: t("projects.projectsClient.toValidate"), value: String(toValidateCount), icon: "CheckSquare", testId: "proj-queue-to-validate" },
+                { label: t("projects.projectsClient.unbilledHours"), value: `${Math.round(unbilledHours * 10) / 10}h`, icon: "AlertCircle", testId: "proj-queue-unbilled" },
                 { label: t("projects.dashboard.hoursLogged"), value: `${Math.round(totalHoursSpent)}h`, icon: "Clock" },
               ],
             },
@@ -1006,30 +1007,10 @@ function ProjectsClientLoaded({
           return { ...w, data: { metrics } }
         }
         if (w.id === "proj-budget-health") {
-          const projectName = new Map(
-            projects.map((p) => [String(p.id), String(p.name ?? p.id)]),
-          )
-          const values = (projectMargins as Record<string, unknown>[])
-            .slice(0, 8)
-            .map((m) => ({
-              project: projectName.get(String(m.projectId ?? "")) ?? String(m.projectId ?? "—"),
-              Budget: Math.round(Number(m.budgetPlanned ?? 0)),
-              Spent: Math.round(Number(m.budgetActual ?? 0)),
-              Margin: Math.round(Number(m.marginPercent ?? 0)),
-              href: m.projectId == null ? "/projects?tab=timesheets" : projectTimesheetsHref(String(m.projectId)),
-            }))
           return {
             ...w,
-            title: "Budget vs actual / margin",
-            data: {
-              categoryKey: "project",
-              series: [
-                { name: "Budget", color: "#94a3b8" },
-                { name: "Spent", color: "#6366f1" },
-              ],
-              values,
-              testId: "proj-margin-panel",
-            },
+            title: t("projects.projectsClient.budgetVsActualMargin"),
+            data: projectMarginChartData(projectMargins as Record<string, unknown>[], projects, t),
           }
         }
         if (w.id === "proj-milestones-table") {
@@ -1152,7 +1133,7 @@ function ProjectsClientLoaded({
               entityConfig: addCsvToolbar(tab.entityConfig, [
                 {
                   id: "add-rate-line",
-                  label: "Add rate line",
+                  label: t("projects.projectsClient.addRateLine"),
                   onClick: () => {
                     setLifecycleError(null)
                     setLifecycleModal({
@@ -1178,7 +1159,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "task-state",
-                  label: "Update state",
+                  label: t("projects.projectsClient.updateState"),
                   requiresSelection: true,
                   selection: "multiple",
                   onClick: (rows) => {
@@ -1188,7 +1169,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "task-parent",
-                  label: "Set parent",
+                  label: t("projects.projectsClient.setParent"),
                   requiresSelection: true,
                   selection: "multiple",
                   onClick: (rows) => {
@@ -1198,7 +1179,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "assign-users",
-                  label: "Assign users",
+                  label: t("projects.projectsClient.assignUsers"),
                   permission: { resource: "project_task", action: "write" },
                   requiresSelection: true,
                   selection: "multiple",
@@ -1224,7 +1205,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "stop-timer",
-                  label: "Stop timer",
+                  label: t("projects.projectsClient.stopTimer"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) =>
@@ -1234,7 +1215,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "validate-timesheets",
-                  label: "Validate",
+                  label: t("accounting.budgets.workspace.validate"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => timesheetStatus(row) === "draft"),
@@ -1247,7 +1228,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "reject-timesheets",
-                  label: "Reject",
+                  label: t("purchasing.actions.rejectSelected"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) =>
@@ -1266,7 +1247,7 @@ function ProjectsClientLoaded({
                 },
                 {
                   id: "bill-timesheets",
-                  label: "Bill",
+                  label: t("accounting.authoring.bill"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) =>
@@ -1490,8 +1471,7 @@ function ProjectsClientLoaded({
     <>
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
-          Contacts reference data: {contactsReferenceStatus}. Partner selection requires CRM contact read access; project and timesheet workflows remain available.
-        </p>
+          {t("purchasing.purchasingClient.contactsReferenceData")}{" "}{contactsReferenceStatus}{t("projects.projectsClient.partnerSelectionRequiresCRMContactReadAccessProjectAndTimesheetWorkflows")}{" "}</p>
       )}
       <ModuleView
         config={config}
@@ -1567,17 +1547,17 @@ function ProjectsClientLoaded({
                 )
               } else if (lifecycleModal.type === "assignUsers") {
                 if (assigningTasks.current) return
-                if (!canAssignTask) throw new Error("Task assignment permission is required")
-                if (!navigator.onLine) throw new Error("Connect to the network to change assignments")
-                if (operatingCompanyId <= 0n) throw new Error("Select an active company")
-                if (!taskAssignees.isSuccess || taskAssignees.isError || taskAssignees.isFetching) throw new Error("Eligible people could not be loaded. Close and reopen the form to retry.")
+                if (!canAssignTask) throw new Error(t("projects.projectsClient.taskAssignmentPermissionIsRequired"))
+                if (!navigator.onLine) throw new Error(t("projects.projectsClient.connectToTheNetworkToChangeAssignments"))
+                if (operatingCompanyId <= 0n) throw new Error(t("projects.projectsClient.selectAnActiveCompany"))
+                if (!taskAssignees.isSuccess || taskAssignees.isError || taskAssignees.isFetching) throw new Error(t("projects.projectsClient.eligiblePeopleCouldNotBeLoadedCloseAndReopenTheForm"))
                 if (lifecycleModal.rows.some((row) => String(row.companyId ?? row.company_id) !== operatingCompanyId.toString())) {
-                  throw new Error("Select tasks from the current company")
+                  throw new Error(t("projects.projectsClient.selectTasksFromTheCurrentCompany"))
                 }
                 const userIds = taskAssigneeIds(Array.isArray(formData.userIds) ? formData.userIds : [])
                 const eligible = new Set(userFieldOptions.map((option) => option.value))
                 if (userIds.some((identity) => !eligible.has(identity))) {
-                  throw new Error("Select active members of this company")
+                  throw new Error(t("projects.projectsClient.selectActiveMembersOfThisCompany"))
                 }
                 assigningTasks.current = true
                 try { await Promise.all(
@@ -1590,10 +1570,10 @@ function ProjectsClientLoaded({
                   ),
                 ) } finally { assigningTasks.current = false }
               } else if (lifecycleModal.type === "billTimesheets") {
-                if (ids.length === 0) throw new Error("Select at least one timesheet")
-                if (operatingCompanyId == null) throw new Error("Select an active company")
+                if (ids.length === 0) throw new Error(t("projects.projectsClient.selectAtLeastOneTimesheet"))
+                if (operatingCompanyId == null) throw new Error(t("projects.projectsClient.selectAnActiveCompany"))
                 if (formData.invoiceDate == null || String(formData.invoiceDate).trim() === "") {
-                  throw new Error("Invoice date is required")
+                  throw new Error(t("projects.projectsClient.invoiceDateIsRequired"))
                 }
                 const outcome = await billTimesheets.mutateAsync({
                   companyId: operatingCompanyId,
@@ -1605,10 +1585,10 @@ function ProjectsClientLoaded({
                 })
                 showWorkflowToast({
                   kind: "success",
-                  title: "Timesheets billed",
-                  description: `Created accounting invoice ${outcome.ref.id}.`,
+                  title: t("projects.projectsClient.timesheetsBilled"),
+                  description: t("projects.projectsClient.createdAccountingInvoice", { value1: outcome.ref.id }),
                   action: {
-                    label: "Open invoice",
+                    label: t("projects.projectsClient.openInvoice"),
                     onClick: () => window.location.assign(accountMoveHref(outcome.ref.id)),
                   },
                 })
@@ -1628,7 +1608,7 @@ function ProjectsClientLoaded({
                   d == null ||
                   d === ""
                 ) {
-                  throw new Error("Sheet, journal, accounts, and invoice date are required")
+                  throw new Error(t("projects.projectsClient.sheetJournalAccountsAndInvoiceDateAreRequired"))
                 }
                 await projectRebill.mutateAsync({
                   sheetId: String(sheetId),
@@ -1668,7 +1648,7 @@ function ProjectsClientLoaded({
                 const from = formData.dateFrom
                 const to = formData.dateTo
                 if (!formData.projectId || from == null || from === "" || to == null || to === "") {
-                  throw new Error("Project, date from, and date to are required")
+                  throw new Error(t("projects.projectsClient.projectDateFromAndDateToAreRequired"))
                 }
                 const skillHint =
                   formData.skillHint != null && String(formData.skillHint).trim() !== ""

@@ -232,19 +232,19 @@ function WorkflowsClientLoaded({
   const migrationPlanBaseForm = useMemo<FormConfig>(
     () => ({
       id: "create-migration-plan",
-      title: "New migration plan",
+      title: t("workflows.forms.migrationPlan.title"),
       description:
-        "Map a published source version to a published target. Identity node/edge mappings are generated from the source graph.",
+        t("workflows.workflowsClient.mapAPublishedSourceVersionToAPublishedTargetIdentityNode"),
       sections: [
         {
           id: "plan",
-          title: "Versions",
+          title: t("workflows.versions.title"),
           fields: [
             {
               id: "workflowId",
               name: "workflowId",
               type: "number",
-              label: "Workflow id",
+              label: t("workflows.workflowsClient.workflowId"),
               required: true,
               width: "1/2",
             },
@@ -252,7 +252,7 @@ function WorkflowsClientLoaded({
               id: "sourceWorkflowVersionId",
               name: "sourceWorkflowVersionId",
               type: "number",
-              label: "Source version id",
+              label: t("workflows.workflowsClient.sourceVersionId"),
               required: true,
               width: "1/2",
             },
@@ -260,7 +260,7 @@ function WorkflowsClientLoaded({
               id: "targetWorkflowVersionId",
               name: "targetWorkflowVersionId",
               type: "number",
-              label: "Target version id",
+              label: t("workflows.workflowsClient.targetVersionId"),
               required: true,
               width: "1/2",
             },
@@ -268,14 +268,14 @@ function WorkflowsClientLoaded({
               id: "active",
               name: "active",
               type: "checkbox",
-              label: "Activate immediately",
+              label: t("workflows.workflowsClient.activateImmediately"),
               width: "1/2",
             },
           ],
         },
       ],
     }),
-    [],
+    [t],
   )
 
   const migrationPlanForm = useMemo<FormConfig>(() => {
@@ -430,7 +430,7 @@ function WorkflowsClientLoaded({
   }, [quickActionUsable, rowDialogUsable])
 
   const handleFormSubmit = (_tabId: string, action: string, formData: Record<string, unknown>) => {
-    if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!actionUsable(action)) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "createWorkflow") {
       const payload = toCreateWorkflowParams(formData)
       if (!payload) return

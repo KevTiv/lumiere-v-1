@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import DOMPurify from "dompurify"
 import { z } from "zod"
 
@@ -112,12 +113,12 @@ const metadataSchema = z.record(jsonValue)
 
 function assertBoundedJson(value: unknown): void {
   let serialized: string | undefined
-  try { serialized = JSON.stringify(value) } catch { throw new Error("Template data is not valid JSON.") }
+  try { serialized = JSON.stringify(value) } catch { throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.assertBoundedJson.error", { defaultValue: "Template data is not valid JSON." })) }
   if (!serialized || new TextEncoder().encode(serialized).length > MAX_PROJECT_BYTES) {
-    throw new Error("Template data exceeds the 1 MB limit.")
+    throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.assertBoundedJson.errortemplateDataExceedsThe1MBLimit", { defaultValue: "Template data exceeds the 1 MB limit." }))
   }
   const visit = (node: unknown, depth: number): void => {
-    if (depth > MAX_DEPTH * 3) throw new Error("Template data is nested too deeply.")
+    if (depth > MAX_DEPTH * 3) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.visit.error", { defaultValue: "Template data is nested too deeply." }))
     if (Array.isArray(node)) node.forEach((child) => visit(child, depth + 1))
     else if (typeof node === "object" && node !== null) {
       Object.values(node).forEach((child) => visit(child, depth + 1))
@@ -199,7 +200,7 @@ function normalizeAttributes(attributes: Record<string, string> = {}): Record<st
 }
 
 function sanitizeTemplateHtml(html: string, kind: DocumentDesignerKind): string {
-  if (new TextEncoder().encode(html).length > MAX_PROJECT_BYTES) throw new Error("Template content exceeds the 1 MB limit.")
+  if (new TextEncoder().encode(html).length > MAX_PROJECT_BYTES) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.sanitizeTemplateHtml.error", { defaultValue: "Template content exceeds the 1 MB limit." }))
   const fragment = DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [...(kind === "document" ? documentTags : semanticTags)],
     ALLOWED_ATTR: ["href", "title", "colspan", "rowspan", "start", "data-type", "data-checked", ...(kind === "document" ? ["style"] : [])],
@@ -233,12 +234,12 @@ export function sanitizeDocumentTemplateHtml(html: string): string {
 function normalizeProject(input: unknown, kind: DocumentDesignerKind): DocumentDesignerProject {
   assertBoundedJson(input)
   const parsed = projectSchema.safeParse(input)
-  if (!parsed.success) throw new Error("This template contains unsupported project data. Only built-in text and page blocks are supported.")
+  if (!parsed.success) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.normalizeProject.error", { defaultValue: "This template contains unsupported project data. Only built-in text and page blocks are supported." }))
   let count = 0
   const normalize = (component: DocumentDesignerComponent, depth: number): DocumentDesignerComponent => {
-    if (++count > MAX_COMPONENTS || depth > MAX_DEPTH) throw new Error("This template has too many nested blocks.")
+    if (++count > MAX_COMPONENTS || depth > MAX_DEPTH) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.normalize.error", { defaultValue: "This template has too many nested blocks." }))
     if (kind === "rich-text" && component.tagName && !semanticTags.some((tag) => tag === component.tagName)) {
-      throw new Error("A text template cannot contain page layout blocks.")
+      throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.normalize.erroraTextTemplateCannotContainPageLayout", { defaultValue: "A text template cannot contain page layout blocks." }))
     }
     return {
       ...component,
@@ -252,7 +253,7 @@ function normalizeProject(input: unknown, kind: DocumentDesignerKind): DocumentD
   }
   const page = parsed.data.pages[0]!
   const frame = page.frames[0]!
-  if (frame.component.type !== "wrapper") throw new Error("The template must contain one page wrapper.")
+  if (frame.component.type !== "wrapper") throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.normalizeProject.errortheTemplateMustContainOnePageWrapper", { defaultValue: "The template must contain one page wrapper." }))
   return { assets: [], styles: [], pages: [{
     id: page.id,
     name: page.name,
@@ -305,12 +306,12 @@ export function createDocumentDesignerSnapshot(kind: DocumentDesignerKind, proje
 
 function readMetadata(metadata: string | null | undefined): z.infer<typeof metadataSchema> {
   if (!metadata?.trim()) return {}
-  if (metadata.length > MAX_PROJECT_BYTES) throw new Error("Template metadata exceeds the 1 MB limit.")
+  if (metadata.length > MAX_PROJECT_BYTES) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.readMetadata.error", { defaultValue: "Template metadata exceeds the 1 MB limit." }))
   let parsed: unknown
-  try { parsed = JSON.parse(metadata) } catch { throw new Error("Template metadata is not valid JSON.") }
+  try { parsed = JSON.parse(metadata) } catch { throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.readMetadata.errortemplateMetadataIsNotValidJSON", { defaultValue: "Template metadata is not valid JSON." })) }
   assertBoundedJson(parsed)
   const result = metadataSchema.safeParse(parsed)
-  if (!result.success) throw new Error("Template metadata must be a JSON object.")
+  if (!result.success) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.readMetadata.errortemplateMetadataMustBeAJSONObject", { defaultValue: "Template metadata must be a JSON object." }))
   return result.data
 }
 
@@ -326,7 +327,7 @@ export function readDocumentDesignerMetadata(metadata: string | null | undefined
   const envelope = readMetadata(metadata)
   if (!("documentDesigner" in envelope)) return null
   const parsed = designerSchema.safeParse(envelope.documentDesigner)
-  if (!parsed.success) throw new Error("This template uses an unsupported designer format.")
+  if (!parsed.success) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.readDocumentDesignerMetadata.error", { defaultValue: "This template uses an unsupported designer format." }))
   return createDocumentDesignerSnapshot(parsed.data.kind, parsed.data.project).designer
 }
 
@@ -344,6 +345,6 @@ export function mergeDocumentDesignerMetadata(metadata: string | null | undefine
   if ("documentDesigner" in envelope) readDocumentDesignerMetadata(metadata)
   const validated = createDocumentDesignerSnapshot(designer.kind, designer.project).designer
   const result = JSON.stringify({ ...envelope, documentDesigner: validated })
-  if (new TextEncoder().encode(result).length > MAX_PROJECT_BYTES) throw new Error("Template metadata exceeds the 1 MB limit.")
+  if (new TextEncoder().encode(result).length > MAX_PROJECT_BYTES) throw new Error(uiI18n.t("documents.builtIn.documentTemplateDesigner.readMetadata.error", { defaultValue: "Template metadata exceeds the 1 MB limit." }))
   return result
 }

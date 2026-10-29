@@ -268,13 +268,13 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
             <p>{t("aiHarness.runLifecycle.comparisonSummary", { leftRunId: data.comparison.leftRunId, leftCursor: data.comparison.leftContinuation.cursor, rightRunId: data.comparison.rightRunId, rightCursor: data.comparison.rightContinuation.cursor })}</p>
             {data.comparison.details ? (
               <div className="mt-3 flex flex-col gap-2 text-muted-foreground">
-                <p>Left: {data.comparison.details.leftStatus}, {data.comparison.details.leftStepCount} steps, {data.comparison.details.leftTokensUsed.toLocaleString()} tokens.</p>
-                <p>Right: {data.comparison.details.rightStatus}, {data.comparison.details.rightStepCount} steps, {data.comparison.details.rightTokensUsed.toLocaleString()} tokens.</p>
-                {data.comparison.details.toolsOnlyLeft.length > 0 ? <p>Only left: {data.comparison.details.toolsOnlyLeft.join(", ")}.</p> : null}
-                {data.comparison.details.toolsOnlyRight.length > 0 ? <p>Only right: {data.comparison.details.toolsOnlyRight.join(", ")}.</p> : null}
-                {data.comparison.details.toolDiffTruncated ? <Badge variant="outline">Tool difference truncated</Badge> : null}
+                <p>{t("aiHarness.runMetrics.comparisonSide", { side: t("ai-harness.runLifecyclePanel.left"), status: runStatusLabel(t, data.comparison.details.leftStatus), steps: t("aiHarness.runMetrics.steps", { count: data.comparison.details.leftStepCount }), tokens: t("aiHarness.runMetrics.tokens", { count: data.comparison.details.leftTokensUsed }) })}</p>
+                <p>{t("aiHarness.runMetrics.comparisonSide", { side: t("ai-harness.runLifecyclePanel.right"), status: runStatusLabel(t, data.comparison.details.rightStatus), steps: t("aiHarness.runMetrics.steps", { count: data.comparison.details.rightStepCount }), tokens: t("aiHarness.runMetrics.tokens", { count: data.comparison.details.rightTokensUsed }) })}</p>
+                {data.comparison.details.toolsOnlyLeft.length > 0 ? <p>{t("ai-harness.runLifecyclePanel.onlyLeft")}{" "}{data.comparison.details.toolsOnlyLeft.join(", ")}.</p> : null}
+                {data.comparison.details.toolsOnlyRight.length > 0 ? <p>{t("ai-harness.runLifecyclePanel.onlyRight")}{" "}{data.comparison.details.toolsOnlyRight.join(", ")}.</p> : null}
+                {data.comparison.details.toolDiffTruncated ? <Badge variant="outline">{t("ai-harness.runLifecyclePanel.toolDifferenceTruncated")}</Badge> : null}
               </div>
-            ) : <p className="mt-1 text-muted-foreground">No bounded comparison details were available.</p>}
+            ) : <p className="mt-1 text-muted-foreground">{t("ai-harness.runLifecyclePanel.noBoundedComparisonDetailsWereAvailable")}</p>}
           </CardContent>
         </Card>
       ) : null}

@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { Button } from "@lumiere/ui"
 
@@ -15,11 +17,12 @@ function MetricTable({
   columns: { key: string; label: string }[]
   rows: Row[]
 }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-2" data-testid={testId}>
       <h3 className="text-sm font-medium">{title}</h3>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rows yet.</p>
+        <p className="text-sm text-muted-foreground">{t("projects.advancedPsaPanel.noRowsYet")}</p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-left text-sm">
@@ -72,76 +75,72 @@ export function AdvancedPsaPanel({
   onRefreshForecast: () => void
   onRefreshEvm: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-8 p-1" data-testid="advanced-psa-panel">
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" onClick={onNewChangeOrder}>
-          New change order
-        </Button>
+          {t("projects.advancedPsaPanel.newChangeOrder")}{" "}</Button>
         <Button type="button" size="sm" variant="outline" onClick={onLinkSubcontractor}>
-          Link subcontractor cost
-        </Button>
+          {t("projects.advancedPsaPanel.linkSubcontractorCost")}{" "}</Button>
         <Button type="button" size="sm" variant="outline" onClick={onNewIntent}>
-          New integration intent
-        </Button>
+          {t("purchasing.ops.createIntegrationIntent")}{" "}</Button>
         <Button type="button" size="sm" variant="ghost" onClick={onRefreshForecast}>
-          Refresh forecast
-        </Button>
+          {t("projects.advancedPsaPanel.refreshForecast")}{" "}</Button>
         <Button type="button" size="sm" variant="ghost" onClick={onRefreshEvm}>
-          Refresh EVM
-        </Button>
+          {t("projects.advancedPsaPanel.refreshEVM")}{" "}</Button>
       </div>
 
       <MetricTable
-        title="Capacity forecast"
+        title={t("projects.advancedPsaPanel.capacityForecast")}
         testId="psa-forecast-table"
         columns={[
-          { key: "employeeId", label: "Employee" },
-          { key: "availableHours", label: "Available" },
-          { key: "allocatedHours", label: "Allocated" },
-          { key: "pipelineHours", label: "Pipeline" },
-          { key: "forecastRemainingHours", label: "Remaining" },
+          { key: "employeeId", label: t("projects.resourceAllocation.columns.employee") },
+          { key: "availableHours", label: t("inventory.stockOnHand.columns.availableQuantity") },
+          { key: "allocatedHours", label: t("hr.leaveAllocations.columns.allocated") },
+          { key: "pipelineHours", label: t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmPipeline.title") },
+          { key: "forecastRemainingHours", label: t("accounting.amortization.colRemaining") },
         ]}
         rows={forecast}
       />
 
       <MetricTable
-        title="Change orders"
+        title={t("projects.advancedPsaPanel.changeOrders")}
         testId="psa-change-orders-table"
         columns={[
-          { key: "name", label: "Name" },
-          { key: "projectId", label: "Project" },
-          { key: "state", label: "State" },
-          { key: "budgetDelta", label: "Budget Δ" },
-          { key: "revisedBudget", label: "Revised budget" },
+          { key: "name", label: t("demo.tables.customers.columns.name") },
+          { key: "projectId", label: t("projects.projects.columns.name") },
+          { key: "state", label: t("moduleInsights.state") },
+          { key: "budgetDelta", label: t("projects.advancedPsaPanel.budget") },
+          { key: "revisedBudget", label: t("projects.advancedPsaPanel.revisedBudget") },
         ]}
         rows={changeOrders}
       />
 
       <MetricTable
-        title="Earned value (PV / EV / AC / SPI / CPI)"
+        title={t("projects.advancedPsaPanel.earnedValuePVEVACSPICPI")}
         testId="psa-evm-table"
         columns={[
-          { key: "projectId", label: "Project" },
-          { key: "plannedValue", label: "PV" },
-          { key: "earnedValue", label: "EV" },
-          { key: "actualCost", label: "AC" },
-          { key: "schedulePerformanceIndex", label: "SPI" },
-          { key: "costPerformanceIndex", label: "CPI" },
-          { key: "percentComplete", label: "% complete" },
+          { key: "projectId", label: t("projects.projects.columns.name") },
+          { key: "plannedValue", label: t("projects.advancedPsaPanel.pV") },
+          { key: "earnedValue", label: t("projects.advancedPsaPanel.eV") },
+          { key: "actualCost", label: t("projects.advancedPsaPanel.aC") },
+          { key: "schedulePerformanceIndex", label: t("projects.advancedPsaPanel.sPI") },
+          { key: "costPerformanceIndex", label: t("projects.advancedPsaPanel.cPI") },
+          { key: "percentComplete", label: t("projects.advancedPsaPanel.complete") },
         ]}
         rows={earnedValue}
       />
 
       <MetricTable
-        title="Integration intents"
+        title={t("projects.advancedPsaPanel.integrationIntents")}
         testId="psa-intents-table"
         columns={[
-          { key: "intentType", label: "Type" },
-          { key: "status", label: "Status" },
-          { key: "projectId", label: "Project" },
-          { key: "idempotencyKey", label: "Key" },
-          { key: "resultRef", label: "Result" },
+          { key: "intentType", label: t("accounting.accounts.type") },
+          { key: "status", label: t("projects.projects.columns.lastUpdateStatus") },
+          { key: "projectId", label: t("projects.projects.columns.name") },
+          { key: "idempotencyKey", label: t("workflows.workflows.columns.key") },
+          { key: "resultRef", label: t("inventory.qualityChecks.columns.qualityState") },
         ]}
         rows={intents}
       />

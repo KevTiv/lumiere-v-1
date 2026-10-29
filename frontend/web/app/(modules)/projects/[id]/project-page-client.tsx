@@ -274,7 +274,7 @@ function ProjectPageLoaded({
           { label },
         ]}
         title={label}
-        subtitle={[partner ? String(partner.name ?? '') : '', `${hours} h`].filter(Boolean).join(' · ')}
+        subtitle={[partner ? String(partner.name ?? '') : '', t("projects.projectPageClient.h", { value1: hours })].filter(Boolean).join(' · ')}
         badge={status ? <Badge variant={status === 'Cancelled' ? 'destructive' : 'secondary'}>{status}</Badge> : undefined}
         navigation={navigation}
         smartButtons={

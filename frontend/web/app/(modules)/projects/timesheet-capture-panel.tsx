@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useState } from "react"
 import { Button } from "@lumiere/ui"
@@ -11,6 +13,7 @@ import {
 
 /** Offline / delayed-sync timesheet outbox with conflict retry UI (Wave E). */
 export function TimesheetCapturePanel({ organizationId }: { organizationId: number }) {
+  const { t } = useTranslation()
   const deviceId = useMemo(() => getOrCreateTimesheetCaptureDeviceId(), [])
   const [tick, setTick] = useState(0)
   const queued = useMemo(
@@ -22,14 +25,13 @@ export function TimesheetCapturePanel({ organizationId }: { organizationId: numb
   if (queued.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground" data-testid="timesheet-capture-empty">
-        No queued offline timesheets. Failed log attempts appear here for retry.
-      </div>
+        {t("projects.timesheetCapturePanel.noQueuedOfflineTimesheetsFailedLogAttemptsAppearHereForRetry")}{" "}</div>
     )
   }
 
   return (
     <div className="space-y-3" data-testid="timesheet-capture-panel">
-      <h3 className="text-sm font-medium">Timesheet sync queue</h3>
+      <h3 className="text-sm font-medium">{t("projects.timesheetCapturePanel.timesheetSyncQueue")}</h3>
       <ul className="space-y-2">
         {queued.map((item) => (
           <li
@@ -39,8 +41,7 @@ export function TimesheetCapturePanel({ organizationId }: { organizationId: numb
           >
             <div>
               <div className="font-medium">
-                {item.payload.projectId} / {item.payload.taskId} — {item.payload.unitAmount}h
-              </div>
+                {item.payload.projectId} / {item.payload.taskId} — {item.payload.unitAmount}{t("projects.projectsPanels.h")}{" "}</div>
               <div className="text-muted-foreground">
                 {item.syncState}
                 {item.lastError ? `: ${item.lastError}` : ""}
@@ -56,8 +57,7 @@ export function TimesheetCapturePanel({ organizationId }: { organizationId: numb
                   setTick((n) => n + 1)
                 }}
               >
-                Retry
-              </Button>
+                {t("common.retry")}{" "}</Button>
               <Button
                 type="button"
                 size="sm"
@@ -67,8 +67,7 @@ export function TimesheetCapturePanel({ organizationId }: { organizationId: numb
                   setTick((n) => n + 1)
                 }}
               >
-                Discard
-              </Button>
+                {t("common.discardChanges.discard")}{" "}</Button>
             </div>
           </li>
         ))}

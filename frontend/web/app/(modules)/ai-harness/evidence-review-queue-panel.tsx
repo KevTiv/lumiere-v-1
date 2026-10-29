@@ -248,7 +248,7 @@ export function EvidenceReviewQueuePanel({ companyId, onInspect }: EvidenceRevie
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{stepLabel(component, t)}</span>
                     <Badge variant="destructive">{linkStateLabel(t, component.linkState)}</Badge>
-                    <Badge variant="outline">v{component.version}</Badge>
+                    <Badge variant="outline">{t("ai-harness.evidenceReviewQueuePanel.v")}{component.version}</Badge>
                   </div>
                   <p className="break-all text-xs text-muted-foreground">{t("aiHarness.reviewQueue.contentHash", { hash: component.contentHash })}</p>
                   <div className="flex flex-wrap gap-2">

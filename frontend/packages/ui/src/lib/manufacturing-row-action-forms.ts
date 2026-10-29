@@ -502,7 +502,7 @@ export function manufacturingWorkcenterRowActionForm(
             defaultValue: "save_name",
             options: [
               { value: "save_name", label: t("manufacturing.rowActions.saveName") },
-              { value: "configure_cost_rate", label: "Configure hourly cost rate" },
+              { value: "configure_cost_rate", label: t("manufacturing.builtIn.manufacturingRowActionForms.manufacturingWorkcenterRowActionForm.configureCostRate.label", { defaultValue: "Configure hourly cost rate" }) },
               { value: "block", label: t("manufacturing.rowActions.block") },
               { value: "unblock", label: t("manufacturing.rowActions.unblock") },
               {
@@ -536,7 +536,7 @@ export function manufacturingWorkcenterRowActionForm(
             type: "number",
             id: "wcHourlyRate",
             name: "wcHourlyRate",
-            label: "Hourly cost rate (company currency)",
+            label: t("manufacturing.builtIn.manufacturingRowActionForms.manufacturingWorkcenterRowActionForm.wcHourlyRate.label", { defaultValue: "Hourly cost rate (company currency)" }),
             defaultValue: p.defaultHourlyRate,
             min: 0,
             step: 0.01,

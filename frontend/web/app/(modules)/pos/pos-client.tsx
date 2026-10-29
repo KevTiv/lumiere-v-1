@@ -175,8 +175,7 @@ function PosClientLoaded({
             </div>
             {loyaltyPrograms.length > 0 ? (
               <p className="mt-3 text-xs text-muted-foreground">
-                {loyaltyPrograms.length} loyalty program(s) available — manage under Sales → Loyalty.
-              </p>
+                {t("pos.posClient.loyaltyProgramCount", { count: loyaltyPrograms.length })}</p>
             ) : null}
             {pos.posLifecycleError ? (
               <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">

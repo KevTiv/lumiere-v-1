@@ -97,7 +97,7 @@ function OrgChartRow({ node, depth }: { node: DeptNode; depth: number }) {
                 </li>
               ))}
               {node.employees.length > 8 ? (
-                <li>+{node.employees.length - 8} more</li>
+                <li>+{node.employees.length - 8} {" "}{t("hr.hrPanels.more")}</li>
               ) : null}
             </ul>
           </div>
@@ -161,6 +161,7 @@ export function CompensationTimelinePanel({
   contractId: string
   events: QueryRows
 }) {
+  const { t } = useTranslation()
   const rows = useMemo(() => {
     return events
       .filter((e) => String((e as Record<string, unknown>).contractId) === contractId)
@@ -174,8 +175,7 @@ export function CompensationTimelinePanel({
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No compensation changes recorded for this contract yet.
-      </p>
+        {t("hr.hrPanels.noCompensationChangesRecordedForThisContractYet")}{" "}</p>
     )
   }
 
@@ -187,7 +187,7 @@ export function CompensationTimelinePanel({
           <li key={String(r.id)} className="rounded-md border border-border px-3 py-2 text-sm">
             <div className="font-medium">{formatCompEventDate(r.effectiveFrom)}</div>
             <div className="text-muted-foreground">
-              Wage: {String(r.wage ?? "—")}
+              {t("hr.hrPanels.wage")}{" "}{String(r.wage ?? "—")}
               {r.reason ? ` · ${String(r.reason)}` : ""}
             </div>
           </li>
@@ -211,13 +211,14 @@ export function LeaveApprovalTimelinePanel({
 }: {
   record: Record<string, unknown>
 }) {
+  const { t } = useTranslation()
   const state = fieldOrDash(record, "state", "State")
   const steps = [
-    { label: "Created", detail: fieldOrDash(record, "createdAt", "created_at") },
-    { label: "Manager", detail: fieldOrDash(record, "managerId", "manager_id") },
-    { label: "First approver", detail: fieldOrDash(record, "firstApproverId", "first_approver_id") },
-    { label: "Second approver", detail: fieldOrDash(record, "secondApproverId", "second_approver_id") },
-    { label: "Current state", detail: state },
+    { label: t("crm.leads.columns.createDate"), detail: fieldOrDash(record, "createdAt", "created_at") },
+    { label: t("hr.departments.columns.managerId"), detail: fieldOrDash(record, "managerId", "manager_id") },
+    { label: t("hr.hrPanels.firstApprover"), detail: fieldOrDash(record, "firstApproverId", "first_approver_id") },
+    { label: t("hr.hrPanels.secondApprover"), detail: fieldOrDash(record, "secondApproverId", "second_approver_id") },
+    { label: t("hr.hrPanels.currentState"), detail: state },
   ]
 
   return (
@@ -229,8 +230,7 @@ export function LeaveApprovalTimelinePanel({
         </div>
       ))}
       <p className="text-xs text-muted-foreground">
-        Full mutation history is on the Audit tab.
-      </p>
+        {t("hr.hrPanels.fullMutationHistoryIsOnTheAuditTab")}{" "}</p>
     </div>
   )
 }
@@ -244,13 +244,14 @@ export function HrOpsQueuePanel({
   payslipsToExport: number
   hrIntegrationIntentsPending?: number
 }) {
+  const { t } = useTranslation()
   return (
     <section className="space-y-3" data-testid="hr-ops-queue-panel">
-      <h3 className="text-sm font-semibold text-foreground">Work queues</h3>
+      <h3 className="text-sm font-semibold text-foreground">{t("hr.hrPanels.workQueues")}</h3>
       <StatCardGrid className="lg:grid-cols-3">
-        <StatCard label="Leave requests to approve" value={leavesToApprove} icon={CalendarClock} tone="warning" />
-        <StatCard label="Payslips to export" value={payslipsToExport} icon={FileOutput} tone="info" />
-        <StatCard label="Pending payroll integrations" value={hrIntegrationIntentsPending ?? 0} icon={Plug} />
+        <StatCard label={t("hr.hrPanels.leaveRequestsToApprove")} value={leavesToApprove} icon={CalendarClock} tone="warning" />
+        <StatCard label={t("hr.dashboard.payslipsToExport")} value={payslipsToExport} icon={FileOutput} tone="info" />
+        <StatCard label={t("hr.hrPanels.pendingPayrollIntegrations")} value={hrIntegrationIntentsPending ?? 0} icon={Plug} />
       </StatCardGrid>
     </section>
   )
@@ -267,14 +268,15 @@ export function HrAdvancedWfmPanel({
   globalAssignments: number
   capacityForecast: number
 }) {
+  const { t } = useTranslation()
   return (
     <section className="space-y-3" data-testid="hr-advanced-wfm-panel">
-      <h3 className="text-sm font-semibold text-foreground">Workforce planning</h3>
+      <h3 className="text-sm font-semibold text-foreground">{t("hr.hrPanels.workforcePlanning")}</h3>
       <StatCardGrid>
-        <StatCard label="Labor cost snapshots" value={laborCostSnapshots} icon={Coins} />
-        <StatCard label="Shift optimization jobs" value={shiftOptJobs} icon={CalendarRange} />
-        <StatCard label="Global assignments" value={globalAssignments} icon={Globe2} />
-        <StatCard label="Capacity forecast entries" value={capacityForecast} icon={TrendingUp} />
+        <StatCard label={t("hr.hrPanels.laborCostSnapshots")} value={laborCostSnapshots} icon={Coins} />
+        <StatCard label={t("hr.hrPanels.shiftOptimizationJobs")} value={shiftOptJobs} icon={CalendarRange} />
+        <StatCard label={t("hr.hrPanels.globalAssignments")} value={globalAssignments} icon={Globe2} />
+        <StatCard label={t("hr.hrPanels.capacityForecastEntries")} value={capacityForecast} icon={TrendingUp} />
       </StatCardGrid>
     </section>
   )

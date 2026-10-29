@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { CheckCircle2, Circle, Ban } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { rowBool, rowNumber, rowString } from "./row-field-utils"
@@ -20,6 +20,7 @@ function ComplianceStatusIcon({
   waived: boolean
   complete: boolean
 }) {
+  useTranslation()
   if (waived) {
     return <Ban className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
   }
@@ -62,8 +63,7 @@ export function ComplianceChecklist({
         </span>
         {incompleteCount > 0 && (
           <span className="text-[10px] text-destructive font-medium">
-            {incompleteCount} open
-          </span>
+            {i18n.t("proposalWorkspace.complianceChecklist.openCount", { count: incompleteCount })}</span>
         )}
       </div>
       <ul className="px-2 pb-2 space-y-0.5">
@@ -88,7 +88,7 @@ export function ComplianceChecklist({
                     {rowString(row.title)}
                   </span>
                   {required && !complete && !waived && (
-                    <span className="text-[10px] text-muted-foreground">Required</span>
+                    <span className="text-[10px] text-muted-foreground">{i18n.t("proposalWorkspace.aiPanel.required")}</span>
                   )}
                 </span>
               </button>

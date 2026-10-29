@@ -1,4 +1,6 @@
 'use client';
+import { i18n } from "@lumiere/i18n"
+
 
 import { useState, useCallback, useMemo } from 'react';
 import {
@@ -47,6 +49,7 @@ export interface UsePOSReturn {
   discountTotal: number;
   total: number;
   categories: string[];
+  fallbackCategories: string[];
   terminals: PosTerminal[];
   configs: PosConfig[];
   sessions: PosSession[];
@@ -95,7 +98,7 @@ function toColor(seed: string): string {
   return palette[acc];
 }
 
-function toPosProduct(row: Record<string, unknown>): POSProduct {
+export function toPosProduct(row: Record<string, unknown>): POSProduct {
   const id = String(row.id ?? row.productTmplId ?? '');
   const name = String(row.name ?? 'Product');
   const sku = String(row.defaultCode ?? row.sku ?? `SKU-${id}`);
@@ -108,6 +111,8 @@ function toPosProduct(row: Record<string, unknown>): POSProduct {
   return {
     id,
     name,
+    nameIsFallback: row.name == null,
+    categoryIsFallback: row.categoryName == null && row.category == null,
     sku,
     price: Number.isFinite(listPrice) ? listPrice : 0,
     taxRate: Number.isFinite(taxRate) ? taxRate : 0,
@@ -115,6 +120,13 @@ function toPosProduct(row: Record<string, unknown>): POSProduct {
     stock: Number.isFinite(stock) ? Math.max(0, stock) : 0,
     imageColor: toColor(id || name),
   };
+}
+
+/** A tenant category with the same literal name must keep its authored label. */
+export function posFallbackCategories(products: readonly POSProduct[]): string[] {
+  return [...new Set(products.map(product => product.category))].filter(category =>
+    products.every(product => product.category !== category || product.categoryIsFallback === true),
+  );
 }
 
 export function usePOS(
@@ -198,6 +210,8 @@ export function usePOS(
     [liveProducts],
   );
 
+  const fallbackCategories = useMemo(() => posFallbackCategories(liveProducts), [liveProducts]);
+
   const addToCart = useCallback((product: POSProduct) => {
     setCart((prev) => {
       const existing = prev.find((it) => it.product.id === product.id);
@@ -280,7 +294,7 @@ export function usePOS(
   const firstTerminal = terminals[0] as Record<string, unknown> | undefined;
   const requireNumericId = useCallback((value: unknown, label: string) => {
     const trimmed = String(value ?? '').trim();
-    if (!trimmed) throw new Error(`${label} is required`);
+    if (!trimmed) throw new Error(i18n.t("purchasing.purchasingConfiguration.isRequired", { value1: label }));
     return trimmed;
   }, []);
 
@@ -315,7 +329,7 @@ export function usePOS(
             ? data.terminalId
             : firstTerminal?.id;
         if (terminalId == null)
-          throw new Error('Create or select a POS terminal first');
+          throw new Error(i18n.t("pos.usePos.createOrSelectAPOSTerminalFirst"));
         await updatePosTerminal.mutateAsync({
           terminalId: String(terminalId),
           status: String(data.status ?? 'open'),
@@ -351,7 +365,7 @@ export function usePOS(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
         await activatePosConfig.mutateAsync(
-          requireNumericId(data.configId, 'Config ID'),
+          requireNumericId(data.configId, i18n.t("pos.usePos.configId")),
         );
       }),
     [activatePosConfig, requireNumericId, runLifecycle],
@@ -361,7 +375,7 @@ export function usePOS(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
         await deactivatePosConfig.mutateAsync(
-          requireNumericId(data.configId, 'Config ID'),
+          requireNumericId(data.configId, i18n.t("pos.usePos.configId")),
         );
       }),
     [deactivatePosConfig, requireNumericId, runLifecycle],
@@ -371,7 +385,7 @@ export function usePOS(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
         await openPosSession.mutateAsync({
-          configId: requireNumericId(data.configId, 'Config ID'),
+          configId: requireNumericId(data.configId, i18n.t("pos.usePos.configId")),
           openingBalance: Number(data.openingBalance) || 0,
         });
       }),
@@ -382,7 +396,7 @@ export function usePOS(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
         await closePosSession.mutateAsync({
-          sessionId: requireNumericId(data.sessionId, 'Session ID'),
+          sessionId: requireNumericId(data.sessionId, i18n.t("pos.usePos.sessionId")),
           closingBalance: Number(data.closingBalance) || 0,
         });
       }),
@@ -393,7 +407,7 @@ export function usePOS(
     (data: Record<string, unknown>) =>
       runLifecycle(async () => {
         await computePosSessionTotals.mutateAsync(
-          requireNumericId(data.sessionId, 'Session ID'),
+          requireNumericId(data.sessionId, i18n.t("pos.usePos.sessionId")),
         );
       }),
     [computePosSessionTotals, requireNumericId, runLifecycle],
@@ -481,6 +495,7 @@ export function usePOS(
     discountTotal,
     total,
     categories,
+    fallbackCategories,
     terminals,
     configs,
     sessions,

@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Helpdesk Module Form Configurations
 //!
 //! This module provides form configurations for Helpdesk/Support.
@@ -10,23 +12,23 @@ export const helpdeskForms: FormRegistryEntry[] = [
   {
     moduleId: "helpdesk",
     formId: "new-ticket",
-    name: "New Ticket",
-    description: "Create a new support ticket",
+    get name() { return i18n.t("helpdesk.forms.newTicket.title") },
+    get description() { return i18n.t("forms.defaults.helpdesk.createANewSupportTicket") },
     icon: "LifeBuoy",
-    category: "Tickets",
+    get category() { return i18n.t("forms.defaults.helpdesk.tickets") },
     defaultConfig: () => ({
       moduleId: "helpdesk",
       formId: "new-ticket",
-      name: "New Ticket",
-      description: "Create a new support ticket",
+      get name() { return i18n.t("helpdesk.forms.newTicket.title") },
+      get description() { return i18n.t("forms.defaults.helpdesk.createANewSupportTicket") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "subject",
           name: "subject",
-          label: "Subject",
+          get label() { return i18n.t("helpdesk.tickets.columns.name") },
           fieldType: "Text",
-          placeholder: "Brief description of the issue",
+          get placeholder() { return i18n.t("helpdesk.forms.newTicket.fields.namePlaceholder") },
           validation: { required: true, minLength: 5 },
           aiSuggestions: [],
           order: 1,
@@ -38,9 +40,9 @@ export const helpdeskForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("helpdesk.teams.columns.description") },
           fieldType: "Textarea",
-          placeholder: "Detailed description of your issue...",
+          get placeholder() { return i18n.t("forms.defaults.helpdesk.detailedDescriptionOfYourIssue") },
           validation: { required: true, minLength: 20 },
           aiSuggestions: [],
           order: 2,
@@ -52,14 +54,14 @@ export const helpdeskForms: FormRegistryEntry[] = [
         {
           fieldId: "category",
           name: "category",
-          label: "Category",
+          get label() { return i18n.t("forms.defaults.helpdesk.category") },
           fieldType: "Select",
           options: [
-            { value: "technical", label: "Technical Issue", color: "red" },
-            { value: "billing", label: "Billing", color: "green" },
-            { value: "account", label: "Account", color: "blue" },
-            { value: "feature", label: "Feature Request", color: "purple" },
-            { value: "other", label: "Other", color: "gray" },
+            { value: "technical", get label() { return i18n.t("forms.defaults.helpdesk.technicalIssue") }, color: "red" },
+            { value: "billing", get label() { return i18n.t("forms.defaults.helpdesk.billing") }, color: "green" },
+            { value: "account", get label() { return i18n.t("forms.defaults.helpdesk.account") }, color: "blue" },
+            { value: "feature", get label() { return i18n.t("forms.defaults.helpdesk.featureRequest") }, color: "purple" },
+            { value: "other", get label() { return i18n.t("common.entityView.otherColumn") }, color: "gray" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -72,13 +74,13 @@ export const helpdeskForms: FormRegistryEntry[] = [
         {
           fieldId: "priority",
           name: "priority",
-          label: "Priority",
+          get label() { return i18n.t("helpdesk.slas.columns.priority") },
           fieldType: "Select",
           options: [
-            { value: "low", label: "Low", color: "gray" },
-            { value: "medium", label: "Medium", color: "blue" },
-            { value: "high", label: "High", color: "orange" },
-            { value: "urgent", label: "Urgent", color: "red" },
+            { value: "low", get label() { return i18n.t("helpdesk.tickets.filters.priority.options.low") }, color: "gray" },
+            { value: "medium", get label() { return i18n.t("forms.defaults.helpdesk.medium") }, color: "blue" },
+            { value: "high", get label() { return i18n.t("helpdesk.tickets.filters.priority.options.high") }, color: "orange" },
+            { value: "urgent", get label() { return i18n.t("helpdesk.dashboard.urgent") }, color: "red" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -91,7 +93,7 @@ export const helpdeskForms: FormRegistryEntry[] = [
         {
           fieldId: "attachments",
           name: "attachments",
-          label: "Attachments",
+          get label() { return i18n.t("forms.defaults.helpdesk.attachments") },
           fieldType: "File",
           validation: { required: false },
           aiSuggestions: [],
@@ -104,7 +106,7 @@ export const helpdeskForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("forms.defaults.helpdesk.tags") },
           fieldType: "Tags",
           validation: { required: false },
           aiSuggestions: [],

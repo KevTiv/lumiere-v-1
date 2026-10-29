@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { i18n } from "@lumiere/i18n"
 
 import type { FormConfig } from "@lumiere/ui"
 
@@ -28,6 +29,29 @@ test("pickerOptions adds None only for optional, non-empty lists", () => {
   assert.deepEqual(pickerOptions(linked, true), linked)
   assert.deepEqual(pickerOptions(linked, false), [{ value: "", label: "None" }, ...linked])
   assert.deepEqual(pickerOptions([], false), [{ value: "", label: "No records", disabled: true }])
+})
+
+test("cached picker hints follow the active language without changing values", async () => {
+  const previous = i18n.language
+  const linked = [{ value: "1", label: "Tenant name (#1)" }]
+  const empty = pickerOptions([], false)
+  const optional = pickerOptions(linked, false)
+  const original = i18n.getResource("fr", "translation", "ui.linkedOptions.noRecords")
+  i18n.addResource("fr", "translation", "ui.linkedOptions.noRecords", "Aucun enregistrement")
+  try {
+    await i18n.changeLanguage("fr")
+    assert.equal(empty[0].label, "Aucun enregistrement")
+    assert.equal(optional[0].label, i18n.t("common.none"))
+    assert.equal(optional[0].value, "")
+    assert.deepEqual(optional[1], linked[0])
+  } finally {
+    if (original === undefined) {
+      delete i18n.getResourceBundle("fr", "translation").ui.linkedOptions.noRecords
+    } else {
+      i18n.addResource("fr", "translation", "ui.linkedOptions.noRecords", original)
+    }
+    await i18n.changeLanguage(previous)
+  }
 })
 
 test("withLinkedPickers converts only the named number fields", () => {

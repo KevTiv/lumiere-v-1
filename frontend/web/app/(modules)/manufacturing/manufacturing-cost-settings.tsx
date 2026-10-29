@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useState } from "react"
 import { Button, FormModal, EntityView, useRBAC, type FormConfig, type EntityViewConfig } from "@lumiere/ui"
@@ -9,6 +11,7 @@ import { useConfigureManufacturingValuation, useMrpValuationConfigs, useMrpWorkc
 import { toManufacturingValuationParams } from "@/lib/manufacturing-cost-params"
 
 export function ManufacturingCostSettings({ organizationId, companyId }: { organizationId: bigint; companyId: bigint }) {
+  const { t } = useTranslation()
   const { permissionsReady, checkPermission } = useRBAC()
   const canConfigure = permissionsReady !== false && checkPermission("account_journal", "write").allowed
   const ratesQuery = useMrpWorkcenterCostRates(organizationId)
@@ -32,49 +35,49 @@ export function ManufacturingCostSettings({ organizationId, companyId }: { organ
   const journalOptions = journals.filter(row => row.active !== false).map(row => ({ value: String(row.id), label: `${row.code ?? ""} ${row.name ?? row.id}`.trim() }))
   const accountOptions = accounts.filter(row => row.deprecated !== true).map(row => ({ value: String(row.id), label: `${row.code ?? ""} ${row.name ?? row.id}`.trim() }))
   const fields = [
-    { name: "journalId", label: "Valuation journal", options: journalOptions },
-    { name: "materialAccountId", label: "Material inventory account", options: accountOptions },
-    { name: "outputAccountId", label: "Output inventory account", options: accountOptions },
-    { name: "workcenterAccountId", label: "Workcenter absorption account", options: accountOptions },
-    { name: "varianceAccountId", label: "Manufacturing variance account", options: accountOptions },
+    { name: "journalId", label: t("manufacturing.manufacturingCostSettings.valuationJournal"), options: journalOptions },
+    { name: "materialAccountId", label: t("manufacturing.manufacturingCostSettings.materialInventoryAccount"), options: accountOptions },
+    { name: "outputAccountId", label: t("manufacturing.manufacturingCostSettings.outputInventoryAccount"), options: accountOptions },
+    { name: "workcenterAccountId", label: t("manufacturing.manufacturingCostSettings.workcenterAbsorptionAccount"), options: accountOptions },
+    { name: "varianceAccountId", label: t("manufacturing.manufacturingCostSettings.manufacturingVarianceAccount"), options: accountOptions },
   ] as const
   const form: FormConfig = {
     id: "manufacturing-valuation-config",
-    title: "Configure manufacturing valuation",
-    description: "Future manufacturing closes will post an entry using these company-currency accounts. Existing cost snapshots are immutable.",
-    submitLabel: "Save valuation configuration",
+    title: t("manufacturing.manufacturingCostSettings.configureManufacturingValuation"),
+    description: t("manufacturing.manufacturingCostSettings.futureManufacturingClosesWillPostAnEntryUsingTheseCompanyCurrency"),
+    submitLabel: t("manufacturing.manufacturingCostSettings.saveValuationConfiguration"),
     sections: [{ id: "valuation-accounts", fields: fields.map(field => ({
       type: "select" as const, id: field.name, name: field.name, label: field.label, required: true,
       options: [...field.options], defaultValue: config?.[field.name] != null ? String(config[field.name]) : "",
     })) }],
   }
   const rateTable: EntityViewConfig = {
-    id: "manufacturing-cost-rates", title: "Configured workcenter rates",
+    id: "manufacturing-cost-rates", title: t("manufacturing.manufacturingCostSettings.configuredWorkcenterRates"),
     view: { mode: "table", rowKey: "workcenterId", columns: [
-      { key: "workcenterId", label: "Workcenter" }, { key: "hourlyRate", label: "Hourly rate", type: "number" }, { key: "currencyId", label: "Currency" },
-    ], emptyMessage: "No workcenter rates configured. Use Configure hourly cost rate on a workcenter." },
+      { key: "workcenterId", label: t("manufacturing.manufacturingCostReadback.workcenter") }, { key: "hourlyRate", label: t("manufacturing.manufacturingCostReadback.hourlyRate"), type: "number" }, { key: "currencyId", label: t("accounting.overview.currency") },
+    ], emptyMessage: t("manufacturing.manufacturingCostSettings.noWorkcenterRatesConfiguredUseConfigureHourlyCostRateOnA") },
   }
   const referencesReady = journalsState.status === "ready" && accountsState.status === "ready" && journalOptions.length > 0 && accountOptions.length > 0
   return (
     <div className="space-y-6" data-testid="manufacturing-cost-settings">
       <section className="space-y-3">
-        <p className="text-sm text-muted-foreground">Rates are saved in company currency. Productivity records retain the rate used when time is logged; missing rates remain explicitly unconfigured.</p>
+        <p className="text-sm text-muted-foreground">{t("manufacturing.manufacturingCostSettings.ratesAreSavedInCompanyCurrencyProductivityRecordsRetainTheRate")}</p>
         <ModuleDataNotice state={ratesState} />
         {canUseModuleData(ratesState) && <EntityView config={rateTable} data={rates} isLoading={ratesState.status === "loading"} />}
       </section>
       <section className="space-y-3">
-        <h2 className="font-semibold">Manufacturing valuation</h2>
+        <h2 className="font-semibold">{t("manufacturing.manufacturingCostSettings.manufacturingValuation")}</h2>
         <ModuleDataNotice state={valuationState} />
         {valuationState.status === "ready" && <p data-testid="manufacturing-valuation-status">
-          {config ? `Configured for company ${config.companyId}, currency ${config.currencyId}, journal ${config.journalId}.` : "Not configured. Manufacturing closes record costs without a journal entry."}
+          {config ? t("manufacturing.manufacturingCostSettings.configuredForCompanyCurrencyJournal", { value1: config.companyId, value2: config.currencyId, value3: config.journalId }) : t("manufacturing.manufacturingCostSettings.notConfiguredManufacturingClosesRecordCostsWithoutAJournalEntry")}
         </p>}
         {config && <dl className="grid grid-cols-2 gap-2 text-sm">{fields.map(field => <div key={field.name}><dt>{field.label}</dt><dd>{String(config[field.name])}</dd></div>)}</dl>}
         {canConfigure && <>
           <ModuleDataNotice state={journalsState} /><ModuleDataNotice state={accountsState} />
-          <Button disabled={!referencesReady || companyId <= 0n || !canUseModuleData(valuationState)} data-testid="manufacturing-configure-valuation" onClick={() => { setSubmitError(null); setSaved(false); setOpen(true) }}>Configure valuation</Button>
-          {!referencesReady && journalsState.status === "ready" && accountsState.status === "ready" && <p className="text-sm">Create an active journal and valuation accounts before configuring manufacturing valuation.</p>}
+          <Button disabled={!referencesReady || companyId <= 0n || !canUseModuleData(valuationState)} data-testid="manufacturing-configure-valuation" onClick={() => { setSubmitError(null); setSaved(false); setOpen(true) }}>{t("manufacturing.manufacturingCostSettings.configureValuation")}</Button>
+          {!referencesReady && journalsState.status === "ready" && accountsState.status === "ready" && <p className="text-sm">{t("manufacturing.manufacturingCostSettings.createAnActiveJournalAndValuationAccountsBeforeConfiguringManufacturingValuation")}</p>}
         </>}
-        {saved && <p role="status" data-testid="manufacturing-valuation-saved">Valuation configuration saved and read back for this company.</p>}
+        {saved && <p role="status" data-testid="manufacturing-valuation-saved">{t("manufacturing.manufacturingCostSettings.valuationConfigurationSavedAndReadBackForThisCompany")}</p>}
       </section>
       <FormModal config={form} open={open} onOpenChange={setOpen} closeOnSubmit={false} submitError={submitError} isPending={mutation.isPending} onSubmit={async values => {
         setSubmitError(null)

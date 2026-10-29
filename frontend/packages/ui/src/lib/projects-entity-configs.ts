@@ -153,44 +153,44 @@ export const timesheetsTableConfig = (t: TFunction): EntityViewConfig => ({
 // ── Rate cards ────────────────────────────────────────────────────────────────
 export const rateCardsTableConfig = (_t: TFunction): EntityViewConfig => ({
   id: "rate-cards-table",
-  title: "Rate cards",
-  description: "Project / employee / task cost and sell rates",
+  title: _t("projects.builtIn.projectsEntityConfigs.rateCardsTableConfig.rateCardsTable.title", { defaultValue: "Rate cards" }),
+  description: _t("projects.builtIn.projectsEntityConfigs.rateCardsTableConfig.rateCardsTable.description", { defaultValue: "Project / employee / task cost and sell rates" }),
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search rate cards…",
+    searchPlaceholder: _t("projects.builtIn.projectsEntityConfigs.rateCardsTableConfig.view.searchPlaceholder", { defaultValue: "Search rate cards…" }),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: "Name", width: "min-w-48" },
-      { key: "projectId", label: "Project", width: "min-w-32" },
-      { key: "currencyId", label: "Currency", width: "min-w-24" },
-      { key: "active", label: "Active", type: "badge" },
+      { key: "name", label: _t("projects.builtIn.projectsEntityConfigs.rateCardsTableConfig.name.label", { defaultValue: "Name" }), width: "min-w-48" },
+      { key: "projectId", label: _t("projects.projects.columns.name", { defaultValue: "Project" }), width: "min-w-32" },
+      { key: "currencyId", label: _t("projects.forms.logTimesheet.fields.currencyId", { defaultValue: "Currency" }), width: "min-w-24" },
+      { key: "active", label: _t("common.active", { defaultValue: "Active" }), type: "badge" },
     ],
-    emptyMessage: "No rate cards yet",
+    emptyMessage: _t("projects.builtIn.projectsEntityConfigs.rateCardsTableConfig.view.emptyMessage", { defaultValue: "No rate cards yet" }),
   },
 })
 
 export const rateCardLinesTableConfig = (_t: TFunction): EntityViewConfig => ({
   id: "rate-card-lines-table",
-  title: "Rate card lines",
-  description: "Scoped rate lines",
+  title: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.rateCardLinesTable.title", { defaultValue: "Rate card lines" }),
+  description: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.rateCardLinesTable.description", { defaultValue: "Scoped rate lines" }),
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search lines…",
+    searchPlaceholder: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.view.searchPlaceholder", { defaultValue: "Search lines…" }),
     searchKeys: ["scope"],
     columns: [
-      { key: "rateCardId", label: "Card", width: "min-w-24" },
-      { key: "scope", label: "Scope", width: "min-w-24" },
-      { key: "employeeId", label: "Employee", width: "min-w-24" },
-      { key: "taskId", label: "Task", width: "min-w-24" },
-      { key: "costRate", label: "Cost", type: "number", align: "right" },
-      { key: "sellRate", label: "Sell", type: "number", align: "right" },
-      { key: "active", label: "Active", type: "badge" },
+      { key: "rateCardId", label: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.rateCardId.label", { defaultValue: "Card" }), width: "min-w-24" },
+      { key: "scope", label: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.scope.label", { defaultValue: "Scope" }), width: "min-w-24" },
+      { key: "employeeId", label: _t("projects.resourceAllocation.columns.employee", { defaultValue: "Employee" }), width: "min-w-24" },
+      { key: "taskId", label: _t("projects.tasks.columns.name", { defaultValue: "Task" }), width: "min-w-24" },
+      { key: "costRate", label: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.costRate.label", { defaultValue: "Cost" }), type: "number", align: "right" },
+      { key: "sellRate", label: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.sellRate.label", { defaultValue: "Sell" }), type: "number", align: "right" },
+      { key: "active", label: _t("common.active", { defaultValue: "Active" }), type: "badge" },
     ],
-    emptyMessage: "No rate card lines yet",
+    emptyMessage: _t("projects.builtIn.projectsEntityConfigs.rateCardLinesTableConfig.view.emptyMessage", { defaultValue: "No rate card lines yet" }),
   },
 })
 

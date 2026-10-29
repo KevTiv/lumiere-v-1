@@ -1121,11 +1121,11 @@ export const newBarcodeRuleForm = (t: TFunction): FormConfig => ({
           defaultValue: "any",
           options: [
             { value: "any", label: t("inventory.forms.newBarcodeRule.fields.encodings.any") },
-            { value: "ean13", label: "EAN-13" },
-            { value: "ean8", label: "EAN-8" },
-            { value: "upca", label: "UPC-A" },
-            { value: "code39", label: "Code 39" },
-            { value: "code128", label: "Code 128" },
+            { value: "ean13", label: t("inventory.builtIn.inventoryFormConfigs.newBarcodeRuleForm.ean13.label", { defaultValue: "EAN-13" }) },
+            { value: "ean8", label: t("inventory.builtIn.inventoryFormConfigs.newBarcodeRuleForm.ean8.label", { defaultValue: "EAN-8" }) },
+            { value: "upca", label: t("inventory.builtIn.inventoryFormConfigs.newBarcodeRuleForm.upca.label", { defaultValue: "UPC-A" }) },
+            { value: "code39", label: t("inventory.builtIn.inventoryFormConfigs.newBarcodeRuleForm.code39.label", { defaultValue: "Code 39" }) },
+            { value: "code128", label: t("inventory.builtIn.inventoryFormConfigs.newBarcodeRuleForm.code128.label", { defaultValue: "Code 128" }) },
           ],
         },
         {

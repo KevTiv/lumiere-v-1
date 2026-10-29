@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { isWorkspaceFormModuleVisible } from "../lib/workspace-profile"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
 import { useErpSession } from "@lumiere/erp-session"
 import {
@@ -126,6 +126,7 @@ type ViewMode = "grid" | "list"
 
 export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettingsProps) {
   const { t } = useTranslation()
+  const language = i18n.resolvedLanguage
   const [isViewingSettings, setIsViewingSettings] = useState<boolean>(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedModule, setSelectedModule] = useState<string | null>(null)
@@ -134,13 +135,13 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
   const workspaceProfile = useWorkspaceProfile()
   const modules = useMemo(
     () => formRegistry.getModules().filter((module) => isWorkspaceFormModuleVisible(workspaceProfile, module.id)),
-    [workspaceProfile],
+    [workspaceProfile, language],
   )
 
   const moduleForms = useMemo(() => {
     if (!selectedModule) return []
     return formRegistry.getByModule(selectedModule)
-  }, [selectedModule])
+  }, [selectedModule, language])
 
   const filteredModules = useMemo(() => {
     if (!searchQuery) return modules

@@ -165,14 +165,14 @@ export const bomLinesTableConfig = (t: TFunction): EntityViewConfig => ({
 // ── Work Orders ───────────────────────────────────────────────────────────────
 export const bomByproductsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "bom-byproducts-table",
-  title: "BOM Byproducts",
+  title: t("manufacturing.builtIn.manufacturingEntityConfigs.bomByproductsTableConfig.bomByproductsTable.title", { defaultValue: "BOM Byproducts" }),
   view: {
     mode: "table",
     rowKey: "id",
     searchable: true,
     searchKeys: ["bomId", "productId"],
     columns: [
-      { key: "id", label: "ID" },
+      { key: "id", label: t("manufacturing.rowActions.idLabel", { defaultValue: "ID" }) },
       { key: "bomId", label: t("manufacturing.bomLines.columns.bomId") },
       { key: "productId", label: t("manufacturing.bomLines.columns.productId") },
       { key: "productQty", label: t("manufacturing.bomLines.columns.productQty"), type: "number", align: "right" },

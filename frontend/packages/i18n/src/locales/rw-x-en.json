@@ -44,6 +44,46 @@
       "historyNotice": "File yoherejwe. Amateka ya vuba y’umuryango ashobora kubamo ibyinjijwe n’abandi bakoresha. Hitamo igikorwa kugira ngo urebe ibisubizo byacyo; ibikorwa ntibihuzwa n’iyi file byikora.",
       "manualResultNotice": "Uku kwinjiza gusaba guhitamo amateka ubwawe. Ibisubizo byako ntibirashobora guhuzwa n’iyi file byikora.",
       "recoveryNotice": "Seriveri ishobora kuba yaramaze kwinjiza iyi file. Kongera kugerageza bigumana ikimenyetso kimwe cy’ubusabe kandi ntibishobora gukora irindi yinjiza. Ntutangire ubusabe bushya utaramenya iki gisubizo."
+    },
+    "builtIn": {
+      "formConfigs": {
+        "newCustomerForm": {
+          "email": {
+            "label": "Email"
+          }
+        },
+        "newOrderForm": {
+          "customerEmail": {
+            "label": "Aderesi ya email"
+          },
+          "newOrder": {
+            "description": "Andika amakuru ya order nshya y’umukiriya",
+            "submitLabel": "Kora order",
+            "title": "Kora order nshya"
+          },
+          "notes": {
+            "label": "Ibisobanuro bya order"
+          },
+          "orderDetails": {
+            "title": "Amakuru ya order"
+          }
+        },
+        "reportForm": {
+          "csv": {
+            "label": "File ya CSV"
+          },
+          "generateReport": {
+            "description": "Tegura kandi ukore report yihariye",
+            "title": "Kora report"
+          },
+          "inventory": {
+            "label": "Report y’ububiko"
+          },
+          "reportType": {
+            "label": "Ubwoko bwa report"
+          }
+        }
+      }
     }
   },
   "nav": {

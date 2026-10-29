@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { phCapture } from "@/lib/posthog-browser"
 import { useProposalsModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -22,6 +24,7 @@ function isMockAnalysis(result: AIAnalysis): boolean {
 }
 
 export function WorkspaceClient({ proposalId, proposalTitle, organizationId }: WorkspaceClientProps) {
+  const { t } = useTranslation()
   useProposalsModuleSubscription()
   const orgId = BigInt(organizationId)
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
@@ -37,7 +40,7 @@ export function WorkspaceClient({ proposalId, proposalTitle, organizationId }: W
 
     if (!response.ok) {
       const err = await response.text()
-      throw new Error(err || "Analysis request failed")
+      throw new Error(err || t("proposals.workspaceClient.analysisRequestFailed"))
     }
 
     const result = (await response.json()) as AIAnalysis
