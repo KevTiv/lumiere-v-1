@@ -1,4 +1,4 @@
-import { MissingOrganization } from "@lumiere/ui"
+import { MissingOrganization } from "@lumiere/ui/components/missing-organization"
 import { getStdbSession } from '@/lib/api-session'
 import { PreviewComposer } from './preview-composer'
 
