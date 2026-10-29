@@ -12,6 +12,19 @@ test('row-action helper selects a report without opening its record', async ({ p
   await expect(page.getByTestId('entity-select-row-report-1')).toBeChecked();
 });
 
+test('confirmed discard opens a fresh form when the same dialog is reopened', async ({ page }) => {
+  await page.goto('/helper-regressions');
+  await expect(page.getByTestId('helper-fixture')).toHaveAttribute('data-hydrated', 'true');
+  const openMessage = page.getByRole('button', { name: 'Message', exact: true });
+  await openMessage.click();
+  await page.getByTestId('form-field-body').fill('Discarded message');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByTestId('discard-changes-confirm').click();
+  await openMessage.click();
+  await expect(page.getByTestId('form-field-body')).toHaveValue('');
+  await expect(page.getByTestId('saved-fixture')).toHaveText('');
+});
+
 test('Dashboard navigation is explicit when Sales defaults to Orders and preserves company scope', async ({ page }) => {
   await page.goto('/sales?module=sales&defaultTab=orders&company=7&filter=id:12&highlight=12');
   await expect(page.getByTestId('navigation-disclosure')).toHaveAttribute('data-hydrated', 'true');

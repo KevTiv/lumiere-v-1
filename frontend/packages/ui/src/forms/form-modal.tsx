@@ -101,6 +101,7 @@ export function FormModal({
 }: FormModalProps) {
   const { t } = useTranslation()
   const [dirty, setDirty] = React.useState(false)
+  const [formRevision, setFormRevision] = React.useState(0)
   const [confirmingDiscard, setConfirmingDiscard] = React.useState(false)
   const submittingRef = React.useRef(false)
   const draftStorageKey = useFormDraftStorageKey(config.id, draftKey)
@@ -223,6 +224,7 @@ export function FormModal({
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ModularForm
+            key={formRevision}
             config={{ ...config, title: "", description: "", layout: "default" }}
             scrollable
             onSubmit={handleSubmit}
@@ -260,6 +262,9 @@ export function FormModal({
                   setDirty(false)
                   // An explicit discard must not come back as a restored draft.
                   if (draft !== false) clearFormDraft(draftStorageKey)
+                  // Closing animations can keep the form mounted. Drop its values
+                  // and pending draft timer before the dialog can reopen.
+                  setFormRevision((revision) => revision + 1)
                   onOpenChange(false)
                 }}
               >
