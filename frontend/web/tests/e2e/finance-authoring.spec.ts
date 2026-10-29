@@ -1,6 +1,13 @@
 import { expect, test, type Page } from "@playwright/test"
 import { chooseSelectOptionByTriggerValue, fetchDefaultCompanyId, gotoModule, selectModuleTab } from "./helpers"
 
+type ReportAuthoringTab = "analytics-metrics" | "report-templates" | "scheduled-reports" | "dashboards" | "dashboard-widgets"
+
+async function openReportDraft(page: Page, tab: ReportAuthoringTab) {
+  await gotoModule(page, `/reports?tab=${tab}`, "reports")
+  await page.getByTestId(`module-create-reports-${tab}`).click()
+}
+
 async function cancelDraft(page: Page) {
   await page.getByRole("button", { name: "Cancel", exact: true }).click()
   const discard = page.getByTestId("discard-changes-dialog")
@@ -26,13 +33,12 @@ async function openDraftDocument(page: Page, kind: "invoice" | "bill") {
 }
 
 test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
-  test("edits a metric through both entry points without creating a record", async ({ page }) => {
+  test("edits a metric and reopens a fresh draft without creating a record", async ({ page }) => {
     const writes: string[] = []
     page.on("request", (request) => {
       if (request.method() === "POST" && request.url().includes("/api/operations/")) writes.push(request.url())
     })
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-new_metric").click()
+    await openReportDraft(page, "analytics-metrics")
     const preview = page.getByTestId("metric-authoring-preview")
     await expect(preview).toBeVisible()
     await page.getByTestId("form-field-name").fill("Outstanding balance")
@@ -43,7 +49,6 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
     await expect(preview.getByLabel("No calculated value", { exact: true })).toHaveText("—")
     await cancelDraft(page)
 
-    await selectModuleTab(page, "reports", "analytics-metrics")
     await page.getByTestId("module-create-reports-analytics-metrics").click()
     await expect(preview).toBeVisible()
     await expect(page.getByTestId("form-field-name")).toHaveValue("")
@@ -52,7 +57,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
 
   test("shows the report structure as the title is edited", async ({ page }) => {
     await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-generate_report").click()
+    await page.getByTestId("report-start").getByRole("button", { name: "Run Trial balance", exact: true }).click()
     await page.getByTestId("form-field-name").fill("October review")
     const preview = page.getByTestId("report-authoring-preview-report")
     await expect(preview).toContainText("October review")
@@ -61,16 +66,14 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
   })
 
   test("previews printable area and detects margins with no remaining space", async ({ page }) => {
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-new_template").click()
+    await openReportDraft(page, "report-templates")
     await expect(page.getByTestId("template-page-preview")).toBeVisible()
     await page.getByTestId("form-field-marginTop").fill("300")
     await expect(page.getByTestId("report-authoring-preview-template")).toContainText("The margins leave no printable area")
   })
 
   test("previews report delivery recipients without sending a report", async ({ page }) => {
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-schedule_report").click()
+    await openReportDraft(page, "scheduled-reports")
     await page.getByTestId("form-field-recipients").fill("finance@example.test, owner@example.test")
     const preview = page.getByTestId("report-authoring-preview-schedule")
     await expect(preview).toContainText("finance@example.test")
@@ -92,8 +95,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
 
   test("previews a new empty dashboard without saving placeholder widgets", async ({ page }) => {
     const writes = observeOperationWrites(page)
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-new_dashboard").click()
+    await openReportDraft(page, "dashboards")
     const modal = page.getByTestId("form-modal-new-dashboard")
     await expect(modal).toBeVisible()
     await modal.getByTestId("form-field-name").fill("Monthly finance board")
@@ -112,8 +114,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
   test("previews supported widget sources and chart choices without saving", async ({ page }) => {
     const writes = observeOperationWrites(page)
     const companyId = await fetchDefaultCompanyId(page)
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-new_widget").click()
+    await openReportDraft(page, "dashboard-widgets")
     const modal = page.getByTestId("form-modal-new-dashboard-widget")
     await expect(modal).toBeVisible()
     await modal.getByTestId("form-field-name").fill("Payments by status")
@@ -180,8 +181,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
 
   test("uses a business report source and preserves custom input while switching template sources", async ({ page }) => {
     const writes = observeOperationWrites(page)
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-new_template").click()
+    await openReportDraft(page, "report-templates")
     const modal = page.getByTestId("form-modal-new-report-template")
     const source = modal.getByTestId("form-field-reportSource")
     const custom = modal.getByTestId("form-field-model")
@@ -210,8 +210,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
 
   test("keeps custom schedule sources available and only offers supported repeat frequencies", async ({ page }) => {
     const writes = observeOperationWrites(page)
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-schedule_report").click()
+    await openReportDraft(page, "scheduled-reports")
     const modal = page.getByTestId("form-modal-new-scheduled-report")
     const source = modal.getByTestId("form-field-reportSource")
     const custom = modal.getByTestId("form-field-model")
@@ -232,8 +231,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
     test(`keeps template actions visible before and after body scrolling at ${viewport.label}`, async ({ page }) => {
       const writes = observeOperationWrites(page)
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
-      await gotoModule(page, "/reports?tab=dashboard", "reports")
-      await page.getByTestId("quick-action-new_template").click()
+      await openReportDraft(page, "report-templates")
       const modal = page.getByTestId("form-modal-new-report-template")
       const create = modal.getByRole("button", { name: "Create template", exact: true })
       const cancel = modal.getByRole("button", { name: "Cancel", exact: true })
@@ -313,8 +311,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
 
   test("keeps metric controls and preview within a narrow viewport", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await gotoModule(page, "/reports?tab=dashboard", "reports")
-    await page.getByTestId("quick-action-new_metric").click()
+    await openReportDraft(page, "analytics-metrics")
     const modal = page.getByTestId("form-modal-new-analytics-metric")
     await expect(modal).toBeVisible()
     await page.getByTestId("metric-authoring-preview").scrollIntoViewIfNeeded()

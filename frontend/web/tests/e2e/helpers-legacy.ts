@@ -209,9 +209,8 @@ export function activeTabEntityTable(page: Page) {
 }
 
 /**
- * Row actions only render once a row is selected. Select the first row of the
- * active table when there is one and expect the actions; with an empty table
- * expect none to be offered.
+ * Row actions only render once a row is selected. Prefer its checkbox because
+ * a row click can open a record without selecting it. Empty tables offer none.
  */
 export async function expectRowActionsOffered(page: Page, actionIds: readonly string[]) {
   const table = activeTabEntityTable(page)
@@ -227,7 +226,13 @@ export async function expectRowActionsOffered(page: Page, actionIds: readonly st
     }
   }
   if (!hasRow) return
-  await firstRow.click()
+  const checkbox = firstRow.getByTestId(/^entity-select-row-/)
+  if (await checkbox.count()) {
+    if (await checkbox.getAttribute("aria-checked") !== "true") await checkbox.click()
+    await expect(checkbox).toBeChecked()
+  } else {
+    await firstRow.click()
+  }
   for (const actionId of actionIds) {
     await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
   }
