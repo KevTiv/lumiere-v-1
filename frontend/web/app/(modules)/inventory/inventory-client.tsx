@@ -1,4 +1,15 @@
 'use client';
+import { useStockMoveTabActions } from './stock-move-tab-actions';
+import { useInventoryCountTabActions } from './inventory-count-tab-actions';
+import { useProductionLotTabActions } from './production-lot-tab-actions';
+import { useProductionSerialTabActions } from './production-serial-tab-actions';
+import { useQualityCheckTabActions } from './quality-check-tab-actions';
+import { useReplenishmentTabActions } from './replenishment-tab-actions';
+import { usePickingWaveTabActions } from './picking-wave-tab-actions';
+import { useStockPackageTabActions } from './stock-package-tab-actions';
+import { useStockRoutingTabActions } from './stock-routing-tab-actions';
+import { useBarcodeTabActions } from './barcode-tab-actions';
+import { useWarehouseTaskTabActions } from './warehouse-task-tab-actions';
 import {
   mapDashboardWidgets,
   withDashboardSections,
@@ -25,9 +36,6 @@ import {
   assignUserToPickingForm,
   buildPartialDeliveryForm,
   pickingRowActions,
-  newQualityCheckForm,
-  newQualityPointForm,
-  newQualityTeamForm,
   newQualityAlertForm,
   assignQualityAlertForm,
   solveQualityAlertForm,
@@ -36,8 +44,6 @@ import {
   lotDetailForm,
   newTraceabilityRecordForm,
   newTraceabilityReportForm,
-  newReplenishmentRuleForm,
-  newPickingWaveForm,
   newProductCategoryForm,
   newStockQuantForm,
   newWarehouse3dZoneForm,
@@ -83,29 +89,22 @@ import {
   ProductVendorPricesTab,
 } from './product-record-read-tabs';
 import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
-import { canReleaseWave } from './picking-wave-actions';
-import { canConfirmPackage, canDonePackage } from './stock-package-actions';
+
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
-import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
-import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
-import { useReplenishmentScheduleWorkflow } from '@lumiere/query-hooks/hooks/replenishment-schedule-workflow';
-import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
-import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
+
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
 import {
   planPartialDelivery,
-  replenishmentScheduleState,
-  variantTag,
 } from '@lumiere/erp-workflows';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import type { KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
 import { transferKpis } from './transfer-kpis';
 import { groupBy } from '@/lib/utils';
 import { transferRecordHref } from './transfer-record';
-import { InventoryOpsPanel } from './inventory-ops-panel';
+
 import {
   useProducts,
   useProductCategories,
@@ -121,15 +120,11 @@ import {
   useStockCycleCounts,
   usePickingWaves,
   useStockPackages,
-  useConfirmStockPackage,
-  useDoneStockPackage,
   useWarehouseTasks,
   useStockRoutes,
   useStockRules,
   useStockMoves,
   useStockProductionSerials,
-  useDoneStockMove,
-  useCancelStockMove,
   useInventoryValuations,
   useReplenishmentRules,
   useBarcodeRules,
@@ -146,90 +141,46 @@ import {
   useCreateProductVariant,
   useCreateStockPicking,
   useCreateInventoryAdjustment,
-  useCreateStockInventory,
-  useCreateStockInventoryLine,
-  useUpdateStockInventoryState,
   useCreateStockLocation,
   useUpdateStockLocation,
   useCreateWarehouse,
   useUpdateWarehouse,
   useDeleteWarehouse,
   useDeleteStockLocation,
-  useCreateStockMove,
-  useConfirmStockMove,
-  useAssignStockMove,
   useAssignUserToPicking,
-  useProcessInventoryAdjustment,
   useReserveStockQuant,
   useUnreserveStockQuant,
   useWarehouse3D,
   useOrgUsers,
-  // Quality management
   useCreateQualityCheck,
-  usePassQualityCheck,
   useCreateQualityAlert,
   useAssignQualityAlert,
   useCancelQualityAlert,
   useCreateQualityPoint,
-  useUpdateQualityPoint,
   useDeleteQualityPoint,
   useCreateQualityTeam,
-  useUpdateQualityTeam,
   useDeleteQualityTeam,
-  // Barcode management
   useCreateBarcodeRule,
   useUpdateBarcodeRule,
-  useDeleteBarcodeRule,
   useRecordBarcodeScan,
-  useCreateBarcodeNomenclature,
-  useUpdateBarcodeNomenclature,
-  useDeleteBarcodeNomenclature,
-  useAddRuleToNomenclature,
-  useRemoveRuleFromNomenclature,
   useCreateAdjustmentReason,
-  useCreateStockProductionLot,
-  useCreateStockProductionSerial,
   useCreateTraceabilityRecord,
   useCreateTraceabilityReport,
   useRunTraceabilityReport,
-  // Replenishment
   useCreateReplenishmentRule,
-  useScheduleReplenishmentRun,
-  useCancelReplenishmentRun,
-  // Picking waves
   useCreatePickingWave,
-  useConfirmPickingWave,
-  useCompletePickingWave,
-  // Product category
   useCreateProductCategory,
   useUpdateProductCategory,
   useDeleteProductCategory,
-  // Stock routes and rules
   useCreateStockRoute,
   useUpdateStockRoute,
-  useDeleteStockRoute,
   useCreateStockRule,
   useUpdateStockRule,
-  useDeleteStockRule,
-  // Warehouse tasks
   useCreateWarehouseTask,
-  useStartWarehouseTask,
-  useCompleteWarehouseTask,
-  useCancelWarehouseTask,
-  useStartQualityCheck,
   useOpenQualityAlert,
   useSolveQualityAlert,
-  useCreateQualityAlertReason,
-  useUpdateQualityAlertReason,
-  useDeleteQualityAlertReason,
-  useAddMemberToQualityTeam,
-  useRemoveMemberFromQualityTeam,
   useCreateStockQuant,
   useUpdateStockQuantQuantity,
-  useUpdateStockProductionLot,
-  useDeleteStockProductionLot,
-  useUpdateStockProductionSerial,
-  useDeleteStockProductionSerial,
   useUpdateProductVariant,
   useUpdateProductInventoryData,
   useUpdateProductPricing,
@@ -239,8 +190,6 @@ import {
   useCreateWarehouse3dZone,
   useUpdateWarehouse3dZone,
   useDeleteWarehouse3dZone,
-  useUpdateWarehouseTaskStatus,
-  useLinkDeviceToQualityCheck,
   useCreateProductSupplierInfo,
   useUpdateProductSupplierInfo,
   useCreateProductPackaging,
@@ -258,7 +207,6 @@ import {
   useImportStockLocationCsv,
   useImportStockQuantCsv,
   useImportLotCsv,
-  useUpdateWhatsappQualityScore,
   useStockInventories,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useIotDevices } from '@lumiere/query-hooks/hooks/iot';
@@ -269,7 +217,7 @@ import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { inventoryProductPrimaryLabel } from '@lumiere/stdb/read-models';
 
-type ScalarId = bigint | number | string;
+import type { ScalarId } from './inventory-tab-actions';
 
 /** Swaps number fields that ask for a record id for searchable pickers (via `withLinkedPickers`). */
 function recordPickerFields(
@@ -283,10 +231,7 @@ function recordPickerFields(
   return picked.sections[0].fields;
 }
 
-/** Lower-cased state/status of a row (handles `{tag}` enum values), for action gating. */
-function rowState(row: Record<string, unknown>, key = 'state'): string {
-  return variantTag(row[key]).toLowerCase();
-}
+import { rowState } from './inventory-tab-actions';
 
 type InventoryCsvImportKind =
   | 'uomCategory'
@@ -334,10 +279,6 @@ import {
   UserCircle2,
   UserPlus,
   XCircle,
-  ShieldCheck,
-  AlertTriangle,
-  ScanLine,
-  RefreshCw,
   PackageOpen,
   FolderTree,
   Route,
@@ -354,7 +295,6 @@ import {
   toCreateProductCategoryParamsFromForm,
   toCreateProductParamsFromForm,
   toCreateStockLocationParamsFromForm,
-  toCreateStockMoveParams,
   toCreateStockPickingParamsFromForm,
   toCreateStockQuantParamsFromForm,
   toCreateStockTraceabilityReportParamsFromForm,
@@ -362,7 +302,7 @@ import {
   warehouse3dZoneParamsFromForm,
 } from '@/lib/inventory-ext-params';
 import { withDefaultsFromRow } from '@/lib/prefill-form-config';
-import { stbTimestampFromDate } from '@/lib/stb-timestamp';
+
 import {
   CycleCountWizard,
   LocationHierarchyPanel,
@@ -881,18 +821,7 @@ function InventoryClientLoaded({
     companyId: operatingCompanyId ?? undefined,
   });
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId);
-  const createStockInventory = useCreateStockInventory(
-    orgId,
-    operatingCompanyId,
-  );
-  const createStockInventoryLine = useCreateStockInventoryLine(
-    orgId,
-    operatingCompanyId,
-  );
-  const updateStockInventoryState = useUpdateStockInventoryState(
-    orgId,
-    operatingCompanyId,
-  );
+
   const createStockLocation = useCreateStockLocation(orgId);
   const updateStockLocation = useUpdateStockLocation(orgId);
   const createWarehouse = useCreateWarehouse(orgId, selectedOperatingCompanyId);
@@ -902,11 +831,7 @@ function InventoryClientLoaded({
   const deleteProduct = useDeleteProduct(orgId);
   const createProductVariant = useCreateProductVariant(orgId);
   const deleteStockLocation = useDeleteStockLocation(orgId);
-  const createStockMove = useCreateStockMove(orgId, operatingCompanyId);
-  const confirmStockMove = useConfirmStockMove(orgId, operatingCompanyId);
-  const assignStockMove = useAssignStockMove(orgId, operatingCompanyId);
-  const doneStockMove = useDoneStockMove(orgId, operatingCompanyId);
-  const cancelStockMove = useCancelStockMove(orgId, operatingCompanyId);
+
   const assignUserToPicking = useAssignUserToPicking(orgId, operatingCompanyId);
   const workflowSurface = useWorkflowSurface({ organizationId });
   const stockQuantWorkflow = useStockQuantWorkflow(
@@ -936,7 +861,7 @@ function InventoryClientLoaded({
       record: workflowSurface.record,
     },
   );
-  const processAdjustment = useProcessInventoryAdjustment(orgId);
+
   const reserveQuant = useReserveStockQuant(orgId, operatingCompanyId);
   const unreserveQuant = useUnreserveStockQuant(orgId, operatingCompanyId);
 
@@ -1015,10 +940,10 @@ function InventoryClientLoaded({
   const qualityTeamOptions = useMemo(
     () =>
       qualityTeams.map((team) => ({
-        value: String((team as Record<string, unknown>).id ?? ''),
+        value: String(team.id ?? ''),
         label: String(
-          (team as Record<string, unknown>).name ??
-            (team as Record<string, unknown>).id ??
+          team.name ??
+            team.id ??
             '',
         ),
       })),
@@ -1118,62 +1043,30 @@ function InventoryClientLoaded({
 
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId);
-  const passQualityCheck = usePassQualityCheck(orgId, operatingCompanyId);
-  const failQualityCheck = useQualityCheckFailWorkflow(
-    orgId,
-    operatingCompanyId ?? 0n,
-    workflowSurface,
-  );
+
   const createQualityAlert = useCreateQualityAlert(orgId, operatingCompanyId);
   const assignQualityAlert = useAssignQualityAlert(orgId, operatingCompanyId);
   const cancelQualityAlert = useCancelQualityAlert(orgId, operatingCompanyId);
   const createQualityPoint = useCreateQualityPoint(orgId, operatingCompanyId);
-  const updateQualityPoint = useUpdateQualityPoint(orgId, operatingCompanyId);
+
   const deleteQualityPoint = useDeleteQualityPoint(orgId, operatingCompanyId);
   const createQualityTeam = useCreateQualityTeam(orgId, operatingCompanyId);
-  const updateQualityTeam = useUpdateQualityTeam(orgId, operatingCompanyId);
+
   const deleteQualityTeam = useDeleteQualityTeam(orgId, operatingCompanyId);
 
   // Barcode hooks
   const createBarcodeRule = useCreateBarcodeRule(orgId, operatingCompanyId);
   const updateBarcodeRule = useUpdateBarcodeRule(orgId, operatingCompanyId);
-  const deleteBarcodeRule = useDeleteBarcodeRule(orgId, operatingCompanyId);
+
   const recordBarcodeScan = useRecordBarcodeScan(orgId, operatingCompanyId);
-  const createBarcodeNomenclature = useCreateBarcodeNomenclature(
-    orgId,
-    operatingCompanyId,
-  );
-  const updateBarcodeNomenclature = useUpdateBarcodeNomenclature(
-    orgId,
-    operatingCompanyId,
-  );
-  const deleteBarcodeNomenclature = useDeleteBarcodeNomenclature(
-    orgId,
-    operatingCompanyId,
-  );
-  const addRuleToNomenclature = useAddRuleToNomenclature(
-    orgId,
-    operatingCompanyId,
-  );
-  const removeRuleFromNomenclature = useRemoveRuleFromNomenclature(
-    orgId,
-    operatingCompanyId,
-  );
+
   const createAdjustmentReason = useCreateAdjustmentReason(
     orgId,
     operatingCompanyId,
   );
-  const useSerial = useSerialUseWorkflow(orgId, workflowSurface);
+
   const blockSerial = useSerialBlockWorkflow(orgId, workflowSurface);
-  const reserveSerial = useSerialReserveWorkflow(orgId, workflowSurface);
-  const createStockProductionLot = useCreateStockProductionLot(
-    orgId,
-    operatingCompanyId,
-  );
-  const createStockProductionSerial = useCreateStockProductionSerial(
-    orgId,
-    operatingCompanyId,
-  );
+
   const createTraceabilityRecord = useCreateTraceabilityRecord(
     orgId,
     operatingCompanyId,
@@ -1195,10 +1088,6 @@ function InventoryClientLoaded({
 
   // Picking wave hooks
   const createPickingWave = useCreatePickingWave(orgId, operatingCompanyId);
-  const confirmPickingWave = useConfirmPickingWave(orgId, operatingCompanyId);
-  const completePickingWave = useCompletePickingWave(orgId, operatingCompanyId);
-  const confirmStockPackage = useConfirmStockPackage(orgId, operatingCompanyId);
-  const doneStockPackage = useDoneStockPackage(orgId, operatingCompanyId);
 
   // Product category hooks
   const createProductCategory = useCreateProductCategory(
@@ -1217,30 +1106,13 @@ function InventoryClientLoaded({
   // Stock routes and rules hooks
   const createStockRoute = useCreateStockRoute(orgId, operatingCompanyId);
   const updateStockRoute = useUpdateStockRoute(orgId, operatingCompanyId);
-  const deleteStockRoute = useDeleteStockRoute(orgId, operatingCompanyId);
+
   const createStockRule = useCreateStockRule(orgId, operatingCompanyId);
   const updateStockRule = useUpdateStockRule(orgId, operatingCompanyId);
-  const deleteStockRule = useDeleteStockRule(orgId, operatingCompanyId);
 
   // Warehouse task hooks
   const createWarehouseTask = useCreateWarehouseTask(orgId, operatingCompanyId);
-  const startWarehouseTask = useStartWarehouseTask(
-    orgId,
-    selectedOperatingCompanyId,
-  );
-  const completeWarehouseTask = useCompleteWarehouseTask(
-    orgId,
-    selectedOperatingCompanyId,
-  );
-  const cancelWarehouseTask = useCancelWarehouseTask(
-    orgId,
-    selectedOperatingCompanyId,
-  );
 
-  const startQualityCheck = useStartQualityCheck(
-    orgId,
-    selectedOperatingCompanyId,
-  );
   const openQualityAlert = useOpenQualityAlert(
     orgId,
     selectedOperatingCompanyId,
@@ -1249,21 +1121,7 @@ function InventoryClientLoaded({
     orgId,
     selectedOperatingCompanyId,
   );
-  const createQualityAlertReason = useCreateQualityAlertReason(orgId);
-  const updateQualityAlertReason = useUpdateQualityAlertReason(orgId);
-  const deleteQualityAlertReason = useDeleteQualityAlertReason(orgId);
-  const addMemberToQualityTeam = useAddMemberToQualityTeam(orgId);
-  const removeMemberFromQualityTeam = useRemoveMemberFromQualityTeam(orgId);
-  const executeReplenishmentRule = useReplenishmentExecutionWorkflow(
-    orgId,
-    operatingCompanyId,
-    workflowSurface,
-  );
-  const replenishmentSchedule = useReplenishmentScheduleWorkflow(
-    orgId,
-    operatingCompanyId,
-    workflowSurface,
-  );
+
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
   });
@@ -1271,10 +1129,7 @@ function InventoryClientLoaded({
     orgId,
     operatingCompanyId,
   );
-  const updateStockProductionLot = useUpdateStockProductionLot(orgId);
-  const deleteStockProductionLot = useDeleteStockProductionLot(orgId);
-  const updateStockProductionSerial = useUpdateStockProductionSerial(orgId);
-  const deleteStockProductionSerial = useDeleteStockProductionSerial(orgId);
+
   const updateProductVariant = useUpdateProductVariant(
     orgId,
     operatingCompanyId,
@@ -1293,18 +1148,13 @@ function InventoryClientLoaded({
   const createWarehouse3dZone = useCreateWarehouse3dZone(orgId);
   const updateWarehouse3dZone = useUpdateWarehouse3dZone(orgId);
   const deleteWarehouse3dZone = useDeleteWarehouse3dZone(orgId);
-  const updateWarehouseTaskStatus = useUpdateWarehouseTaskStatus(
-    orgId,
-    selectedOperatingCompanyId,
-  );
-  const linkDeviceToQualityCheck = useLinkDeviceToQualityCheck(orgId);
+
   const createProductSupplierInfo = useCreateProductSupplierInfo(orgId);
   const updateProductSupplierInfo = useUpdateProductSupplierInfo(orgId);
   const createProductPackaging = useCreateProductPackaging(orgId);
   const updateProductPackaging = useUpdateProductPackaging(orgId);
   const restoreProductCategory = useRestoreProductCategory(orgId);
   const upsertWarehouseGeo = useUpsertWarehouseGeo(orgId);
-  const updateWhatsappQualityScore = useUpdateWhatsappQualityScore(orgId);
 
   // Field labels for the action dialogs below.
   const lbl = useMemo(
@@ -2348,6 +2198,88 @@ function InventoryClientLoaded({
     [organizationId, operatingCompanyId, selectedOperatingCompanyId],
   );
 
+  const stockMoveTabActions = useStockMoveTabActions({
+    orgId,
+    operatingCompanyId,
+    askForm,
+    productSelectOptions,
+    uomFieldOptions,
+    stockOnHandLocationOptions,
+  });
+  const inventoryCountTabActions = useInventoryCountTabActions({
+    orgId,
+    operatingCompanyId,
+    askForm,
+    adjustmentFormConfig,
+    stockInventoryOptions,
+    productSelectOptions,
+    uomFieldOptions,
+    stockOnHandLocationOptions,
+    stockInventoryStateOptions,
+  });
+  const productionLotTabActions = useProductionLotTabActions({
+    orgId,
+    operatingCompanyId,
+    askForm,
+    productSelectOptions,
+    setCsvKind,
+  });
+  const productionSerialTabActions = useProductionSerialTabActions({
+    orgId,
+    operatingCompanyId,
+    askForm,
+    productSelectOptions,
+    workflowSurface,
+  });
+  const qualityCheckTabActions = useQualityCheckTabActions({
+    orgId,
+    operatingCompanyId,
+    selectedOperatingCompanyId,
+    askForm,
+    workflowSurface,
+    products,
+    warehouses,
+    qualityTeamOptions,
+    stockOnHandLocationOptions,
+    iotDeviceOptions,
+    setActiveTab,
+    setCreateQualityAlertOpen,
+  });
+  const replenishmentTabActions = useReplenishmentTabActions({
+    orgId,
+    operatingCompanyId,
+    workflowSurface,
+    products,
+    warehouses,
+    locationParentOptions,
+    uomFieldOptions,
+  });
+  const pickingWaveTabActions = usePickingWaveTabActions({
+    orgId,
+    operatingCompanyId,
+    assignUserFieldOptions,
+  });
+  const stockPackageTabActions = useStockPackageTabActions({
+    orgId,
+    operatingCompanyId,
+  });
+  const stockRoutingTabActions = useStockRoutingTabActions({
+    orgId,
+    operatingCompanyId,
+  });
+  const barcodeTabActions = useBarcodeTabActions({
+    orgId,
+    operatingCompanyId,
+    askForm,
+    barcodeRuleOptions,
+  });
+  const warehouseTaskTabActions = useWarehouseTaskTabActions({
+    orgId,
+    selectedOperatingCompanyId,
+    askForm,
+    warehouseTaskStatusOptions,
+  });
+
   const config = useMemo(() => {
     const withTransferActions = (
       tab: (typeof moduleConfig.tabs)[number],
@@ -2946,175 +2878,7 @@ function InventoryClientLoaded({
           },
         };
       }
-      if (tab.id === 'stock-moves') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'create-stock-move',
-                  label: t('inventory.stockMoveActions.create'),
-                  icon: Plus,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.stockMoveActions.create'),
-                      fields: [
-                        {
-                          id: 'productId',
-                          name: 'productId',
-                          label: lbl.product,
-                          type: 'select',
-                          required: true,
-                          options: productSelectOptions,
-                        },
-                        {
-                          id: 'productUom',
-                          name: 'productUom',
-                          label: lbl.uom,
-                          type: 'select',
-                          required: true,
-                          options: uomFieldOptions,
-                        },
-                        {
-                          id: 'locationId',
-                          name: 'locationId',
-                          label: lbl.sourceLocation,
-                          type: 'select',
-                          required: true,
-                          options: stockOnHandLocationOptions,
-                          width: '1/2',
-                        },
-                        {
-                          id: 'locationDestId',
-                          name: 'locationDestId',
-                          label: lbl.destLocation,
-                          type: 'select',
-                          required: true,
-                          options: stockOnHandLocationOptions,
-                          width: '1/2',
-                        },
-                        {
-                          id: 'quantity',
-                          name: 'quantity',
-                          label: t('inventory.stockMoveActions.quantityPrompt'),
-                          type: 'number',
-                          required: true,
-                          defaultValue: 1,
-                          min: 0,
-                          width: '1/2',
-                        },
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.stockMoveActions.namePrompt'),
-                          type: 'text',
-                          defaultValue: 'Manual Stock Move',
-                          width: '1/2',
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const quantity = formNumber(values.quantity);
-                    if (quantity == null) return;
-                    await createStockMove.mutateAsync(
-                      toCreateStockMoveParams({
-                        companyId: operatingCompanyId,
-                        name: formText(values.name) ?? 'Manual Stock Move',
-                        productId: Number(values.productId),
-                        productUom: Number(values.productUom),
-                        quantity,
-                        locationId: Number(values.locationId),
-                        locationDestId: Number(values.locationDestId),
-                      }),
-                    );
-                  },
-                },
-                {
-                  id: 'confirm-move',
-                  label: t('inventory.stockMoveActions.confirm'),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.confirm') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await confirmStockMove.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'assign-move',
-                  label: t('inventory.stockMoveActions.assign'),
-                  icon: UserCircle2,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['confirmed'].includes(rowState(row, 'state'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.assign') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await assignStockMove.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'done-move',
-                  label: t('inventory.stockMoveActions.done'),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['assigned'].includes(rowState(row, 'state'))),
-                  onClick: async (rows) => {
-                    const row = rows[0] as Record<string, unknown> | undefined;
-                    const id = row?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    const def = Number(
-                      row?.productUomQty ?? row?.product_uom_qty ?? 1,
-                    );
-                    const values = await askForm({
-                      title: t('inventory.stockMoveActions.done'),
-                      fields: [
-                        {
-                          id: 'quantityDone',
-                          name: 'quantityDone',
-                          label: t('inventory.stockMoveActions.quantityDonePrompt'),
-                          type: 'number',
-                          required: true,
-                          min: 0,
-                          defaultValue: Number.isFinite(def) ? def : 1,
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const qty = formNumber(values.quantityDone);
-                    if (qty == null) return;
-                    await doneStockMove.mutateAsync({
-                      moveId: id,
-                      quantityDone: qty,
-                    });
-                  },
-                },
-                {
-                  id: 'cancel-move',
-                  label: t('inventory.stockMoveActions.cancel'),
-                  icon: XCircle,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => !['done', 'cancel', 'cancelled'].includes(rowState(row, 'state'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.cancel') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await cancelStockMove.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'stock-moves') return stockMoveTabActions.configureTab(tab);
       if (tab.id === 'stock') {
         return {
           ...tab,
@@ -3195,210 +2959,7 @@ function InventoryClientLoaded({
           },
         };
       }
-      if (tab.id === 'adjustments') {
-        return {
-          ...tab,
-          createForm: adjustmentFormConfig,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'create-stock-inventory',
-                  label: t('inventory.stockInventoryActions.create'),
-                  icon: Plus,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.stockInventoryActions.create'),
-                      fields: [
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.stockInventoryActions.namePrompt'),
-                          type: 'text',
-                          required: true,
-                          defaultValue: 'Cycle Count',
-                        },
-                      ],
-                    });
-                    const name = formText(values?.name);
-                    if (name == null || operatingCompanyId == null) return;
-                    await createStockInventory.mutateAsync({
-                      company_id: Number(operatingCompanyId),
-                      name,
-                      location_ids: [],
-                      product_ids: [],
-                      lot_ids: [],
-                      owner_ids: [],
-                      package_ids: [],
-                      accounting_date: null,
-                      category_id: null,
-                      counted_mode: 'all',
-                      is_stock_check: true,
-                      metadata: null,
-                    });
-                  },
-                },
-                {
-                  id: 'create-stock-inventory-line',
-                  label: t('inventory.stockInventoryActions.addLine'),
-                  icon: ListChecks,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.stockInventoryActions.addLine'),
-                      fields: [
-                        {
-                          id: 'inventoryId',
-                          name: 'inventoryId',
-                          label: lbl.inventory,
-                          type: 'select',
-                          required: true,
-                          options: stockInventoryOptions,
-                        },
-                        {
-                          id: 'productId',
-                          name: 'productId',
-                          label: lbl.product,
-                          type: 'select',
-                          required: true,
-                          options: productSelectOptions,
-                        },
-                        {
-                          id: 'uomId',
-                          name: 'uomId',
-                          label: lbl.uom,
-                          type: 'select',
-                          required: true,
-                          options: uomFieldOptions,
-                          width: '1/2',
-                        },
-                        {
-                          id: 'locationId',
-                          name: 'locationId',
-                          label: lbl.location,
-                          type: 'select',
-                          required: true,
-                          options: stockOnHandLocationOptions,
-                          width: '1/2',
-                        },
-                        {
-                          id: 'qty',
-                          name: 'qty',
-                          label: t('inventory.stockInventoryActions.productQtyPrompt'),
-                          type: 'number',
-                          required: true,
-                          min: 0,
-                          defaultValue: 0,
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const inventoryId = formText(values.inventoryId);
-                    const productId = formText(values.productId);
-                    const uomId = formText(values.uomId);
-                    const locationId = formText(values.locationId);
-                    const qty = formNumber(values.qty);
-                    if (
-                      inventoryId == null ||
-                      productId == null ||
-                      uomId == null ||
-                      locationId == null ||
-                      qty == null
-                    )
-                      return;
-                    await createStockInventoryLine.mutateAsync({
-                      inventoryId,
-                      params: {
-                        product_id: Number(productId),
-                        product_variant_id: null,
-                        product_uom_id: Number(uomId),
-                        location_id: Number(locationId),
-                        location_name: null,
-                        prod_lot_id: null,
-                        package_id: null,
-                        partner_id: null,
-                        theoretical_qty: 0,
-                        product_qty: qty,
-                        inventory_location_id: null,
-                        inventory_product_id: null,
-                        inventory_prod_lot_id: null,
-                        inventory_package_id: null,
-                        inventory_partner_id: null,
-                        package_level_id: null,
-                        package_level_id_visible: false,
-                        state: 'draft',
-                        product_tracking: 'none',
-                        product_barcode: null,
-                        product_type: 'product',
-                        is_editable: true,
-                        outdated: false,
-                        inventory_location_id_name: null,
-                        inventory_product_id_name: null,
-                        theoretical_qty_text: null,
-                        product_uom_category_id: null,
-                        metadata: null,
-                      },
-                    });
-                  },
-                },
-                {
-                  id: 'set-stock-inventory-state',
-                  label: t('inventory.stockInventoryActions.setState'),
-                  icon: Pencil,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.stockInventoryActions.setState'),
-                      fields: [
-                        {
-                          id: 'inventoryId',
-                          name: 'inventoryId',
-                          label: lbl.inventory,
-                          type: 'select',
-                          required: true,
-                          options: stockInventoryOptions,
-                        },
-                        {
-                          id: 'newState',
-                          name: 'newState',
-                          label: t('inventory.stockInventoryActions.statePrompt'),
-                          type: 'select',
-                          required: true,
-                          defaultValue: 'confirm',
-                          options: stockInventoryStateOptions,
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const inventoryId = formText(values.inventoryId);
-                    const newState = formText(values.newState);
-                    if (inventoryId == null || newState == null) return;
-                    await updateStockInventoryState.mutateAsync({
-                      inventoryId,
-                      newState,
-                    });
-                  },
-                },
-                {
-                  id: 'process-adjustment',
-                  label: t('inventory.adjustmentActions.process'),
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.adjustmentActions.process') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await processAdjustment.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'adjustments') return inventoryCountTabActions.configureTab(tab);
       if (tab.id === 'locations') {
         return {
           ...tab,
@@ -3467,294 +3028,8 @@ function InventoryClientLoaded({
           },
         };
       }
-      if (tab.id === 'lots') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'csv-lot',
-                  label: t('inventory.csvImport.toolbarLots'),
-                  onClick: () => setCsvKind('lot'),
-                },
-                {
-                  id: 'create-lot',
-                  label: t('inventory.lotActions.create'),
-                  icon: Plus,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.lotActions.create'),
-                      fields: [
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.lotActions.namePrompt'),
-                          type: 'text',
-                          required: true,
-                        },
-                        {
-                          id: 'productId',
-                          name: 'productId',
-                          label: lbl.product,
-                          type: 'select',
-                          required: true,
-                          options: productSelectOptions,
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const name = formText(values.name);
-                    const productId = formText(values.productId);
-                    if (
-                      name == null ||
-                      productId == null ||
-                      operatingCompanyId == null
-                    )
-                      return;
-                    await createStockProductionLot.mutateAsync({
-                      companyId: BigInt(operatingCompanyId),
-                      name,
-                      productId: BigInt(Number(productId)),
-                      productVariantId: undefined,
-                      ref: undefined,
-                      note: undefined,
-                      expirationDate: undefined,
-                      useDate: undefined,
-                      removalDate: undefined,
-                      alertDate: undefined,
-                      productQty: 0,
-                      locationId: undefined,
-                      packageId: undefined,
-                      ownerId: undefined,
-                      isScrap: false,
-                      isLocked: false,
-                      metadata: undefined,
-                    });
-                  },
-                },
-                {
-                  id: 'edit-lot-note',
-                  label: t('inventory.lotActions.editNote'),
-                  icon: Pencil,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const row = rows[0] as Record<string, unknown> | undefined;
-                    const id = row?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    const values = await askForm({
-                      title: t('inventory.lotActions.editNote'),
-                      fields: [
-                        {
-                          id: 'note',
-                          name: 'note',
-                          label: t('inventory.lotActions.notePrompt'),
-                          type: 'textarea',
-                          rows: 3,
-                          defaultValue: String(row?.note ?? ''),
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    await updateStockProductionLot.mutateAsync({
-                      lotId: id,
-                      params: {
-                        companyId: undefined,
-                        note: formText(values.note),
-                      },
-                    });
-                  },
-                },
-                {
-                  id: 'delete-lot',
-                  label: t('common.delete'),
-                  icon: Trash2,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
-                  confirm: {
-                    title: t('common.delete'),
-                    description: t('inventory.lotActions.confirmDelete'),
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    await deleteStockProductionLot.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
-      if (tab.id === 'serials') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'create-serial',
-                  label: t('inventory.serialActions.create'),
-                  icon: Plus,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.serialActions.create'),
-                      fields: [
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.serialActions.namePrompt'),
-                          type: 'text',
-                          required: true,
-                        },
-                        {
-                          id: 'productId',
-                          name: 'productId',
-                          label: lbl.product,
-                          type: 'select',
-                          required: true,
-                          options: productSelectOptions,
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const name = formText(values.name);
-                    const productId = formText(values.productId);
-                    if (
-                      name == null ||
-                      productId == null ||
-                      operatingCompanyId == null
-                    )
-                      return;
-                    await createStockProductionSerial.mutateAsync({
-                      companyId: BigInt(operatingCompanyId),
-                      name,
-                      productId: BigInt(Number(productId)),
-                      productVariantId: undefined,
-                      lotId: undefined,
-                      ref: undefined,
-                      note: undefined,
-                      expirationDate: undefined,
-                      useDate: undefined,
-                      removalDate: undefined,
-                      alertDate: undefined,
-                      productQty: 1,
-                      locationId: undefined,
-                      packageId: undefined,
-                      ownerId: undefined,
-                      // The serial lifecycle only recognizes "free" as the
-                      // initial state (reserve_serial/use_serial/etc. all
-                      // check for it verbatim) — "available" left every
-                      // UI-created serial permanently unreservable.
-                      state: 'free',
-                      isScrap: false,
-                      isLocked: false,
-                      warrantyExpiration: undefined,
-                      warrantyStart: undefined,
-                      lastMaintenance: undefined,
-                      nextMaintenance: undefined,
-                      maintenanceCount: 0,
-                      metadata: undefined,
-                    });
-                  },
-                },
-                {
-                  id: 'reserve-serial',
-                  label: t('inventory.productionSerials.actions.reserve'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['free'].includes(rowState(row, 'state'))),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      await reserveSerial.reserve(
-                        { serialId: String(id) },
-                        { navigateToNext: true },
-                      );
-                  },
-                },
-                {
-                  id: 'use-serial',
-                  label: t('inventory.productionSerials.actions.markInUse'),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['reserved'].includes(rowState(row, 'state'))),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      await useSerial.markInUse(
-                        { serialId: String(id) },
-                        { navigateToNext: true },
-                      );
-                  },
-                },
-                {
-                  id: 'edit-serial-note',
-                  label: t('inventory.serialActions.editNote'),
-                  icon: Pencil,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const row = rows[0] as Record<string, unknown> | undefined;
-                    const id = row?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    const values = await askForm({
-                      title: t('inventory.serialActions.editNote'),
-                      fields: [
-                        {
-                          id: 'note',
-                          name: 'note',
-                          label: t('inventory.serialActions.notePrompt'),
-                          type: 'textarea',
-                          rows: 3,
-                          defaultValue: String(row?.note ?? ''),
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    await updateStockProductionSerial.mutateAsync({
-                      serialId: id,
-                      params: {
-                        companyId: undefined,
-                        note: formText(values.note),
-                      },
-                    });
-                  },
-                },
-                {
-                  id: 'delete-serial',
-                  label: t('common.delete'),
-                  icon: Trash2,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
-                  confirm: {
-                    title: t('common.delete'),
-                    description: t('inventory.serialActions.confirmDelete'),
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    await deleteStockProductionSerial.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'lots') return productionLotTabActions.configureTab(tab);
+      if (tab.id === 'serials') return productionSerialTabActions.configureTab(tab);
       if (tab.id === 'cycle-counts') {
         return {
           ...tab,
@@ -3782,544 +3057,13 @@ function InventoryClientLoaded({
         };
       }
       // Quality checks actions
-      if (tab.id === 'quality') {
-        return {
-          ...tab,
-          createAction: 'createQualityCheck',
-          createForm: mergeSelectOptionsForFields(newQualityCheckForm(t), {
-            productId: productRowsToSelectOptions(products),
-            teamId: qualityTeamOptions,
-          }),
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'quality-alerts-tab',
-                  label: t('inventory.qualityAlerts.tabLabel'),
-                  icon: AlertTriangle,
-                  requiresSelection: false,
-                  onClick: () => setActiveTab('quality-alerts'),
-                },
-                {
-                  id: 'create-quality-alert',
-                  label: t('inventory.forms.newQualityAlert.title'),
-                  icon: Plus,
-                  requiresSelection: false,
-                  onClick: () => setCreateQualityAlertOpen(true),
-                },
-                {
-                  id: 'pass-check',
-                  label: t('inventory.qualityActions.pass'),
-                  icon: ShieldCheck,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => !['completed'].includes(rowState(row, 'status'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.qualityActions.pass') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      await passQualityCheck.mutateAsync({ checkId: id });
-                  },
-                },
-                {
-                  id: 'fail-check',
-                  label: t('inventory.qualityActions.fail'),
-                  icon: AlertTriangle,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => !['completed'].includes(rowState(row, 'status'))),
-                  onClick: async (rows) => {
-                    const row = rows[0];
-                    const id = row?.id;
-                    const productId = row?.productId;
-                    const companyId = row?.companyId;
-                    const lotId = row?.lotId;
-                    if (id == null || productId == null || companyId == null)
-                      return;
-                    const quarantineWarehouse = warehouses.find(
-                      (w) => w.whQcStockLocId != null,
-                    );
-                    const configuredQuarantineLocationId =
-                      quarantineWarehouse?.whQcStockLocId;
-                    // No warehouse in this org has a configured QC location yet
-                    // (wh_qc_stock_loc_id is create-only, never set by seed data
-                    // or update_warehouse) — ask the operator which location the
-                    // failed stock quarantines to.
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.fail'),
-                      submitLabel: t('inventory.qualityActions.fail'),
-                      fields: [
-                        ...(configuredQuarantineLocationId == null
-                          ? [
-                              {
-                                id: 'quarantineLocationId',
-                                name: 'quarantineLocationId',
-                                label: lbl.quarantineLocation,
-                                type: 'select' as const,
-                                required: true,
-                                options: stockOnHandLocationOptions,
-                              },
-                            ]
-                          : []),
-                        {
-                          id: 'reason',
-                          name: 'reason',
-                          label: lbl.failReason,
-                          type: 'textarea' as const,
-                          rows: 3,
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const quarantineLocationId =
-                      configuredQuarantineLocationId ??
-                      formText(values.quarantineLocationId);
-                    if (quarantineLocationId == null) return;
-                    await failQualityCheck.fail(
-                      {
-                        checkId: String(id),
-                        productId: String(productId),
-                        lotId: lotId != null ? String(lotId) : undefined,
-                        companyId: String(companyId),
-                        quarantineLocationId: String(quarantineLocationId),
-                        qtyFailed: 1,
-                        note: formText(values.reason),
-                      },
-                      { navigateToNext: true },
-                    );
-                  },
-                },
-                {
-                  id: 'start-check',
-                  label: t('inventory.qualityActions.startCheck'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['draft'].includes(rowState(row, 'status'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.qualityActions.startCheck') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await startQualityCheck.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'link-device-check',
-                  label: t('inventory.qualityActions.linkDevice'),
-                  icon: ScanLine,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const checkId = rows[0]?.id as ScalarId | undefined;
-                    if (checkId == null) return;
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.linkDevice'),
-                      fields: [
-                        {
-                          id: 'deviceId',
-                          name: 'deviceId',
-                          label: lbl.device,
-                          type: 'select',
-                          required: true,
-                          options: iotDeviceOptions,
-                        },
-                      ],
-                    });
-                    const deviceId = formNumber(values?.deviceId);
-                    if (deviceId == null) return;
-                    await linkDeviceToQualityCheck.mutateAsync({
-                      deviceId,
-                      checkId,
-                    });
-                  },
-                },
-                {
-                  id: 'add-alert-reason',
-                  label: t('inventory.qualityActions.addAlertReason'),
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.addAlertReason'),
-                      fields: [
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.qualityActions.alertReasonNamePrompt'),
-                          type: 'text',
-                          required: true,
-                        },
-                        {
-                          id: 'description',
-                          name: 'description',
-                          label: t('inventory.qualityActions.alertReasonDescPrompt'),
-                          type: 'textarea',
-                          rows: 3,
-                        },
-                      ],
-                    });
-                    const name = formText(values?.name);
-                    if (name == null) return;
-                    await createQualityAlertReason.mutateAsync({
-                      name,
-                      description: formText(values?.description) ?? null,
-                    });
-                  },
-                },
-                {
-                  id: 'update-alert-reason',
-                  label: t('inventory.qualityActions.updateAlertReason'),
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.updateAlertReason'),
-                      fields: [
-                        {
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.reasonId', { defaultValue: 'Alert reason ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
-                        },
-                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
-                      ],
-                    });
-                    if (!values) return;
-                    await updateQualityAlertReason.mutateAsync({
-                      reasonId: Number(values.recordId),
-                      params: { name: formText(values.name) ?? null },
-                    });
-                  },
-                },
-                {
-                  id: 'delete-alert-reason',
-                  label: t('inventory.qualityActions.deleteAlertReason'),
-                  variant: 'destructive',
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.deleteAlertReason'),
-                      submitLabel: t('common.delete'),
-                      fields: [{
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.reasonId', { defaultValue: 'Alert reason ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
-                        }],
-                    });
-                    if (!values) return;
-                    await deleteQualityAlertReason.mutateAsync(Number(values.recordId));
-                  },
-                },
-                {
-                  id: 'add-team-member',
-                  label: t('inventory.qualityActions.addTeamMember'),
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.addTeamMember'),
-                      fields: [{
-                          id: 'teamId',
-                          name: 'teamId',
-                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
-                          type: 'select',
-                          required: true,
-                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
-                        }, {
-                          id: 'member',
-                          name: 'member',
-                          label: t('inventory.byRecord.member', { defaultValue: 'Member identity' }),
-                          type: 'text',
-                          required: true,
-                        }],
-                    });
-                    if (!values) return;
-                    await addMemberToQualityTeam.mutateAsync({
-                      teamId: Number(values.teamId),
-                      memberIdentityHex: String(values.member).trim(),
-                    });
-                  },
-                },
-                {
-                  id: 'update-quality-point',
-                  label: t('inventory.qualityActions.updatePoint'),
-                  icon: Pencil,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.updatePoint'),
-                      fields: [
-                        {
-                          id: 'recordId',
-                          name: 'recordId',
-                          label: t('inventory.byRecord.pointId', { defaultValue: 'Quality point ID' }),
-                          type: 'number',
-                          required: true,
-                          min: 1,
-                        },
-                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
-                        { id: 'testType', name: 'testType', label: t('inventory.byRecord.testType', { defaultValue: 'Test type' }), type: 'text' },
-                      ],
-                    });
-                    if (!values) return;
-                    const name = formText(values.name);
-                    const testType = formText(values.testType);
-                    if (name == null && testType == null) return;
-                    await updateQualityPoint.mutateAsync({
-                      pointId: Number(values.recordId),
-                      params: { name, testType },
-                    });
-                  },
-                },
-                {
-                  id: 'update-quality-team',
-                  label: t('inventory.qualityActions.updateTeam'),
-                  icon: Pencil,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.updateTeam'),
-                      fields: [
-                        {
-                          id: 'teamId',
-                          name: 'teamId',
-                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
-                          type: 'select',
-                          required: true,
-                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
-                        },
-                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
-                        { id: 'email', name: 'email', label: t('inventory.byRecord.email', { defaultValue: 'Email' }), type: 'email' },
-                      ],
-                    });
-                    if (!values) return;
-                    const name = formText(values.name);
-                    const email = formText(values.email);
-                    if (name == null && email == null) return;
-                    await updateQualityTeam.mutateAsync({
-                      teamId: Number(values.teamId),
-                      params: { name, email },
-                    });
-                  },
-                },
-                {
-                  id: 'remove-team-member',
-                  label: t('inventory.qualityActions.removeTeamMember'),
-                  variant: 'destructive',
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.qualityActions.removeTeamMember'),
-                      submitLabel: t('common.remove', { defaultValue: 'Remove' }),
-                      fields: [{
-                          id: 'teamId',
-                          name: 'teamId',
-                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
-                          type: 'select',
-                          required: true,
-                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
-                        }, {
-                          id: 'member',
-                          name: 'member',
-                          label: t('inventory.byRecord.member', { defaultValue: 'Member identity' }),
-                          type: 'text',
-                          required: true,
-                        }],
-                    });
-                    if (!values) return;
-                    await removeMemberFromQualityTeam.mutateAsync({
-                      teamId: Number(values.teamId),
-                      memberIdentityHex: String(values.member).trim(),
-                    });
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'quality') return qualityCheckTabActions.configureTab(tab);
       // Replenishment rules actions
-      if (tab.id === 'replenishment') {
-        return {
-          ...tab,
-          createAction: 'createReplenishmentRule',
-          createForm: mergeSelectOptionsForFields(newReplenishmentRuleForm(t), {
-            productId: productRowsToSelectOptions(products),
-            locationId: locationParentOptions,
-            uomId: uomFieldOptions,
-            warehouseId: warehouses.map((w) => ({
-              value: String(w.id),
-              label: String(w.name ?? w.id),
-            })),
-          }),
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'execute-replenishment-rule',
-                  label: t('inventory.replenishmentActions.executeRule'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  confirm: {
-                    title: t('inventory.replenishmentActions.executeRule'),
-                    description: `${t('inventory.replenishmentActions.executeRule')}\n${t('inventory.replenishmentActions.executeRuleHint')}`,
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    if (
-                      typeof globalThis.crypto === 'undefined' ||
-                      typeof globalThis.crypto.randomUUID !== 'function'
-                    ) {
-                      return;
-                    }
-                    await executeReplenishmentRule.execute(
-                      {
-                        ruleId: String(id),
-                        idempotencyKey: globalThis.crypto.randomUUID(),
-                      },
-                      { navigateToNext: true },
-                    );
-                  },
-                },
-                {
-                  id: 'schedule-replenishment-run',
-                  label: t('inventory.replenishmentActions.scheduleRun'),
-                  icon: Play,
-                  requiresSelection: true,
-                  isApplicable: (rows) => {
-                    if (rows.length !== 1) return false;
-                    const state = replenishmentScheduleState(rows[0] ?? {});
-                    return state.readable && state.jobId === null;
-                  },
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) {
-                      void replenishmentSchedule.schedule(String(id), {
-                        navigateToNext: true,
-                      });
-                    }
-                  },
-                },
-                {
-                  id: 'cancel-replenishment-run',
-                  label: t('inventory.replenishmentActions.cancelRun'),
-                  icon: XCircle,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  isApplicable: (rows) => {
-                    if (rows.length !== 1) return false;
-                    const state = replenishmentScheduleState(rows[0] ?? {});
-                    return state.readable && state.jobId !== null;
-                  },
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) {
-                      void replenishmentSchedule.cancel(String(id), {
-                        navigateToNext: true,
-                      });
-                    }
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'replenishment') return replenishmentTabActions.configureTab(tab);
       // Picking waves actions
-      if (tab.id === 'picking-waves') {
-        return {
-          ...tab,
-          createAction: 'createPickingWave',
-          createForm: mergeSelectOptionsForFields(newPickingWaveForm(t), {
-            userId: assignUserFieldOptions,
-          }),
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'confirm-wave',
-                  label: t('inventory.pickingWaveActions.confirm'),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  isApplicable: (rows) => rows.length === 1 && canReleaseWave(rows[0]),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.confirm') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await confirmPickingWave.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'complete-wave',
-                  label: t('inventory.pickingWaveActions.complete'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  isApplicable: (rows) =>
-                    rows.every((row) => ['in_progress'].includes(rowState(row, 'state'))),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.complete') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await completePickingWave.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'picking-waves') return pickingWaveTabActions.configureTab(tab);
       // Stock package actions
-      if (tab.id === 'stock-packages') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'confirm-package',
-                  label: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  permission: { resource: 'stock_picking', action: 'update' },
-                  isApplicable: (rows) => rows.length === 1 && canConfirmPackage(rows[0]),
-                  successMessage: t('common.actionCompleted', {
-                    action: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
-                  }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await confirmStockPackage.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'done-package',
-                  label: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  permission: { resource: 'stock_picking', action: 'update' },
-                  isApplicable: (rows) => rows.length === 1 && canDonePackage(rows[0]),
-                  successMessage: t('common.actionCompleted', {
-                    action: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
-                  }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await doneStockPackage.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'stock-packages') return stockPackageTabActions.configureTab(tab);
       // Product categories actions
       if (tab.id === 'product-categories') {
         return {
@@ -4389,310 +3133,18 @@ function InventoryClientLoaded({
         };
       }
       // Stock routes actions
-      if (tab.id === 'routes') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'delete-route',
-                  label: t('common.delete'),
-                  icon: Trash2,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
-                  confirm: {
-                    title: t('common.delete'),
-                    description: t('inventory.routeActions.confirmDelete'),
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    await deleteStockRoute.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'routes') return stockRoutingTabActions.configureTab(tab);
       // Stock rules actions
-      if (tab.id === 'rules') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'delete-rule',
-                  label: t('common.delete'),
-                  icon: Trash2,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
-                  confirm: {
-                    title: t('common.delete'),
-                    description: t('inventory.ruleActions.confirmDelete'),
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    await deleteStockRule.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'rules') return stockRoutingTabActions.configureTab(tab);
       // Barcode rules actions
-      if (tab.id === 'barcode-rules') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'set-whatsapp-quality-score',
-                  label: t('inventory.barcodeActions.setWhatsappQualityScore'),
-                  icon: ScanLine,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    // WhatsApp accounts have no list query yet, so the account is
-                    // still identified by its id.
-                    const values = await askForm({
-                      title: t('inventory.barcodeActions.setWhatsappQualityScore'),
-                      fields: [
-                        {
-                          id: 'accountId',
-                          name: 'accountId',
-                          label: lbl.whatsappAccount,
-                          type: 'number',
-                          required: true,
-                          min: 1,
-                        },
-                        {
-                          id: 'qualityScore',
-                          name: 'qualityScore',
-                          label: lbl.qualityRating,
-                          type: 'select',
-                          required: true,
-                          defaultValue: 'UNKNOWN',
-                          options: [
-                            { value: 'GREEN', label: 'GREEN' },
-                            { value: 'YELLOW', label: 'YELLOW' },
-                            { value: 'RED', label: 'RED' },
-                            { value: 'UNKNOWN', label: 'UNKNOWN' },
-                          ],
-                        },
-                      ],
-                    });
-                    if (!values) return;
-                    const accountId = formText(values.accountId);
-                    const qualityScore = formText(values.qualityScore);
-                    if (accountId == null || qualityScore == null) return;
-                    await updateWhatsappQualityScore.mutateAsync({
-                      accountId,
-                      qualityScore,
-                    });
-                  },
-                },
-                {
-                  id: 'delete-barcode-rule',
-                  label: t('common.delete'),
-                  icon: Trash2,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
-                  confirm: {
-                    title: t('common.delete'),
-                    description: t('inventory.barcodeActions.confirmDelete'),
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    await deleteBarcodeRule.mutateAsync(id);
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'barcode-rules') return barcodeTabActions.configureTab(tab);
       if (tab.id === 'traceability-records') {
         return {
           ...tab,
           createForm: traceRecordFormConfig,
         };
       }
-      if (tab.id === 'barcode-nomenclatures') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'create-barcode-nomenclature',
-                  label: t('inventory.barcodeNomenclatures.actions.create'),
-                  icon: Plus,
-                  requiresSelection: false,
-                  onClick: async () => {
-                    const values = await askForm({
-                      title: t('inventory.barcodeNomenclatures.actions.create'),
-                      fields: [
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.barcodeNomenclatures.actions.namePrompt'),
-                          type: 'text',
-                          required: true,
-                        },
-                      ],
-                    });
-                    const name = formText(values?.name);
-                    if (name == null) return;
-                    await createBarcodeNomenclature.mutateAsync({
-                      name,
-                      description: null,
-                      is_default: false,
-                      upc_ean_conv: 'none',
-                      is_active: true,
-                      metadata: null,
-                    });
-                  },
-                },
-                {
-                  id: 'update-barcode-nomenclature',
-                  label: t('common.edit'),
-                  icon: Pencil,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const row = rows[0] as Record<string, unknown> | undefined;
-                    const nomenclatureId = row?.id as ScalarId | undefined;
-                    if (nomenclatureId == null) return;
-                    const values = await askForm({
-                      title: t('common.edit'),
-                      fields: [
-                        {
-                          id: 'name',
-                          name: 'name',
-                          label: t('inventory.barcodeNomenclatures.actions.namePrompt'),
-                          type: 'text',
-                          required: true,
-                          defaultValue: String(row?.name ?? ''),
-                        },
-                      ],
-                    });
-                    const name = formText(values?.name);
-                    if (name == null) return;
-                    await updateBarcodeNomenclature.mutateAsync({
-                      nomenclatureId,
-                      params: { name, isActive: true },
-                    });
-                  },
-                },
-                {
-                  id: 'add-rule-to-nomenclature',
-                  label: t('inventory.barcodeNomenclatures.actions.addRule'),
-                  icon: Plus,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    if (nomenclatureId == null) return;
-                    const values = await askForm({
-                      title: t('inventory.barcodeNomenclatures.actions.addRule'),
-                      fields: [
-                        {
-                          id: 'ruleId',
-                          name: 'ruleId',
-                          label: lbl.rule,
-                          type: 'select',
-                          required: true,
-                          options: barcodeRuleOptions,
-                        },
-                      ],
-                    });
-                    const ruleId = formText(values?.ruleId);
-                    if (ruleId == null) return;
-                    await addRuleToNomenclature.mutateAsync({
-                      nomenclatureId,
-                      ruleId,
-                    });
-                  },
-                },
-                {
-                  id: 'remove-rule-from-nomenclature',
-                  label: t('inventory.barcodeNomenclatures.actions.removeRule'),
-                  icon: Pencil,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    if (nomenclatureId == null) return;
-                    const values = await askForm({
-                      title: t('inventory.barcodeNomenclatures.actions.removeRule'),
-                      fields: [
-                        {
-                          id: 'ruleId',
-                          name: 'ruleId',
-                          label: lbl.rule,
-                          type: 'select',
-                          required: true,
-                          options: barcodeRuleOptions,
-                        },
-                      ],
-                    });
-                    const ruleId = formNumber(values?.ruleId);
-                    if (ruleId == null) return;
-                    await removeRuleFromNomenclature.mutateAsync({
-                      nomenclatureId,
-                      ruleId,
-                    });
-                  },
-                },
-                {
-                  id: 'delete-barcode-nomenclature',
-                  label: t('common.delete'),
-                  icon: Trash2,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
-                  confirm: {
-                    title: t('common.delete'),
-                    description: t(
-                          'inventory.barcodeNomenclatures.actions.confirmDelete',
-                        ),
-                    confirmLabel: t('common.confirm'),
-                    cancelLabel: t('common.cancel'),
-                  },
-                  onClick: async (rows) => {
-                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    if (nomenclatureId == null)
-                      return;
-                    await deleteBarcodeNomenclature.mutateAsync(
-                      nomenclatureId,
-                    );
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'barcode-nomenclatures') return barcodeTabActions.configureTab(tab);
       if (tab.id === 'traceability-reports') {
         return {
           ...tab,
@@ -4724,86 +3176,7 @@ function InventoryClientLoaded({
         };
       }
       // Warehouse tasks actions
-      if (tab.id === 'warehouse-tasks') {
-        return {
-          ...tab,
-          entityConfig: {
-            ...tab.entityConfig,
-            view: {
-              ...v,
-              actions: [
-                {
-                  id: 'start-task',
-                  label: t('inventory.taskActions.start'),
-                  icon: CheckCircle,
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.start') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await startWarehouseTask.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'complete-task',
-                  label: t('inventory.taskActions.complete'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.complete') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      await completeWarehouseTask.mutateAsync({
-                        taskId: id,
-                        result: {},
-                      });
-                  },
-                },
-                {
-                  id: 'cancel-task',
-                  label: t('inventory.taskActions.cancel'),
-                  icon: XCircle,
-                  variant: 'destructive',
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.cancel') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await cancelWarehouseTask.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'set-task-status',
-                  label: t('inventory.taskActions.setStatus'),
-                  icon: Pencil,
-                  requiresSelection: true,
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null) return;
-                    const values = await askForm({
-                      title: t('inventory.taskActions.setStatus'),
-                      fields: [
-                        {
-                          id: 'status',
-                          name: 'status',
-                          label: lbl.status,
-                          type: 'select',
-                          required: true,
-                          options: warehouseTaskStatusOptions,
-                        },
-                      ],
-                    });
-                    const newStatus = formText(values?.status);
-                    if (newStatus == null) return;
-                    await updateWarehouseTaskStatus.mutateAsync({
-                      taskId: id,
-                      newStatus,
-                    });
-                  },
-                },
-              ],
-            },
-          },
-        };
-      }
+      if (tab.id === 'warehouse-tasks') return warehouseTaskTabActions.configureTab(tab);
       return tab;
     };
 
@@ -4864,6 +3237,17 @@ function InventoryClientLoaded({
       ],
     } as ModuleConfig;
   }, [
+    stockMoveTabActions,
+    inventoryCountTabActions,
+    productionLotTabActions,
+    productionSerialTabActions,
+    qualityCheckTabActions,
+    replenishmentTabActions,
+    pickingWaveTabActions,
+    stockPackageTabActions,
+    stockRoutingTabActions,
+    barcodeTabActions,
+    warehouseTaskTabActions,
     moduleConfig,
     liveSections,
     cycleCountWizardTab,
@@ -4883,7 +3267,6 @@ function InventoryClientLoaded({
     transferRecordSheet,
     t,
     pickingWorkflow,
-    processAdjustment,
     reserveQuant,
     unreserveQuant,
     deleteStockLocation,
@@ -4896,62 +3279,19 @@ function InventoryClientLoaded({
     createUomCategory,
     createUom,
     createUomConversion,
-    createStockInventory,
-    createStockInventoryLine,
-    updateStockInventoryState,
     updateStockLocation,
-    createStockMove,
-    confirmStockMove,
-    assignStockMove,
-    doneStockMove,
-    cancelStockMove,
     // Quality management
-    passQualityCheck,
-    failQualityCheck,
-    updateQualityPoint,
     deleteQualityPoint,
-    updateQualityTeam,
     deleteQualityTeam,
     // Picking waves
-    confirmPickingWave,
-    completePickingWave,
-    confirmStockPackage,
-    doneStockPackage,
     // Product categories
     deleteProductCategory,
     // Stock routes and rules
-    deleteStockRoute,
-    deleteStockRule,
     // Barcode
-    deleteBarcodeRule,
-    updateWhatsappQualityScore,
-    createBarcodeNomenclature,
-    updateBarcodeNomenclature,
-    addRuleToNomenclature,
-    deleteBarcodeNomenclature,
     // Warehouse tasks
-    startWarehouseTask,
-    completeWarehouseTask,
-    cancelWarehouseTask,
-    updateWarehouseTaskStatus,
-    executeReplenishmentRule,
-    replenishmentSchedule,
-    startQualityCheck,
     openQualityAlert,
     solveQualityAlert,
-    createQualityAlertReason,
-    updateQualityAlertReason,
-    deleteQualityAlertReason,
-    addMemberToQualityTeam,
-    removeMemberFromQualityTeam,
     updateStockQuantQuantity,
-    updateStockProductionLot,
-    createStockProductionLot,
-    deleteStockProductionLot,
-    updateStockProductionSerial,
-    createStockProductionSerial,
-    deleteStockProductionSerial,
-    linkDeviceToQualityCheck,
     upsertWarehouseGeo,
     restoreProductCategory,
     updateProductSupplierInfo,
@@ -4962,8 +3302,6 @@ function InventoryClientLoaded({
     productLabelById,
     stockQuantFormConfig,
     traceRecordFormConfig,
-    useSerial,
-    removeRuleFromNomenclature,
     runTraceabilityReport,
     askForm,
     lbl,
@@ -5419,12 +3757,19 @@ function InventoryClientLoaded({
 
   const isFormMutationPending =
     [
+      stockMoveTabActions,
+      inventoryCountTabActions,
+      productionLotTabActions,
+      productionSerialTabActions,
+      qualityCheckTabActions,
+      replenishmentTabActions,
+      pickingWaveTabActions,
+      stockRoutingTabActions,
+      barcodeTabActions,
+      warehouseTaskTabActions,
       createProduct,
       createStockPicking,
       createInventoryAdjustment,
-      createStockInventory,
-      createStockInventoryLine,
-      updateStockInventoryState,
       createStockLocation,
       updateStockLocation,
       createWarehouse,
@@ -5434,79 +3779,41 @@ function InventoryClientLoaded({
       deleteProduct,
       createProductVariant,
       deleteStockLocation,
-      createStockMove,
-      confirmStockMove,
-      assignStockMove,
-      doneStockMove,
-      cancelStockMove,
       assignUserToPicking,
       pickingWorkflow,
-      processAdjustment,
       reserveQuant,
       unreserveQuant,
       stockQuantWorkflow,
       createQualityCheck,
-      passQualityCheck,
-      failQualityCheck,
       createQualityAlert,
       assignQualityAlert,
       cancelQualityAlert,
       createQualityPoint,
-      updateQualityPoint,
       deleteQualityPoint,
       createQualityTeam,
-      updateQualityTeam,
       deleteQualityTeam,
       createBarcodeRule,
       updateBarcodeRule,
-      deleteBarcodeRule,
       recordBarcodeScan,
-      createBarcodeNomenclature,
-      updateBarcodeNomenclature,
-      deleteBarcodeNomenclature,
-      addRuleToNomenclature,
-      removeRuleFromNomenclature,
       createAdjustmentReason,
-      useSerial,
       blockSerial,
-      createStockProductionLot,
-      createStockProductionSerial,
       createTraceabilityRecord,
       createTraceabilityReport,
       runTraceabilityReport,
       createReplenishmentRule,
       createPickingWave,
-      confirmPickingWave,
-      completePickingWave,
       createProductCategory,
       updateProductCategory,
       deleteProductCategory,
       createStockRoute,
       updateStockRoute,
-      deleteStockRoute,
       createStockRule,
       updateStockRule,
-      deleteStockRule,
       createWarehouseTask,
-      startWarehouseTask,
-      completeWarehouseTask,
-      cancelWarehouseTask,
-      startQualityCheck,
       openQualityAlert,
       solveQualityAlert,
-      createQualityAlertReason,
-      updateQualityAlertReason,
-      deleteQualityAlertReason,
-      addMemberToQualityTeam,
-      removeMemberFromQualityTeam,
-      executeReplenishmentRule,
-      replenishmentSchedule,
       createStockQuant,
       updateStockQuantQuantity,
-      updateStockProductionLot,
-      deleteStockProductionLot,
-      updateStockProductionSerial,
-      deleteStockProductionSerial,
       updateProductVariant,
       updateProductInventoryData,
       updateProductPricing,
@@ -5516,15 +3823,12 @@ function InventoryClientLoaded({
       createWarehouse3dZone,
       updateWarehouse3dZone,
       deleteWarehouse3dZone,
-      updateWarehouseTaskStatus,
-      linkDeviceToQualityCheck,
       createProductSupplierInfo,
       updateProductSupplierInfo,
       createProductPackaging,
       updateProductPackaging,
       restoreProductCategory,
       upsertWarehouseGeo,
-      updateWhatsappQualityScore,
     ].some((h) => h.isPending) ||
     Object.values(csvImports).some((h) => h.isPending);
 

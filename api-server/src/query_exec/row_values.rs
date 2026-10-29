@@ -3,6 +3,14 @@
 use serde_json::Value;
 use stdb_auth::{has_resource_read_permission, FieldAccessContext};
 
+pub(super) fn row_company_matches(row: &Value, company_id: u64, allow_shared: bool) -> bool {
+    match row_u64(row, "companyId", "company_id") {
+        Ok(Some(id)) => id == company_id,
+        Ok(None) => allow_shared,
+        Err(_) => false,
+    }
+}
+
 /// Keep timestamp microseconds exact when query JSON is read by JavaScript.
 ///
 /// Only direct, single-key timestamp wire objects are changed. Arbitrary nested

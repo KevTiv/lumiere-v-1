@@ -1,6 +1,6 @@
 //! Scoped purchasing query handlers.
 
-use super::row_company_matches;
+use super::row_values::row_company_matches;
 use super::row_values::row_enum_tag_is;
 use super::row_values::row_id_u64;
 use super::row_values::row_u64;
@@ -104,4 +104,17 @@ pub(super) async fn read_partner_banks(
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     rows.retain(|row| row_company_matches(row, company_id, true));
     return Ok(rows);
+}
+
+pub(super) fn sort_purchasing_rows(resource: &str, rows: &mut [Value]) {
+    match resource {
+        "landed-costs" => {
+            rows.sort_by(|a, b| {
+                let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                bi.cmp(&ai)
+            });
+        }
+        _ => {}
+    }
 }

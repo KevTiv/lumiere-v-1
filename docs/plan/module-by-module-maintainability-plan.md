@@ -1,6 +1,9 @@
 # Module-by-module maintainability execution plan
 
-Status: **READY TO EXECUTE — no module is accepted by this document.**
+Status: **IN PROGRESS — bounded Accounting, Inventory and API query-execution slices have module ledgers; no whole module is accepted by this document.**
+Current evidence: [2026-10-28 cleanup verification](god-file-cleanup-2026-10-28.md),
+[Accounting](module-cleanup/accounting.md), [Inventory](module-cleanup/inventory.md)
+and [API query execution](module-cleanup/api-query-execution.md).
 Created: 2026-09-06.
 Audience: one maintainer and one implementation agent per session.
 Unit of delivery: one coherent, behavior-preserving cleanup slice in one module.

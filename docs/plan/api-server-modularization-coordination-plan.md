@@ -3,6 +3,11 @@
 Status: IN PROGRESS. Corrective implementation began 2026-09-05 against `221f2fe3`.
 Current evidence and remaining gates: [Luna integration log](code-ownership-luna-integration-log.md).
 `IMPLEMENTED` below means source ownership has moved, not that service-backed acceptance is complete.
+2026-10-28 follow-up: remaining query helpers now live in the existing domain
+owners; the literal dispatcher and original test paths remain intact. See the
+[query execution ledger](module-cleanup/api-query-execution.md) and
+[current verification record](god-file-cleanup-2026-10-28.md). M90 remains
+distinct from these source extractions and historical runtime evidence.
 Created: 2026-09-04.
 Scope: `api-server/src`, its focused tests, and source-inspecting codegen tooling affected by file moves.
 Execution owner: The primary agent session implementing this plan (the coordinator).

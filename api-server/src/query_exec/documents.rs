@@ -15,6 +15,63 @@ use super::row_values::sort_rows_by_id_desc;
 #[path = "documents_tests.rs"]
 mod tests;
 
+// Pilot ACL = owner-only on both WS and HTTP (match erp_subscriptions.rs; not full
+// `read_access_ids`). Documents/folders/versions must not fall through to org-only SQL.
+pub(super) async fn read_document_folders(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Vec<Value>, ApiError> {
+    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let cols =
+        resolve_http_sql_columns("document-folders", field_access).map_err(ApiError::Internal)?;
+    let col_part = cols.join(", ");
+    let sql = format!(
+        "SELECT {col_part} FROM doc_folder WHERE organization_id = {organization_id} AND (is_access_restricted = false OR owner_id = {id})"
+    );
+    client.query_sql(&sql).await.map_err(ApiError::internal)
+}
+
+pub(super) async fn read_documents(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Vec<Value>, ApiError> {
+    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let cols = resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal)?;
+    let col_part = cols.join(", ");
+    let deleted = if resource == "documents-deleted" {
+        "true"
+    } else {
+        "false"
+    };
+    let sql = format!(
+        "SELECT {col_part} FROM document WHERE organization_id = {organization_id} AND is_deleted = {deleted} AND owner_id = {id}"
+    );
+    client.query_sql(&sql).await.map_err(ApiError::internal)
+}
+
+// Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL cannot
+// JOIN/subquery parent `document.owner_id`. Filter by `created_by` (same as WS).
+pub(super) async fn read_document_versions(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<Vec<Value>, ApiError> {
+    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let cols =
+        resolve_http_sql_columns("document-versions", field_access).map_err(ApiError::Internal)?;
+    let col_part = cols.join(", ");
+    let sql = format!(
+        "SELECT {col_part} FROM document_version WHERE organization_id = {organization_id} AND created_by = {id}"
+    );
+    client.query_sql(&sql).await.map_err(ApiError::internal)
+}
+
 /// Child reads inherit the document permission, not a separately provisioned child grant.
 pub(super) fn has_document_read_permission(field_access: Option<&FieldAccessContext>) -> bool {
     if field_access.is_some_and(|access| stdb_auth::resource_read_denied(access, "documents")) {

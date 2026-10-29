@@ -2,6 +2,7 @@
 
 use super::company_scope::company_ids_for_organization;
 use super::company_scope::default_company_id;
+use super::row_values::row_company_matches;
 use crate::error::ApiError;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -10,6 +11,17 @@ use stdb_auth::resolve_http_sql_columns;
 use stdb_auth::select_company_scoped_sql;
 use stdb_auth::FieldAccessContext;
 use stdb_client::StdbClient;
+
+pub(super) fn filter_inventory_company_rows(
+    resource: &str,
+    company_id: u64,
+    rows: &mut Vec<Value>,
+) {
+    // product-categories with no company_id are org-shared and visible to all
+    // company members within the organization.
+    let allow_shared = matches!(resource, "product-categories");
+    rows.retain(|row| row_company_matches(row, company_id, allow_shared));
+}
 
 pub(super) async fn read_pos_configs(
     client: &StdbClient,
@@ -138,4 +150,17 @@ pub(super) async fn read_picking_batches(
     let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
         .map_err(ApiError::Internal)?;
     return client.query_sql(&sql).await.map_err(ApiError::internal);
+}
+
+pub(super) fn sort_inventory_rows(resource: &str, rows: &mut [Value]) {
+    match resource {
+        "quality-alerts" => {
+            rows.sort_by(|a, b| {
+                let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                bi.cmp(&ai)
+            });
+        }
+        _ => {}
+    }
 }
