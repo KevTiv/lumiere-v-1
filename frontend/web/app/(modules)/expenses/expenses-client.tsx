@@ -436,7 +436,7 @@ function ExpensesClientLoaded({
 
     return mapDashboardWidgets(moduleConfig, (w) => {
         if (["exp-monthly-spend", "exp-spend-by-category"].includes(w.id) && (expenseCurrencies.size !== 1 || expenseCurrencies.has(""))) {
-          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: t("accounting.accountingClient.thisAggregateRequiresOneKnownCurrencyMixedCurrenciesNeedVerifiedConversion") } }
         }
         if (w.type === "combo-chart" && w.id === "exp-monthly-spend") {
           return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now, 6, locale), valueFormat: money } }
@@ -453,7 +453,7 @@ function ExpensesClientLoaded({
                 { startMs: lastMonthStart, endMs: monthStart - 1 },
               ),
               valueFormat: money,
-              changeLabel: "vs last month",
+              changeLabel: t("expenses.expensesClient.vsLastMonth"),
             },
           }
         }
@@ -462,25 +462,25 @@ function ExpensesClientLoaded({
             ...w,
             data: {
               tabs: [
-                { id: "all", label: "All" },
-                { id: "awaiting-approval", label: "Awaiting approval" },
-                { id: "awaiting-posting", label: "Awaiting posting" },
+                { id: "all", label: t("accounting.accounts.all") },
+                { id: "awaiting-approval", label: t("sales.dashboard.queues.awaitingApproval") },
+                { id: "awaiting-posting", label: t("accounting.overview.awaitingPosting") },
               ],
               columns: [
-                { key: "report", label: "Report" },
-                { key: "employee", label: "Employee" },
-                { key: "submitted", label: "Created" },
-                { key: "ageDays", label: "Age (days)", type: "number", align: "right" },
-                { key: "amount", label: "Amount", type: "currency", currencyKey: "currency", align: "right" },
+                { key: "report", label: t("expenses.expenses.columns.sheetId") },
+                { key: "employee", label: t("expenses.expenses.columns.employeeId") },
+                { key: "submitted", label: t("expenses.expenseReports.columns.createdAt") },
+                { key: "ageDays", label: t("expenses.expensesClient.ageDays"), type: "number", align: "right" },
+                { key: "amount", label: t("expenses.expenses.columns.totalAmount"), type: "currency", currencyKey: "currency", align: "right" },
                 {
                   key: "status",
-                  label: "Status",
+                  label: t("expenses.expenses.columns.state"),
                   type: "badge",
-                  badgeVariants: { "Awaiting approval": "warning", "Awaiting posting": "info" },
+                  badgeVariants: { [t("sales.dashboard.queues.awaitingApproval")]: "warning", [t("accounting.overview.awaitingPosting")]: "info" },
                 },
               ],
               rows: approvalBacklog(sheetsRaw, employeeNames, currencyCodeById, nowMs),
-              emptyMessage: "Nothing waiting — every expense report is handled.",
+              emptyMessage: t("expenses.expensesClient.nothingWaitingEveryExpenseReportIsHandled"),
               onRowClick: (row: TabbedTableRow) => {
                 const sheet = sheetsRaw.find((candidate) => String(candidate.id) === String(row.id))
                 if (sheet) router.push(expenseReportHref(sheet)!)
@@ -657,7 +657,7 @@ function ExpensesClientLoaded({
                       decision.open("refuse", submitted[0]!)
                       return
                     }
-                    setToolbarError("Select one submitted report to refuse (reason required).")
+                    setToolbarError(t("expenses.expensesClient.selectOneSubmittedReportToRefuseReasonRequired"))
                   },
                 },
                 {
@@ -676,7 +676,7 @@ function ExpensesClientLoaded({
                       finance.open("postReport", approved[0]!)
                       return
                     }
-                    setToolbarError("Select one approved report to post (accounts required).")
+                    setToolbarError(t("expenses.expensesClient.selectOneApprovedReportToPostAccountsRequired"))
                   },
                 },
                 {
@@ -695,7 +695,7 @@ function ExpensesClientLoaded({
                       finance.open("reimburseReport", posted[0]!)
                       return
                     }
-                    setToolbarError("Select one posted report to reimburse.")
+                    setToolbarError(t("expenses.expensesClient.selectOnePostedReportToReimburse"))
                   },
                 },
               ]),
@@ -877,6 +877,7 @@ function ExpensesClientLoaded({
     editExpenseFormConfig,
     addToReportFormForRow,
     allocationsFormConfig,
+    t,
   ])
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {

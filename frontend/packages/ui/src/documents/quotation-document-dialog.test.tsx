@@ -14,7 +14,7 @@ vi.mock("@lumiere/ui/lib/rbac-context", () => ({ useRBAC: () => ({
   permissionsReady: true, currentUser: { id: "alice" },
   checkPermission: (_resource: string, action: string) => ({ allowed: action !== "create" || harness.canCreate }),
 }) }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()), useTranslation: () => ({ t: (key: string) => key }) }))
 // The UI package does not itself depend on React Query. Resolve the web
 // component's package entry so this seam mocks the same module instance.
 vi.mock("../../../../web/node_modules/@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries: harness.invalidate }) }))

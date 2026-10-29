@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { Button, Input, Label, DashboardWidgetRenderer, resolveStoredDashboard } from "@lumiere/ui"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
 import {
@@ -59,7 +59,7 @@ const FILTER_OPS: Array<{ value: QueryBuilderFilterOp; label: string }> = [
   { value: "gte", label: "≥" },
   { value: "lt", label: "<" },
   { value: "lte", label: "≤" },
-  { value: "in", label: "in (comma-separated)" },
+  { value: "in", get label() { return i18n.t("reports.queryBuilder.inCommaSeparated") } },
 ]
 
 const AGGREGATIONS = ["count", "sum", "avg", "min", "max"] as const
@@ -582,7 +582,7 @@ export function QueryBuilder({
                   <SelectContent className="max-h-72">
                     <SelectItem value="__none__">{t("reports.queryBuilder.sortNone")}</SelectItem>
                     {widgetKind === "chart" ? (
-                      <SelectItem value="value">Value</SelectItem>
+                      <SelectItem value="value">{t("crm.builtIn.moduleDashboardConfigs.crmDashboard.value.label")}</SelectItem>
                     ) : null}
                     {fields.map((f) => (
                       <SelectItem key={f.field} value={f.field}>
@@ -599,8 +599,8 @@ export function QueryBuilder({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="asc">Ascending</SelectItem>
-                    <SelectItem value="desc">Descending</SelectItem>
+                    <SelectItem value="asc">{t("reports.queryBuilder.ascending")}</SelectItem>
+                    <SelectItem value="desc">{t("reports.queryBuilder.descending")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

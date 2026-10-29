@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 //! Documents Module Form Configurations
 //!
 //! This module provides form configurations for Documents.
@@ -10,23 +12,23 @@ export const documentsForms: FormRegistryEntry[] = [
   {
     moduleId: "documents",
     formId: "new-document",
-    name: "New Document",
-    description: "Upload a new document",
+    get name() { return i18n.t("forms.defaults.documents.newDocument") },
+    get description() { return i18n.t("forms.defaults.documents.uploadANewDocument") },
     icon: "File",
-    category: "Documents",
+    get category() { return i18n.t("forms.defaults.documents.documents") },
     defaultConfig: () => ({
       moduleId: "documents",
       formId: "new-document",
-      name: "New Document",
-      description: "Upload a new document",
+      get name() { return i18n.t("forms.defaults.documents.newDocument") },
+      get description() { return i18n.t("forms.defaults.documents.uploadANewDocument") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "title",
           name: "title",
-          label: "Title",
+          get label() { return i18n.t("settings.ai.insightTitleField") },
           fieldType: "Text",
-          placeholder: "Document title",
+          get placeholder() { return i18n.t("forms.defaults.documents.documentTitle") },
           validation: { required: true, minLength: 2 },
           aiSuggestions: [],
           order: 1,
@@ -38,9 +40,9 @@ export const documentsForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("settings.ai.description") },
           fieldType: "Textarea",
-          placeholder: "Document description...",
+          get placeholder() { return i18n.t("forms.defaults.documents.documentDescription") },
           validation: { required: false },
           aiSuggestions: [],
           order: 2,
@@ -52,15 +54,15 @@ export const documentsForms: FormRegistryEntry[] = [
         {
           fieldId: "category",
           name: "category",
-          label: "Category",
+          get label() { return i18n.t("documents.forms.newCategory.sections.category") },
           fieldType: "Select",
           options: [
-            { value: "contract", label: "Contract", color: "blue" },
-            { value: "invoice", label: "Invoice", color: "green" },
-            { value: "report", label: "Report", color: "purple" },
-            { value: "policy", label: "Policy", color: "orange" },
-            { value: "manual", label: "Manual", color: "teal" },
-            { value: "other", label: "Other", color: "gray" },
+            { value: "contract", get label() { return i18n.t("forms.defaults.documents.contract") }, color: "blue" },
+            { value: "invoice", get label() { return i18n.t("forms.defaults.documents.invoice") }, color: "green" },
+            { value: "report", get label() { return i18n.t("forms.defaults.documents.report") }, color: "purple" },
+            { value: "policy", get label() { return i18n.t("forms.defaults.documents.policy") }, color: "orange" },
+            { value: "manual", get label() { return i18n.t("forms.defaults.documents.manual") }, color: "teal" },
+            { value: "other", get label() { return i18n.t("common.entityView.otherColumn") }, color: "gray" },
           ],
           validation: { required: false },
           aiSuggestions: [],
@@ -73,7 +75,7 @@ export const documentsForms: FormRegistryEntry[] = [
         {
           fieldId: "tags",
           name: "tags",
-          label: "Tags",
+          get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Tags") },
           fieldType: "Tags",
           validation: { required: false },
           aiSuggestions: [],
@@ -105,23 +107,23 @@ export const documentsForms: FormRegistryEntry[] = [
   {
     moduleId: "documents",
     formId: "new-folder",
-    name: "New Folder",
-    description: "Create a new folder",
+    get name() { return i18n.t("forms.defaults.documents.newFolder") },
+    get description() { return i18n.t("forms.defaults.documents.createANewFolder") },
     icon: "FolderPlus",
-    category: "Folders",
+    get category() { return i18n.t("forms.defaults.documents.folders") },
     defaultConfig: () => ({
       moduleId: "documents",
       formId: "new-folder",
-      name: "New Folder",
-      description: "Create a new folder",
+      get name() { return i18n.t("forms.defaults.documents.newFolder") },
+      get description() { return i18n.t("forms.defaults.documents.createANewFolder") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "name",
           name: "name",
-          label: "Folder Name",
+          get label() { return i18n.t("forms.defaults.documents.folderName") },
           fieldType: "Text",
-          placeholder: "Enter folder name",
+          get placeholder() { return i18n.t("forms.defaults.documents.enterFolderName") },
           validation: { required: true, minLength: 1 },
           aiSuggestions: [],
           order: 1,
@@ -133,7 +135,7 @@ export const documentsForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("settings.ai.description") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],

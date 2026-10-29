@@ -34,7 +34,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
 import { useErpSession } from "@lumiere/erp-session"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   DashboardWidgetRenderer,
@@ -745,7 +745,7 @@ function assertBundleImportSucceeded(
   if (receipt.status === "success" && receipt.errorRows === 0) return
   const firstError = receipt.errors[0]?.errorMessage
   throw new Error(
-    `${stage} import job #${receipt.jobId} finished ${receipt.status} with ${receipt.errorRows} rejected row${receipt.errorRows === 1 ? "" : "s"}.${firstError ? ` ${firstError}` : " Review the import job before retrying."}`,
+    i18n.t("accounting.accountingClient.importJobRejectedRows", { stage, jobId: receipt.jobId, status: receipt.status, count: receipt.errorRows, detail: firstError ?? i18n.t("accounting.accountingClient.reviewTheImportJobBeforeRetrying").trim() }),
   )
 }
 
@@ -774,6 +774,7 @@ export function AccountingClient(props: AccountingClientProps) {
 }
 
 function AccountingClientLoaded(props: AccountingClientLoadedProps) {
+  const { t } = useTranslation()
   const { companyIds, setActiveCompanyId } = useErpSession()
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
   const retainedCompany = useRef(operatingCompanyId)
@@ -793,13 +794,12 @@ function AccountingClientLoaded(props: AccountingClientLoadedProps) {
   if (retainedCompany.current == null) {
     return (
       <div className="space-y-4 rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
-        <p>Select an active company to open the accounting workspace.</p>
+        <p>{t("accounting.accountingClient.selectAnActiveCompanyToOpenTheAccountingWorkspace")}</p>
         <a
           href="/settings?section=finance-setup"
           className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
         >
-          Complete Finance setup
-        </a>
+          {t("settings.ui.settingsClient.completeFinanceSetup")}{" "}</a>
       </div>
     )
   }
@@ -1017,7 +1017,7 @@ function AccountingClientReady({
   const invoiceSellerCompany = invoiceSellerCompanyFromQueryRow(invoiceCompany)
   const invoiceIdentityReady = isInvoiceSellerIdentityReady(invoiceSellerCompany, operatingCompanyId, organizationId)
   const invoiceIdentityState = companiesRead.state.status === "ready" && !invoiceIdentityReady
-    ? { status: "error" as const, message: "The selected company identity is unavailable. Refresh before creating or posting an invoice." }
+    ? { status: "error" as const, message: t("accounting.accountingClient.theSelectedCompanyIdentityIsUnavailableRefreshBeforeCreatingOrPosting") }
     : companiesRead.state
   const invoiceSeller = invoicePersonalization.profile && invoiceIdentityReady
     ? invoiceSellerFromCompany(invoiceSellerCompany, invoicePersonalization.profile)
@@ -1146,11 +1146,11 @@ function AccountingClientReady({
       return {
         ...line,
         paymentTermLabel: term
-          ? `${term.name}${term.isActive ? "" : " (inactive)"}`
+          ? `${term.name}${term.isActive ? "" : t("accounting.accountingClient.inactive")}`
           : `Missing payment term #${paymentTermId}`,
       }
     })
-  }, [paymentTermLines, paymentTerms])
+  }, [paymentTermLines, paymentTerms, t])
 
   const fiscalYearSelectOptionsForPeriods = useMemo(() => {
     const companyKey = operatingCompanyId > 0n ? String(operatingCompanyId) : null
@@ -1537,12 +1537,12 @@ function AccountingClientReady({
       const first = readiness.blockingItems[0]
       toast({
         variant: "destructive",
-        title: `${first?.label ?? "Accounting setup"} is required`,
+        title: t("accounting.accountingClient.setupItemRequired", { item: first?.label ?? t("accounting.accountingClient.accountingSetup") }),
         description:
-          first?.reason ?? "Complete the accounting setup requirements shown above first.",
+          first?.reason ?? t("accounting.accountingClient.completeTheAccountingSetupRequirementsShownAboveFirst"),
       })
     },
-    [readinessByAction, toast],
+    [readinessByAction, toast, t],
   )
 
   const requestAccountingAction = useCallback(
@@ -1597,9 +1597,9 @@ function AccountingClientReady({
       }
       if (item.id === "base-currency") {
         toast({
-          title: "Base currency needs administrator repair",
+          title: t("accounting.accountingClient.baseCurrencyNeedsAdministratorRepair"),
           description:
-            "This operating company has no valid base currency. Keep this company selected and repair its company record before posting or importing accounting history.",
+            t("accounting.accountingClient.thisOperatingCompanyHasNoValidBaseCurrencyKeepThisCompany"),
           variant: "destructive",
         })
         return
@@ -1611,7 +1611,7 @@ function AccountingClientReady({
       } else if (item.id.endsWith("-account")) setAccountingActiveTab("accounts")
       else setAccountingActiveTab("taxes")
     },
-    [setAccountingActiveTab, toast],
+    [setAccountingActiveTab, toast, t],
   )
 
   const partnerSelectOptions = useMemo(() => {
@@ -1879,9 +1879,9 @@ function AccountingClientReady({
         Cancelled: "destructive",
       } as Record<string, BadgeVariant>,
       badgeLabels: {
-        Draft: "Draft",
-        Posted: "Posted",
-        Cancelled: "Cancelled",
+        Draft: t("accounting.journalEntries.states.draft"),
+        Posted: t("accounting.journalEntries.states.posted"),
+        Cancelled: t("accounting.journalEntries.states.cancelled"),
       },
     }
     const linesConfig = accountMoveLinesTableConfig(t, {
@@ -4549,19 +4549,19 @@ function AccountingClientReady({
       })
       await createDocument.mutateAsync(params)
       toast({
-        title: "Archived to Documents",
-        description: "PDF stored as a linked document version.",
+        title: t("accounting.accountingClient.archivedToDocuments"),
+        description: t("accounting.accountingClient.pDFStoredAsALinkedDocumentVersion"),
       })
     } catch (e) {
       toast({
         variant: "destructive",
-        title: "Archive PDF",
+        title: t("accounting.accountingClient.archivePDF"),
         description: e instanceof Error ? e.message : String(e),
       })
     } finally {
       setInvoiceDocBusy(null)
     }
-  }, [selectedInvoice, operatingCompanyId, createDocument, toast])
+  }, [selectedInvoice, operatingCompanyId, createDocument, toast, t])
 
   const handleInvoiceSendEmail = useCallback((move?: { id?: unknown }) => {
     const id = optionalBigIntU64(move?.id ?? selectedInvoice?.id)
@@ -4610,19 +4610,19 @@ function AccountingClientReady({
   const confirmBankLink = async (request: ReconciliationRequest): Promise<ReconciliationOutcome> => {
     const current = bankLinkAccess.current
     if (!current.actorKey || !canDispatchReviewedBankLink(current.source, request, current.allowed)) {
-      return { status: "rejected", message: "The company, access or bank records changed. Review the current records before linking." }
+      return { status: "rejected", message: t("accounting.accountingClient.theCompanyAccessOrBankRecordsChangedReviewTheCurrentRecords") }
     }
     if ([request.organizationId, request.companyId, request.lineId, ...request.moveLineIds].some((id) => BigInt(id) > BigInt(Number.MAX_SAFE_INTEGER))) {
-      return { status: "rejected", message: "This record identifier is not supported by the current command transport. No link was submitted." }
+      return { status: "rejected", message: t("accounting.accountingClient.thisRecordIdentifierIsNotSupportedByTheCurrentCommandTransport") }
     }
     try {
       const effect = await reconcileBankLine.mutateAsync({ lineId: BigInt(request.lineId), params: bankReconcileParamsToJson(request.moveLineIds.map((id) => BigInt(id)), 0) })
-      if (!current.actorKey || bankLinkAccess.current.actorKey !== current.actorKey) return { status: "unknown", message: "The signed-in user changed. Return to the original user and check this action." }
+      if (!current.actorKey || bankLinkAccess.current.actorKey !== current.actorKey) return { status: "unknown", message: t("accounting.bankRecovery.actorChanged") }
       if ("attempt" in effect) return { status: "lifecycle", attempt: effect.attempt }
       return effect.status === "awaiting_approval" ? { status: "awaiting_approval", paymentId: effect.paymentId } : { status: "confirmed" }
     } catch {
       // The existing command hook does not retain HTTP status; no error is safe to replay automatically.
-      return { status: "unknown", message: "The original bank-line link could not be confirmed. Check its saved result; do not submit it again." }
+      return { status: "unknown", message: t("accounting.accountingClient.theOriginalBankLineLinkCouldNotBeConfirmedCheckIts") }
     }
   }
   const checkBankLink = async (request: ReconciliationRequest, recovery?: BankSettlementRecoveryRequest): Promise<ReconciliationStatusResult> => {
@@ -4633,11 +4633,11 @@ function AccountingClientReady({
       && bankLinkAccess.current.source.state.status === "ready"
     if (!sameScope()) return "unconfirmed"
     const [lines, statements, payments, moves, moveLines] = await Promise.all([
-      fetchQueryList("/api/query/bank-statement-lines", "Could not check the original bank line"),
-      fetchQueryList("/api/query/bank-statements", "Could not check the original statement"),
-      fetchQueryList("/api/query/account-payments", "Could not check the original settlement payment"),
-      fetchQueryList("/api/query/account-moves", "Could not check the original settlement entries"),
-      fetchQueryList("/api/query/account-move-lines", "Could not check the original settlement balances"),
+      fetchQueryList("/api/query/bank-statement-lines", i18n.t("accounting.accounting_client.couldNotCheckTheOriginalBankLine")),
+      fetchQueryList("/api/query/bank-statements", i18n.t("accounting.accounting_client.couldNotCheckTheOriginalStatement")),
+      fetchQueryList("/api/query/account-payments", i18n.t("accounting.accounting_client.couldNotCheckTheOriginalSettlementPayment")),
+      fetchQueryList("/api/query/account-moves", i18n.t("accounting.accounting_client.couldNotCheckTheOriginalSettlementEntries")),
+      fetchQueryList("/api/query/account-move-lines", i18n.t("accounting.accounting_client.couldNotCheckTheOriginalSettlementBalances")),
     ])
     if (!sameScope()) return "unconfirmed"
     const lifecycle = resolveBankSettlementLifecycleEffect({ lines, statements, payments, moves, moveLines }, {
@@ -4668,15 +4668,15 @@ function AccountingClientReady({
         && (request.action !== "resubmit" || canDispatchReviewedBankLink(current.source, { organizationId: request.organizationId, companyId: request.companyId,
           statementId: request.statementId, lineId: request.lineId, moveLineIds: request.moveLineIds, amountResidual: 0 }, true))
     }
-    if (!mayDispatch()) return { status: "rejected", message: "The original settlement, user, company or access changed. Check its current status before recovering it." }
+    if (!mayDispatch()) return { status: "rejected", message: t("accounting.accountingClient.theOriginalSettlementUserCompanyOrAccessChangedCheckItsCurrent") }
     try {
       const effect = await recoverBankSettlement.mutateAsync({ request, mayDispatch })
       return { status: "lifecycle", attempt: effect.attempt }
     } catch (error) {
       const status = error != null && typeof error === "object" && "status" in error ? error.status : undefined
       return typeof status === "number" && status >= 400 && status < 500 && ![408, 429].includes(status)
-        ? { status: "rejected", message: error instanceof Error ? error.message : "The recovery request was rejected." }
-        : { status: "unknown", message: "The settlement recovery is unconfirmed. Keep the original request and check its saved result." }
+        ? { status: "rejected", message: error instanceof Error ? error.message : t("accounting.accountingClient.theRecoveryRequestWasRejected") }
+        : { status: "unknown", message: t("accounting.accountingClient.theSettlementRecoveryIsUnconfirmedKeepTheOriginalRequestAndCheck") }
     }
   }
 
@@ -4690,7 +4690,7 @@ function AccountingClientReady({
   const draftReviewState = mergeModuleStates([invoiceIdentityState, invoicePersonalization.state])
   const selectedInvoiceCompanyMatches = selectedInvoice != null && String(selectedInvoice.companyId) === String(operatingCompanyId)
   const selectedDraftReviewState = !selectedInvoiceCompanyMatches
-    ? { status: "error" as const, message: "Select this invoice’s company before reviewing or posting it." }
+    ? { status: "error" as const, message: t("accounting.accountingClient.selectThisInvoiceSCompanyBeforeReviewingOrPostingIt") }
     : draftReviewState
   const selectedInvoiceMoveType = enumTag(selectedInvoice?.moveType)
   const draftInvoicePersonalization = selectedInvoice && selectedInvoiceCompanyMatches && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && invoicePersonalization.profile && invoiceSeller
@@ -4711,13 +4711,13 @@ function AccountingClientReady({
     const ids = ["acc-revenue-expenses", "acc-collection-rate", "acc-aging-share", "acc-top-customers", "acc-cash-movements"]
     return mapDashboardWidgets(moduleConfigBase, (w) => {
       if (!ids.includes(w.id)) return w
-      if (sourceState.status !== "ready" || !currencyCode) return { ...w, type: "diagnostic", data: { code: "missing-measure", message: sourceState.status !== "ready" ? "Financial source data is not ready. Refresh this overview before interpreting totals." : "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+      if (sourceState.status !== "ready" || !currencyCode) return { ...w, type: "diagnostic", data: { code: "missing-measure", message: sourceState.status !== "ready" ? t("accounting.accountingClient.financialSourceDataIsNotReadyRefreshThisOverviewBeforeInterpreting") : t("accounting.accountingClient.thisAggregateRequiresOneKnownCurrencyMixedCurrenciesNeedVerifiedConversion") } }
       if (w.type === "combo-chart" && w.id === "acc-revenue-expenses") return { ...w, data: { ...w.data, values: revenueVsExpensesByMonth(chartInvoices, chartBills, now, 6, locale), valueFormat: money } }
       if (w.type === "radial-gauge" && w.id === "acc-collection-rate") {
         const rate = collectionRate(chartInvoices, currentRange)
-        return { ...w, data: { ...w.data, value: rate.collected, max: rate.invoiced, stats: [{ label: "Invoiced", value: formatChartValue(rate.invoiced, money) }, { label: "Collected", value: formatChartValue(rate.collected, money) }, { label: "Outstanding", value: formatChartValue(rate.outstanding, money) }] } }
+        return { ...w, data: { ...w.data, value: rate.collected, max: rate.invoiced, stats: [{ label: t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.revenue.label"), value: formatChartValue(rate.invoiced, money) }, { label: t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accCollectionRate.label"), value: formatChartValue(rate.collected, money) }, { label: t("sales.salesOrders.columns.amountResidual"), value: formatChartValue(rate.outstanding, money) }] } }
       }
-      if (w.type === "share-bar" && w.id === "acc-aging-share") return { ...w, data: { ...w.data, rows: agingShareRows(agingTotals(chartInvoices, chartBills, now.getTime()), { ar: "Invoices", ap: "Bills" }), valueFormat: money } }
+      if (w.type === "share-bar" && w.id === "acc-aging-share") return { ...w, data: { ...w.data, rows: agingShareRows(agingTotals(chartInvoices, chartBills, now.getTime()), { ar: t("accounting.accountingClient.invoiceSeriesLabel"), ap: t("accounting.accountingClient.billSeriesLabel") }), valueFormat: money } }
       if (w.type === "ranked-bars" && w.id === "acc-top-customers") return { ...w, data: { ...w.data, items: topCustomers(chartInvoices, partnerLabelMap, currentRange, previousRange), valueFormat: money } }
       if (w.type === "step-chart" && w.id === "acc-cash-movements") {
         const cash = weeklyCashMovements(chartPayments, now)
@@ -4725,7 +4725,7 @@ function AccountingClientReady({
       }
       return w
     }).map((section) => ({ ...section, widgets: section.widgets.filter((widget) => ids.includes(widget.id)) })).filter((section) => section.widgets.length > 0)
-  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale])
+  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale, t])
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}
@@ -5048,9 +5048,9 @@ function AccountingClientReady({
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!companyAvailable) throw new Error("Select an active company before saving this accounting form.")
+    if (!companyAvailable) throw new Error(t("accounting.accountingClient.selectAnActiveCompanyBeforeSavingThisAccountingForm"))
     if (isAccountingDataAction(action) && dataState[actionTabs[action]].status !== "ready") {
-      throw new Error("The accounting records needed by this form are not ready. Refresh their source before saving.")
+      throw new Error(t("accounting.accountingClient.theAccountingRecordsNeededByThisFormAreNotReadyRefresh"))
     }
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
@@ -5094,7 +5094,7 @@ function AccountingClientReady({
       await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
     } else if (action === "createFiscalYear") {
       if (operatingCompanyId <= 0n) {
-        throw new Error("No operating company is available for this organization")
+        throw new Error(t("accounting.accountingClient.noOperatingCompanyIsAvailableForThisOrganization"))
       }
       const p = toCreateFiscalYearParams(formData)
       if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
@@ -5211,11 +5211,11 @@ function AccountingClientReady({
             { companyId: operatingCompanyId },
           ),
         )
-        assertBundleImportSucceeded("Journal entry header", parentReceipt)
+        assertBundleImportSucceeded(i18n.t("accounting.accountingClient.journalEntryHeader"), parentReceipt)
 
         let importedMoves = await fetchQueryList<"account-moves">(
           `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
-          "Failed to resolve imported journal entries",
+          i18n.t("accounting.accountingClient.failedToResolveImportedJournalEntries"),
         )
         for (let attempt = 0; attempt < 4; attempt += 1) {
           const availableRefs = new Set(
@@ -5228,7 +5228,7 @@ function AccountingClientReady({
           await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
           importedMoves = await fetchQueryList<"account-moves">(
             `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
-            "Failed to resolve imported journal entries",
+            i18n.t("accounting.accountingClient.failedToResolveImportedJournalEntries"),
           )
         }
 
@@ -5258,10 +5258,10 @@ function AccountingClientReady({
           { companyId: operatingCompanyId },
         ),
       )
-      assertBundleImportSucceeded("Journal entry line", lineReceipt)
+      assertBundleImportSucceeded(i18n.t("accounting.accountingClient.journalEntryLine"), lineReceipt)
       return { bundleToken, moveIdByRef }
     },
-    [operatingCompanyId, orgId, trackedBundleImport],
+    [operatingCompanyId, orgId, trackedBundleImport, t],
   )
 
   const importAccountMoveBundle = useCallback(
@@ -5269,7 +5269,7 @@ function AccountingClientReady({
       const parsed = parseCsvText(text)
       const headers = parsed.headers.map((header) => header.trim().toLowerCase())
       if (new Set(headers).size !== headers.length) {
-        throw new Error("The journal import contains duplicate column names.")
+        throw new Error(t("accounting.accountingClient.theJournalImportContainsDuplicateColumnNames"))
       }
 
       const { parentMapping, lineMapping } = accountMoveBundleMappings(headers)
@@ -5288,7 +5288,7 @@ function AccountingClientReady({
         fileNamePrefix: "journal-entry",
       })
     },
-    [submitAccountMoveBundle],
+    [submitAccountMoveBundle, t],
   )
 
   const importOutstandingDocuments = useCallback(
@@ -5296,7 +5296,7 @@ function AccountingClientReady({
       const parsed = parseCsvText(text)
       const headers = parsed.headers.map((header) => header.trim().toLowerCase())
       if (new Set(headers).size !== headers.length) {
-        throw new Error("The outstanding-document import contains duplicate column names.")
+        throw new Error(t("accounting.accountingClient.theOutstandingDocumentImportContainsDuplicateColumnNames"))
       }
       const supportedColumns: ReadonlySet<string> = new Set([
         ...(mode === "reconstruct_original_total"
@@ -5329,7 +5329,7 @@ function AccountingClientReady({
         )
         if (!capabilityResponse.ok) {
           throw new Error(
-            `Historical payment replay capability check failed (${capabilityResponse.status})`,
+            i18n.t("accounting.accountingClient.historicalPaymentReplayCapabilityCheckFailed", { value1: capabilityResponse.status }),
           )
         }
         validateHistoricalPaymentReplayCapability(await capabilityResponse.json())
@@ -5391,7 +5391,7 @@ function AccountingClientReady({
           } catch (cause) {
             const detail = cause instanceof Error ? cause.message : String(cause)
             throw new Error(
-              `Original-total document ${moveId} was imported but could not be posted before payment replay. Complete any required approval, then retry this file. ${detail}`,
+              i18n.t("accounting.accountingClient.originalTotalDocumentWasImportedButCouldNotBePostedBefore", { value1: moveId, value2: detail }),
             )
           }
         }
@@ -5407,7 +5407,7 @@ function AccountingClientReady({
           } catch (cause) {
             const detail = cause instanceof Error ? cause.message : String(cause)
             throw new Error(
-              `Documents were imported and posted, but payment transaction ${batch.paymentTransactionId} could not be replayed. Correct the payment and retry this file; completed batches are idempotent. ${detail}`,
+              i18n.t("accounting.accountingClient.documentsWereImportedAndPostedButPaymentTransactionCouldNotBe", { value1: batch.paymentTransactionId, value2: detail }),
             )
           }
         }
@@ -5419,6 +5419,7 @@ function AccountingClientReady({
       operatingCompanyId,
       postMove,
       submitAccountMoveBundle,
+      t,
     ],
   )
 
@@ -5462,7 +5463,7 @@ function AccountingClientReady({
         tabs: (() => {
           const mapped = moduleConfigBase.tabs.map((tab) => {
             if (tab.id === "dashboard") {
-              return { ...tab, type: "custom" as const, customContent: <div className="space-y-8">{accountantOverview}<section aria-label="Financial charts" data-testid="accounting-finance-charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">{financeChartSections.flatMap((section) => section.widgets.map((widget) => <DashboardWidgetRenderer key={widget.id} widget={widget} widthClass={widget.width === "full" ? "lg:col-span-3" : widget.width === "2/3" ? "lg:col-span-2" : "lg:col-span-1"} />))}</section></div> }
+              return { ...tab, type: "custom" as const, customContent: <div className="space-y-8">{accountantOverview}<section aria-label={t("accounting.accountingClient.financialCharts")} data-testid="accounting-finance-charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">{financeChartSections.flatMap((section) => section.widgets.map((widget) => <DashboardWidgetRenderer key={widget.id} widget={widget} widthClass={widget.width === "full" ? "lg:col-span-3" : widget.width === "2/3" ? "lg:col-span-2" : "lg:col-span-1"} />))}</section></div> }
             }
             if (tab.id === "analytic-lines") {
               return {
@@ -5572,7 +5573,7 @@ function AccountingClientReady({
                         companyId: operatingCompanyId,
                         accountTypes,
                       })
-                      if (!p) throw new Error("Account type configuration is unavailable")
+                      if (!p) throw new Error(t("accounting.accountingClient.accountTypeConfigurationIsUnavailable"))
                       await createAccount.mutateAsync(p)
                     } : undefined}
                   />
@@ -6401,7 +6402,7 @@ function AccountingClientReady({
         action={readinessAction}
         onResolve={handleReadinessResolve}
         className="mb-4"
-      /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
+      /> : <p role="status" className="rounded-lg border p-4 text-sm">{t("accounting.accountingClient.selectAnActiveCompanyToContinueOriginalPendingOperationsHaveBeen")}</p>}
       {companyAvailable ? <ModuleWorkView
         organizationId={organizationId}
         config={config}
@@ -6421,8 +6422,8 @@ function AccountingClientReady({
       /> : null}
 
       {(accountingActiveTab === "payment-operations" && dataState["payment-operations"].status === "ready") || paymentOperationsLocked ? (
-        <section className="mt-6 space-y-3" aria-label="Payment operations">
-          {accountingActiveTab !== "payment-operations" ? <p role="status" className="rounded-lg border p-3 text-sm">The original payment operation is retained here until its result is confirmed.</p> : null}
+        <section className="mt-6 space-y-3" aria-label={t("accounting.tabs.operationalPayments")}>
+          {accountingActiveTab !== "payment-operations" ? <p role="status" className="rounded-lg border p-3 text-sm">{t("accounting.accountingClient.theOriginalPaymentOperationIsRetainedHereUntilItsResultIs")}</p> : null}
           <PaymentOperationsPanel
             organizationId={organizationId}
             companyId={operatingCompanyId}
@@ -7070,7 +7071,7 @@ function AccountingClientReady({
             <DialogTitle>
               {t("accounting.bankStatementDetail.title")}
               {bankLinkSource.state.status === "ready" && currentBankStatement
-                ? ` — ${currentBankStatement.name || `Statement #${currentBankStatement.id}`}`
+                ? ` — ${currentBankStatement.name || t("accounting.accountingClient.statementReference", { id: currentBankStatement.id })}`
                   : ""}
             </DialogTitle>
           </DialogHeader>

@@ -265,8 +265,8 @@ function ReleasedCreateInvoiceModal({
   }, [companyId, draftCompanyId, dirty, locked, saving, personalizationReady, sourceSignature, documentDefaults.signature])
 
   const buildParams = (): CreateManualAccountInvoiceParams => {
-    if (companyMismatch || !personalizationReady || defaultsChanged) throw new Error("Review the current company and invoice defaults before saving.")
-    if (!journal) throw new Error("Select an accounting journal")
+    if (companyMismatch || !personalizationReady || defaultsChanged) throw new Error(t("accounting.createInvoiceModal.reviewTheCurrentCompanyAndInvoiceDefaultsBeforeSaving", { defaultValue: "Review the current company and invoice defaults before saving." }))
+    if (!journal) throw new Error(t("accounting.createInvoiceModal.selectAnAccountingJournal", { defaultValue: "Select an accounting journal" }))
     const idempotencyKey = requestId ?? crypto.randomUUID().replaceAll("-", "")
     if (!requestId) setRequestId(idempotencyKey)
     const custom = Object.fromEntries(
@@ -298,7 +298,7 @@ function ReleasedCreateInvoiceModal({
         productId: line.productId ? BigInt(line.productId) : undefined,
       })),
     })
-    if (!params) throw new Error("Complete the required invoice fields with valid values")
+    if (!params) throw new Error(t("accounting.createInvoiceModal.completeTheRequiredInvoiceFieldsWithValidValues", { defaultValue: "Complete the required invoice fields with valid values" }))
     return params
   }
 
@@ -318,7 +318,7 @@ function ReleasedCreateInvoiceModal({
       else if (outcome.kind === "rejected") setError(outcome.error.message)
       else {
         setUnknownParams(params)
-        setError("The result is not confirmed. Check the previous action before trying again.")
+        setError(t("accounting.createInvoiceModal.theResultIsNotConfirmedCheckThePreviousActionBefore", { defaultValue: "The result is not confirmed. Check the previous action before trying again." }))
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
     finally { setSaving(false) }
@@ -329,68 +329,68 @@ function ReleasedCreateInvoiceModal({
     try {
       const ref = await onCheckStatus(unknownParams)
       if (ref) resolve(ref)
-      else setError("The invoice is still unconfirmed. Keep this form and check again later.")
+      else setError(t("accounting.createInvoiceModal.theInvoiceIsStillUnconfirmedKeepThisFormAndCheck", { defaultValue: "The invoice is still unconfirmed. Keep this form and check again later." }))
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
     finally { setSaving(false) }
   }
   const close = () => { if (saving) return; if (!locked && !dirty) reset(); onClose() }
   const discard = async () => {
     if (locked || saving) return
-    if (await confirmDiscard({ description: "Discard this unsaved invoice draft and its document edits?" })) reset()
+    if (await confirmDiscard({ description: t("accounting.createInvoiceModal.discardThisUnsavedInvoiceDraftAndItsDocumentEdits", { defaultValue: "Discard this unsaved invoice draft and its document edits?" }) })) reset()
   }
 
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
     <DialogContent data-testid="create-invoice-modal" className="flex h-[min(94dvh,960px)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1480px,calc(100%-3rem))]">
-      <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
+      <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>{t("accounting.createInvoiceModal.prepareTheDetailsAndReviewTheDocumentBeforeSavingA", { defaultValue: "Prepare the details and review the document before saving a draft." })}</DialogDescription></DialogHeader>
       <div ref={scrollBodyRef} data-testid="create-invoice-scroll-body" className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
       {error ? <p role="alert" className="mb-4 rounded-md border bg-destructive/5 p-3 text-sm text-destructive [overflow-wrap:anywhere]">{error}</p> : null}
       <FinanceReviewWorkspace previewTabTestId="create-invoice-preview-toggle" editor={
       <div className="min-w-0">
-      {companyMismatch ? <p role="alert" className="mb-4 rounded-md border p-3 text-sm">This draft belongs to company #{String(draftCompanyId)}. Switch back to continue. Your entries and any previous action are preserved.</p> : null}
+      {companyMismatch ? <p role="alert" className="mb-4 rounded-md border p-3 text-sm">{t("accounting.createInvoiceModal.draftCompanyChanged", { defaultValue: "This draft belongs to company #{{companyId}}. Switch back to continue. Your entries and any previous action are preserved.", companyId: String(draftCompanyId) })}</p> : null}
       {kind === "invoice" ? <ModuleDataNotice state={personalizationState} /> : null}
-      {defaultsChanged ? <div role="status" className="mb-4 space-y-2 rounded-md border p-3 text-sm"><p>Company invoice settings changed. Review the latest defaults before saving. Your explicit changes and notes will be kept.</p><Button variant="outline" disabled={locked || saving} onClick={() => setDocumentDefaults(currentDefaults())}>Apply current invoice defaults</Button></div> : null}
+      {defaultsChanged ? <div role="status" className="mb-4 space-y-2 rounded-md border p-3 text-sm"><p>{t("accounting.createInvoiceModal.companyInvoiceSettingsChangedReviewTheLatestDefaultsBeforeSaving", { defaultValue: "Company invoice settings changed. Review the latest defaults before saving. Your explicit changes and notes will be kept." })}</p><Button variant="outline" disabled={locked || saving} onClick={() => setDocumentDefaults(currentDefaults())}>{t("accounting.createInvoiceModal.applyCurrentInvoiceDefaults", { defaultValue: "Apply current invoice defaults" })}</Button></div> : null}
       <fieldset disabled={locked || saving || companyMismatch || !personalizationReady} className="min-w-0 space-y-6" onChangeCapture={() => setFormEdited(true)}>
         <section className="space-y-4" aria-label={t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}><div><h3 className="font-semibold">{t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.documentDetailsHint", { defaultValue: "Start with the customer or vendor, dates and reference." })}</p></div>
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldSelect label={kind === "bill" ? t("accounting.workflowGuide.vendor", { defaultValue: "Vendor" }) : t("accounting.workflowGuide.customer", { defaultValue: "Customer" })} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
-          <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? "Bill date" : "Invoice Date"}</Label><DatePicker id="create-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
+          <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? t("accounting.createInvoiceModal.billDate", { defaultValue: "Bill date" }) : t("accounting.forms.newInvoice.fields.invoiceDate", { defaultValue: "Invoice Date" })}</Label><DatePicker id="create-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
           <div className="space-y-2"><Label htmlFor="create-invoice-due-date">{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><DatePicker id="create-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
-          <div className="space-y-2"><Label>Reference</Label><Input aria-label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} /></div>
-          <div className="space-y-2"><Label>Currency</Label><Input aria-label="Currency" value={currencyOption?.label ?? (journal ? `Currency #${journal.currencyId}` : "Select a journal")} readOnly /></div>
+          <div className="space-y-2"><Label>{t("accounting.journalEntries.ref", { defaultValue: "Reference" })}</Label><Input aria-label={t("accounting.journalEntries.ref", { defaultValue: "Reference" })} value={reference} onChange={(event) => setReference(event.target.value)} /></div>
+          <div className="space-y-2"><Label>{t("accounting.overview.currency", { defaultValue: "Currency" })}</Label><Input aria-label={t("accounting.overview.currency", { defaultValue: "Currency" })} value={currencyOption?.label ?? (journal ? t("accounting.createInvoiceModal.currencyValue", { defaultValue: "Currency #{{value1}}", value1: journal.currencyId }) : t("accounting.createInvoiceModal.selectAJournal", { defaultValue: "Select a journal" }))} readOnly /></div>
         </div></section>
-        {journalOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active purchase journal before recording a bill." : "Configure an active sales journal before creating an invoice."}</ReadinessMessage> : null}
+        {journalOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? t("accounting.createInvoiceModal.configureAnActivePurchaseJournalBeforeRecordingABill", { defaultValue: "Configure an active purchase journal before recording a bill." }) : t("accounting.createInvoiceModal.configureAnActiveSalesJournalBeforeCreatingAnInvoice", { defaultValue: "Configure an active sales journal before creating an invoice." })}</ReadinessMessage> : null}
         <p className="text-xs text-muted-foreground">{t("accounting.workflowGuide.saveDraftHint", { defaultValue: "Save creates a draft and opens the saved document. Review and post it there when ready; payment and bank matching come afterwards." })}</p>
-        {partnerOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Add an active vendor before recording a bill." : "Add an active customer before creating an invoice."}</ReadinessMessage> : null}
-        {counterpartOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active payable account before recording a bill." : "Configure an active receivable account before creating an invoice."}</ReadinessMessage> : null}
-        {commercialOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active expense account before recording a bill." : "Configure an active income account before creating an invoice."}</ReadinessMessage> : null}
+        {partnerOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? t("accounting.createInvoiceModal.addAnActiveVendorBeforeRecordingABill", { defaultValue: "Add an active vendor before recording a bill." }) : t("accounting.createInvoiceModal.addAnActiveCustomerBeforeCreatingAnInvoice", { defaultValue: "Add an active customer before creating an invoice." })}</ReadinessMessage> : null}
+        {counterpartOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? t("accounting.createInvoiceModal.configureAnActivePayableAccountBeforeRecordingABill", { defaultValue: "Configure an active payable account before recording a bill." }) : t("accounting.createInvoiceModal.configureAnActiveReceivableAccountBeforeCreatingAnInvoice", { defaultValue: "Configure an active receivable account before creating an invoice." })}</ReadinessMessage> : null}
+        {commercialOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? t("accounting.createInvoiceModal.configureAnActiveExpenseAccountBeforeRecordingABill", { defaultValue: "Configure an active expense account before recording a bill." }) : t("accounting.createInvoiceModal.configureAnActiveIncomeAccountBeforeCreatingAnInvoice", { defaultValue: "Configure an active income account before creating an invoice." })}</ReadinessMessage> : null}
         {customFields.length ? <div className="grid gap-4 md:grid-cols-2">{customFields.map((field) =>
           <div key={field.fieldId} className="space-y-2"><Label>{field.label}{field.validation.required ? " *" : ""}</Label><Input data-testid={`create-invoice-custom-${field.fieldId}`} value={customValues[field.fieldId] ?? ""} onChange={(event) => setCustomValues((previous) => ({ ...previous, [field.fieldId]: event.target.value }))} /></div>)}</div> : null}
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 border-t pt-5"><h3 className="font-semibold">{t("accounting.forms.newInvoice.lineItems")}</h3><Button type="button" variant="outline" size="sm" onClick={() => setLineItems((previous) => [...previous, newLine(crypto.randomUUID())])}><Plus className="mr-2 h-4 w-4" />{t("accounting.forms.newInvoice.addItem")}</Button></div>
           {lineItems.map((line, index) => <div key={line.id} className="rounded-lg border bg-muted/15 p-4">
-            <div className="mb-4 flex items-center justify-between"><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Item {index + 1}</span><Button type="button" aria-label={`Remove item ${index + 1}`} variant="ghost" size="icon" disabled={lineItems.length === 1} onClick={() => setLineItems((previous) => previous.filter((item) => item.id !== line.id))}><Trash2 className="h-4 w-4" /></Button></div>
+            <div className="mb-4 flex items-center justify-between"><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("accounting.createInvoiceModal.lineNumber", { defaultValue: "Item {{number}}", number: index + 1 })}</span><Button type="button" aria-label={t("accounting.createInvoiceModal.removeItemValue", { defaultValue: "Remove item {{value1}}", value1: index + 1 })} variant="ghost" size="icon" disabled={lineItems.length === 1} onClick={() => setLineItems((previous) => previous.filter((item) => item.id !== line.id))}><Trash2 className="h-4 w-4" /></Button></div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <FieldSelect label="Product" value={line.productId || NONE} onChange={(value) => chooseProduct(line, value)} options={[{ value: NONE, label: "No product" }, ...productOptions]} />
-            <div className="space-y-2 xl:col-span-2"><Label>Description</Label><Input aria-label={`Item ${index + 1} description`} data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
-            <div className="space-y-2"><Label htmlFor={`invoice-line-quantity-${line.id}`}>Qty</Label><Input id={`invoice-line-quantity-${line.id}`} aria-label={`Item ${index + 1} quantity`} type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></div>
-            <div className="space-y-2"><Label>Unit price</Label><Input aria-label={`Item ${index + 1} unit price`} data-testid={index === 0 ? "create-invoice-line-unit-price" : undefined} type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) })} /></div>
-            <FieldSelect label="Tax" value={line.taxId || NONE} onChange={(value) => updateLine(line.id, { taxId: value === NONE ? "" : value })} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
-            <div className="space-y-2"><Label>Discount %</Label><Input aria-label={`Item ${index + 1} discount percent`} type="number" min={0} max={100} value={line.discount} onChange={(event) => updateLine(line.id, { discount: Number(event.target.value) })} /></div>
-            <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
-          </div><div className="mt-4 flex justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Line amount</span><span className="font-medium tabular-nums">{money(line.quantity * line.unitPrice * (1 - line.discount / 100))}</span></div></div>)}
+            <FieldSelect label={t("accounting.createInvoiceModal.product", { defaultValue: "Product" })} value={line.productId || NONE} onChange={(value) => chooseProduct(line, value)} options={[{ value: NONE, label: t("accounting.createInvoiceModal.noProduct", { defaultValue: "No product" }) }, ...productOptions]} />
+            <div className="space-y-2 xl:col-span-2"><Label>{t("accounting.taxSchedules.columns.description", { defaultValue: "Description" })}</Label><Input aria-label={t("accounting.createInvoiceModal.itemValueDescription", { defaultValue: "Item {{value1}} description", value1: index + 1 })} data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor={`invoice-line-quantity-${line.id}`}>{t("accounting.forms.newInvoice.columns.qty", { defaultValue: "Qty" })}</Label><Input id={`invoice-line-quantity-${line.id}`} aria-label={t("accounting.createInvoiceModal.itemValueQuantity", { defaultValue: "Item {{value1}} quantity", value1: index + 1 })} type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></div>
+            <div className="space-y-2"><Label>{t("accounting.billCorrection.price", { defaultValue: "Unit price" })}</Label><Input aria-label={t("accounting.createInvoiceModal.itemValueUnitPrice", { defaultValue: "Item {{value1}} unit price", value1: index + 1 })} data-testid={index === 0 ? "create-invoice-line-unit-price" : undefined} type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) })} /></div>
+            <FieldSelect label={t("accounting.forms.newInvoice.summary.tax", { defaultValue: "Tax" })} value={line.taxId || NONE} onChange={(value) => updateLine(line.id, { taxId: value === NONE ? "" : value })} options={[{ value: NONE, label: t("accounting.createInvoiceModal.noTax", { defaultValue: "No tax" }) }, ...taxOptions]} />
+            <div className="space-y-2"><Label>{t("accounting.createInvoiceModal.discount", { defaultValue: "Discount %" })}</Label><Input aria-label={t("accounting.createInvoiceModal.itemValueDiscountPercent", { defaultValue: "Item {{value1}} discount percent", value1: index + 1 })} type="number" min={0} max={100} value={line.discount} onChange={(event) => updateLine(line.id, { discount: Number(event.target.value) })} /></div>
+            <FieldSelect label={kind === "bill" ? t("accounting.createInvoiceModal.expenseAccount", { defaultValue: "Expense account" }) : t("accounting.createInvoiceModal.incomeAccount", { defaultValue: "Income account" })} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
+          </div><div className="mt-4 flex justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">{t("accounting.createInvoiceModal.lineAmount", { defaultValue: "Line amount" })}</span><span className="font-medium tabular-nums">{money(line.quantity * line.unitPrice * (1 - line.discount / 100))}</span></div></div>)}
         </div>
         <section className="space-y-4 border-t pt-5" aria-label={t("accounting.authoring.paymentDetails", { defaultValue: "Payment details" })}>
           <h3 className="font-semibold">{t("accounting.authoring.paymentDetails", { defaultValue: "Payment details" })}</h3>
           <div className="grid gap-4 sm:grid-cols-2">
-          <FieldSelect label="Payment term (optional)" value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: "None" }, ...paymentTermOptions]} />
-          <div className="space-y-2"><Label>Payment reference</Label><Input aria-label="Payment reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
+          <FieldSelect label={t("accounting.createInvoiceModal.paymentTermOptional", { defaultValue: "Payment term (optional)" })} value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: t("common.none", { defaultValue: "None" }) }, ...paymentTermOptions]} />
+          <div className="space-y-2"><Label>{t("accounting.authoring.paymentReference", { defaultValue: "Payment reference" })}</Label><Input aria-label={t("accounting.authoring.paymentReference", { defaultValue: "Payment reference" })} value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
           </div>
         </section>
         <section className="space-y-4 border-t pt-5" aria-label={t("accounting.authoring.accountingDetails", { defaultValue: "Accounting details" })}>
           <div><h3 className="font-semibold">{t("accounting.authoring.accountingDetails", { defaultValue: "Accounting details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.accountingSelectionHint", { defaultValue: "Review the journal and accounts before saving. The journal sets the currency." })}</p></div>
           <div className="grid gap-4 sm:grid-cols-2">
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={(value) => { setFormEdited(true); setJournalId(value) }} options={journalOptions} />
-          <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartAccountId(value) }} options={counterpartOptions} />
+          <FieldSelect label={kind === "bill" ? t("accounting.createInvoiceModal.payableAccount", { defaultValue: "Payable account" }) : t("accounting.creditControl.writeOffForm.fields.receivableAccountId", { defaultValue: "Receivable account" })} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartAccountId(value) }} options={counterpartOptions} />
           </div>
         </section>
         {kind === "invoice" ? <Collapsible className="flex min-w-0 flex-col gap-3 border-t pt-5">
@@ -399,7 +399,7 @@ function ReleasedCreateInvoiceModal({
           </CollapsibleTrigger>
           <dl className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="create-invoice-content-summary">
             {contentFields.map(({ key, label }) => <div key={key} className="min-w-0 text-xs">
-              <dt className="font-medium">{label} · <span className="text-muted-foreground">{Object.hasOwn(contentOverrides, key)
+              <dt className="font-medium">{t(`accounting.invoiceContent.${key}`, { defaultValue: label })} · <span className="text-muted-foreground">{Object.hasOwn(contentOverrides, key)
                 ? effectiveProfile[key] === "" ? t("accounting.authoring.contentCleared", { defaultValue: "Cleared for this document" }) : t("accounting.authoring.contentOverride", { defaultValue: "Edited for this document" })
                 : t("accounting.authoring.contentInherited", { defaultValue: "Company default" })}</span></dt>
               <dd className="line-clamp-2 whitespace-pre-wrap break-words text-muted-foreground">{effectiveProfile[key] || t("accounting.authoring.contentEmpty", { defaultValue: "No text" })}</dd>
@@ -407,7 +407,7 @@ function ReleasedCreateInvoiceModal({
           </dl>
           <CollapsibleContent className="flex min-w-0 flex-col gap-4">
             <p className="text-xs text-muted-foreground">{t("accounting.authoring.documentContentHint", { defaultValue: "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text." })}</p>
-            {contentFields.map(({ key, label, limit }) => <div key={key} className="min-w-0 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor={`invoice-content-${key}`}>{label}</Label>{Object.hasOwn(contentOverrides, key) ? <Button variant="ghost" size="sm" onClick={() => setContentOverrides((previous) => { const next = { ...previous }; delete next[key]; return next })}>Use company default</Button> : null}</div><Textarea id={`invoice-content-${key}`} aria-label={label} value={effectiveProfile[key]} maxLength={limit} onChange={(event) => setContentOverrides((previous) => ({ ...previous, [key]: event.target.value }))} rows={key === "terms" ? 4 : 3} /></div>)}
+            {contentFields.map(({ key, label, limit }) => <div key={key} className="min-w-0 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor={`invoice-content-${key}`}>{t(`accounting.invoiceContent.${key}`, { defaultValue: label })}</Label>{Object.hasOwn(contentOverrides, key) ? <Button variant="ghost" size="sm" onClick={() => setContentOverrides((previous) => { const next = { ...previous }; delete next[key]; return next })}>{t("accounting.createInvoiceModal.useCompanyDefault", { defaultValue: "Use company default" })}</Button> : null}</div><Textarea id={`invoice-content-${key}`} aria-label={t(`accounting.invoiceContent.${key}`, { defaultValue: label })} value={effectiveProfile[key]} maxLength={limit} onChange={(event) => setContentOverrides((previous) => ({ ...previous, [key]: event.target.value }))} rows={key === "terms" ? 4 : 3} /></div>)}
           </CollapsibleContent>
         </Collapsible> : null}
         <section className="space-y-2 border-t pt-5">
@@ -416,12 +416,12 @@ function ReleasedCreateInvoiceModal({
       </fieldset>
       </div>
       } preview={
-      <div className="min-w-0 rounded-xl bg-muted/40 p-4 sm:p-6"><div className="mb-4 flex items-center gap-2 text-sm font-medium"><Eye className="size-4 text-muted-foreground" />Live preview</div><InvoiceDocument title={kind === "bill" ? "Vendor bill" : "Invoice"} reference={reference} partnerLabel={kind === "bill" ? "Vendor" : "Bill to"} partner={partnerOptions.find((option) => option.value === partnerId)?.label} date={invoiceDate} dueDate={dueDate} currency={currency} lines={lineItems} subtotal={subtotal} tax={totalTax} total={subtotal + totalTax} personalization={kind === "invoice" ? previewPersonalization : undefined} notes={notes} draft /></div>
+      <div className="min-w-0 rounded-xl bg-muted/40 p-4 sm:p-6"><div className="mb-4 flex items-center gap-2 text-sm font-medium"><Eye className="size-4 text-muted-foreground" />{t("settings.formConfig.tabs.preview", { defaultValue: "Live preview" })}</div><InvoiceDocument title={kind === "bill" ? t("accounting.manualInvoice.billTitle", { defaultValue: "Vendor bill" }) : t("accounting.manualInvoice.invoiceTitle", { defaultValue: "Invoice" })} reference={reference} partnerLabel={kind === "bill" ? t("accounting.workflowGuide.vendor", { defaultValue: "Vendor" }) : t("accounting.createInvoiceModal.billTo", { defaultValue: "Bill to" })} partner={partnerOptions.find((option) => option.value === partnerId)?.label} date={invoiceDate} dueDate={dueDate} currency={currency} lines={lineItems} subtotal={subtotal} tax={totalTax} total={subtotal + totalTax} personalization={kind === "invoice" ? previewPersonalization : undefined} notes={notes} draft /></div>
       } />
       </div>
-      <DialogFooter className="m-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none bg-background px-5 sm:justify-between sm:px-6"><div className="mr-auto min-w-0 text-sm"><span className="text-muted-foreground">Total</span><p className="font-semibold tabular-nums [overflow-wrap:anywhere]">{money(subtotal + totalTax)}</p></div>{dirty && !locked ? <Button variant="ghost" onClick={() => void discard()} disabled={saving}>Discard draft</Button> : null}<Button variant="outline" onClick={close} disabled={saving}>{locked ? "Close and keep draft" : t("common.cancel")}</Button>{locked
-        ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>
-        : <Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>Save as Draft</Button>}</DialogFooter>
+      <DialogFooter className="m-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none bg-background px-5 sm:justify-between sm:px-6"><div className="mr-auto min-w-0 text-sm"><span className="text-muted-foreground">{t("common.entityView.pivotTotal", { defaultValue: "Total" })}</span><p className="font-semibold tabular-nums [overflow-wrap:anywhere]">{money(subtotal + totalTax)}</p></div>{dirty && !locked ? <Button variant="ghost" onClick={() => void discard()} disabled={saving}>{t("common.formDraft.discard", { defaultValue: "Discard draft" })}</Button> : null}<Button variant="outline" onClick={close} disabled={saving}>{locked ? t("accounting.createInvoiceModal.closeAndKeepDraft", { defaultValue: "Close and keep draft" }) : t("common.cancel")}</Button>{locked
+        ? <Button onClick={() => void checkStatus()} disabled={saving}>{t("accounting.createInvoiceModal.checkPreviousAction", { defaultValue: "Check previous action" })}</Button>
+        : <Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>{t("accounting.forms.newInvoice.saveDraft", { defaultValue: "Save as Draft" })}</Button>}</DialogFooter>
       {navigationDialog}
       {discardDialog}
     </DialogContent>
@@ -431,8 +431,9 @@ function ReleasedCreateInvoiceModal({
 function FieldSelect({ label, value, onChange, options, testId }: {
   label: string; value: string; onChange: (value: string) => void; options: ManualInvoiceOption[]; testId?: string
 }) {
+  const { t } = useTranslation()
   const id = useId()
-  return <div className="min-w-0 space-y-2"><Label htmlFor={id}>{label}</Label><Select value={value} onValueChange={onChange}><SelectTrigger id={id} data-testid={testId}><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
+  return <div className="min-w-0 space-y-2"><Label htmlFor={id}>{label}</Label><Select value={value} onValueChange={onChange}><SelectTrigger id={id} data-testid={testId}><SelectValue placeholder={t("settings.formConfig.fieldDialog.fieldTypes.Select", { defaultValue: "Select" })} /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>
 }
 
 interface LegacyCreateInvoiceModalProps {
@@ -561,22 +562,22 @@ function LegacyCreateInvoiceModal({
 
   return <Dialog open={open} onOpenChange={(next) => { if (!next && !saving) onClose() }}>
     <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-4xl overflow-y-auto sm:max-w-4xl">
-      <DialogHeader><DialogTitle>{documentKind === "bill" ? "New bill" : "New invoice"}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{documentKind === "bill" ? t("accounting.overview.newBill", { defaultValue: "New bill" }) : t("accounting.overview.newInvoice", { defaultValue: "New invoice" })}</DialogTitle></DialogHeader>
       <div className="grid gap-4 md:grid-cols-2">
-        <FieldSelect label={documentKind === "bill" ? "Vendor" : "Customer"} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
-        <FieldSelect label="Journal" value={journalId} onChange={setJournalId} options={journalOptions} />
-        <FieldSelect label={documentKind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartAccountOptions} />
-        <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? "Bill Date" : "Invoice Date"}</Label><DatePicker id="legacy-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">Due Date</Label><DatePicker id="legacy-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
+        <FieldSelect label={documentKind === "bill" ? t("accounting.workflowGuide.vendor", { defaultValue: "Vendor" }) : t("accounting.workflowGuide.customer", { defaultValue: "Customer" })} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
+        <FieldSelect label={t("accounting.journalEntries.journal", { defaultValue: "Journal" })} value={journalId} onChange={setJournalId} options={journalOptions} />
+        <FieldSelect label={documentKind === "bill" ? t("accounting.createInvoiceModal.payableAccount", { defaultValue: "Payable account" }) : t("accounting.creditControl.writeOffForm.fields.receivableAccountId", { defaultValue: "Receivable account" })} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartAccountOptions} />
+        <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? t("accounting.bills.billDate", { defaultValue: "Bill Date" }) : t("accounting.forms.newInvoice.fields.invoiceDate", { defaultValue: "Invoice Date" })}</Label><DatePicker id="legacy-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">{t("accounting.invoices.dueDate", { defaultValue: "Due Date" })}</Label><DatePicker id="legacy-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
       </div>
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-5">
-        <div className="space-y-2 md:col-span-2"><Label htmlFor="legacy-line-description">Description</Label><Input id="legacy-line-description" data-testid="create-invoice-line-description" value={line.description} onChange={(event) => setLine((value) => ({ ...value, description: event.target.value }))} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-line-quantity">Qty</Label><Input id="legacy-line-quantity" type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => setLine((value) => ({ ...value, quantity: Number(event.target.value) }))} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-line-price">Unit price</Label><Input id="legacy-line-price" data-testid="create-invoice-line-unit-price" type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => setLine((value) => ({ ...value, unitPrice: Number(event.target.value) }))} /></div>
-        <FieldSelect label="Tax" testId="create-invoice-line-tax" value={line.taxId || NONE} onChange={(value) => setLine((current) => ({ ...current, taxId: value === NONE ? "" : value }))} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
+        <div className="space-y-2 md:col-span-2"><Label htmlFor="legacy-line-description">{t("accounting.taxSchedules.columns.description", { defaultValue: "Description" })}</Label><Input id="legacy-line-description" data-testid="create-invoice-line-description" value={line.description} onChange={(event) => setLine((value) => ({ ...value, description: event.target.value }))} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-line-quantity">{t("accounting.forms.newInvoice.columns.qty", { defaultValue: "Qty" })}</Label><Input id="legacy-line-quantity" type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => setLine((value) => ({ ...value, quantity: Number(event.target.value) }))} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-line-price">{t("accounting.billCorrection.price", { defaultValue: "Unit price" })}</Label><Input id="legacy-line-price" data-testid="create-invoice-line-unit-price" type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => setLine((value) => ({ ...value, unitPrice: Number(event.target.value) }))} /></div>
+        <FieldSelect label={t("accounting.forms.newInvoice.summary.tax", { defaultValue: "Tax" })} testId="create-invoice-line-tax" value={line.taxId || NONE} onChange={(value) => setLine((current) => ({ ...current, taxId: value === NONE ? "" : value }))} options={[{ value: NONE, label: t("accounting.createInvoiceModal.noTax", { defaultValue: "No tax" }) }, ...taxOptions]} />
       </div>
-      <div className="text-right text-sm">Subtotal: {formatLegacyAmount(amountUntaxed, currencyCode)} · Tax: {formatLegacyAmount(amountTax, currencyCode)} · <strong>Total: {formatLegacyAmount(amountTotal, currencyCode)}</strong></div>
-      <DialogFooter><Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button><Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>{documentKind === "bill" ? "Save bill draft" : t("accounting.forms.newInvoice.saveDraft")}</Button></DialogFooter>
+      <div className="text-right text-sm">{t("accounting.createInvoiceModal.subtotal", { defaultValue: "Subtotal:" })} {formatLegacyAmount(amountUntaxed, currencyCode)}  {t("accounting.createInvoiceModal.tax", { defaultValue: "· Tax:" })} {formatLegacyAmount(amountTax, currencyCode)} · <strong>{t("accounting.createInvoiceModal.copy.totalValue", { defaultValue: "Total: {{value1}}", value1: formatLegacyAmount(amountTotal, currencyCode) })}</strong></div>
+      <DialogFooter><Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button><Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>{documentKind === "bill" ? t("accounting.createInvoiceModal.saveBillDraft", { defaultValue: "Save bill draft" }) : t("accounting.forms.newInvoice.saveDraft")}</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

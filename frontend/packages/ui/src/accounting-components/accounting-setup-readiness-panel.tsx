@@ -103,6 +103,9 @@ export function AccountingSetupReadinessPanel({
                 `accounting.readiness.${action ?? "all"}.${readiness.isReady ? "ready" : "blocked"}.description`,
                 {
                   defaultValue: description,
+                  context: readiness.isReady
+                    ? readiness.advisoryItems.length > 0 ? "advisory" : "complete"
+                    : undefined,
                 },
               )}
             </CardDescription>

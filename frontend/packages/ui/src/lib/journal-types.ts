@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Work Notes / Journal de Bord Types
 // A quick-entry system for work observations, notes, and task-related updates
 
@@ -54,49 +55,49 @@ export interface WorkNotesConfig {
 // Note type configurations with visual styling
 export const noteTypeConfig: Record<NoteType, { label: string; icon: string; color: string; bgColor: string }> = {
   observation: {
-    label: "Observation",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.observation.label") },
     icon: "eye",
     color: "text-info",
     bgColor: "bg-info/10 border-info/20"
   },
   "task-update": {
-    label: "Task Update",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.taskUpdate.label") },
     icon: "check-circle",
     color: "text-success",
     bgColor: "bg-success/10 border-success/20"
   },
   blocker: {
-    label: "Blocker",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.blocker.label") },
     icon: "alert-triangle",
     color: "text-destructive",
     bgColor: "bg-destructive/10 border-destructive/20"
   },
   idea: {
-    label: "Idea",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.idea.label") },
     icon: "lightbulb",
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/20"
   },
   "meeting-note": {
-    label: "Meeting Note",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.meetingNote.label") },
     icon: "users",
     color: "text-category-3",
     bgColor: "bg-category-3/10 border-category-3/20"
   },
   reminder: {
-    label: "Reminder",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.reminder.label") },
     icon: "bell",
     color: "text-warning",
     bgColor: "bg-warning/10 border-warning/20"
   },
   question: {
-    label: "Question",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.question.label") },
     icon: "help-circle",
     color: "text-category-7",
     bgColor: "bg-category-7/10 border-category-7/20"
   },
   decision: {
-    label: "Decision",
+    get label() { return uiI18n.t("journal.builtIn.journalTypes.noteTypeConfig.decision.label") },
     icon: "git-branch",
     color: "text-category-1",
     bgColor: "bg-category-1/10 border-category-1/20"
@@ -104,16 +105,16 @@ export const noteTypeConfig: Record<NoteType, { label: string; icon: string; col
 }
 
 export const notePriorityConfig: Record<NotePriority, { label: string; color: string; dotColor: string }> = {
-  low: { label: "Low", color: "text-muted-foreground", dotColor: "bg-muted-foreground" },
-  normal: { label: "Normal", color: "text-foreground", dotColor: "bg-foreground" },
-  high: { label: "High", color: "text-warning", dotColor: "bg-warning" },
-  urgent: { label: "Urgent", color: "text-destructive", dotColor: "bg-destructive" },
+  low: { get label() { return uiI18n.t("journal.builtIn.journalTypes.notePriorityConfig.low.label") }, color: "text-muted-foreground", dotColor: "bg-muted-foreground" },
+  normal: { get label() { return uiI18n.t("journal.builtIn.journalTypes.notePriorityConfig.normal.label") }, color: "text-foreground", dotColor: "bg-foreground" },
+  high: { get label() { return uiI18n.t("journal.builtIn.journalTypes.notePriorityConfig.high.label") }, color: "text-warning", dotColor: "bg-warning" },
+  urgent: { get label() { return uiI18n.t("journal.builtIn.journalTypes.notePriorityConfig.urgent.label") }, color: "text-destructive", dotColor: "bg-destructive" },
 }
 
 export const noteStatusConfig: Record<NoteStatus, { label: string; color: string }> = {
-  active: { label: "Active", color: "text-info" },
-  resolved: { label: "Resolved", color: "text-success" },
-  archived: { label: "Archived", color: "text-muted-foreground" },
+  active: { get label() { return uiI18n.t("common.active") }, color: "text-info" },
+  resolved: { get label() { return uiI18n.t("journal.builtIn.journalTypes.noteStatusConfig.resolved.label") }, color: "text-success" },
+  archived: { get label() { return uiI18n.t("journal.builtIn.journalTypes.noteStatusConfig.archived.label") }, color: "text-muted-foreground" },
 }
 
 // Role-based configurations
@@ -126,9 +127,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "admin-obs", type: "observation", label: "System Observation", placeholder: "Noticed something about the system...", icon: "eye", color: "text-info", suggestedTags: ["system", "monitoring"] },
-      { id: "admin-dec", type: "decision", label: "Policy Decision", placeholder: "Decision made regarding...", icon: "git-branch", color: "text-category-1", suggestedTags: ["policy", "security"] },
-      { id: "admin-block", type: "blocker", label: "Critical Issue", placeholder: "Blocking issue identified...", icon: "alert-triangle", color: "text-destructive", suggestedTags: ["urgent", "escalation"] },
+      { id: "admin-obs", type: "observation", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.adminObs.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.adminObs.placeholder") }, icon: "eye", color: "text-info", suggestedTags: ["system", "monitoring"] },
+      { id: "admin-dec", type: "decision", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.adminDec.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.adminDec.placeholder") }, icon: "git-branch", color: "text-category-1", suggestedTags: ["policy", "security"] },
+      { id: "admin-block", type: "blocker", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.adminBlock.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.adminBlock.placeholder") }, icon: "alert-triangle", color: "text-destructive", suggestedTags: ["urgent", "escalation"] },
     ]
   },
   "role-manager": {
@@ -139,9 +140,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "mgr-meeting", type: "meeting-note", label: "Meeting Note", placeholder: "Key points from meeting...", icon: "users", color: "text-category-3", suggestedTags: ["meeting", "team"] },
-      { id: "mgr-update", type: "task-update", label: "Team Update", placeholder: "Team progress update...", icon: "check-circle", color: "text-success", suggestedTags: ["progress", "milestone"] },
-      { id: "mgr-decision", type: "decision", label: "Project Decision", placeholder: "Decided to...", icon: "git-branch", color: "text-category-1", suggestedTags: ["project", "planning"] },
+      { id: "mgr-meeting", type: "meeting-note", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.mgrMeeting.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.mgrMeeting.placeholder") }, icon: "users", color: "text-category-3", suggestedTags: ["meeting", "team"] },
+      { id: "mgr-update", type: "task-update", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.mgrUpdate.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.mgrUpdate.placeholder") }, icon: "check-circle", color: "text-success", suggestedTags: ["progress", "milestone"] },
+      { id: "mgr-decision", type: "decision", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.mgrDecision.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.mgrDecision.placeholder") }, icon: "git-branch", color: "text-category-1", suggestedTags: ["project", "planning"] },
     ]
   },
   "role-sales": {
@@ -152,9 +153,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "sales-obs", type: "observation", label: "Customer Insight", placeholder: "Customer mentioned...", icon: "eye", color: "text-info", suggestedTags: ["customer", "insight"] },
-      { id: "sales-update", type: "task-update", label: "Deal Update", placeholder: "Deal status changed...", icon: "check-circle", color: "text-success", suggestedTags: ["deal", "pipeline"] },
-      { id: "sales-remind", type: "reminder", label: "Follow-up Reminder", placeholder: "Remember to follow up on...", icon: "bell", color: "text-warning", suggestedTags: ["follow-up", "call"] },
+      { id: "sales-obs", type: "observation", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.salesObs.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.salesObs.placeholder") }, icon: "eye", color: "text-info", suggestedTags: ["customer", "insight"] },
+      { id: "sales-update", type: "task-update", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.salesUpdate.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.salesUpdate.placeholder") }, icon: "check-circle", color: "text-success", suggestedTags: ["deal", "pipeline"] },
+      { id: "sales-remind", type: "reminder", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.salesRemind.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.salesRemind.placeholder") }, icon: "bell", color: "text-warning", suggestedTags: ["follow-up", "call"] },
     ]
   },
   "role-warehouse": {
@@ -165,9 +166,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: true,
     defaultPriority: "normal",
     quickTemplates: [
-      { id: "wh-obs", type: "observation", label: "Inventory Note", placeholder: "Noticed in warehouse...", icon: "eye", color: "text-info", suggestedTags: ["inventory", "stock"] },
-      { id: "wh-block", type: "blocker", label: "Issue Report", placeholder: "Problem with...", icon: "alert-triangle", color: "text-destructive", suggestedTags: ["safety", "equipment"] },
-      { id: "wh-update", type: "task-update", label: "Task Complete", placeholder: "Completed...", icon: "check-circle", color: "text-success", suggestedTags: ["shipment", "processing"] },
+      { id: "wh-obs", type: "observation", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.whObs.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.whObs.placeholder") }, icon: "eye", color: "text-info", suggestedTags: ["inventory", "stock"] },
+      { id: "wh-block", type: "blocker", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.whBlock.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.whBlock.placeholder") }, icon: "alert-triangle", color: "text-destructive", suggestedTags: ["safety", "equipment"] },
+      { id: "wh-update", type: "task-update", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.whUpdate.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.whUpdate.placeholder") }, icon: "check-circle", color: "text-success", suggestedTags: ["shipment", "processing"] },
     ]
   },
   "role-viewer": {
@@ -178,9 +179,9 @@ export const workNotesConfigs: Record<string, WorkNotesConfig> = {
     enableTaskLinking: false,
     defaultPriority: "low",
     quickTemplates: [
-      { id: "view-obs", type: "observation", label: "Data Observation", placeholder: "Noticed in the data...", icon: "eye", color: "text-info", suggestedTags: ["data", "trend"] },
-      { id: "view-question", type: "question", label: "Question", placeholder: "Need clarification on...", icon: "help-circle", color: "text-category-7", suggestedTags: ["question", "clarify"] },
-      { id: "view-idea", type: "idea", label: "Suggestion", placeholder: "It would be helpful if...", icon: "lightbulb", color: "text-warning", suggestedTags: ["suggestion", "improvement"] },
+      { id: "view-obs", type: "observation", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.viewObs.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.viewObs.placeholder") }, icon: "eye", color: "text-info", suggestedTags: ["data", "trend"] },
+      { id: "view-question", type: "question", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.viewQuestion.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.viewQuestion.placeholder") }, icon: "help-circle", color: "text-category-7", suggestedTags: ["question", "clarify"] },
+      { id: "view-idea", type: "idea", get label() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.viewIdea.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.workNotesConfigs.viewIdea.placeholder") }, icon: "lightbulb", color: "text-warning", suggestedTags: ["suggestion", "improvement"] },
     ]
   },
 }
@@ -193,9 +194,9 @@ export const defaultWorkNotesConfig: WorkNotesConfig = {
   enableTaskLinking: true,
   defaultPriority: "normal",
   quickTemplates: [
-    { id: "def-obs", type: "observation", label: "Observation", placeholder: "I noticed...", icon: "eye", color: "text-info", suggestedTags: ["observation"] },
-    { id: "def-update", type: "task-update", label: "Task Update", placeholder: "Progress on...", icon: "check-circle", color: "text-success", suggestedTags: ["progress"] },
-    { id: "def-idea", type: "idea", label: "Idea", placeholder: "What if we...", icon: "lightbulb", color: "text-warning", suggestedTags: ["idea"] },
+    { id: "def-obs", type: "observation", get label() { return uiI18n.t("journal.builtIn.journalTypes.defaultWorkNotesConfig.defObs.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.defaultWorkNotesConfig.defObs.placeholder") }, icon: "eye", color: "text-info", suggestedTags: ["observation"] },
+    { id: "def-update", type: "task-update", get label() { return uiI18n.t("journal.builtIn.journalTypes.defaultWorkNotesConfig.defUpdate.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.defaultWorkNotesConfig.defUpdate.placeholder") }, icon: "check-circle", color: "text-success", suggestedTags: ["progress"] },
+    { id: "def-idea", type: "idea", get label() { return uiI18n.t("journal.builtIn.journalTypes.defaultWorkNotesConfig.defIdea.label") }, get placeholder() { return uiI18n.t("journal.builtIn.journalTypes.defaultWorkNotesConfig.defIdea.placeholder") }, icon: "lightbulb", color: "text-warning", suggestedTags: ["idea"] },
   ]
 }
 

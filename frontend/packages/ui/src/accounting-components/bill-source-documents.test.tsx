@@ -3,7 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { BillSourceDocuments, type BillSourceDocumentsProps } from "./bill-source-documents"
 import { billSourceDocuments } from "../lib/bill-source-document-model"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 afterEach(cleanup)
 const document = { id: 5n, organizationId: 1n, companyId: 2n, resModel: "account_move", resId: 3n, name: "Supplier receipt", isDeleted: false }
 const props = (overrides: Partial<BillSourceDocumentsProps> = {}): BillSourceDocumentsProps => ({ organizationId: 1n, companyId: 2n, billId: 3n, documents: [document], sourceState: { status: "ready" }, onUpload: vi.fn().mockResolvedValue(undefined), onRefresh: vi.fn(), ...overrides })

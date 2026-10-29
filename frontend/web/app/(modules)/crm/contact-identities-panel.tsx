@@ -11,7 +11,7 @@ import {
   UserRoundXIcon,
 } from "lucide-react"
 
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   assignContactRoleForm,
@@ -54,17 +54,17 @@ type IdentityKindName = "Primary" | "WhatsApp" | "MobileMoney"
 type VerificationStateName = "Unverified" | "Pending" | "Verified" | "Failed" | "OptedOut"
 
 const IDENTITY_KINDS: Array<{ value: IdentityKindName; label: string }> = [
-  { value: "Primary", label: "Primary phone" },
-  { value: "WhatsApp", label: "WhatsApp" },
-  { value: "MobileMoney", label: "Mobile money" },
+  { value: "Primary", get label() { return i18n.t("crm.forms.contactIdentity.kinds.primary") } },
+  { value: "WhatsApp", get label() { return i18n.t("crm.forms.contactIdentity.kinds.whatsApp") } },
+  { value: "MobileMoney", get label() { return i18n.t("crm.forms.contactIdentity.kinds.mobileMoney") } },
 ]
 
 const VERIFICATION_STATES: Array<{ value: VerificationStateName; label: string }> = [
-  { value: "Unverified", label: "Unverified" },
-  { value: "Pending", label: "Pending" },
-  { value: "Verified", label: "Verified" },
-  { value: "Failed", label: "Failed" },
-  { value: "OptedOut", label: "Opted out" },
+  { value: "Unverified", get label() { return i18n.t("crm.forms.contactIdentity.states.unverified") } },
+  { value: "Pending", get label() { return i18n.t("crm.forms.contactIdentity.states.pending") } },
+  { value: "Verified", get label() { return i18n.t("crm.forms.contactIdentity.states.verified") } },
+  { value: "Failed", get label() { return i18n.t("crm.forms.contactIdentity.states.failed") } },
+  { value: "OptedOut", get label() { return i18n.t("crm.forms.contactIdentity.states.optedOut") } },
 ]
 
 function enumName(value: unknown): string {
@@ -119,7 +119,7 @@ function identityStateVariant(state: VerificationStateName) {
 }
 
 function displayMasked(row: Row): string {
-  return String(row.displayMasked ?? row.display_masked ?? "Masked phone")
+  return String(row.displayMasked ?? row.display_masked ?? i18n.t("crm.contactIdentitiesPanel.maskedPhone"))
 }
 
 export interface ContactIdentitiesPanelProps {
@@ -196,7 +196,7 @@ export function ContactIdentitiesPanel({
         })
       } else if (editingIdentity) {
         const identityId = rowId(editingIdentity)
-        if (identityId == null) throw new Error("The selected identity has no ID")
+        if (identityId == null) throw new Error(t("crm.contactIdentitiesPanel.theSelectedIdentityHasNoID"))
         await updateIdentity.mutateAsync({
           identityId,
           params: {
@@ -210,7 +210,7 @@ export function ContactIdentitiesPanel({
       }
       setIdentityDialog(null)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to save the phone identity"
+      const message = cause instanceof Error ? cause.message : t("crm.contactIdentitiesPanel.unableToSaveThePhoneIdentity")
       setIdentityFormError(message)
       throw cause
     }
@@ -229,7 +229,7 @@ export function ContactIdentitiesPanel({
       })
       setRoleDialogOpen(false)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to assign the role"
+      const message = cause instanceof Error ? cause.message : t("crm.contactIdentitiesPanel.unableToAssignTheRole")
       setRoleFormError(message)
       throw cause
     }
@@ -238,12 +238,12 @@ export function ContactIdentitiesPanel({
   const archive = async (row: Row) => {
     const id = rowId(row)
     if (id == null) return
-    if (!(await confirmDialog({ description: "Archive this phone identity? It will remain in the audit history." }))) return
+    if (!(await confirmDialog({ description: t("crm.contactIdentitiesPanel.archiveThisPhoneIdentityItWillRemainInTheAuditHistory") }))) return
     try {
       setActionError(null)
       await archiveIdentity.mutateAsync(id)
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "Unable to archive the phone identity")
+      setActionError(cause instanceof Error ? cause.message : t("crm.contactIdentitiesPanel.unableToArchiveThePhoneIdentity"))
     }
   }
 
@@ -258,7 +258,7 @@ export function ContactIdentitiesPanel({
       })
       setEndingRole(null)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to end the role"
+      const message = cause instanceof Error ? cause.message : t("crm.contactIdentitiesPanel.unableToEndTheRole")
       setEndRoleFormError(message)
       throw cause
     }
@@ -277,13 +277,12 @@ export function ContactIdentitiesPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Phone identities</CardTitle>
-          <CardDescription>Masked by default. Keep the preferred contact method current.</CardDescription>
+          <CardTitle>{t("crm.contactIdentitiesPanel.phoneIdentities")}</CardTitle>
+          <CardDescription>{t("crm.contactIdentitiesPanel.maskedByDefaultKeepThePreferredContactMethodCurrent")}</CardDescription>
           <CardAction>
             <Button size="sm" onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog("create") }}>
               <PlusIcon data-icon="inline-start" />
-              Add phone
-            </Button>
+              {t("crm.forms.contactIdentity.add")}{" "}</Button>
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -297,18 +296,18 @@ export function ContactIdentitiesPanel({
                     <span className="font-medium">{displayMasked(identity)}</span>
                     <Badge variant="outline">{IDENTITY_KINDS.find((option) => option.value === identityKind(identity))?.label ?? identityKind(identity)}</Badge>
                     <Badge variant={identityStateVariant(state)}>{VERIFICATION_STATES.find((option) => option.value === state)?.label ?? state}</Badge>
-                    {Boolean(identity.isPreferred ?? identity.is_preferred) ? <Badge variant="secondary">Preferred</Badge> : null}
+                    {Boolean(identity.isPreferred ?? identity.is_preferred) ? <Badge variant="secondary">{t("crm.contactIdentitiesPanel.preferred")}</Badge> : null}
                   </div>
-                  <span className="text-xs text-muted-foreground">The full number is never displayed in this workspace.</span>
+                  <span className="text-xs text-muted-foreground">{t("crm.contactIdentitiesPanel.theFullNumberIsNeverDisplayedInThisWorkspace")}</span>
                   {state !== "Verified" ? (
-                    <span className="text-xs text-muted-foreground">Verification completes only after trusted OTP/provider proof.</span>
+                    <span className="text-xs text-muted-foreground">{t("crm.contactIdentitiesPanel.verificationCompletesOnlyAfterTrustedOTPProviderProof")}</span>
                   ) : null}
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button size="icon-sm" variant="ghost" aria-label="Edit phone identity" onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog(identity) }}>
+                  <Button size="icon-sm" variant="ghost" aria-label={t("crm.forms.contactIdentity.editTitle")} onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog(identity) }}>
                     <PencilIcon />
                   </Button>
-                  <Button size="icon-sm" variant="ghost" aria-label="Archive phone identity" disabled={mutationBusy} onClick={() => void archive(identity)}>
+                  <Button size="icon-sm" variant="ghost" aria-label={t("crm.contactIdentitiesPanel.archivePhoneIdentity")} disabled={mutationBusy} onClick={() => void archive(identity)}>
                     <ArchiveIcon />
                   </Button>
                 </div>
@@ -318,14 +317,13 @@ export function ContactIdentitiesPanel({
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><PhoneIcon /></EmptyMedia>
-                <EmptyTitle>{identitiesLoading ? "Loading phone identities" : "No phone identities"}</EmptyTitle>
-                <EmptyDescription>Add a primary number before creating a reminder or mobile-money transaction.</EmptyDescription>
+                <EmptyTitle>{identitiesLoading ? t("crm.contactIdentitiesPanel.loadingPhoneIdentities") : t("crm.contactIdentitiesPanel.noPhoneIdentities")}</EmptyTitle>
+                <EmptyDescription>{t("crm.contactIdentitiesPanel.addAPrimaryNumberBeforeCreatingAReminderOrMobileMoney")}</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
                 <Button size="sm" onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog("create") }}>
                   <PlusIcon data-icon="inline-start" />
-                  Add phone
-                </Button>
+                  {t("crm.forms.contactIdentity.add")}{" "}</Button>
               </EmptyContent>
             </Empty>
           )}
@@ -334,13 +332,12 @@ export function ContactIdentitiesPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Roles</CardTitle>
-          <CardDescription>Commercial roles are scoped to the active company when one is selected.</CardDescription>
+          <CardTitle>{t("settings.users.roles")}</CardTitle>
+          <CardDescription>{t("crm.contactIdentitiesPanel.commercialRolesAreScopedToTheActiveCompanyWhenOneIs")}</CardDescription>
           <CardAction>
             <Button size="sm" variant="outline" onClick={() => { setActionError(null); setRoleFormError(null); setRoleDialogOpen(true) }}>
               <UserRoundPlusIcon data-icon="inline-start" />
-              Assign role
-            </Button>
+              {t("crm.forms.assignContactRole.submit")}{" "}</Button>
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -349,14 +346,13 @@ export function ContactIdentitiesPanel({
             return (
               <div key={String(rowId(role))} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
                 <div className="flex items-center gap-2">
-                  <Badge variant={active ? "default" : "secondary"}>{String(role.role ?? "Role")}</Badge>
-                  <span className="text-xs text-muted-foreground">{active ? "Active" : "Ended"}</span>
+                  <Badge variant={active ? "default" : "secondary"}>{String(role.role ?? t("crm.forms.assignContactRole.sections.role"))}</Badge>
+                  <span className="text-xs text-muted-foreground">{active ? t("common.active") : t("crm.contactIdentitiesPanel.ended")}</span>
                 </div>
                 {active ? (
                   <Button size="sm" variant="ghost" disabled={mutationBusy} onClick={() => { setActionError(null); setEndRoleFormError(null); setEndingRole(role) }}>
                     <UserRoundXIcon data-icon="inline-start" />
-                    End role
-                  </Button>
+                    {t("crm.forms.endContactRole.submit")}{" "}</Button>
                 ) : null}
               </div>
             )
@@ -364,8 +360,8 @@ export function ContactIdentitiesPanel({
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><ShieldCheckIcon /></EmptyMedia>
-                <EmptyTitle>{rolesLoading ? "Loading roles" : "No roles assigned"}</EmptyTitle>
-                <EmptyDescription>Assign customer, supplier, member, or another operational role.</EmptyDescription>
+                <EmptyTitle>{rolesLoading ? t("crm.contactIdentitiesPanel.loadingRoles") : t("crm.contactIdentitiesPanel.noRolesAssigned")}</EmptyTitle>
+                <EmptyDescription>{t("crm.contactIdentitiesPanel.assignCustomerSupplierMemberOrAnotherOperationalRole")}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           )}

@@ -11,7 +11,7 @@ vi.mock("@lumiere/ui", () => ({
   reimburseExpenseReportForm: () => ({ id: "pay", title: "Pay", sections: [] }),
   projectRebillExpenseReportForm: () => ({ id: "bill", title: "Bill", sections: [] }),
 }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("@lumiere/query-hooks/hooks/expenses", () => ({
   usePostExpenseSheet: () => ({ mutateAsync: state.post, isPending: false }),
   useCreateExpenseReimbursementPayment: () => ({ mutateAsync: state.reimburse, isPending: false }),

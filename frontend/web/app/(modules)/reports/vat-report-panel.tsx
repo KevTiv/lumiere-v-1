@@ -250,7 +250,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
           <Input value={locale} onChange={(e) => setLocale(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vat-report-currency">Currency</Label>
+          <Label htmlFor="vat-report-currency">{t("reports.authoring.currency")}</Label>
           <Select value={currencyId} onValueChange={setCurrencyId}>
             <SelectTrigger id="vat-report-currency">
               <SelectValue />

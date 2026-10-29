@@ -2,7 +2,16 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { InvoiceWorkflowGuide, type InvoiceWorkflowGuideProps } from "./invoice-workflow-guide"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 afterEach(cleanup)
 const props: InvoiceWorkflowGuideProps = { stage: "draft", isBill: false, amountDue: "EUR 100.00", onReviewLines: vi.fn(), paymentsHref: "/accounting?tab=payments" }
 

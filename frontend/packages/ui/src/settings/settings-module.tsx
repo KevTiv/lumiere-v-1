@@ -3,7 +3,7 @@
 import type { ComponentType, ReactNode } from "react"
 import { useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
@@ -51,22 +51,22 @@ const iconMap: Record<string, ComponentType<{ className?: string }>> = {
 const settingsGroups = [
   {
     id: "account",
-    title: "Account",
+    get title() { return i18n.t("settings.groups.account") },
     sectionIds: ["profile", "notifications", "appearance", "custom-fields"],
   },
   {
     id: "organization",
-    title: "Organization",
+    get title() { return i18n.t("settings.organization.title") },
     sectionIds: ["organization", "users", "roles", "sso"],
   },
   {
     id: "data",
-    title: "Data & integrations",
+    get title() { return i18n.t("settings.groups.data") },
     sectionIds: [],
   },
   {
     id: "platform",
-    title: "Platform",
+    get title() { return i18n.t("settings.groups.platform") },
     sectionIds: ["ai", "form-config", "audit"],
   },
 ] as const

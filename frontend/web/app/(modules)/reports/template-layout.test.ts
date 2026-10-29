@@ -1,6 +1,8 @@
+import { i18n } from "@lumiere/i18n"
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  REPORT_COLUMNS,
   parseTemplateBlocks,
   serializeTemplateBlocks,
   templatePreviewDocument,
@@ -54,4 +56,21 @@ test("invalid duplicate sections and unsupported columns do not get interpreted"
     null,
   )
   assert.equal(parseTemplateBlocks("<!--lumiere-layout-v1:broken-->"), null)
+})
+
+
+test("language changes update layout labels and previews without changing saved markup", async () => {
+  const previousLanguage = i18n.language
+  await i18n.changeLanguage("en")
+  const saved = serializeTemplateBlocks(blocks)
+  i18n.addResource("fr", "translation", "reports.templateLayout.documentNumber", "Numéro du document")
+  try {
+    await i18n.changeLanguage("fr")
+    assert.equal(REPORT_COLUMNS[0].label, "Numéro du document")
+    assert.match(templatePreviewDocument(saved, "Portrait"), /Numéro du document/)
+    assert.equal(serializeTemplateBlocks(blocks), saved)
+    assert.deepEqual(parseTemplateBlocks(saved), blocks)
+  } finally {
+    await i18n.changeLanguage(previousLanguage)
+  }
 })

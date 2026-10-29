@@ -243,7 +243,7 @@ export function PurchasingOpsSod({
                       setActionError(null)
                     }}
                   >
-                    {String(row.name ?? `PO-${id}`)} ·{' '}
+                    {String(row.name ?? t("purchasing.purchasingOpsSod.pO", { value1: id }))} ·{' '}
                     {Number(
                       row.amountTotal ?? row.amount_total ?? 0,
                     ).toLocaleString()}

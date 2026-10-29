@@ -3,7 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { billIntakeReview } from "./bill-intake-review-model"
 import { BillIntakeReview, type BillIntakeReviewProps } from "./bill-intake-review"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 afterEach(cleanup)
 
 const bill = { id: 10n, organizationId: 1n, companyId: 2n, moveType: { tag: "InInvoice" }, state: { tag: "Draft" }, partnerId: 4n, name: "Vendor bill A", ref: "INV-A", invoiceDate: { microsSinceUnixEpoch: BigInt(Date.UTC(2026, 0, 15)) * 1000n }, amountTotal: 100 }

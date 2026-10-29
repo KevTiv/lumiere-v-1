@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n as rootI18n } from "@lumiere/i18n"
 import { apiFetch } from '@/lib/api-fetch'
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
@@ -27,12 +28,14 @@ export default function SignInPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const messages: Record<string, string> = {
-    admission_denied: 'Your account needs administrator approval or explicit linking to an existing account.',
-    membership_suspended: 'Your organization access is suspended. Contact your administrator.',
-    invitation_required: 'You are signed in. Open your organization invitation to finish joining.',
-    authentication_unavailable: 'Authentication is temporarily unavailable. Please retry.',
+    admission_denied: rootI18n.t("auth.errors.admissionDenied"),
+    membership_suspended: rootI18n.t("auth.errors.membershipSuspended"),
+    invitation_required: rootI18n.t("auth.errors.invitationRequired"),
+    authentication_unavailable: rootI18n.t("auth.errors.authenticationUnavailable"),
   }
-  const [error, setError] = useState<string | null>(messages[searchParams.get('error') ?? ''] ?? null)
+  const initialError = searchParams.get('error') ?? ''
+  const [error, setError] = useState<string | null>(Object.hasOwn(messages, initialError) ? initialError : null)
+  const displayedError = error ? messages[error] ?? error : null
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -75,7 +78,7 @@ export default function SignInPage() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {displayedError && <p role="alert" className="text-sm text-destructive">{displayedError}</p>}
         {!useWorkOsAuth && (
           <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
@@ -128,7 +131,7 @@ export default function SignInPage() {
 
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
-          {useWorkOsAuth || process.env.NODE_ENV === 'production' ? 'Access is by invitation. Contact your administrator.' : <>
+          {useWorkOsAuth || process.env.NODE_ENV === 'production' ? rootI18n.t("auth.ui.page.accessIsByInvitationContactYourAdministrator") : <>
             {t("auth.signIn.noAccount")}{" "}
             <Link href="/sign-up" className="font-medium text-foreground hover:underline">
               {t("auth.signIn.createOne")}

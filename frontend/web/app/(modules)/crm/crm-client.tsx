@@ -74,7 +74,7 @@ import {
   toUpdateOpportunityStageParams,
 } from "@/lib/crm-update-params"
 import { groupBy } from "@/lib/utils"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type { CreateCrmForecastSnapshotParams } from "@lumiere/stdb/types"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
@@ -270,23 +270,23 @@ function crmRowChatterLabel(tabId: string, row: Record<string, unknown>): string
   const id = String(row.id ?? "")
   if (tabId === "activities") {
     const s = String(row.summary ?? row.name ?? "").trim()
-    return s || `Activity #${id}`
+    return s || i18n.t("crm.crmClient.activityReference", { id })
   }
   if (tabId === "leads") {
     const s = String(
       row.contactName ?? row.contact_name ?? row.name ?? row.emailFrom ?? row.email_from ?? "",
     ).trim()
-    return s || `Lead #${id}`
+    return s || i18n.t("crm.crmClient.leadReference", { id })
   }
   if (tabId === "opportunities") {
     const s = String(row.name ?? "").trim()
-    return s || `Opportunity #${id}`
+    return s || i18n.t("crm.crmClient.opportunityReference", { id })
   }
   if (tabId === "contacts") {
     const label = contactPrimaryLabel(row).trim()
-    return label || `Contact #${id}`
+    return label || i18n.t("crm.crmClient.contactReference", { id })
   }
-  return id ? `Record #${id}` : "Record"
+  return id ? i18n.t("crm.crmClient.recordReference", { id }) : i18n.t("crm.crmClient.record")
 }
 
 function scalarFieldString(value: unknown): string {
@@ -463,7 +463,7 @@ function CrmClientLoaded({
   const { rows: warehouses } = moduleCollection(warehousesQuery)
   const activityTypesQuery = useQuery({
     queryKey: ["activity-types", organizationId],
-    queryFn: () => fetchQueryList("/api/query/activity-types", "Could not load activity types"),
+    queryFn: () => fetchQueryList("/api/query/activity-types", i18n.t("crm.crm_client.couldNotLoadActivityTypes")),
     staleTime: 60_000,
   })
   const activityTypeOptions = useMemo(() => moduleCollection(activityTypesQuery).rows
@@ -1333,7 +1333,7 @@ function CrmClientLoaded({
       customTabs: [
         {
           id: "phones-and-roles",
-          label: "Phones & roles",
+          label: t("crm.crmClient.phonesRoles"),
           content: (record) => (
             <ContactIdentitiesPanel
               organizationId={organizationId}
@@ -1381,7 +1381,7 @@ function CrmClientLoaded({
         },
         {
           id: "payments-and-messages",
-          label: "Payments & messages",
+          label: t("crm.crmClient.paymentsMessages"),
           content: (record) => (
             <ContactPaymentsAndMessagesPanel
               organizationId={organizationId}
@@ -2080,7 +2080,7 @@ function CrmClientLoaded({
       ),
     )
       .map(([campaignId, items]) => ({
-        label: `Campaign ${campaignId}`,
+        label: t("crm.crmClient.campaignReference", { id: campaignId }),
         value: items.reduce(
           (sum, item) =>
             sum + Number((item as Record<string, unknown>).expectedRevenue ?? (item as Record<string, unknown>).expected_revenue ?? 0),
@@ -2444,7 +2444,7 @@ function CrmClientLoaded({
 
   const handleWorkflowSubmit = async (formData: Record<string, unknown>) => {
     if (!workflowModal) return
-    if (!workflowUsable) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!workflowUsable) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     setWorkflowSubmitError(null)
     try {
       if (workflowModal.kind === "scheduleActivity") {
@@ -2649,7 +2649,7 @@ function CrmClientLoaded({
       })
       setWorkflowModal(null)
     } catch (e) {
-      setWorkflowSubmitError(e instanceof Error ? e.message : "Action failed")
+      setWorkflowSubmitError(e instanceof Error ? e.message : t("hr.recruitment.actionFailed"))
       throw e
     }
   }

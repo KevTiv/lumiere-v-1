@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
@@ -24,7 +26,7 @@ function formatScalar(value: unknown): string {
 
 function summarizeOrderLines(lines: unknown, label: string): DraftDiffField[] {
   if (!Array.isArray(lines) || lines.length === 0) {
-    return [{ label, value: "No lines" }]
+    return [{ label, value: i18n.t("ui.aiChat.aiActionDraftDiffPanel.noLines") }]
   }
   const summaries = lines.map((line, index) => {
     if (line == null || typeof line !== "object" || Array.isArray(line)) {
@@ -52,39 +54,39 @@ export function buildDraftDiffFields(
   switch (reducerName) {
     case "create_task":
       return [
-        { label: "Task name", value: formatScalar(params.name) },
-        { label: "Description", value: formatScalar(params.description) },
-        { label: "Project", value: formatScalar(params.project_id) },
-        { label: "Stage", value: formatScalar(params.stage_id) },
-        { label: "Priority", value: formatScalar(params.priority) },
-        { label: "State", value: formatScalar(params.state) },
-        { label: "Partner", value: formatScalar(params.partner_id) },
-        { label: "Planned hours", value: formatScalar(params.planned_hours) },
-        { label: "Deadline", value: formatScalar(params.date_deadline) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.taskName"), value: formatScalar(params.name) },
+        { label: i18n.t("settings.ai.description"), value: formatScalar(params.description) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.project"), value: formatScalar(params.project_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.stage"), value: formatScalar(params.stage_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.priority"), value: formatScalar(params.priority) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.state"), value: formatScalar(params.state) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.partner"), value: formatScalar(params.partner_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.plannedHours"), value: formatScalar(params.planned_hours) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.deadline"), value: formatScalar(params.date_deadline) },
       ].filter((field) => field.value !== "—")
 
     case "create_sale_order":
       return [
-        { label: "Customer (partner)", value: formatScalar(params.partner_id) },
-        { label: "Invoice address", value: formatScalar(params.partner_invoice_id) },
-        { label: "Shipping address", value: formatScalar(params.partner_shipping_id) },
-        { label: "Pricelist", value: formatScalar(params.pricelist_id) },
-        { label: "Currency", value: formatScalar(params.currency_id) },
-        { label: "Warehouse", value: formatScalar(params.warehouse_id) },
-        { label: "Origin", value: formatScalar(params.origin) },
-        { label: "Customer reference", value: formatScalar(params.client_order_ref) },
-        { label: "Note", value: formatScalar(params.note) },
-        ...summarizeOrderLines(params.order_lines, "Order lines"),
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.customerPartner"), value: formatScalar(params.partner_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.invoiceAddress"), value: formatScalar(params.partner_invoice_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.shippingAddress"), value: formatScalar(params.partner_shipping_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.pricelist"), value: formatScalar(params.pricelist_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.currency"), value: formatScalar(params.currency_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.warehouse"), value: formatScalar(params.warehouse_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.origin"), value: formatScalar(params.origin) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.customerReference"), value: formatScalar(params.client_order_ref) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.note"), value: formatScalar(params.note) },
+        ...summarizeOrderLines(params.order_lines, i18n.t("ui.aiChat.aiActionDraftDiffPanel.orderLines")),
       ].filter((field) => field.value !== "—")
 
     case "create_purchase_order":
       return [
-        { label: "Vendor (partner)", value: formatScalar(params.partner_id) },
-        { label: "Currency", value: formatScalar(params.currency_id) },
-        { label: "Origin", value: formatScalar(params.origin) },
-        { label: "Vendor reference", value: formatScalar(params.partner_ref) },
-        { label: "Notes", value: formatScalar(params.notes) },
-        ...summarizeOrderLines(params.order_lines, "Order lines"),
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.vendorPartner"), value: formatScalar(params.partner_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.currency"), value: formatScalar(params.currency_id) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.origin"), value: formatScalar(params.origin) },
+        { label: i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.vendorReference"), value: formatScalar(params.partner_ref) },
+        { label: i18n.t("common.notes"), value: formatScalar(params.notes) },
+        ...summarizeOrderLines(params.order_lines, i18n.t("ui.aiChat.aiActionDraftDiffPanel.orderLines")),
       ].filter((field) => field.value !== "—")
 
     default:
@@ -110,10 +112,11 @@ export function AiActionDraftDiffPanel({
   onReviewedChange,
   className,
 }: AiActionDraftDiffPanelProps) {
+  useTranslation()
   const [showRawJson, setShowRawJson] = useState(false)
   const fields = useMemo(
     () => buildDraftDiffFields(draft.reducerName, draft.paramsJson),
-    [draft.reducerName, draft.paramsJson],
+    [draft.reducerName, draft.paramsJson, i18n.resolvedLanguage],
   )
   const rawJson = JSON.stringify(draft.paramsJson, null, 2)
   const isPending = (draft.status ?? "pending") === "pending"
@@ -124,10 +127,9 @@ export function AiActionDraftDiffPanel({
       className={cn("rounded-md border border-border/60 bg-background/50", className)}
     >
       <div className="border-b border-border/60 px-2.5 py-1.5">
-        <p className="text-[10px] font-medium text-foreground">Will create</p>
+        <p className="text-[10px] font-medium text-foreground">{i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.willCreate")}</p>
         <p className="text-[9px] text-muted-foreground">
-          Review the fields below before approving this draft.
-        </p>
+          {i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.reviewTheFieldsBelowBeforeApprovingThisDraft")}</p>
       </div>
 
       {fields.length > 0 ? (
@@ -143,7 +145,7 @@ export function AiActionDraftDiffPanel({
           ))}
         </dl>
       ) : (
-        <p className="px-2.5 py-2 text-[10px] text-muted-foreground">No parameters to preview.</p>
+        <p className="px-2.5 py-2 text-[10px] text-muted-foreground">{i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.noParametersToPreview")}</p>
       )}
 
       <div className="border-t border-border/60 px-2.5 py-1.5">
@@ -152,7 +154,7 @@ export function AiActionDraftDiffPanel({
           onClick={() => setShowRawJson((value) => !value)}
           className="flex w-full items-center justify-between text-[10px] text-muted-foreground hover:text-foreground"
         >
-          <span>Raw JSON</span>
+          <span>{i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.rawJSON")}</span>
           {showRawJson ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
         {showRawJson ? (
@@ -171,7 +173,7 @@ export function AiActionDraftDiffPanel({
               className="mt-0.5"
               data-testid="ai-action-draft-reviewed"
             />
-            <span>I reviewed this draft and confirm the values above.</span>
+            <span>{i18n.t("ui.aiAssistant.aiActionDraftDiffPanel.iReviewedThisDraftAndConfirmTheValuesAbove")}</span>
           </label>
         </div>
       ) : null}

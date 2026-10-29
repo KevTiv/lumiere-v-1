@@ -25,18 +25,15 @@ interface OwnerControlLoopProps {
 const CONTROL_ITEMS: Array<{
   key: "overdueInvoices" | "unreconciledPayments" | "lowStockProducts" | "pendingMessageApprovals" | "draftBills" | "expenseApprovals"
   resource: Resource
-  title: string
-  description: string
   href: string
-  action: string
   icon: typeof CircleDollarSignIcon
 }> = [
-  { key: "overdueInvoices", resource: "account_move", title: "Overdue customer balances", description: "Review open receivables and follow up from accounting.", href: "/accounting?tab=invoices", action: "Open invoices", icon: CircleDollarSignIcon },
-  { key: "unreconciledPayments", resource: "account_move", title: "Reconciliation exceptions", description: "Match posted provider transactions to invoices or bills.", href: "/accounting?tab=payment-operations", action: "Reconcile payments", icon: AlertTriangleIcon },
-  { key: "lowStockProducts", resource: "module:inventory", title: "Low-stock alerts", description: "Review replenishment priorities and current stock availability.", href: "/inventory", action: "Open inventory", icon: PackageSearchIcon },
-  { key: "pendingMessageApprovals", resource: "module:messages", title: "Message approvals", description: "Approve or reject invoice reminders and customer batches.", href: "/messages", action: "Review messages", icon: BellRingIcon },
-  { key: "draftBills", resource: "account_move", title: "Draft vendor bills", description: "Check vendor details, lines and evidence before posting.", href: "/accounting?tab=bills", action: "Review bills", icon: CircleDollarSignIcon },
-  { key: "expenseApprovals", resource: "hr_expense_sheet", title: "Expense reports to review", description: "Open submitted reports and review their receipts and approval history.", href: "/expenses?tab=expense-sheets&filter=state%3ASubmitted", action: "Review reports", icon: AlertTriangleIcon },
+  { key: "overdueInvoices", resource: "account_move", href: "/accounting?tab=invoices", icon: CircleDollarSignIcon },
+  { key: "unreconciledPayments", resource: "account_move", href: "/accounting?tab=payment-operations", icon: AlertTriangleIcon },
+  { key: "lowStockProducts", resource: "module:inventory", href: "/inventory", icon: PackageSearchIcon },
+  { key: "pendingMessageApprovals", resource: "module:messages", href: "/messages", icon: BellRingIcon },
+  { key: "draftBills", resource: "account_move", href: "/accounting?tab=bills", icon: CircleDollarSignIcon },
+  { key: "expenseApprovals", resource: "hr_expense_sheet", href: "/expenses?tab=expense-sheets&filter=state%3ASubmitted", icon: AlertTriangleIcon },
 ]
 
 export function OwnerControlLoop(props: OwnerControlLoopProps) {
@@ -79,19 +76,19 @@ export function OwnerControlLoop(props: OwnerControlLoopProps) {
                 <Icon className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{t(`financeReview.queues.${item.key}.title`, { defaultValue: item.title })}</p>
+                    <p className="font-medium">{t(`financeReview.queues.${item.key}.title`)}</p>
                     <Badge variant={typeof count === "number" && count > 0 ? "destructive" : "secondary"}>{count}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{t(`financeReview.queues.${item.key}.description`, { defaultValue: item.description })}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t(`financeReview.queues.${item.key}.description`)}</p>
                 </div>
               </div>
-              <Link className={buttonVariants({ size: "sm", variant: "outline" })} href={item.href}>{t(`financeReview.queues.${item.key}.action`, { defaultValue: item.action })}<ArrowRightIcon data-icon="inline-end" /></Link>
+              <Link className={buttonVariants({ size: "sm", variant: "outline" })} href={item.href}>{t(`financeReview.queues.${item.key}.action`)}<ArrowRightIcon data-icon="inline-end" /></Link>
             </div>
           )
         })}
       </CardContent>
       <CardContent className="pt-0">
-        <Link className={buttonVariants({ variant: "secondary" })} href="/reports">Review owner reports<ArrowRightIcon data-icon="inline-end" /></Link>
+        <Link className={buttonVariants({ variant: "secondary" })} href="/reports">{t("overview.ownerControlLoop.reviewOwnerReports")}<ArrowRightIcon data-icon="inline-end" /></Link>
       </CardContent>
     </Card>
   )

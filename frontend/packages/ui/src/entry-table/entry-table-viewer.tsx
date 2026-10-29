@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
@@ -55,6 +57,7 @@ export function EntryTableViewer({
   onSave,
   className,
 }: EntryTableViewerProps) {
+  useTranslation()
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
@@ -187,14 +190,12 @@ export function EntryTableViewer({
                 onClick={() => downloadCsv(config.title || config.id, entryRowsToCsv(config.columns, sortedData))}
               >
                 <Download className="h-4 w-4" />
-                Export
-              </Button>
+                {i18n.t("common.export")}</Button>
             )}
             {onAdd && (
               <Button size="sm" className="gap-2" onClick={onAdd}>
                 <Plus className="h-4 w-4" />
-                Add New
-              </Button>
+                {i18n.t("ui.entryTable.entryTableViewer.addNew")}</Button>
             )}
           </div>
         </div>
@@ -203,7 +204,7 @@ export function EntryTableViewer({
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search entries..."
+              placeholder={i18n.t("ui.entryTable.entryTableViewer.searchEntries")}
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -251,8 +252,7 @@ export function EntryTableViewer({
                 ))}
                 {(actions.view || actions.edit || actions.delete) && (
                   <th className="p-3 w-24 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Actions
-                  </th>
+                    {i18n.t("ui.stock3d.details.actions")}</th>
                 )}
               </tr>
             </thead>
@@ -263,8 +263,7 @@ export function EntryTableViewer({
                     colSpan={visibleColumns.length + (features.selection ? 1 : 0) + (actions.view || actions.edit || actions.delete ? 1 : 0)}
                     className="p-8 text-center text-muted-foreground"
                   >
-                    No entries found
-                  </td>
+                    {i18n.t("ui.entryTable.entryTableViewer.noEntriesFound")}</td>
                 </tr>
               ) : (
                 paginatedData.map((row, idx) => {
@@ -350,7 +349,7 @@ export function EntryTableViewer({
         {features.pagination && totalPages > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-border/50">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Rows per page:</span>
+              <span>{i18n.t("ui.entryTable.entryTableViewer.rowsPerPage")}</span>
               <Select
                 value={String(pageSize)}
                 onValueChange={(v) => {
@@ -370,7 +369,7 @@ export function EntryTableViewer({
                 </SelectContent>
               </Select>
               <span className="ml-4">
-                {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, sortedData.length)} of {sortedData.length}
+                {i18n.t("ui.components.tablePager.range", { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, sortedData.length), total: sortedData.length })}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -393,7 +392,7 @@ export function EntryTableViewer({
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="px-3 text-sm">
-                Page {page} of {totalPages}
+                {i18n.t("ui.entryTable.entryTableViewer.pageOf", { page, totalPages })}
               </span>
               <Button
                 variant="outline"
@@ -427,7 +426,7 @@ export function EntryTableViewer({
           mode={modalMode}
           onModeChange={setModalMode}
           onSave={handleSave}
-          title={modalMode === "view" ? "View Entry" : "Edit Entry"}
+          title={modalMode === "view" ? i18n.t("ui.entryTable.entryTableViewer.viewEntry") : i18n.t("ui.entryTable.entryTableViewer.editEntry")}
         />
       )}
     </Card>

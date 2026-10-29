@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n as rootI18n } from "@lumiere/i18n"
 import { apiFetch } from '@/lib/api-fetch'
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -114,7 +115,7 @@ export default function SignUpPage() {
 
         {useWorkOsAuth && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Access requires an approved invitation and organization membership.</p>
+            <p className="text-sm text-muted-foreground">{rootI18n.t("auth.ui.page.accessRequiresAnApprovedInvitationAndOrganizationMembership")}</p>
             <form action={redirectToWorkOsSignUp} className="space-y-2">
               <input type="hidden" name="returnTo" value="/onboarding" />
               <Button type="submit" size="lg" className="w-full">

@@ -261,7 +261,7 @@ export function BudgetsWorkspace({
         searchPlaceholder: t("accounting.budgets.workspace.searchPosts"),
         emptyMessage: t("accounting.budgets.workspace.emptyPosts"),
         columns: v.columns.map((c) =>
-          c.key === "name" ? { ...c, label: t("accounting.budgets.workspace.colName") } : c,
+          ({ ...c, label: t(`accounting.budgets.workspace.postColumns.${c.key}`, { defaultValue: c.label }) }),
         ),
       },
     }
@@ -572,7 +572,7 @@ export function BudgetsWorkspace({
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-20">ID</TableHead>
+                          <TableHead className="w-20">{t("accounting.budgetsWorkspace.iD", { defaultValue: "ID" })}</TableHead>
                           <TableHead>{t("accounting.budgets.workspace.colAnalytic")}</TableHead>
                           <TableHead className="text-right">
                             {t("accounting.budgets.planned")}

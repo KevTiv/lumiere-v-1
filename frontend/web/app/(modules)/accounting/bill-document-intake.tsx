@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react"
 import { BillSourceDocuments } from "@lumiere/ui"
@@ -20,8 +22,9 @@ export function BillDocumentIntake(props: BillDocumentScope) {
 }
 
 function LoadedBillDocumentIntake(props: BillDocumentScope & { canCreate: boolean }) {
+  const { t } = useTranslation()
   const live = useRef({ mounted: true, allowed: false })
-  const documents = useQuery<BillSourceDocument[]>({ queryKey: ["bill-source-documents", String(props.organizationId), String(props.companyId), String(props.billId), props.actorId], queryFn: () => fetchQueryList("/api/query/documents", "Failed to read supplier documents"), staleTime: 0 })
+  const documents = useQuery<BillSourceDocument[]>({ queryKey: ["bill-source-documents", String(props.organizationId), String(props.companyId), String(props.billId), props.actorId], queryFn: () => fetchQueryList("/api/query/documents", i18n.t("accounting.bill_document_intake.failedToReadSupplierDocuments")), staleTime: 0 })
   const create = useCreateDocumentWithRef(props.organizationId, props.companyId, { mayDispatch: () => live.current.mounted && live.current.allowed })
   const activeCompanyId = useOperatingCompanyBigInt(Number(props.organizationId))
   const scopeKey = billDocumentAttemptKey(props, props.actorId ?? "")
@@ -46,10 +49,10 @@ function LoadedBillDocumentIntake(props: BillDocumentScope & { canCreate: boolea
     }) }}
     onUpload={props.canCreate ? async (file) => {
       const current = readBillDocumentAttempt(scopeKey)
-      if (current?.phase === "pending" || current?.phase === "unknown") throw new Error("Check the previous attachment attempt before uploading again")
+      if (current?.phase === "pending" || current?.phase === "unknown") throw new Error(t("accounting.billDocumentIntake.checkThePreviousAttachmentAttemptBeforeUploadingAgain"))
       await uploadBillSourceDocument({ file, scope: props, isCurrent: () => live.current.mounted && live.current.allowed, upload: uploadDocumentBlob, create: create.mutateAsync, readDocuments: async () => {
         const result = await documents.refetch()
-        if (result.isError || !result.data) throw new Error("Document readback is unavailable; refresh this bill's documents before uploading again")
+        if (result.isError || !result.data) throw new Error(t("accounting.billDocumentIntake.documentReadbackIsUnavailableRefreshThisBillSDocumentsBeforeUploading"))
         return result.data
       }, onAttempt: updateAttempt })
     } : undefined}

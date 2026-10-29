@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useMemo, useState } from "react"
 import type { PageNode, PreviewCollection, PreviewResponse } from "@lumiere/presentation-core/preview-contract"
@@ -48,6 +50,7 @@ function CollectionPreview({
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
+  useTranslation()
   const fields = nodeFields(node)
   const rowsPager = usePagedRows(collection?.rows ?? [])
   return (
@@ -55,9 +58,9 @@ function CollectionPreview({
       <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
       <CardContent className="min-w-0 [&_[data-slot=pagination-content]]:flex-wrap">
         {!collection ? (
-          <p className="text-sm text-destructive" data-testid={`composed-unavailable-${node.id}`}>Collection data unavailable.</p>
+          <p className="text-sm text-destructive" data-testid={`composed-unavailable-${node.id}`}>{i18n.t("ui.composed.composedcollectiondetailhost.collectionDataUnavailable")}</p>
         ) : collection.rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground" data-testid={`composed-empty-${node.id}`}>No records.</p>
+          <p className="text-sm text-muted-foreground" data-testid={`composed-empty-${node.id}`}>{i18n.t("ui.composed.composedcollectiondetailhost.noRecords")}</p>
         ) : (
           <Table>
             <TableHeader><TableRow>{fields.map((field) => <TableHead key={field}>{field}</TableHead>)}</TableRow></TableHeader>
@@ -82,7 +85,7 @@ function CollectionPreview({
                     {fields.map((field, fieldIndex) => (
                       <TableCell key={field}>
                         {fieldIndex === 0 ? (
-                          <Button type="button" variant="ghost" size="sm" className="h-auto px-1" aria-label={`Select ${row.id}`} onClick={() => onSelect(row.id)}>
+                          <Button type="button" variant="ghost" size="sm" className="h-auto px-1" aria-label={i18n.t("ui.composed.composedcollectiondetailhost.selectValue", { value1: row.id })} onClick={() => onSelect(row.id)}>
                             {values.get(field) ?? "—"}
                           </Button>
                         ) : values.get(field) ?? "—"}
@@ -95,7 +98,7 @@ function CollectionPreview({
           </Table>
         )}
         <TablePager {...rowsPager} />
-        {collection?.truncated ? <p className="mt-3 text-sm text-muted-foreground" data-testid={`composed-truncated-${node.id}`}>Preview limit reached. Increase the limit to see more records.</p> : null}
+        {collection?.truncated ? <p className="mt-3 text-sm text-muted-foreground" data-testid={`composed-truncated-${node.id}`}>{i18n.t("ui.composed.composedcollectiondetailhost.previewLimitReachedIncreaseTheLimitToSeeMoreRecords")}</p> : null}
       </CardContent>
     </Card>
   )
@@ -110,13 +113,14 @@ function DetailPreview({
   collection: PreviewCollection | undefined
   selectedId: string | undefined
 }) {
+  useTranslation()
   const row = collection?.rows.find((entry) => entry.id === selectedId)
   const values = row ? fieldsForRow(row) : null
   return (
     <Card className={cn(workspaceStyles.surface, "min-w-0")} data-testid={`composed-detail-${node.id}`}>
       <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
       <CardContent className="min-w-0">
-        {!values ? <p className="text-sm text-muted-foreground">Select a record to inspect it.</p> : (
+        {!values ? <p className="text-sm text-muted-foreground">{i18n.t("ui.composed.composedcollectiondetailhost.selectARecordToInspectIt")}</p> : (
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {node.fields.map((field) => (
               <div key={field} className="min-w-0 [overflow-wrap:anywhere]">
@@ -134,14 +138,15 @@ function DetailPreview({
 }
 
 export function ComposedCollectionDetailHost({ preview, loading = false, error }: ComposedCollectionDetailHostProps) {
+  useTranslation()
   const [selection, setSelection] = useState<Selection>({})
 
   useEffect(() => setSelection({}), [preview])
 
   const collections = useMemo(() => preview?.collections ?? [], [preview])
-  if (loading) return <p data-testid="composed-loading">Loading preview…</p>
+  if (loading) return <p data-testid="composed-loading">{i18n.t("ui.composed.composedcollectiondetailhost.loadingPreview")}</p>
   if (error) return <p role="alert" data-testid="composed-error">{error}</p>
-  if (!preview) return <p className="text-sm text-muted-foreground" data-testid="composed-empty-preview">No preview available.</p>
+  if (!preview) return <p className="text-sm text-muted-foreground" data-testid="composed-empty-preview">{i18n.t("ui.composed.composedcollectiondetailhost.noPreviewAvailable")}</p>
 
   return (
     <div className="min-w-0 space-y-6" data-testid="composed-module-host">

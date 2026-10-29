@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type { ReactNode } from "react"
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
@@ -249,8 +250,8 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
 
 export const documentsRecycleBinTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "documents-recycle-bin-table",
-  title: "Recycle bin",
-  description: "Soft-deleted documents that can be restored.",
+  title: t("documents.builtIn.documentsEntityConfigs.documentsRecycleBinTableConfig.documentsRecycleBinTable.title"),
+  description: t("documents.builtIn.documentsEntityConfigs.documentsRecycleBinTableConfig.documentsRecycleBinTable.description"),
   view: {
     mode: "table",
     // Deleted document names and filenames remain confidential.
@@ -263,55 +264,55 @@ export const documentsRecycleBinTableConfig = (t: TFunction): EntityViewConfig =
     columns: [
       { key: "name", sensitive: true, label: t("documents.documents.columns.name"), width: "min-w-48" },
       { key: "fileName", sensitive: true, label: t("documents.documents.columns.fileName"), width: "min-w-36" },
-      { key: "deletedAt", label: "Deleted at", type: "date" },
+      { key: "deletedAt", label: t("documents.builtIn.documentsEntityConfigs.documentsRecycleBinTableConfig.deletedAt.label"), type: "date" },
       { key: "versionCount", label: t("documents.documents.columns.versionCount"), type: "number", align: "right" },
     ],
-    emptyMessage: "Recycle bin is empty",
+    emptyMessage: t("documents.builtIn.documentsEntityConfigs.documentsRecycleBinTableConfig.documentsRecycleBinTable.emptyMessage"),
   },
 })
 
 export const documentTemplatesTableConfig = (_t: TFunction): EntityViewConfig => ({
   id: "document-templates-table",
-  title: "Document templates",
-  description: "PDF / HTML document layouts.",
+  get title() { return uiI18n.t("documents.designer.libraryTitle") },
+  get description() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.documentTemplatesTableConfig.documentTemplatesTable.description") },
   view: {
     mode: "table",
     // Reviewed for generic CSV: sensitive columns are excluded from the file.
     allowExport: true,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search templates…",
+    get searchPlaceholder() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.documentTemplatesTableConfig.documentTemplatesTable.searchPlaceholder") },
     searchKeys: ["name", "model"],
     columns: [
-      { key: "name", label: "Name", width: "min-w-48" },
-      { key: "model", label: "Model", width: "min-w-32" },
-      { key: "reportType", label: "Report type", width: "min-w-28" },
-      { key: "isDefault", label: "Default", type: "boolean" },
-      { key: "isActive", label: "Active", type: "boolean" },
+      { key: "name", get label() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.documentTemplatesTableConfig.name.label") }, width: "min-w-48" },
+      { key: "model", get label() { return uiI18n.t("documents.processing.columns.modelUsed") }, width: "min-w-32" },
+      { key: "reportType", get label() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.documentTemplatesTableConfig.reportType.label") }, width: "min-w-28" },
+      { key: "isDefault", get label() { return uiI18n.t("documents.studio.default") }, type: "boolean" },
+      { key: "isActive", get label() { return uiI18n.t("common.active") }, type: "boolean" },
     ],
-    emptyMessage: "No document templates yet",
+    get emptyMessage() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.documentTemplatesTableConfig.documentTemplatesTable.emptyMessage") },
   },
 })
 
 export const mailTemplatesTableConfig = (_t: TFunction): EntityViewConfig => ({
   id: "mail-templates-table",
-  title: "Mail templates",
-  description: "Outbound email templates.",
+  get title() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.mailTemplatesTableConfig.mailTemplatesTable.title") },
+  get description() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.mailTemplatesTableConfig.mailTemplatesTable.description") },
   view: {
     mode: "table",
     // Reviewed for generic CSV: sensitive columns are excluded from the file.
     allowExport: true,
     rowKey: "id",
     searchable: true,
-    searchPlaceholder: "Search mail templates…",
+    get searchPlaceholder() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.mailTemplatesTableConfig.mailTemplatesTable.searchPlaceholder") },
     searchKeys: ["name", "model", "subject"],
     columns: [
-      { key: "name", label: "Name", width: "min-w-48" },
-      { key: "model", label: "Model", width: "min-w-32" },
-      { key: "subject", label: "Subject", width: "min-w-40" },
-      { key: "isActive", label: "Active", type: "boolean" },
+      { key: "name", get label() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.mailTemplatesTableConfig.name.label") }, width: "min-w-48" },
+      { key: "model", get label() { return uiI18n.t("documents.processing.columns.modelUsed") }, width: "min-w-32" },
+      { key: "subject", get label() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.mailTemplatesTableConfig.subject.label") }, width: "min-w-40" },
+      { key: "isActive", get label() { return uiI18n.t("common.active") }, type: "boolean" },
     ],
-    emptyMessage: "No mail templates yet",
+    get emptyMessage() { return uiI18n.t("documents.builtIn.documentsEntityConfigs.mailTemplatesTableConfig.mailTemplatesTable.emptyMessage") },
   },
 })
 

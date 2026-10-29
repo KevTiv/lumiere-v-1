@@ -4,15 +4,16 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { PeriodCloseChecklist, type PeriodCloseChecklistProps } from "./period-close-checklist"
 import { chooseSelectValue } from "../components/select-test-utils"
 
-vi.mock("@lumiere/i18n", () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, unknown>) => {
-      if (options?.defaultValue) return String(options.defaultValue)
-      if ("count" in (options ?? {})) return `${key}:${String(options?.count)}`
-      return key
-    },
-  }),
-}))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 
 afterEach(cleanup)
 

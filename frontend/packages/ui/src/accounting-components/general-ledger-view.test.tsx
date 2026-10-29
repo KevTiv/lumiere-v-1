@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { GeneralLedgerView } from "./general-ledger-view"
 
-vi.mock("@lumiere/i18n", () => ({
+vi.mock("@lumiere/i18n", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@lumiere/i18n")>(),
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 

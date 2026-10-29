@@ -98,7 +98,7 @@ function TemplateSheet({ values, title }: { values: FormValues; title: string })
       <div className="relative mx-auto w-full max-w-sm overflow-hidden rounded-sm border bg-background" style={{ aspectRatio: `${page.pageWidth} / ${page.pageHeight}` }} data-testid="template-page-preview">
         {page.fits ? <div className="absolute flex flex-col justify-between gap-4 border border-dashed border-border p-3" style={{ top: `${page.top / page.pageHeight * 100}%`, bottom: `${page.bottom / page.pageHeight * 100}%`, left: `${page.left / page.pageWidth * 100}%`, right: `${page.right / page.pageWidth * 100}%` }}>
           <div className="flex flex-col gap-3"><h3 className="break-words">{title}</h3>{values.headerLine ? <Separator /> : null}<p className="text-sm text-muted-foreground">{t("reports.authoring.reportContent", { defaultValue: "Report content" })}</p><div className="flex flex-col gap-3" aria-hidden="true">{["w-full", "w-4/5", "w-full", "w-3/5"].map((width, index) => <div key={index} className={`h-2 rounded bg-muted ${width}`} />)}</div></div>
-          <div className="flex flex-col gap-2">{values.footerLine ? <Separator /> : null}<p className="text-xs text-muted-foreground">{String(values.reportType ?? "PDF")} · 1</p></div>
+          <div className="flex flex-col gap-2">{values.footerLine ? <Separator /> : null}<p className="text-xs text-muted-foreground">{String(values.reportType ?? t("documents.forms.newDocument.fields.options.pdf"))} · 1</p></div>
         </div> : null}
       </div>
     </>
@@ -116,7 +116,7 @@ function ScheduleSheet({ values, config, title }: { values: FormValues; config: 
       <p>{authoringOptionLabel(config, "reportTemplateId", values.reportTemplateId) || t("reports.authoring.chooseTemplate", { defaultValue: "Choose a report template." })}</p>
       <div className="flex flex-col gap-2 rounded-md border p-4"><p className="text-sm text-muted-foreground">{t("reports.authoring.nextRun", { defaultValue: "Selected next run" })}</p><p data-testid="schedule-next-run-preview">{preview.nextRun ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone }).format(preview.nextRun) : "—"}</p><p className="text-xs text-muted-foreground">{timeZone} · {authoringOptionLabel(config, "frequency", values.frequency)}</p></div>
       <Separator />
-      <p className="text-sm">{t("reports.authoring.delivery", { defaultValue: "Delivery" })} · {String(values.attachmentFormat ?? "PDF")}</p>
+      <p className="text-sm">{t("reports.authoring.delivery", { defaultValue: "Delivery" })} · {String(values.attachmentFormat ?? t("documents.forms.newDocument.fields.options.pdf"))}</p>
       {preview.recipients.length ? <ul className="flex flex-col gap-1 text-sm">{preview.recipients.map((recipient, index) => <li key={`${recipient}-${index}`} className="break-all">{recipient}</li>)}</ul> : <p className="text-sm text-muted-foreground">{t("reports.authoring.addRecipients", { defaultValue: "Add recipients to preview the delivery list." })}</p>}
       <p className="text-xs text-muted-foreground">{t("reports.authoring.scheduleLimit", { defaultValue: "The selected datetime uses your browser time zone. Future run dates depend on the scheduler." })}</p>
     </>

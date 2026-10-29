@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCurrencyFormat } from "../../lib/currency-context"
 
@@ -9,6 +11,7 @@ interface OverdueInvoicesData {
 }
 
 export function OverdueInvoicesWidget({ data }: { data: OverdueInvoicesData }) {
+  useTranslation()
   const { money } = useCurrencyFormat()
   const status = data.count === 0 ? "green" : data.oldestDays > 60 ? "red" : "amber"
   const colorClass =
@@ -26,19 +29,17 @@ export function OverdueInvoicesWidget({ data }: { data: OverdueInvoicesData }) {
         <div>
           <p className={`text-3xl font-bold ${colorClass}`}>{data.count}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            overdue invoice{data.count !== 1 ? "s" : ""}
+            {i18n.t("ui.pages.overdueInvoicesWidget.overdueInvoices", { count: data.count })}
           </p>
         </div>
         <div className="text-right">
           <p className={`text-lg font-semibold ${colorClass}`}>{money(data.totalAmount)}</p>
-          <p className="text-xs text-muted-foreground">total outstanding</p>
+          <p className="text-xs text-muted-foreground">{i18n.t("ui.pages.overdueInvoicesWidget.totalOutstanding")}</p>
         </div>
       </div>
       {data.count > 0 && (
         <p className="text-xs text-muted-foreground mt-3">
-          Oldest:{" "}
-          <span className={`font-medium ${colorClass}`}>{data.oldestDays} days</span> overdue
-        </p>
+          {i18n.t("ui.pages.overdueInvoicesWidget.oldestOverdue", { count: data.oldestDays })}</p>
       )}
     </div>
   )

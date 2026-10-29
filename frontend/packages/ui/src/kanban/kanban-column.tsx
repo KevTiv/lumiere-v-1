@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useDroppable } from "@dnd-kit/core"
 import { cn } from "../lib/utils"
@@ -28,6 +30,7 @@ export function KanbanColumn({
   disabled = false,
   children,
 }: KanbanColumnProps) {
+  useTranslation()
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
     data: { column },
@@ -64,7 +67,7 @@ export function KanbanColumn({
             size="icon"
             className="h-6 w-6 shrink-0"
             onClick={onAddItem}
-            aria-label={`Add to ${column.title}`}
+            aria-label={i18n.t("ui.kanban.kanbanColumn.addToValue", { value1: column.title })}
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -83,7 +86,7 @@ export function KanbanColumn({
 
         {itemCount === 0 ? (
           <div className="flex items-center justify-center h-24 text-sm text-muted-foreground text-center px-2">
-            {labels?.emptyColumn ?? "Drop items here"}
+            {labels?.emptyColumn ?? i18n.t("ui.kanban.kanbanColumn.dropItemsHere")}
           </div>
         ) : null}
       </div>
@@ -91,7 +94,7 @@ export function KanbanColumn({
       {atWipLimit ? (
         <div className="mt-2 px-2 py-1 text-xs text-warning bg-warning/10 rounded">
           {labels?.wipLimitReached?.(column.limit!) ??
-            `WIP limit reached (${column.limit})`}
+            i18n.t("ui.kanban.kanbanColumn.wipLimitReachedValue", { value1: column.limit })}
         </div>
       ) : null}
     </div>

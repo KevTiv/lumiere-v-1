@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 /**
  * Pure data behind the Expenses dashboard charts: spend by category, monthly spend, and the
  * approval backlog, all from the expense and expense-report rows the module already loads.
@@ -12,9 +14,9 @@ import { timestampMs, type MsRange } from "../accounting/accounting-dashboard-ch
 const DAY_MS = 86_400_000
 
 const LINE_KIND_LABELS: { [kind: string]: string } = {
-  Standard: "Other expenses",
-  Mileage: "Mileage",
-  PerDiem: "Per diem",
+  get Standard() { return i18n.t("expenses.expensesDashboardCharts.otherExpenses") },
+  get Mileage() { return i18n.t("expenses.expensesDashboardCharts.mileage") },
+  get PerDiem() { return i18n.t("expenses.expensesDashboardCharts.perDiem") },
 }
 
 /** Spend that counts: everything submitted onwards, never drafts or refused lines. */
@@ -31,7 +33,7 @@ function expenseMs(expense: HrExpense): number | null {
 export function expenseCategory(expense: HrExpense, productNames: ReadonlyMap<string, string>): string {
   const product = expense.productId != null ? productNames.get(String(expense.productId)) : undefined
   if (product) return product
-  return LINE_KIND_LABELS[variantTag(expense.lineKind)] ?? "Other expenses"
+  return LINE_KIND_LABELS[variantTag(expense.lineKind)] ?? i18n.t("expenses.expensesDashboardCharts.otherExpenses")
 }
 
 /** Spend per category in the period, with the change against the previous period. */
@@ -132,7 +134,7 @@ export function approvalBacklog(
         ageDays: createdMs == null ? 0 : Math.max(0, Math.floor((nowMs - createdMs) / DAY_MS)),
         amount: Number(sheet.totalAmount ?? 0),
         currency: currencyCodeById.get(String(sheet.currencyId)) ?? "",
-        status: state === "Submitted" ? "Awaiting approval" : "Awaiting posting",
+        status: state === "Submitted" ? i18n.t("sales.dashboard.queues.awaitingApproval") : i18n.t("accounting.overview.awaitingPosting"),
       }
     })
 }

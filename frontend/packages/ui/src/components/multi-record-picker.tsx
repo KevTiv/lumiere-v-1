@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useState, type KeyboardEvent } from "react"
 import { Check, ChevronsUpDown, X } from "lucide-react"
@@ -51,7 +53,7 @@ export function MultiRecordPicker({
   options,
   placeholder = "Select...",
   searchPlaceholder = "Search...",
-  emptyText = "No matches",
+  emptyText = i18n.t("ui.components.multiRecordPicker.noMatches"),
   removeLabel = (label) => `Remove ${label}`,
   unavailableLabel = (missing) => missing,
   disabled,
@@ -61,6 +63,7 @@ export function MultiRecordPicker({
   "data-testid": testId,
   "aria-describedby": describedBy,
 }: MultiRecordPickerProps) {
+  useTranslation()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
   const selected = new Set(value)

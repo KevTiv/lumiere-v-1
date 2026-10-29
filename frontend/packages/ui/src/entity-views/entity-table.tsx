@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, type MouseEvent } from "react"
 import { useTableDensity } from "../hooks/use-table-density"
 import { TableDensityControl } from "../composed/table-density-control"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type {
   EntityAction,
@@ -123,7 +123,7 @@ export function allFilterLabel(label: string): string {
   if (/[^aeiou]y$/.test(lower)) plural = `${lower.slice(0, -1)}ies`
   else if (/(s|x|z|ch|sh)$/.test(lower)) plural = `${lower}es`
   else plural = `${lower}s`
-  return `All ${plural}`
+  return i18n.t("ui.entityViews.entityTable.allFilter", { label: i18n.resolvedLanguage?.startsWith("en") ? plural : label })
 }
 
 function readPersistedFilters(
@@ -346,7 +346,7 @@ export function EntityTable({
   )
   const groupLabel = (value: string): string =>
     value === ""
-      ? "None"
+      ? i18n.t("ui.entityViews.entityTable.none")
       : (groupFilter?.options?.find((option) => String(option.value) === value)?.label ?? value)
 
   const [pendingConfirm, setPendingConfirm] = useState<{
@@ -440,7 +440,7 @@ export function EntityTable({
           needsSingleRow ||
           (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)
         }
-        title={needsSingleRow ? "Select a single record to use this action" : undefined}
+        title={needsSingleRow ? i18n.t("ui.entityViews.entityTable.selectASingleRecordToUseThisAction") : undefined}
         aria-busy={isPending || undefined}
         onClick={() => runAction(action)}
         className="h-auto min-h-7 max-w-full whitespace-normal text-left"
@@ -563,7 +563,7 @@ export function EntityTable({
                 key={key}
                 variant="secondary"
                 size="sm"
-                aria-label={`Clear filter ${key}`}
+                aria-label={i18n.t("ui.entityViews.entityTable.clearFilterValue", { value1: key })}
                 className="h-auto min-h-7 max-w-full whitespace-normal text-left"
                 data-testid={`entity-active-filter-${key}`}
                 disabled={Object.hasOwn(initialFilters ?? {}, key) && !onInitialFilterClear}
@@ -593,8 +593,8 @@ export function EntityTable({
               <div className="relative min-w-0 flex-1 basis-48">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  aria-label="Search records"
-                  placeholder={config.searchPlaceholder ?? "Search…"}
+                  aria-label={i18n.t("ui.entityViews.entityTable.searchRecords")}
+                  placeholder={config.searchPlaceholder ?? i18n.t("ui.entityViews.entityTable.search")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9"
@@ -662,19 +662,17 @@ export function EntityTable({
                         variant="outline"
                         size="sm"
                         className="h-auto min-h-7 max-w-full whitespace-normal"
-                        aria-label="Saved filters"
+                        aria-label={i18n.t("ui.entityViews.entityTable.savedFilters")}
                         data-testid="entity-saved-filters"
                       />
                     }
                   >
                     <Bookmark className="mr-2 h-4 w-4" />
-                    Saved filters
-                  </PopoverTrigger>
+                    {i18n.t("ui.entityViews.entityTable.savedFilters")}</PopoverTrigger>
                   <PopoverContent align="end" className="w-72 space-y-3">
                     {savedFilters.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        No saved filters yet. Set a search or filters, then save them under a name.
-                      </p>
+                        {i18n.t("ui.entityViews.entityTable.noSavedFiltersYetSetASearchOrFiltersThenSaveThemUnderAName")}</p>
                     ) : (
                       <ul className="space-y-1" data-testid="entity-saved-filter-list">
                         {savedFilters.map((saved) => (
@@ -697,7 +695,7 @@ export function EntityTable({
                             <Button
                               variant="ghost"
                               size="icon"
-                              aria-label={`Delete saved filter ${saved.name}`}
+                              aria-label={i18n.t("ui.entityViews.entityTable.deleteSavedFilterValue", { value1: saved.name })}
                               data-testid={`entity-saved-filter-delete-${saved.name}`}
                               onClick={() => setSavedFilters((prev) => removeSavedFilter(prev, saved.name))}
                             >
@@ -718,8 +716,8 @@ export function EntityTable({
                       }}
                     >
                       <Input
-                        aria-label="Name for the current filters"
-                        placeholder="Name for current filters"
+                        aria-label={i18n.t("ui.entityViews.entityTable.nameForTheCurrentFilters")}
+                        placeholder={i18n.t("ui.entityViews.entityTable.nameForCurrentFilters")}
                         value={newFilterName}
                         onChange={(event) => setNewFilterName(event.target.value)}
                         data-testid="entity-saved-filter-name"
@@ -730,8 +728,7 @@ export function EntityTable({
                         disabled={!newFilterName.trim()}
                         data-testid="entity-saved-filter-save"
                       >
-                        Save
-                      </Button>
+                        {i18n.t("common.save")}</Button>
                     </form>
                   </PopoverContent>
                 </Popover>
@@ -743,14 +740,14 @@ export function EntityTable({
                     setView((prev) => ({ ...prev, groupBy: val === "__none__" ? null : String(val) }))
                   }
                 >
-                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label="Group by" data-testid="entity-group-by">
-                    <SelectValue placeholder="Group by" />
+                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label={i18n.t("common.entityView.pivotGroupBy")} data-testid="entity-group-by">
+                    <SelectValue placeholder={i18n.t("common.entityView.pivotGroupBy")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">No grouping</SelectItem>
+                    <SelectItem value="__none__">{i18n.t("ui.entityViews.entityTable.noGrouping")}</SelectItem>
                     {groupableFilters.map((filter) => (
                       <SelectItem key={filter.key} value={filter.key}>
-                        Group by {filter.label.toLowerCase()}
+                        {i18n.t("common.entityView.pivotGroupBy")}{" "}{filter.label.toLowerCase()}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -763,15 +760,14 @@ export function EntityTable({
                       variant="outline"
                       size="sm"
                       className="h-auto min-h-7 max-w-full whitespace-normal"
-                      aria-label="Choose columns"
+                      aria-label={i18n.t("ui.entityViews.entityTable.chooseColumns")}
                       data-testid="entity-columns"
                     >
                       <Columns3 className="mr-2 h-4 w-4" />
-                      Columns
-                    </Button>
+                      {i18n.t("common.entityView.pivotColumnsBy")}</Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                    <DropdownMenuLabel>{i18n.t("ui.entityViews.entityTable.showColumns")}</DropdownMenuLabel>
                     {permittedColumns.map((col) => (
                       <DropdownMenuCheckboxItem
                         key={col.key}
@@ -815,8 +811,7 @@ export function EntityTable({
             data-testid="entity-selection-actions"
           >
             <span className="mr-1 text-sm font-medium text-foreground">
-              {selectedRows.length} selected
-            </span>
+              {selectedRows.length} {i18n.t("ui.entityViews.entityTable.selected")}</span>
             {selectionActions.map(renderActionButton)}
             <Button
               variant="ghost"
@@ -825,8 +820,7 @@ export function EntityTable({
               onClick={clearSelection}
               data-testid="entity-selection-clear"
             >
-              Clear selection
-            </Button>
+              {i18n.t("ui.entityViews.entityTable.clearSelection")}</Button>
           </div>
         )}
 
@@ -837,7 +831,7 @@ export function EntityTable({
                 {showSelectColumn && (
                   <TableHead className="w-10">
                     <Checkbox
-                      aria-label="Select all rows on this page"
+                      aria-label={i18n.t("ui.entityViews.entityTable.selectAllRowsOnThisPage")}
                       data-testid="entity-select-all"
                       checked={table.getIsAllPageRowsSelected()}
                       indeterminate={table.getIsSomePageRowsSelected()}
@@ -883,7 +877,7 @@ export function EntityTable({
                 ))}
                 {rowActionColumnCount > 0 && (
                   <TableHead className="w-10">
-                    <span className="sr-only">Row actions</span>
+                    <span className="sr-only">{i18n.t("ui.entityViews.entityTable.rowActions")}</span>
                   </TableHead>
                 )}
               </TableRow>
@@ -951,7 +945,7 @@ export function EntityTable({
                         {groupLabel(group.value)}
                         <span className="ml-2 font-normal text-muted-foreground">
                           {groupCounts?.get(group.value) ?? group.rows.length}
-                          {group.value === continuedGroup ? " · continued" : ""}
+                          {group.value === continuedGroup ? i18n.t("ui.entityViews.entityTable.continued") : ""}
                         </span>
                       </TableCell>
                       {columns.slice(1).map((col) => {
@@ -1026,7 +1020,7 @@ export function EntityTable({
                       {showSelectColumn && (
                         <TableCell className="w-10" onClick={(event) => event.stopPropagation()}>
                           <Checkbox
-                            aria-label="Select row"
+                            aria-label={i18n.t("ui.entityViews.entityTable.selectRow")}
                             data-testid={`entity-select-row-${key}`}
                             checked={isSelected}
                             onCheckedChange={(checked) => tableRow.toggleSelected(checked === true)}
@@ -1078,7 +1072,7 @@ export function EntityTable({
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                aria-label="Row actions"
+                                aria-label={i18n.t("ui.entityViews.entityTable.rowActions")}
                                 data-testid={`entity-row-actions-${key}`}
                               >
                                 <MoreHorizontal className="h-4 w-4" />
@@ -1119,7 +1113,7 @@ export function EntityTable({
         {!isLoading && sorted.length > ENTITY_TABLE_PAGE_SIZES[0] ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span id="entity-rows-per-page-label">Rows per page</span>
+              <span id="entity-rows-per-page-label">{i18n.t("ui.entityViews.entityTable.rowsPerPage")}</span>
               <Select
                 value={String(pageSize)}
                 onValueChange={(val) => {
@@ -1157,10 +1151,10 @@ export function EntityTable({
         {!isLoading && sorted.length > 0 && (
           <p className="text-xs text-muted-foreground">
             {sorted.length > pageSize
-              ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, sorted.length)} of ${sorted.length}`
-              : `${sorted.length} of ${data.length}`}{" "}
-            record{sorted.length !== 1 ? "s" : ""}
-            {selectedCount > 0 && ` · ${selectedCount} selected`}
+              ? i18n.t("ui.entityViews.entityTable.valueValueOfValue", { value1: (currentPage - 1) * pageSize + 1, value2: Math.min(currentPage * pageSize, sorted.length), value3: sorted.length })
+              : i18n.t("ui.entityViews.entityTable.valueOfValue", { value1: sorted.length, value2: data.length })}{" "}
+            {i18n.t("ui.entityViews.entityTable.record")}{sorted.length !== 1 ? "s" : ""}
+            {selectedCount > 0 && i18n.t("ui.entityViews.entityTable.valueSelected", { value1: selectedCount })}
           </p>
         )}
       </div>

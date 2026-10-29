@@ -35,7 +35,7 @@ import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatCo
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 
 interface ChatReply {
@@ -484,13 +484,13 @@ export function AIChatPanel({
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold tracking-tight">{config?.title || t("aiChat.title")}</h2>
-            <p className="truncate text-xs text-muted-foreground">{docked ? "Working alongside your module" : "Business workspace"}</p>
+            <p className="truncate text-xs text-muted-foreground">{docked ? i18n.t("ui.aiAssistant.aiChatPanel.workingAlongsideYourModule") : i18n.t("ui.aiAssistant.aiChatPanel.businessWorkspace")}</p>
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
           {contextOptions && contextOptions.length > 0 && onContextChange ? (
             <label className="min-w-0">
-              <span className="sr-only">Assistant context</span>
+              <span className="sr-only">{i18n.t("ui.aiAssistant.aiChatPanel.assistantContext")}</span>
               <Select
                 value={String(selectedContext ?? contextOptions[0]?.value ?? "")}
                 onValueChange={(nextValue) => onContextChange(nextValue)}
@@ -498,7 +498,7 @@ export function AIChatPanel({
                 <SelectTrigger
                   data-testid="erp-ai-chat-context"
                   className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
-                  aria-label={"Assistant context"}
+                  aria-label={i18n.t("ui.aiAssistant.aiChatPanel.assistantContext")}
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -520,7 +520,7 @@ export function AIChatPanel({
             </label>
           ) : null}
           {onDockToggle ? (
-            <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
+            <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? i18n.t("ui.aiAssistant.aiChatPanel.openFullWorkspace") : i18n.t("ui.aiAssistant.aiChatPanel.dockBesideERP")} aria-label={docked ? i18n.t("ui.aiAssistant.aiChatPanel.openFullWorkspace") : i18n.t("ui.aiAssistant.aiChatPanel.dockBesideERP")}>
               {docked ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
             </Button>
           ) : null}
@@ -538,11 +538,10 @@ export function AIChatPanel({
               <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <span className="inline-block size-1.5 rounded-full bg-primary" aria-hidden="true" />
-                  {context?.activeView ?? "Your organization"}
+                  {context?.activeView ?? i18n.t("ui.aiAssistant.aiChatPanel.yourOrganization")}
                 </div>
                 <h3 className={cn("font-semibold tracking-tight text-foreground", docked ? "text-xl" : "text-3xl sm:text-4xl")}>
-                  What would you like to work on?
-                </h3>
+                  {i18n.t("ui.aiAssistant.aiChatPanel.whatWouldYouLikeToWorkOn")}</h3>
                 <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
                   {config?.welcomeMessage || t("aiChat.emptyState.welcome")}
                 </p>
@@ -607,7 +606,7 @@ export function AIChatPanel({
                               const isLive = src.kind === "live" || src.trust === "authoritative"
                               const isWeb = src.kind === "web"
                               const badgeLabel = isWeb
-                                ? "Web"
+                                ? t("aiChat.sourceWeb")
                                 : isLive
                                   ? t("aiChat.sourceLive")
                                   : src.kind === "activity"
@@ -708,7 +707,7 @@ export function AIChatPanel({
                           <button
                             onClick={() => handleCopy(message.content, message.id)}
                             className="text-muted-foreground hover:text-foreground transition-colors"
-                            title="Copy answer"
+                            title={i18n.t("ui.aiAssistant.aiChatPanel.copyAnswer")}
                           >
                             {copiedId === message.id ? (
                               <Check className="h-3 w-3 text-success" />
@@ -723,16 +722,14 @@ export function AIChatPanel({
                             onClick={() => handleUseAnswerInForm(message.content)}
                             className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                           >
-                            Use in form
-                          </button>
+                            {i18n.t("ui.aiAssistant.aiChatPanel.useInForm")}</button>
                         )}
                         {message.role === "assistant" && message.metadata?.runId != null ? (
                           <a
                             href={`/ai-harness?runId=${message.metadata.runId}${message.metadata.companyId ? `&companyId=${message.metadata.companyId}` : ""}`}
                             className="text-[11px] text-primary hover:underline"
                           >
-                            Inspect run
-                          </a>
+                            {i18n.t("ui.aiAssistant.aiChatPanel.inspectRun")}</a>
                         ) : null}
                         {message.metadata?.tokens != null ? (
                           <span className="text-[11px] text-muted-foreground">
@@ -815,7 +812,7 @@ export function AIChatPanel({
               onKeyDown={handleKeyDown}
               placeholder={config?.placeholder || t("aiChat.placeholder")}
               rows={2}
-              aria-label="Message Lumière assistant"
+              aria-label={i18n.t("ui.aiAssistant.aiChatPanel.messageLumiReAssistant")}
               className="block field-sizing-fixed min-h-[58px] max-h-[180px] w-full resize-none rounded-none border-0 bg-transparent px-3 pt-2 text-sm leading-6 text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-0 dark:bg-transparent"
             />
             <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 pl-2">
@@ -834,15 +831,14 @@ export function AIChatPanel({
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
                 className="size-9 shrink-0 rounded-xl"
-                aria-label="Send message"
+                aria-label={i18n.t("ui.aiAssistant.aiChatPanel.sendMessage")}
               >
                 {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               </Button>
             </div>
           </div>
           <p className="mx-auto mt-2 max-w-[790px] text-center text-[11px] text-muted-foreground">
-            Suggested actions require review. Lumière checks your current permissions.
-          </p>
+            {i18n.t("ui.aiAssistant.aiChatPanel.suggestedActionsRequireReviewLumiReChecksYourCurrentPermissions")}</p>
         </div>
       </div>
     </section>

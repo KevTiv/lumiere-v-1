@@ -58,24 +58,24 @@ import {
   defaultForensicFormConfig
 } from "@/lib/form-config-types"
 import { defaultRoles } from "@/lib/rbac-defaults"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 
 const fieldTypeOptions: { value: FieldType; label: string; description: string }[] = [
-  { value: "text", label: "Text", description: "Single line text input" },
-  { value: "textarea", label: "Text Area", description: "Multi-line text input" },
-  { value: "number", label: "Number", description: "Numeric input" },
-  { value: "select", label: "Dropdown", description: "Single selection from options" },
-  { value: "multiselect", label: "Multi-Select", description: "Multiple selections from options" },
-  { value: "date", label: "Date", description: "Date picker" },
-  { value: "time", label: "Time", description: "Time picker" },
-  { value: "datetime", label: "Date & Time", description: "Date and time picker" },
-  { value: "checkbox", label: "Checkbox", description: "Yes/No toggle" },
-  { value: "radio", label: "Radio Buttons", description: "Single choice from visible options" },
-  { value: "rating", label: "Rating", description: "Star rating (1-5)" },
-  { value: "slider", label: "Slider", description: "Numeric slider" },
-  { value: "tags", label: "Tags", description: "Multiple tag input" },
-  { value: "user-select", label: "User Select", description: "Select team member" },
-  { value: "file", label: "File Upload", description: "File attachment" },
+  { value: "text", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Text") }, get description() { return i18n.t("settings.formConfigSettings.text.singleLineTextInput") } },
+  { value: "textarea", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Textarea") }, get description() { return i18n.t("settings.formConfigSettings.text.multiLineTextInput") } },
+  { value: "number", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Number") }, get description() { return i18n.t("settings.formConfigSettings.text.numericInput") } },
+  { value: "select", get label() { return i18n.t("settings.formConfigSettings.text.dropdown") }, get description() { return i18n.t("settings.formConfigSettings.text.singleSelectionFromOptions") } },
+  { value: "multiselect", get label() { return i18n.t("settings.formConfigSettings.text.multiSelect") }, get description() { return i18n.t("settings.formConfigSettings.text.multipleSelectionsFromOptions") } },
+  { value: "date", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Date") }, get description() { return i18n.t("settings.formConfigSettings.text.datePicker") } },
+  { value: "time", get label() { return i18n.t("ui.datePicker.time") }, get description() { return i18n.t("settings.formConfigSettings.text.timePicker") } },
+  { value: "datetime", get label() { return i18n.t("settings.formConfigSettings.text.dateTime") }, get description() { return i18n.t("settings.formConfigSettings.text.dateAndTimePicker") } },
+  { value: "checkbox", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Checkbox") }, get description() { return i18n.t("settings.formConfigSettings.text.yesNoToggle") } },
+  { value: "radio", get label() { return i18n.t("settings.formConfigSettings.text.radioButtons") }, get description() { return i18n.t("settings.formConfigSettings.text.singleChoiceFromVisibleOptions") } },
+  { value: "rating", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Rating") }, get description() { return i18n.t("settings.formConfigSettings.text.starRating15") } },
+  { value: "slider", get label() { return i18n.t("settings.formConfigSettings.text.slider") }, get description() { return i18n.t("settings.formConfigSettings.text.numericSlider") } },
+  { value: "tags", get label() { return i18n.t("settings.formConfig.fieldDialog.fieldTypes.Tags") }, get description() { return i18n.t("settings.formConfigSettings.text.multipleTagInput") } },
+  { value: "user-select", get label() { return i18n.t("settings.formConfigSettings.text.userSelect") }, get description() { return i18n.t("settings.formConfigSettings.text.selectTeamMember") } },
+  { value: "file", get label() { return i18n.t("settings.formConfigSettings.text.fileUpload") }, get description() { return i18n.t("settings.formConfigSettings.text.fileAttachment") } },
 ]
 
 interface FormConfigSettingsProps {
@@ -475,8 +475,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-sm">{field.label}</span>
                         <Badge variant="outline" className="text-xs">
-                          {field.aiSuggestions?.length || 0} suggestions
-                        </Badge>
+                          {i18n.t("settings.formConfigSettings.text.suggestionCount", { count: field.aiSuggestions?.length || 0 })}</Badge>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {field.aiSuggestions?.map((suggestion, idx) => (

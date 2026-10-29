@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 // Jira-like Task Board Types
 
 export type TaskStatus = "backlog" | "todo" | "in-progress" | "review" | "done"
@@ -96,28 +97,28 @@ export interface TaskBoardConfig {
 
 // Default columns configuration
 export const defaultColumns: TaskColumn[] = [
-  { id: "backlog", title: "Backlog", color: "bg-muted-foreground" },
-  { id: "todo", title: "To Do", color: "bg-info" },
-  { id: "in-progress", title: "In Progress", color: "bg-warning" },
-  { id: "review", title: "Review", color: "bg-category-3" },
-  { id: "done", title: "Done", color: "bg-success" },
+  { id: "backlog", get title() { return uiI18n.t("tasks.statuses.backlog") }, color: "bg-muted-foreground" },
+  { id: "todo", get title() { return uiI18n.t("tasks.statuses.todo") }, color: "bg-info" },
+  { id: "in-progress", get title() { return uiI18n.t("tasks.builtIn.taskBoardTypes.defaultColumns.inProgress.title") }, color: "bg-warning" },
+  { id: "review", get title() { return uiI18n.t("tasks.statuses.review") }, color: "bg-category-3" },
+  { id: "done", get title() { return uiI18n.t("tasks.builtIn.taskBoardTypes.defaultColumns.done.title") }, color: "bg-success" },
 ]
 
 // Priority configuration
 export const priorityConfig: Record<TaskPriority, { label: string; color: string; icon: string }> = {
-  low: { label: "Low", color: "text-muted-foreground", icon: "arrow-down" },
-  medium: { label: "Medium", color: "text-info", icon: "minus" },
-  high: { label: "High", color: "text-warning", icon: "arrow-up" },
-  urgent: { label: "Urgent", color: "text-destructive", icon: "alert-triangle" },
+  low: { get label() { return uiI18n.t("tasks.priorities.low") }, color: "text-muted-foreground", icon: "arrow-down" },
+  medium: { get label() { return uiI18n.t("tasks.priorities.medium") }, color: "text-info", icon: "minus" },
+  high: { get label() { return uiI18n.t("tasks.priorities.high") }, color: "text-warning", icon: "arrow-up" },
+  urgent: { get label() { return uiI18n.t("tasks.priorities.urgent") }, color: "text-destructive", icon: "alert-triangle" },
 }
 
 // Task type configuration
 export const taskTypeConfig: Record<TaskType, { label: string; color: string; icon: string }> = {
-  task: { label: "Task", color: "bg-info", icon: "check-square" },
-  bug: { label: "Bug", color: "bg-destructive", icon: "bug" },
-  feature: { label: "Feature", color: "bg-success", icon: "zap" },
-  story: { label: "Story", color: "bg-category-3", icon: "book-open" },
-  epic: { label: "Epic", color: "bg-category-1", icon: "layers" },
+  task: { get label() { return uiI18n.t("tasks.types.task") }, color: "bg-info", icon: "check-square" },
+  bug: { get label() { return uiI18n.t("tasks.types.bug") }, color: "bg-destructive", icon: "bug" },
+  feature: { get label() { return uiI18n.t("tasks.types.feature") }, color: "bg-success", icon: "zap" },
+  story: { get label() { return uiI18n.t("tasks.types.story") }, color: "bg-category-3", icon: "book-open" },
+  epic: { get label() { return uiI18n.t("tasks.types.epic") }, color: "bg-category-1", icon: "layers" },
 }
 
 // Sample data

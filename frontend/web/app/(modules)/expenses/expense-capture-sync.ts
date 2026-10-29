@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import { OperationRequestError } from "@lumiere/api-client"
 import type { CreateExpenseParams } from "@lumiere/stdb/types"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
@@ -430,19 +432,19 @@ export async function syncExpenseCapture(
       let receipt = current.receipt
       if (!receipt)
         throw new Error(
-          "This queued capture has no receipt file. Discard it and capture it again with an attachment.",
+          i18n.t("expenses.expenseCaptureSync.thisQueuedCaptureHasNoReceiptFileDiscardItAndCapture"),
         )
       if (!receipt.uploaded) {
         if (!file || !captureFileMatches(file, receipt))
           throw new Error(
-            "Reattach the original receipt file to continue. File bytes are not stored across reloads.",
+            i18n.t("expenses.expenseCaptureSync.reattachTheOriginalReceiptFileToContinueFileBytesAreNot"),
           )
         services.assertWriteAllowed?.()
         receipt = { ...receipt, state: "uploading", lastError: undefined }
         save({ ...current, receipt })
         const upload = await services.upload(file, scope.companyId)
         if (!upload.objectKey || !upload.checksum)
-          throw new Error("The upload did not return a verified file identity")
+          throw new Error(i18n.t("expenses.expenseCaptureSync.theUploadDidNotReturnAVerifiedFileIdentity"))
         receipt = {
           ...receipt,
           uploaded: {
@@ -488,7 +490,7 @@ export async function syncExpenseCapture(
           throw (
             registrationError ??
             new Error(
-              "Receipt registration is not confirmed. Retry will check the same request identity.",
+              i18n.t("expenses.expenseCaptureSync.receiptRegistrationIsNotConfirmedRetryWillCheckTheSameRequest"),
             )
           )
       }
@@ -540,11 +542,11 @@ export async function syncExpenseCapture(
       lastError:
         dispatchError instanceof Error
           ? dispatchError.message
-          : "The expense command was accepted, but its saved result is not confirmed.",
+          : i18n.t("expenses.expenseCaptureSync.theExpenseCommandWasAcceptedButItsSavedResultIsNot"),
     })
     return current
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Capture failed"
+    const message = error instanceof Error ? error.message : i18n.t("expenses.capture.attachments.failed")
     save({
       ...current,
       syncState: submissionCheckpointSaved ? "unknown" : "error",

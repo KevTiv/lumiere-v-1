@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
@@ -52,6 +54,7 @@ export function FormFieldRenderer({
   error,
   disabled,
 }: FormFieldRendererProps) {
+  useTranslation()
   const renderField = () => {
     switch (field.type) {
       case "Text":
@@ -105,7 +108,7 @@ export function FormFieldRenderer({
             disabled={disabled}
           >
             <SelectTrigger className={cn(error && "border-destructive")}>
-              <SelectValue placeholder={field.placeholder || "Select..."} />
+              <SelectValue placeholder={field.placeholder || i18n.t("ui.forms.formFieldRenderer.select")} />
             </SelectTrigger>
             <SelectContent>
               {field.options?.map((option, idx) => (
@@ -270,7 +273,7 @@ export function FormFieldRenderer({
       default:
         return (
           <Input
-            placeholder="Unsupported field type"
+            placeholder={i18n.t("ui.forms.formFieldRenderer.unsupportedFieldType")}
             disabled
             value={`Unsupported: ${field.type}`}
           />
@@ -351,6 +354,7 @@ function DatePicker({
   onChange: (value: string) => void
   disabled?: boolean
 }) {
+  useTranslation()
   const date = value ? new Date(value) : undefined
 
   return (
@@ -366,7 +370,7 @@ function DatePicker({
             disabled={disabled}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {date ? format(date, "PPP") : <span>Pick a date</span>}
+            {date ? format(date, "PPP") : <span>{i18n.t("ui.forms.formFieldRenderer.pickADate")}</span>}
           </Button>
         }
       />
@@ -391,6 +395,7 @@ function DateTimePicker({
   onChange: (value: string) => void
   disabled?: boolean
 }) {
+  useTranslation()
   const date = value ? new Date(value) : undefined
 
   return (
@@ -407,7 +412,7 @@ function DateTimePicker({
               disabled={disabled}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {date ? format(date, "PPP") : <span>Pick date</span>}
+              {date ? format(date, "PPP") : <span>{i18n.t("ui.forms.formFieldRenderer.pickDate")}</span>}
             </Button>
           }
         />
@@ -489,6 +494,7 @@ function TagsField({
   placeholder?: string
   disabled?: boolean
 }) {
+  useTranslation()
   const [inputValue, setInputValue] = React.useState("")
 
   const addTag = () => {
@@ -520,7 +526,7 @@ function TagsField({
       {!disabled && (
         <div className="flex gap-2">
           <Input
-            placeholder={placeholder || "Add tag..."}
+            placeholder={placeholder || i18n.t("ui.forms.formFieldRenderer.addTag")}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => {
@@ -531,8 +537,7 @@ function TagsField({
             }}
           />
           <Button type="button" variant="outline" onClick={addTag}>
-            Add
-          </Button>
+            {i18n.t("settings.formConfigSettings.aiSuggestions.add")}</Button>
         </div>
       )}
     </div>
@@ -548,6 +553,7 @@ function FileUploadField({
   onChange: (value: File[]) => void
   disabled?: boolean
 }) {
+  useTranslation()
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -594,8 +600,7 @@ function FileUploadField({
             onClick={() => inputRef.current?.click()}
           >
             <FileIcon className="mr-2 h-4 w-4" />
-            Upload Files
-          </Button>
+            {i18n.t("ui.forms.formFieldRenderer.uploadFiles")}</Button>
         </div>
       )}
     </div>
@@ -613,6 +618,7 @@ function UserSelectField({
   onChange: (value: string) => void
   disabled?: boolean
 }) {
+  useTranslation()
   const selectedIsAvailable = options.some(option => option.value === value)
   const displayOptions = value && !selectedIsAvailable
     ? [
@@ -633,7 +639,7 @@ function UserSelectField({
       disabled={disabled || !hasSelectableUser}
     >
       <SelectTrigger>
-        <SelectValue placeholder={options.length > 0 ? "Select user..." : "No users available"} />
+        <SelectValue placeholder={options.length > 0 ? i18n.t("ui.forms.formFieldRenderer.selectUser") : i18n.t("ui.forms.formFieldRenderer.noUsersAvailable")} />
       </SelectTrigger>
       <SelectContent>
         {displayOptions.map((option, index) => (
@@ -657,10 +663,11 @@ function AISuggestions({
   suggestions: string[]
   onSelect: (suggestion: string) => void
 }) {
+  useTranslation()
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <Sparkles className="h-3 w-3 text-primary" />
-      <span className="text-xs text-muted-foreground">Suggestions:</span>
+      <span className="text-xs text-muted-foreground">{i18n.t("ui.forms.formFieldRenderer.suggestions")}</span>
       {suggestions.map((suggestion, index) => (
         <button
           key={index}

@@ -1,3 +1,5 @@
+"use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
@@ -6,9 +8,10 @@ import { cn } from "@lumiere/ui/lib/utils"
 import { ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 
 function Breadcrumb({ className, ...props }: React.ComponentProps<"nav">) {
+  useTranslation()
   return (
     <nav
-      aria-label="breadcrumb"
+      aria-label={i18n.t("ui.components.breadcrumb.breadcrumb")}
       data-slot="breadcrumb"
       className={cn(className)}
       {...props}
@@ -96,6 +99,7 @@ function BreadcrumbEllipsis({
   className,
   ...props
 }: React.ComponentProps<"span">) {
+  useTranslation()
   return (
     <span
       data-slot="breadcrumb-ellipsis"
@@ -109,7 +113,7 @@ function BreadcrumbEllipsis({
     >
       <MoreHorizontalIcon
       />
-      <span className="sr-only">More</span>
+      <span className="sr-only">{i18n.t("ui.components.breadcrumb.more")}</span>
     </span>
   )
 }

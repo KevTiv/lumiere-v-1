@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import type { ReactNode } from "react"
 import { Fragment, createContext, useContext } from "react"
@@ -48,11 +50,11 @@ interface DashboardHeaderProps {
 }
 
 const timeRanges = [
-  { label: "Today", value: "today" },
-  { label: "Last 7 Days", value: "7d" },
-  { label: "Last 30 Days", value: "30d" },
-  { label: "Last 90 Days", value: "90d" },
-  { label: "Year to Date", value: "ytd" },
+  { get label() { return i18n.t("dashboard.timeRange.today") }, value: "today" },
+  { get label() { return i18n.t("dashboard.timeRange.7d") }, value: "7d" },
+  { get label() { return i18n.t("dashboard.timeRange.30d") }, value: "30d" },
+  { get label() { return i18n.t("dashboard.timeRange.90d") }, value: "90d" },
+  { get label() { return i18n.t("dashboard.timeRange.ytd") }, value: "ytd" },
 ]
 
 /** Content the app shell shows at the end of every DashboardHeader's actions (e.g. the notifications bell). */
@@ -70,6 +72,7 @@ export function DashboardHeader({
   timeRange = "30d",
   onTimeRangeChange,
 }: DashboardHeaderProps) {
+  useTranslation()
   const trailing = useContext(HeaderTrailingContext)
   const selectedTimeRange = timeRanges.find((range) => range.value === timeRange) ?? timeRanges[2]
   const hasPrimaryAction = primaryAction != null && primaryAction !== false
@@ -140,12 +143,12 @@ export function DashboardHeader({
           </DropdownMenu>
         ) : null}
         {onRefresh ? (
-          <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh dashboard">
+          <Button variant="outline" size="icon" onClick={onRefresh} aria-label={i18n.t("ui.pages.dashboardHeader.refreshDashboard")}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         ) : null}
         {onExport ? (
-          <Button variant="outline" size="icon" onClick={onExport} aria-label="Export dashboard">
+          <Button variant="outline" size="icon" onClick={onExport} aria-label={i18n.t("ui.pages.dashboardHeader.exportDashboard")}>
             <Download className="h-4 w-4" />
           </Button>
         ) : null}

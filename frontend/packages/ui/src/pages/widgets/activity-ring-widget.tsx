@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { cn } from "@/lib/utils"
 import {
@@ -23,6 +25,7 @@ export interface ActivityRing {
 }
 
 export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
+  useTranslation()
   const size = data.size || "md"
   const baseSize = size === "sm" ? 150 : size === "md" ? 180 : 220
   const strokeWidth = size === "sm" ? 10 : size === "md" ? 12 : 14
@@ -79,7 +82,7 @@ export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
           <span className={cn("font-bold", size === "sm" ? "text-xl" : "text-2xl")}>
             {Math.round((data.rings.reduce((acc, r) => acc + r.value, 0) / data.rings.reduce((acc, r) => acc + r.max, 0)) * 100)}%
           </span>
-          <span className="text-xs text-muted-foreground">Complete</span>
+          <span className="text-xs text-muted-foreground">{i18n.t("ui.pages.activityRingWidget.complete")}</span>
         </div>
       </div>
 

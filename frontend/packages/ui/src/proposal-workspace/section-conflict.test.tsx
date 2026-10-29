@@ -8,7 +8,7 @@ const i18n = vi.hoisted(() => {
   const value = { t }
   return { useTranslation: () => value }
 })
-vi.mock("@lumiere/i18n", () => i18n)
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()), ...i18n }))
 vi.mock("next/link", () => ({ default: (p: { children?: React.ReactNode }) => <a>{p.children}</a> }))
 const toasts = vi.hoisted(() => ({ show: vi.fn() }))
 vi.mock("../lib/workflow-toast", () => ({ showWorkflowToast: toasts.show }))

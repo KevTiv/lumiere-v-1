@@ -174,7 +174,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                       { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const },
                       { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const },
                       { key: "location", label: t("calendar.events.columns.location") },
-                      { key: "description", type: "markdown" as const, label: "Description" },
+                      { key: "description", type: "markdown" as const, label: t("calendar.forms.newEvent.fields.description") },
                     ],
                   },
                 ],
@@ -293,7 +293,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!actionUsable(action)) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
       if (!p) throw new Error(t("calendar.errors.activityIncomplete", { defaultValue: "Complete the activity details before saving. Your entries are retained." }))

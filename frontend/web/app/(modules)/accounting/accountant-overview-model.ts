@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
 import { normalizedTag } from "@lumiere/erp-workflows"
@@ -117,7 +119,7 @@ function bucket(source: OverviewCollection, matches: (row: OverviewRow) => boole
   if (source.state.status !== "ready") return { rows: [], state: source.state }
   // Field-redacted and incomplete rows cannot turn into reassuring zero totals.
   if (complete && source.rows.some((row) => !complete(row))) {
-    return { rows: [], state: { status: "partial", message: "Some required fields are unavailable." } }
+    return { rows: [], state: { status: "partial", message: i18n.t("accounting.accountantOverviewModel.someRequiredFieldsAreUnavailable") } }
   }
   return { state: source.state, rows: source.rows.filter(matches) }
 }
@@ -157,7 +159,7 @@ export function buildAccountantOverview(data: AccountantOverviewData, now = new 
   const unmatched = bucket(bankSource,
     (row) => cell(row, "isReconciled", "is_reconciled") === false,
     (row) => typeof cell(row, "isReconciled", "is_reconciled") === "boolean")
-  const missingAllocationRead: OverviewCollection = { rows: [], state: { status: "partial", message: "Payment allocation sources are unavailable." } }
+  const missingAllocationRead: OverviewCollection = { rows: [], state: { status: "partial", message: i18n.t("accounting.accountantOverviewModel.paymentAllocationSourcesAreUnavailable") } }
   const allocationProjection = projectPaymentAllocations({
     organizationId: data.organizationId, companyId: data.companyId, payments: data.payments,
     moves: data.moves, currencies: data.currencies,
@@ -213,6 +215,6 @@ export function overviewMoneyTotals(rows: readonly OverviewRow[], currencies: Ov
     totals.set(currencyId, (totals.get(currencyId) ?? 0) + amount)
   }
   return [...totals].sort(([a], [b]) => a.localeCompare(b)).map(([currencyId, amount]) => ({
-    currencyId, amount, currencyLabel: labels.get(currencyId) || (currencyId ? `Currency #${currencyId}` : "Currency unspecified"),
+    currencyId, amount, currencyLabel: labels.get(currencyId) || (currencyId ? `Currency #${currencyId}` : i18n.t("accounting.overview.currencyUnspecified")),
   }))
 }

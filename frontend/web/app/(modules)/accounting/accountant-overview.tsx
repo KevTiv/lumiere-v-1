@@ -134,7 +134,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     <h2 id="accountant-action-queues" className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("accounting.insights.queuesTitle")}</h2>
     <div className={`${workspaceStyles.surface} grid grid-cols-1 overflow-hidden min-[360px]:grid-cols-2`}>
       {summaryCards.slice(2).map((card, index) => {
-        const className = `flex min-w-0 flex-col gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-ring sm:gap-4 sm:p-5 ${index > 0 ? "border-t min-[360px]:border-t-0" : ""} ${index > 1 ? "min-[360px]:border-t xl:border-t-0" : ""} ${index % 2 === 1 ? "min-[360px]:border-l" : ""} ${index === 2 ? "xl:border-l" : ""}`
+        const className = `flex min-w-0 flex-col gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-ring sm:gap-4 sm:p-5 ${index > 0 ? t("accounting.accountantOverview.borderTMin360pxBorderT0") : ""} ${index > 1 ? t("accounting.accountantOverview.min360pxBorderTXlBorderT0") : ""} ${index % 2 === 1 ? t("accounting.accountantOverview.min360pxBorderL") : ""} ${index === 2 ? "xl:border-l" : ""}`
         const content = <>
         <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><span>{card.label}</span><span className="[&>svg]:size-4">{card.icon}</span></div>
         <div className="flex-1">{card.key === "bank-lines"

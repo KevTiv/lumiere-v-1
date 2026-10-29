@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useId, useState, type FormEvent } from "react"
 import { Button } from "@lumiere/ui/components/button"
@@ -20,20 +22,20 @@ export interface PurchasingIntakeReasonDialogProps {
 
 const copy = {
   hold: {
-    title: "Hold supplier intake",
-    description: "Explain what must be resolved before purchasing can continue.",
-    label: "Hold reason",
-    placeholder: "Enter the reason for placing this intake on hold",
-    submit: "Place on hold",
-    pending: "Placing on hold…",
+    get title() { return i18n.t("purchasing.purchasingIntakeReasonDialog.holdSupplierIntake") },
+    get description() { return i18n.t("purchasing.purchasingIntakeReasonDialog.explainWhatMustBeResolvedBeforePurchasingCanContinue") },
+    get label() { return i18n.t("purchasing.purchasingIntakeReasonDialog.holdReason") },
+    get placeholder() { return i18n.t("purchasing.purchasingIntakeReasonDialog.enterTheReasonForPlacingThisIntakeOnHold") },
+    get submit() { return i18n.t("purchasing.purchasingIntakeReasonDialog.placeOnHold") },
+    get pending() { return i18n.t("purchasing.purchasingIntakeReasonDialog.placingOnHold") },
   },
   reject: {
-    title: "Reject supplier intake",
-    description: "Explain why this supplier intake cannot proceed.",
-    label: "Rejection reason",
-    placeholder: "Enter the reason for rejecting this intake",
-    submit: "Reject intake",
-    pending: "Rejecting…",
+    get title() { return i18n.t("purchasing.purchasingIntakeReasonDialog.rejectSupplierIntake") },
+    get description() { return i18n.t("purchasing.purchasingIntakeReasonDialog.explainWhyThisSupplierIntakeCannotProceed") },
+    get label() { return i18n.t("purchasing.ops.rejectReasonPrompt") },
+    get placeholder() { return i18n.t("purchasing.purchasingIntakeReasonDialog.enterTheReasonForRejectingThisIntake") },
+    get submit() { return i18n.t("purchasing.purchasingIntakeReasonDialog.rejectIntake") },
+    get pending() { return i18n.t("purchasing.purchasingIntakeReasonDialog.rejecting") },
   },
 } as const
 
@@ -47,6 +49,7 @@ export function PurchasingIntakeReasonDialog({
   onOpenChange,
   onSubmit,
 }: PurchasingIntakeReasonDialogProps) {
+  const { t } = useTranslation()
   const [reason, setReason] = useState("")
   const reasonId = useId()
   const content = copy[kind]
@@ -70,7 +73,7 @@ export function PurchasingIntakeReasonDialog({
             <DialogTitle>{content.title}</DialogTitle>
             <DialogDescription>
               {content.description}
-              {intakeLabel ? ` Intake: ${intakeLabel}.` : ""}
+              {intakeLabel ? t("purchasing.purchasingIntakeReasonDialog.intake", { value1: intakeLabel }) : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
@@ -91,8 +94,7 @@ export function PurchasingIntakeReasonDialog({
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
+              {t("common.cancel")}{" "}</Button>
             <Button type="submit" variant={kind === "reject" ? "destructive" : "default"} disabled={!trimmedReason || pending}>
               {pending ? content.pending : content.submit}
             </Button>

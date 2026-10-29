@@ -4,7 +4,16 @@ import { WorkflowError } from "@lumiere/erp-workflows"
 import { chooseSelectValue } from "../components/select-test-utils"
 import { ApplyPostedPaymentDialog, type ApplyPostedPaymentDialogProps } from "./apply-posted-payment-dialog"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 afterEach(cleanup)
 const props = (): ApplyPostedPaymentDialogProps => ({ options: [{ value: "9007199254740993", label: "PAY/001" }], sourceState: { status: "ready" }, canApply: true, isPending: false, onApply: vi.fn().mockResolvedValue(undefined), onClose: vi.fn() })
 

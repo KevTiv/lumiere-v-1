@@ -23,7 +23,7 @@ vi.mock("./unified-form-config-settings", () => ({ UnifiedFormConfigSettings: ()
 vi.mock("./user-custom-fields", () => ({ UserCustomFields: () => <div /> }))
 vi.mock("./organization-settings", () => ({ OrganizationSettings: () => <div /> }))
 vi.mock("./sso-settings", () => ({ SsoSettings: () => <div /> }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 afterEach(() => { access.admin = false; access.allowed = false; document.body.innerHTML = "" })
 
 it("keeps personal language settings accessible in the alpha without granting admin sections", async () => {

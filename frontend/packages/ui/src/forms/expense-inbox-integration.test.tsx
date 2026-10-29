@@ -10,7 +10,7 @@ vi.mock("@lumiere/query-hooks/hooks/expenses", () => {
 })
 vi.mock("../../../../web/app/(modules)/expenses/expense-report-decision", () => ({ useExpenseReportDecision: () => ({ open: vi.fn(), modal: null, isPending: false, error: null, can: () => true }) }))
 vi.mock("../../../../web/app/(modules)/expenses/expense-record-picker", () => ({ ExpenseRecordPicker: () => null }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("next/link", () => ({ default: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props} /> }))
 import { ExpensesInboxPanel } from "../../../../web/app/(modules)/expenses/expenses-inbox-panel"
 

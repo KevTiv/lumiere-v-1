@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { Check } from "lucide-react"
 
@@ -29,11 +31,12 @@ export interface StatusBarProps {
  * rest are muted. Presentation only; the record's actions are what change its stage.
  */
 export function StatusBar({ steps, current, terminal, className }: StatusBarProps) {
+  useTranslation()
   const currentIndex = terminal ? -1 : steps.findIndex((step) => step.id === current)
 
   return (
     <ol
-      aria-label="Status"
+      aria-label={i18n.t("settings.import.status")}
       data-testid="status-bar"
       className={cn("flex flex-wrap items-center gap-1.5 text-sm", className)}
     >

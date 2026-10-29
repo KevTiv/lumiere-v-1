@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type { FormField, FormValues } from "../lib/form-types"
 import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
@@ -202,7 +202,7 @@ export function FormFieldRenderer({
               aria-invalid={!!error}
               aria-describedby={describedBy}
             >
-              <SelectValue placeholder={field.placeholder || "Select..."} />
+              <SelectValue placeholder={field.placeholder || i18n.t("ui.forms.formsFieldRender.select")} />
             </SelectTrigger>
             <SelectContent>
               {field.options.map((option, idx) => (
@@ -435,7 +435,7 @@ export function FormFieldRenderer({
           className="text-sm font-medium text-foreground"
         >
           {field.label}
-          {field.required && <span className="ml-1 text-muted-foreground" aria-label="required">*</span>}
+          {field.required && <span className="ml-1 text-muted-foreground" aria-label={i18n.t("ui.forms.formsFieldRender.required")}>*</span>}
         </Label>
       )}
       {renderField()}
@@ -450,8 +450,7 @@ export function FormFieldRenderer({
       )}
       {aiSuggestion ? (
         <p className="text-xs leading-5 text-info">
-          AI suggestion applied ({Math.round(aiSuggestion.confidence * 100)}% confidence)
-          {aiSuggestion.note ? `: ${aiSuggestion.note}` : ""}
+          {i18n.t("ui.forms.formsFieldRender.aiSuggestionConfidence", { percent: Math.round(aiSuggestion.confidence * 100) })}{aiSuggestion.note ? `: ${aiSuggestion.note}` : ""}
         </p>
       ) : null}
     </div>

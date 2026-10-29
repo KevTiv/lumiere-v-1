@@ -243,9 +243,9 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
           defaultValue: "PDF",
           options: [
             { value: "PDF", label: "PDF" },
-            { value: "Excel", label: "Excel" },
+            { value: "Excel", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.reportType.label") },
             { value: "CSV", label: "CSV" },
-            { value: "HTML", label: "HTML" },
+            { value: "HTML", label: t("reports.builtIn.reportsFormConfigs.newReportTemplateForm.reportType.labelhTML") },
           ],
         },
         {
@@ -476,7 +476,7 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
           defaultValue: "PDF",
           options: [
             { value: "PDF", label: "PDF" },
-            { value: "Excel", label: "Excel" },
+            { value: "Excel", label: t("reports.builtIn.reportsFormConfigs.newScheduledReportForm.attachmentFormat.label") },
             { value: "CSV", label: "CSV" },
           ],
         },
@@ -518,9 +518,9 @@ export const newAnalyticsMetricForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           defaultValue: "KPI",
           options: [
-            { value: "KPI", label: "KPI" },
-            { value: "Trend", label: "Trend" },
-            { value: "Comparison", label: "Comparison" },
+            { value: "KPI", label: t("reports.queryBuilder.widgetTypes.kpi") },
+            { value: "Trend", label: t("reports.builtIn.reportsFormConfigs.newAnalyticsMetricForm.metricType.label") },
+            { value: "Comparison", label: t("reports.builtIn.reportsFormConfigs.newAnalyticsMetricForm.metricType.labelcomparison") },
           ],
         },
         {
@@ -547,11 +547,11 @@ export const newAnalyticsMetricForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           defaultValue: "Sum",
           options: [
-            { value: "Count", label: "Count" },
-            { value: "Sum", label: "Sum" },
-            { value: "Average", label: "Average" },
-            { value: "Min", label: "Min" },
-            { value: "Max", label: "Max" },
+            { value: "Count", label: t("reports.builtIn.reportsFormConfigs.newAnalyticsMetricForm.aggregation.label") },
+            { value: "Sum", label: t("reports.builtIn.reportsFormConfigs.newAnalyticsMetricForm.aggregation.labelsum") },
+            { value: "Average", label: t("reports.authoring.metric.average") },
+            { value: "Min", label: t("reports.builtIn.reportsFormConfigs.newAnalyticsMetricForm.aggregation.labelmin") },
+            { value: "Max", label: t("reports.builtIn.reportsFormConfigs.newAnalyticsMetricForm.aggregation.labelmax") },
           ],
         },
         {

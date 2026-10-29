@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "../components/button"
@@ -54,7 +54,7 @@ export interface SaleOrderLineGridProps {
 
 const COLUMNS = [
   { key: "sequence", label: "#" },
-  { key: "id", label: "ID" },
+  { key: "id", get label() { return i18n.t("ui.entityViews.saleOrderLineGrid.id") } },
 ]
 // Lines read in the order they were entered, not newest first like a list of orders.
 const ENTRY_ORDER = [

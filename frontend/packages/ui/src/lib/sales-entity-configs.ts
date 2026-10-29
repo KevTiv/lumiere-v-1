@@ -108,7 +108,7 @@ export const saleOrderDetailConfig = (t: TFunction): EntityDetailConfig => ({
     {
       id: "customer",
       fields: [
-        { key: "partnerName", label: "Customer" },
+        { key: "partnerName", label: t("sales.builtIn.salesEntityConfigs.saleOrderDetailConfig.partnerName.label") },
         { key: "clientOrderRef", label: t("sales.salesOrders.columns.clientOrderRef") },
       ],
     },

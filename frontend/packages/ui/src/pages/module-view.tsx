@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 import { Label } from "../components/label"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -405,7 +405,7 @@ export function ModuleView({
                         data-testid={`module-create-${config.id}-${tab.id}`}
                       >
                         <Plus className="h-4 w-4" />
-                        {tab.createLabel ?? "New"}
+                        {tab.createLabel ?? i18n.t("ui.pages.moduleView.new")}
                       </Button>
                     ) : undefined
                   }

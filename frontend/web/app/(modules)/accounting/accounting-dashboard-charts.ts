@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 /**
  * Pure data behind the accounting dashboard charts. Every figure comes from the subscribed
  * account_move / account_payment rows the dashboard already loads; nothing here talks to the server.
@@ -162,8 +164,8 @@ export function customerName(move: AccountMoveQueryRow, partnerLabels: ReadonlyM
   return (
     (partnerId ? partnerLabels.get(partnerId) : undefined) ??
     move.invoicePartnerDisplayName?.trim() ??
-    (partnerId ? `Partner #${partnerId}` : "No customer")
-  ) || "No customer"
+    (partnerId ? i18n.t("accounting.accountingDashboardCharts.partnerReference", { id: partnerId }) : i18n.t("accounting.accountingDashboardCharts.noCustomer"))
+  ) || i18n.t("accounting.accountingDashboardCharts.noCustomer")
 }
 
 /** Posted invoicing per customer in the period, with the change against the previous period. */

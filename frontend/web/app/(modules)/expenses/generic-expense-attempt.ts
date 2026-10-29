@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import { mergeFieldDefaultValues } from "@lumiere/ui/lib/form-config-merge"
 import type { FormConfig, FormValues } from "@lumiere/ui/lib/form-types"
 import type { CreateExpenseParams } from "@lumiere/stdb/types"
@@ -5,7 +7,7 @@ import type { ExpenseCaptureOutboxItem, ExpenseCapturePayload } from "../../../l
 
 /** Serialize every admitted create parameter into the existing capture checkpoint. */
 export function genericExpensePayload(params: Partial<CreateExpenseParams>, values: FormValues): ExpenseCapturePayload {
-  if (!params.employeeId || !params.currencyId || !params.date || !params.lineKind || !params.paymentMode) throw new Error("The expense context is incomplete")
+  if (!params.employeeId || !params.currencyId || !params.date || !params.lineKind || !params.paymentMode) throw new Error(i18n.t("expenses.genericExpenseAttempt.theExpenseContextIsIncomplete"))
   return {
     employeeId: String(params.employeeId), currencyId: String(params.currencyId),
     name: params.name ?? "", date: new Date(String(values.date)).toISOString(),
@@ -23,7 +25,7 @@ export function genericExpensePayload(params: Partial<CreateExpenseParams>, valu
 
 export function pendingGenericExpense(items: readonly ExpenseCaptureOutboxItem[], actorIdentity: string): ExpenseCaptureOutboxItem | null {
   const pending = items.filter((item) => item.formOrigin?.actorIdentity === actorIdentity && item.syncState !== "synced")
-  if (pending.length > 1) throw new Error("Multiple retained expense requests need review; no new request was started")
+  if (pending.length > 1) throw new Error(i18n.t("expenses.genericExpenseAttempt.multipleRetainedExpenseRequestsNeedReviewNoNewRequestWasStarted"))
   return pending[0] ?? null
 }
 

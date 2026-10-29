@@ -20,9 +20,9 @@ export function aiReducerAllowlistCreateFormConfig(t: TFunction): FormConfig {
             width: "full",
             defaultValue: "create_sale_order",
             options: [
-              { value: "create_task", label: "create_task" },
-              { value: "create_sale_order", label: "create_sale_order" },
-              { value: "create_purchase_order", label: "create_purchase_order" },
+              { value: "create_task", label: t("aiAssistant.builtIn.aiReducerAllowlistFormConfigs.aiReducerAllowlistCreateFormConfig.reducerName.label") },
+              { value: "create_sale_order", label: t("aiAssistant.builtIn.aiReducerAllowlistFormConfigs.aiReducerAllowlistCreateFormConfig.reducerName.labelcreateSaleOrder") },
+              { value: "create_purchase_order", label: t("aiAssistant.builtIn.aiReducerAllowlistFormConfigs.aiReducerAllowlistCreateFormConfig.reducerName.labelcreatePurchaseOrder") },
             ],
           },
           {

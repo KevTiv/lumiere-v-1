@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 import { workflowDelegationMetadata } from "@lumiere/erp-shared/workflow-delegation"
 
 export const PURCHASING_CONFIGURATION_KINDS = [
@@ -87,7 +89,7 @@ export type PurchasingConfigurationSubmission =
 
 function required(values: PurchasingConfigurationValues, key: string, label: string) {
   const value = String(values[key] ?? "").trim()
-  if (!value) throw new Error(`${label} is required`)
+  if (!value) throw new Error(i18n.t("purchasing.purchasingConfiguration.isRequired", { value1: label }))
   return value
 }
 
@@ -98,7 +100,7 @@ function requiredU64(
 ): bigint {
   const value = required(values, key, label)
   if (!/^\d+$/.test(value) || BigInt(value) <= 0n) {
-    throw new Error(`${label} must be a positive id`)
+    throw new Error(i18n.t("purchasing.purchasingConfiguration.mustBeAPositiveId", { value1: label }))
   }
   return BigInt(value)
 }
@@ -111,7 +113,7 @@ function optionalU64(
   const value = String(values[key] ?? "").trim()
   if (!value) return null
   if (!/^\d+$/.test(value) || BigInt(value) <= 0n) {
-    throw new Error(`${label} must be a positive id`)
+    throw new Error(i18n.t("purchasing.purchasingConfiguration.mustBeAPositiveId", { value1: label }))
   }
   return BigInt(value)
 }
@@ -123,7 +125,7 @@ function boundedScore(
 ): number {
   const value = Number(required(values, key, label))
   if (!Number.isFinite(value) || value < 0 || value > 100) {
-    throw new Error(`${label} must be between 0 and 100`)
+    throw new Error(i18n.t("purchasing.purchasingConfiguration.mustBeBetween0And100", { value1: label }))
   }
   return value
 }
@@ -134,7 +136,7 @@ function finiteNumber(
   label: string,
 ): number {
   const value = Number(required(values, key, label))
-  if (!Number.isFinite(value)) throw new Error(`${label} must be a number`)
+  if (!Number.isFinite(value)) throw new Error(i18n.t("purchasing.purchasingConfiguration.mustBeANumber", { value1: label }))
   return value
 }
 
@@ -159,13 +161,13 @@ export function buildPurchasingConfigurationSubmission(
       const dateStart = String(values.dateStart ?? "").trim() || null
       const dateEnd = String(values.dateEnd ?? "").trim() || null
       if (dateStart && dateEnd && dateStart > dateEnd) {
-        throw new Error("End date must be on or after start date")
+        throw new Error(i18n.t("purchasing.purchasingConfiguration.endDateMustBeOnOrAfterStartDate"))
       }
       return {
         kind,
         params: {
-          name: required(values, "name", "Contract name"),
-          partnerId: requiredU64(values, "partnerId", "Vendor"),
+          name: required(values, "name", i18n.t("purchasing.purchasingConfiguration.fields.contractName")),
+          partnerId: requiredU64(values, "partnerId", i18n.t("purchasing.purchasingConfiguration.fields.vendor")),
           dateStart,
           dateEnd,
           metadata: null,
@@ -176,9 +178,9 @@ export function buildPurchasingConfigurationSubmission(
       return {
         kind,
         params: {
-          partnerId: requiredU64(values, "partnerId", "Vendor"),
-          otifScore: boundedScore(values, "otifScore", "OTIF score"),
-          qualityScore: boundedScore(values, "qualityScore", "Quality score"),
+          partnerId: requiredU64(values, "partnerId", i18n.t("purchasing.purchasingConfiguration.fields.vendor")),
+          otifScore: boundedScore(values, "otifScore", i18n.t("purchasing.purchasingConfiguration.fields.oTIFScore")),
+          qualityScore: boundedScore(values, "qualityScore", i18n.t("purchasing.purchasingConfiguration.fields.qualityScore")),
           metadata: null,
         },
       }
@@ -186,9 +188,9 @@ export function buildPurchasingConfigurationSubmission(
       return {
         kind,
         params: {
-          partnerId: requiredU64(values, "partnerId", "Vendor"),
+          partnerId: requiredU64(values, "partnerId", i18n.t("purchasing.purchasingConfiguration.fields.vendor")),
           isFlagged: values.isFlagged === true,
-          riskLevel: required(values, "riskLevel", "Risk level"),
+          riskLevel: required(values, "riskLevel", i18n.t("purchasing.purchasingConfiguration.fields.riskLevel")),
           reason: String(values.reason ?? "").trim() || null,
           metadata: null,
         },
@@ -205,10 +207,10 @@ export function buildPurchasingConfigurationSubmission(
         "Delegate identity",
       ).replace(/^0x/i, "").toLowerCase()
       if (principalIdentity === delegateIdentity) {
-        throw new Error("Principal and delegate must be different users")
+        throw new Error(i18n.t("purchasing.purchasingConfiguration.principalAndDelegateMustBeDifferentUsers"))
       }
       if (!/^[0-9a-f]{64}$/.test(principalIdentity) || !/^[0-9a-f]{64}$/.test(delegateIdentity)) {
-        throw new Error("Principal and delegate must be valid identities")
+        throw new Error(i18n.t("purchasing.purchasingConfiguration.principalAndDelegateMustBeValidIdentities"))
       }
       return {
         kind,
@@ -226,9 +228,9 @@ export function buildPurchasingConfigurationSubmission(
       return {
         kind,
         params: {
-          code: required(values, "code", "Commodity code"),
-          rate: finiteNumber(values, "rate", "Rate"),
-          asOf: required(values, "asOf", "As-of date"),
+          code: required(values, "code", i18n.t("purchasing.purchasingConfiguration.fields.commodityCode")),
+          rate: finiteNumber(values, "rate", i18n.t("purchasing.purchasingConfiguration.fields.rate")),
+          asOf: required(values, "asOf", i18n.t("purchasing.purchasingConfiguration.fields.asOfDate")),
           metadata: null,
         },
       }
@@ -236,10 +238,10 @@ export function buildPurchasingConfigurationSubmission(
       return {
         kind,
         params: {
-          name: required(values, "name", "Agreement name"),
-          partnerId: requiredU64(values, "partnerId", "Vendor"),
-          productId: requiredU64(values, "productId", "Product"),
-          warehouseId: requiredU64(values, "warehouseId", "Warehouse"),
+          name: required(values, "name", i18n.t("purchasing.purchasingConfiguration.fields.agreementName")),
+          partnerId: requiredU64(values, "partnerId", i18n.t("purchasing.purchasingConfiguration.fields.vendor")),
+          productId: requiredU64(values, "productId", i18n.t("purchasing.purchasingConfiguration.fields.product")),
+          warehouseId: requiredU64(values, "warehouseId", i18n.t("purchasing.purchasingConfiguration.fields.warehouse")),
           metadata: null,
         },
       }
@@ -247,8 +249,8 @@ export function buildPurchasingConfigurationSubmission(
       return {
         kind,
         params: {
-          provider: required(values, "provider", "Provider"),
-          intentType: required(values, "intentType", "Intent type"),
+          provider: required(values, "provider", i18n.t("purchasing.purchasingConfiguration.fields.provider")),
+          intentType: required(values, "intentType", i18n.t("purchasing.purchasingConfiguration.fields.intentType")),
           purchaseOrderId: optionalU64(
             values,
             "purchaseOrderId",

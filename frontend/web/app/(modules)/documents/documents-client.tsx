@@ -5,7 +5,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useErpSession } from "@lumiere/erp-session"
-import { useTranslation } from "@lumiere/i18n"
+import { i18n, useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   FormModal,
@@ -152,8 +152,8 @@ type DocumentRowAction =
 function editDocumentForm(row: Record<string, unknown>): FormConfig {
   return {
     id: "edit-document",
-    title: "Update Document",
-    submitLabel: "Update document",
+    title: i18n.t("documents.documentsClient.updateDocument"),
+    submitLabel: i18n.t("documents.documentPageClient.updateDocument"),
     sections: [
       {
         id: "document",
@@ -162,7 +162,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
             id: "doc-name",
             name: "name",
             type: "text",
-            label: "Name",
+            label: i18n.t("documents.documents.columns.name"),
             required: true,
             defaultValue: String(row.name ?? ""),
             width: "full",
@@ -171,7 +171,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
             id: "doc-file-name",
             name: "fileName",
             type: "text",
-            label: "File name",
+            label: i18n.t("accounting.forms.bankStatementImport.fileName"),
             defaultValue: String(row.fileName ?? ""),
             width: "1/2",
           },
@@ -179,7 +179,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
             id: "doc-mimetype",
             name: "mimetype",
             type: "text",
-            label: "MIME type",
+            label: i18n.t("documents.documentsClient.mIMEType"),
             defaultValue: String(row.mimetype ?? ""),
             width: "1/2",
           },
@@ -187,7 +187,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
             id: "doc-description",
             name: "description",
             type: "textarea",
-            label: "Description",
+            label: i18n.t("documents.documents.columns.description"),
             defaultValue: String(row.description ?? ""),
             rows: 3,
             width: "full",
@@ -196,7 +196,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
             id: "doc-favorite",
             name: "isFavorite",
             type: "checkbox",
-            label: "Favorite",
+            label: i18n.t("documents.documents.columns.isFavorite"),
             defaultValue: Boolean(row.isFavorite),
             width: "1/2",
           },
@@ -204,7 +204,7 @@ function editDocumentForm(row: Record<string, unknown>): FormConfig {
             id: "doc-shared",
             name: "isShared",
             type: "checkbox",
-            label: "Shared",
+            label: i18n.t("documents.documents.columns.isShared"),
             defaultValue: Boolean(row.isShared),
             width: "1/2",
           },
@@ -332,7 +332,7 @@ function DocumentsClientLoaded({
   const assertBrowserAction = (action: "upload" | "createFolder") => {
     const current = browserActionScope.current
     if (current.key !== templateScopeKey || !current[action]) {
-      throw new Error("Your company or document permissions changed. Try again in the current workspace.")
+      throw new Error(t("documents.documentsClient.yourCompanyOrDocumentPermissionsChangedTryAgainInTheCurrent"))
     }
   }
   const processingJobsRead = moduleCollection(useAiDocumentProcessingJobs(orgId, initialProcessingJobs))
@@ -659,10 +659,10 @@ function DocumentsClientLoaded({
             ...w,
             data: {
               stats: [
-                { label: "Total Documents", value: String(documents.length), icon: "FileText" },
-                { label: "Shared", value: String(shared), icon: "Share2" },
-                { label: "Favorites", value: String(favorites), icon: "Star" },
-                { label: "Published Articles", value: String(published), icon: "BookOpen" },
+                { label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsStatCards.label"), value: String(documents.length), icon: "FileText" },
+                { label: t("documents.documents.columns.isShared"), value: String(shared), icon: "Share2" },
+                { label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsStatCards.labelfavorites"), value: String(favorites), icon: "Star" },
+                { label: t("documents.documentsClient.publishedArticles"), value: String(published), icon: "BookOpen" },
               ],
             },
           }
@@ -788,8 +788,8 @@ function DocumentsClientLoaded({
                       { key: "fileName", label: t("documents.documents.columns.fileName") },
                       { key: "mimetype", label: t("documents.documents.columns.mimetype") },
                       { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
-                      { key: "resName", label: "Attached to" },
-                      { key: "description", type: "markdown" as const, label: "Description" },
+                      { key: "resName", label: t("documents.documents.columns.resName") },
+                      { key: "description", type: "markdown" as const, label: t("documents.documents.columns.description") },
                     ],
                   },
                 ],
@@ -801,7 +801,7 @@ function DocumentsClientLoaded({
               [
                 {
                   id: "lock-document",
-                  label: "Lock",
+                  label: t("documents.page.lock"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
@@ -820,7 +820,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "unlock-document",
-                  label: "Unlock",
+                  label: t("documents.page.unlock"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => row.isLocked === true),
@@ -839,7 +839,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "upload-document-version",
-                  label: "Upload version",
+                  label: t("documents.page.uploadVersion"),
                   requiresSelection: true,
                   onClick: (rows) => {
                     if (rows.length !== 1) return
@@ -852,7 +852,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "set-document-retention",
-                  label: "Set retention",
+                  label: t("documents.forms.setRetention.title"),
                   requiresSelection: true,
                   onClick: (rows) => {
                     if (rows.length !== 1) return
@@ -872,7 +872,7 @@ function DocumentsClientLoaded({
                   canEdit: (row) => !truthyRowBool(row.isDeleted) && !truthyRowBool(row.isLocked),
                   save: async (row, value) => {
                     const name = String(value)
-                    if (!name) throw new Error("A document needs a name")
+                    if (!name) throw new Error(t("documents.documentsClient.aDocumentNeedsAName"))
                     await updateDocument.mutateAsync({
                       documentId: row.id as string | number,
                       params: { name },
@@ -912,7 +912,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "edit-article",
-                  label: "Edit",
+                  label: t("common.edit"),
                   requiresSelection: true,
                   onClick: (rows) => {
                     if (rows.length !== 1) return
@@ -925,7 +925,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "publish-article",
-                  label: "Publish",
+                  label: t("documents.documentsClient.publish"),
                   requiresSelection: true,
                   selection: "multiple",
                   successMessage: t("common.actionCompleted", { action: "Publish" }),
@@ -946,7 +946,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "unpublish-article",
-                  label: "Unpublish",
+                  label: t("documents.documentsClient.unpublish"),
                   requiresSelection: true,
                   selection: "multiple",
                   successMessage: t("common.actionCompleted", { action: "Unpublish" }),
@@ -967,7 +967,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "lock-article",
-                  label: "Lock",
+                  label: t("documents.page.lock"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
@@ -986,7 +986,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "unlock-article",
-                  label: "Unlock",
+                  label: t("documents.page.unlock"),
                   requiresSelection: true,
                   selection: "multiple",
                   successMessage: t("common.actionCompleted", { action: "Unlock" }),
@@ -1004,7 +1004,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "add-article-member",
-                  label: "Add member",
+                  label: t("documents.builtIn.documentsFormConfigs.addArticleMemberForm.addArticleMember.submitLabel"),
                   requiresSelection: true,
                   onClick: (rows) => {
                     if (rows.length !== 1) return
@@ -1018,7 +1018,7 @@ function DocumentsClientLoaded({
                 removeMemberAction,
                 {
                   id: "delete-article",
-                  label: "Delete",
+                  label: t("common.delete"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.every((row) => !truthyRowBool(row.isLocked)),
@@ -1068,7 +1068,7 @@ function DocumentsClientLoaded({
               [
                 {
                   id: "edit-folder",
-                  label: "Edit folder",
+                  label: t("documents.documentsClient.editFolder"),
                   requiresSelection: true,
                   onClick: (rows) => {
                     if (rows.length !== 1) return
@@ -1083,7 +1083,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "delete-folder",
-                  label: "Delete folder",
+                  label: t("documents.documentsClient.deleteFolder"),
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) =>
@@ -1114,7 +1114,7 @@ function DocumentsClientLoaded({
               [
                 {
                   id: "restore-document",
-                  label: "Restore",
+                  label: t("documents.page.restore"),
                   requiresSelection: true,
                   selection: "multiple",
                   successMessage: t("common.actionCompleted", { action: "Restore" }),
@@ -1132,7 +1132,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "purge-expired",
-                  label: "Purge expired",
+                  label: t("documents.documentsClient.purgeExpired"),
                   requiresSelection: false,
                   successMessage: t("common.actionCompleted", { action: "Purge expired" }),
                   onClick: async () => {
@@ -1275,7 +1275,7 @@ function DocumentsClientLoaded({
                 },
                 {
                   id: "ask-ai",
-                  label: "Ask AI",
+                  label: t("documents.documentsClient.askAI"),
                   onClick: (rows) => {
                     const selection = rows[0]
                       ? buildEntitySelection({
@@ -1286,7 +1286,7 @@ function DocumentsClientLoaded({
                       : {
                           activeTab: "document-insights",
                           entityType: "document_insight",
-                          selectionSummary: "Document insights",
+                          selectionSummary: t("documents.documentsClient.documentInsights"),
                         }
                     openErpAiChat({ selection })
                   },
@@ -1420,7 +1420,7 @@ function DocumentsClientLoaded({
       residencyRegion: formData.residencyRegion ?? residency,
     })
     if (!params) {
-      throw new Error("Document registration params incomplete after upload")
+      throw new Error(t("documents.documentsClient.documentRegistrationParamsIncompleteAfterUpload"))
     }
     const created = await createDocument.mutateAsync(params)
     assertBrowserAction("upload")
@@ -1442,7 +1442,7 @@ function DocumentsClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!tabUsable(actionTabs[action])) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!tabUsable(actionTabs[action])) throw new Error(t("calendar.calendarClient.requiredDataIsUnavailableRefreshAndTryAgain"))
     if (action === "createDocument" || action === "uploadDocument") {
       const file = firstFileFromFormValue(formData.file)
       if (!file) {
@@ -1467,7 +1467,7 @@ function DocumentsClientLoaded({
       })
     } else if (action === "createMailTemplate") {
       const params = toCreateMailTemplateParams(formData)
-      if (!params) throw new Error("Mail template params incomplete")
+      if (!params) throw new Error(t("documents.documentsClient.mailTemplateParamsIncomplete"))
       await createMailTemplate.mutateAsync(params)
     } else if (action === "createDocumentProcessingJob") {
       await createProcessingJob.mutateAsync(toCreateDocumentProcessingJobParams(formData))
@@ -1649,7 +1649,7 @@ function DocumentsClientLoaded({
                 })
               } else if (documentRowAction.action === "uploadVersion") {
                 const file = firstFileFromFormValue(formData.file)
-                if (!file) throw new Error("Select a file to upload")
+                if (!file) throw new Error(t("documents.documentPageClient.selectAFileToUpload"))
                 const residency =
                   typeof documentRowAction.row.residencyRegion === "string"
                     ? documentRowAction.row.residencyRegion
@@ -1667,7 +1667,7 @@ function DocumentsClientLoaded({
                   url: uploaded.url,
                   checksum: uploaded.checksum,
                 })
-                if (!params) throw new Error("Version params incomplete after upload")
+                if (!params) throw new Error(t("documents.documentPageClient.versionParamsIncompleteAfterUpload"))
                 await addDocumentVersion.mutateAsync({
                   documentId: documentRowAction.row.id as string | number,
                   params,
@@ -1702,7 +1702,7 @@ function DocumentsClientLoaded({
                 })
               } else if (documentRowAction.action === "addArticleMember") {
                 const member = String(formData.member ?? "").trim()
-                if (!member) throw new Error("Member identity is required")
+                if (!member) throw new Error(t("documents.documentsClient.memberIdentityIsRequired"))
                 await addArticleMember.mutateAsync({
                   articleId: documentRowAction.row.id as string | number,
                   member,

@@ -1,3 +1,5 @@
+
+import { i18n } from "@lumiere/i18n"
 /**
  * Pure data behind the Subscriptions dashboard charts: MRR with new business and churn rate per
  * month, and the plan mix of active MRR. Built from the subscription rows the module loads.
@@ -90,8 +92,8 @@ export function planMix(
   const values: { [segmentKey: string]: number } = {}
   for (const [key, value] of top) values[`plan-${key}`] = Math.round(value)
   if (otherTotal > 0) {
-    segments.push({ key: "other", label: "Other plans", color: "hsl(var(--muted-foreground))" })
+    segments.push({ key: "other", label: i18n.t("subscriptions.subscriptionDashboardCharts.otherPlans"), color: "hsl(var(--muted-foreground))" })
     values.other = Math.round(otherTotal)
   }
-  return { segments, rows: segments.length > 0 ? [{ label: "MRR", values }] : [] }
+  return { segments, rows: segments.length > 0 ? [{ label: i18n.t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.mrr.label"), values }] : [] }
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import {
   toCreateAiAgentParams,
@@ -389,7 +389,7 @@ export function AiSettings() {
         params: buildAgentUpdateParams(agent, Array.from(next)),
       })
       toast({
-        title: enabled ? "Action enabled" : "Action disabled",
+        title: enabled ? i18n.t("settings.aiSettings.text.actionEnabled") : i18n.t("settings.aiSettings.text.actionDisabled"),
         description: action.replace(/_/g, " "),
       })
       await refetchAgents()
@@ -791,7 +791,7 @@ export function AiSettings() {
                             }}
                             disabled={mutating || agentOpsPending}
                           />
-                          <span className="text-xs text-muted-foreground">Analytics read</span>
+                          <span className="text-xs text-muted-foreground">{i18n.t("settings.aiSettings.text.analyticsRead")}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
@@ -801,7 +801,7 @@ export function AiSettings() {
                             }}
                             disabled={mutating || agentOpsPending}
                           />
-                          <span className="text-xs text-muted-foreground">Analytics run</span>
+                          <span className="text-xs text-muted-foreground">{i18n.t("settings.aiSettings.text.analyticsRun")}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
@@ -811,7 +811,7 @@ export function AiSettings() {
                             }}
                             disabled={mutating || agentOpsPending}
                           />
-                          <span className="text-xs text-muted-foreground">Web search</span>
+                          <span className="text-xs text-muted-foreground">{i18n.t("settings.aiSettings.text.webSearch")}</span>
                         </div>
                       </div>
                     </div>
@@ -946,7 +946,7 @@ export function AiSettings() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{str(ins.title)}</span>
-                          <Badge variant="outline">{severityLabel(ins.severity)}</Badge>
+                          <Badge variant="outline">{t(`settings.ai.severities.${severityLabel(ins.severity)}`, { defaultValue: severityLabel(ins.severity) })}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">{str(ins.description)}</p>
                       </div>
@@ -1136,7 +1136,7 @@ export function AiSettings() {
                 <SelectContent>
                   {(["Info", "Low", "Medium", "High", "Critical"] as const).map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {t(`settings.ai.severities.${s}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>

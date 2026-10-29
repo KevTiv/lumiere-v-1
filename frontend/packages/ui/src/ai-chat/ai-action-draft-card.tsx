@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
@@ -27,6 +29,7 @@ export function AiActionDraftCard({
   onReject,
   onUpdateDraft,
 }: AiActionDraftCardProps) {
+  useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editJson, setEditJson] = useState("")
@@ -60,10 +63,10 @@ export function AiActionDraftCard({
     try {
       parsed = JSON.parse(editJson) as Record<string, unknown>
       if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("Parameters must be a JSON object")
+        throw new Error(i18n.t("ui.aiChat.aiActionDraftCard.parametersMustBeAJSONObject"))
       }
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : "Invalid JSON")
+      setEditError(err instanceof Error ? err.message : i18n.t("ui.aiChat.aiActionDraftCard.invalidJSON"))
       return
     }
 
@@ -131,12 +134,11 @@ export function AiActionDraftCard({
               }
               className="text-[9px] h-4 px-1.5 capitalize"
             >
-              {status}
+              {i18n.t(`ui.aiAssistant.aiActionDraftCard.status.${status}`, { defaultValue: status })}
             </Badge>
             {draft.confidence > 0 ? (
               <span className="text-[9px] text-muted-foreground">
-                {Math.round(draft.confidence * 100)}% confidence
-              </span>
+                {i18n.t("ui.aiAssistant.aiActionDraftCard.confidenceLabel", { percent: Math.round(draft.confidence * 100) })}</span>
             ) : null}
           </div>
 
@@ -144,13 +146,13 @@ export function AiActionDraftCard({
 
           {draft.sourceQuery ? (
             <p className="text-[10px] text-muted-foreground line-clamp-2">
-              Request: {draft.sourceQuery}
+              {i18n.t("ui.aiAssistant.aiActionDraftCard.request")}{" "}{draft.sourceQuery}
             </p>
           ) : null}
 
           {draft.expiresAt && (draft.status ?? "pending") === "pending" ? (
             <p className="text-[10px] text-muted-foreground">
-              Expires {new Date(draft.expiresAt).toLocaleString()}
+              {i18n.t("ui.aiAssistant.aiActionDraftCard.expires")}{" "}{new Date(draft.expiresAt).toLocaleString()}
             </p>
           ) : null}
 
@@ -158,7 +160,7 @@ export function AiActionDraftCard({
             <div className="space-y-1.5">
               <div className="flex items-center gap-1 text-[10px] text-warning">
                 <ShieldAlert className="h-3 w-3 shrink-0" />
-                <span>Elevated action — review parameters carefully before approving.</span>
+                <span>{i18n.t("ui.aiAssistant.aiActionDraftCard.elevatedActionReviewParametersCarefullyBeforeApproving")}</span>
               </div>
               {isPending ? (
                 <label className="flex items-start gap-2 text-[10px] text-muted-foreground cursor-pointer">
@@ -167,7 +169,7 @@ export function AiActionDraftCard({
                     onCheckedChange={(checked) => setConfirmedElevated(checked === true)}
                     className="mt-0.5"
                   />
-                  <span>I have reviewed the parameters and approve this elevated action.</span>
+                  <span>{i18n.t("ui.aiAssistant.aiActionDraftCard.iHaveReviewedTheParametersAndApproveThisElevatedAction")}</span>
                 </label>
               ) : null}
             </div>
@@ -187,15 +189,14 @@ export function AiActionDraftCard({
           {draft.executionRecordId != null && status === "approved" ? (
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground">
-                Created record #{draft.executionRecordId}
+                {i18n.t("ui.aiAssistant.aiActionDraftCard.createdRecord")}{draft.executionRecordId}
               </p>
               {draft.executionRecordHref ? (
                 <a
                   href={draft.executionRecordHref}
                   className="inline-flex text-[10px] font-medium text-primary hover:underline"
                 >
-                  Open created record
-                </a>
+                  {i18n.t("ui.aiAssistant.aiActionDraftCard.openCreatedRecord")}</a>
               ) : null}
             </div>
           ) : null}
@@ -225,7 +226,7 @@ export function AiActionDraftCard({
             onClick={() => setExpanded((v) => !v)}
             className="flex flex-1 items-center justify-between text-[10px] text-muted-foreground hover:text-foreground"
           >
-            <span>Parameters</span>
+            <span>{i18n.t("ui.aiAssistant.aiActionDraftCard.parameters")}</span>
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
           {isPending && onUpdateDraft ? (
@@ -242,7 +243,7 @@ export function AiActionDraftCard({
               }}
             >
               <Pencil className="h-3 w-3" />
-              {editing ? "Cancel edit" : "Edit"}
+              {editing ? i18n.t("ui.aiAssistant.aiActionDraftCard.cancelEdit") : i18n.t("common.edit")}
             </Button>
           ) : null}
         </div>
@@ -263,7 +264,7 @@ export function AiActionDraftCard({
                 disabled={busy != null}
                 onClick={() => void handleSaveParams()}
               >
-                {busy === "save" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save parameters"}
+                {busy === "save" ? <Loader2 className="h-3 w-3 animate-spin" /> : i18n.t("ui.aiAssistant.aiActionDraftCard.saveParameters")}
               </Button>
             </div>
           ) : (
@@ -289,8 +290,7 @@ export function AiActionDraftCard({
               ) : (
                 <Check className="h-3 w-3" />
               )}
-              Approve
-            </Button>
+              {i18n.t("ui.aiAssistant.aiActionDraftCard.approve")}</Button>
           ) : null}
           {onReject ? (
             <Button
@@ -306,8 +306,7 @@ export function AiActionDraftCard({
               ) : (
                 <X className="h-3 w-3" />
               )}
-              Reject
-            </Button>
+              {i18n.t("ui.aiAssistant.aiActionDraftCard.reject")}</Button>
           ) : null}
         </div>
       ) : null}

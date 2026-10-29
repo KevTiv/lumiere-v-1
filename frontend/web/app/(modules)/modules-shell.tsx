@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n, useTranslation } from "@lumiere/i18n"
 import { WorkspaceProfileProvider } from "@lumiere/ui/lib/workspace-profile-context"
 import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
@@ -126,6 +127,7 @@ function dateFromStored(raw: unknown): Date {
 }
 
 function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context">) {
+  useTranslation()
   const { organizationId } = useErpSession()
   const { route, module, activeTab, selection } = useErpAiRouteContext()
   const orgId = organizationId ?? 0
@@ -332,7 +334,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       },
       onCiteSource: async ({ messageId, source }: { messageId: string; source: ChatMessageSourceRef }) => {
         if (!sessionKey || operatingCompanyId == null || operatingCompanyId <= 0 || source.passage_id == null) {
-          throw new Error("Chat session or passage reference is not ready")
+          throw new Error(i18n.t("aiChat.shell.sourceNotReady"))
         }
         await citeSource.mutateAsync({
           companyId: operatingCompanyId,
@@ -362,8 +364,8 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         return {
           content:
             companiesQuery.isLoading
-              ? "Loading companies… Configure a legal entity first, then try again."
-              : "No company found for this organization. Create a company record, then open the ERP Assistant again.",
+              ? i18n.t("aiChat.shell.loadingCompanies")
+              : i18n.t("aiChat.shell.noCompany"),
           sources: [] as ChatMessageSourceRef[],
         }
       }
@@ -385,7 +387,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
       const assistantText =
         draftActions.length > 0 && !out.answer.includes("draft")
-          ? `${out.answer}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`
+          ? out.answer + "\n\n" + i18n.t("aiChat.shell.preparedDrafts", { count: draftActions.length })
           : out.answer
       void persistExchange({
         userText,
@@ -489,9 +491,9 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       if (draftActions.length > 0) {
         handlers.onActions?.(draftActions)
         if (!content.includes("draft")) {
-          content = `${content}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`
+          content = content + "\n\n" + i18n.t("aiChat.shell.preparedDrafts", { count: draftActions.length })
           handlers.onDelta(
-            `\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`,
+            "\n\n" + i18n.t("aiChat.shell.preparedDrafts", { count: draftActions.length }),
           )
         }
       }
@@ -570,6 +572,7 @@ function ModulesContent({
   children: ReactNode
   firstOrgProfile: boolean
 }) {
+  useTranslation()
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
@@ -625,8 +628,8 @@ function ModulesContent({
               onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
               config={{
                 title: "Lumière Assistant",
-                welcomeMessage: "Explore your business, prepare a draft, or turn an insight into a report.",
-                placeholder: "Ask about your work or describe what you need...",
+                welcomeMessage: i18n.t("aiChat.shell.welcomeMessage"),
+                placeholder: i18n.t("aiChat.shell.placeholder"),
               }}
             />
 

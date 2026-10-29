@@ -1,4 +1,6 @@
 "use client"
+import { useTranslation } from "@lumiere/i18n"
+
 
 import { useState, type FormEvent, type ReactNode } from "react"
 import type { TFunction } from "i18next"
@@ -531,7 +533,7 @@ function CreatePurchaseReturnDialog({ request, options, t, onDismiss, onSubmit }
       purchaseOrderId: requiredId(purchaseOrderId, t("purchasing.forms.fields.purchaseOrder", { defaultValue: "Purchase order" }), t),
       partnerId: requiredId(partnerId, t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" }), t),
       // This value is persisted as business data and must not vary by UI locale.
-      returnReason: reason.trim() || "Purchase return",
+      returnReason: reason.trim() || t("purchasing.forms.fields.purchaseReturn"),
       lines: [{
         purchaseOrderLineId: null,
         productId: requiredId(productId, t("purchasing.forms.fields.product", { defaultValue: "Product" }), t),

@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 interface TaxDeadlineEntry {
   title: string
@@ -12,9 +14,10 @@ interface TaxDeadlineData {
 }
 
 export function TaxDeadlineWidget({ data }: { data: TaxDeadlineData }) {
+  useTranslation()
   if (data.deadlines.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-4">No upcoming deadlines</p>
+      <p className="text-sm text-muted-foreground text-center py-4">{i18n.t("ui.pages.taxDeadlineWidget.noUpcomingDeadlines")}</p>
     )
   }
 
@@ -30,10 +33,10 @@ export function TaxDeadlineWidget({ data }: { data: TaxDeadlineData }) {
             : "bg-info/15 text-info dark:bg-info/20"
         const label =
           isOverdue
-            ? `${Math.abs(d.daysUntil)}d overdue`
+            ? i18n.t("ui.pages.taxDeadlineWidget.daysOverdue", { count: Math.abs(d.daysUntil) })
             : d.daysUntil === 0
-              ? "Today"
-              : `${d.daysUntil}d`
+              ? i18n.t("ui.datePicker.today")
+              : i18n.t("ui.pages.taxDeadlineWidget.daysUntil", { count: d.daysUntil })
         return (
           <div
             key={i}

@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useState } from "react"
 import { cn } from "../lib/utils"
@@ -43,6 +45,7 @@ export function EntityPivotView({
   onColumnKeyChange,
   className,
 }: EntityPivotViewProps) {
+  useTranslation()
   const { labels } = pivot
   const [groupKey, setGroupKey] = useState(pivot.groupKeys[0] ?? "")
   const [columnKey, setColumnKey] = useState(initialColumnKey ?? "")
@@ -178,7 +181,7 @@ export function EntityPivotView({
           disabled={result.rows.length === 0}
           data-testid="entity-pivot-export"
         >
-          {labels.exportCsv ?? "Export CSV"}
+          {labels.exportCsv ?? i18n.t("common.entityView.pivotExportCsv")}
         </Button>
       </div>
 

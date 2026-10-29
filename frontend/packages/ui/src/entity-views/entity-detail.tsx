@@ -1,5 +1,7 @@
 "use client"
 
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 import { useMemo } from "react"
 import { cn } from "../lib/utils"
 import type { EntityDetailConfig, EntityDetailField, EntityRow } from "../lib/entity-view-types"
@@ -59,6 +61,8 @@ const widthClasses: Record<string, string> = {
 }
 
 export function EntityDetail({ config, data, className }: EntityDetailProps) {
+  useTranslation()
+  const language = i18n.resolvedLanguage
   const { checkPermission } = useRBAC()
   const currency = useCurrencyFormat()
 
@@ -70,7 +74,7 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
           fields: filterEntitySurface(section.fields, checkPermission),
         }))
         .filter((section) => section.fields.length > 0),
-    [config.sections, checkPermission],
+    [config.sections, checkPermission, language],
   )
 
   return (

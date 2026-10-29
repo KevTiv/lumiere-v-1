@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import Link from "next/link"
 import { cn } from "../lib/utils"
@@ -43,6 +45,7 @@ export function EntityRecordSheet({
   config,
   record,
 }: EntityRecordSheetProps) {
+  useTranslation()
   const title = record ? String(record[config.titleKey] ?? "") : ""
   const statusRaw =
     record && config.statusKey ? resolveStatusValue(record, config.statusKey) : ""
@@ -86,15 +89,14 @@ export function EntityRecordSheet({
                       data-testid="entity-record-sheet-open"
                     >
                       <ExternalLink className="mr-1 h-3.5 w-3.5" />
-                      Open
-                    </Button>
+                      {i18n.t("ui.entityViews.entityRecordSheet.open")}</Button>
                   )}
                 </div>
               )}
 
               <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
-                <ContextTabsList aria-label="Record views">
-                  <ContextTabsTrigger value="overview">Overview</ContextTabsTrigger>
+                <ContextTabsList aria-label={i18n.t("ui.entityViews.entityRecordSheet.recordViews")}>
+                  <ContextTabsTrigger value="overview">{i18n.t("common.overview")}</ContextTabsTrigger>
                   {config.customTabs?.map((tab) => (
                     <ContextTabsTrigger
                       key={tab.id}
@@ -107,10 +109,9 @@ export function EntityRecordSheet({
                   ))}
                   {showDiscussion && (
                     <ContextTabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
-                      Discussion
-                    </ContextTabsTrigger>
+                      {i18n.t("ui.entityViews.entityRecordSheet.discussion")}</ContextTabsTrigger>
                   )}
-                  <ContextTabsTrigger value="audit">Audit</ContextTabsTrigger>
+                  <ContextTabsTrigger value="audit">{i18n.t("common.audit")}</ContextTabsTrigger>
                 </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
@@ -143,8 +144,7 @@ export function EntityRecordSheet({
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Audit history is not configured for this record type.
-                    </p>
+                      {i18n.t("ui.entityViews.entityRecordSheet.auditHistoryIsNotConfiguredForThisRecordType")}</p>
                   )}
                 </TabsContent>
               </Tabs>

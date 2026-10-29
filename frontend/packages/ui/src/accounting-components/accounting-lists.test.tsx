@@ -12,12 +12,16 @@ const permissions = vi.hoisted(() => ({ create: true }))
 vi.mock("../lib/rbac-context", () => ({
   useRBAC: () => ({ checkPermission: () => ({ allowed: permissions.create }) }),
 }))
-vi.mock("@lumiere/i18n", () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? key,
-  }),
-}))
+vi.mock("@lumiere/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lumiere/i18n")>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: { defaultValue?: string; [name: string]: unknown }) =>
+        options?.defaultValue ? actual.i18n.t(key, { ...options, lng: "en" }) : key,
+    }),
+  }
+})
 import { InvoiceListView } from "./invoice-list-view"
 import { BillsListView } from "./bills-list-view"
 

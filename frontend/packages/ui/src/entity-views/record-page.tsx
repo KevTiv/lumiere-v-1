@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import Link from "next/link"
 import { Fragment, type ReactNode } from "react"
@@ -82,6 +84,7 @@ export function RecordPage({
   testIdPrefix,
   className,
 }: RecordPageProps) {
+  useTranslation()
   return (
     <div className={cn("min-w-0 space-y-6", className)} data-testid={`${testIdPrefix}-page`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -141,7 +144,7 @@ export function RecordPage({
 
       <Tabs value={activeTab} onValueChange={(tabId) => onTabChange(String(tabId))} className="flex min-w-0 flex-col">
         <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
-          <ContextTabsList aria-label="Record views">
+          <ContextTabsList aria-label={i18n.t("ui.entityViews.recordPage.recordViews")}>
             {tabs.map((tab) => (
               <ContextTabsTrigger
                 key={tab.id}
@@ -172,8 +175,9 @@ function NavButton({
   target: { href: string; label: string } | undefined
   testIdPrefix: string
 }) {
+  useTranslation()
   const Icon = direction === "previous" ? ChevronLeft : ChevronRight
-  const label = direction === "previous" ? "Previous record" : "Next record"
+  const label = direction === "previous" ? i18n.t("ui.entityViews.recordPage.previousRecord") : i18n.t("ui.entityViews.recordPage.nextRecord")
   if (!target) {
     return (
       <Button variant="outline" size="icon" disabled aria-label={label} data-testid={`${testIdPrefix}-${direction}`}>

@@ -81,9 +81,9 @@ export function buildNavGroups(
       items: [
         { surfaceId: "forensics", label: t("nav.forensics"), href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
         { surfaceId: "trackers", label: t("nav.trackers"), href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
-        { surfaceId: "ai-skills", label: "AI Skills", href: "/ai-skills", icon: Sparkles, resource: "dashboard:analytics" },
-        { surfaceId: "approvals", label: "Approvals", href: "/approvals", icon: ClipboardCheck, resource: "module:workflows" },
-        { surfaceId: "ai-action-drafts", label: "AI Approvals", href: "/ai-action-drafts", icon: Sparkles, resource: "dashboard:analytics" },
+        { surfaceId: "ai-skills", label: t("common.builtIn.navigationCatalog.groups.aISkills.label"), href: "/ai-skills", icon: Sparkles, resource: "dashboard:analytics" },
+        { surfaceId: "approvals", label: t("common.builtIn.navigationCatalog.groups.approvals.label"), href: "/approvals", icon: ClipboardCheck, resource: "module:workflows" },
+        { surfaceId: "ai-action-drafts", label: t("common.builtIn.navigationCatalog.groups.aIApprovals.label"), href: "/ai-action-drafts", icon: Sparkles, resource: "dashboard:analytics" },
       ],
     },
     {

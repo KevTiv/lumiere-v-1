@@ -307,10 +307,10 @@ function AccountingWorklistTable({
         return accountingWorklistRow(
           move,
           kind,
-          option?.label || option?.code || (id ? `Currency #${id}` : "—")
+          option?.label || option?.code || (id ? t("accounting.accountingListDisplay.currencyValue", { defaultValue: "Currency #{{id}}", id: id }) : "—")
         )
       }),
-    [scoped, currencyOptions, kind]
+    [scoped, currencyOptions, kind, t]
   )
   const linked = { ...initialFilters }
   delete linked.search
@@ -432,7 +432,7 @@ function AccountingWorklistTable({
     label:
       currencyOptions.find((currency) => currency.value === id)?.label ||
       currencyOptions.find((currency) => currency.value === id)?.code ||
-      `Currency #${id}`,
+      t("accounting.accountingListDisplay.currencyValue", { defaultValue: "Currency #{{id}}", id: id }),
   }))
   const change = (next: AccountingWorklistView) => {
     if (preferences) update({ ...preferences, current: next })
@@ -538,13 +538,7 @@ function AccountingWorklistTable({
           />
         </CardHeader>
         <CardContent className="min-w-0 space-y-4">
-          <p className={workspaceStyles.sectionDescription}>
-            {filtered.length}{" "}
-            {t("accounting.worklists.matchingRecords", {
-              defaultValue:
-                "matching records · totals reflect the current filters, across all pages",
-            })}
-          </p>
+          <p className={workspaceStyles.sectionDescription}>{t("accounting.accountingWorklistView.copy.valueMatchingRecordsTotalsReflectTheCurrent", { defaultValue: "{{length}} matching records · totals reflect the current filters, across all pages", length: filtered.length })}</p>
           {filtered.length === 0 ? (
             <div className="min-w-0 [&_button]:min-h-11">
               <EmptyStateCard
@@ -685,7 +679,7 @@ function AccountingWorklistTable({
                           >
                             <input
                               type="checkbox"
-                              aria-label={`Select ${row.name}`}
+                              aria-label={t("accounting.accountingWorklistView.selectValue", { defaultValue: "Select {{value1}}", value1: row.name })}
                               checked={tableRow.getIsSelected()}
                               onChange={tableRow.getToggleSelectedHandler()}
                               className="size-4 accent-primary"
@@ -761,7 +755,7 @@ function AccountingWorklistTable({
                                   variant="ghost"
                                   size="icon"
                                   className="size-11 min-h-11 min-w-11"
-                                  aria-label={`Actions for ${move.name || move.id}`}
+                                  aria-label={t("accounting.accountingWorklistView.actionsForValue", { defaultValue: "Actions for {{value1}}", value1: move.name || move.id })}
                                 >
                                   <MoreHorizontal className="size-4" />
                                 </Button>
@@ -877,7 +871,7 @@ function AccountingWorklistTable({
             </nav>
           )}
           <section
-            aria-label="Totals by currency"
+            aria-label={t("accounting.accountingListSummary.totalsByCurrency", { defaultValue: "Totals by currency" })}
             className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3"
           >
             {summaries.map((group) => (

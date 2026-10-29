@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCurrencyFormat } from "../../lib/currency-context"
 
@@ -9,6 +11,7 @@ interface CashFlowData {
 }
 
 export function CashFlowWidget({ data }: { data: CashFlowData }) {
+  useTranslation()
   const { money } = useCurrencyFormat()
   const fmt = { format: (value: number) => money(value, undefined, { compact: true }) }
   const total = data.arTotal + data.apTotal
@@ -19,11 +22,11 @@ export function CashFlowWidget({ data }: { data: CashFlowData }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg bg-success/10 p-3 text-center">
-          <p className="text-xs text-muted-foreground">Receivable (AR)</p>
+          <p className="text-xs text-muted-foreground">{i18n.t("ui.pages.cashFlowWidget.receivableAR")}</p>
           <p className="text-lg font-bold text-success">{fmt.format(data.arTotal)}</p>
         </div>
         <div className="rounded-lg bg-destructive/10 p-3 text-center">
-          <p className="text-xs text-muted-foreground">Payable (AP)</p>
+          <p className="text-xs text-muted-foreground">{i18n.t("ui.pages.cashFlowWidget.payableAP")}</p>
           <p className="text-lg font-bold text-destructive">{fmt.format(data.apTotal)}</p>
         </div>
       </div>
@@ -34,7 +37,7 @@ export function CashFlowWidget({ data }: { data: CashFlowData }) {
         />
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Net position</span>
+        <span className="text-muted-foreground">{i18n.t("ui.pages.cashFlowWidget.netPosition")}</span>
         <span className={`font-semibold ${isPositive ? "text-success" : "text-destructive"}`}>
           {isPositive ? "+" : ""}
           {fmt.format(data.netPosition)}

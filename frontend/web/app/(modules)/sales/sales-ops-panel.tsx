@@ -559,7 +559,7 @@ export function SalesOpsPanel({
                   >
                     <span className="truncate">
                       {isCommissionRow
-                        ? `#${id} · SO ${soId} · ${String(row.amount ?? '')}`
+                        ? t("sales.salesOpsPanel.sO", { value1: id, value2: soId, value3: String(row.amount ?? '') })
                         : isAccrueQueue
                           ? `${String(row.reference ?? row.name ?? id)} · ${rate}%`
                           : String(
@@ -887,14 +887,14 @@ export function SalesOpsPanel({
                       selectedOrderId,
                   )}
                 </span>{' '}
-                · {saleOrderState(selectedOrder)} · total{' '}
+                · {saleOrderState(selectedOrder)} {" "}{t("sales.salesOpsPanel.total")}{' '}
                 {String(
                   selectedOrder.amountTotal ?? selectedOrder.amount_total ?? '',
                 )}
               </p>
               {poIds.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Dropship POs: {poIds.join(', ')}
+                  {t("sales.salesOpsPanel.dropshipPOs")}{" "}{poIds.join(', ')}
                 </p>
               )}
               <DrillSection
@@ -943,10 +943,9 @@ export function SalesOpsPanel({
         data-testid="sales-ops-promise-atp"
       >
         <div>
-          <h3 className="text-sm font-medium">Delivery promise dates</h3>
+          <h3 className="text-sm font-medium">{t("sales.salesOpsPanel.deliveryPromiseDates")}</h3>
           <p className="text-xs text-muted-foreground">
-            Refresh promised dates using warehouse availability and lead times.
-          </p>
+            {t("sales.salesOpsPanel.refreshPromisedDatesUsingWarehouseAvailabilityAndLeadTimes")}{" "}</p>
         </div>
         <Button
           size="sm"
@@ -955,12 +954,12 @@ export function SalesOpsPanel({
           data-testid="sales-ops-refresh-promise"
           onClick={async () => {
             const values = await askForm({
-              title: 'Refresh promise dates',
+              title: t("sales.salesOpsPanel.refreshPromiseDates"),
               fields: [
                 {
                   id: 'orderId',
                   name: 'orderId',
-                  label: 'Sale order',
+                  label: t("sales.forms.addSaleOrderLine.sections.order"),
                   type: 'select',
                   required: true,
                   searchable: true,
@@ -981,7 +980,7 @@ export function SalesOpsPanel({
             }
           }}
         >
-          {refreshPromise.isPending ? 'Refreshing…' : 'Refresh promise dates'}
+          {refreshPromise.isPending ? t("sales.salesOpsPanel.refreshing") : t("sales.salesOpsPanel.refreshPromiseDates")}
         </Button>
       </div>
 

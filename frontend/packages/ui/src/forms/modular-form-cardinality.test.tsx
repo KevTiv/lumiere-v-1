@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { FormConfig } from "../lib/form-types"
 import { ModularForm } from "./modular-form"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string; value?: string }) => options?.defaultValue?.replace("{{value}}", options.value ?? "") ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),  useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string; value?: string }) => options?.defaultValue?.replace("{{value}}", options.value ?? "") ?? key }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-forms", () => ({ useAiFormSuggest: () => ({}) }))
 vi.mock("sonner", () => ({ toast: { warning: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 

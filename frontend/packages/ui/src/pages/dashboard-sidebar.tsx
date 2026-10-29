@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRBAC } from "@/lib/rbac-context"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import { CompanySwitcher } from "../settings/company-switcher"
 import {
   ChevronLeft,
@@ -208,8 +208,8 @@ function DashboardSidebarContent({
           <button
             type="button"
             onClick={() => runQuickAction(onOpenJournal)}
-            title="Open Journal"
-            aria-label="Open Journal"
+            title={i18n.t("ui.pages.dashboardSidebar.openJournal")}
+            aria-label={i18n.t("ui.pages.dashboardSidebar.openJournal")}
             className={cn(
               "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
               "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
@@ -227,8 +227,8 @@ function DashboardSidebarContent({
           <button
             type="button"
             onClick={() => runQuickAction(onOpenNotebook)}
-            title="Open Notebook"
-            aria-label="Open Notebook"
+            title={i18n.t("ui.pages.dashboardSidebar.openNotebook")}
+            aria-label={i18n.t("ui.pages.dashboardSidebar.openNotebook")}
             className={cn(
               "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
               "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
@@ -246,8 +246,8 @@ function DashboardSidebarContent({
           <button
             type="button"
             onClick={() => runQuickAction(onOpenAIChat)}
-            title="Open AI Assistant"
-            aria-label="Open AI Assistant"
+            title={i18n.t("ui.pages.dashboardSidebar.openAIAssistant")}
+            aria-label={i18n.t("ui.pages.dashboardSidebar.openAIAssistant")}
             data-testid="sidebar-open-ai-chat"
             className={cn(
               "flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-sidebar-accent px-2.5 py-2 text-sm transition-colors",

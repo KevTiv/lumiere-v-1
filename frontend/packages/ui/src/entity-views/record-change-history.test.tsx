@@ -4,7 +4,7 @@ import en from "../../../i18n/src/locales/en.json";
 import type { AccountMoveHistoryEntry } from "@lumiere/query-hooks/hooks/account-move-history-model";
 import { RecordChangeHistory } from "./record-change-history";
 
-vi.mock("@lumiere/i18n", () => ({
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()),
   useTranslation: () => ({
     i18n: { resolvedLanguage: "en", language: "en" },
     t: (key: string, params?: { [key: string]: unknown }) => {

@@ -87,7 +87,7 @@ export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organi
 
   const requireCurrencyId = (value: unknown): bigint => {
     const parsed = optionalBigIntU64(value)
-    if (parsed === undefined || parsed === 0n) throw new Error("Choose an active currency")
+    if (parsed === undefined || parsed === 0n) throw new Error(t("expenses.expensesOpsPanel.chooseAnActiveCurrency"))
     return parsed
   }
 

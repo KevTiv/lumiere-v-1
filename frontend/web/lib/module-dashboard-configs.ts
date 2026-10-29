@@ -1,3 +1,4 @@
+import { i18n as uiI18n } from "@lumiere/i18n"
 import type { TFunction } from "i18next"
 import { accountingWorkspaceNavigation } from "./accounting-workspace-navigation"
 import { businessWorkspaceNavigation } from "./business-workspace-navigation"
@@ -255,8 +256,8 @@ import {
 
 export const accountingDashboard: DashboardConfig = {
   id: "accounting",
-  title: "Accounting",
-  description: "Financial overview — P&L, cash position, and budget tracking",
+  get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accounting.title") },
+  get description() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accounting.description") },
   sections: [
     {
       id: "acc-quick-actions-section",
@@ -264,16 +265,16 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_invoice", label: "New Invoice", icon: "file", color: "blue" },
-              { id: "create_bill", label: "New Bill", icon: "download", color: "orange" },
-              { id: "journal_entry", label: "Journal Entry", icon: "plus", color: "green" },
-              { id: "create_tax", label: "Create Tax", icon: "settings", color: "purple" },
-              { id: "currency_rate", label: "Currency rate", icon: "gauge", color: "teal" },
+              { id: "create_invoice", get label() { return uiI18n.t("accounting.actions.newInvoice") }, icon: "file", color: "blue" },
+              { id: "create_bill", get label() { return uiI18n.t("accounting.actions.newBill") }, icon: "download", color: "orange" },
+              { id: "journal_entry", get label() { return uiI18n.t("accounting.journalEntries.types.entry") }, icon: "plus", color: "green" },
+              { id: "create_tax", get label() { return uiI18n.t("accounting.forms.newTax.submitLabel") }, icon: "settings", color: "purple" },
+              { id: "currency_rate", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.currencyRate.label") }, icon: "gauge", color: "teal" },
             ],
           },
         },
@@ -285,16 +286,16 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Accounts Receivable", value: "—", icon: "TrendingUp" },
-              { label: "Accounts Payable", value: "—", icon: "TrendingDown" },
-              { label: "Cash Balance", value: "—", icon: "DollarSign" },
-              { label: "Revenue", value: "—", icon: "BarChart2" },
-              { label: "Invoices Issued", value: "—", icon: "FileText" },
-              { label: "Payments Received", value: "—", icon: "dollar" },
+              { get label() { return uiI18n.t("accounting.dashboard.accountsReceivable") }, value: "—", icon: "TrendingUp" },
+              { get label() { return uiI18n.t("accounting.dashboard.accountsPayable") }, value: "—", icon: "TrendingDown" },
+              { get label() { return uiI18n.t("accounting.dashboard.cashBalance") }, value: "—", icon: "DollarSign" },
+              { get label() { return uiI18n.t("accounting.dashboard.revenue") }, value: "—", icon: "BarChart2" },
+              { get label() { return uiI18n.t("accounting.dashboard.invoicesIssued") }, value: "—", icon: "FileText" },
+              { get label() { return uiI18n.t("accounting.dashboard.paymentsReceived") }, value: "—", icon: "dollar" },
             ],
           },
         },
@@ -306,15 +307,15 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-revenue-expenses",
           type: "combo-chart",
-          title: "Invoiced vs Billed",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accRevenueExpenses.title") },
           width: "2/3",
           data: {
             xAxisKey: "month",
             bars: [
-              { key: "revenue", label: "Invoiced", color: "hsl(var(--chart-1))" },
-              { key: "expenses", label: "Billed", color: "hsl(var(--chart-3))" },
+              { key: "revenue", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.revenue.label") }, color: "hsl(var(--chart-1))" },
+              { key: "expenses", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.expenses.label") }, color: "hsl(var(--chart-3))" },
             ],
-            line: { key: "net", label: "Net", color: "hsl(var(--chart-2))" },
+            line: { key: "net", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.net.label") }, color: "hsl(var(--chart-2))" },
             lineAxis: "left",
             values: [],
           },
@@ -322,22 +323,22 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-collection-rate",
           type: "radial-gauge",
-          title: "Collection Rate",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accCollectionRate.title") },
           width: "1/3",
-          data: { value: 0, max: 0, label: "Collected", stats: [] },
+          data: { value: 0, max: 0, get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accCollectionRate.label") }, stats: [] },
         },
         {
           id: "acc-aging-share",
           type: "share-bar",
-          title: "Open invoices and bills by due date",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accAgingShare.title") },
           width: "1/2",
           data: {
             segments: [
-              { key: "Current", label: "Current", color: "hsl(var(--chart-2))" },
-              { key: "1-30", label: "1–30 days", color: "hsl(var(--chart-1))" },
-              { key: "31-60", label: "31–60 days", color: "hsl(var(--chart-3))" },
-              { key: "61-90", label: "61–90 days", color: "hsl(var(--chart-4))" },
-              { key: "90+", label: "90+ days", color: "hsl(var(--destructive))" },
+              { key: "Current", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.current.label") }, color: "hsl(var(--chart-2))" },
+              { key: "1-30", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.130.label") }, color: "hsl(var(--chart-1))" },
+              { key: "31-60", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.3160.label") }, color: "hsl(var(--chart-3))" },
+              { key: "61-90", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.6190.label") }, color: "hsl(var(--chart-4))" },
+              { key: "90+", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.90.label") }, color: "hsl(var(--destructive))" },
             ],
             rows: [],
             emptyLabel: "No open invoices or bills in this company.",
@@ -346,18 +347,18 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-top-customers",
           type: "ranked-bars",
-          title: "Top Customers",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accTopCustomers.title") },
           width: "1/2",
           data: { items: [], emptyLabel: "No posted invoices in this period." },
         },
         {
           id: "acc-cash-movements",
           type: "step-chart",
-          title: "Cash Movements (weekly net)",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accCashMovements.title") },
           width: "full",
           data: {
             xAxisKey: "week",
-            series: { key: "net", label: "Net cash", color: "hsl(var(--chart-1))" },
+            series: { key: "net", get label() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.net.labelnetCash") }, color: "hsl(var(--chart-1))" },
             values: [],
             reference: { value: 0, label: "0" },
           },
@@ -365,7 +366,7 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-recent-invoices",
           type: "tabbed-table",
-          title: "Recent Invoices",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accRecentInvoices.title") },
           width: "full",
           data: { tabs: [], columns: [], rows: [] },
         },
@@ -377,35 +378,35 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-overdue",
           type: "overdue-invoices",
-          title: "Overdue Invoices",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accOverdue.title") },
           width: "1/3",
           data: { count: 0, totalAmount: 0, oldestDays: 0 },
         },
         {
           id: "acc-cashflow",
           type: "cash-flow",
-          title: "Cash Flow Position",
+          get title() { return uiI18n.t("accounting.overview.cashFlow") },
           width: "1/3",
           data: { arTotal: 0, apTotal: 0, netPosition: 0 },
         },
         {
           id: "acc-budget",
           type: "budget-progress",
-          title: "Budget vs Actual",
+          get title() { return uiI18n.t("accounting.overview.budgetVsActual") },
           width: "1/3",
           data: { budgets: [] },
         },
         {
           id: "acc-balances",
           type: "account-balance",
-          title: "Key Account Balances",
+          get title() { return uiI18n.t("accounting.builtIn.moduleDashboardConfigs.accountingDashboard.accBalances.title") },
           width: "1/2",
           data: { accounts: [] },
         },
         {
           id: "acc-tax-deadlines",
           type: "tax-deadline",
-          title: "Tax Deadlines",
+          get title() { return uiI18n.t("accounting.taxDeadlines.title") },
           width: "1/2",
           data: { deadlines: [] },
         },
@@ -417,8 +418,8 @@ export const accountingDashboard: DashboardConfig = {
 export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "accounting",
   workBoard: { scope: "accounting", sources: ["workflow", "activities"], label: t("workBoard.kanban") },
-  title: "Accounting",
-  description: "Financial overview — P&L, cash position, and budget tracking",
+  title: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.accounting.title"),
+  description: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.accounting.description"),
   defaultTab: "dashboard",
   workspaceNav: accountingWorkspaceNavigation(t),
   tabGroups: [
@@ -433,57 +434,57 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: accountingDashboard.sections,
     },
     {
       id: "accounts",
-      label: "Chart of Accounts",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.accounts.label"),
       type: "entity",
       entityConfig: buildAccountsTableConfig({
         formatAccountDisplayName: chartAccountPrimaryLabel,
       }),
       createForm: newAccountForm(t),
-      createLabel: "New Account",
+      createLabel: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.accounts.createLabel"),
       createAction: "createAccount",
     },
     {
       id: "journal-entries",
-      label: "Journal Entries",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.journalEntries.label"),
       type: "entity",
       entityConfig: journalEntriesTableConfig,
       createForm: newJournalEntryForm(t),
-      createLabel: "New Entry",
+      createLabel: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.journalEntries.createLabel"),
       createAction: "createMove",
     },
     {
       id: "invoices",
-      label: "Invoices",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.invoices.label"),
       type: "entity",
       entityConfig: journalEntriesTableConfig,
       createForm: newInvoiceForm(t),
-      createLabel: "New Invoice",
+      createLabel: t("accounting.actions.newInvoice"),
       createAction: "createInvoice",
       createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "bills",
-      label: "Bills",
+      label: t("accounting.insights.bills"),
       type: "entity",
       entityConfig: journalEntriesTableConfig,
       createForm: newBillForm(t),
-      createLabel: "New Bill",
+      createLabel: t("accounting.actions.newBill"),
       createAction: "createBill",
       createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "taxes",
-      label: "Taxes",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.taxes.label"),
       type: "entity",
       entityConfig: taxesTableConfig,
       createForm: newTaxForm(t),
-      createLabel: "New Tax",
+      createLabel: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.taxes.createLabel"),
       createAction: "createTax",
     },
     {
@@ -544,11 +545,11 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "budgets",
-      label: "Budgets",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.budgets.label"),
       type: "entity",
       entityConfig: budgetsTableConfig,
       createForm: newBudgetForm(t),
-      createLabel: "New Budget",
+      createLabel: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.budgets.createLabel"),
       createAction: "createBudget",
     },
     {
@@ -580,7 +581,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "bank-statements",
-      label: "Bank Statements",
+      label: t("accounting.entities.bankStatements.title"),
       type: "entity",
       entityConfig: bankStatementsTableConfig(t),
     },
@@ -595,7 +596,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "fixed-assets",
-      label: "Fixed Assets",
+      label: t("accounting.builtIn.moduleDashboardConfigs.accountingModuleConfig.fixedAssets.label"),
       type: "entity",
       entityConfig: fixedAssetsTableConfig(t),
     },
@@ -656,8 +657,8 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const salesDashboard: DashboardConfig = {
   id: "sales",
-  title: "Sales",
-  description: "Revenue performance, pipeline health, and deal activity",
+  get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.sales.title") },
+  get description() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.sales.description") },
   sections: [
     {
       id: "sales-quick-actions-section",
@@ -665,30 +666,30 @@ export const salesDashboard: DashboardConfig = {
         {
           id: "sales-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_sale_order", label: "New quotation", icon: "file", color: "blue" },
-              { id: "create_pricelist", label: "New Pricelist", icon: "settings", color: "purple" },
-              { id: "new_delivery", label: "New Delivery", icon: "package", color: "green" },
-              { id: "view_pipeline", label: "View Pipeline", icon: "trending", color: "teal" },
+              { id: "create_sale_order", get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.createSaleOrder.label") }, icon: "file", color: "blue" },
+              { id: "create_pricelist", get label() { return uiI18n.t("sales.forms.newPricelist.title") }, icon: "settings", color: "purple" },
+              { id: "new_delivery", get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.newDelivery.label") }, icon: "package", color: "green" },
+              { id: "view_pipeline", get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.viewPipeline.label") }, icon: "trending", color: "teal" },
               {
                 id: "create_commission_plan",
-                label: "Commission plan",
+                get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.createCommissionPlan.label") },
                 icon: "users",
                 color: "orange",
               },
               {
                 id: "create_sale_contract",
-                label: "Sale contract",
+                get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.createSaleContract.label") },
                 icon: "file",
                 color: "teal",
               },
               {
                 id: "create_integration_intent",
-                label: "Fiscal/carrier intent",
+                get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.createIntegrationIntent.label") },
                 icon: "settings",
                 color: "green",
               },
@@ -703,14 +704,14 @@ export const salesDashboard: DashboardConfig = {
         {
           id: "sales-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Revenue MTD", value: "—", icon: "TrendingUp" },
-              { label: "Orders Closed", value: "—", icon: "ShoppingCart" },
-              { label: "Avg Deal Size", value: "—", icon: "DollarSign" },
-              { label: "Win Rate", value: "—", icon: "Target" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.label") }, value: "—", icon: "TrendingUp" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.labelordersClosed") }, value: "—", icon: "ShoppingCart" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.labelavgDealSize") }, value: "—", icon: "DollarSign" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesStatCards.labelwinRate") }, value: "—", icon: "Target" },
             ],
           },
         },
@@ -718,20 +719,20 @@ export const salesDashboard: DashboardConfig = {
     },
     {
       id: "sales-exception-queues",
-      title: "Exception queues",
+      get title() { return uiI18n.t("sales.dashboard.exceptionQueues") },
       widgets: [
         {
           id: "sales-exception-queue-cards",
           type: "stat-cards",
-          title: "Live exceptions",
+          get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesExceptionQueueCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Awaiting approval", value: "—", icon: "FileText", testId: "sales-queue-to-approve" },
-              { label: "Sent quotations", value: "—", icon: "CheckCircle", testId: "sales-queue-sent" },
-              { label: "Credit holds", value: "—", icon: "AlertCircle", testId: "sales-queue-credit" },
-              { label: "Returns to receive", value: "—", icon: "package", testId: "sales-queue-returns" },
-              { label: "Open deliveries", value: "—", icon: "cart", testId: "sales-queue-pickings" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesExceptionQueueCards.label") }, value: "—", icon: "FileText", testId: "sales-queue-to-approve" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesExceptionQueueCards.labelsentQuotations") }, value: "—", icon: "CheckCircle", testId: "sales-queue-sent" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesExceptionQueueCards.labelcreditHolds") }, value: "—", icon: "AlertCircle", testId: "sales-queue-credit" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesExceptionQueueCards.labelreturnsToReceive") }, value: "—", icon: "package", testId: "sales-queue-returns" },
+              { get label() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesExceptionQueueCards.labelopenDeliveries") }, value: "—", icon: "cart", testId: "sales-queue-pickings" },
             ],
           },
         },
@@ -739,12 +740,12 @@ export const salesDashboard: DashboardConfig = {
     },
     {
       id: "sales-charts",
-      title: "Trends",
+      get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesCharts.title") },
       widgets: [
         {
           id: "sales-revenue-trend",
           type: "area-chart",
-          title: "Monthly Revenue",
+          get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesRevenueTrend.title") },
           width: "2/3",
           data: {
             xAxisKey: "month",
@@ -758,14 +759,14 @@ export const salesDashboard: DashboardConfig = {
         {
           id: "sales-by-rep",
           type: "metrics",
-          title: "Top Sales Reps",
+          get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesByRep.title") },
           width: "1/3",
           data: { metrics: [] },
         },
         {
           id: "sales-orders-by-state",
           type: "donut-chart",
-          title: "Orders by State",
+          get title() { return uiI18n.t("sales.dashboard.ordersByState") },
           width: "1/3",
           data: { segments: [] },
         },
@@ -773,12 +774,12 @@ export const salesDashboard: DashboardConfig = {
     },
     {
       id: "sales-breakdown",
-      title: "Product Mix",
+      get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesBreakdown.title") },
       widgets: [
         {
           id: "sales-by-product",
           type: "bar-chart",
-          title: "Revenue by Product Line",
+          get title() { return uiI18n.t("sales.builtIn.moduleDashboardConfigs.salesDashboard.salesByProduct.title") },
           width: "full",
           data: {
             categoryKey: "product",
@@ -795,13 +796,13 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "sales",
   workBoard: { scope: "sales", sources: ["workflow", "activities"], label: t("workBoard.kanban") },
   workspaceNav: businessWorkspaceNavigation("sales", t),
-  title: "Sales",
-  description: "Revenue performance, pipeline health, and deal activity",
+  title: t("sales.builtIn.moduleDashboardConfigs.salesModuleConfig.sales.title"),
+  description: t("sales.builtIn.moduleDashboardConfigs.salesModuleConfig.sales.description"),
   defaultTab: "orders",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("sales.builtIn.moduleDashboardConfigs.salesModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: salesDashboard.sections,
     },
@@ -824,17 +825,17 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "order-lines",
-      label: "Order Lines",
+      label: t("sales.orderLines.title"),
       type: "entity",
       entityConfig: saleOrderLinesTableConfig(t),
     },
     {
       id: "pricelists",
-      label: "Pricelists",
+      label: t("sales.pricelists.title"),
       type: "entity",
       entityConfig: pricelistsTableConfig(t),
       createForm: newPricelistForm(t),
-      createLabel: "New Pricelist",
+      createLabel: t("sales.forms.newPricelist.title"),
       createAction: "createPricelist",
     },
     {
@@ -845,7 +846,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "deliveries",
-      label: "Deliveries",
+      label: t("sales.builtIn.moduleDashboardConfigs.salesModuleConfig.deliveries.label"),
       type: "entity",
       entityConfig: deliveriesTableConfig(t),
       createForm: newPickingBatchForm(t),
@@ -935,8 +936,8 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const crmDashboard: DashboardConfig = {
   id: "crm",
-  title: "CRM",
-  description: "Lead pipeline, customer lifecycle, and relationship health",
+  get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crm.title") },
+  get description() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crm.description") },
   sections: [
     {
       id: "crm-quick-actions-section",
@@ -944,16 +945,16 @@ export const crmDashboard: DashboardConfig = {
         {
           id: "crm-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_lead", label: "Add Lead", icon: "plus", color: "blue" },
-              { id: "create_opportunity", label: "Add Opportunity", icon: "trending", color: "green" },
-              { id: "create_contact", label: "Add Contact", icon: "users", color: "teal" },
-              { id: "log_activity", label: "Log Activity", icon: "bell", color: "orange" },
-              { id: "create_forecast_snapshot", label: "Snapshot forecast", icon: "trending", color: "purple" },
+              { id: "create_lead", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.createLead.label") }, icon: "plus", color: "blue" },
+              { id: "create_opportunity", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.createOpportunity.label") }, icon: "trending", color: "green" },
+              { id: "create_contact", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.createContact.label") }, icon: "users", color: "teal" },
+              { id: "log_activity", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.logActivity.label") }, icon: "bell", color: "orange" },
+              { id: "create_forecast_snapshot", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.createForecastSnapshot.label") }, icon: "trending", color: "purple" },
             ],
           },
         },
@@ -965,14 +966,14 @@ export const crmDashboard: DashboardConfig = {
         {
           id: "crm-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Active Leads", value: "—", icon: "Users" },
-              { label: "Pipeline Value", value: "—", icon: "TrendingUp" },
-              { label: "Win Rate", value: "—", icon: "Target" },
-              { label: "Churn Rate", value: "—", icon: "UserMinus" },
+              { get label() { return uiI18n.t("crm.dashboard.activeLeads") }, value: "—", icon: "Users" },
+              { get label() { return uiI18n.t("crm.dashboard.pipelineValue") }, value: "—", icon: "TrendingUp" },
+              { get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmStatCards.label") }, value: "—", icon: "Target" },
+              { get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmStatCards.labelchurnRate") }, value: "—", icon: "UserMinus" },
             ],
           },
         },
@@ -980,12 +981,12 @@ export const crmDashboard: DashboardConfig = {
     },
     {
       id: "crm-pipeline",
-      title: "Pipeline",
+      get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmPipeline.title") },
       widgets: [
         {
           id: "crm-by-stage",
           type: "bar-chart",
-          title: "Leads by Stage",
+          get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmByStage.title") },
           width: "1/2",
           data: {
             categoryKey: "stage",
@@ -997,14 +998,14 @@ export const crmDashboard: DashboardConfig = {
         {
           id: "crm-opportunity-funnel",
           type: "funnel-chart",
-          title: "Opportunity Funnel",
+          get title() { return uiI18n.t("crm.dashboard.opportunityFunnel") },
           width: "1/2",
           data: { stages: [] },
         },
         {
           id: "crm-pipeline-health",
           type: "metrics",
-          title: "Pipeline Health",
+          get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmPipelineHealth.title") },
           width: "1/2",
           data: { metrics: [] },
         },
@@ -1012,20 +1013,20 @@ export const crmDashboard: DashboardConfig = {
     },
     {
       id: "crm-activity",
-      title: "Recent Activity",
+      get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmActivity.title") },
       widgets: [
         {
           id: "crm-recent-contacts",
           type: "table",
-          title: "Recent Contacts",
+          get title() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.crmRecentContacts.title") },
           width: "full",
           data: {
             columns: [
-              { key: "name", label: "Name" },
-              { key: "company", label: "Company" },
-              { key: "stage", label: "Stage" },
-              { key: "value", label: "Value", align: "right" },
-              { key: "lastContact", label: "Last Contact" },
+              { key: "name", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.name.label") } },
+              { key: "company", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.company.label") } },
+              { key: "stage", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.stage.label") } },
+              { key: "value", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.value.label") }, align: "right" },
+              { key: "lastContact", get label() { return uiI18n.t("crm.builtIn.moduleDashboardConfigs.crmDashboard.lastContact.label") } },
             ],
             rows: [],
           },
@@ -1038,33 +1039,33 @@ export const crmDashboard: DashboardConfig = {
 export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "crm",
   workspaceNav: businessWorkspaceNavigation("crm", t),
-  title: "CRM",
-  description: "Lead pipeline, customer lifecycle, and relationship health",
+  title: t("crm.builtIn.moduleDashboardConfigs.crmModuleConfig.crm.title"),
+  description: t("crm.builtIn.moduleDashboardConfigs.crmModuleConfig.crm.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("crm.builtIn.moduleDashboardConfigs.crmModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: crmDashboard.sections,
     },
     {
       id: "leads",
-      label: "Leads",
+      label: t("crm.leads.title"),
       type: "entity",
       entityConfig: leadsTableConfig(t),
       createForm: newLeadForm(t),
-      createLabel: "New Lead",
+      createLabel: t("crm.forms.newLead.title"),
       createAction: "createLead",
       createPermission: { resource: "lead", action: "create" },
     },
     {
       id: "opportunities",
-      label: "Opportunities",
+      label: t("crm.opportunities.title"),
       type: "entity",
       entityConfig: opportunitiesTableConfig(t),
       createForm: newOpportunityForm(t),
-      createLabel: "New Opportunity",
+      createLabel: t("crm.builtIn.moduleDashboardConfigs.crmModuleConfig.opportunities.createLabel"),
       createAction: "createOpportunity",
       createPermission: { resource: "opportunity", action: "create" },
     },
@@ -1076,23 +1077,23 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "contacts",
-      label: "Contacts",
+      label: t("crm.contacts.title"),
       type: "entity",
       entityConfig: contactsTableConfig(t, {
         formatContactDisplayName: contactPrimaryLabel,
       }),
       createForm: newContactForm(t),
-      createLabel: "New Contact",
+      createLabel: t("crm.forms.newContact.title"),
       createAction: "createContact",
       createPermission: { resource: "contact", action: "create" },
     },
     {
       id: "activities",
-      label: "Activities",
+      label: t("crm.activities.title"),
       type: "entity",
       entityConfig: activitiesTableConfig(t),
       createForm: newActivityForm(t),
-      createLabel: "Log Activity",
+      createLabel: t("crm.builtIn.moduleDashboardConfigs.crmModuleConfig.activities.createLabel"),
       createAction: "createActivity",
     },
   ],
@@ -1454,8 +1455,8 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const purchasingDashboard: DashboardConfig = {
   id: "purchasing",
-  title: "Purchasing",
-  description: "Purchase orders, vendor performance, and spend analysis",
+  get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purchasing.title") },
+  get description() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purchasing.description") },
   sections: [
     {
       id: "pur-quick-actions-section",
@@ -1463,30 +1464,30 @@ export const purchasingDashboard: DashboardConfig = {
         {
           id: "pur-quick-actions",
           type: "quick-actions",
-          title: "Quick Actions",
+          get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purQuickActions.title") },
           width: "full",
           data: {
             columns: 4,
             actions: [
-              { id: "create_purchase_order", label: "New Purchase Order", icon: "file", color: "blue" },
-              { id: "create_requisition", label: "New Requisition", icon: "plus", color: "orange" },
-              { id: "receive_goods", label: "Receive Goods", icon: "download", color: "green" },
-              { id: "view_vendors", label: "View Vendors", icon: "users", color: "teal" },
+              { id: "create_purchase_order", get label() { return uiI18n.t("purchasing.forms.newPurchaseOrder.title") }, icon: "file", color: "blue" },
+              { id: "create_requisition", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.createRequisition.label") }, icon: "plus", color: "orange" },
+              { id: "receive_goods", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.receiveGoods.label") }, icon: "download", color: "green" },
+              { id: "view_vendors", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.viewVendors.label") }, icon: "users", color: "teal" },
               {
                 id: "create_purchase_blanket_order",
-                label: "Blanket order",
+                get label() { return uiI18n.t("purchasing.blanket.fallback.order") },
                 icon: "file",
                 color: "purple",
               },
               {
                 id: "create_purchase_contract",
-                label: "Purchase contract",
+                get label() { return uiI18n.t("purchasing.configuration.kinds.contract") },
                 icon: "file",
                 color: "teal",
               },
               {
                 id: "create_purchasing_integration_intent",
-                label: "Customs/e-invoice intent",
+                get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.createPurchasingIntegrationIntent.label") },
                 icon: "settings",
                 color: "green",
               },
@@ -1501,14 +1502,14 @@ export const purchasingDashboard: DashboardConfig = {
         {
           id: "pur-stat-cards",
           type: "stat-cards",
-          title: "Key Metrics",
+          get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purStatCards.title") },
           width: "full",
           data: {
             stats: [
-              { label: "Open POs", value: "—", icon: "FileText" },
-              { label: "Spend MTD", value: "—", icon: "DollarSign" },
-              { label: "Active Vendors", value: "—", icon: "Building" },
-              { label: "Avg Lead Time", value: "—", icon: "Clock" },
+              { get label() { return uiI18n.t("purchasing.dashboard.openPOs") }, value: "—", icon: "FileText" },
+              { get label() { return uiI18n.t("purchasing.dashboard.spendMTD") }, value: "—", icon: "DollarSign" },
+              { get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purStatCards.label") }, value: "—", icon: "Building" },
+              { get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purStatCards.labelavgLeadTime") }, value: "—", icon: "Clock" },
             ],
           },
         },
@@ -1516,12 +1517,12 @@ export const purchasingDashboard: DashboardConfig = {
     },
     {
       id: "pur-vendors",
-      title: "Vendor Spend",
+      get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purVendors.title") },
       widgets: [
         {
           id: "pur-by-vendor",
           type: "bar-chart",
-          title: "Top Vendors by Spend",
+          get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purByVendor.title") },
           width: "2/3",
           data: {
             categoryKey: "vendor",
@@ -1533,7 +1534,7 @@ export const purchasingDashboard: DashboardConfig = {
         {
           id: "pur-on-time",
           type: "metrics",
-          title: "Vendor On-Time Delivery",
+          get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purOnTime.title") },
           width: "1/3",
           data: { metrics: [] },
         },
@@ -1541,21 +1542,21 @@ export const purchasingDashboard: DashboardConfig = {
     },
     {
       id: "pur-pending",
-      title: "Pending Orders",
+      get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purPending.title") },
       widgets: [
         {
           id: "pur-po-table",
           type: "table",
-          title: "Open Purchase Orders",
+          get title() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.purPoTable.title") },
           width: "full",
           data: {
             columns: [
-              { key: "po", label: "PO #" },
-              { key: "vendor", label: "Vendor" },
-              { key: "amount", label: "Amount", align: "right" },
-              { key: "ordered", label: "Ordered" },
-              { key: "expected", label: "Expected" },
-              { key: "status", label: "Status" },
+              { key: "po", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.po.label") } },
+              { key: "vendor", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.vendor.label") } },
+              { key: "amount", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.amount.label") }, align: "right" },
+              { key: "ordered", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.ordered.label") } },
+              { key: "expected", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.expected.label") } },
+              { key: "status", get label() { return uiI18n.t("purchasing.builtIn.moduleDashboardConfigs.purchasingDashboard.status.label") } },
             ],
             rows: [],
           },
@@ -1569,44 +1570,44 @@ export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "purchasing",
   workBoard: { scope: "purchasing", sources: ["workflow", "activities"], label: t("workBoard.kanban") },
   workspaceNav: businessWorkspaceNavigation("purchasing", t),
-  title: "Purchasing",
-  description: "Purchase orders, vendor performance, and spend analysis",
+  title: t("purchasing.builtIn.moduleDashboardConfigs.purchasingModuleConfig.purchasing.title"),
+  description: t("purchasing.builtIn.moduleDashboardConfigs.purchasingModuleConfig.purchasing.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("purchasing.builtIn.moduleDashboardConfigs.purchasingModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: purchasingDashboard.sections,
     },
     {
       id: "orders",
-      label: "Purchase Orders",
+      label: t("purchasing.purchaseOrders.title"),
       type: "entity",
       entityConfig: purchaseOrdersTableConfig(t),
       createForm: newPurchaseOrderForm(t),
-      createLabel: "New Order",
+      createLabel: t("purchasing.builtIn.moduleDashboardConfigs.purchasingModuleConfig.orders.createLabel"),
       createAction: "createPurchaseOrder",
       createPermission: { resource: "purchase_order", action: "create" },
     },
     {
       id: "lines",
-      label: "Order Lines",
+      label: t("purchasing.orderLines.title"),
       type: "entity",
       entityConfig: purchaseOrderLinesTableConfig(t),
     },
     {
       id: "requisitions",
-      label: "Purchase Agreements",
+      label: t("purchasing.purchaseAgreements.title"),
       type: "entity",
       entityConfig: purchaseRequisitionsTableConfig(t),
       createForm: newPurchaseRequisitionForm(t),
-      createLabel: "New Agreement",
+      createLabel: t("purchasing.builtIn.moduleDashboardConfigs.purchasingModuleConfig.requisitions.createLabel"),
       createAction: "createPurchaseRequisition",
     },
     {
       id: "vendors",
-      label: "Vendors",
+      label: t("purchasing.vendors.title"),
       type: "entity",
       entityConfig: vendorsTableConfig(t),
     },
@@ -2363,13 +2364,13 @@ export const iotModuleConfig = (t: TFunction): ModuleConfig => ({
 export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "documents",
   workspaceNav: businessWorkspaceNavigation("documents", t),
-  title: "Documents",
-  description: "Files, knowledge base, and document management",
+  title: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.documents.title"),
+  description: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.documents.description"),
   defaultTab: "documents",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -2378,13 +2379,13 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "docs-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsQuickActions.title"),
               width: "full",
               data: {
                 columns: 2,
                 actions: [
-                  { id: "upload_document", label: "Upload Document", icon: "upload", color: "blue" },
-                  { id: "create_article", label: "New Article", icon: "plus", color: "green" },
+                  { id: "upload_document", label: t("documents.forms.newDocument.title"), icon: "upload", color: "blue" },
+                  { id: "create_article", label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.createArticle.label"), icon: "plus", color: "green" },
                 ],
               },
             },
@@ -2396,14 +2397,14 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "docs-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Total Documents", value: "0", icon: "FileText" },
-                  { label: "Shared", value: "0", icon: "Share2" },
-                  { label: "Favorites", value: "0", icon: "Star" },
-                  { label: "Articles", value: "0", icon: "BookOpen" },
+                  { label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsStatCards.label"), value: "0", icon: "FileText" },
+                  { label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsStatCards.labelshared"), value: "0", icon: "Share2" },
+                  { label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.docsStatCards.labelfavorites"), value: "0", icon: "Star" },
+                  { label: t("documents.knowledgeCategories.columns.articleCount"), value: "0", icon: "BookOpen" },
                 ],
               },
             },
@@ -2417,16 +2418,16 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: documentsTableConfig(t),
       createForm: newDocumentForm(t),
-      createLabel: "Upload Document",
+      createLabel: t("documents.forms.newDocument.title"),
       createAction: "uploadDocument",
     },
     {
       id: "knowledge-base",
-      label: "Knowledge Base",
+      label: t("documents.knowledgeBase.title"),
       type: "entity",
       entityConfig: knowledgeArticlesTableConfig(t),
       createForm: newKnowledgeArticleForm(t),
-      createLabel: "New Article",
+      createLabel: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.knowledgeBase.createLabel"),
       createAction: "createArticle",
     },
     {
@@ -2449,26 +2450,26 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "documents-recycle-bin",
-      label: "Recycle bin",
+      label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.documentsRecycleBin.label"),
       type: "entity",
       entityConfig: documentsRecycleBinTableConfig(t),
     },
     {
       id: "document-templates",
-      label: "Doc templates",
+      label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.documentTemplates.label"),
       type: "entity",
       entityConfig: documentTemplatesTableConfig(t),
       createForm: newDocumentTemplateForm(t),
-      createLabel: "New document template",
+      createLabel: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.documentTemplates.createLabel"),
       createAction: "createDocumentTemplate",
     },
     {
       id: "mail-templates",
-      label: "Mail templates",
+      label: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.mailTemplates.label"),
       type: "entity",
       entityConfig: mailTemplatesTableConfig(t),
       createForm: newMailTemplateForm(t),
-      createLabel: "New mail template",
+      createLabel: t("documents.builtIn.moduleDashboardConfigs.documentsModuleConfig.mailTemplates.createLabel"),
       createAction: "createMailTemplate",
     },
     {
@@ -2494,13 +2495,13 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
 export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "calendar",
   workspaceNav: businessWorkspaceNavigation("calendar", t),
-  title: "Calendar",
-  description: "Meetings, appointments, and scheduled events",
+  title: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.calendar.title"),
+  description: t("calendar.events.description"),
   defaultTab: "calendar",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         // {
@@ -2526,14 +2527,14 @@ export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "cal-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.calStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Events Today", value: "0", icon: "Calendar" },
-                  { label: "Upcoming", value: "0", icon: "Clock" },
-                  { label: "Recurring", value: "0", icon: "RefreshCw" },
-                  { label: "Total Events", value: "0", icon: "CalendarDays" },
+                  { label: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.calStatCards.label"), value: "0", icon: "Calendar" },
+                  { label: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.calStatCards.labelupcoming"), value: "0", icon: "Clock" },
+                  { label: t("calendar.events.columns.recurrency"), value: "0", icon: "RefreshCw" },
+                  { label: t("calendar.dashboard.totalEvents"), value: "0", icon: "CalendarDays" },
                 ],
               },
             },
@@ -2543,26 +2544,26 @@ export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "calendar",
-      label: "Calendar",
+      label: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.calendar.label"),
       type: "entity",
       entityConfig: calendarEventsTableConfig(t),
     },
     {
       id: "events",
-      label: "Events",
+      label: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.events.label"),
       type: "entity",
       entityConfig: calendarEventsTableConfig(t),
       createForm: newCalendarEventForm(t),
-      createLabel: "New Event",
+      createLabel: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.events.createLabel"),
       createAction: "createEvent",
     },
     {
       id: "activities",
-      label: "Activities",
+      label: t("calendar.activitiesTab"),
       type: "entity",
       entityConfig: activitiesTableConfig(t),
       createForm: newActivityForm(t),
-      createLabel: "New Activity",
+      createLabel: t("calendar.builtIn.moduleDashboardConfigs.calendarModuleConfig.activities.createLabel"),
       createAction: "createActivity",
     },
   ],
@@ -2662,15 +2663,15 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "rep-pl-trend",
               type: "combo-chart",
-              title: "Profit & Loss Trend",
+              title: t("reports.builtIn.moduleDashboardConfigs.reportsModuleConfig.repPlTrend.title"),
               width: "2/3",
               data: {
                 xAxisKey: "month",
                 bars: [
-                  { key: "revenue", label: "Income", color: "hsl(var(--chart-1))" },
-                  { key: "expenses", label: "Expenses", color: "hsl(var(--chart-3))" },
+                  { key: "revenue", label: t("reports.authoring.income"), color: "hsl(var(--chart-1))" },
+                  { key: "expenses", label: t("reports.authoring.expenses"), color: "hsl(var(--chart-3))" },
                 ],
-                line: { key: "margin", label: "Net margin", color: "hsl(var(--chart-2))" },
+                line: { key: "margin", label: t("reports.builtIn.moduleDashboardConfigs.reportsModuleConfig.margin.label"), color: "hsl(var(--chart-2))" },
                 lineFormat: { kind: "percent" },
                 values: [],
               },
@@ -2678,14 +2679,14 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "rep-cash-runway",
               type: "radial-gauge",
-              title: "Cash Runway",
+              title: t("reports.builtIn.moduleDashboardConfigs.reportsModuleConfig.repCashRunway.title"),
               width: "1/3",
-              data: { value: 0, max: 0, label: "months of runway", stats: [] },
+              data: { value: 0, max: 0, label: t("reports.builtIn.moduleDashboardConfigs.reportsModuleConfig.repCashRunway.label"), stats: [] },
             },
             {
               id: "rep-expense-breakdown",
               type: "ranked-bars",
-              title: "Expense Breakdown (last 90 days)",
+              title: t("reports.builtIn.moduleDashboardConfigs.reportsModuleConfig.repExpenseBreakdown.title"),
               width: "full",
               data: { items: [], maxItems: 8, emptyLabel: "No posted expenses in the last 90 days." },
             },
@@ -2785,8 +2786,8 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "subscriptions",
-  title: "Subscriptions",
-  description: "Recurring revenue, plans, and subscription management",
+  title: t("subscriptions.subscriptions.title"),
+  description: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subscriptions.description"),
   defaultTab: "dashboard",
   workspaceNav: {
     workspaces: [
@@ -2809,7 +2810,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -2818,13 +2819,13 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "sub-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subQuickActions.title"),
               width: "full",
               data: {
                 columns: 2,
                 actions: [
-                  { id: "new_subscription", label: "New Subscription", icon: "plus", color: "green" },
-                  { id: "new_plan", label: "New Plan", icon: "plus", color: "blue" },
+                  { id: "new_subscription", label: t("subscriptions.forms.newSubscription.title"), icon: "plus", color: "green" },
+                  { id: "new_plan", label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.newPlan.label"), icon: "plus", color: "blue" },
                   {
                     id: "import_plan_csv",
                     label: t("subscriptions.dashboard.importPlanCsv"),
@@ -2848,14 +2849,14 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "sub-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Active Subscriptions", value: "0", icon: "RefreshCw" },
-                  { label: "Total MRR", value: "$0", icon: "TrendingUp" },
-                  { label: "Trial Subscriptions", value: "0", icon: "Clock" },
-                  { label: "Plans Available", value: "0", icon: "Package" },
+                  { label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subStatCards.label"), value: "0", icon: "RefreshCw" },
+                  { label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subStatCards.labeltotalMRR"), value: "$0", icon: "TrendingUp" },
+                  { label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subStatCards.labeltrialSubscriptions"), value: "0", icon: "Clock" },
+                  { label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subStatCards.labelplansAvailable"), value: "0", icon: "Package" },
                 ],
               },
             },
@@ -2867,15 +2868,15 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "sub-mrr-churn",
               type: "combo-chart",
-              title: "MRR & churn estimate (current contract values)",
+              title: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subMrrChurn.title"),
               width: "2/3",
               data: {
                 xAxisKey: "month",
                 bars: [
-                  { key: "mrr", label: "MRR", color: "hsl(var(--chart-1))" },
-                  { key: "newMrr", label: "New MRR", color: "hsl(var(--chart-2))" },
+                  { key: "mrr", label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.mrr.label"), color: "hsl(var(--chart-1))" },
+                  { key: "newMrr", label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.newMrr.label"), color: "hsl(var(--chart-2))" },
                 ],
-                line: { key: "churnRate", label: "Churn rate", color: "hsl(var(--destructive))" },
+                line: { key: "churnRate", label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.churnRate.label"), color: "hsl(var(--destructive))" },
                 lineFormat: { kind: "percent" },
                 values: [],
               },
@@ -2883,7 +2884,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "sub-plan-mix",
               type: "share-bar",
-              title: "Plan Mix (active MRR)",
+              title: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.subPlanMix.title"),
               width: "1/3",
               data: { segments: [], rows: [], emptyLabel: "No active paid subscriptions yet." },
             },
@@ -2893,21 +2894,21 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "subscriptions",
-      label: "Subscriptions",
+      label: t("subscriptions.subscriptions.title"),
       type: "entity",
       entityConfig: subscriptionsTableConfig(t),
       createForm: newSubscriptionForm(t),
-      createLabel: "New Subscription",
+      createLabel: t("subscriptions.forms.newSubscription.title"),
       createAction: "createSubscription",
       createPermission: { resource: "subscription", action: "create" },
     },
     {
       id: "plans",
-      label: "Plans",
+      label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.plans.label"),
       type: "entity",
       entityConfig: subscriptionPlansTableConfig(t),
       createForm: newSubscriptionPlanForm(t),
-      createLabel: "New Plan",
+      createLabel: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.plans.createLabel"),
       createAction: "createPlan",
       createPermission: { resource: "subscription_plan", action: "create" },
     },
@@ -2947,7 +2948,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: subscriptionPriceTiersTableConfig(t),
       createForm: createSubscriptionPriceTierForm(t),
-      createLabel: "Add tier",
+      createLabel: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.priceTiers.createLabel"),
       createAction: "createPriceTier",
     },
     {
@@ -2982,26 +2983,26 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "deferred-schedules",
-      label: "Deferred schedules",
+      label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.deferredSchedules.label"),
       type: "entity",
       entityConfig: deferredRevenueSchedulesTableConfig(t),
       createForm: newDeferredRevenueScheduleForm(t),
-      createLabel: "New schedule",
+      createLabel: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.deferredSchedules.createLabel"),
       createAction: "createDeferredSchedule",
     },
     {
       id: "deferred-lines",
-      label: "Recognition lines",
+      label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.deferredLines.label"),
       type: "entity",
       entityConfig: deferredRevenueLinesTableConfig(t),
     },
     {
       id: "recognition-rules",
-      label: "Recognition rules",
+      label: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.recognitionRules.label"),
       type: "entity",
       entityConfig: revenueRecognitionRulesTableConfig(t),
       createForm: newRevenueRecognitionRuleForm(t),
-      createLabel: "New rule",
+      createLabel: t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.recognitionRules.createLabel"),
       createAction: "createRecognitionRule",
     },
   ],
@@ -3013,13 +3014,13 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "expenses",
   workBoard: { scope: "expenses", sources: ["workflow"], label: t("workBoard.kanban") },
   workspaceNav: businessWorkspaceNavigation("expenses", t),
-  title: "Expenses",
-  description: "Employee expense management and reimbursement",
+  title: t("expenses.expenses.title"),
+  description: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expenses.description"),
   defaultTab: "dashboard",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -3028,13 +3029,13 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "exp-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expQuickActions.title"),
               width: "full",
               data: {
                 columns: 2,
                 actions: [
-                  { id: "new_expense", label: "New Expense", icon: "plus", color: "orange" },
-                  { id: "new_expense_sheet", label: "New Report", icon: "plus", color: "blue" },
+                  { id: "new_expense", label: t("expenses.forms.newExpense.title"), icon: "plus", color: "orange" },
+                  { id: "new_expense_sheet", label: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.newExpenseSheet.label"), icon: "plus", color: "blue" },
                 ],
               },
             },
@@ -3046,14 +3047,14 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "exp-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Pending Expenses", value: "0", icon: "Receipt" },
-                  { label: "Total Amount", value: "$0", icon: "DollarSign" },
-                  { label: "Expense Reports", value: "0", icon: "FileText" },
-                  { label: "Approved Reports", value: "0", icon: "CheckCircle" },
+                  { label: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expStatCards.label"), value: "0", icon: "Receipt" },
+                  { label: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expStatCards.labeltotalAmount"), value: "$0", icon: "DollarSign" },
+                  { label: t("expenses.expenseReports.title"), value: "0", icon: "FileText" },
+                  { label: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expStatCards.labelapprovedReports"), value: "0", icon: "CheckCircle" },
                 ],
               },
             },
@@ -3065,15 +3066,15 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "exp-monthly-spend",
               type: "combo-chart",
-              title: "Monthly Spend",
+              title: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expMonthlySpend.title"),
               width: "2/3",
               data: {
                 xAxisKey: "month",
                 bars: [
-                  { key: "outOfPocket", label: "Out of pocket", color: "hsl(var(--chart-1))" },
-                  { key: "corporateCard", label: "Corporate card", color: "hsl(var(--chart-4))" },
+                  { key: "outOfPocket", label: t("expenses.forms.newExpense.fields.paymentModeOutOfPocket"), color: "hsl(var(--chart-1))" },
+                  { key: "corporateCard", label: t("expenses.forms.newExpense.fields.paymentModeCorporateCard"), color: "hsl(var(--chart-4))" },
                 ],
-                line: { key: "count", label: "Expenses", color: "hsl(var(--chart-3))" },
+                line: { key: "count", label: t("expenses.expenses.title"), color: "hsl(var(--chart-3))" },
                 lineFormat: { kind: "number" },
                 stacked: true,
                 values: [],
@@ -3082,14 +3083,14 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "exp-spend-by-category",
               type: "ranked-bars",
-              title: "Spend by Category (this month)",
+              title: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expSpendByCategory.title"),
               width: "1/3",
               data: { items: [], emptyLabel: "No submitted expenses this month." },
             },
             {
               id: "exp-approval-backlog",
               type: "tabbed-table",
-              title: "Approval Backlog",
+              title: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expApprovalBacklog.title"),
               width: "full",
               data: { tabs: [], columns: [], rows: [] },
             },
@@ -3099,21 +3100,21 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
     },
     {
       id: "expenses",
-      label: "Expenses",
+      label: t("expenses.expenses.title"),
       type: "entity",
       entityConfig: expensesTableConfig(t),
       createForm: newExpenseForm(t),
-      createLabel: "New Expense",
+      createLabel: t("expenses.forms.newExpense.title"),
       createAction: "createExpense",
       createPermission: { resource: "hr_expense", action: "create" },
     },
     {
       id: "expense-sheets",
-      label: "Expense Reports",
+      label: t("expenses.expenseReports.title"),
       type: "entity",
       entityConfig: expenseSheetsTableConfig(t),
       createForm: newExpenseSheetForm(t),
-      createLabel: "New Report",
+      createLabel: t("expenses.builtIn.moduleDashboardConfigs.expensesModuleConfig.expenseSheets.createLabel"),
       createAction: "createSheet",
     },
     {
@@ -3324,13 +3325,13 @@ export const workflowsModuleConfig = (t: TFunction): ModuleConfig => ({
 export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "messages",
   workspaceNav: businessWorkspaceNavigation("messages", t),
-  title: "Messages",
-  description: "Internal messages, email threads, and notifications",
+  title: t("messages.messages.title"),
+  description: t("messages.builtIn.moduleDashboardConfigs.messagesModuleConfig.messages.description"),
   defaultTab: "messages",
   tabs: [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: t("messages.builtIn.moduleDashboardConfigs.messagesModuleConfig.dashboard.label"),
       type: "dashboard",
       sections: [
         {
@@ -3339,14 +3340,14 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "msg-quick-actions",
               type: "quick-actions",
-              title: "Quick Actions",
+              title: t("messages.builtIn.moduleDashboardConfigs.messagesModuleConfig.msgQuickActions.title"),
               width: "full",
               data: {
                 columns: undefined,
                 actions: [
-                  { id: "new_message", label: "New Message", icon: "plus", color: "blue" },
-                  { id: "subscribe_record", label: "Subscribe to record", icon: "users", color: "green" },
-                  { id: "unsubscribe_record", label: "Unsubscribe", icon: "refresh", color: "orange" },
+                  { id: "new_message", label: t("messages.forms.newMessage.title"), icon: "plus", color: "blue" },
+                  { id: "subscribe_record", label: t("messages.builtIn.moduleDashboardConfigs.messagesModuleConfig.subscribeRecord.label"), icon: "users", color: "green" },
+                  { id: "unsubscribe_record", label: t("messages.forms.unsubscribe.submit"), icon: "refresh", color: "orange" },
                 ],
               },
             },
@@ -3358,14 +3359,14 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
             {
               id: "msg-stat-cards",
               type: "stat-cards",
-              title: "Key Metrics",
+              title: t("messages.builtIn.moduleDashboardConfigs.messagesModuleConfig.msgStatCards.title"),
               width: "full",
               data: {
                 stats: [
-                  { label: "Total Messages", value: "0", icon: "MessageSquare" },
-                  { label: "Emails", value: "0", icon: "Mail" },
-                  { label: "Comments", value: "0", icon: "MessageCircle" },
-                  { label: "Notifications", value: "0", icon: "Bell" },
+                  { label: t("messages.dashboard.totalMessages"), value: "0", icon: "MessageSquare" },
+                  { label: t("messages.dashboard.emails"), value: "0", icon: "Mail" },
+                  { label: t("messages.dashboard.comments"), value: "0", icon: "MessageCircle" },
+                  { label: t("messages.dashboard.notifications"), value: "0", icon: "Bell" },
                 ],
               },
             },
@@ -3379,12 +3380,12 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: mailMessagesTableConfig(t),
       createForm: newMailMessageForm(t),
-      createLabel: "New Message",
+      createLabel: t("messages.forms.newMessage.title"),
       createAction: "createMessage",
     },
     {
       id: "message-batches",
-      label: "Message batches",
+      label: t("messages.builtIn.moduleDashboardConfigs.messagesModuleConfig.messageBatches.label"),
       type: "custom",
     },
     {
@@ -3399,7 +3400,7 @@ export const messagesModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: mailFollowersTableConfig(t),
       createForm: subscribeToRecordForm(t),
-      createLabel: "Subscribe",
+      createLabel: t("messages.forms.subscribe.submit"),
       createAction: "subscribeToRecord",
     },
   ],

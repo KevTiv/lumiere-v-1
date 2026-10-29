@@ -393,13 +393,13 @@ function ReportsClientLoaded({
         onDrillTarget: handleStoredDashboardDrill,
       },
     )
-  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange, handleStoredDashboardDrill])
+  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange, handleStoredDashboardDrill, t])
 
   const storedDashboardExport = useMemo(
     () => storedDashboardResolution
       ? storedDashboardExportGate(storedDashboardResolution)
-      : { allowed: false, reason: "No dashboard is selected." },
-    [storedDashboardResolution],
+      : { allowed: false, reason: t("reports.reportsClient.noDashboardSelected") },
+    [storedDashboardResolution, t],
   )
 
   const storedDashboardRef = useRef<HTMLDivElement>(null)
@@ -688,7 +688,7 @@ function ReportsClientLoaded({
           },
           {
             id: "ask-ai",
-            label: "Ask AI",
+            label: t("documents.documentsClient.askAI"),
             icon: Sparkles,
             requiresSelection: true,
             onClick: (rows) => {
@@ -741,14 +741,14 @@ function ReportsClientLoaded({
               const first = rows[0]
               if (!first?.id) return
               try {
-                if (operatingCompanyId == null || operatingCompanyId <= 0n) throw new Error("Select a company before editing a template")
+                if (operatingCompanyId == null || operatingCompanyId <= 0n) throw new Error(t("reports.reportsClient.selectACompanyBeforeEditingATemplate"))
                 const row = currentReportTemplate(reportTemplates, orgId, operatingCompanyId, BigInt(String(first.id)))
-                if (!row) throw new Error("Report template is no longer available")
+                if (!row) throw new Error(t("reports.reportsClient.reportTemplateIsNoLongerAvailable"))
                 setEditTemplateInitial(reportTemplateEditValues(row))
                 setEditTemplateId(String(first.id))
                 setEditTemplateOpen(true)
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Unable to open report template")
+                toast.error(error instanceof Error ? error.message : t("reports.reportsClient.unableToOpenReportTemplate"))
               }
             },
           },
@@ -929,7 +929,7 @@ function ReportsClientLoaded({
 
     return mapDashboardWidgets(moduleConfig, (w) => {
         if (["rep-pl-trend", "rep-expense-breakdown"].includes(w.id) && (chartSourceState.status !== "ready" || !companyCurrencyCode)) {
-          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: chartSourceState.status !== "ready" ? "Financial source data is not ready. Refresh before interpreting this chart." : "Select a company with a known reporting currency to view this aggregate." } }
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: chartSourceState.status !== "ready" ? t("reports.reportsClient.financialSourceDataIsNotReadyRefreshBeforeInterpretingThisChart") : t("reports.reportsClient.selectACompanyWithAKnownReportingCurrencyToViewThis") } }
         }
         if (w.type === "combo-chart" && w.id === "rep-pl-trend") {
           return {
@@ -938,7 +938,7 @@ function ReportsClientLoaded({
           }
         }
         if (w.id === "rep-cash-runway") {
-          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "Cash runway is unavailable until reconciled bank balances and verified cash-flow evidence are connected." } }
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: t("reports.reportsClient.cashRunwayIsUnavailableUntilReconciledBankBalancesAndVerifiedCash") } }
         }
         if (w.type === "ranked-bars" && w.id === "rep-expense-breakdown") {
           return {
@@ -1217,7 +1217,7 @@ function ReportsClientLoaded({
     if (source && moduleQueryState(source).status !== "ready") throw new Error(t("reports.forms.sourceUnavailable", { defaultValue: "Required report records could not be verified. Retry their source list before saving. Your entries are retained." }))
     if (action === "createReport" || action === "generateReport") {
       if (moduleQueryState(currenciesQuery).status !== "ready") throw new Error(t("reports.workspace.currencyUnavailable"))
-      if (periodRequested && (!validPeriodContext || validPeriodContext.reportType !== "trial-balance")) throw new Error("The selected period report context is not ready for trial balance generation")
+      if (periodRequested && (!validPeriodContext || validPeriodContext.reportType !== "trial-balance")) throw new Error(t("reports.reportsClient.theSelectedPeriodReportContextIsNotReadyForTrialBalance"))
       const created = await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(validPeriodContext ? applyPeriodReportFormContext(formData, validPeriodContext) : formData))
       if (reportActionLive.current.scope === reportActionScope && reportActionLive.current.allowed) openReport(created.id)
     } else if (action === "createReportTemplate") {
@@ -1335,7 +1335,7 @@ function ReportsClientLoaded({
         showSubmitSuccessToast={false}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
-          if (editTemplateId == null || !editTemplateInitial) throw new Error("No template selected")
+          if (editTemplateId == null || !editTemplateInitial) throw new Error(t("reports.reportsClient.noTemplateSelected"))
           await updateReportTemplate.mutateAsync({
             expected: editTemplateInitial,
             templateId: editTemplateId,
@@ -1367,7 +1367,7 @@ function ReportsClientLoaded({
         onSubmit={async (formData) => {
           if (metricValuesId == null) throw new Error(t("reports.forms.selectedRecordUnavailable", { defaultValue: "The selected record is unavailable. Close and reopen this form." }))
           const cv = Number(formData.currentValue)
-          if (!Number.isFinite(cv)) throw new Error("Invalid current value")
+          if (!Number.isFinite(cv)) throw new Error(t("reports.reportsClient.invalidCurrentValue"))
           const pvRaw = formData.previousValue
           const pv =
             pvRaw != null && String(pvRaw).trim() !== ""
@@ -1396,7 +1396,7 @@ function ReportsClientLoaded({
           if (recordRunScheduledId == null) throw new Error(t("reports.forms.selectedRecordUnavailable", { defaultValue: "The selected record is unavailable. Close and reopen this form." }))
           const raw = formData.nextRun
           if (raw == null || String(raw).trim() === "") {
-            throw new Error("Next run is required")
+            throw new Error(t("reports.reportsClient.nextRunIsRequired"))
           }
           await recordReportRun.mutateAsync({
             reportId: recordRunScheduledId,
@@ -1590,11 +1590,11 @@ function ReportsClientLoaded({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All time</SelectItem>
-                      <SelectItem value="7d">Last 7 days</SelectItem>
-                      <SelectItem value="30d">Last 30 days</SelectItem>
-                      <SelectItem value="90d">Last 90 days</SelectItem>
-                      <SelectItem value="ytd">Year to date</SelectItem>
+                      <SelectItem value="all">{t("reports.reportsClient.allTime")}</SelectItem>
+                      <SelectItem value="7d">{t("reports.reportsClient.last7Days")}</SelectItem>
+                      <SelectItem value="30d">{t("reports.reportsClient.last30Days")}</SelectItem>
+                      <SelectItem value="90d">{t("reports.reportsClient.last90Days")}</SelectItem>
+                      <SelectItem value="ytd">{t("reports.reportsClient.yearToDate")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <Button

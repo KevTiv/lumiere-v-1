@@ -31,7 +31,7 @@ import {
   CheckCircle,
   Loader2,
 } from "lucide-react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import type { AuditLogEntry } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { auditActionPillClass } from "@/lib/theme-colors"
@@ -74,7 +74,7 @@ function mapAuditRow(row: Record<string, unknown>): AuditLogEntry {
   return {
     id,
     userId: "system",
-    userName: "System",
+    userName: i18n.t("settings.auditLog.text.system"),
     action: action ? `${action} · ${tableName}` : tableName,
     resource: tableName,
     details: formatAuditDetails(row),
@@ -151,7 +151,7 @@ export function AuditLog() {
 
   const handleExport = () => {
     const csv = [
-      ["Timestamp", "User", "Action", "Resource", "Details", "IP"],
+      [i18n.t("settings.auditLog.text.timestamp"), i18n.t("settings.auditLog.text.user"), i18n.t("settings.auditLog.text.action"), i18n.t("settings.auditLog.text.resource"), i18n.t("settings.auditLog.text.details"), i18n.t("settings.auditLog.text.ip")],
       ...filteredLogs.map((log) => [
         log.timestamp,
         log.userName,
@@ -193,12 +193,12 @@ export function AuditLog() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("settings.auditLog.allActions")}</SelectItem>
-              <SelectItem value="create">CREATE</SelectItem>
-              <SelectItem value="update">UPDATE</SelectItem>
-              <SelectItem value="delete">DELETE</SelectItem>
-              <SelectItem value="crm">CRM</SelectItem>
-              <SelectItem value="sale">Sales</SelectItem>
-              <SelectItem value="account">Accounting</SelectItem>
+              <SelectItem value="create">{i18n.t("settings.auditLog.text.create")}</SelectItem>
+              <SelectItem value="update">{i18n.t("settings.auditLog.text.update")}</SelectItem>
+              <SelectItem value="delete">{i18n.t("settings.auditLog.text.delete")}</SelectItem>
+              <SelectItem value="crm">{i18n.t("nav.crm")}</SelectItem>
+              <SelectItem value="sale">{i18n.t("nav.sales")}</SelectItem>
+              <SelectItem value="account">{i18n.t("nav.accounting")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -248,20 +248,18 @@ export function AuditLog() {
           {auditQuery.isLoading ? (
             <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading audit log…
-            </div>
+              {i18n.t("settings.auditLog.text.loadingAuditLog")}</div>
           ) : null}
           {auditQuery.isError ? (
             <p className="p-6 text-sm text-destructive">
               {auditQuery.error instanceof Error
                 ? auditQuery.error.message
-                : "Unable to load audit log"}
+                : i18n.t("settings.auditLog.text.unableToLoadAuditLog")}
             </p>
           ) : null}
           {!auditQuery.isLoading && filteredLogs.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground" data-testid="audit-log-empty">
-              No audit entries match your filters yet.
-            </p>
+              {i18n.t("settings.auditLog.text.noAuditEntriesMatchYourFiltersYet")}</p>
           ) : null}
           <div className="divide-y divide-border" data-testid="audit-log-list">
             {filteredLogs.map((log) => {
@@ -289,7 +287,7 @@ export function AuditLog() {
                         {log.ip ? (
                           <>
                             <span className="text-border">•</span>
-                            <span>IP: {log.ip}</span>
+                            <span>{i18n.t("settings.auditLog.text.ip")}{" "}{log.ip}</span>
                           </>
                         ) : null}
                       </div>
@@ -344,7 +342,7 @@ export function AuditLog() {
               } else {
                 const expiresRaw = String(data.expiresAt ?? "").trim()
                 const millis = Date.parse(expiresRaw)
-                if (!Number.isFinite(millis)) throw new Error("expiresAt must be a valid date/time")
+                if (!Number.isFinite(millis)) throw new Error(i18n.t("settings.auditLog.text.expiresatMustBeAValidDateTime"))
                 await createUserSession.mutateAsync({
                   sessionToken: String(data.sessionToken ?? ""),
                   ipAddress: data.ipAddress ? String(data.ipAddress) : null,

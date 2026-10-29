@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { PieChart, Pie, Cell } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../components/chart"
@@ -13,13 +15,14 @@ const FALLBACK_COLORS = [
 ]
 
 export function DonutChartWidget({ data }: { data: DonutChartWidgetType["data"] }) {
+  useTranslation()
   const segments = data.segments
   const total = segments.reduce((sum, segment) => sum + segment.value, 0)
 
   if (segments.length === 0 || total === 0) {
     return (
       <div className="flex h-[300px] w-full items-center justify-center text-sm text-muted-foreground">
-        {data.emptyLabel ?? "No data"}
+        {data.emptyLabel ?? i18n.t("ui.pages.donutChartWidget.noData")}
       </div>
     )
   }

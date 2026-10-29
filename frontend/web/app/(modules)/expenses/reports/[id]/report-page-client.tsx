@@ -6,7 +6,7 @@ import { FinanceReviewWorkspace } from '@lumiere/ui/composed/finance-review-work
 import { ExpenseSourcePreview } from '../../../../../components/finance-source-preview';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { FileText, ListOrdered } from 'lucide-react';
-import { useTranslation } from '@lumiere/i18n';
+import { i18n, useTranslation } from '@lumiere/i18n';
 import {
   Button,
   EntityDetail,
@@ -59,7 +59,7 @@ type Row = Record<string, unknown>;
 const TAB_IDS = ['overview', 'expenses', 'approvals', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
-const MOVE_LABEL = { post: 'Journal entry', reimbursement: 'Reimbursement', rebill: 'Rebill' } as const;
+const MOVE_LABEL = { get post() { return i18n.t("expenses.reportPageClient.journalEntry") }, get reimbursement() { return i18n.t("expenses.reportPageClient.reimbursement") }, get rebill() { return i18n.t("expenses.reportPageClient.rebill") } } as const;
 
 export function ExpenseReportPageClient(props: ExpenseReportPageClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -293,7 +293,7 @@ function ExpenseReportPageLoaded({
                 ) : null}
                 {!timeline.isError && timeline.rows.map((row) => (
                   <div key={String(row.id)} className="rounded-md border p-3 text-sm space-y-1">
-                    <div className="font-medium">{String(row.summary ?? row.action ?? 'Approval')}</div>
+                    <div className="font-medium">{String(row.summary ?? row.action ?? t("expenses.reportPageClient.approval"))}</div>
                     <div className="text-muted-foreground">
                       {String(row.status ?? 'pending')} · {String(row.action ?? '')}
                     </div>

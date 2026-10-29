@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useMemo, useRef, useState } from "react"
 import {
@@ -41,6 +43,7 @@ export function KanbanBoard<T extends object = EntityRow>({
   onItemClick,
   onAddItem,
 }: KanbanBoardProps<T>) {
+  useTranslation()
   const [activeId, setActiveId] = useState<string | null>(null)
   const activeDrag = useRef<{ itemId: string; fromColumnId: string } | null>(
     null,
@@ -118,7 +121,7 @@ export function KanbanBoard<T extends object = EntityRow>({
       await onMove?.(move)
     } catch (error) {
       const failedMessage =
-        labels?.moveFailed ?? "Could not move item. Try again."
+        labels?.moveFailed ?? i18n.t("ui.kanban.kanbanBoard.couldNotMoveItemTryAgain")
       if (onMoveError) {
         try {
           await onMoveError(error, move)

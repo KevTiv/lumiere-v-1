@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { forwardRef, useMemo } from "react"
 import { DashboardGrid } from "./dashboard-grid"
@@ -39,6 +41,8 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
     },
     ref,
   ) {
+    useTranslation()
+    const language = i18n.resolvedLanguage
     const resolution = useMemo(() => {
       const widgetIds = (dashboard.widgetIds ?? dashboard.widget_ids) as
         | Array<bigint | number>
@@ -54,7 +58,7 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
           onDrillTarget,
         },
       )
-    }, [dashboard, widgets, dataSources, sourceStates, suppliedResolution, timeRange, onDrillTarget])
+    }, [dashboard, widgets, dataSources, sourceStates, suppliedResolution, timeRange, onDrillTarget, language])
 
     const exportProvenanceByWidget = useMemo(() => {
       if (organizationId == null) return undefined
@@ -81,11 +85,11 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
       return [
         {
           id: `stored-dashboard-${String(dashboard.id ?? "view")}`,
-          title: String(dashboard.name ?? "Dashboard"),
+          title: String(dashboard.name ?? i18n.t("ui.pages.storedDashboardView.dashboard")),
           widgets: resolution.widgets,
         },
       ]
-    }, [dashboard, resolution.widgets])
+    }, [dashboard, resolution.widgets, language])
 
     const firstIssue = resolution.issues[0]
     const hasLoadingSource = resolution.issues.some((issue) => issue.kind === "source-loading")
@@ -93,8 +97,7 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
     if (hasLoadingSource && sections.length === 0) {
       return (
         <p className="text-sm text-muted-foreground" role="status" data-testid={`${testId}-loading`}>
-          Dashboard data is loading.
-        </p>
+          {i18n.t("ui.pages.storedDashboardView.dashboardDataIsLoading")}</p>
       )
     }
 
@@ -106,7 +109,7 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
     ) {
       return (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3" role="alert" data-testid={`${testId}-${resolution.state}`}>
-          <p className="text-sm font-medium">Dashboard data cannot be rendered.</p>
+          <p className="text-sm font-medium">{i18n.t("ui.pages.storedDashboardView.dashboardDataCannotBeRendered")}</p>
           <p className="text-sm text-muted-foreground">{firstIssue?.message}</p>
         </div>
       )
@@ -115,8 +118,7 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
     if (sections.length === 0) {
       return (
         <p className="text-sm text-muted-foreground" data-testid={testId}>
-          No widgets configured for this dashboard.
-        </p>
+          {i18n.t("ui.pages.storedDashboardView.noWidgetsConfiguredForThisDashboard")}</p>
       )
     }
 
@@ -128,20 +130,19 @@ export const StoredDashboardView = forwardRef<HTMLDivElement, StoredDashboardVie
             role="alert"
             data-testid={`${testId}-invalid-definition`}
           >
-            <p className="text-sm font-medium">Dashboard data contains an invalid definition.</p>
+            <p className="text-sm font-medium">{i18n.t("ui.pages.storedDashboardView.dashboardDataContainsAnInvalidDefinition")}</p>
             <p className="text-sm text-muted-foreground">{firstIssue?.message}</p>
           </div>
         ) : null}
         {resolution.state === "partial" ? (
           <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3" role="status" data-testid={`${testId}-partial`}>
-            <p className="text-sm font-medium">Dashboard data is partial.</p>
+            <p className="text-sm font-medium">{i18n.t("ui.pages.storedDashboardView.dashboardDataIsPartial")}</p>
             <p className="text-sm text-muted-foreground">{firstIssue?.message}</p>
           </div>
         ) : null}
         {resolution.state === "empty" ? (
           <p className="mb-3 text-sm text-muted-foreground" data-testid={`${testId}-empty`}>
-            Dashboard sources loaded with no rows.
-          </p>
+            {i18n.t("ui.pages.storedDashboardView.dashboardSourcesLoadedWithNoRows")}</p>
         ) : null}
         <DashboardGrid
           sections={sections}

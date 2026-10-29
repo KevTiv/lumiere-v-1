@@ -14,7 +14,7 @@ const hooks = vi.hoisted(() => {
   }
 })
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", async (importOriginal) => ({ ...(await importOriginal<typeof import("@lumiere/i18n")>()), useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-import-mapping", () => ({
   useAnalyzeImportMapping: () => hooks.analyze,
   usePreviewImportMapping: () => hooks.preview,

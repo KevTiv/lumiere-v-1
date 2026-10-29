@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useCurrencyFormat } from "../lib/currency-context"
 import { Bar, BarChart, XAxis, YAxis } from "recharts"
@@ -56,6 +58,7 @@ export function SegmentedShareBar({
   emptyLabel,
   className,
 }: SegmentedShareBarProps) {
+  useTranslation()
   const { locale } = useCurrencyFormat()
   const data = shareRows(segments, rows)
   if (!data.some((row) => row.total > 0)) return <ChartEmpty label={emptyLabel} />
@@ -121,10 +124,10 @@ export function SegmentedShareBar({
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground">
-                <th className="py-1.5 text-left font-medium">Segment</th>
+                <th className="py-1.5 text-left font-medium">{i18n.t("ui.charts.segmentedShareBar.segment")}</th>
                 {data.map((row) => (
                   <th key={row.label} className="py-1.5 pl-3 text-right font-medium" colSpan={multiRow ? 1 : 2}>
-                    {multiRow ? row.label : "Amount"}
+                    {multiRow ? row.label : i18n.t("ui.charts.segmentedShareBar.amount")}
                   </th>
                 ))}
               </tr>

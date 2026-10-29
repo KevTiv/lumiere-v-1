@@ -1,5 +1,6 @@
 "use client"
 
+import { i18n as rootI18n, useTranslation as useRootTranslation } from "@lumiere/i18n"
 import { NavigationGuardProvider } from "@lumiere/ui"
 
 import { QueryClient, QueryClientProvider, useQueryClient, useQuery } from "@tanstack/react-query"
@@ -215,6 +216,7 @@ export function Providers({
   companyIds?: readonly number[]
   fieldAccess?: FieldAccessContext
 }) {
+  useRootTranslation()
   const [queryClient] = useState(() => new QueryClient())
   const [authorityUnavailable, setAuthorityUnavailable] = useState(false)
   const markAuthorityUnavailable = useCallback(() => {
@@ -234,8 +236,7 @@ export function Providers({
           <QueryClientProvider client={queryClient}>
             {authorityUnavailable ? (
               <main data-testid="authority-unavailable" role="alert">
-                Authorization state is unavailable. Reload to try again.
-              </main>
+                {rootI18n.t("workspaceShell.ui.providers.authorizationStateIsUnavailableReloadToTryAgain")}</main>
             ) : (
               <StdbSubscriptionProvider
                 fieldAccess={fieldAccess}

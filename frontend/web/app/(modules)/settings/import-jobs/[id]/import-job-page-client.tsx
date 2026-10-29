@@ -80,7 +80,7 @@ function ImportJobPageLoaded({
           render={<Link href="/settings" />}
           nativeButton={false}
         >
-          Back to settings
+          {t("settings.importJobs.backToSettings")}
         </Button>
       </div>
       {rollbackError ? <p role="alert" className="text-sm text-destructive">{rollbackError}</p> : null}

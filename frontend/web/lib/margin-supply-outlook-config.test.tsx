@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { i18n } from "@lumiere/i18n"
 
 import type { ReportPreview } from "@lumiere/erp-shared/report-schemas"
 
@@ -11,7 +12,7 @@ import {
   MARGIN_SUPPLY_SCENARIO_FIELDS,
 } from "./margin-supply-outlook-config"
 
-test("scenario fields and dashboard widgets are config driven", () => {
+test("scenario fields and dashboard widgets are config driven", async () => {
   assert.deepEqual(
     MARGIN_SUPPLY_SCENARIO_FIELDS.map((field) => field.key),
     [
@@ -98,4 +99,35 @@ test("scenario fields and dashboard widgets are config driven", () => {
   const xlsx = marginSupplyXlsxData(preview)
   assert.ok(xlsx.headers.includes("Scenario source"))
   assert.ok(xlsx.headers.includes("Calculation evidence and caveats"))
+
+  const originalLanguage = i18n.language
+  const originalFrench = structuredClone(i18n.getResourceBundle("fr", "translation"))
+  const payloadBefore = JSON.stringify(preview)
+  const csvHeadersBefore = MARGIN_SUPPLY_SCENARIO_FIELDS.map((field) => field.csvHeader)
+  try {
+    i18n.addResourceBundle("fr", "translation", { reports: { marginSupply: {
+      description: "Aide à la décision du {{from}} au {{to}}",
+      days_one: "{{count}} jour",
+      days_other: "{{count}} jours",
+      source: { manual: "Saisie manuelle" },
+      export: { product: "Produit" },
+      validation: { required: "Champ requis : {{field}}" },
+    } } }, true, true)
+    await i18n.changeLanguage("fr")
+    assert.equal(dashboard.description, "Aide à la décision du 2026-10-01 au 2026-11-01")
+    const assumptionWidget = dashboard.sections[1]?.widgets[0]
+    const assumptionData = assumptionWidget?.data as { stats: { value: unknown }[] }
+    assert.equal(assumptionData.stats[2]?.value, "7 jours")
+    assert.equal(assumptionData.stats[4]?.value, "Saisie manuelle")
+    assert.equal(marginSupplyXlsxData(preview).headers[0], "Produit")
+    assert.throws(() => marginSupplyScenarioFromDraft({
+      ...DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT, targetMarginPct: "",
+    }), /Champ requis/)
+    assert.deepEqual(MARGIN_SUPPLY_SCENARIO_FIELDS.map((field) => field.csvHeader), csvHeadersBefore)
+    assert.equal(JSON.stringify(preview), payloadBefore)
+  } finally {
+    await i18n.changeLanguage(originalLanguage)
+    i18n.removeResourceBundle("fr", "translation")
+    i18n.addResourceBundle("fr", "translation", originalFrench)
+  }
 })

@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import type { ComponentType, ReactNode } from "react"
 import { TrendingDown, TrendingUp } from "lucide-react"
@@ -40,13 +42,14 @@ export function StatCard({
   icon: Icon,
   tone = "default",
   change,
-  changeLabel = "vs last period",
+  changeLabel = i18n.t("ui.components.statCard.vsLastPeriod"),
   invertChange = false,
   footer,
   onClick,
   className,
   testId,
 }: StatCardProps) {
+  useTranslation()
   const clickable = typeof onClick === "function"
   return (
     <div

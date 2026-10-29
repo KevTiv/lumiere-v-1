@@ -20,6 +20,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
+import assert from "node:assert/strict"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FRONTEND_ROOT = join(__dirname, "..")
@@ -82,7 +83,7 @@ function collectLeafKeys(value, prefix = "") {
  * @param {string} keyPath
  * @returns {'ok' | 'missing' | 'nonLeaf'}
  */
-function classifyKey(root, keyPath) {
+function classifyExactKey(root, keyPath) {
   const parts = keyPath.split(".").filter(Boolean)
   if (parts.length === 0) return "missing"
   let cur = root
@@ -94,6 +95,28 @@ function classifyKey(root, keyPath) {
   if (typeof cur === "string" || typeof cur === "number") return "ok"
   if (cur !== null && typeof cur === "object" && !Array.isArray(cur)) return "nonLeaf"
   return "missing"
+}
+
+/** i18next resolves English count keys through their _one/_other leaf family. */
+function classifyKey(root, keyPath) {
+  const exact = classifyExactKey(root, keyPath)
+  if (exact !== "missing") return exact
+  return classifyExactKey(root, `${keyPath}_one`) === "ok" &&
+    classifyExactKey(root, `${keyPath}_other`) === "ok"
+    ? "ok"
+    : "missing"
+}
+
+function selfTest() {
+  const resources = { example: { title: "Title", rows_one: "One row", rows_other: "{{count}} rows", incomplete_one: "One", object_other: {} } }
+  assert.equal(classifyKey(resources, "example.title"), "ok")
+  assert.equal(classifyKey(resources, "example.rows"), "ok")
+  assert.equal(classifyKey(resources, "example.rows_one"), "ok")
+  assert.equal(classifyKey(resources, "example.incomplete"), "missing")
+  assert.equal(classifyKey(resources, "example.object"), "missing")
+  assert.equal(classifyKey(resources, "example.unknown"), "missing")
+  assert.equal(classifyKey(resources, "example"), "nonLeaf")
+  console.log("i18n key classifier self-test passed.")
 }
 
 /**
@@ -426,4 +449,5 @@ function main() {
   process.exit(exitBad ? 1 : 0)
 }
 
-main()
+if (process.argv.includes("--self-test")) selfTest()
+else main()

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
-import { useTranslation } from "@lumiere/i18n"
+import { useTranslation, i18n } from "@lumiere/i18n"
 import type { FormConfig } from "../lib/form-types"
 import {
   analyzeCsv,
@@ -140,7 +140,7 @@ export function CsvImportModal({
     setIsSubmitting(true)
     try {
       if (trackSubmission) {
-        if (!organizationId || !tableName) throw new Error("Tracked import requires organization and entity scope")
+        if (!organizationId || !tableName) throw new Error(i18n.t("ui.components.csvImportModal.trackedImportRequiresOrganizationAndEntityScope"))
         const next = request ?? createCsvImportRequest(organizationId, tableName, csvText, fileName, trackedImport)
         setRequest(next)
         setSubmitted(true)

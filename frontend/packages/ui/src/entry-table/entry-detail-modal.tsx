@@ -1,4 +1,6 @@
 "use client"
+import { i18n, useTranslation } from "@lumiere/i18n"
+
 
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -40,6 +42,7 @@ export function EntryDetailModal({
   title,
   description,
 }: EntryDetailModalProps) {
+  useTranslation()
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
@@ -72,7 +75,7 @@ export function EntryDetailModal({
     const newErrors: Record<string, string> = {}
     fields.forEach((field) => {
       if (field.required && !values[field.name]) {
-        newErrors[field.name] = `${field.label || field.name} is required`
+        newErrors[field.name] = i18n.t("ui.entryTable.entryDetailModal.requiredField", { label: field.label || field.name })
       }
     })
 
@@ -120,7 +123,7 @@ export function EntryDetailModal({
               { }
               <img
                 src={src}
-                alt={field.label || "Image"}
+                alt={field.label || i18n.t("ui.entryTable.entryDetailModal.image")}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -140,7 +143,7 @@ export function EntryDetailModal({
       switch (field.type) {
         case "checkbox":
         case "switch":
-          displayValue = value ? "Yes" : "No"
+          displayValue = value ? i18n.t("common.yes") : i18n.t("common.no")
           break
         case "select": {
           const selectField = field as unknown as {
@@ -184,7 +187,7 @@ export function EntryDetailModal({
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
             <div>
-              <DialogTitle>{title || (mode === "view" ? "View Entry" : "Edit Entry")}</DialogTitle>
+              <DialogTitle>{title || (mode === "view" ? i18n.t("ui.entryTable.entryDetailModal.viewEntry") : i18n.t("ui.entryTable.entryDetailModal.editEntry"))}</DialogTitle>
               {description && <DialogDescription>{description}</DialogDescription>}
             </div>
             {mode === "view" && onSave && (
@@ -195,8 +198,7 @@ export function EntryDetailModal({
                 className="gap-2"
               >
                 <Pencil className="h-4 w-4" />
-                Edit
-              </Button>
+                {i18n.t("common.edit")}</Button>
             )}
           </div>
         </DialogHeader>
@@ -236,13 +238,12 @@ export function EntryDetailModal({
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={handleCancel}>
             <X className="h-4 w-4 mr-2" />
-            {mode === "edit" ? "Cancel" : "Close"}
+            {mode === "edit" ? i18n.t("common.cancel") : i18n.t("common.close")}
           </Button>
           {mode === "edit" && (
             <Button onClick={() => void handleSave()} disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
+              {i18n.t("settings.formConfig.saveChanges")}</Button>
           )}
         </DialogFooter>
       </DialogContent>

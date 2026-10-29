@@ -164,18 +164,17 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span data-testid="approvals-inbox-count">
-          {inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : `${pendingTasks.length} open task${pendingTasks.length === 1 ? "" : "s"}`}
+          {inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : t("approvals.approvalsClient.openTaskCount", { count: pendingTasks.length })}
         </span>
         {!inboxQuery.isError && !inboxQuery.isPending && aiDraftCount > 0 ? (
           <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
             <Sparkles className="h-3.5 w-3.5" />
-            {aiDraftCount} AI draft{aiDraftCount === 1 ? "" : "s"}
+            {t("approvals.approvalsClient.aiDraftCount", { count: aiDraftCount })}
           </span>
         ) : null}
         {inboxQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         <Link href="/workflows" className="text-primary hover:underline">
-          Workflow definitions
-        </Link>
+          {t("approvals.approvalsClient.workflowDefinitions")}{" "}</Link>
       </div>
 
       {actionError ? <p role="alert" className="break-words text-sm text-destructive">{actionError}</p> : null}
@@ -184,8 +183,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
           className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
           data-testid="approvals-inbox-no-company"
         >
-          Select an operating company to load your authorized task inbox.
-        </div>
+          {t("approvals.approvalsClient.selectAnOperatingCompanyToLoadYourAuthorizedTaskInbox")}{" "}</div>
       ) : inboxQuery.isError ? (
         <div role="alert" className="flex flex-col gap-3 rounded-lg border bg-card p-6 text-sm" data-testid="approvals-inbox-error">
           <p>{t("approvals.errors.loadFailed", { defaultValue: "Approval tasks could not be loaded. Retry before making a decision." })}</p>
@@ -199,8 +197,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
           data-testid="approvals-inbox-empty"
         >
           {target
-            ? `No open approval task matches ${target.model} #${target.resId}.`
-            : "No open tasks for this company. Guarded actions create version-pinned human tasks when approval is required."}
+            ? t("approvals.approvalsClient.noOpenApprovalTaskMatches", { value1: target.model, value2: target.resId })
+            : t("approvals.approvalsClient.noOpenTasksForThisCompanyGuardedActionsCreateVersionPinned")}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -244,14 +242,13 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       {isAiDraft ? (
                         <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-normal">
                           <Sparkles className="h-3 w-3" />
-                          AI draft
-                        </span>
+                          {t("approvals.review.kinds.aiDraft")}{" "}</span>
                       ) : null}
                     </h3>
                     <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                       <span className="rounded border px-2 py-0.5 text-xs">{status}</span>
                       <span className="rounded border px-2 py-0.5 text-xs">
-                        rev {humanTaskRevision(row)}
+                        {t("approvals.approvalsClient.rev")}{" "}{humanTaskRevision(row)}
                       </span>
                     </p>
                   </div>
@@ -260,8 +257,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       href={recordHref}
                       className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                     >
-                      Open record
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      {t("messages.workspace.openRecord")}{" "}<ExternalLink className="h-3.5 w-3.5" />
                     </Link>
                   ) : null}
                 </div>
@@ -284,8 +280,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 <div className="flex flex-wrap gap-2">
                   {showActorSelection ? (
                     <label className="flex items-center gap-2 text-sm">
-                      Acting as
-                      <Select
+                      {t("purchasing.ops.actingAs")}{" "}<Select
                         value={String(selectedActor ?? "") || "__none__"}
                         onValueChange={(selectValue) => {
                           const nextValue = selectValue === "__none__" ? "" : selectValue
@@ -299,14 +294,14 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                         <SelectTrigger
                           className="rounded border bg-background px-2 py-1"
                           data-testid={`approval-acting-for-${taskId}`}
-                          aria-label={"Acting as"}
+                          aria-label={t("workBoard.actingAs")}
                         >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {row.directlyEligible === true ? <SelectItem value={"__none__"}>Myself</SelectItem> : null}
+                          {row.directlyEligible === true ? <SelectItem value={"__none__"}>{t("purchasing.ops.myself")}</SelectItem> : null}
                           {row.directlyEligible !== true && needsActorSelection ? (
-                            <SelectItem value={"__none__"}>Select an eligible principal</SelectItem>
+                            <SelectItem value={"__none__"}>{t("purchasing.ops.selectPrincipal")}</SelectItem>
                           ) : null}
                           {actorOptions.map((option) => (
                             <SelectItem key={option.identityHex} value={String(option.identityHex)}>
@@ -326,8 +321,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       disabled={busy || needsActorSelection}
                     >
                       <Hand className="mr-1.5 h-4 w-4" />
-                      Claim
-                    </Button>
+                      {t("aiHarness.evidenceReviewer.claim")}{" "}</Button>
                   ) : null}
                   <Button
                     size="sm"
@@ -336,8 +330,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     disabled={busy || needsActorSelection}
                   >
                     <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                    Approve
-                  </Button>
+                    {t("purchasing.actions.approveSelected")}{" "}</Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -350,8 +343,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     disabled={busy || needsActorSelection}
                   >
                     <XCircle className="mr-1.5 h-4 w-4" />
-                    Reject
-                  </Button>
+                    {t("purchasing.actions.rejectSelected")}{" "}</Button>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -363,20 +355,18 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     }}
                     disabled={busy}
                   >
-                    Comment
-                  </Button>
+                    {t("messages.messages.filters.messageType.options.comment")}{" "}</Button>
                 </div>
 
                 {needsActorSelection ? (
                   <p className="text-xs text-muted-foreground" role="status">
-                    Select a currently eligible principal before claiming or deciding this task.
-                  </p>
+                    {t("approvals.approvalsClient.selectACurrentlyEligiblePrincipalBeforeClaimingOrDecidingThisTask")}{" "}</p>
                 ) : null}
 
                 {commentingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">
                     <Textarea
-                      placeholder="Add an evidence comment"
+                      placeholder={t("approvals.approvalsClient.addAnEvidenceComment")}
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
                       rows={3}
@@ -388,8 +378,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       data-testid={`approval-comment-confirm-${taskId}`}
                       onClick={() => void runAction(() => handleComment(row))}
                     >
-                      Save comment
-                    </Button>
+                      {t("approvals.approvalsClient.saveComment")}{" "}</Button>
                   </div>
                 ) : null}
 
@@ -398,8 +387,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     <Textarea
                       placeholder={
                         requireComment
-                          ? "Reason for rejection (required)"
-                          : "Optional comment"
+                          ? t("approvals.approvalsClient.reasonForRejectionRequired")
+                          : t("approvals.approvalsClient.optionalComment")
                       }
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
@@ -413,8 +402,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       data-testid={`approval-reject-confirm-${taskId}`}
                       onClick={() => void runAction(() => handleReject(row))}
                     >
-                      Confirm rejection
-                    </Button>
+                      {t("approvals.approvalsClient.confirmRejection")}{" "}</Button>
                   </div>
                 ) : null}
                   </div>
@@ -426,15 +414,12 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
       )}
 
       <section className="space-y-2 rounded-lg border bg-card p-5">
-        <h3 className="font-medium">Workflow policy</h3>
+        <h3 className="font-medium">{t("approvals.approvalsClient.workflowPolicy")}</h3>
         <p className="text-sm text-muted-foreground">
-          Approval rules are published workflow versions with human-task nodes. Create and publish
-          definitions in the{" "}
+          {t("approvals.approvalsClient.approvalRulesArePublishedWorkflowVersionsWithHumanTaskNodesCreate")}{" "}
           <Link href="/workflows" className="text-primary hover:underline">
-            Workflows
-          </Link>{" "}
-          module.
-        </p>
+            {t("nav.workflows")}{" "}</Link>{" "}
+          {t("approvals.approvalsClient.module")}{" "}</p>
       </section>
     </div>
   )
