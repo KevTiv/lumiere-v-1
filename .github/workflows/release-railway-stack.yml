@@ -186,7 +186,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT"
+          # Project tokens cannot query the account workspaces used by `link`.
+          # Verify access against the explicit release project and environment.
           railway service list \
             --project "$RAILWAY_PROJECT_ID" \
             --environment "$RAILWAY_ENVIRONMENT" \

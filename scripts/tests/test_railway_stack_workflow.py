@@ -1,5 +1,9 @@
 import json
+import os
 import re
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -8,6 +12,45 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RailwayStackWorkflowTests(unittest.TestCase):
+    def test_project_token_access_uses_explicit_scope_without_account_linking(self):
+        workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
+        access = workflow.split("- name: Verify Railway access and context", 1)[1].split("- name:", 1)[0]
+        self.assertNotIn("railway link", access)
+        self.assertNotIn("railway whoami", access)
+        self.assertIn("railway service list", access)
+        self.assertIn('--project "$RAILWAY_PROJECT_ID"', access)
+        self.assertIn('--environment "$RAILWAY_ENVIRONMENT"', access)
+        self.assertIn("set -euo pipefail", access)
+
+    def test_project_access_inventory_preserves_authorization_failures(self):
+        workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
+        access = workflow.split("- name: Verify Railway access and context", 1)[1].split("- name:", 1)[0]
+        script = textwrap.dedent(access.split("run: |", 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            railway = Path(directory) / "railway"
+            railway.write_text('''#!/usr/bin/env bash
+set -eu
+printf '%s\\n' "$*" > "$TEST_CALLS_FILE"
+[[ "$*" == 'service list --project project-test --environment production --json' ]] || exit 91
+if [[ "$TEST_ACCESS_EXIT" != 0 ]]; then exit "$TEST_ACCESS_EXIT"; fi
+printf '[{"id":"service-test","name":"api-server"}]\\n'
+''')
+            railway.chmod(0o755)
+            calls = Path(directory) / "calls"
+            env = {**os.environ, "PATH": directory + os.pathsep + os.environ["PATH"],
+                   "RAILWAY_PROJECT_ID": "project-test", "RAILWAY_ENVIRONMENT": "production",
+                   "TEST_CALLS_FILE": str(calls)}
+            for exit_code in (0, 47):
+                with self.subTest(exit_code=exit_code):
+                    result = subprocess.run(["bash", "-c", script], cwd=ROOT,
+                                            env={**env, "TEST_ACCESS_EXIT": str(exit_code)},
+                                            capture_output=True, text=True, check=False)
+                    self.assertEqual(result.returncode, exit_code, result.stderr)
+                    self.assertEqual(calls.read_text().strip(),
+                                     "service list --project project-test --environment production --json")
+                    if exit_code == 0:
+                        self.assertEqual(json.loads(result.stdout), [{"id": "service-test", "name": "api-server"}])
+
     def test_release_phases_remain_ordered(self):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
         phases = [
