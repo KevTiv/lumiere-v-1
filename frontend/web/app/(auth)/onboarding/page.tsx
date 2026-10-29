@@ -8,7 +8,7 @@ import { Button } from "@lumiere/ui"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@lumiere/ui/components/card"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
-import { Checkbox } from "@lumiere/ui/components/checkbox"
+import { SetupConfirmation } from "./setup-confirmation"
 import {
   Select,
   SelectContent,
@@ -245,7 +245,7 @@ export default function OnboardingPage() {
             {!onboardingFiscalYearEnd(fiscalMonth, fiscalDay) && <p role="alert" className="text-sm text-destructive">{t("auth.onboarding.errors.fiscalDate", { defaultValue: "Enter a valid annual year-end, such as June 30 or December 31." })}</p>}
           </fieldset>
 
-          <div className="flex items-start gap-2"><Checkbox id="confirm-setup" checked={setupConfirmed} onCheckedChange={(checked) => setSetupConfirmed(checked === true)} /><Label htmlFor="confirm-setup" className="text-sm leading-5">{t("auth.onboarding.confirmSetup", { defaultValue: "I have checked the base currency, company timezone and fiscal year-end." })}</Label></div>
+          <SetupConfirmation checked={setupConfirmed} onCheckedChange={setSetupConfirmed} label={t("auth.onboarding.confirmSetup", { defaultValue: "I have checked the base currency, company timezone and fiscal year-end." })} />
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
