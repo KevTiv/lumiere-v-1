@@ -1,3 +1,4 @@
+import { i18n } from "@lumiere/i18n"
 //! Subscriptions Module Form Configurations
 //!
 //! This module provides form configurations for Subscriptions.
@@ -9,23 +10,23 @@ export const subscriptionsForms: FormRegistryEntry[] = [
   {
     moduleId: "subscriptions",
     formId: "new-subscription",
-    name: "New Subscription",
-    description: "Create a new subscription",
+    get name() { return i18n.t("subscriptions.forms.newSubscription.title") },
+    get description() { return i18n.t("forms.defaults.subscriptions.createANewSubscription") },
     icon: "RefreshCw",
-    category: "Subscriptions",
+    get category() { return i18n.t("subscriptions.subscriptions.title") },
     defaultConfig: () => ({
       moduleId: "subscriptions",
       formId: "new-subscription",
-      name: "New Subscription",
-      description: "Create a new subscription",
+      get name() { return i18n.t("subscriptions.forms.newSubscription.title") },
+      get description() { return i18n.t("forms.defaults.subscriptions.createANewSubscription") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "name",
           name: "name",
-          label: "Subscription Name",
+          get label() { return i18n.t("forms.defaults.subscriptions.subscriptionName") },
           fieldType: "Text",
-          placeholder: "e.g., Monthly Service",
+          get placeholder() { return i18n.t("forms.defaults.subscriptions.eGMonthlyService") },
           validation: { required: true },
           aiSuggestions: [],
           order: 1,
@@ -37,7 +38,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "customer",
           name: "customer",
-          label: "Customer",
+          get label() { return i18n.t("subscriptions.subscriptions.columns.partnerId") },
           fieldType: "UserSelect",
           validation: { required: true },
           aiSuggestions: [],
@@ -50,13 +51,13 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "plan",
           name: "plan",
-          label: "Plan",
+          get label() { return i18n.t("subscriptions.subscriptions.columns.productId") },
           fieldType: "Select",
           options: [
-            { value: "basic", label: "Basic", color: "gray" },
-            { value: "standard", label: "Standard", color: "blue" },
-            { value: "premium", label: "Premium", color: "purple" },
-            { value: "enterprise", label: "Enterprise", color: "gold" },
+            { value: "basic", get label() { return i18n.t("forms.defaults.subscriptions.basic") }, color: "gray" },
+            { value: "standard", get label() { return i18n.t("forms.defaults.subscriptions.standard") }, color: "blue" },
+            { value: "premium", get label() { return i18n.t("forms.defaults.subscriptions.premium") }, color: "purple" },
+            { value: "enterprise", get label() { return i18n.t("forms.defaults.subscriptions.enterprise") }, color: "gold" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -69,7 +70,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "amount",
           name: "amount",
-          label: "Amount",
+          get label() { return i18n.t("subscriptions.deferredLines.columns.amount") },
           fieldType: "Number",
           placeholder: "0.00",
           validation: { required: true, min: 0 },
@@ -83,12 +84,12 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "billing_cycle",
           name: "billing_cycle",
-          label: "Billing Cycle",
+          get label() { return i18n.t("subscriptions.plans.columns.recurrenceId") },
           fieldType: "Select",
           options: [
-            { value: "monthly", label: "Monthly", color: "blue" },
-            { value: "quarterly", label: "Quarterly", color: "green" },
-            { value: "yearly", label: "Yearly", color: "purple" },
+            { value: "monthly", get label() { return i18n.t("subscriptions.forms.newSubscription.fields.options.recurring.monthly") }, color: "blue" },
+            { value: "quarterly", get label() { return i18n.t("forms.defaults.subscriptions.quarterly") }, color: "green" },
+            { value: "yearly", get label() { return i18n.t("subscriptions.forms.newSubscription.fields.options.recurring.yearly") }, color: "purple" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -101,7 +102,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "start_date",
           name: "start_date",
-          label: "Start Date",
+          get label() { return i18n.t("subscriptions.subscriptions.columns.dateStart") },
           fieldType: "Date",
           validation: { required: true },
           aiSuggestions: [],
@@ -114,7 +115,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "end_date",
           name: "end_date",
-          label: "End Date",
+          get label() { return i18n.t("subscriptions.subscriptions.columns.dateEnd") },
           fieldType: "Date",
           validation: { required: false },
           aiSuggestions: [],
@@ -127,13 +128,13 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "status",
           name: "status",
-          label: "Status",
+          get label() { return i18n.t("subscriptions.subscriptions.columns.state") },
           fieldType: "Select",
           options: [
-            { value: "active", label: "Active", color: "green" },
-            { value: "paused", label: "Paused", color: "yellow" },
-            { value: "cancelled", label: "Cancelled", color: "red" },
-            { value: "expired", label: "Expired", color: "gray" },
+            { value: "active", get label() { return i18n.t("common.active") }, color: "green" },
+            { value: "paused", get label() { return i18n.t("subscriptions.subscriptions.filters.state.options.paused") }, color: "yellow" },
+            { value: "cancelled", get label() { return i18n.t("subscriptions.subscriptions.filters.state.options.Cancelled") }, color: "red" },
+            { value: "expired", get label() { return i18n.t("forms.defaults.subscriptions.expired") }, color: "gray" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -146,7 +147,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "notes",
           name: "notes",
-          label: "Notes",
+          get label() { return i18n.t("common.notes") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -172,23 +173,23 @@ export const subscriptionsForms: FormRegistryEntry[] = [
   {
     moduleId: "subscriptions",
     formId: "new-plan",
-    name: "New Plan",
-    description: "Create a new subscription plan",
+    get name() { return i18n.t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.newPlan.label") },
+    get description() { return i18n.t("forms.defaults.subscriptions.createANewSubscriptionPlan") },
     icon: "Layers",
-    category: "Plans",
+    get category() { return i18n.t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.plans.label") },
     defaultConfig: () => ({
       moduleId: "subscriptions",
       formId: "new-plan",
-      name: "New Plan",
-      description: "Create a new subscription plan",
+      get name() { return i18n.t("subscriptions.builtIn.moduleDashboardConfigs.subscriptionsModuleConfig.newPlan.label") },
+      get description() { return i18n.t("forms.defaults.subscriptions.createANewSubscriptionPlan") },
       isSystemDefault: true,
       fields: [
         {
           fieldId: "name",
           name: "name",
-          label: "Plan Name",
+          get label() { return i18n.t("subscriptions.plans.columns.name") },
           fieldType: "Text",
-          placeholder: "e.g., Premium Plan",
+          get placeholder() { return i18n.t("forms.defaults.subscriptions.eGPremiumPlan") },
           validation: { required: true },
           aiSuggestions: [],
           order: 1,
@@ -200,7 +201,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "description",
           name: "description",
-          label: "Description",
+          get label() { return i18n.t("subscriptions.subscriptions.columns.description") },
           fieldType: "Textarea",
           validation: { required: false },
           aiSuggestions: [],
@@ -213,7 +214,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "price",
           name: "price",
-          label: "Price",
+          get label() { return i18n.t("subscriptions.builtIn.subscriptionsFormConfigs.amendSubscriptionForm.amendmentType.label") },
           fieldType: "Number",
           placeholder: "0.00",
           validation: { required: true, min: 0 },
@@ -227,12 +228,12 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "billing_cycle",
           name: "billing_cycle",
-          label: "Billing Cycle",
+          get label() { return i18n.t("subscriptions.plans.columns.recurrenceId") },
           fieldType: "Select",
           options: [
-            { value: "monthly", label: "Monthly", color: "blue" },
-            { value: "quarterly", label: "Quarterly", color: "green" },
-            { value: "yearly", label: "Yearly", color: "purple" },
+            { value: "monthly", get label() { return i18n.t("subscriptions.forms.newSubscription.fields.options.recurring.monthly") }, color: "blue" },
+            { value: "quarterly", get label() { return i18n.t("forms.defaults.subscriptions.quarterly") }, color: "green" },
+            { value: "yearly", get label() { return i18n.t("subscriptions.forms.newSubscription.fields.options.recurring.yearly") }, color: "purple" },
           ],
           validation: { required: true },
           aiSuggestions: [],
@@ -245,7 +246,7 @@ export const subscriptionsForms: FormRegistryEntry[] = [
         {
           fieldId: "is_active",
           name: "is_active",
-          label: "Active",
+          get label() { return i18n.t("common.active") },
           fieldType: "Switch",
           validation: { required: false },
           aiSuggestions: [],

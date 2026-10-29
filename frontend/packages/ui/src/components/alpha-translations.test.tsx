@@ -5,6 +5,11 @@ import { Pagination, PaginationNext, PaginationPrevious } from "./pagination"
 import { accountingForms } from "../forms/config/modules/accounting.config"
 import { OverdueInvoicesWidget } from "../pages/widgets/overdue-invoices-widget"
 
+import { crmForms } from "../forms/config/modules/crm.config"
+import { salesForms } from "../forms/config/modules/sales.config"
+import { purchasingForms } from "../forms/config/modules/purchasing.config"
+import { subscriptionsForms } from "../forms/config/modules/subscriptions.config"
+
 let frenchResources: Record<string, unknown>
 
 beforeEach(async () => {
@@ -71,4 +76,23 @@ describe("Alpha shared translations", () => {
     expect(screen.getByText("factures en retard")).toBeTruthy()
     expect(screen.getByText("La plus ancienne : 2 jours de retard")).toBeTruthy()
   })
+  it("updates cached Alpha business form defaults while keeping field names stable", async () => {
+    const cases = [
+      { entry: crmForms[0], field: "first_name", key: "forms.defaults.crm.firstName", label: "Prénom" },
+      { entry: salesForms[0], field: "order_number", key: "forms.defaults.sales.orderNumber", label: "Numéro de commande" },
+      { entry: purchasingForms[0], field: "po_number", key: "forms.defaults.purchasing.poNumber", label: "Numéro d’achat" },
+      { entry: subscriptionsForms[0], field: "name", key: "forms.defaults.subscriptions.subscriptionName", label: "Nom de l’abonnement" },
+    ].map((item) => ({ ...item, config: item.entry.defaultConfig() }))
+    for (const item of cases) french(item.key, item.label)
+
+    await i18n.changeLanguage("fr")
+
+    for (const item of cases) {
+      const field = item.config.fields.find((field) => field.fieldId === item.field)!
+      expect(field.label).toBe(item.label)
+      expect(field.name).toBe(item.field)
+      expect(item.config.formId).toBe(item.entry.formId)
+    }
+  })
+
 })
