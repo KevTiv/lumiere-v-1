@@ -2,11 +2,39 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { encodeIdentity, stdbParamsToJson } from "../stdb-params-json"
-import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
 import {
+  SESSION_OPERATION_DESCRIPTORS,
+  SESSION_OPERATION_NAMES,
+  type SessionOperationName,
+} from "@lumiere/contracts/generated/operation-descriptors"
+import { SESSION_OPERATION_IDS } from "../generated/browser-operation-ids"
+import {
+  STDB_BFF_REDUCERS,
   stdbBffCallUrl,
   stdbBffCommandPost,
 } from "./stdb-http"
+
+test("compact browser IDs and names match every pinned session descriptor", () => {
+  assert.deepEqual(STDB_BFF_REDUCERS, SESSION_OPERATION_NAMES)
+  assert.deepEqual(
+    SESSION_OPERATION_IDS,
+    Object.fromEntries(Object.entries(SESSION_OPERATION_DESCRIPTORS).map(
+      ([name, descriptor]) => [name, descriptor.contractOperationId],
+    )),
+  )
+  for (const name of SESSION_OPERATION_NAMES) {
+    assert.equal(
+      stdbBffCallUrl(name),
+      `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS[name].contractOperationId)}`,
+    )
+  }
+})
+
+test("denied, unknown, and inherited object keys cannot produce an operation URL", () => {
+  for (const name of ["apply_global_migrations", "not_an_operation", "toString", "constructor", "__proto__"]) {
+    assert.throws(() => stdbBffCallUrl(name as SessionOperationName), /Unknown session operation/)
+  }
+})
 
 test("assign_ticket accepts and emits the SpacetimeDB identity wire shape", () => {
   const identity = "ab".repeat(32)

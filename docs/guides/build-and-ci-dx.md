@@ -7,6 +7,37 @@ workstream: moving Rust modules alone does not create smaller compilation units.
 
 ## Daily local loop
 
+For a focused generation and browser-transport check, run `make dx-check`.
+Use `make dx-check-rust` or `make dx-check-frontend` to check one lane. These
+commands require the Rust/Python toolchains, prepared vendored Rust contracts,
+and installed frontend dependencies. They do not fetch a live schema, compile
+WASM, or start the application stack. Full application typechecks and browser
+acceptance tests remain separate checks.
+Generated Turbo task logs are ignored rather than tracked, so running a
+typecheck does not leave modified log files in the checkout.
+
+Codegen preserves unchanged output files. Reducer parameter constants use
+operation names, so inserting a reducer does not rename subsequent constants.
+The Rust and TypeScript SDK wrappers generate and validate temporary snapshots
+before syncing changed files and removing stale output. Generation or validation
+failures leave the previous SDK snapshot available.
+
+The browser command transport uses a compact operation ID registry generated
+from the installed, pinned contracts package. After changing that package pin
+and installing dependencies, run:
+
+```sh
+make generate-browser-operation-ids
+make dx-check-frontend
+```
+
+CI checks the registry against the pinned canonical descriptors. Rich operation
+metadata remains available through the contracts package for tools that need it.
+`pnpm --dir frontend stdb:generate` delegates to `make generate-stdb-ts-sdk`,
+including the generator compatibility fixes, and writes to contracts staging.
+It does not overwrite the frontend's handwritten contract proxy files or change
+the application's installed contracts release.
+
 From the repository root, with frontend dependencies and the pinned contracts
 staging available:
 
