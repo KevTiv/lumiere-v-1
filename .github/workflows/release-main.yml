@@ -1,0 +1,82 @@
+name: Release main to Railway
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# Builds may overlap. The reusable release holds the production concurrency
+# lock, with cancellation disabled, throughout migrations and service cutover.
+permissions:
+  contents: read
+  actions: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  revision:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+      current: ${{ steps.revision.outputs.current }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Select the tested main revision
+        id: revision
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TESTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$TESTED_SHA"
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          echo "sha=$TESTED_SHA" >> "$GITHUB_OUTPUT"
+          if [[ "$TESTED_SHA" == "$(git rev-parse origin/main)" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo 'A newer main commit superseded this release.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  runtime:
+    needs: revision
+    if: needs.revision.outputs.current == 'true'
+    uses: ./.github/workflows/build-rust-runtime-image.yml
+    with:
+      release_sha: ${{ needs.revision.outputs.sha }}
+
+  publisher:
+    needs: revision
+    if: needs.revision.outputs.current == 'true'
+    uses: ./.github/workflows/build-production-stdb-image.yml
+    with:
+      release_sha: ${{ needs.revision.outputs.sha }}
+
+  edge:
+    needs: revision
+    if: needs.revision.outputs.current == 'true'
+    uses: ./.github/workflows/build-production-edge-images.yml
+    with:
+      release_sha: ${{ needs.revision.outputs.sha }}
+
+  release:
+    needs: [revision, runtime, publisher, edge]
+    uses: ./.github/workflows/release-railway-stack.yml
+    with:
+      release_sha: ${{ needs.revision.outputs.sha }}
+      environment: production
+      require_current_main: true
+      # AI is already active in production and must receive shared auth updates.
+      enable_ai: true
+      enable_integrations: ${{ vars.RAILWAY_ENABLE_INTEGRATIONS == 'true' }}
+      enable_owner_reports: ${{ vars.RAILWAY_ENABLE_OWNER_REPORTS == 'true' }}
+      edge_readiness_url: https://api-gateway-production-d680.up.railway.app/health/ready
+    secrets: inherit

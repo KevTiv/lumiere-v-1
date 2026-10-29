@@ -139,7 +139,7 @@
     },
     { "name": "projection-worker", "role": "projection", "runtimeBinary": "projection-worker" },
     { "name": "workflow-worker", "role": "workflow", "runtimeBinary": "workflow-worker" },
-    { "name": "owner-report-worker", "role": "owner-report", "runtimeBinary": "owner-report-worker" },
+    { "name": "owner-report-worker", "role": "owner-report", "runtimeBinary": "owner-report-worker", "required": false, "featureGate": "RAILWAY_ENABLE_OWNER_REPORTS" },
     {
       "name": "expense-integration-worker",
       "required": false,
@@ -215,7 +215,8 @@
         "KONG_PG_DATABASE": { "kind": "exact", "value": "lumiere_kong" },
         "KONG_PG_USER": { "kind": "exact", "value": "lumiere_kong" },
         "KONG_PG_PASSWORD": { "kind": "secret" },
-        "KONG_TRUSTED_IPS": { "kind": "non-placeholder" },
+        "LUMIERE_GATEWAY_RATE_LIMIT_SCOPE": { "kind": "exact", "value": "service" },
+        "KONG_TRUSTED_IPS": { "kind": "empty" },
         "REDIS_UPSTREAM_HOST": { "kind": "empty" },
         "REDIS_UPSTREAM_PORT": { "kind": "empty" },
         "REDIS_UPSTREAM_USERNAME": { "kind": "empty" },

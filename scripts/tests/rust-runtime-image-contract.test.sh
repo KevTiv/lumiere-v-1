@@ -136,7 +136,8 @@ required_workflow_fragments = (
     "provenance: mode=max",
     "sbom: true",
     "subject-digest: ${{ steps.build.outputs.digest }}",
-    "commit image tags are immutable",
+    "Reusing immutable image",
+    "if: steps.existing.outputs.digest == ''",
     "push: ${{ github.event_name != 'pull_request' }}",
 )
 for fragment in required_workflow_fragments:

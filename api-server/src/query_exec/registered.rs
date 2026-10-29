@@ -75,6 +75,23 @@ fn row_u64_value(row: &serde_json::Value, camel: &str, snake: &str) -> u64 {
 
 pub(super) fn sort_registered_rows(resource: &str, rows: &mut [serde_json::Value]) {
     match resource {
+        "pricelist-items" => {
+            rows.sort_by(|a, b| {
+                let apl = a
+                    .get("pricelistId")
+                    .or_else(|| a.get("pricelist_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let bpl = b
+                    .get("pricelistId")
+                    .or_else(|| b.get("pricelist_id"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                apl.cmp(&bpl).then(asq.cmp(&bsq))
+            });
+        }
         "pos-loyalty-programs"
         | "sale-commissions"
         | "sale-commissions-pending"

@@ -2,19 +2,11 @@ use crate::error::ApiError;
 use serde_json::Value;
 use stdb_client::StdbClient;
 
-use super::row_values::row_u64;
+use super::row_values::row_company_matches;
 #[cfg(test)]
 use super::row_values::{row_id_u64, row_not_soft_deleted};
 #[cfg(test)]
 use std::collections::HashSet;
-
-fn row_company_matches(row: &Value, company_id: u64, allow_shared: bool) -> bool {
-    match row_u64(row, "companyId", "company_id") {
-        Ok(Some(id)) => id == company_id,
-        Ok(None) => allow_shared,
-        Err(_) => false,
-    }
-}
 
 pub(super) fn filter_direct_crm_company_rows(
     resource: &str,
@@ -73,4 +65,31 @@ pub(super) async fn filter_crm_company_rows(
         _ => {}
     }
     Ok(())
+}
+
+pub(super) fn sort_crm_rows(resource: &str, rows: &mut [Value]) {
+    match resource {
+        "contact-tags" | "contact-categories" | "contact-segments" => {
+            rows.sort_by(|a, b| {
+                let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                an.cmp(bn)
+            });
+        }
+        "opportunity-stages" => {
+            rows.sort_by(|a, b| {
+                let asq = a.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                let bsq = b.get("sequence").and_then(|v| v.as_i64()).unwrap_or(0);
+                asq.cmp(&bsq)
+            });
+        }
+        "activities" => {
+            rows.sort_by(|a, b| {
+                let ai = a.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                let bi = b.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                bi.cmp(&ai)
+            });
+        }
+        _ => {}
+    }
 }

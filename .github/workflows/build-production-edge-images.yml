@@ -2,12 +2,13 @@ name: Build production edge images
 
 on:
   push:
-    branches: [main, codex/railway-production-completion]
+    branches: [codex/railway-production-completion]
     paths:
       - frontend/**
       - infra/kong/**
       - scripts/tests/test_kong*.py
       - docker-compose.yml
+      - chromium-worker/**
       - .dockerignore
       - .github/workflows/build-production-edge-images.yml
   pull_request:
@@ -16,16 +17,23 @@ on:
       - infra/kong/**
       - scripts/tests/test_kong*.py
       - docker-compose.yml
+      - chromium-worker/**
       - .dockerignore
       - .github/workflows/build-production-edge-images.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_sha:
+        description: Exact main revision selected by the stack release
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: production-edge-${{ github.ref }}
+  group: production-edge-${{ github.workflow }}-${{ inputs.release_sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,10 +50,13 @@ jobs:
           - service: api-gateway
             context: .
             dockerfile: infra/kong/Dockerfile
+          - service: chromium-worker
+            context: chromium-worker
+            dockerfile: chromium-worker/Dockerfile
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
       - name: Validate pinned frontend contracts
         if: matrix.service == 'web'
         run: |
@@ -72,23 +83,27 @@ jobs:
         id: image
         env:
           SERVICE: ${{ matrix.service }}
-          IMAGE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          IMAGE_SHA: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-$SERVICE"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
           echo "tag=$repository:$IMAGE_SHA" >> "$GITHUB_OUTPUT"
-      - name: Preserve immutable commit images
+      - name: Preserve existing commit image
+        id: existing
         if: github.event_name != 'pull_request'
+        shell: bash
         env:
           IMAGE: ${{ steps.image.outputs.tag }}
         run: |
           set -euo pipefail
-          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
-            echo "Refusing to overwrite existing commit image $IMAGE" >&2
-            exit 1
+          if manifest="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' 2>/dev/null)"; then
+            digest="$(jq -er '.digest' <<<"$manifest")"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "Reusing immutable image $IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Build image
+        if: steps.existing.outputs.digest == ''
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -102,7 +117,7 @@ jobs:
             NEXT_PUBLIC_REALTIME_WS_URL=wss://api-gateway-production-d680.up.railway.app/v1/realtime/ws
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+            org.opencontainers.image.revision=${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
           cache-from: type=gha,scope=production-${{ matrix.service }}
           cache-to: type=gha,scope=production-${{ matrix.service }},mode=max
           provenance: mode=max
@@ -110,7 +125,7 @@ jobs:
       - name: Publish deployment coordinate
         if: github.event_name != 'pull_request'
         env:
-          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
+          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
         run: |
           set -euo pipefail
           task_docker_config="$(mktemp -d)"

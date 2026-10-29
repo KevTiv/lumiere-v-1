@@ -588,12 +588,22 @@ Kong version upgrades still need the upstream schema-upgrade procedure. Keep
 one production gateway replica while startup owns configuration reconciliation;
 scale only after separating configuration writes into a single release job.
 
-Set `LUMIERE_ENV=production` and `KONG_TRUSTED_IPS` to verified ingress-proxy
-CIDRs. Production startup rejects missing or globally trusted proxy ranges and
-uses `X-Forwarded-For` recursively. Verify the platform's header sanitization
-and CIDRs before configuring trust; observed proxy addresses alone do not prove
-a safe range. Do not use `0.0.0.0/0`, `::/0`, or a caller-controlled header as
-the rate-limit key. Test distinct real clients and forged forwarding headers.
+Set `LUMIERE_ENV=production`. The Railway production manifest selects
+`LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=service`: every route's quota is shared across
+all clients and replicas. This mode requires no ingress-proxy CIDR list and
+forces proxy trust to loopback only. Leave `KONG_TRUSTED_IPS` unset. The existing
+thresholds remain in force, so the sign-in route admits 10 requests per minute
+and 100 per hour across all users. A busy client can exhaust that shared quota.
+
+Per-client limits remain available with `LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=ip`
+(the default outside this production manifest). In production, this mode
+requires `KONG_TRUSTED_IPS` containing verified ingress-proxy CIDRs and uses
+`X-Forwarded-For` recursively. Startup rejects missing or globally trusted
+ranges. Verify platform header sanitization and CIDRs before selecting it;
+observed proxy addresses alone do not prove a safe range. Never use
+`0.0.0.0/0`, `::/0`, or a caller-controlled header as a quota key. Update the
+production manifest when switching modes and test real clients and forged
+forwarding headers.
 
 Only `api-gateway` should have public networking. Point `NEXT_PUBLIC_APP_URL`,
 WorkOS callbacks and realtime at that origin, then remove the direct `web`

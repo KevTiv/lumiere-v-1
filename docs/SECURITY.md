@@ -4,8 +4,10 @@
 
 The Kong gateway uses PostgreSQL-backed shared counters (`policy: cluster`)
 with `fault_tolerant: false`. See [gateway setup and fencing](PRODUCTION_DEPLOY.md#gateway-counters-and-ingress-fencing).
-Production must expose only the gateway, verify trusted-proxy/client-IP handling,
-and keep the counter database isolated from the ERP database. Limits can be
+Production must expose only the gateway and keep the counter database isolated
+from the ERP database. The Railway manifest uses shared per-service quotas and
+loopback-only proxy trust because no verified ingress CIDR list is available.
+Per-client quotas require verified trusted-proxy/client-IP handling. Limits can be
 bypassed if `web` retains a public domain. CORS, robots instructions, and scanner
 path rejection do not replace authentication, authorization, or network fencing.
 

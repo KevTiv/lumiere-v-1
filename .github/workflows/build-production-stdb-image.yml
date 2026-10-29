@@ -2,7 +2,7 @@ name: Build production SpacetimeDB publisher
 
 on:
   push:
-    branches: [main, codex/railway-production-completion]
+    branches: [codex/railway-production-completion]
     paths:
       - spacetimedb/**
       - crates/presentation-core/**
@@ -29,19 +29,26 @@ on:
       - .github/workflows/build-contracts-module.yml
       - .github/workflows/build-production-stdb-image.yml
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_sha:
+        description: Exact main revision selected by the stack release
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: production-stdb-${{ github.ref }}
+  group: production-stdb-${{ github.workflow }}-${{ inputs.release_sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
   module:
     uses: ./.github/workflows/build-contracts-module.yml
     with:
+      source_ref: ${{ inputs.release_sha }}
       production: true
       alpha_founder_identities: ${{ vars.LUMIERE_ALPHA_FOUNDER_IDENTITIES }}
   publish:
@@ -51,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: contracts-module
@@ -95,17 +102,27 @@ jobs:
         id: image
         shell: bash
         env:
-          IMAGE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          IMAGE_SOURCE_SHA: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-spacetimedb-publisher"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
           echo "tag=$repository:$IMAGE_SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          if [[ '${{ github.event_name }}' != 'pull_request' ]] && docker buildx imagetools inspect "$repository:$IMAGE_SOURCE_SHA" >/dev/null 2>&1; then
-            echo 'Refusing to overwrite immutable commit image' >&2
-            exit 1
+      - name: Preserve existing commit image
+        id: existing
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if manifest="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' 2>/dev/null)"; then
+            digest="$(jq -er '.digest' <<<"$manifest")"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "Reusing immutable image $IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: docker/build-push-action@v6
+        if: steps.existing.outputs.digest == ''
         id: build
         with:
           context: .
@@ -114,7 +131,7 @@ jobs:
           tags: ${{ steps.image.outputs.tag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+            org.opencontainers.image.revision=${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
           cache-from: type=gha,scope=production-stdb-publisher
           cache-to: type=gha,scope=production-stdb-publisher,mode=max
           provenance: mode=max
@@ -122,7 +139,7 @@ jobs:
       - name: Verify public immutable deployment coordinate
         if: github.event_name != 'pull_request'
         env:
-          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
+          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
         run: |
           task_docker_config="$(mktemp -d)"
           DOCKER_CONFIG="$task_docker_config" docker manifest inspect "$IMAGE" >/dev/null

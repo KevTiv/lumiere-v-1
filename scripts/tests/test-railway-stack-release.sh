@@ -173,6 +173,36 @@ grep -Fq -- '--environment production' "$redeploy_args_file"
 grep -Fq -- '--service api-server' "$redeploy_args_file"
 grep -Fq -- '--from-source' "$redeploy_args_file"
 
+# Publisher promotion must use its own image and require a positive marker
+# from the new deployment, just like storage migrations.
+publisher_digest="ghcr.io/kevtiv/lumiere-v-1-spacetimedb-publisher@sha256:$(printf 'b%.0s' {1..64})"
+for publisher_logs in 'SpacetimeDB publish and schema verification passed' 'publish failed'; do
+  expected_status=0
+  [[ "$publisher_logs" == 'publish failed' ]] && expected_status=1
+  actual_status=0
+  env "${common_env[@]}" \
+    STDB_PUBLISHER_IMAGE="$publisher_digest" \
+    TEST_RAILWAY_SERVICES_JSON='[{"id":"publisher-id","name":"spacetimedb-publisher"}]' \
+    TEST_RAILWAY_LOGS="$publisher_logs" \
+    RAILWAY_DEPLOY_TIMEOUT_SECONDS=1 \
+    TEST_SOURCE_PATCH_FILE="$source_patch_file" \
+    TEST_SOURCE_ARGS_FILE="$source_args_file" \
+    bash -c '
+      source "$1"
+      wait_for_new_deployment() { printf "dep-1\n"; }
+      wait_for_terminal_success() { :; }
+      deployment_image() { printf "%s\n" "$STDB_PUBLISHER_IMAGE"; }
+      promote_publisher spacetimedb-publisher
+    ' _ "$ROOT/scripts/railway-stack-release.sh" >"$TMP/publisher-promotion.log" 2>&1 || actual_status=1
+  [[ "$actual_status" == "$expected_status" ]] || {
+    cat "$TMP/publisher-promotion.log" >&2
+    echo "publisher promotion did not enforce its completion marker" >&2
+    exit 1
+  }
+done
+jq -e --arg image "$publisher_digest" \
+  '.services["publisher-id"].source.image == $image' "$source_patch_file" >/dev/null
+
 publisher_bin="$TMP/publisher-bin"
 mkdir -p "$publisher_bin"
 cat >"$publisher_bin/spacetime" <<'EOF'

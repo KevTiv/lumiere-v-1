@@ -1,4 +1,9 @@
 "use client"
+import { buildManualInvoiceCatalog, manualInvoiceAccountChoices, manualInvoiceJournalChoices, manualInvoiceTaxChoices } from "./features/manual-invoice-catalog"
+import { useTaxDeadlineAdministration } from "./features/use-tax-deadline-administration"
+import { useTaxGroupAdministration } from "./features/use-tax-group-administration"
+import { useTaxJurisdictionAdministration } from "./features/use-tax-jurisdiction-administration"
+import { useTaxScheduleAdministration } from "./features/use-tax-schedule-administration"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -28,7 +33,6 @@ import { AccountingAuthoringPreview, hasAccountingAuthoringPreview } from "./acc
 import type { FormValues } from "@lumiere/ui/lib/form-types"
 import { ReconciliationMoveLineProvider } from "@lumiere/ui/forms/reconciliation-move-line-picker"
 import { reconciliationAccountChoices, reconciliationPartnerChoices, reconciliationSelectionIssue, type ReconciliationSelectionIssue } from "@lumiere/ui/lib/reconciliation-widget-choices"
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
@@ -181,8 +185,6 @@ import {
   ACCOUNT_MOVE_IMPORT_BUNDLE,
   accountMoveBundleMappings,
   accountMoveBundleToken,
-  accountIsEligibleManualInvoiceTaxPosting,
-  accountMatchesManualInvoiceLineType,
   accountMoveReference,
   buildAccountMoveLineCsv,
   buildBundleParentCsv,
@@ -355,19 +357,8 @@ import {
   useScheduleTaxDeadlineUpdates,
   useTaxDeadlines,
   useAccountTaxGroups,
-  useCreateAccountTaxGroup,
-  useUpdateAccountTaxGroup,
   useTaxJurisdictions,
-  useCreateTaxJurisdiction,
-  useUpdateTaxJurisdiction,
   useTaxSchedules,
-  useCreateTaxSchedule,
-  useUpdateTaxSchedule,
-  useCompleteTaxDeadline,
-  useWaiveTaxDeadline,
-  useDeleteTaxDeadline,
-  useCreateTaxDeadline,
-  useUpdateTaxDeadline,
   useUpdateAccountTax,
   useDeprecateAccountAccount,
   useUpdateAccountAccount,
@@ -420,37 +411,7 @@ import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import { useInvoiceToPaymentWorkflow } from "@lumiere/query-hooks/hooks/accounting/invoice-workflow"
 import { isPaymentRegistrable, variantTag } from "@lumiere/erp-workflows"
-import {
-  canCompleteTaxDeadline,
-  canDeleteTaxDeadline,
-  canEditTaxDeadline,
-  canWaiveTaxDeadline,
-  deadlineDateInput,
-  toTaxDeadlineCreateBody,
-  toTaxDeadlineUpdateBody,
-} from "./tax-deadline-actions"
-import {
-  canEditTaxGroup,
-  taxGroupAccountOptions,
-  taxGroupEditDefaults,
-  toTaxGroupCreateParams,
-  toTaxGroupUpdateParams,
-} from "./tax-group-actions"
-import {
-  taxJurisdictionEditDefaults,
-  toTaxJurisdictionCreateParams,
-  toTaxJurisdictionUpdateParams,
-} from "./tax-jurisdiction-actions"
-import {
-  canEditTaxSchedule,
-  scheduleJurisdictionOptions,
-  scheduleTaxOptions,
-  taxScheduleEditDefaults,
-  toTaxScheduleCreateParams,
-  toTaxScheduleUpdateParams,
-} from "./tax-schedule-actions"
-import { taxPickerField } from "./tax-picker-field"
-import { cellId, cellText, withNone } from "./tax-setup-wire"
+import { withNone } from "./tax-setup-wire"
 import {
   ASSET_TYPES,
   DEPRECIATION_METHODS,
@@ -503,11 +464,6 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
   BankStatementImportLinesSection,
   ConsolidationCompanyRatesSection,
-  TaxDeadlineRemindersSection,
-  taxDeadlinesTableConfig,
-  taxGroupsTableConfig,
-  taxJurisdictionsTableConfig,
-  taxSchedulesTableConfig,
 } from "./read-sections"
 import { apiFetch, fetchQueryList } from "@lumiere/query-hooks/http"
 import { persistCustomFieldsToEav } from "@/lib/persist-record-custom-fields"
@@ -528,7 +484,6 @@ import {
 import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
-import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row))
@@ -536,71 +491,6 @@ function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
 
 function copyAsRecords<T extends object>(rows: readonly T[]): Record<string, unknown>[] {
   return rows.map(copyAsRecord)
-}
-
-type ManualInvoiceAccountLookup = {
-  readonly id?: unknown
-  readonly code?: unknown
-  readonly name?: unknown
-  readonly companyId?: unknown
-  readonly company_id?: unknown
-  readonly deprecated?: unknown
-  readonly isOffBalance?: unknown
-  readonly internalType?: unknown
-  readonly internalGroup?: unknown
-  readonly allowedJournalIds?: unknown
-}
-
-type ManualInvoicePartnerLookup = {
-  readonly id?: unknown
-  readonly name?: unknown
-  readonly displayName?: unknown
-  readonly companyId?: unknown
-  readonly company_id?: unknown
-  readonly deletedAt?: unknown
-  readonly deleted_at?: unknown
-  readonly isCustomer?: unknown
-  readonly customerRank?: unknown
-  readonly isVendor?: unknown
-  readonly supplierRank?: unknown
-}
-
-type ManualInvoiceJournalLookup = {
-  readonly id?: unknown
-  readonly name?: unknown
-  readonly code?: unknown
-  readonly companyId?: unknown
-  readonly company_id?: unknown
-  readonly active?: unknown
-  readonly type?: unknown
-  readonly type_?: unknown
-  readonly currencyId?: unknown
-  readonly currency_id?: unknown
-}
-
-type ManualInvoiceTaxGroupLookup = {
-  readonly id?: unknown
-  readonly taxPayableAccountId?: unknown
-  readonly tax_payable_account_id?: unknown
-  readonly taxReceivableAccountId?: unknown
-  readonly tax_receivable_account_id?: unknown
-}
-
-type ManualInvoiceTaxLookup = {
-  readonly id?: unknown
-  readonly name?: unknown
-  readonly companyId?: unknown
-  readonly company_id?: unknown
-  readonly active?: unknown
-  readonly typeTaxUse?: unknown
-  readonly type_tax_use?: unknown
-  readonly priceInclude?: unknown
-  readonly hasNegativeFactor?: unknown
-  readonly amount?: unknown
-  readonly amountType?: unknown
-  readonly amount_type?: unknown
-  readonly taxGroupId?: unknown
-  readonly tax_group_id?: unknown
 }
 
 function moveTypeTag(row: Record<string, unknown>): string {
@@ -618,12 +508,6 @@ function paymentTermValueTag(
 
 function moveStateStr(row: Record<string, unknown>): string {
   const v = row.state
-  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
-  return String(v ?? "")
-}
-
-function taxDeadlineStatusStr(row: Record<string, unknown>): string {
-  const v = row.status
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
 }
@@ -1279,77 +1163,8 @@ function AccountingClientReady({
     () => invoiceCurrencyOptions.find((option) => option.value === String(manualInvoiceCurrencyId))?.code,
     [invoiceCurrencyOptions, manualInvoiceCurrencyId],
   )
+  const manualInvoiceOptions = useMemo(() => buildManualInvoiceCatalog({ accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes }), [accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes])
 
-  const manualInvoiceOptions = useMemo(() => {
-    const companyKey = String(operatingCompanyId)
-    const accountLabel = (row: ManualInvoiceAccountLookup) =>
-      `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id ?? "")}`
-    const allowedJournals = (row: ManualInvoiceAccountLookup) =>
-      Array.isArray(row.allowedJournalIds) ? row.allowedJournalIds.map(String) : []
-    const accountsFor = (kind: "invoice" | "bill", counterpart: boolean) =>
-      (accounts as ManualInvoiceAccountLookup[])
-        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey)
-        .filter((row) => row.deprecated !== true && row.isOffBalance !== true)
-        .filter((row) => enumTag(counterpart ? row.internalType : row.internalGroup) === (
-          counterpart ? (kind === "invoice" ? "Receivable" : "Payable") : (kind === "invoice" ? "Income" : "Expense")
-        ))
-        .map((row) => ({ value: String(row.id), label: accountLabel(row), allowedJournalIds: allowedJournals(row) }))
-    const partnersFor = (kind: "invoice" | "bill") =>
-      (contacts as ManualInvoicePartnerLookup[])
-        .filter((row) => row.deletedAt == null && row.deleted_at == null)
-        .filter((row) => {
-          const rowCompany = row.companyId ?? row.company_id
-          return rowCompany == null || String(rowCompany) === companyKey
-        })
-        .filter((row) => kind === "invoice"
-          ? row.isCustomer === true || Number(row.customerRank ?? 0) > 0
-          : row.isVendor === true || Number(row.supplierRank ?? 0) > 0)
-        .map((row) => ({ value: String(row.id), label: String(row.displayName ?? row.name ?? row.id) }))
-    const journalsFor = (kind: "invoice" | "bill") =>
-      (journals as ManualInvoiceJournalLookup[])
-        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
-        .filter((row) => enumTag(row.type ?? row.type_) === (kind === "invoice" ? "Sale" : "Purchase"))
-        .map((row) => ({
-          value: String(row.id),
-          label: `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id)}`,
-          currencyId: String(row.currencyId ?? row.currency_id ?? defaultCurrencyId),
-        }))
-    const taxGroupById = new Map(
-      (taxGroups as ManualInvoiceTaxGroupLookup[]).map((row) => [String(row.id), row]),
-    )
-    const taxesFor = (kind: "invoice" | "bill") =>
-      (taxes as ManualInvoiceTaxLookup[])
-        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
-        .filter((row) => [kind === "invoice" ? "Sale" : "Purchase", "None"].includes(enumTag(row.typeTaxUse ?? row.type_tax_use)))
-        .filter((row) => row.priceInclude !== true && row.hasNegativeFactor !== true && Number(row.amount ?? 0) >= 0)
-        .filter((row) => ["Percent", "Fixed", "Division"].includes(enumTag(row.amountType ?? row.amount_type)))
-        .filter((row) => {
-          const group = taxGroupById.get(String(row.taxGroupId ?? row.tax_group_id ?? ""))
-          return group != null && (kind === "invoice"
-            ? group.taxPayableAccountId ?? group.tax_payable_account_id
-            : group.taxReceivableAccountId ?? group.tax_receivable_account_id) != null
-        })
-        .map((row) => ({
-          value: String(row.id), label: String(row.name ?? row.id), amount: Number(row.amount ?? 0),
-          amountType: enumTag(row.amountType ?? row.amount_type) as "Percent" | "Fixed" | "Division",
-        }))
-    const productsFor = (kind: "invoice" | "bill") =>
-      (products as Record<string, unknown>[])
-        .filter((row) => row.active !== false && (kind === "invoice" ? row.saleOk === true : row.purchaseOk === true))
-        .map((row) => ({
-          value: String(row.id),
-          label: String(row.displayName ?? row.name ?? row.id),
-          description: String((kind === "invoice" ? row.descriptionSale : row.descriptionPurchase) ?? row.name ?? ""),
-          price: Number(kind === "invoice" ? row.listPrice ?? row.price ?? 0 : row.standardPrice ?? 0),
-          accountId: String((kind === "invoice" ? row.propertyAccountIncomeId : row.propertyAccountExpenseId) ?? "") || undefined,
-          taxIds: (Array.isArray(kind === "invoice" ? row.taxesId : row.supplierTaxesId)
-            ? (kind === "invoice" ? row.taxesId : row.supplierTaxesId) as unknown[] : []).map(String),
-        }))
-    return {
-      invoice: { journals: journalsFor("invoice"), partners: partnersFor("invoice"), counterpart: accountsFor("invoice", true), commercial: accountsFor("invoice", false), taxes: taxesFor("invoice"), products: productsFor("invoice") },
-      bill: { journals: journalsFor("bill"), partners: partnersFor("bill"), counterpart: accountsFor("bill", true), commercial: accountsFor("bill", false), taxes: taxesFor("bill"), products: productsFor("bill") },
-    }
-  }, [accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes])
 
   const companySelectOptions = useMemo(
     () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
@@ -1360,100 +1175,12 @@ function AccountingClientReady({
     () => contactRowsToAccountingPartnerSelectOptions(contacts),
     [contacts],
   )
+  const manualInvoiceAccountOptions = useMemo(() => manualInvoiceAccountChoices({ accountTypes, accounts, manualInvoiceCurrencyId, operatingCompanyId }), [accountTypes, accounts, manualInvoiceCurrencyId, operatingCompanyId])
 
-  const manualInvoiceAccountOptions = useMemo(() => {
-    const eligibleAccounts = accounts.filter(
-      (account) =>
-        account.companyId === operatingCompanyId &&
-        account.deprecated === false &&
-        (account.currencyId == null || account.currencyId === manualInvoiceCurrencyId),
-    )
-    const toOptions = (rows: typeof accounts) =>
-      rows.map((account) => ({
-        value: String(account.id),
-        label: `${account.code ? `${account.code} — ` : ""}${account.name ?? account.id}`,
-      }))
-    const lineOptions = (expectedType: "Income" | "Expense") =>
-      toOptions(
-        eligibleAccounts.filter((account) =>
-          accountMatchesManualInvoiceLineType(account, accountTypes, expectedType),
-        ),
-      )
-    const counterpartOptions = (expectedType: "Receivable" | "Payable") =>
-      toOptions(
-        eligibleAccounts.filter(
-          (account) => enumTag(account.internalType) === expectedType,
-        ),
-      )
+  const manualInvoiceJournalOptions = useMemo(() => manualInvoiceJournalChoices({ journals, manualInvoiceCurrencyId, operatingCompanyId }), [journals, manualInvoiceCurrencyId, operatingCompanyId])
 
-    return {
-      income: lineOptions("Income"),
-      expense: lineOptions("Expense"),
-      receivable: counterpartOptions("Receivable"),
-      payable: counterpartOptions("Payable"),
-    }
-  }, [accountTypes, accounts, manualInvoiceCurrencyId, operatingCompanyId])
+  const manualInvoiceTaxOptions = useMemo(() => manualInvoiceTaxChoices({ accounts, manualInvoiceCurrencyId, operatingCompanyId, taxGroups, taxes }), [accounts, manualInvoiceCurrencyId, operatingCompanyId, taxGroups, taxes])
 
-  const manualInvoiceJournalOptions = useMemo(() => {
-    const eligible = (journalType: "Sale" | "Purchase") =>
-      accountJournalRowsToSelectOptions(
-        journals.filter(
-          (journal) =>
-            journal.companyId === operatingCompanyId &&
-            journal.active === true &&
-            enumTag(journal.type) === journalType &&
-            (journal.currencyId == null || journal.currencyId === manualInvoiceCurrencyId),
-        ),
-      )
-    return { sales: eligible("Sale"), purchases: eligible("Purchase") }
-  }, [journals, manualInvoiceCurrencyId, operatingCompanyId])
-
-  const manualInvoiceTaxOptions = useMemo(() => {
-    const accountById = new Map(accounts.map((account) => [account.id, account]))
-    const groupById = new Map(taxGroups.map((group) => [group.id, group]))
-    const eligible = (taxUse: "Sale" | "Purchase") =>
-      taxes
-        .filter((tax) => {
-          const amount = Number(tax.amount)
-          if (
-            tax.companyId !== operatingCompanyId ||
-            tax.active !== true ||
-            tax.hasNegativeFactor === true ||
-            enumTag(tax.typeTaxUse) !== taxUse ||
-            enumTag(tax.amountType) !== "Percent" ||
-            !Number.isFinite(amount) ||
-            amount < 0 ||
-            amount > 100 ||
-            tax.taxGroupId == null
-          ) {
-            return false
-          }
-          const group = groupById.get(tax.taxGroupId)
-          if (group == null || group.companyId !== operatingCompanyId) return false
-          const postingAccountId =
-            taxUse === "Sale" ? group.taxPayableAccountId : group.taxReceivableAccountId
-          if (postingAccountId == null) return false
-          const postingAccount = accountById.get(postingAccountId)
-          if (
-            postingAccount == null ||
-            !accountIsEligibleManualInvoiceTaxPosting(
-              postingAccount,
-              operatingCompanyId,
-              manualInvoiceCurrencyId,
-            )
-          ) {
-            return false
-          }
-          return true
-        })
-        .map((tax) => ({
-          value: String(tax.id),
-          label: `${tax.name} (${Number(tax.amount)}%)`,
-          rate: Number(tax.amount),
-          priceIncluded: Boolean(tax.priceInclude),
-        }))
-    return { sales: eligible("Sale"), purchases: eligible("Purchase") }
-  }, [accounts, manualInvoiceCurrencyId, operatingCompanyId, taxGroups, taxes])
 
   const accountingSetup = useMemo<AccountingSetupReadinessInput>(() => {
     const company = companies.find(
@@ -1827,49 +1554,6 @@ function AccountingClientReady({
       ),
     }
   }, [companySelectOptions, currencySelectOptions, accountPeriodsRaw])
-
-  const taxDeadlineRows = useMemo(
-    () =>
-      (taxDeadlines as Record<string, unknown>[])
-        .filter((d) => d.deletedAt == null && d.deleted_at == null)
-        .map((d) => ({
-          ...d,
-          dueDate: d.dueDate ?? d.due_date,
-          statusLabel: taxDeadlineStatusStr(d),
-        })),
-    [taxDeadlines],
-  )
-
-  const taxDeadlineRecordSheet = useMemo(
-    (): EntityRecordSheetConfig => ({
-      titleKey: "title",
-      statusKey: "statusLabel",
-      detailConfig: {
-        mode: "detail",
-        sections: [
-          {
-            id: "header",
-            fields: [
-              { key: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }) },
-              { key: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date" },
-              { key: "statusLabel", label: t("accounting.taxDeadlines.columns.status", { defaultValue: "Status" }) },
-              { key: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }) },
-            ],
-          },
-        ],
-      },
-      customTabs: [
-        {
-          id: "reminders",
-          label: t("accounting.taxDeadlines.reminders.tab", { defaultValue: "Reminders" }),
-          content: (record) => (
-            <TaxDeadlineRemindersSection organizationId={orgId} deadlineId={String(record.id ?? "")} />
-          ),
-        },
-      ],
-    }),
-    [t, orgId],
-  )
 
   const accountMoveRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const moveStatus = {
@@ -2304,17 +1988,6 @@ function AccountingClientReady({
   const updateAccount = useUpdateAccountAccount(organizationId)
   const createBankStatement = useCreateAccountBankStatement(organizationId)
   const updateBankStatement = useUpdateAccountBankStatement(organizationId)
-  const completeTaxDeadline = useCompleteTaxDeadline(organizationId)
-  const waiveTaxDeadline = useWaiveTaxDeadline(organizationId)
-  const deleteTaxDeadline = useDeleteTaxDeadline(organizationId)
-  const createTaxDeadline = useCreateTaxDeadline(organizationId)
-  const updateTaxDeadline = useUpdateTaxDeadline(organizationId)
-  const createTaxGroup = useCreateAccountTaxGroup(organizationId, operatingCompanyId)
-  const updateTaxGroup = useUpdateAccountTaxGroup(organizationId, operatingCompanyId)
-  const createTaxJurisdiction = useCreateTaxJurisdiction(organizationId)
-  const updateTaxJurisdiction = useUpdateTaxJurisdiction(organizationId)
-  const createTaxSchedule = useCreateTaxSchedule(organizationId, operatingCompanyId)
-  const updateTaxSchedule = useUpdateTaxSchedule(organizationId, operatingCompanyId)
   const createBudget = useCreateCrossoveredBudget(organizationId)
   const updateBudget = useUpdateCrossoveredBudget(organizationId)
   const createBudgetLine = useCreateBudgetLine(organizationId)
@@ -2862,413 +2535,11 @@ function AccountingClientReady({
     },
     [t],
   )
+  const { taxDeadlineRows, taxDeadlineRecordSheet, taxDeadlinesEntityConfig } = useTaxDeadlineAdministration({ organizationId, taxDeadlines, companySelectOptions, askForm, runTaxCommand })
+  const { taxGroupRows, taxGroupsEntityConfig } = useTaxGroupAdministration({ organizationId, operatingCompanyId, accounts, taxGroups, companySelectOptions, askForm, runTaxCommand })
+  const { taxJurisdictionRows, taxJurisdictionsEntityConfig } = useTaxJurisdictionAdministration({ organizationId, taxJurisdictions, askForm, runTaxCommand })
+  const { taxScheduleRows, taxSchedulesEntityConfig } = useTaxScheduleAdministration({ organizationId, operatingCompanyId, taxes, taxJurisdictions, taxSchedules, companySelectOptions, askForm, runTaxCommand })
 
-  const taxDeadlinesEntityConfig = useMemo((): EntityViewConfig => {
-    const base = taxDeadlinesTableConfig(t)
-    const view = base.view as EntityTableConfig
-    const newLabel = t("accounting.taxDeadlines.actions.new", { defaultValue: "New deadline" })
-    const editLabel = t("accounting.taxDeadlines.actions.edit", { defaultValue: "Edit deadline" })
-    const completeLabel = t("accounting.taxDeadlines.actions.complete", { defaultValue: "Mark complete" })
-    const waiveLabel = t("accounting.taxDeadlines.actions.waive", { defaultValue: "Waive" })
-    const deleteLabel = t("accounting.taxDeadlines.actions.delete", { defaultValue: "Delete deadline" })
-    const invalidInput = (title: string) =>
-      showWorkflowToast({
-        kind: "error",
-        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
-        description: t("accounting.taxDeadlines.actions.invalid", {
-          defaultValue: "Enter a title and a due date.",
-        }),
-      })
-    const idOf = (row: Record<string, unknown>) => BigInt(String(row.id))
-    const cancelLabel = t("common.cancel", { defaultValue: "Cancel" })
-
-    const promptNew = async () => {
-      const values = await askForm({
-        title: newLabel,
-        fields: [
-          { id: "title", name: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }), type: "text", required: true },
-          {
-            id: "deadlineType",
-            name: "deadlineType",
-            label: t("accounting.taxDeadlines.form.type", { defaultValue: "Type" }),
-            type: "select",
-            required: true,
-            defaultValue: "Filing",
-            width: "1/2",
-            options: ["Filing", "Payment", "Registration", "Report", "Renewal"].map((value) => ({
-              value,
-              label: t(`accounting.taxDeadlines.form.types.${value}`, { defaultValue: value }),
-            })),
-          },
-          { id: "dueDate", name: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date", required: true, width: "1/2" },
-          {
-            id: "companyId",
-            name: "companyId",
-            label: t("accounting.taxDeadlines.form.company", { defaultValue: "Company (optional)" }),
-            type: "select",
-            options: companySelectOptions,
-          },
-          { id: "description", name: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }), type: "textarea" },
-        ],
-      })
-      if (values == null) return
-      const body = toTaxDeadlineCreateBody(values)
-      if (body == null) return invalidInput(newLabel)
-      await runTaxCommand(newLabel, () => createTaxDeadline.mutateAsync(body))
-    }
-
-    const promptEdit = async (row: Record<string, unknown>) => {
-      const values = await askForm({
-        title: editLabel,
-        fields: [
-          { id: "title", name: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }), type: "text", required: true, defaultValue: String(row.title ?? "") },
-          { id: "dueDate", name: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date", defaultValue: deadlineDateInput(row.dueDate) },
-          { id: "description", name: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }), type: "textarea", defaultValue: String(row.description ?? "") },
-        ],
-      })
-      if (values == null) return
-      const body = toTaxDeadlineUpdateBody(values)
-      if (body == null) return invalidInput(editLabel)
-      await runTaxCommand(editLabel, () => updateTaxDeadline.mutateAsync({ deadlineId: idOf(row), params: body }))
-    }
-
-    const actions: EntityAction[] = [
-      {
-        id: "tax-deadline-new",
-        label: newLabel,
-        permission: { resource: "tax_deadline", action: "create" },
-        onClick: () => promptNew(),
-      },
-      {
-        id: "tax-deadline-complete",
-        label: completeLabel,
-        requiresSelection: true,
-        permission: { resource: "tax_deadline", action: "write" },
-        isApplicable: (rows) => rows.every((r) => canCompleteTaxDeadline(r)),
-        successMessage: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: completeLabel }),
-        onClick: (rows) => completeTaxDeadline.mutateAsync(idOf(rows[0]!)),
-      },
-      {
-        id: "tax-deadline-edit",
-        label: editLabel,
-        requiresSelection: true,
-        permission: { resource: "tax_deadline", action: "write" },
-        isApplicable: (rows) => rows.every((r) => canEditTaxDeadline(r)),
-        onClick: (rows) => promptEdit(rows[0]!),
-      },
-      {
-        id: "tax-deadline-waive",
-        label: waiveLabel,
-        requiresSelection: true,
-        permission: { resource: "tax_deadline", action: "admin" },
-        isApplicable: (rows) => rows.every((r) => canWaiveTaxDeadline(r)),
-        confirm: {
-          title: waiveLabel,
-          description: t("accounting.taxDeadlines.actions.waiveConfirm", {
-            defaultValue: "Mark this deadline as not applicable. It stops counting as open.",
-          }),
-          confirmLabel: waiveLabel,
-          cancelLabel,
-        },
-        successMessage: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: waiveLabel }),
-        onClick: (rows) => waiveTaxDeadline.mutateAsync(idOf(rows[0]!)),
-      },
-      {
-        id: "tax-deadline-delete",
-        label: deleteLabel,
-        variant: "destructive",
-        requiresSelection: true,
-        permission: { resource: "tax_deadline", action: "delete" },
-        isApplicable: (rows) => rows.every((r) => canDeleteTaxDeadline(r)),
-        confirm: {
-          title: deleteLabel,
-          description: t("accounting.taxDeadlines.actions.deleteConfirm", {
-            defaultValue: "Delete this tax deadline? It disappears from the list.",
-          }),
-          confirmLabel: t("common.delete", { defaultValue: "Delete" }),
-          cancelLabel,
-        },
-        successMessage: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: deleteLabel }),
-        onClick: (rows) => deleteTaxDeadline.mutateAsync(idOf(rows[0]!)),
-      },
-    ]
-    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
-  }, [
-    t,
-    askForm,
-    companySelectOptions,
-    runTaxCommand,
-    createTaxDeadline.mutateAsync,
-    updateTaxDeadline.mutateAsync,
-    completeTaxDeadline.mutateAsync,
-    waiveTaxDeadline.mutateAsync,
-    deleteTaxDeadline.mutateAsync,
-  ])
-
-  const taxGroupRows = useMemo(() => {
-    const accountLabel = new Map<string, string>()
-    for (const a of copyAsRecords(accounts)) {
-      const id = cellId(a.id)
-      if (id != null) accountLabel.set(id.toString(), `${cellText(a.code)} ${cellText(a.name)}`.trim())
-    }
-    const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
-    const labelOf = (map: Map<string, string>, v: unknown) => {
-      const id = cellId(v)
-      return id == null ? "" : (map.get(id.toString()) ?? id.toString())
-    }
-    return copyAsRecords(taxGroups).map((g) => ({
-      ...g,
-      sequence: Number(cellText(g.sequence)) || 0,
-      companyName: labelOf(companyLabel, g.companyId),
-      precedingSubtotalText: cellText(g.precedingSubtotal),
-      payableAccountName: labelOf(accountLabel, g.taxPayableAccountId),
-      receivableAccountName: labelOf(accountLabel, g.taxReceivableAccountId),
-      advanceAccountName: labelOf(accountLabel, g.advanceTaxPaymentAccountId),
-    }))
-  }, [taxGroups, accounts, companySelectOptions])
-
-  /** Tax groups table: "New tax group" and "Edit tax group" (the reducers re-validate accounts and company). */
-  const taxGroupsEntityConfig = useMemo((): EntityViewConfig => {
-    const base = taxGroupsTableConfig(t)
-    const view = base.view as EntityTableConfig
-    const newLabel = t("accounting.taxGroups.actions.new", { defaultValue: "New tax group" })
-    const editLabel = t("accounting.taxGroups.actions.edit", { defaultValue: "Edit tax group" })
-    const noneLabel = t("accounting.taxGroups.form.none", { defaultValue: "None" })
-    const accountRows = copyAsRecords(accounts)
-    const fields = (current: ReturnType<typeof taxGroupEditDefaults> | null): FormField[] => [
-      { id: "name", name: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "", width: "2/3" },
-      { id: "sequence", name: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), type: "number", required: true, min: 0, step: 1, defaultValue: current?.sequence ?? 10, width: "1/3" },
-      { id: "precedingSubtotal", name: "precedingSubtotal", label: t("accounting.taxGroups.columns.precedingSubtotal", { defaultValue: "Preceding subtotal" }), type: "text", defaultValue: current?.precedingSubtotal ?? "" },
-      { id: "taxPayableAccountId", name: "taxPayableAccountId", label: t("accounting.taxGroups.columns.payableAccount", { defaultValue: "Tax payable account" }), type: "select", defaultValue: current?.taxPayableAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "payable", operatingCompanyId), noneLabel) },
-      { id: "taxReceivableAccountId", name: "taxReceivableAccountId", label: t("accounting.taxGroups.columns.receivableAccount", { defaultValue: "Tax receivable account" }), type: "select", defaultValue: current?.taxReceivableAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "receivable", operatingCompanyId), noneLabel) },
-      { id: "advanceTaxPaymentAccountId", name: "advanceTaxPaymentAccountId", label: t("accounting.taxGroups.columns.advanceAccount", { defaultValue: "Advance tax payment account" }), type: "select", defaultValue: current?.advanceTaxPaymentAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "advance", operatingCompanyId), noneLabel) },
-    ]
-    const invalid = (title: string) =>
-      showWorkflowToast({
-        kind: "error",
-        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
-        description: t("accounting.taxGroups.actions.invalid", { defaultValue: "Enter a name and a whole-number sequence." }),
-      })
-
-    const promptNew = async () => {
-      const values = await askForm({ title: newLabel, fields: fields(null) })
-      if (values == null) return
-      const params = toTaxGroupCreateParams(values)
-      if (params == null) return invalid(newLabel)
-      await runTaxCommand(newLabel, () => createTaxGroup.mutateAsync(params))
-    }
-    const promptEdit = async (row: Record<string, unknown>) => {
-      const values = await askForm({ title: editLabel, fields: fields(taxGroupEditDefaults(row)) })
-      if (values == null) return
-      const result = toTaxGroupUpdateParams(values, row)
-      if (!result.ok) {
-        if (result.reason === "invalid") return invalid(editLabel)
-        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
-        return
-      }
-      await runTaxCommand(editLabel, () =>
-        updateTaxGroup.mutateAsync({ groupId: BigInt(String(row.id)), params: result.params }),
-      )
-    }
-
-    const actions: EntityAction[] = [
-      {
-        id: "tax-group-new",
-        label: newLabel,
-        permission: { resource: "account_tax_group", action: "create" },
-        onClick: () => promptNew(),
-      },
-      {
-        id: "tax-group-edit",
-        label: editLabel,
-        requiresSelection: true,
-        permission: { resource: "account_tax_group", action: "write" },
-        isApplicable: (rows) => rows.every((r) => canEditTaxGroup(r, operatingCompanyId)),
-        onClick: (rows) => promptEdit(rows[0]!),
-      },
-    ]
-    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
-  }, [t, askForm, accounts, operatingCompanyId, runTaxCommand, createTaxGroup.mutateAsync, updateTaxGroup.mutateAsync])
-
-  const taxJurisdictionRows = useMemo(
-    () =>
-      copyAsRecords(taxJurisdictions).map((j) => {
-        const current = taxJurisdictionEditDefaults(j)
-        return {
-          ...j,
-          ...current,
-          activeLabel: current.isActive
-            ? t("accounting.taxJurisdictions.active", { defaultValue: "Active" })
-            : t("accounting.taxJurisdictions.inactive", { defaultValue: "Inactive" }),
-        }
-      }),
-    [taxJurisdictions, t],
-  )
-
-  /** Jurisdictions table: "New jurisdiction" and "Edit jurisdiction" (organization-level records). */
-  const taxJurisdictionsEntityConfig = useMemo((): EntityViewConfig => {
-    const base = taxJurisdictionsTableConfig(t)
-    const view = base.view as EntityTableConfig
-    const newLabel = t("accounting.taxJurisdictions.actions.new", { defaultValue: "New jurisdiction" })
-    const editLabel = t("accounting.taxJurisdictions.actions.edit", { defaultValue: "Edit jurisdiction" })
-    const fields = (current: ReturnType<typeof taxJurisdictionEditDefaults> | null): FormField[] => [
-      { id: "name", name: "name", label: t("accounting.taxJurisdictions.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "", width: "2/3" },
-      { id: "code", name: "code", label: t("accounting.taxJurisdictions.columns.code", { defaultValue: "Code" }), type: "text", required: true, defaultValue: current?.code ?? "", width: "1/3" },
-      // The reducer cannot change the country of an existing jurisdiction, so it is only asked for on create.
-      ...(current == null
-        ? [{ id: "countryCode", name: "countryCode", label: t("accounting.taxJurisdictions.columns.countryCode", { defaultValue: "Country code" }), description: t("accounting.taxJurisdictions.form.countryHint", { defaultValue: "ISO country code, for example US." }), type: "text" as const, required: true, defaultValue: "", width: "1/3" as const }]
-        : []),
-      { id: "stateCode", name: "stateCode", label: t("accounting.taxJurisdictions.columns.stateCode", { defaultValue: "State" }), type: "text", defaultValue: current?.stateCode ?? "", width: "1/3" },
-      { id: "countyCode", name: "countyCode", label: t("accounting.taxJurisdictions.columns.countyCode", { defaultValue: "County" }), type: "text", defaultValue: current?.countyCode ?? "", width: "1/3" },
-      { id: "city", name: "city", label: t("accounting.taxJurisdictions.columns.city", { defaultValue: "City" }), type: "text", defaultValue: current?.city ?? "", width: "1/3" },
-      { id: "zipFrom", name: "zipFrom", label: t("accounting.taxJurisdictions.columns.zipFrom", { defaultValue: "Postal code from" }), type: "text", defaultValue: current?.zipFrom ?? "", width: "1/3" },
-      { id: "zipTo", name: "zipTo", label: t("accounting.taxJurisdictions.columns.zipTo", { defaultValue: "Postal code to" }), type: "text", defaultValue: current?.zipTo ?? "", width: "1/3" },
-      { id: "isActive", name: "isActive", label: t("accounting.taxJurisdictions.active", { defaultValue: "Active" }), type: "switch", defaultValue: current?.isActive ?? true, width: "1/3" },
-    ]
-    const invalid = (title: string) =>
-      showWorkflowToast({
-        kind: "error",
-        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
-        description: t("accounting.taxJurisdictions.actions.invalid", { defaultValue: "Enter a name, a code and a country code." }),
-      })
-
-    const promptNew = async () => {
-      const values = await askForm({ title: newLabel, fields: fields(null) })
-      if (values == null) return
-      const params = toTaxJurisdictionCreateParams(values)
-      if (params == null) return invalid(newLabel)
-      await runTaxCommand(newLabel, () => createTaxJurisdiction.mutateAsync(params))
-    }
-    const promptEdit = async (row: Record<string, unknown>) => {
-      const values = await askForm({ title: editLabel, fields: fields(taxJurisdictionEditDefaults(row)) })
-      if (values == null) return
-      const result = toTaxJurisdictionUpdateParams(values, row)
-      if (!result.ok) {
-        if (result.reason === "invalid") return invalid(editLabel)
-        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
-        return
-      }
-      await runTaxCommand(editLabel, () =>
-        updateTaxJurisdiction.mutateAsync({ jurisdictionId: BigInt(String(row.id)), params: result.params }),
-      )
-    }
-
-    const actions: EntityAction[] = [
-      {
-        id: "tax-jurisdiction-new",
-        label: newLabel,
-        permission: { resource: "tax_jurisdiction", action: "create" },
-        onClick: () => promptNew(),
-      },
-      {
-        id: "tax-jurisdiction-edit",
-        label: editLabel,
-        requiresSelection: true,
-        permission: { resource: "tax_jurisdiction", action: "write" },
-        onClick: (rows) => promptEdit(rows[0]!),
-      },
-    ]
-    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
-  }, [t, askForm, runTaxCommand, createTaxJurisdiction.mutateAsync, updateTaxJurisdiction.mutateAsync])
-
-  const taxScheduleRows = useMemo(() => {
-    const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
-    const jurisdictionLabel = new Map(
-      copyAsRecords(taxJurisdictions).map((j) => [cellId(j.id)?.toString() ?? "", cellText(j.name)] as const),
-    )
-    const taxLabel = new Map(
-      copyAsRecords(taxes).map((x) => [cellId(x.id)?.toString() ?? "", cellText(x.name)] as const),
-    )
-    return copyAsRecords(taxSchedules).map((s) => {
-      const current = taxScheduleEditDefaults(s)
-      const companyKey = cellId(s.companyId)?.toString() ?? ""
-      return {
-        ...s,
-        description: current.description,
-        companyName: companyLabel.get(companyKey) ?? companyKey,
-        jurisdictionName: jurisdictionLabel.get(current.jurisdictionId) ?? "",
-        taxNames: current.taxIds.map((id) => taxLabel.get(id) ?? id).join(", "),
-        effectiveFromDate: current.effectiveFrom,
-        effectiveToDate: current.effectiveTo,
-        activeLabel: current.isActive
-          ? t("accounting.taxSchedules.active", { defaultValue: "Active" })
-          : t("accounting.taxSchedules.inactive", { defaultValue: "Inactive" }),
-      }
-    })
-  }, [taxSchedules, taxJurisdictions, taxes, companySelectOptions, t])
-
-  /** Tax schedules table: "New schedule" and "Edit schedule" (taxes are picked from the company's active taxes). */
-  const taxSchedulesEntityConfig = useMemo((): EntityViewConfig => {
-    const base = taxSchedulesTableConfig(t)
-    const view = base.view as EntityTableConfig
-    const newLabel = t("accounting.taxSchedules.actions.new", { defaultValue: "New schedule" })
-    const editLabel = t("accounting.taxSchedules.actions.edit", { defaultValue: "Edit schedule" })
-    const noneLabel = t("accounting.taxSchedules.form.none", { defaultValue: "None" })
-    const inactiveSuffix = t("accounting.taxSchedules.form.inactive", { defaultValue: "(inactive)" })
-    const taxRows = copyAsRecords(taxes)
-    const jurisdictionRows = copyAsRecords(taxJurisdictions)
-    const fields = (current: ReturnType<typeof taxScheduleEditDefaults> | null): FormField[] => [
-      { id: "name", name: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "" },
-      { id: "description", name: "description", label: t("accounting.taxSchedules.columns.description", { defaultValue: "Description" }), type: "textarea", defaultValue: current?.description ?? "" },
-      { id: "jurisdictionId", name: "jurisdictionId", label: t("accounting.taxSchedules.columns.jurisdiction", { defaultValue: "Jurisdiction" }), type: "select", defaultValue: current?.jurisdictionId ?? "", options: withNone(scheduleJurisdictionOptions(jurisdictionRows, current?.jurisdictionId ?? "", inactiveSuffix), noneLabel) },
-      taxPickerField({
-        id: "taxIds",
-        name: "taxIds",
-        label: t("accounting.taxSchedules.columns.taxes", { defaultValue: "Taxes" }),
-        options: scheduleTaxOptions(taxRows, operatingCompanyId, current?.taxIds ?? [], inactiveSuffix),
-        defaultValue: current?.taxIds ?? [],
-        emptyHint: t("accounting.taxSchedules.form.noActiveTaxes", { defaultValue: "There are no active taxes to choose from." }),
-      }),
-      { id: "effectiveFrom", name: "effectiveFrom", label: t("accounting.taxSchedules.columns.effectiveFrom", { defaultValue: "Effective from" }), type: "date", defaultValue: current?.effectiveFrom ?? "", width: "1/2" },
-      { id: "effectiveTo", name: "effectiveTo", label: t("accounting.taxSchedules.columns.effectiveTo", { defaultValue: "Effective to" }), type: "date", defaultValue: current?.effectiveTo ?? "", width: "1/2" },
-      { id: "isActive", name: "isActive", label: t("accounting.taxSchedules.active", { defaultValue: "Active" }), type: "switch", defaultValue: current?.isActive ?? true },
-    ]
-    const invalid = (title: string) =>
-      showWorkflowToast({
-        kind: "error",
-        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
-        description: t("accounting.taxSchedules.actions.invalid", { defaultValue: "Enter a name and valid effective dates." }),
-      })
-
-    const promptNew = async () => {
-      const values = await askForm({ title: newLabel, fields: fields(null) })
-      if (values == null) return
-      const params = toTaxScheduleCreateParams(values)
-      if (params == null) return invalid(newLabel)
-      await runTaxCommand(newLabel, () => createTaxSchedule.mutateAsync(params))
-    }
-    const promptEdit = async (row: Record<string, unknown>) => {
-      const values = await askForm({ title: editLabel, fields: fields(taxScheduleEditDefaults(row)) })
-      if (values == null) return
-      const result = toTaxScheduleUpdateParams(values, row)
-      if (!result.ok) {
-        if (result.reason === "invalid") return invalid(editLabel)
-        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
-        return
-      }
-      await runTaxCommand(editLabel, () =>
-        updateTaxSchedule.mutateAsync({ scheduleId: BigInt(String(row.id)), params: result.params }),
-      )
-    }
-
-    const actions: EntityAction[] = [
-      {
-        id: "tax-schedule-new",
-        label: newLabel,
-        permission: { resource: "tax_schedule", action: "create" },
-        onClick: () => promptNew(),
-      },
-      {
-        id: "tax-schedule-edit",
-        label: editLabel,
-        requiresSelection: true,
-        permission: { resource: "tax_schedule", action: "write" },
-        isApplicable: (rows) => rows.every((r) => canEditTaxSchedule(r, operatingCompanyId)),
-        onClick: (rows) => promptEdit(rows[0]!),
-      },
-    ]
-    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
-  }, [t, askForm, taxes, taxJurisdictions, operatingCompanyId, runTaxCommand, createTaxSchedule.mutateAsync, updateTaxSchedule.mutateAsync])
 
   const editTaxAction = useMemo((): EntityAction => {
     const label = t("accounting.taxes.actions.edit", { defaultValue: "Edit tax" })
