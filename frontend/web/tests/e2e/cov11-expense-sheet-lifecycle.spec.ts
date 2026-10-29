@@ -298,7 +298,7 @@ test.describe(
             matchesOperationResponse(response, "submit_expense_sheet"),
           { timeout: 45_000 },
         ),
-        submitConfirmation.getByRole("button", { name: "Submit report", exact: true }).click(),
+        submitConfirmation.getByRole("button", { name: "Submit for approval", exact: true }).click(),
       ])
       expect(submitted.ok(), await submitted.text()).toBe(true)
       await expect
@@ -408,7 +408,7 @@ test.describe(
               matchesOperationResponse(response, "approve_expense_sheet"),
             { timeout: 45_000 },
           ),
-          approveConfirmation.getByRole("button", { name: "Approve report", exact: true }).click(),
+          approveConfirmation.getByRole("button", { name: "Approve", exact: true }).click(),
         ])
         expect(approved.ok(), await approved.text()).toBe(true)
         approvedRequest = approved.request()
