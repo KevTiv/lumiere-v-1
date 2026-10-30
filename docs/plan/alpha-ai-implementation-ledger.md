@@ -173,7 +173,8 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   eleven activation cases. Combined i18n, type-debt, transport and vendored checks
   pass. The first integrated workspace typecheck was killed with exit 137 during
   concurrent module/API compilation (nine package passes). Build stages are now
-  serialized; a fresh final typecheck is required, not counted as passed.
+  serialized; the final full workspace typecheck now passes all eleven package
+  checks with concurrency one (nine cached, two executed; no check disabled).
 - AA-02 #322 at 31ae7ce4: eleven model cases, full web suite, web TypeScript and
   source checks pass. Independent QA reran all four synthetic browser cases on the
   committed head at 320/390/768/1440px and inspected the mobile screenshot. The
@@ -192,7 +193,9 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   fresh-tenant/contact test passes (one test, 37.3s) after correcting an initial
   test-only currency route error; that failed attempt created no contact or AI
   request. Exact saved contact scope/identity survive reload, with one create POST
-  and zero AI requests. Test-only #323 is stacked against the testing branch.
+  and zero AI requests. Persisted organization 4098, company 4098 and contact 4097
+  were independently confirmed with one bounded synthetic-marker read, no newest-row
+  fallback or mutation. Test-only #323 is stacked against the testing branch.
   See [authenticated evidence](alpha-ai-acceptance-evidence/README.md). No existing
   database, production configuration, provider or production tenant has been used.
 - Accepted bounded evidence: fresh organization → normal CRM first contact →

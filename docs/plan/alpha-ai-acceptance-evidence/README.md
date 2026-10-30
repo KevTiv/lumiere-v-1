@@ -15,7 +15,12 @@ Runtime credentials and encryption/signing keys are not included.
 
 ## Passed bounded journey
 
-The focused `alpha-assisted-activation.spec.ts` passed one test in 37.3 seconds:
+The focused `alpha-assisted-activation.spec.ts` passed one test in 37.3 seconds.
+Persisted organization **4098**, company **4098**, contact **4097** were also
+independently confirmed by a bounded read-only lookup of the unique synthetic
+marker with exactly-one enforcement, no ordering/newest-row discovery and no writes.
+
+The test performs these steps:
 
 1. Provision only an organization-less test authentication account; no business
    records are seeded into its new organization.

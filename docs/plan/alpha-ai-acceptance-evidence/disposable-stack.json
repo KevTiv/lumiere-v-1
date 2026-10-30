@@ -35,5 +35,13 @@
   "integrated_main": "8fee8fd507f948e75be99fb27d0b2344cab6db78",
   "authenticated_test_pr": 323,
   "authenticated_test_commit": "b2291da2bbfe33c737191c52ee1cfc3b9d8961bb",
-  "authenticated_first_contact": "passed: one canonical create; exact org/company/contact identity survives reload; zero AI requests"
+  "authenticated_first_contact": "passed: one canonical create; exact org/company/contact identity survives reload; zero AI requests",
+  "persisted_test_result": {
+    "organization_id": "4098",
+    "company_id": "4098",
+    "contact_id": "4097",
+    "contact_create_requests": 1,
+    "ai_requests": 0,
+    "independent_readback": "bounded unique-marker lookup; exactly one result; no ordering; no writes"
+  }
 }
