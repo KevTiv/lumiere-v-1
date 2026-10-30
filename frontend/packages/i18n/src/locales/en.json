@@ -13091,7 +13091,8 @@
       "unavailable": "This guide is unavailable in the current company.",
       "unsavedChanges": "Unsaved changes",
       "unsavedDraft": "Unsaved draft",
-      "verified": "Verified"
+      "verified": "Verified",
+      "retryAccess": "Retry access check"
     },
     "title": "AI Assistant",
     "subtitle": "Type @ for commands",

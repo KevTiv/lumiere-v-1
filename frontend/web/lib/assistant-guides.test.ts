@@ -7,7 +7,24 @@ import {
   boundedGuideSearch, guideSaveRequestKey,
   guideQuestionContext,
   guideQuestionEdits,
+  guideAccessRevoked,
+  guideRequestInScope,
 } from "./assistant-guides"
+
+test("unsaved guide requests are never carried into another actor's conversation", () => {
+  const request = { messageId: "message-1", draft: { draftKey: "draft-1", title: "Private notes", markdown: "Private working draft", companyId: "7", module: "accounting", sources: [] } }
+  const entry = { scope: "alice:org1:company7", request }
+  assert.equal(guideRequestInScope(entry, entry.scope), request)
+  assert.equal(guideRequestInScope(entry, "bob:org1:company7"), null)
+  assert.equal(guideRequestInScope(entry, "alice:org1:company8"), null)
+  assert.equal(guideRequestInScope(entry, null), null)
+})
+
+test("only authoritative access or disappearance statuses revoke loaded guide content", () => {
+  for (const status of [401, 403, 404, 410]) assert.equal(guideAccessRevoked(new GuideRequestError("denied", status)), true)
+  for (const cause of [new TypeError("network unavailable"), new Error("invalid response"), new GuideRequestError("dependency unavailable", 503), new GuideRequestError("upstream unavailable", 502), new GuideRequestError("server error", 500), { status: 403 }])
+    assert.equal(guideAccessRevoked(cause), false)
+})
 
 test("guide identities retain u64 precision and reject invalid references", () => {
   assert.equal(guideId("18446744073709551615"), "18446744073709551615")

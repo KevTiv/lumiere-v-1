@@ -25,6 +25,8 @@ export interface AssistantGuideViewerProps {
   onDirtyChange?: (dirty: boolean) => void
   moduleOptions?: readonly { value: string; label: string }[]
   busy?: boolean
+  verificationUnavailable?: boolean
+  onRetryVerification?: () => void
   error?: string | null
   className?: string
 }
@@ -54,7 +56,7 @@ export function buildGuideHtmlPreview(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox"><meta name="referrer" content="no-referrer"><style>body{margin:0;padding:24px;font:15px/1.7 system-ui,sans-serif;color:#202529;background:#fff;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}pre{white-space:pre-wrap}h1,h2,h3{line-height:1.3}</style></head><body>${safe}</body></html>`
 }
 
-export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFullPage, history, onRevisionChange, onDirtyChange, moduleOptions, busy = false, error, className }: AssistantGuideViewerProps) {
+export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFullPage, history, onRevisionChange, onDirtyChange, moduleOptions, busy = false, verificationUnavailable = false, onRetryVerification, error, className }: AssistantGuideViewerProps) {
   const { t } = useTranslation()
   const id = useId()
   const [edit, setEdit] = useState(false)
@@ -110,7 +112,7 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
   }
 
   async function save() {
-    if (!onSave || !canSave || disabled || !title.trim() || !module.trim() || !markdown.trim()) return
+    if (!onSave || !canSave || disabled || verificationUnavailable || !title.trim() || !module.trim() || !markdown.trim()) return
     setPending("save")
     setLocalError(null)
     try {
@@ -125,7 +127,7 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
   }
 
   async function ask() {
-    if (!onAsk || !question.trim() || disabled) return
+    if (!onAsk || !question.trim() || disabled || verificationUnavailable) return
     const submitted = question.trim()
     setPending("ask")
     setLocalError(null)
@@ -168,17 +170,18 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
           </div>
         </div>
         <div className="flex w-full shrink-0 flex-wrap items-center gap-1 sm:w-auto">
-          {onOpenFullPage ? <Button variant="outline" size="sm" disabled={disabled || hasPendingInput} onClick={() => onOpenFullPage(saved ? { guideId: guide.guideId, revision: guide.revision } : undefined)}><ExternalLink className="size-3.5" aria-hidden="true" />{saved ? t("aiChat.guide.openFullPage", { defaultValue: "Open full page" }) : t("aiChat.guide.saveOpenFullPage", { defaultValue: "Save and open full page" })}</Button> : null}
+          {onOpenFullPage ? <Button variant="outline" size="sm" disabled={disabled || verificationUnavailable || hasPendingInput} onClick={() => onOpenFullPage(saved ? { guideId: guide.guideId, revision: guide.revision } : undefined)}><ExternalLink className="size-3.5" aria-hidden="true" />{saved ? t("aiChat.guide.openFullPage", { defaultValue: "Open full page" }) : t("aiChat.guide.saveOpenFullPage", { defaultValue: "Save and open full page" })}</Button> : null}
           <Button variant="ghost" size="icon-sm" onClick={download} aria-label={t("aiChat.guide.download", { defaultValue: "Download Markdown" })}><Download className="size-4" /></Button>
         </div>
       </div>
+      {verificationUnavailable && onRetryVerification ? <Button className="mt-3" variant="outline" size="sm" disabled={disabled} onClick={onRetryVerification}>{t("aiChat.guide.retryAccess", { defaultValue: "Retry access check" })}</Button> : null}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {canSave ? <Button variant="ghost" size="sm" disabled={disabled} onClick={() => { setEdit((value) => !value); setFormat("markdown") }}><Pencil className="size-3.5" aria-hidden="true" />{edit ? t("aiChat.guide.read", { defaultValue: "Read guide" }) : t("aiChat.guide.edit", { defaultValue: "Edit guide" })}</Button> : null}
         {guide.html && !edit && !dirty ? <div className="flex gap-1" aria-label={t("aiChat.guide.format", { defaultValue: "Document format" })}>
           <Button variant={format === "markdown" ? "secondary" : "ghost"} size="sm" aria-pressed={format === "markdown"} onClick={() => setFormat("markdown")}>Markdown</Button>
           <Button variant={format === "html" ? "secondary" : "ghost"} size="sm" aria-pressed={format === "html"} onClick={() => setFormat("html")}>{t("aiChat.guide.htmlPreview", { defaultValue: "HTML preview" })}</Button>
         </div> : null}
-        {history && history.length > 0 && onRevisionChange && saved ? <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span>{t("aiChat.guide.history", { defaultValue: "History" })}</span><Select value={String(guide.revision)} disabled={disabled || hasPendingInput} onValueChange={(value) => {
+        {history && history.length > 0 && onRevisionChange && saved ? <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span>{t("aiChat.guide.history", { defaultValue: "History" })}</span><Select value={String(guide.revision)} disabled={disabled || verificationUnavailable || hasPendingInput} onValueChange={(value) => {
           setLocalError(null)
           Promise.resolve(onRevisionChange(Number(value))).catch((cause) => setLocalError(cause instanceof Error ? cause.message : t("aiChat.guide.openFailed", { defaultValue: "The document could not be opened. Try again." })))
         }}><SelectTrigger className="max-w-48 text-foreground" aria-label={t("aiChat.guide.history", { defaultValue: "History" })}><SelectValue /></SelectTrigger><SelectContent>{history.map((revision) => <SelectItem key={revision.revision} value={String(revision.revision)}>{t("aiChat.guide.revision", { defaultValue: "Revision {{revision}}", revision: revision.revision })} · {labels[revision.reviewState]}</SelectItem>)}</SelectContent></Select></label> : null}
@@ -204,9 +207,9 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
       {followUp ? <div role="status" className="max-h-40 overflow-y-auto rounded-lg border border-border bg-background p-3 text-sm"><MarkdownView value={guideMarkdownWithoutHtml(followUp)} /></div> : null}
       {onAsk ? <form className="flex items-end gap-2" onSubmit={(event) => { event.preventDefault(); void ask() }}>
         <label className="min-w-0 flex-1" htmlFor={`${id}-question`}><span className="sr-only">{t("aiChat.guide.ask", { defaultValue: "Ask about this document" })}</span><Textarea variant="plain" id={`${id}-question`} placeholder={t("aiChat.guide.ask", { defaultValue: "Ask about this document" })} rows={2} value={question} disabled={disabled} onChange={(event) => setQuestion(event.target.value)} className="max-h-28 min-h-16 resize-none bg-background" /></label>
-        <Button type="submit" disabled={disabled || !question.trim()}>{pending === "ask" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}{t("aiChat.guide.send", { defaultValue: "Send" })}</Button>
+        <Button type="submit" disabled={disabled || verificationUnavailable || !question.trim()}>{pending === "ask" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}{t("aiChat.guide.send", { defaultValue: "Send" })}</Button>
       </form> : null}
-      {canSave ? <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{t("aiChat.guide.saveScope", { defaultValue: "Save to {{module}} · current company", module: filingLabel })}</span><Button disabled={disabled || !title.trim() || !module.trim() || !markdown.trim() || (saved && !dirty)} onClick={() => void save()}>{pending === "save" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}{saved ? t("aiChat.guide.saveRevision", { defaultValue: "Save new revision" }) : t("aiChat.guide.save", { defaultValue: "Save guide" })}</Button></div> : null}
+      {canSave ? <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{t("aiChat.guide.saveScope", { defaultValue: "Save to {{module}} · current company", module: filingLabel })}</span><Button disabled={disabled || verificationUnavailable || !title.trim() || !module.trim() || !markdown.trim() || (saved && !dirty)} onClick={() => void save()}>{pending === "save" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}{saved ? t("aiChat.guide.saveRevision", { defaultValue: "Save new revision" }) : t("aiChat.guide.save", { defaultValue: "Save guide" })}</Button></div> : null}
     </footer>
   </section>
 }

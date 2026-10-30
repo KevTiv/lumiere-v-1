@@ -82,3 +82,46 @@ Merged main `58441915` in `252b3535` after PRs #308 and #311 landed. This preser
 4. A dedicated contextual `Explain this error` control on admitted ERP forms remains to be wired through the existing owner. Contextual chat and existing draft/action-review paths are reused; this slice does not certify every record-entry/recovery journey.
 
 No provider completion, production provisioning, feature merge into main, or deployment is recorded here.
+
+
+## Main integration and retained-edit correction (2026-10-30)
+
+Merged main `3d6f32c2` in `31987fe0`, retaining PR #315's scoped assistant
+remount, late-result protection and visible history-save failures alongside
+exact guide-reference metadata. The pinned guide contracts remain `0.3.158`.
+
+Independent source review found that focus/interval revalidation unmounted the
+guide editor on any read failure, and an unpinned document URL could follow a
+newer head over a dirty editor. Both the production modal and dedicated page now
+retain title, Markdown and an unsent question after transient transport failures.
+Save, follow-up and revision actions remain blocked until the explicit access
+retry succeeds. Authoritative 401/403/404/410 responses and actor/company scope
+changes clear protected content. Unpinned links discover their revision once;
+background reads check that exact immutable revision. Per-read ordering and
+aborted-effect checks reject older results after a newer successful check.
+Changing display translations no longer reinitializes a dirty modal. Acknowledged
+new revisions invalidate pending old reads. Unsaved guide requests and follow-up
+conversation work retain the canonical actor/company history scope.
+
+Local validation of this correction:
+
+- 37 focused UI tests pass, including thirteen tests mounting the production modal
+  and dedicated-page owners. They cover transient failure/retry, retained fields,
+  denied content removal/reopen, actor changes, initial-load retry, older denied responses
+  arriving after newer success, exact-revision checks and translation changes.
+- Nineteen Node helper/reference tests pass with explicit Node 24 no-isolation
+  execution; no test-file-only discovery count is used as a pass.
+- All seven Chromium guide fixture scenarios pass, including modal/full-page
+  continuity, existing ERP draft protection, failed-save retention, static HTML
+  isolation and zero horizontal overflow at 320px and 390px.
+- Changed-source lint, translation keys/duplicate JSON, locale/interpolation,
+  Kinyarwanda overrides, shared Select checks, immutable operation transport,
+  unchanged opaque-record baseline (2261), and finance operation inventory pass.
+- Full web and UI TypeScript pass against the exact immutable `0.3.158` contracts.
+  Local dependency setup initially omitted the contracts package's peer bindings;
+  that setup failure is not counted as a source/typecheck pass.
+
+These checks are source/model and synthetic-browser evidence. They do not close
+item 1 of Remaining admission work. Authenticated ERP save/reload/new-conversation
+retrieval, denial/company/stale-edit scenarios and restart/reconnect still need
+an integrated real-service acceptance run on the final merged candidate.

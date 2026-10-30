@@ -16,7 +16,7 @@ import {
 import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
 import { AssistantGuideHost } from "../../components/assistant-guide-host"
 import { AssistantGuideConversationProvider, useAssistantGuideConversation } from "@/lib/assistant-guide-context"
-import { guideDraftQuestion, guideQuestionEdits, guideQuestionContext, guideLibraryHref, guideReferencesMetadata, parseStoredGuideReferences, readAssistantGuide, withGuideReferencesMetadata } from "@/lib/assistant-guides"
+import { guideDraftQuestion, guideQuestionEdits, guideQuestionContext, guideRequestInScope, guideLibraryHref, guideReferencesMetadata, parseStoredGuideReferences, readAssistantGuide, withGuideReferencesMetadata } from "@/lib/assistant-guides"
 import { isSavedGuide, type GuideDocument, type GuideDraft, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
 import { EntityCurrencyBoundary } from "@/lib/entity-currency-boundary"
 import { useErpSession } from "@lumiere/erp-session"
@@ -133,10 +133,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const currentHistoryScope = useRef(historyScope)
   currentHistoryScope.current = historyScope
   const [selectedScope, setSelectedScope] = useState("current")
-  const [openGuide, setOpenGuide] = useState<OpenGuideRequest | null>(null)
+  const [openGuide, setOpenGuide] = useState<{ scope: string; request: OpenGuideRequest } | null>(null)
   const guideConversation = useAssistantGuideConversation()
-  const activeScope = useRef("")
-  activeScope.current = `${orgId}:${operatingCompanyId ?? ""}`
+  const activeScope = useRef<string | null>(null)
+  activeScope.current = actorHistoryScope
   const workspaceScope = useMemo(
     () => resolveAiWorkspaceScope(selectedScope, route, selection),
     [selectedScope, route, selection],
@@ -316,7 +316,9 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     () => ({
       ...props.config,
       guideLibraryHref: operatingCompanyId ? guideLibraryHref(String(operatingCompanyId), module ?? undefined) : undefined,
-      onOpenGuide: (request: OpenGuideRequest) => setOpenGuide(request),
+      onOpenGuide: (request: OpenGuideRequest) => {
+        if (actorHistoryScope) setOpenGuide({ scope: actorHistoryScope, request })
+      },
       onApproveActionDraft: async (draft: { draftId: number; companyId?: number }) => {
         await approveActionDraft.mutateAsync({
           draftId: draft.draftId,
@@ -363,6 +365,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     }),
     [
       approveActionDraft,
+      actorHistoryScope,
       citeSource,
       operatingCompanyId,
       props.config,
@@ -552,8 +555,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 
   const onGuideSaved = useCallback(async (guide: GuideDocument) => {
+    const scope = actorHistoryScope
+    if (!scope || activeScope.current !== scope) throw new Error("The conversation scope changed")
     if (!sessionKey || !orgReady || operatingCompanyId == null || guide.companyId !== String(operatingCompanyId)) throw new Error("The conversation scope changed")
     await ensureSession()
+    if (activeScope.current !== scope) throw new Error("The conversation scope changed")
     await appendMessage.mutateAsync({
       session_key: sessionKey,
       role: "assistant",
@@ -561,10 +567,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       sources_json: "[]",
       metadata: guideReferencesMetadata(guide),
     })
-  }, [appendMessage, ensureSession, operatingCompanyId, orgReady, sessionKey])
+  }, [appendMessage, ensureSession, operatingCompanyId, orgReady, sessionKey, actorHistoryScope])
 
   const askAboutGuide = useCallback(async (guide: GuideDraft | GuideDocument, question: string, draftOverride?: GuideDraft) => {
-    const scope = `${orgId}:${operatingCompanyId ?? ""}`
+    const scope = actorHistoryScope
+    if (!scope || activeScope.current !== scope) throw new Error("The conversation scope changed")
     if (guide.companyId !== String(operatingCompanyId) || !sessionKey) throw new Error("Open the guide in the current company before asking a question.")
     let references: GuideReference[] | undefined
     let currentGuide = guide
@@ -577,7 +584,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     const reply = await onSendMessage(question, references, currentGuide, Boolean(draftOverride))
     if (activeScope.current !== scope) throw new Error("The company changed while answering. Reopen the guide in the current company.")
     return reply.content
-  }, [onSendMessage, operatingCompanyId, orgId, sessionKey])
+  }, [onSendMessage, operatingCompanyId, actorHistoryScope, sessionKey])
 
   useEffect(() => guideConversation.register(askAboutGuide), [guideConversation.register, askAboutGuide])
 
@@ -595,7 +602,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
     />
-    <AssistantGuideHost request={openGuide} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
+    <AssistantGuideHost request={guideRequestInScope(openGuide, actorHistoryScope)} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
       onClose={() => setOpenGuide(null)} onSaved={onGuideSaved} onAsk={askAboutGuide} />
   </>
 }

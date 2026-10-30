@@ -6,7 +6,10 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
-use crate::core::organization::require_company_in_organization;
+use crate::core::organization::{
+    default_company_id_for_organization, require_company_in_organization,
+};
+use crate::core::permissions::effective_roles;
 use crate::core::users::user_organization;
 use crate::documents::knowledge::{knowledge_article, KnowledgeArticle};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -135,17 +138,34 @@ fn validate(params: &SaveKnowledgeGuideParams) -> Result<(), String> {
 
 fn require_company_membership(ctx: &ReducerContext, org: u64, company: u64) -> Result<(), String> {
     require_company_in_organization(ctx, org, company)?;
-    if !ctx
+    let memberships: Vec<_> = ctx
         .db
         .user_organization()
-        .user_org_by_org()
-        .filter(&org)
-        .any(|membership| {
-            membership.user_identity == ctx.sender()
-                && membership.is_active
-                && (membership.company_id.is_none() || membership.company_id == Some(company))
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .filter(|membership| membership.organization_id == org && membership.is_active)
+        .collect();
+    let [membership] = memberships.as_slice() else {
+        return Err("permission denied: guide company membership required".to_string());
+    };
+    // Match the API's company selection authority: only a current exact *:*
+    // role grants every company. Canonical effective roles exclude inactive,
+    // expired and foreign assignments; a resource wildcard is insufficient.
+    let organization_wide = effective_roles(ctx, org, ctx.sender()).is_ok_and(|roles| {
+        roles.iter().any(|role| {
+            role.permissions
+                .iter()
+                .any(|permission| permission == "*:*")
         })
-    {
+    });
+    if organization_wide {
+        return Ok(());
+    }
+    let allowed_company = match membership.company_id {
+        Some(company) => company,
+        None => default_company_id_for_organization(ctx, org)?,
+    };
+    if company != allowed_company {
         return Err("permission denied: guide company membership required".to_string());
     }
     Ok(())

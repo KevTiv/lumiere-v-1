@@ -1,8 +1,13 @@
-import type { GuideDocument, GuideDraft, GuideReference } from "@lumiere/ui/lib/assistant-guide-types"
+import type { GuideDocument, GuideDraft, GuideReference, OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
 import { AI_WORKSPACE_SCOPES } from "./ai-workspace-scope"
 import { recordPageHref } from "./record-page-href"
 
 const U64_MAX = 18_446_744_073_709_551_615n
+
+/** An unsaved chat-derived document retains its originating actor/company scope. */
+export function guideRequestInScope(entry: { scope: string; request: OpenGuideRequest } | null, scope: string | null): OpenGuideRequest | null {
+  return scope && entry?.scope === scope ? entry.request : null
+}
 
 export function guideId(value: unknown): string | null {
   if (typeof value !== "string" || !/^[1-9]\d{0,19}$/.test(value)) return null
@@ -140,6 +145,11 @@ export function withGuideReferencesMetadata(raw: string | null | undefined, refe
 
 export class GuideRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message) }
+}
+
+/** Transient transport failures cannot revoke a loaded editor's local work. */
+export function guideAccessRevoked(cause: unknown): boolean {
+  return cause instanceof GuideRequestError && [401, 403, 404, 410].includes(cause.status)
 }
 
 export function boundedGuideSearch(value: string): string {
