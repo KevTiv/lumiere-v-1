@@ -68,11 +68,12 @@ is_terminal_failure() {
 
 deployment_list() {
   local service="$1"
+  local limit="${2:-100}"
   railway deployment list \
     --project "$RAILWAY_PROJECT_ID" \
     --environment "$RAILWAY_ENVIRONMENT" \
     --service "$service" \
-    --limit 100 \
+    --limit "$limit" \
     --json
 }
 
@@ -127,23 +128,56 @@ dump_diagnostics() {
 
 verify_runtime_region() {
   local service="$1"
+  local deployment="$2"
   [[ -n "${RAILWAY_EXPECTED_REGION:-}" ]] || return 0
 
-  local observed
-  if ! observed="$(timeout 45 railway ssh \
+  # Use the active deployment's immutable manifest, not planned service config.
+  # Railway records legacy-to-runtime zone mappings in its deployment metadata.
+  # The current CLI requires registered SSH keys unavailable to project-token CI.
+  if ! jq -e --arg expected "$RAILWAY_EXPECTED_REGION" '
+    def runtime_region($aliases; $configured):
+      [$aliases[] | select(.region == $configured) | .replacementRegion] as $matches
+      | if ($matches | length) == 0 then $configured
+        elif ($matches | length) == 1 then $matches[0]
+        else null end;
+    .meta.serviceManifest.deploy.multiRegionConfig as $config
+    | (.meta.deprecatedRegions // []) as $aliases
+    | if ($config | type) != "object" or ($aliases | type) != "array" then false
+      else
+        [$config | to_entries[] | select(.value != null)] as $placements
+        | ($placements | length) > 0
+          and all($placements[];
+            . as $placement
+            | (.value.numReplicas | type) == "number"
+              and .value.numReplicas > 0
+              and .value.numReplicas == (.value.numReplicas | floor)
+              and runtime_region($aliases; $placement.key) == $expected)
+      end
+  ' >/dev/null <<<"$deployment"; then
+    echo "[railway-release] $service: active deployment has missing, ambiguous or non-$RAILWAY_EXPECTED_REGION placement evidence" >&2
+    return 1
+  fi
+  echo "[railway-release] $service: active deployment region $RAILWAY_EXPECTED_REGION (Railway manifest)"
+}
+
+existing_service_snapshot() {
+  local service="$1"
+  timeout 45 railway status \
     --project "$RAILWAY_PROJECT_ID" \
     --environment "$RAILWAY_ENVIRONMENT" \
-    --service "$service" \
-    printenv RAILWAY_REPLICA_REGION 2>/dev/null)"; then
-    echo "[railway-release] $service: could not read RAILWAY_REPLICA_REGION" >&2
-    return 1
-  fi
-  observed="$(printf '%s' "$observed" | tr -d '\r' | tail -1)"
-  if [[ "$observed" != "$RAILWAY_EXPECTED_REGION" ]]; then
-    echo "[railway-release] $service: expected region $RAILWAY_EXPECTED_REGION, observed ${observed:-<empty>}" >&2
-    return 1
-  fi
-  echo "[railway-release] $service: runtime region $observed"
+    --json | jq -ce \
+      --arg project "$RAILWAY_PROJECT_ID" \
+      --arg environment "$RAILWAY_ENVIRONMENT" \
+      --arg service "$service" '
+        select(.id == $project)
+        | [.environments.edges[].node
+            | select(.id == $environment or .name == $environment)]
+        | select(length == 1) | .[0] as $environment
+        | [$environment.serviceInstances.edges[].node
+            | select((.serviceName == $service or .serviceId == $service)
+              and .environmentId == $environment.id)]
+        | select(length == 1) | .[0]
+      '
 }
 
 wait_for_existing_success() {
@@ -153,16 +187,43 @@ wait_for_existing_success() {
   local status=""
 
   while (( SECONDS < deadline )); do
-    local deployments
-    if deployments="$(deployment_list "$service" 2>/dev/null)"; then
-      deployment_id="$(jq -r '.[0].id // empty' <<<"$deployments")"
-      status="$(jq -r '.[0].status // empty' <<<"$deployments")"
+    local snapshot deployment deployments
+    if snapshot="$(existing_service_snapshot "$service" 2>/dev/null)"; then
+      deployment_id="$(jq -r '.latestDeployment.id // empty' <<<"$snapshot")"
+      status="$(jq -r '.latestDeployment.status // empty' <<<"$snapshot")"
       echo "[railway-release] $service existing deployment ${deployment_id:-<none>}: ${status:-not-listed}"
-      if [[ "$status" == SUCCESS ]]; then
-        verify_runtime_region "$service"
-        return
+      # A watch-path SKIPPED record did not replace the running deployment.
+      # Never fall back past failed, crashed or pending real deployments.
+      if [[ "$status" == SUCCESS || "$status" == SKIPPED ]]; then
+        if ! deployments="$(deployment_list "$service" 1000 2>/dev/null)"; then
+          sleep "$POLL_SECONDS"
+          continue
+        fi
+        # Check history as well: a SKIPPED record may follow a failed rollout.
+        # Require the newest actual deployment, not any older success.
+        local actual_id actual_status
+        actual_id="$(jq -r '[.[] | select(.status != "SKIPPED")][0].id // empty' <<<"$deployments")"
+        actual_status="$(jq -r '[.[] | select(.status != "SKIPPED")][0].status // empty' <<<"$deployments")"
+        if is_terminal_failure "$actual_status"; then
+          dump_diagnostics "$service" "$actual_id"
+          return 1
+        fi
+        if deployment="$(jq -ce '
+          .activeDeployments | select(type == "array" and length == 1) | .[0]
+          | select(.status == "SUCCESS" and .deploymentStopped == false
+            and (.id | type == "string" and length > 0)
+            and (.instances | type == "array"))
+          | .instances |= map(select(.status != "REMOVED" and .status != "REMOVING"))
+          | select(.instances | length > 0 and all(.[]; .status == "RUNNING"))
+        ' <<<"$snapshot")"; then
+          if [[ "$actual_status" == SUCCESS && "$(jq -r '.id' <<<"$deployment")" == "$actual_id" &&
+                ( "$status" == SKIPPED || "$actual_id" == "$deployment_id" ) ]]; then
+            verify_runtime_region "$service" "$deployment" || return 1
+            return
+          fi
+        fi
       fi
-      if is_terminal_failure "$status"; then
+      if [[ "$status" != SKIPPED ]] && is_terminal_failure "$status"; then
         dump_diagnostics "$service" "$deployment_id"
         return 1
       fi
