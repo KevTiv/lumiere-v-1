@@ -116,6 +116,11 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     // Wave D/E ops surface: FX fee on statement create (post advance covered in domain tests).
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     await expect(page.getByTestId("expenses-ops-amount")).toBeVisible()
+    const cardFields = page.getByTestId("expenses-ops-panel")
+    await expect(cardFields.getByLabel("Statement reference", { exact: true })).toBeVisible()
+    await expect(cardFields.getByLabel("Merchant reference", { exact: true })).toBeVisible()
+    await expect(cardFields.getByLabel("Amount", { exact: true })).toHaveAttribute("inputmode", "decimal")
+    await expect(cardFields.getByLabel("FX fee", { exact: true })).toHaveAttribute("inputmode", "decimal")
     await expect(page.getByPlaceholder("FX fee")).toBeVisible()
 
     // Allocations: create a Draft expense via BFF (seed rows are often Approved), then open form.
