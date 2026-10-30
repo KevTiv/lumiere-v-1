@@ -22,7 +22,7 @@ release workflow is deployment evidence, not acceptance of the new work here.
 | #282 | Merged. Historical report 1.0.5 independent certification and live settled-spend acceptance are recorded; this does not certify newer source bindings. |
 | #291 | Merged. Preserve descriptors, queue foundations and disabled budget parking; no production dispatcher may be inferred. |
 | #315 | Merged. Preserve Alpha usability, actor/company history and onboarding configuration. |
-| #309 | Open at 49355068b8cf783129086c016f917c48dee3a610. Guide implementation and history remain owned there; CI and all P0 shards currently pass. Integrated authenticated guide acceptance is still pending in its status document. Do not duplicate it. |
+| #309 | Still open; refreshed head f2d5e8e0700e57a75cd6ad8175127edbf3c4d296. The earlier inspected 49355068 head had green CI/P0. On the new head, Authenticated guide lifecycle and P0 shard 1 fail; shards 2/3 remain pending. It now owns additional current-main guide recovery/company-scope fixes and a required real-stack lifecycle job. Preserve that history and wait for its owner to resolve these gates; do not duplicate the implementation. |
 | #312 | Open at ce7f357f32a8e33ada8d69e41ac0f1a7ba8790b2. CI gate passes; E2E gate fails. Owns broad Alpha translations, including shell, shared chat and Overview. Keep our edits narrow and resolve overlap when integrated. |
 | #313 | Open stacked on #312 at 48df6868cd2e559707245f70c75509598594cb51. CI/E2E gates fail. Owns remaining module/mobile translations. |
 | #317 | Now merged in 8fee8fd5 during implementation. Three disjoint infrastructure files were incorporated into the local testing branch; no release/CI/manifests authored by this program. |
@@ -228,3 +228,7 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   #312/#313. AA-03/04 remain dependent, #309 owns guide work, and live skill
   certification/provider/production gates require their separately authorized
   access and evidence. No full Alpha completion or promotion is declared.
+
+Final #309 refresh: current main remains `8fee8fd5`. #309 remains open at
+`f2d5e8e`; its failed authenticated lifecycle/P0 gates block AA-05 integration.
+This program's passing contact acceptance does not satisfy any guide gate.
