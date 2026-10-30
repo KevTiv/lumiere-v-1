@@ -51,6 +51,22 @@ a focused test is not whole-package acceptance.
 | AA-07 | BLOCKED | Reports/UI owner (coordinator until assigned) | — | AA-01 | Existing owner reports/charts, saved run inspector and artifact/document surfaces | Typed report/record/artifact intents and provenance-preserving normal-user navigation not accepted; arbitrary code/HTML/SQL tools deferred |
 | AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | No local authenticated services/auth state. Fixture/typecheck passes cannot close canonical saved-result or live-provider gates |
 
+## Source states (distinct from admission)
+
+- Implemented owners: authentication/bootstrap settings, scoped company reads,
+  ordinary CRM/Sales/Expense forms, Accounting readiness, governed RAG answer
+  admission and stream provenance, draft review, saved run/evidence inspection.
+- Partial integration: unified conversational dispatch, organization activation,
+  AI form proposal handoff, exact business-effect recovery, structured result
+  navigation and the six source-bound skill candidates.
+- Disabled/deferred: production budget parking/resume without its admitted
+  dispatcher; unrestricted model tools/code/SQL; uncertified capability promotion.
+- Missing accepted evidence: current tenant release/certificate readback for the
+  candidate versions, approved live-provider usefulness/settled-spend tests,
+  integrated guide durability/revocation/restart proof, and full authenticated
+  first-record/action/insight/recovery journeys. Individual source implementations
+  or local fixtures do not change these admission states.
+
 ## Supported-journey readiness by operation
 
 | Journey / module | Existing canonical owner and source evidence | Missing integration / acceptance boundary |
@@ -167,5 +183,5 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   A dedicated PostgreSQL 16 test container is healthy; isolated SpacetimeDB
   tooling is installed and development module/API builds are underway. No existing
   database, production configuration, provider or tenant has been used.
-- No new end-to-end journey accepted. No merges, deployments, contract publications,
+- No new end-to-end journey accepted. No PR merges, production deployments, contract publications,
   live provider dispatches or business-state mutations performed by this program.
