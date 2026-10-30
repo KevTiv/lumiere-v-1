@@ -162,7 +162,7 @@ fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, Strin
             name: format!("Sub C {company_id}"),
             code: code.clone(),
             type_: JournalType::Sale,
-            currency_id: Some(1),
+            currency_id: Some(fixture.currency_id),
             default_account_id: Some(revenue_id),
             suspense_account_id: None,
             loss_account_id: None,
@@ -217,7 +217,7 @@ fn seed_active_subscription(
             name: format!("Wave C {label}"),
             code: plan_code.clone(),
             description: None,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
@@ -264,7 +264,7 @@ fn seed_active_subscription(
         CreatePricelistParams {
             company_id: None,
             name: format!("PL-C-{label}-{org_id}"),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -285,7 +285,7 @@ fn seed_active_subscription(
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -845,6 +845,93 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
     Ok(())
 }
 
+/// Omitted and empty notes, like zero and one intervals, normalize to the same immutable request.
+pub fn test_renew_default_notes_receipt(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let journal_id = seed_journal(ctx, &fixture)?;
+    let (sub_id, _) = seed_active_subscription(ctx, &fixture, journal_id, "RENEW-DEFAULT", 60.0)?;
+    let before = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription before default renewal")?
+        .recurring_next_date;
+    let key = format!("renew-once-{sub_id}");
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 0,
+            notes: None,
+            idempotency_key: Some(key.clone()),
+        },
+    )?;
+    let after = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after default renewal")?
+        .recurring_next_date;
+    if after <= before {
+        return Err("default renewal did not advance its billing interval".into());
+    }
+    let amendment = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .find(|row| row.amendment_type == "renew")
+        .ok_or("default renewal receipt")?;
+    if !amendment.notes.is_empty() {
+        return Err("omitted renewal notes must be stored as the canonical empty value".into());
+    }
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 1,
+            notes: Some(String::new()),
+            idempotency_key: Some(key.clone()),
+        },
+    )?;
+    if renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 1,
+            notes: Some("changed notes".into()),
+            idempotency_key: Some(key),
+        },
+    )
+    .is_ok()
+    {
+        return Err("a default-note request key must reject later changed notes".into());
+    }
+    if ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after default replay")?
+        .recurring_next_date
+        != after
+    {
+        return Err("default-note renewal replay advanced the billing date".into());
+    }
+    require_exact_renewal_capture(ctx, org_id, company_id, sub_id, after)
+}
+
 pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
@@ -860,7 +947,7 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
             name: "To Update".into(),
             code: format!("PLAN-UPD-{org_id}"),
             description: None,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
