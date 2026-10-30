@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { purchasingFinancialSummary } from "./purchasing-financial-summary"
+import { purchasingFinancialSummary, purchasingReviewCounts } from "./purchasing-financial-summary"
 
 const scope = { organizationId: 1n, companyId: 2n }
 const period = { startMs: Date.parse("2026-10-01"), endMs: Date.parse("2026-10-30") }
@@ -52,4 +52,64 @@ test("missing amounts/currency/dates, duplicates and stale/denied reads never be
   }
   assert.equal(summary([order({ amountTotal: 0 })]).value, "USD 0.00")
   assert.equal(summary([]).value, "—")
+})
+
+test("missing vendors suppress ranking without losing exact confirmed order value or merging unknown vendors", () => {
+  const result = summary([order({ partnerId: undefined }), order({ id: "8", partnerId: undefined, amountTotal: 2 })])
+  assert.equal(result.status, "ready")
+  assert.equal(result.value, "USD 14.34")
+  assert.equal(result.vendorsStatus, "unavailable")
+  assert.deepEqual(result.vendors, [])
+  assert.equal(result.openOrders[0].vendorId, "")
+  assert.equal(summary([order()]).vendorsStatus, "ready")
+})
+
+const ready = { status: "ready" as const }
+const review = (patch: Partial<Parameters<typeof purchasingReviewCounts>[0]> = {}) => purchasingReviewCounts({
+  orders: { rows: [order({ receiptStatus: "partial", datePlanned: "2026-10-25" })], state: ready },
+  toApprove: { rows: [order({ state: "ToApprove" })], state: ready },
+  partialReceipt: { rows: [order({ receiptStatus: "partial" })], state: ready },
+  overBilled: { rows: [order({ state: "Confirmed", orderId: "7" })], state: ready },
+  ...patch,
+}, scope, period, previous, Date.parse("2026-10-30"))
+
+test("operational counts reject incomplete scope, duplicate identities and unreadable states across every source", () => {
+  const exact = review()
+  assert.deepEqual([exact.open, exact.pendingReceipt, exact.toApprove, exact.partialReceipt, exact.overBilled], [1, 1, 1, 1, 1])
+  for (const field of ["orders", "toApprove", "partialReceipt", "overBilled"] as const) {
+    for (const patch of [{ id: undefined }, { companyId: undefined }, { organizationId: undefined }, { state: undefined }]) {
+      const candidate = order({ receiptStatus: "partial", ...patch })
+      const result = review({ [field]: { rows: [candidate], state: ready } })
+      assert.equal(field === "orders" ? result.open : result[field], null)
+    }
+    const candidate = order({ state: field === "toApprove" ? "ToApprove" : field === "overBilled" ? "Confirmed" : "Purchase", receiptStatus: "partial", orderId: "7" })
+    const duplicate = review({ [field]: { rows: [candidate, candidate], state: ready } })
+    assert.equal(field === "orders" ? duplicate.open : duplicate[field], null)
+    for (const status of ["loading", "error", "denied", "partial"] as const) {
+      const result = review({ [field]: { rows: [candidate], state: { status } } })
+      assert.equal(field === "orders" ? result.open : result[field], null)
+    }
+    const foreign = review({ [field]: { rows: [{ ...candidate, companyId: 3n }], state: ready } })
+    assert.equal(field === "orders" ? foreign.open : foreign[field], 0)
+    const empty = review({ [field]: { rows: [], state: ready } })
+    assert.equal(field === "orders" ? empty.open : empty[field], 0)
+  }
+})
+
+test("complete operational counts remain usable with masked money, while missing receipt/date inputs gate only affected metrics", () => {
+  const candidate = order({ amountTotal: undefined, currencyId: undefined, receiptStatus: "partial", datePlanned: "2026-10-25" })
+  const counts = review({ orders: { rows: [candidate], state: ready } })
+  assert.equal(counts.open, 1)
+  assert.equal(counts.pendingReceipt, 1)
+  assert.equal(counts.receivedOrNotDue, 0)
+  assert.equal(summary([candidate]).status, "unavailable")
+  const maskedReceipt = review({ orders: { rows: [{ ...candidate, receiptStatus: undefined }], state: ready } })
+  assert.equal(maskedReceipt.open, 1)
+  assert.equal(maskedReceipt.pendingReceipt, null)
+  assert.equal(maskedReceipt.receivedOrNotDue, null)
+  const maskedDate = review({ orders: { rows: [{ ...candidate, dateOrder: undefined, datePlanned: undefined }], state: ready } })
+  assert.equal(maskedDate.open, 1)
+  assert.equal(maskedDate.pendingReceipt, 1)
+  assert.equal(maskedDate.change, undefined)
+  assert.equal(maskedDate.receivedOrNotDue, null)
 })

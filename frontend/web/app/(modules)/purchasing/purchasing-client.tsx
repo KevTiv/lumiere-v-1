@@ -53,8 +53,6 @@ import {
   csvImportForm,
   RecordChatterDialog,
   type TimeRangeValue,
-  isTimestampInRange,
-  percentChange,
   previousPeriodMs,
   timeRangeToMs,
   formNumber,
@@ -102,7 +100,7 @@ import {
 } from "./purchase-order-forms"
 import { usePurchasingWorkflow } from "@lumiere/query-hooks/hooks/purchasing-workflow"
 import { useCreateWorkflowDelegation } from "@lumiere/query-hooks/hooks/approvals"
-import { normalizedTag, recordRef, type TransitionNotice } from "@lumiere/erp-workflows"
+import { recordRef, type TransitionNotice } from "@lumiere/erp-workflows"
 import {
   usePurchaseOrders,
   usePurchaseOrdersToApprove,
@@ -177,10 +175,9 @@ import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import { purchaseOrderListFieldAliases } from "@lumiere/ui/lib/purchasing-entity-configs"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { currencyCodeMap, kpiDate, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
-import { isToReceive, purchaseOrderKpis } from "./purchase-order-kpis"
-import { scopedPurchaseReviewRows } from "./purchase-discrepancies"
-import { purchasingFinancialSummary } from "./purchasing-financial-summary"
+import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { purchaseOrderKpis } from "./purchase-order-kpis"
+import { purchasingFinancialSummary, purchasingReviewCounts } from "./purchasing-financial-summary"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -228,10 +225,6 @@ function poState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
-}
-
-function recordTimestampMs(row: Record<string, unknown>): number {
-  return kpiDate(row.dateOrder ?? row.date_order)?.getTime() ?? 0
 }
 
 function landedCostState(row: Record<string, unknown>): string {
@@ -2079,46 +2072,18 @@ function PurchasingClientLoaded({
     const now = new Date()
     const { startMs, endMs } = timeRangeToMs(dashboardTimeRange, now)
     const previousRange = previousPeriodMs(dashboardTimeRange, now)
-    const inCurrentRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), startMs, endMs)
-    const inPreviousRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
-
     const scope = { organizationId: orgId, companyId: operatingCompanyId }
-    const currentOrders = ordersRead.state.status === "ready" ? scopedPurchaseReviewRows(orders, scope) : []
+    const review = purchasingReviewCounts({
+      orders: { rows: orders, state: ordersRead.state },
+      toApprove: { rows: ordersToApprove, state: ordersToApproveRead.state },
+      partialReceipt: { rows: ordersPartialReceipt, state: ordersPartialReceiptRead.state },
+      overBilled: { rows: linesOverBilled, state: linesOverBilledRead.state },
+    }, scope, { startMs, endMs }, previousRange, now.getTime())
     const financial = purchasingFinancialSummary(orders, currencyCodeMap(currencies), scope, { startMs, endMs }, previousRange,
       financialLocale, { orders: ordersRead.state, currencies: moduleQueryState(currenciesQuery) })
-    const vendorLabel = (id: string) => vendorLabelById.get(id) ?? (id ? t("purchasing.dashboard.exactVendor", { defaultValue: "Vendor #{{id}}", id }) : "—")
-    const isOpenOrder = (o: Record<string, unknown>) =>
-      ["purchase", "draft", "sent", "toapprove"].includes(normalizedTag(o.state))
-    const isConfirmedOrder = (o: Record<string, unknown>) =>
-      ["purchase", "done"].includes(normalizedTag(o.state))
-
-    const openOrders = currentOrders.filter((o) => isOpenOrder(o as Record<string, unknown>))
-    const currentOpenOrders = openOrders.filter((o) => inCurrentRange(o as Record<string, unknown>))
-    const previousOpenOrders = currentOrders.filter(
-      (o) => isOpenOrder(o as Record<string, unknown>) && inPreviousRange(o as Record<string, unknown>),
-    )
-    const pendingReceipt = currentOrders.filter(isToReceive).length
-    const toApprove = scopedPurchaseReviewRows(ordersToApprove, scope).length
-    const partialReceipt = scopedPurchaseReviewRows(ordersPartialReceipt, scope).length
-    const overBilled = scopedPurchaseReviewRows(linesOverBilled, scope).length
-    // Current state proves completion/not-yet-due, not when completed receipts actually arrived.
-    const confirmedWithPlan = currentOrders.filter((o) => {
-      if (!isConfirmedOrder(o as Record<string, unknown>)) return false
-      return kpiDate(o.datePlanned ?? o.date_planned) !== null
-    })
-    const receivedOrNotDueCount = confirmedWithPlan.filter((o) => {
-      const plannedMs = kpiDate(o.datePlanned ?? o.date_planned)?.getTime() ?? 0
-      const receipt = normalizedTag(o.receiptStatus ?? o.receipt_status)
-      if (receipt === "full" || receipt === "received") return true
-      if (plannedMs > 0 && now.getTime() <= plannedMs) return true
-      return false
-    }).length
-    const receivedOrNotDuePct =
-      confirmedWithPlan.length > 0
-        ? Math.round((receivedOrNotDueCount / confirmedWithPlan.length) * 100)
-        : null
+    const vendorLabel = (id: string) => vendorLabelById.get(id) ?? (id
+      ? t("purchasing.dashboard.exactVendor", { defaultValue: "Vendor #{{id}}", id })
+      : t("purchasing.dashboard.vendorUnavailable", { defaultValue: "Vendor unavailable" }))
 
     return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
@@ -2128,8 +2093,8 @@ function PurchasingClientLoaded({
               stats: [
                 {
                   label: t("purchasing.dashboard.openPOs"),
-                  value: ordersRead.state.status === "ready" ? openOrders.length.toString() : "—",
-                  change: ordersRead.state.status === "ready" ? percentChange(currentOpenOrders.length, previousOpenOrders.length) : undefined,
+                  value: review.open?.toString() ?? "—",
+                  change: review.change,
                   icon: "FileText",
                 },
                 {
@@ -2138,27 +2103,27 @@ function PurchasingClientLoaded({
                   change: financial.change,
                   icon: "DollarSign",
                 },
-                { label: t("purchasing.dashboard.pendingReceipt"), value: ordersRead.state.status === "ready" ? pendingReceipt.toString() : "—", icon: "Truck" },
-                { label: t("purchasing.dashboard.awaitingApproval"), value: ordersToApproveRead.state.status === "ready" ? toApprove.toString() : "—", icon: "Clock" },
+                { label: t("purchasing.dashboard.pendingReceipt"), value: review.pendingReceipt?.toString() ?? "—", icon: "Truck" },
+                { label: t("purchasing.dashboard.awaitingApproval"), value: review.toApprove?.toString() ?? "—", icon: "Clock" },
                 {
                   label: t("purchasing.dashboard.partialReceipt", {
                     defaultValue: "Partial receipt",
                   }),
-                  value: ordersPartialReceiptRead.state.status === "ready" ? partialReceipt.toString() : "—",
+                  value: review.partialReceipt?.toString() ?? "—",
                   icon: "Package",
                 },
                 {
                   label: t("purchasing.dashboard.overBilled", {
                     defaultValue: "Over-billed lines",
                   }),
-                  value: linesOverBilledRead.state.status === "ready" ? overBilled.toString() : "—",
+                  value: review.overBilled?.toString() ?? "—",
                   icon: "AlertTriangle",
                 },
                 {
                   label: t("purchasing.dashboard.receivedOrNotDue", {
                     defaultValue: "Received or not yet due",
                   }),
-                  value: receivedOrNotDuePct == null ? "—" : `${receivedOrNotDuePct}%`,
+                  value: review.receivedOrNotDue == null ? "—" : `${review.receivedOrNotDue}%`,
                   icon: "Gauge",
                 },
               ],
@@ -2200,7 +2165,7 @@ function PurchasingClientLoaded({
             data: { columns: [{ key: "vendor", label: t("purchasing.dashboard.vendor", { defaultValue: "Vendor" }) },
               { key: "currency", label: t("purchasing.dashboard.currency", { defaultValue: "Currency" }) },
               { key: "value", label: t("purchasing.dashboard.orderValue", { defaultValue: "Order value" }), align: "right" as const }],
-            rows: financial.status === "ready" ? financial.vendors.map((vendor) => ({ vendor: vendorLabel(vendor.vendorId), currency: vendor.currency, value: vendor.value }))
+            rows: financial.status === "ready" && financial.vendorsStatus === "ready" ? financial.vendors.map((vendor) => ({ vendor: vendorLabel(vendor.vendorId), currency: vendor.currency, value: vendor.value }))
               : [{ vendor: t("common.recordsUnavailable"), currency: "—", value: "—" }] } }
         }
         if (w.id === "pur-po-table") {

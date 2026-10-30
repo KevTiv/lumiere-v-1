@@ -44,6 +44,15 @@ function inScope(row: PurchaseHandoffProjection, scope: OrderToCashScope): boole
 export function scopedPurchaseReviewRows<Row extends PurchaseDiscrepancyRow>(rows: readonly Row[], scope: OrderToCashScope): Row[] {
   return rows.filter((row) => Boolean(parseStrictU64(row.id)) && inScope(row, scope))
 }
+
+/** Counts need complete identities: silently dropping a masked row could report a false zero. */
+export function completeScopedPurchaseReviewRows<Row extends PurchaseDiscrepancyRow>(rows: readonly Row[], scope: OrderToCashScope): Row[] | null {
+  if (scope.organizationId <= 0n || scope.companyId <= 0n
+    || rows.some((row) => !parseStrictU64(row.id) || !parseStrictU64(row.organizationId ?? row.organization_id)
+      || !parseStrictU64(row.companyId ?? row.company_id))) return null
+  const scoped = scopedPurchaseReviewRows(rows, scope)
+  return new Set(scoped.map((row) => String(parseStrictU64(row.id)))).size === scoped.length ? scoped : null
+}
 function tag(value: unknown): string {
   const text = typeof value === "string" ? value : value && typeof value === "object" && "tag" in value ? String(value.tag) : ""
   return text.toLowerCase().replaceAll("_", "")
