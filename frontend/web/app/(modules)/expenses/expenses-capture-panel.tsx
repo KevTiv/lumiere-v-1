@@ -60,6 +60,7 @@ import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
 import { DatePicker } from "@lumiere/ui/components/date-picker"
+import { useExplainErpError } from "@/lib/erp-ai-context"
 
 export function ExpensesCapturePanel({
   organizationId,
@@ -67,6 +68,7 @@ export function ExpensesCapturePanel({
   organizationId: number
 }) {
   const { t } = useTranslation()
+  const explainError = useExplainErpError()
   const orgId = BigInt(organizationId)
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const { identity } = useErpSession()
@@ -410,6 +412,7 @@ export function ExpensesCapturePanel({
           <Alert variant="destructive">
             <AlertDescription data-testid="expenses-capture-status">
               {error}
+              <Button type="button" variant="outline" size="sm" onClick={() => explainError(error)}>{t("common.explainError", { defaultValue: "Explain this error" })}</Button>
             </AlertDescription>
           </Alert>
         ) : null}

@@ -92,6 +92,7 @@ import { useAccountTaxes, useAccountAnalyticAccounts } from "@lumiere/query-hook
 import { allocationLookupRows, expenseAllocationLines } from "./expense-allocation-input"
 import { useExpenseAllocationReadback } from "./use-expense-allocation-readback"
 import { expenseVariantTag } from "@/lib/expense-state"
+import { useExplainErpError } from "@/lib/erp-ai-context"
 import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseDefaultEmployee, expenseEmployeeDefaultForm, expensePricelistLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
 import {
   expenseQuantity,
@@ -195,6 +196,7 @@ function ExpensesClientLoaded({
   const { t } = useTranslation()
   const router = useRouter()
   const { identity } = useErpSession()
+  const explainError = useExplainErpError()
   const { checkPermission, permissionsReady } = useRBAC()
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
@@ -1091,6 +1093,7 @@ function ExpensesClientLoaded({
         isPending={isFormMutationPending}
       />
       <FormModal
+        onExplainError={explainError}
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => {
           if (!open) {
@@ -1185,6 +1188,7 @@ function ExpensesClientLoaded({
       </Dialog> : null}
       {workflowFormConfig && workflowForm && expensesUsable && (workflowForm.kind !== "setAllocations" || allocationReadback.initialized) && (
         <FormModal
+          onExplainError={explainError}
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}
           open={quickActionForm === null}
           onOpenChange={(open) => !open && setWorkflowForm(null)}
