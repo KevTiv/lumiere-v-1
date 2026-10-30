@@ -34,7 +34,8 @@ test("stale queue, missing/duplicate parent, malformed quantities and foreign co
 test("order handoffs verify receipt kind, exact bill IDs/type and scope, with unknown relations kept unavailable", () => {
   const picking = { ...scope, id: "31", purchaseId: order.id, pickingCode: "incoming", state: "Done" }
   const bill = { ...scope, id: "21", moveType: "InInvoice", state: "Draft" }
-  const result = purchaseDiscrepancyHandoffs(order, scope, [picking, { ...picking, id: "32", companyId: 3n }], [bill, { ...bill, id: "22", invoiceOrigin: order.name }])
+  const nameOnlyUnrelatedBill = { ...bill, id: "22", invoiceOrigin: order.name }
+  const result = purchaseDiscrepancyHandoffs(order, scope, [picking, { ...picking, id: "32", companyId: 3n }], [bill, nameOnlyUnrelatedBill])
   assert.equal(result.status, "ready")
   assert.deepEqual(result.links.map((link) => [link.kind, link.id]), [["receipt", "31"], ["bill", "21"]])
   assert.equal(purchaseDiscrepancyHandoffs(order, scope, [], [{ ...bill, moveType: "OutInvoice" }]).status, "unavailable")

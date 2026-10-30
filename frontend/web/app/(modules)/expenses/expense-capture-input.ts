@@ -56,7 +56,7 @@ export function expenseDefaultEmployee(rows: readonly ExpenseLookupRow[], organi
 export function expenseEmployeeDefaultForm(config: FormConfig, employeeId: string | undefined, description: string): FormConfig {
   if (!employeeId) return config
   return { ...config, sections: config.sections.map((section) => ({ ...section, fields: section.fields.map((field) =>
-    field.name === "employeeId" ? { ...field, defaultValue: employeeId, description } : field,
+    field.name === "employeeId" && field.type === "select" ? { ...field, defaultValue: employeeId, description } : field,
   ) })) }
 }
 

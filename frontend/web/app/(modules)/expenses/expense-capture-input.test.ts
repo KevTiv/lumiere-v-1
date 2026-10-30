@@ -37,6 +37,21 @@ test("employee default requires one current company active link to the exact act
   assert.equal(field?.description, "From your linked employee")
 })
 
+test("employee defaults preserve unsupported field shapes and unrelated selectors", () => {
+  const config: FormConfig = { ...newExpenseForm(t), sections: [{ id: "alternate-fields", fields: [
+    { id: "employee-number", name: "employeeId", type: "number", defaultValue: 7, description: "Existing numeric control" },
+    { id: "employee-checkbox", name: "employeeId", type: "checkbox", defaultValue: false },
+    { id: "project", name: "projectId", type: "select", defaultValue: "project-1", options: [{ value: "project-1", label: "Current project" }] },
+  ] }] }
+  const result = expenseEmployeeDefaultForm(config, "9007199254740993", "From your linked employee")
+  for (const [index, field] of config.sections[0].fields.entries()) {
+    assert.equal(result.sections[0].fields[index], field)
+  }
+  assert.equal(result.sections[0].fields[0].defaultValue, 7)
+  assert.equal(result.sections[0].fields[0].description, "Existing numeric control")
+  assert.equal(result.sections[0].fields[1].defaultValue, false)
+})
+
 test("price list currency choices require declared organization/company scope and active state", () => {
   const row = { id: 4n, organizationId: 9n, companyId: null, currencyId: 5n, isActive: true }
   assert.deepEqual(expensePricelistLookupRows([row, { ...row, id: 5n, companyId: 2n }], 9n, 2n).map((row) => row.id), [4n, 5n])
