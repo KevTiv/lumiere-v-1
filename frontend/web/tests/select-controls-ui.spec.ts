@@ -1,9 +1,33 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 import { chooseSelectOptionByValue, chooseSelectOptionByLabel } from "./e2e/helpers-legacy"
+
+async function expectControlSizes(page: Page, minimum: number, aligned: boolean) {
+  const controls = ["control-reference", "control-choice", "control-record", "control-save"].map((id) => page.getByTestId(id))
+  for (const control of controls) await expect(control).toBeVisible()
+  const boxes = await Promise.all(controls.map((control) => control.boundingBox()))
+  for (const box of boxes) {
+    expect(box).not.toBeNull()
+    expect(box!.height).toBeGreaterThanOrEqual(minimum)
+    expect(Math.abs(box!.height - boxes[0]!.height)).toBeLessThanOrEqual(1)
+    if (aligned) expect(Math.abs(box!.y - boxes[0]!.y)).toBeLessThanOrEqual(1)
+  }
+  expect(await page.getByTestId("control-sizing-sample").evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+}
 
 for (const width of [320, 1440]) {
   test.describe(`${width}px shared select controls`, () => {
     test.use({ viewport: { width, height: 900 }, hasTouch: width < 768 })
+    test("form fields and actions share a height and retain persistent labels", async ({ page }) => {
+      await page.goto("/select-controls")
+      if (width < 768) expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
+      await expectControlSizes(page, width < 768 ? 44 : 36, width >= 768)
+      await page.getByText("Control reference", { exact: true }).click()
+      await expect(page.getByTestId("control-reference")).toBeFocused()
+      await page.getByTestId("control-reference").fill("STAT-42")
+      await expect(page.getByText("Control reference", { exact: true })).toBeVisible()
+      await page.getByTestId("control-save").click()
+      await expect(page.getByTestId("control-saved-reference")).toHaveText("STAT-42")
+    })
     test("account options receive pointer clicks above a scrolling posting form", async ({ page }) => {
       await page.goto("/select-controls")
       await page.getByRole("button", { name: "Open posting form" }).click()
@@ -115,3 +139,10 @@ for (const width of [320, 1440]) {
     })
   })
 }
+
+test("shared controls retain equal heights with enlarged text", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/select-controls")
+  await page.addStyleTag({ content: "html { font-size: 20px; }" })
+  await expectControlSizes(page, 44, true)
+})
