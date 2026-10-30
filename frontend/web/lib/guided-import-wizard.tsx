@@ -4,7 +4,11 @@ import { useCallback, useMemo, useState } from "react"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
-import { assertCsvSafeForAi } from "@lumiere/erp-shared/csv-import-safety"
+import { assertCsvSafeForAi, parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
+import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useQueryClient } from "@tanstack/react-query"
+import { apiFetch } from "@/lib/api-fetch"
+import { REVIEW_TARGETS, reviewDatasetFromCsv, type ReviewedImportSource } from "./import-review-model"
 import {
   useAnalyzeImportMapping,
   usePreviewImportMapping,
@@ -80,12 +84,17 @@ function importJobCount(job: ImportJobRow, camel: keyof ImportJobRow, snake: key
 
 export type GuidedImportWizardProps = {
   organizationId: number
+  initialSource?: ReviewedImportSource
+  onReviewSaved?: (id: string) => void
 }
 
-export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) {
+export function GuidedImportWizard({ organizationId, initialSource, onReviewSaved }: GuidedImportWizardProps) {
   const { t } = useTranslation()
   const workspaceProfile = useWorkspaceProfile()
   const orgId = BigInt(organizationId)
+  const companyId = useOperatingCompanyId(organizationId)
+  const queryClient = useQueryClient()
+  const initialParsed = useMemo(() => initialSource ? parseCsvText(initialSource.csv) : null, [initialSource])
 
   const analyze = useAnalyzeImportMapping()
   const preview = usePreviewImportMapping()
@@ -98,12 +107,12 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
   const contactsQuery = useContacts(orgId)
   const productsQuery = useProducts(orgId)
 
-  const [wizardKey, setWizardKey] = useState("contact")
+  const [wizardKey, setWizardKey] = useState(initialSource?.targetEntity ?? "contact")
   const [step, setStep] = useState<WizardStep>("upload")
-  const [csvText, setCsvText] = useState("")
-  const [headers, setHeaders] = useState<string[]>([])
-  const [rows, setRows] = useState<string[][]>([])
-  const [sourceFileName, setSourceFileName] = useState("")
+  const [csvText, setCsvText] = useState(initialSource?.csv ?? "")
+  const [headers, setHeaders] = useState<string[]>(initialParsed?.headers ?? [])
+  const [rows, setRows] = useState<string[][]>(initialParsed?.rows ?? [])
+  const [sourceFileName, setSourceFileName] = useState(initialSource?.fileName ?? "")
   const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
   const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
@@ -348,6 +357,21 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     [previewResult],
   )
   const previewWarnings = previewResult?.warnings.length ?? 0
+  const saveForReview = async () => {
+    if (!companyId || !previewResult || busy) return
+    setBusy(true); setError(null)
+    try {
+      const dataset = await reviewDatasetFromCsv({ title: sourceFileName || entityOption.label, targetEntity, fileName: sourceFileName || "source.csv", csv: csvText, headers, rows, mapping, requiredFields: analysis?.mappings.filter(item => item.required).map(item => item.target_field) ?? [], issues: previewResult.validation_errors })
+      const response = await apiFetch("/api/import-reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ companyId, dataset }) })
+      const result = await response.json()
+      if (!response.ok || typeof result.id !== "string") throw new Error(result.error ?? "Source review could not be saved.")
+      await queryClient.invalidateQueries({ queryKey: ["import-reviews", organizationId, companyId] })
+      onReviewSaved?.(result.id)
+      resetFlow(); setCsvText(""); setHeaders([]); setRows([]); setSourceFileName("")
+      setStatus(t("settings.importReview.saved", { defaultValue: "Saved as a source draft. Review the uncertain rows below." }))
+    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
+    finally { setBusy(false) }
+  }
   const duplicateSkipCount = duplicateStates.filter((item) => item.action === "skip").length
   const mappedColumnCount = Object.values(mapping).filter((value) => value !== "__skip__").length
 
@@ -777,6 +801,11 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
         {step === "map" ? (
           <Button type="button" disabled={preview.isPending} onClick={() => void runPreview()}>
             {t("settings.import.preview", "Preview import")}
+          </Button>
+        ) : null}
+        {step === "preview" ? (
+          <Button type="button" variant="outline" disabled={busy || !companyId || !REVIEW_TARGETS.has(targetEntity) || rows.length > 1000} onClick={() => void saveForReview()}>
+            {t("settings.importReview.saveForReview", { defaultValue: "Save for review" })}
           </Button>
         ) : null}
         {step === "preview" ? (
