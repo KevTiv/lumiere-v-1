@@ -22,11 +22,33 @@ struct CreationOption {
     disabled: bool,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CreationValidation {
+    #[serde(default)]
+    required: bool,
+    #[serde(alias = "minLength")]
+    min_length: Option<u32>,
+    #[serde(alias = "maxLength")]
+    max_length: Option<u32>,
+    min: Option<f64>,
+    max: Option<f64>,
+    pattern: Option<String>,
+    message: Option<String>,
+}
+
 fn effective_validation(raw: &str, required_by_role: bool) -> Result<FieldValidation, String> {
-    let mut validation: FieldValidation =
+    let validation: CreationValidation =
         serde_json::from_str(raw).map_err(|_| "invalid custom-field validation")?;
-    validation.required |= required_by_role;
-    Ok(validation)
+    Ok(FieldValidation {
+        required: validation.required || required_by_role,
+        min_length: validation.min_length,
+        max_length: validation.max_length,
+        min: validation.min,
+        max: validation.max,
+        pattern: validation.pattern,
+        message: validation.message,
+    })
 }
 
 /// Immutable recovery evidence. Never expose this table as an organization feed.
@@ -287,11 +309,15 @@ fn validate_entries_for_form(
     }) {
         let data: serde_json::Value = serde_json::from_str(&personal.field_data_json)
             .map_err(|_| "invalid personal custom-field definition")?;
-        if data
-            .get("validation")
-            .and_then(|validation| validation.get("required"))
-            .and_then(|required| required.as_bool())
-            == Some(true)
+        let validation = effective_validation(
+            &data
+                .get("validation")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({}))
+                .to_string(),
+            false,
+        )?;
+        if validation.required
             && !entries
                 .iter()
                 .any(|entry| entry.field_key == personal.field_id)
@@ -367,7 +393,14 @@ fn validate_entries_for_form(
                     .ok_or("missing custom-field type")?,
             )
             .map_err(|_| "invalid custom-field type")?;
-            let validation: FieldValidation = serde_json::from_value(data.get("validation").cloned().unwrap_or_else(|| serde_json::json!({"required":false,"min_length":null,"max_length":null,"min":null,"max":null,"pattern":null,"message":null}))).map_err(|_| "invalid custom-field validation")?;
+            let validation = effective_validation(
+                &data
+                    .get("validation")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({}))
+                    .to_string(),
+                false,
+            )?;
             let options: Vec<CreationOption> = serde_json::from_value(
                 data.get("options")
                     .cloned()
@@ -633,6 +666,29 @@ mod tests {
             .is_err());
         }
         assert!(effective_validation("invalid", false).is_err());
+    }
+
+    #[test]
+    fn ui_and_native_validation_names_have_one_strict_meaning() {
+        let validation =
+            effective_validation(r#"{"required":false,"minLength":3,"maxLength":5}"#, false)
+                .expect("UI rules");
+        assert!(validate_custom_field_value(
+            "custom:text",
+            &FieldType::Text,
+            &validation,
+            r#""ab""#
+        )
+        .is_err());
+        assert!(validate_custom_field_value(
+            "custom:text",
+            &FieldType::Text,
+            &validation,
+            r#""abcdef""#
+        )
+        .is_err());
+        assert!(effective_validation(r#"{"minLength":3,"min_length":1}"#, false).is_err());
+        assert!(effective_validation(r#"{"unknownConstraint":true}"#, false).is_err());
     }
 
     #[test]
