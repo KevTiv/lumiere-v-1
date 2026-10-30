@@ -35,6 +35,9 @@ fn key(id: u64, revision: u64) -> String {
     format!("guide:{id}:revision:{revision}")
 }
 
+#[cfg(test)]
+mod transport_tests;
+
 /// The existing evidence inspection grant and canonical evidence scope own this
 /// named picker. Saved source pointers are selectors, never read authority.
 pub(super) async fn choices(
@@ -265,7 +268,7 @@ pub(super) async fn evidence(
         .ok_or_else(|| ApiError::Internal("invalid guide review version".into()))?;
     let reviews = state.stdb.query_sql(&format!("SELECT id, review_kind, outcome, review_epoch, reviewer_uid FROM ai_knowledge_review WHERE organization_id = {org} AND company_id = {company} AND version_id = {candidate_id} LIMIT 201")).await.map_err(ApiError::internal)?;
     let dependencies = state.stdb.query_sql(&format!("SELECT requirement, state, acknowledged_by FROM ai_evidence_dependency WHERE organization_id = {org} AND company_id = {company} AND dependent_kind = 'knowledge_version' AND dependent_id = {candidate_id} LIMIT 201")).await.map_err(ApiError::internal)?;
-    let sources_current = references_current(state, org, company, candidate).await?;
+    let sources_current = references_current(&state.stdb, org, company, candidate).await?;
     let verified = sources_current
         && verification_allowed(head, rev, entry, candidate, &reviews, &dependencies);
     let mut current_reviews: Vec<Value> = ["source_fidelity", "domain_interpretation", "implementation"].into_iter().filter_map(|kind| {
@@ -299,7 +302,7 @@ pub(super) async fn evidence(
 /// Recheck canonical records as well as dependency edges: legacy passage status
 /// changes do not necessarily append a source-change event or escalate an edge.
 async fn references_current(
-    state: &AppState,
+    client: &stdb_client::StdbClient,
     org: u64,
     company: u64,
     candidate: &Value,
@@ -313,9 +316,24 @@ async fn references_current(
     if decisions.is_empty() || decisions.len() > 32 || claims.len() > 32 || passages.len() > 32 {
         return Ok(false);
     }
-    let csv = |ids: &BTreeSet<u64>| ids.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
-    let decision_rows=state.stdb.query_sql(&format!("SELECT id, status, adopted_claim_ids, supporting_claim_ids FROM ai_evidence_decision WHERE organization_id = {org} AND company_id = {company} AND id IN ({}) LIMIT 201",csv(&decisions))).await.map_err(ApiError::internal)?;
-    if decision_rows.len() != decisions.len()
+    // SpacetimeDB SQL has no IN expression. Keep one bounded query per level,
+    // using the same parenthesized equality disjunction as scoped role reads.
+    let filter = |ids: &BTreeSet<u64>| {
+        ids.iter()
+            .map(|id| format!("id = {id}"))
+            .collect::<Vec<_>>()
+            .join(" OR ")
+    };
+    let complete = |rows: &[Value], ids: &BTreeSet<u64>| {
+        rows.len() == ids.len()
+            && rows
+                .iter()
+                .filter_map(|row| u64_value(row, "id"))
+                .collect::<BTreeSet<_>>()
+                == *ids
+    };
+    let decision_rows=client.query_sql(&format!("SELECT id, status, adopted_claim_ids, supporting_claim_ids FROM ai_evidence_decision WHERE organization_id = {org} AND company_id = {company} AND ({}) LIMIT 201",filter(&decisions))).await.map_err(ApiError::internal)?;
+    if !complete(&decision_rows, &decisions)
         || decision_rows
             .iter()
             .any(|row| string(row, "status") != Some("accepted"))
@@ -329,8 +347,8 @@ async fn references_current(
     if claims.is_empty() || claims.len() > 200 {
         return Ok(false);
     }
-    let claim_rows=state.stdb.query_sql(&format!("SELECT id, status, supporting_passage_ids, contradicting_passage_ids FROM ai_evidence_claim WHERE organization_id = {org} AND company_id = {company} AND id IN ({}) LIMIT 201",csv(&claims))).await.map_err(ApiError::internal)?;
-    if claim_rows.len() != claims.len()
+    let claim_rows=client.query_sql(&format!("SELECT id, status, supporting_passage_ids, contradicting_passage_ids FROM ai_evidence_claim WHERE organization_id = {org} AND company_id = {company} AND ({}) LIMIT 201",filter(&claims))).await.map_err(ApiError::internal)?;
+    if !complete(&claim_rows, &claims)
         || claim_rows
             .iter()
             .any(|row| string(row, "status") != Some("current"))
@@ -344,8 +362,8 @@ async fn references_current(
     if passages.is_empty() || passages.len() > 200 {
         return Ok(false);
     }
-    let passage_rows=state.stdb.query_sql(&format!("SELECT id, company_id, status, text_state, source_version_id FROM ai_evidence_passage WHERE organization_id = {org} AND id IN ({}) LIMIT 201",csv(&passages))).await.map_err(ApiError::internal)?;
-    if passage_rows.len() != passages.len()
+    let passage_rows=client.query_sql(&format!("SELECT id, company_id, status, text_state, source_version_id FROM ai_evidence_passage WHERE organization_id = {org} AND ({}) LIMIT 201",filter(&passages))).await.map_err(ApiError::internal)?;
+    if !complete(&passage_rows, &passages)
         || passage_rows.iter().any(|row| {
             string(row, "status") != Some("current")
                 || string(row, "text_state") != Some("present")
@@ -362,8 +380,8 @@ async fn references_current(
     if versions.is_empty() {
         return Ok(true);
     }
-    let version_rows=state.stdb.query_sql(&format!("SELECT id, source_id, status, verification FROM ai_evidence_source_version WHERE organization_id = {org} AND id IN ({}) LIMIT 201",csv(&versions))).await.map_err(ApiError::internal)?;
-    if version_rows.len() != versions.len()
+    let version_rows=client.query_sql(&format!("SELECT id, source_id, status, verification FROM ai_evidence_source_version WHERE organization_id = {org} AND ({}) LIMIT 201",filter(&versions))).await.map_err(ApiError::internal)?;
+    if !complete(&version_rows, &versions)
         || version_rows.iter().any(|row| {
             string(row, "status") != Some("current")
                 || string(row, "verification") != Some("inspected")
@@ -378,8 +396,8 @@ async fn references_current(
     if sources.is_empty() {
         return Ok(false);
     }
-    let source_rows=state.stdb.query_sql(&format!("SELECT id, company_id, scope FROM ai_evidence_source WHERE organization_id = {org} AND id IN ({}) LIMIT 201",csv(&sources))).await.map_err(ApiError::internal)?;
-    Ok(source_rows.len() == sources.len()
+    let source_rows=client.query_sql(&format!("SELECT id, company_id, scope FROM ai_evidence_source WHERE organization_id = {org} AND ({}) LIMIT 201",filter(&sources))).await.map_err(ApiError::internal)?;
+    Ok(complete(&source_rows, &sources)
         && source_rows.iter().all(|row| {
             string(row, "scope") == Some("organization")
                 || (string(row, "scope") == Some("company")
@@ -517,7 +535,7 @@ pub(super) async fn record_review(
     {
         return Err(ApiError::BadRequest("invalid guide review".into()));
     }
-    dispatch_session_reducer(&state,&session,"review_ai_knowledge_entry_version",json!([ctx.organization_id(),company,positive_id(version_id)?,{"review_kind":body.review_kind,"outcome":body.outcome,"note":body.note.as_ref().map(|note|json!({"some":note})).unwrap_or_else(||json!({"none":[]}))}])).await?;
+    crate::commands::dispatch_knowledge_guide_review(&state,&session,json!([ctx.organization_id(),company,positive_id(version_id)?,{"review_kind":body.review_kind,"outcome":body.outcome,"note":body.note.as_ref().map(|note|json!({"some":note})).unwrap_or_else(||json!({"none":[]}))}])).await?;
     let guide = revision(&state, &ctx, company, &current, Some(body.revision)).await?;
     Ok(Json(json!({"schemaVersion":1,"guide":guide})))
 }
