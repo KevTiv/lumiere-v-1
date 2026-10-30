@@ -16433,7 +16433,7 @@
       "shortCode": "Short code",
       "shortCodePlaceholder": "ACME",
       "shortCodeHint": "Uppercase letters and numbers, max 8 characters",
-      "approvedCodeHint": "This code is fixed by your organization approval. Your existing organization stays available.",
+      "approvedCodeHint": "This code is fixed by your organization approval. Your existing organization membership is retained.",
       "timezone": "Timezone",
       "currency": "Currency",
       "currencies": {

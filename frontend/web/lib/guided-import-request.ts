@@ -1,4 +1,5 @@
 import { createCsvImportRequest, supportsTrackedCsvImport } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
 
 // UI aliases map to the job tables returned by the existing import API.
 const JOB_TABLES: Record<string, string> = {
@@ -18,5 +19,12 @@ export function guidedImportRequest(args: { organizationId: bigint; companyId: n
   if (!company) throw new Error("The operating company must be loaded before importing.")
   const currencyId = entity === "product" ? String(company.currencyId ?? "") : undefined
   if (currencyId !== undefined && !/^[1-9]\d*$/.test(currencyId)) throw new Error("Configure the operating company’s currency before importing products.")
+  if (entity === "product") {
+    const parsed = parseCsvText(args.csv)
+    const prices = ["sale_price", "cost_price"].map(key => parsed.headers.indexOf(key))
+    if (prices.some(index => index < 0) || parsed.rows.some(row => prices.some(index => !/^\d{1,12}(?:\.\d{1,6})?$/.test((row[index] ?? "").trim())))) {
+      throw new Error("Enter an explicit sale price and cost price for every product. Save unknown prices for review.")
+    }
+  }
   return createCsvImportRequest(args.organizationId, entity, args.csv, args.fileName, { companyId: args.companyId, ...(currencyId === undefined ? {} : { currencyId }) })
 }

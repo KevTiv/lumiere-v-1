@@ -190,7 +190,7 @@ export default function OnboardingPage() {
               maxLength={approvedCode ? 32 : 8}
               placeholder={t("auth.onboarding.shortCodePlaceholder")}
             />
-            <p className="text-xs text-muted-foreground">{approvedCode ? t("auth.onboarding.approvedCodeHint", { defaultValue: "This code is fixed by your organization approval. Your existing organization stays available." }) : t("auth.onboarding.shortCodeHint")}</p>
+            <p className="text-xs text-muted-foreground">{approvedCode ? t("auth.onboarding.approvedCodeHint", { defaultValue: "This code is fixed by your organization approval. Your existing organization membership is retained." }) : t("auth.onboarding.shortCodeHint")}</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
