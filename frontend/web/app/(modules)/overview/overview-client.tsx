@@ -36,6 +36,7 @@ import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { OwnerControlLoop } from "./owner-control-loop"
+import { ActivationChecklistPanel } from "./activation-checklist-panel"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
@@ -362,6 +363,7 @@ function OverviewClientLoaded({
             lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
             pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
           />
+          <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} />
           {workspaceProfile === "finance-alpha" && <DailyWorkWorkspace organizationId={organizationId} summary />}
           <DashboardGrid sections={myWorkSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
           {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
