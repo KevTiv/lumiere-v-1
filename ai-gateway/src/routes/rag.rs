@@ -513,7 +513,13 @@ fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
         .map(|snapshot| {
             let excerpt = serde_json::to_string(&snapshot.row).unwrap_or_default();
             let text_snippet = if excerpt.len() > 280 {
-                format!("{}…", &excerpt[..280])
+                // Keep the existing byte bound without splitting a UTF-8
+                // character in a multilingual ERP record.
+                let mut end = 280;
+                while !excerpt.is_char_boundary(end) {
+                    end -= 1;
+                }
+                format!("{}…", &excerpt[..end])
             } else {
                 excerpt
             };
@@ -1245,6 +1251,44 @@ mod tests {
         assert_eq!(sources[0].kind, "live");
         assert_eq!(sources[0].trust, "authoritative");
         assert_eq!(sources[0].label.as_deref(), Some("Sale order #42"));
+    }
+
+    #[test]
+    fn live_source_snippets_preserve_utf8_and_the_byte_bound() {
+        for character in ["é", "中", "🙂"] {
+            // The JSON prefix is nine bytes, placing the multi-byte character
+            // at byte 279 so the source preview limit falls inside it.
+            let row = json!({"name": format!("{}{character}private tail", "a".repeat(270))});
+            let serialized = row.to_string();
+            assert!(!serialized.is_char_boundary(280));
+            let sources = live_snapshots_to_rag_sources(&[LiveSnapshot {
+                row,
+                ..snapshot_with_total(0.0)
+            }]);
+            let snippet = &sources[0].text_snippet;
+            assert_eq!(snippet, &format!("{}…", &serialized[..279]));
+            assert!(snippet.len() <= 280 + "…".len());
+            assert!(!snippet.contains("private tail"));
+            assert_eq!(sources[0].entity_id.as_deref(), Some("42"));
+        }
+    }
+
+    #[test]
+    fn live_source_snippets_mark_only_truncated_records() {
+        for (name_length, truncated) in [(0, false), (269, false), (270, true)] {
+            let row = json!({"name": "a".repeat(name_length)});
+            let serialized = row.to_string();
+            let sources = live_snapshots_to_rag_sources(&[LiveSnapshot {
+                row,
+                ..snapshot_with_total(0.0)
+            }]);
+            let expected = if truncated {
+                format!("{}…", &serialized[..280])
+            } else {
+                serialized
+            };
+            assert_eq!(sources[0].text_snippet, expected);
+        }
     }
 
     #[test]
