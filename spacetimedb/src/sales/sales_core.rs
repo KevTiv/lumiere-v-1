@@ -832,7 +832,7 @@ pub(crate) fn create_sale_order_record(
         ..order
     });
 
-    crate::forms::record_creation::finish_creation(
+    let creation_receipt = crate::forms::record_creation::finish_creation(
         ctx,
         organization_id,
         company_id,
@@ -862,6 +862,15 @@ pub(crate) fn create_sale_order_record(
         },
     );
 
+    if let Some(receipt) = creation_receipt {
+        crate::forms::record_creation_persistence::record_quotation_creation(
+            ctx,
+            organization_id,
+            company_id,
+            order.id,
+            &receipt,
+        )?;
+    }
     Ok(order.id)
 }
 

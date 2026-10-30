@@ -199,7 +199,7 @@ pub fn create_purchase_order_once(
     ctx.db
         .purchase_order_creation_operation()
         .insert(PurchaseOrderCreationOperation {
-            id,
+            id: id.clone(),
             organization_id,
             company_id,
             operation_key,
@@ -208,5 +208,12 @@ pub fn create_purchase_order_once(
             created_by: ctx.sender(),
             created_at: ctx.timestamp,
         });
+    crate::forms::record_creation_persistence::record_purchase_order_creation(
+        ctx,
+        organization_id,
+        company_id,
+        purchase_order_id,
+        &id,
+    )?;
     Ok(())
 }

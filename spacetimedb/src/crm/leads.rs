@@ -546,7 +546,7 @@ pub fn create_lead(
         metadata: params.metadata,
     });
 
-    crate::forms::record_creation::finish_creation(
+    let creation_receipt = crate::forms::record_creation::finish_creation(
         ctx,
         organization_id,
         operating_company_id,
@@ -572,6 +572,15 @@ pub fn create_lead(
         },
     );
 
+    if let Some(receipt) = creation_receipt {
+        crate::forms::record_creation_persistence::record_lead_creation(
+            ctx,
+            organization_id,
+            operating_company_id,
+            lead.id,
+            &receipt,
+        )?;
+    }
     Ok(())
 }
 

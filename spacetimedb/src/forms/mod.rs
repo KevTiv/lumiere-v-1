@@ -43,6 +43,7 @@ use crate::types::AccountMoveState;
 
 pub mod migrations;
 pub(crate) mod record_creation;
+pub(crate) mod record_creation_persistence;
 
 /// Max custom-field entries accepted in one EAV upsert (bounds WASM work).
 const MAX_CUSTOM_FIELD_ENTRIES: usize = 64;

@@ -699,10 +699,17 @@ pub fn create_manual_account_invoice(
         organization_id,
         params.company_id,
         ACTION_KIND,
-        params.idempotency_key,
+        params.idempotency_key.clone(),
         payload_fingerprint,
         "account_move",
         move_record.id,
     );
+    crate::forms::record_creation_persistence::record_manual_invoice_creation(
+        ctx,
+        organization_id,
+        params.company_id,
+        move_record.id,
+        &params.idempotency_key,
+    )?;
     Ok(())
 }

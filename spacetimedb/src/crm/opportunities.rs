@@ -709,7 +709,7 @@ pub fn create_opportunity(
         metadata: params.metadata,
     });
 
-    crate::forms::record_creation::finish_creation(
+    let creation_receipt = crate::forms::record_creation::finish_creation(
         ctx,
         organization_id,
         operating_company_id,
@@ -736,6 +736,15 @@ pub fn create_opportunity(
         },
     );
 
+    if let Some(receipt) = creation_receipt {
+        crate::forms::record_creation_persistence::record_opportunity_creation(
+            ctx,
+            organization_id,
+            operating_company_id,
+            opp.id,
+            &receipt,
+        )?;
+    }
     Ok(())
 }
 

@@ -14,6 +14,7 @@ use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::forms::record_custom_field_value;
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountMoveState, JournalType, MoveType, TaxAmountType, TaxTypeUse};
@@ -341,6 +342,39 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
 
     if custom_count() != 1 {
         return Err("manual invoice replay duplicated custom EAV rows".into());
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&fixture.organization_id)
+        .filter(|commit| {
+            commit.operation_id == "erp.create_manual_account_invoice"
+                && commit.correlation_id == receipt.id
+        })
+        .collect();
+    if commits.len() != 1 {
+        return Err("manual invoice replay duplicated or lost durable source commit".into());
+    }
+    let rows: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&fixture.organization_id)
+        .filter(|row| row.commit_sequence == commits[0].sequence)
+        .collect();
+    for (table, expected) in [
+        ("account_move", 1),
+        ("account_move_line", 3),
+        ("record_custom_field_value", 1),
+        ("accounting_operation_receipt", 1),
+        ("audit_log", 2),
+    ] {
+        if rows.iter().filter(|row| row.table_name == table).count() != expected {
+            return Err(format!(
+                "manual invoice source commit has wrong {table} coverage"
+            ));
+        }
     }
     let before_invalid = ctx
         .db

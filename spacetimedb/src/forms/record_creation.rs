@@ -501,9 +501,9 @@ pub(crate) fn finish_creation(
     model: &str,
     record_id: u64,
     intent: Option<CreationIntent>,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     let Some(intent) = intent else {
-        return Ok(());
+        return Ok(None);
     };
     persist_new_record_fields(
         ctx,
@@ -513,6 +513,7 @@ pub(crate) fn finish_creation(
         record_id,
         &intent.entries,
     );
+    let receipt_id = intent.id.clone();
     ctx.db
         .record_creation_receipt()
         .insert(RecordCreationReceipt {
@@ -526,7 +527,7 @@ pub(crate) fn finish_creation(
             created_by: ctx.sender(),
             created_at: ctx.timestamp,
         });
-    Ok(())
+    Ok(Some(receipt_id))
 }
 
 /// Owners with an existing immutable idempotency receipt (Accounting) reuse the

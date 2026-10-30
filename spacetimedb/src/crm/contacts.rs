@@ -420,7 +420,7 @@ pub fn create_contact(
         metadata: params.metadata,
     });
 
-    crate::forms::record_creation::finish_creation(
+    let creation_receipt = crate::forms::record_creation::finish_creation(
         ctx,
         organization_id,
         operating_company_id,
@@ -446,6 +446,15 @@ pub fn create_contact(
         },
     );
 
+    if let Some(receipt) = creation_receipt {
+        crate::forms::record_creation_persistence::record_contact_creation(
+            ctx,
+            organization_id,
+            operating_company_id,
+            contact.id,
+            &receipt,
+        )?;
+    }
     Ok(())
 }
 

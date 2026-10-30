@@ -4,6 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::permissions::{role, Role};
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::users::{
     find_user_profile_for_organization, user_organization, user_profile, UserOrganization,
     UserProfile,
@@ -163,6 +164,75 @@ fn exact_saved(
         || values[0].value_json != r#""Accepted""#
     {
         return Err("created record did not commit its exact custom value once".into());
+    }
+    let operation = if model == "contact" {
+        "erp.create_contact"
+    } else {
+        "erp.create_sale_order"
+    };
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&fixture.organization_id)
+        .filter(|commit| commit.operation_id == operation && commit.correlation_id == id)
+        .collect();
+    if commits.len() != 1 || commits[0].actor_identity != ctx.sender() {
+        return Err(
+            "configured create has no unique actor-scoped durable commit (or replay duplicated it)"
+                .into(),
+        );
+    }
+    let rows: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&fixture.organization_id)
+        .filter(|row| row.commit_sequence == commits[0].sequence)
+        .collect();
+    for table in [
+        model,
+        "record_custom_field_value",
+        "record_creation_receipt",
+    ] {
+        if rows.iter().filter(|row| row.table_name == table).count() != 1 {
+            return Err(format!("configured creation commit omitted exact {table}"));
+        }
+    }
+    for row in &rows {
+        let value: serde_json::Value = serde_json::from_str(
+            row.row_json
+                .as_deref()
+                .ok_or("creation commit lacks complete row")?,
+        )
+        .map_err(|error| error.to_string())?;
+        if value["organization_id"].as_u64() != Some(fixture.organization_id) {
+            return Err("creation commit captured another organization".into());
+        }
+        if row.table_name == "record_creation_receipt"
+            || row.table_name == "record_custom_field_value"
+        {
+            if value["company_id"].as_u64() != Some(fixture.company_id) {
+                return Err("creation commit captured another company's recovery values".into());
+            }
+        }
+    }
+    if rows
+        .iter()
+        .filter(|row| row.table_name == "audit_log")
+        .count()
+        != 2
+    {
+        return Err("creation commit omitted canonical business or custom-field audit".into());
+    }
+    if model == "sale_order"
+        && rows
+            .iter()
+            .filter(|row| row.table_name == "document_sequence")
+            .count()
+            != 1
+    {
+        return Err("quotation commit omitted document sequence".into());
     }
     Ok(receipt.record_id)
 }
