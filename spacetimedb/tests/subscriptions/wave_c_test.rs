@@ -544,6 +544,7 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
         RenewSubscriptionParams {
             intervals: 2,
             notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
         },
     )?;
     let after = ctx
@@ -563,6 +564,83 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
             .as_secs()
     {
         return Err("renew should push recurring_next_date forward".into());
+    }
+
+    let renewal_count = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .filter(|row| row.amendment_type == "renew")
+        .count();
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 2,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )?;
+    let replayed = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("sub after replay")?;
+    let replay_count = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .filter(|row| row.amendment_type == "renew")
+        .count();
+    if replayed.recurring_next_date != after || replay_count != renewal_count || renewal_count != 1
+    {
+        return Err("renewal replay advanced billing or created another amendment".into());
+    }
+    if renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 3,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )
+    .is_ok()
+    {
+        return Err("renewal key reuse with different intervals must reject".into());
+    }
+    if renew_subscription(
+        ctx,
+        org_id,
+        company_id + 1,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 2,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )
+    .is_ok()
+    {
+        return Err("renewal replay must enforce company ownership before resolving".into());
+    }
+    if ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("sub after rejected replay")?
+        .recurring_next_date
+        != after
+    {
+        return Err("rejected renewal replay changed the billing date".into());
     }
 
     generate_subscription_invoice(
@@ -603,6 +681,32 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
     let closed = ctx.db.subscription().id().find(&sub_id).ok_or("sub")?;
     if closed.state != "closed" || closed.is_active {
         return Err("expected closed after cancel".into());
+    }
+    let closed_next_date = closed.recurring_next_date;
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 2,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )?;
+    let closed_after_replay = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("closed replay")?;
+    if closed_after_replay.state != "closed"
+        || closed_after_replay.recurring_next_date != closed_next_date
+    {
+        return Err(
+            "resolving a completed renewal must not reopen or advance a later-closed subscription"
+                .into(),
+        );
     }
     if !closed.metadata.contains("entitlement_revoke_pending") {
         return Err("expected entitlement revoke hook in metadata".into());

@@ -52,6 +52,7 @@ import {
   type ResolvedOperationEffectOutcome,
 } from './operation-effect';
 import { resolveExactRecordState } from './exact-record-state';
+import { executeSubscriptionRenewal, requireMatchingRenewalCommand, resolveSubscriptionRenewalEffect, type RenewalRequest, type SubscriptionRenewalEffectRef } from './subscription-renewal';
 
 function requireSelectedCompany(companyId: bigint | undefined): bigint {
   if (companyId == null || companyId <= 0n) {
@@ -813,24 +814,37 @@ export function useResumeSubscription(
 export function useRenewSubscription(
   organizationId: bigint,
   companyId?: bigint,
+  actorIdentity?: string | null,
 ) {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    ResolvedOperationEffectOutcome<SubscriptionRenewalEffectRef>,
     Error,
-    { subscriptionId: bigint; params: RenewSubscriptionParams }
+    { subscriptionId: bigint; params: RenewSubscriptionParams; request: RenewalRequest; reconcileOnly?: boolean }
   >({
-    mutationFn: async ({ subscriptionId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost('renew_subscription', {
-        companyId: requireSelectedCompany(companyId),
-        subscriptionId: subscriptionId,
-        params: stdbParamsToJson(params as object, 'RenewSubscriptionParams'),
+    retry: false,
+    mutationFn: async ({ subscriptionId, params, request, reconcileOnly }) => {
+      const activeCompanyId = requireSelectedCompany(companyId);
+      if (!actorIdentity) throw new Error('The authenticated actor is required for renewal recovery');
+      const encodedParams = stdbParamsToJson(params as object, 'RenewSubscriptionParams');
+      requireMatchingRenewalCommand(encodedParams, request);
+      const resolveEffect = async () => resolveSubscriptionRenewalEffect(
+        await fetchQueryList('/api/query/subscription-amendments', 'Renewal history could not be verified'),
+        organizationId, activeCompanyId, subscriptionId, actorIdentity, request,
+      );
+      return executeSubscriptionRenewal({
+        resolveEffect,
+        reconcileOnly,
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost('renew_subscription', {
+            companyId: activeCompanyId, subscriptionId,
+            params: encodedParams,
+          });
+          return decodeOperationDispatch(await apiFetch(urlPath, init), 'Failed to renew subscription');
+        },
+        afterDispatch: () => invalidateSubscriptionLifecycle(qc, organizationId),
+        readbackAttempts: 6, readbackDelayMs: 150,
       });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to renew subscription');
-    },
-    onSuccess: async () => {
-      await invalidateSubscriptionLifecycle(qc, organizationId);
     },
   });
 }

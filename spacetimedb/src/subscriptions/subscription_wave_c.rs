@@ -1,5 +1,6 @@
 //! Wave C — amendments, proration, pause/resume, renew, cancel+credit, plan update.
 
+use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -99,6 +100,8 @@ pub struct RenewSubscriptionParams {
     /// Number of billing intervals to extend the term / next date.
     pub intervals: u32,
     pub notes: Option<String>,
+    /// Stable actor-scoped request identity. Matching replays never advance billing twice.
+    pub idempotency_key: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -810,10 +813,66 @@ pub fn renew_subscription(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "subscription", "write")?;
     let subscription = load_owned_subscription(ctx, organization_id, company_id, subscription_id)?;
+    let key = params.idempotency_key.as_deref().map(str::trim);
+    if key.is_some_and(|key| key.is_empty() || key.len() > 200) {
+        return Err("renewal idempotency key must contain 1 to 200 bytes".into());
+    }
+    let intervals = params.intervals.max(1);
+    let notes = params.notes.clone().unwrap_or_default();
+    let fingerprint = renewal_fingerprint(
+        organization_id,
+        company_id,
+        subscription_id,
+        &ctx.sender().to_hex(),
+        intervals,
+        &notes,
+    );
+    if let Some(key) = key {
+        let mut matched = false;
+        for amendment in ctx
+            .db
+            .subscription_amendment()
+            .subscription_amendment_by_sub()
+            .filter(&subscription_id)
+        {
+            if amendment.organization_id != organization_id
+                || amendment.company_id != company_id
+                || amendment.created_by != ctx.sender()
+                || amendment.amendment_type != "renew"
+            {
+                continue;
+            }
+            let Ok(metadata) = serde_json::from_str::<serde_json::Value>(&amendment.metadata)
+            else {
+                continue;
+            };
+            if metadata
+                .get("idempotency_key")
+                .and_then(|value| value.as_str())
+                != Some(key)
+            {
+                continue;
+            }
+            if metadata
+                .get("request_fingerprint")
+                .and_then(|value| value.as_str())
+                != Some(fingerprint.as_str())
+            {
+                return Err("renewal idempotency key was already used for different values".into());
+            }
+            if matched {
+                return Err("multiple renewal receipts match this request".into());
+            }
+            matched = true;
+        }
+        // Authorization and exact ownership were checked before looking for a prior effect.
+        if matched {
+            return Ok(());
+        }
+    }
     if subscription.state != "active" && subscription.state != "paused" {
         return Err("Only active or paused subscriptions can be renewed".to_string());
     }
-    let intervals = params.intervals.max(1);
     let before = serde_json::json!({
         "recurring_next_date": subscription.recurring_next_date
             .to_duration_since_unix_epoch()
@@ -881,8 +940,12 @@ pub fn renew_subscription(
         0.0,
         None,
         None,
-        params.notes.unwrap_or_default(),
-        String::new(),
+        notes,
+        key.map(|key| {
+            serde_json::json!({ "idempotency_key": key, "request_fingerprint": fingerprint })
+                .to_string()
+        })
+        .unwrap_or_default(),
     );
     write_audit_log_v2(
         ctx,
@@ -902,6 +965,50 @@ pub fn renew_subscription(
         },
     );
     Ok(())
+}
+
+fn renewal_fingerprint(
+    organization_id: u64,
+    company_id: u64,
+    subscription_id: u64,
+    actor: &str,
+    intervals: u32,
+    notes: &str,
+) -> String {
+    let canonical = serde_json::json!([
+        organization_id.to_string(),
+        company_id.to_string(),
+        subscription_id.to_string(),
+        actor,
+        intervals,
+        notes
+    ])
+    .to_string();
+    hex::encode(Sha256::digest(canonical.as_bytes()))
+}
+
+#[cfg(test)]
+mod renewal_request_tests {
+    use super::renewal_fingerprint;
+
+    #[test]
+    fn renewal_fingerprint_binds_actor_scope_and_payload_without_lossy_ids() {
+        let baseline = renewal_fingerprint(7, 8, 9_007_199_254_740_993, "actor-a", 2, "extend");
+        assert_eq!(
+            baseline,
+            renewal_fingerprint(7, 8, 9_007_199_254_740_993, "actor-a", 2, "extend")
+        );
+        for changed in [
+            renewal_fingerprint(9, 8, 9_007_199_254_740_993, "actor-a", 2, "extend"),
+            renewal_fingerprint(7, 9, 9_007_199_254_740_993, "actor-a", 2, "extend"),
+            renewal_fingerprint(7, 8, 9_007_199_254_740_992, "actor-a", 2, "extend"),
+            renewal_fingerprint(7, 8, 9_007_199_254_740_993, "actor-b", 2, "extend"),
+            renewal_fingerprint(7, 8, 9_007_199_254_740_993, "actor-a", 3, "extend"),
+            renewal_fingerprint(7, 8, 9_007_199_254_740_993, "actor-a", 2, "changed"),
+        ] {
+            assert_ne!(baseline, changed);
+        }
+    }
 }
 
 /// Cancel subscription: close + optional OutRefund credit note + entitlement revoke hook.

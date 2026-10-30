@@ -61,6 +61,7 @@ import { useSubscriptionActions } from '../use-subscription-actions';
 import { inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, nextSubscriptionAction, ADVANCED_SUBSCRIPTION_ACTIONS, subscriptionActionPermissions } from '../subscription-workflow';
 import { moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { SubscriptionSourceNotice } from '../subscription-overview';
+import { SubscriptionLifecycleSummary } from '../subscription-lifecycle-summary';
 import { PAYMENT_INTENT_TYPES, newIdempotencyKey, toPaymentIntentParams } from '../subscription-payment-intent';
 
 interface SubscriptionPageClientProps {
@@ -99,7 +100,8 @@ function SubscriptionPageLoaded({
   const isLoading = subscriptionsQuery.isLoading;
   const linesQuery = useSubscriptionLines(orgId);
   const { rows: lines, state: linesState } = moduleCollection(linesQuery);
-  const { data: amendments = [] } = useSubscriptionAmendments(orgId);
+  const amendmentsQuery = useSubscriptionAmendments(orgId);
+  const { rows: amendments, state: amendmentsState } = moduleCollection(amendmentsQuery);
   const { data: billingRuns = [], isLoading: runsLoading, isError: runsError } = useSubscriptionBillingRuns(orgId);
   const { data: accountMoves = [], isLoading: movesLoading, isError: movesError } = useAccountMoves(orgId);
   const { data: accountPayments = [], isLoading: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
@@ -286,6 +288,7 @@ function SubscriptionPageLoaded({
       actions={
         <>
           {subscriptionActions.dialogs}
+          {subscriptionActions.hasPendingRenewal(BigInt(subscriptionId)) && <Button variant="outline" disabled={busy} data-testid="subscription-review-renewal" onClick={() => runAction('renew')}>{t('subscriptions.lifecycle.checkRenewal')}</Button>}
           <FormModal key={`${orgId}:${operatingCompanyId}:${subscriptionId}:${requestKey}`} open={requestOpen} onOpenChange={setRequestOpen} config={paymentRequestForm} draft={false}
             isPending={createPaymentIntent.isPending} submissionDisabled={!billingReady || !canRequestPayment || unpaidInvoices.length === 0}
             showSubmitSuccessToast={false}
@@ -359,6 +362,7 @@ function SubscriptionPageLoaded({
               <p className="text-sm text-muted-foreground">{t(nextAction && !canAct(nextAction) ? 'subscriptions.workflow.operatorNeeded' : nextAction ? `subscriptions.workflow.next.${nextAction}` : state === 'closed' ? 'subscriptions.workflow.next.closed' : state === 'draft' && linesState.status === 'ready' && ownLines.length === 0 ? 'subscriptions.workflow.noLines' : !billingReady || linesState.status !== 'ready' ? 'subscriptions.workflow.next.verify' : 'subscriptions.workflow.next.scheduled')}</p>
               <Button variant="outline" size="sm" onClick={() => setActiveTab('billing')}>{t('subscriptions.workflow.reviewBilling')}</Button>
             </section>
+            <SubscriptionLifecycleSummary subscription={subscription} amendments={ownAmendments} amendmentsState={amendmentsState} scope={{ organizationId: orgId, companyId: operatingCompanyId }} />
             <EntityDetail config={detailConfig} data={subscription} />
           </div>,
         },
@@ -376,7 +380,7 @@ function SubscriptionPageLoaded({
         {
           id: 'amendments',
           label: t('subscriptions.amendments.title', { defaultValue: 'Amendments' }),
-          content: (
+          content: amendmentsState.status !== 'ready' ? <SubscriptionSourceNotice state={amendmentsState} /> : (
             <EntityView
               config={{ ...subscriptionAmendmentsTableConfig(t), title: '', description: undefined }}
               data={ownAmendments}
