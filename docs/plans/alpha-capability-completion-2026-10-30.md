@@ -84,10 +84,9 @@ without weakening their economic assertions.
 
 Integrated query-hooks passed 576 tests, ERP-shared 170, registered web helpers
 142, STDB transport files 8, presentation-core files 3 and guide helper files 2.
-The full UI run passed 1,464 tests and found five failures in one fixture missing
-the new exclusions-hook mock. The corrected fixture then passed all 13 cases,
-including three new positive/denied-evidence cases; the other 211 files were
-unchanged. Fixture lint passed with zero warnings.
+After correcting the missing exclusions-hook fixture and adding three explicit
+evidence-denial cases, the full UI rerun at `095cf893` passed all 1,472 cases
+across 212 files. The focused fixture also passed lint with zero warnings.
 The Purchasing type-debt baseline decreased from 2,261 to 2,244 occurrences.
 The codegen ledger checksum test passes and regeneration classifies exactly 524
 tables with all 15 ledger migrations released. Final API-source regression
