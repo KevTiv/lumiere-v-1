@@ -12,7 +12,7 @@ import { apiFetch } from "../http"
 
 export type { AiUiContext } from "../ai-ui-context"
 
-import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
+import { httpResponseError, responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
 export type AiMemoryContextHit = {
   score: number
@@ -283,7 +283,7 @@ export function useAiMemoryRag() {
           ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
         }),
       })
-      if (!r.ok) throw new Error(await parseAiError(r))
+      if (!r.ok) throw await httpResponseError(r)
       return (await r.json()) as {
         answer: string
         sources: AiRagSource[]

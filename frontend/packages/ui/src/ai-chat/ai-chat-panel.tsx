@@ -365,20 +365,11 @@ export function AIChatPanel({
           },
         }
       } else {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 600)
-        })
-        const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: generateMockResponse(userMessage.content, context),
+          content: t("aiChat.turn.notConfigured"),
           timestamp: new Date(),
-          metadata: {
-            model: "mock",
-            tokens: Math.floor(Math.random() * 500) + 100,
-            duration: Math.round(t1 - t0),
-          },
         }
       }
 
@@ -897,68 +888,4 @@ export function AIChatPanel({
       </div>
     </section>
   )
-}
-
-// Mock response generator (replace with actual AI SDK integration)
-function generateMockResponse(userInput: string, context?: { activeView?: string }): string {
-  const input = userInput.toLowerCase()
-
-  if (input.includes("@sales") || input.includes("sales summary")) {
-    return `Sales summary for current period:
-
-**Revenue:** $284,392 (+12.5%)
-**Orders:** 1,847 processed
-**AOV:** $154
-
-Top products:
-1. Enterprise Suite - $84,600
-2. Professional Plan - $46,800
-3. Starter Kit - $28,350
-
-Want a detailed report?`
-  }
-
-  if (input.includes("@inventory") || input.includes("inventory") || input.includes("stock")) {
-    return `Inventory status:
-
-**SKUs:** 1,234 items
-**Low Stock:** 23 alerts
-**Out of Stock:** 5 items
-
-Need attention:
-- Electronics: 8 low
-- Accessories: 12 low
-- Software: 3 out
-
-Generate restock list?`
-  }
-
-  if (input.includes("@customers") || input.includes("customers")) {
-    return `Customer overview:
-
-**Total:** 3,421
-**New:** 423 (+8.2%)
-**Active:** 2,156 (63%)
-
-Segments:
-- Enterprise: 234 ($1.2M ARR)
-- Professional: 892 ($890K ARR)
-- Starter: 2,295 ($450K ARR)
-
-Export customer list?`
-  }
-
-  if (input.includes("@help") || input.includes("help")) {
-    return `Available commands:
-
-**Data:** @sales, @inventory, @customers, @reports
-**Actions:** @create, @update, @delete, @export
-**Context:** @view, @selection, @user
-
-Type any command or ask naturally!`
-  }
-
-  return `I can help with "${userInput}" in the ${context?.activeView || "current"} view.
-
-Try @ commands or describe what you need.`
 }
