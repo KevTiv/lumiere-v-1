@@ -5,7 +5,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::check_permission;
 use crate::purchasing::purchase_orders::{
-    create_purchase_order_record, purchase_order, CreatePurchaseOrderParams,
+    create_keyed_purchase_order_record, purchase_order, CreatePurchaseOrderParams,
 };
 
 /// Immutable mapping from one scoped creation key to the exact purchase order.
@@ -195,7 +195,7 @@ pub fn create_purchase_order_once(
     }
 
     let (operation_key, order_params) = into_order_params(company_id, params);
-    let purchase_order_id = create_purchase_order_record(ctx, organization_id, order_params)?;
+    let purchase_order_id = create_keyed_purchase_order_record(ctx, organization_id, order_params)?;
     ctx.db
         .purchase_order_creation_operation()
         .insert(PurchaseOrderCreationOperation {
