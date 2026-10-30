@@ -17,6 +17,7 @@ import { nullableBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import { useTranslation } from '@lumiere/i18n';
 import { useErpSession } from '@lumiere/erp-session';
 import { QuotationDocumentDialog } from './quotation-document-dialog';
+import { RecordCreationRecovery } from '../../../components/record-creation-recovery';
 import {
   FormModal,
   CsvImportModal,
@@ -2663,6 +2664,9 @@ function SalesClientLoaded({
 
   return (
     <EntityLabelsProvider value={entityLabels}>
+      <RecordCreationRecovery organizationId={orgId} companyId={operatingCompanyId} refreshKey={isFormMutationPending} models={[
+        { model: 'sale_order', canRead: permissionsReady === true && checkPermission('sale_order', 'read').allowed && ordersRead.state.status === 'ready' },
+      ]} />
       {savedQuotationNotice && <p role="status" className="mx-4 mb-3 rounded-lg border p-4 text-sm">{t('sales.workspace.savedOpenQuotation', { defaultValue: 'Quotation saved. Open it from Quotations & orders to add products.' })}</p>}
       <ModuleWorkView
         organizationId={organizationId}

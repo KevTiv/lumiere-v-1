@@ -1,5 +1,6 @@
 "use client"
 import { Button } from "@lumiere/ui/components/button"
+import { RecordCreationRecovery } from '../../../components/record-creation-recovery'
 
 import { crmContactListRow, crmLeadListRow } from "@/lib/crm-list-rows"
 import { crmContactListFieldAliases, crmLeadListFieldAliases, crmOpportunityListFieldAliases } from "@lumiere/ui/lib/crm-entity-configs"
@@ -367,7 +368,7 @@ function CrmClientLoaded({
   useCrmModuleSubscription()
   const { t } = useTranslation()
   const router = useRouter()
-  const { currentUser, checkPermission } = useRBAC()
+  const { currentUser, checkPermission, permissionsReady } = useRBAC()
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const ownerLabelMap = useIdentityLabelMap(organizationId)
@@ -2694,6 +2695,11 @@ function CrmClientLoaded({
 
   return (
     <EntityLabelsProvider value={entityLabels}>
+      <RecordCreationRecovery organizationId={orgId} companyId={operatingCompanyId} refreshKey={isFormMutationPending} models={[
+        { model: 'crm_lead', canRead: permissionsReady === true && checkPermission('lead', 'read').allowed && leadsRead.state.status === 'ready' },
+        { model: 'opportunity', canRead: permissionsReady === true && checkPermission('opportunity', 'read').allowed && opportunitiesRead.state.status === 'ready' },
+        { model: 'contact', canRead: permissionsReady === true && checkPermission('contact', 'read').allowed && contactsRead.state.status === 'ready' },
+      ]} />
       {focusedRecord && <EntityRecordSheet open={focusedLiveRecord != null} onOpenChange={(open) => !open && setFocusedRecord(null)}
         record={focusedLiveRecord} config={focusedRecord.kind === "lead" ? leadRecordSheet : focusedRecord.kind === "opportunity" ? opportunityRecordSheet : contactRecordSheet} />}
       <ModuleView
