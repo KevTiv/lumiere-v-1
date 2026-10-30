@@ -19,8 +19,8 @@ use stdb_client::StdbClient;
 use tower_cookies::Cookies;
 
 use crate::{
-    error::ApiError, state::AppState, trusted_context::TrustedOperationContext,
-    web_session::resolve_session,
+    error::ApiError, session::load_field_access_context, state::AppState,
+    trusted_context::TrustedOperationContext, web_session::resolve_session,
 };
 
 #[derive(Deserialize)]
@@ -185,13 +185,12 @@ fn preview_rows(
     )
 }
 
-async fn read_preview(
+async fn read_preview_sources(
     client: &StdbClient,
     org: u64,
     access: &FieldAccessContext,
     delay: u64,
-    now: i64,
-) -> Result<Value, ApiError> {
+) -> Result<(Vec<Value>, Vec<Value>), ApiError> {
     require_preview_access(access, delay)?;
     if org == 0 || access.organization_id != org {
         return Err(ApiError::Forbidden(
@@ -202,6 +201,45 @@ async fn read_preview(
     // entire destructive scope. Names are redacted by preview_rows before return.
     let documents = client.query_sql(&format!("SELECT id, organization_id, company_id, owner_id, name, is_deleted, purge_after FROM document WHERE organization_id = {org} AND is_deleted = true")).await.map_err(ApiError::internal)?;
     let holds = client.query_sql(&format!("SELECT organization_id, document_id, is_active FROM document_legal_hold WHERE organization_id = {org}")).await.map_err(ApiError::internal)?;
+    Ok((documents, holds))
+}
+
+async fn reauthorized_preview(
+    source_client: &StdbClient,
+    authority_client: &StdbClient,
+    org: u64,
+    actor: &str,
+    initial_access: &FieldAccessContext,
+    delay: u64,
+    now: i64,
+) -> Result<Value, ApiError> {
+    let (documents, holds) =
+        read_preview_sources(source_client, org, initial_access, delay).await?;
+    // The response is projected under authority resolved after both source reads.
+    // A revoked grant fails; narrowed fields retain redacted counts and block action.
+    let current = load_field_access_context(authority_client, actor, org)
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::Unauthorized)?;
+    if identity_sql_literal(&current.identity_hex).map_err(ApiError::Internal)?
+        != identity_sql_literal(actor).map_err(ApiError::Internal)?
+    {
+        return Err(ApiError::Forbidden(
+            "Retention preview actor context changed".into(),
+        ));
+    }
+    preview_rows(&documents, &holds, org, &current, now, delay)
+}
+
+#[cfg(test)]
+async fn read_preview(
+    client: &StdbClient,
+    org: u64,
+    access: &FieldAccessContext,
+    delay: u64,
+    now: i64,
+) -> Result<Value, ApiError> {
+    let (documents, holds) = read_preview_sources(client, org, access, delay).await?;
     preview_rows(&documents, &holds, org, access, now, delay)
 }
 
@@ -215,11 +253,14 @@ pub(super) async fn preview(
         .await?
         .ok_or(ApiError::Unauthorized)?;
     let context = TrustedOperationContext::for_resource_read(&state, &session)?;
+    context.require_current_placement(&state.organization_placements)?;
     let org = context.organization_id();
     let now = chrono::Utc::now().timestamp_micros();
-    let preview = read_preview(
+    let preview = reauthorized_preview(
         context.client(),
+        &state.stdb,
         org,
+        context.actor_identity(),
         context.field_access(),
         query.delay_seconds,
         now,
@@ -238,6 +279,7 @@ pub(super) async fn preview(
 mod tests {
     use super::*;
     const ACTOR: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const OTHER: &str = "123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0";
     fn access() -> FieldAccessContext {
         FieldAccessContext {
             organization_id: 7,
@@ -253,6 +295,109 @@ mod tests {
     }
     fn document(id: u64, owner: &str, expiry: i64) -> Value {
         json!({"id":id,"organization_id":7,"company_id":12,"owner_id":owner,"name":"Saved file","is_deleted":true,"purge_after":{"microsSinceUnixEpoch":expiry}})
+    }
+
+    fn sql_rows(rows: &[Value]) -> Value {
+        let Some(first) = rows.first().and_then(Value::as_object) else {
+            return json!([{"schema":{"elements":[]},"rows":[]}]);
+        };
+        let keys = first.keys().collect::<Vec<_>>();
+        let columns = keys
+            .iter()
+            .map(|key| {
+                let kind = match &first[*key] {
+                    Value::Bool(_) => json!({"Bool":[]}),
+                    Value::Number(_) => json!({"U64":[]}),
+                    Value::Array(_) => json!({"Array":{"String":[]}}),
+                    _ => json!({"String":[]}),
+                };
+                json!({"name":{"some":key},"algebraic_type":kind})
+            })
+            .collect::<Vec<_>>();
+        json!([{"schema":{"elements":columns},"rows":rows.iter().map(|row|keys.iter().map(|key|row[*key].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()}])
+    }
+
+    #[tokio::test]
+    async fn actual_preview_helper_reloads_source_policy_after_reads_and_redacts_newly_restricted_names(
+    ) {
+        use axum::{http::StatusCode, routing::post, Router};
+        use std::sync::{
+            atomic::{AtomicU8, Ordering},
+            Mutex,
+        };
+        let mode = Arc::new(AtomicU8::new(0));
+        let current_mode = mode.clone();
+        let records = Arc::new(Mutex::new(vec![document(1, ACTOR, 100)]));
+        let current_records = records.clone();
+        let queries = Arc::new(Mutex::new(Vec::new()));
+        let recorded = queries.clone();
+        let app=Router::new().route("/v1/database/retention-reauth/sql",post(move |sql:String| {
+            let mode=current_mode.clone();let records=current_records.clone();let recorded=recorded.clone();
+            async move {
+                recorded.lock().expect("queries").push(sql.clone());
+                let mode=mode.load(Ordering::SeqCst);
+                if mode==3 && sql.contains("FROM user_profile ") {return(StatusCode::SERVICE_UNAVAILABLE,Json(json!({"error":"authority unavailable"})));}
+                let rows=if sql.contains("FROM document WHERE") {records.lock().expect("documents").clone()}
+                    else if sql.contains("FROM document_legal_hold ") {vec![]}
+                    else if sql.contains("FROM user_profile ") {vec![json!({"identity":ACTOR,"organization_id":7,"is_active":true,"is_superuser":false,"metadata":null})]}
+                    else if sql.contains("FROM user_organization ") {vec![json!({"organization_id":7,"user_identity":ACTOR,"role_id":1,"company_id":12,"is_active":true})]}
+                    else if sql.contains("FROM role ") {vec![json!({"id":1,"organization_id":7,"is_active":true,"name":"Reviewer","permissions":if mode==1 {Vec::<String>::new()} else {vec!["document:*".to_owned()]}})]}
+                    else if sql.contains("FROM field_permission ") {if mode==2 {vec![json!({"id":1,"organization_id":7,"role_id":1,"resource":"document","action":"read","allowed_fields":["id"]})]} else {vec![]}}
+                    else if sql.contains("FROM user_role_assignment ") || sql.contains("FROM org_permission ") {vec![]}
+                    else {panic!("unexpected retention authority SQL")};
+                (StatusCode::OK,Json(sql_rows(&rows)))
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.expect("serve") });
+        let client = StdbClient::new(
+            format!("http://{address}"),
+            "retention-reauth".into(),
+            "fixture".into(),
+        );
+        let old_access = access();
+        let allowed = reauthorized_preview(&client, &client, 7, ACTOR, &old_access, 0, 100)
+            .await
+            .expect("allowed");
+        assert_eq!(allowed["canProceed"], true);
+        assert_eq!(allowed["documents"].as_array().expect("rows").len(), 1);
+        mode.store(1, Ordering::SeqCst);
+        assert!(matches!(
+            reauthorized_preview(&client, &client, 7, ACTOR, &old_access, 0, 100).await,
+            Err(ApiError::Forbidden(_))
+        ));
+        mode.store(2, Ordering::SeqCst);
+        let narrowed = reauthorized_preview(&client, &client, 7, ACTOR, &old_access, 0, 100)
+            .await
+            .expect("redacted");
+        assert_eq!(narrowed["documents"], json!([]));
+        assert_eq!(narrowed["unreviewableCount"], 1);
+        assert_eq!(narrowed["canProceed"], false);
+        mode.store(0, Ordering::SeqCst);
+        let mut hidden = document(2, OTHER, 100);
+        hidden["name"] = json!("Hidden filename");
+        records.lock().expect("documents").push(hidden);
+        let redacted = reauthorized_preview(&client, &client, 7, ACTOR, &old_access, 0, 100)
+            .await
+            .expect("hidden owner");
+        assert_eq!(redacted["documents"].as_array().expect("rows").len(), 1);
+        assert_eq!(redacted["unreviewableCount"], 1);
+        assert_eq!(redacted["canProceed"], false);
+        assert!(!redacted.to_string().contains("Hidden filename"));
+        mode.store(3, Ordering::SeqCst);
+        assert!(
+            reauthorized_preview(&client, &client, 7, ACTOR, &old_access, 0, 100)
+                .await
+                .is_err()
+        );
+        let queries = queries.lock().expect("queries");
+        assert!(queries[0].contains("FROM document WHERE"));
+        assert!(queries[1].contains("FROM document_legal_hold "));
+        assert!(queries[2].contains("FROM user_profile "));
+        server.abort();
     }
     #[test]
     fn complete_preview_excludes_legal_holds_and_includes_delayed_expiry() {
