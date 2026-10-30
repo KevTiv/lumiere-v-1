@@ -2,6 +2,16 @@
   "version": 1,
   "reducers": [
     {
+      "name": "run_knowledge_guide_tests",
+      "exposure": "denied",
+      "reason": "in-module development regression only; never session exposed"
+    },
+    {
+      "name": "save_knowledge_guide",
+      "exposure": "session",
+      "reason": "reviewed assistant guide save route; current company/article membership, immutable revision conflict and actor-bound idempotency remain reducer-enforced"
+    },
+    {
       "name": "abandon_bank_statement_settlement",
       "exposure": "session",
       "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"

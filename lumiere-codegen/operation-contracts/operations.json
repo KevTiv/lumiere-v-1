@@ -1,5 +1,25 @@
 {
   "operations": {
+    "run_knowledge_guide_tests": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/platform/mod.rs runtime guide lifecycle regression reducer",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "test"
+    },
+    "save_knowledge_guide": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/knowledge_guides.rs: save_knowledge_guide binds request key to actor, company, complete payload and exact prior revision.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
     "acknowledge_iot_action": {
       "client_facing": true,
       "codec": {

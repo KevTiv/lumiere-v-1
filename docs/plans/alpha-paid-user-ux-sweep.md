@@ -12,6 +12,8 @@ Success means task completion with correct saved results and usable recovery. A 
 
 ## 2. Baseline and scope
 
+**Scope addition, 2026-10-28:** Alpha includes the [contextual ERP assistant and help documents feature](./alpha-assistant-help-artifacts-plan.md), tracked as AIH-29. Follow the user's Dia-style direction: contextual side chat grounded in ERP records, existing draft/review handoffs, and generated Markdown/static HTML opened in a modal above the ERP or a dedicated in-app document view. Save and revise guides under their module, reopen them from Documents/Knowledge, and retrieve/cite applicable guides in future chats. Core code and local checks are complete in the working tree; see the [implementation evidence and remaining release gates](../plan/alpha-assistant-help-artifacts-status.md). This addition is not covered by the completed P01-P08 code-sweep status above. Its HELP-01 through HELP-05 packets and acceptance cases own the new work. Existing document/RAG and governed-run gates still apply.
+
 - Reviewed public application: https://api-gateway-production-d680.up.railway.app.
 - Railway web service: `738b69d4-6f86-4da4-bbe5-ba435101c40a`, production environment `dbeb35da-dcc5-43bb-ad1d-0066aa530199`.
 - Latest successful web deployment rechecked during execution on 2026-10-27: `69ca9ecb-ff33-4d44-91b9-d14a69b5a40d`, commit `5ada7d0b268bf9fb1f2f8f5c91f58841a2ac5e46` (PR #284). A fresh Dia page read confirmed the shared select changes. See the execution record for the earlier baseline and routing limit.
