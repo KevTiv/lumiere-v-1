@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 mod business_history;
 mod knowledge_guides;
+mod record_creations;
 
 static DATABASE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
