@@ -44,6 +44,10 @@ Executable tracker for the backlog (Pilot → Competitive → Differentiating). 
 - [x] Collaborative presence table/reducers for docs/articles
 - [x] Bidirectional Drive/SharePoint conflict policy
 
+## Alpha addition — Contextual assistant documents
+
+- [ ] AIH-29 / HELP-01 through HELP-05: [contextual ERP assistant and help documents](./alpha-assistant-help-artifacts-plan.md). Generated guides open above the ERP in a modal or in a dedicated view, save under their module through the existing KnowledgeArticle owner, retain revisions and provenance, and support authorized future-chat reuse. Core code and local checks are recorded in the [implementation status](../plan/alpha-assistant-help-artifacts-status.md); matching contract release and integrated Alpha acceptance remain pending. Earlier checked waves do not certify this integration.
+
 ## Out of scope (do not invent here)
 
 - Storing file bytes inside SpacetimeDB tables

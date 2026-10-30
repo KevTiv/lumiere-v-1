@@ -633,6 +633,43 @@ pub fn has_resource_read_permission(
     })
 }
 
+/// Check a field on a dedicated detail route using the same applicable field
+/// rules as the canonical SQL projection. Default list columns are a transport
+/// projection, not an implicit denial of every omitted detail field.
+pub fn has_resource_field_read_permission(
+    field_access: Option<&FieldAccessContext>,
+    resource_key: &str,
+    field: &str,
+) -> bool {
+    if !has_resource_read_permission(field_access, resource_key) {
+        return false;
+    }
+    let Some(access) = field_access else {
+        return false;
+    };
+    if access.is_superuser
+        || access
+            .role_permissions
+            .iter()
+            .any(|permission| permission == "*:*")
+    {
+        return true;
+    }
+    let has_explicit_projection = access.field_permissions.iter().any(|rule| {
+        rule.action.eq_ignore_ascii_case("read")
+            && field_permission_applies(rule, access)
+            && field_resource_matches(&rule.resource, resource_key)
+            && !rule.allowed_fields.is_empty()
+            && assert_safe_sql_identifiers(&rule.allowed_fields).is_ok()
+    });
+    if !has_explicit_projection {
+        return true;
+    }
+    resolve_read_columns(resource_key, Some(access)).is_ok_and(|columns| {
+        columns.is_none_or(|columns| columns.iter().any(|column| column == field))
+    })
+}
+
 /// `None` = full row access; `Some(cols)` = explicit snake_case columns.
 pub(crate) fn resolve_read_columns(
     resource_key: &str,
@@ -1071,6 +1108,61 @@ pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detail_field_access_honors_applicable_projection_without_confusing_list_defaults() {
+        let mut access = FieldAccessContext {
+            role_id: 7,
+            role_permissions: vec!["knowledge_article:read".into()],
+            ..Default::default()
+        };
+        assert!(has_resource_field_read_permission(
+            Some(&access),
+            "knowledge-articles",
+            "body"
+        ));
+        access.field_permissions.push(FieldPermissionLike {
+            id: None,
+            organization_id: None,
+            role_id: Some(7),
+            resource: "knowledge_article".into(),
+            action: "read".into(),
+            allowed_fields: vec!["name".into()],
+            subject_user_hex: None,
+            subject_role_id: None,
+        });
+        assert!(!has_resource_field_read_permission(
+            Some(&access),
+            "knowledge-articles",
+            "body"
+        ));
+        assert!(has_resource_field_read_permission(
+            Some(&access),
+            "knowledge-articles",
+            "name"
+        ));
+        access.field_permissions[0]
+            .allowed_fields
+            .push("body".into());
+        assert!(has_resource_field_read_permission(
+            Some(&access),
+            "knowledge-articles",
+            "body"
+        ));
+        access.field_permissions[0].allowed_fields = vec!["name".into()];
+        access.field_permissions[0].role_id = Some(99);
+        assert!(has_resource_field_read_permission(
+            Some(&access),
+            "knowledge-articles",
+            "body"
+        ));
+        access.role_permissions.clear();
+        assert!(!has_resource_field_read_permission(
+            Some(&access),
+            "knowledge-articles",
+            "body"
+        ));
+    }
 
     #[test]
     fn explicit_denies_override_wildcard_reads_and_writes() {

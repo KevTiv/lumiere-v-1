@@ -1,6 +1,7 @@
 //! Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 mod country_pack_test;
 mod document_templates_test;
+mod knowledge_guides_test;
 mod platform_smoke;
 mod tenant_isolation_test;
 
@@ -17,6 +18,7 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_documents_wave_c_tests(ctx)?;
     run_documents_wave_d_tests(ctx)?;
     run_documents_wave_e_tests(ctx)?;
+    run_knowledge_guide_tests(ctx)?;
     run_workflow_definition_test(ctx)?;
     run_subscription_plan_test(ctx)?;
     run_forms_custom_field_test(ctx)?;
@@ -147,4 +149,9 @@ pub fn run_country_pack_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("fiscal document versions: {e}"))?;
     country_pack_test::test_fiscal_document_restore_revalidates_pack_without_writes(ctx)
         .map_err(|e| format!("fiscal document restore: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_knowledge_guide_tests(ctx: &ReducerContext) -> Result<(), String> {
+    knowledge_guides_test::lifecycle(ctx)
 }

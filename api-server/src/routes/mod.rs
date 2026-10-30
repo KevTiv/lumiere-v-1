@@ -17,6 +17,7 @@ pub(crate) mod health;
 mod history;
 mod import;
 mod inventory;
+mod knowledge_guides;
 mod mail;
 mod messaging;
 pub(crate) mod operations;
@@ -54,6 +55,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(accounting::router())
         .merge(history::router())
         .merge(documents::router())
+        .merge(knowledge_guides::router())
         .merge(mail::router())
         .merge(messaging::router())
         .merge(inventory::router())

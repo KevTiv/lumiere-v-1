@@ -14,6 +14,10 @@ import {
   recentNotifications,
 } from "@lumiere/ui"
 import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
+import { AssistantGuideHost } from "../../components/assistant-guide-host"
+import { AssistantGuideConversationProvider, useAssistantGuideConversation } from "@/lib/assistant-guide-context"
+import { guideDraftQuestion, guideQuestionEdits, guideQuestionContext, guideRequestInScope, guideLibraryHref, guideReferencesMetadata, parseStoredGuideReferences, readAssistantGuide, withGuideReferencesMetadata } from "@/lib/assistant-guides"
+import { isSavedGuide, type GuideDocument, type GuideDraft, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
 import { EntityCurrencyBoundary } from "@/lib/entity-currency-boundary"
 import { useErpSession } from "@lumiere/erp-session"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
@@ -129,6 +133,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const currentHistoryScope = useRef(historyScope)
   currentHistoryScope.current = historyScope
   const [selectedScope, setSelectedScope] = useState("current")
+  const [openGuide, setOpenGuide] = useState<{ scope: string; request: OpenGuideRequest } | null>(null)
+  const guideConversation = useAssistantGuideConversation()
+  const activeScope = useRef<string | null>(null)
+  activeScope.current = actorHistoryScope
   const workspaceScope = useMemo(
     () => resolveAiWorkspaceScope(selectedScope, route, selection),
     [selectedScope, route, selection],
@@ -183,6 +191,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       timestamp: dateFromStored(row.createDate ?? row.create_date),
       sources: parseStoredSources(row.sourcesJson ?? row.sources_json),
       actions: parseStoredChatActions(row.metadata) as ChatAction[] | undefined,
+      guides: parseStoredGuideReferences(row.metadata),
       metadata: {
         model: row.model ?? undefined,
         duration:
@@ -217,6 +226,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       model?: string | null
       actions?: ChatAction[]
       runId?: number
+      guides?: GuideReference[]
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       const result = await saveAssistantHistory({
@@ -236,7 +246,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           ui_context_json: JSON.stringify(args.uiContext ?? null),
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
-          metadata:
+          metadata: withGuideReferencesMetadata(
             args.actions?.length || args.runId != null
               ? chatActionsToMetadata(
                   (args.actions ?? []).filter(
@@ -246,6 +256,8 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
                   args.runId,
                 )
               : null,
+            args.guides,
+          ),
         }) },
       })
       if (result === "failed") setFailedHistoryScope(historyScope)
@@ -254,17 +266,18 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 
   const buildRequestContext = useCallback(
-    (userText: string) => {
-      const atCommands = [...new Set([...parseAtCommands(userText), ...workspaceScope.commands])]
+    (userText: string, questionGuide?: GuideDraft) => {
+      const guideContext = questionGuide ? guideQuestionContext(questionGuide) : undefined
+      const atCommands = [...new Set([...parseAtCommands(userText), ...(guideContext?.commands ?? workspaceScope.commands)])]
       return {
         atCommands,
         includeTypes: atCommandsToIncludeTypes(atCommands),
         uiContext: buildAiUiContext({
-          pathname: workspaceScope.pathname,
+          pathname: guideContext?.pathname ?? workspaceScope.pathname,
           companyId: operatingCompanyId,
-          activeTab: workspaceScope.usesCurrentPage ? activeTab : null,
+          activeTab: guideContext ? guideContext.activeTab : workspaceScope.usesCurrentPage ? activeTab : null,
           atCommands,
-          selection: workspaceScope.selection,
+          selection: guideContext ? guideContext.selection : workspaceScope.selection,
         }),
       }
     },
@@ -302,6 +315,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const chatConfig = useMemo(
     () => ({
       ...props.config,
+      guideLibraryHref: operatingCompanyId ? guideLibraryHref(String(operatingCompanyId), module ?? undefined) : undefined,
+      onOpenGuide: (request: OpenGuideRequest) => {
+        if (actorHistoryScope) setOpenGuide({ scope: actorHistoryScope, request })
+      },
       onApproveActionDraft: async (draft: { draftId: number; companyId?: number }) => {
         await approveActionDraft.mutateAsync({
           draftId: draft.draftId,
@@ -348,17 +365,19 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     }),
     [
       approveActionDraft,
+      actorHistoryScope,
       citeSource,
       operatingCompanyId,
       props.config,
       rejectActionDraft,
       sessionKey,
       updateActionDraft,
+      module,
     ],
   )
 
   const onSendMessage = useCallback(
-    async (userText: string) => {
+    async (userText: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => {
       if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return {
           content:
@@ -370,19 +389,21 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       }
 
       const started = typeof performance !== "undefined" ? performance.now() : Date.now()
-      const { includeTypes, uiContext } = buildRequestContext(userText)
+      const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
 
       const [out, draftActions] = await Promise.all([
         rag.mutateAsync({
-          query: userText,
+          query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText,
           companyId: operatingCompanyId,
           include_types: includeTypes,
           ui_context: uiContext,
+          guide_refs: guideRefs,
         }),
         resolveActionDrafts(userText, uiContext),
       ])
 
       const sources = (out.sources ?? []).map(mapRagSourceToChatSource)
+      const guides: GuideReference[] | undefined = out.related_guides?.map((guide) => ({ guideId: guide.guideId, revision: guide.revision, title: guide.title, module: guide.module }))
       const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
       const assistantText =
         draftActions.length > 0 && !out.answer.includes("draft")
@@ -397,12 +418,14 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         model: out.model ?? null,
         actions: draftActions.length > 0 ? draftActions : undefined,
         runId: out.run_id,
+        guides,
       })
 
       return {
         content: assistantText,
         runId: out.run_id,
         sources,
+        guides,
         actions: draftActions.length > 0 ? draftActions : undefined,
       }
     },
@@ -450,6 +473,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       let sources: ChatMessageSourceRef[] = []
       let resolvedModel: string | null = null
       let resolvedRunId: number | undefined
+      let guides: GuideReference[] | undefined
 
       const processEvent = (raw: string) => {
         const lines = raw.split(/\r?\n/)
@@ -466,10 +490,12 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
             sources?: AiRagSource[]
             model?: string
             run_id?: number
+            related_guides?: GuideReference[]
           }
           sources = (parsed.sources ?? []).map(mapRagSourceToChatSource)
           resolvedModel = parsed.model ?? null
           resolvedRunId = parsed.run_id
+          guides = parsed.related_guides
           handlers.onSources(sources)
         }
       }
@@ -507,12 +533,14 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         model: resolvedModel,
         actions: draftActions.length > 0 ? draftActions : undefined,
         runId: resolvedRunId,
+        guides,
       })
 
       return {
         content,
         runId: resolvedRunId,
         sources,
+        guides,
         actions: draftActions.length > 0 ? draftActions : undefined,
       }
     },
@@ -526,7 +554,41 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     ],
   )
 
-  return (
+  const onGuideSaved = useCallback(async (guide: GuideDocument) => {
+    const scope = actorHistoryScope
+    if (!scope || activeScope.current !== scope) throw new Error("The conversation scope changed")
+    if (!sessionKey || !orgReady || operatingCompanyId == null || guide.companyId !== String(operatingCompanyId)) throw new Error("The conversation scope changed")
+    await ensureSession()
+    if (activeScope.current !== scope) throw new Error("The conversation scope changed")
+    await appendMessage.mutateAsync({
+      session_key: sessionKey,
+      role: "assistant",
+      content: "Saved a guide to the current company's knowledge library.",
+      sources_json: "[]",
+      metadata: guideReferencesMetadata(guide),
+    })
+  }, [appendMessage, ensureSession, operatingCompanyId, orgReady, sessionKey, actorHistoryScope])
+
+  const askAboutGuide = useCallback(async (guide: GuideDraft | GuideDocument, question: string, draftOverride?: GuideDraft) => {
+    const scope = actorHistoryScope
+    if (!scope || activeScope.current !== scope) throw new Error("The conversation scope changed")
+    if (guide.companyId !== String(operatingCompanyId) || !sessionKey) throw new Error("Open the guide in the current company before asking a question.")
+    let references: GuideReference[] | undefined
+    let currentGuide = guide
+    if (isSavedGuide(guide)) {
+      currentGuide = await readAssistantGuide(guide, guide.companyId)
+      if (activeScope.current !== scope) throw new Error("The company changed. Reopen the guide before asking.")
+      references = [{ guideId: guide.guideId, revision: guide.revision }]
+    }
+    if (draftOverride) currentGuide = guideQuestionEdits(currentGuide, draftOverride)
+    const reply = await onSendMessage(question, references, currentGuide, Boolean(draftOverride))
+    if (activeScope.current !== scope) throw new Error("The company changed while answering. Reopen the guide in the current company.")
+    return reply.content
+  }, [onSendMessage, operatingCompanyId, actorHistoryScope, sessionKey])
+
+  useEffect(() => guideConversation.register(askAboutGuide), [guideConversation.register, askAboutGuide])
+
+  return <>
     <AIChatPanel
       key={JSON.stringify([identity, organizationId, operatingCompanyId])}
       {...props}
@@ -540,7 +602,9 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
     />
-  )
+    <AssistantGuideHost request={guideRequestInScope(openGuide, actorHistoryScope)} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
+      onClose={() => setOpenGuide(null)} onSaved={onGuideSaved} onAsk={askAboutGuide} />
+  </>
 }
 
 /** Header bell: unread notifications addressed to the signed-in user. */
@@ -669,6 +733,7 @@ export default function ModulesShell({
 }) {
   return (
     <WorkspaceProfileProvider value="finance-alpha">
+      <AssistantGuideConversationProvider>
       <Suspense fallback={null}>
         <ErpAiRouteContextProvider>
           <ChatterUploaderProvider value={useWebChatterUploader}>
@@ -678,6 +743,7 @@ export default function ModulesShell({
           </ChatterUploaderProvider>
         </ErpAiRouteContextProvider>
       </Suspense>
+      </AssistantGuideConversationProvider>
     </WorkspaceProfileProvider>
   )
 }
