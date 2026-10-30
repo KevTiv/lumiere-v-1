@@ -17,11 +17,18 @@ class GuideScopeTests(unittest.TestCase):
     def test_real_guide_owners_select_gate(self):
         for path in (
             "api-server/src/routes/knowledge_guides.rs",
+            "api-server/src/routes/knowledge_guides/review.rs",
             "ai-gateway/src/routes/guide_retrieval.rs",
+            "ai-gateway/src/orchestrator/guide_source_authority.rs",
+            "ai-gateway/src/orchestrator/evidence_inspector.rs",
+            "spacetimedb/src/ai/runtime_reads.rs",
             "spacetimedb/src/documents/knowledge_guides.rs",
             "frontend/web/app/(modules)/documents/knowledge/[id]/guide-page-client.tsx",
             "frontend/web/components/assistant-guide-host.tsx",
             "frontend/packages/ui/src/ai-chat/assistant-guide-viewer.tsx",
+            "frontend/packages/ui/src/ai-chat/guide-verification-actions.tsx",
+            "frontend/web/app/(modules)/modules-shell.tsx",
+            "frontend/web/lib/erp-ai-context.tsx",
             "scripts/run-guide-lifecycle.mjs",
             ".github/workflows/e2e-smoke.yml",
         ):
