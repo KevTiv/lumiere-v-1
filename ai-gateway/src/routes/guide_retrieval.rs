@@ -589,4 +589,127 @@ mod tests {
         assert!(references.is_err());
         server.abort();
     }
+
+    /// Invoked only by the isolated hosted lifecycle job against its actual
+    /// authenticated API/STDB/PostgreSQL stack. No fake authority or model runs.
+    #[tokio::test]
+    #[ignore = "requires the real-service guide lifecycle fixture"]
+    async fn real_authority_guides_lifecycle() {
+        let path = std::env::var("GUIDE_LIVE_FIXTURE").expect("live fixture is required");
+        let fixture: Value =
+            serde_json::from_slice(&std::fs::read(path).expect("live fixture must be readable"))
+                .expect("live fixture JSON");
+        let text = |key: &str| {
+            fixture[key]
+                .as_str()
+                .filter(|value| !value.is_empty())
+                .expect("required live fixture string")
+        };
+        let number = |key: &str| {
+            fixture[key]
+                .as_u64()
+                .filter(|value| *value > 0)
+                .expect("required live fixture identity")
+        };
+        let base = text("apiBase");
+        assert_eq!(base, "http://127.0.0.1:8082");
+        let org = number("orgId");
+        let company = number("companyId");
+        let actor = ActorCredentials::new(text("token"), text("identity")).expect("live actor");
+        let denied = ActorCredentials::new(text("deniedToken"), text("deniedIdentity"))
+            .expect("denied live actor");
+        let non_member = ActorCredentials::new(text("nonMemberToken"), text("nonMemberIdentity"))
+            .expect("non-member live actor");
+        let identity = GuideIdentity {
+            guide_id: text("guideId").to_string(),
+            revision: u32::try_from(number("revision")).expect("live revision"),
+        };
+        let http = reqwest::Client::new();
+        let discovered = retrieve_for_scope(
+            &http,
+            base,
+            &actor,
+            org,
+            company,
+            text("query"),
+            Some("accounting"),
+            &[],
+        )
+        .await
+        .expect("real fresh-request discovery");
+        if fixture["revoked"].as_bool() == Some(true) {
+            assert!(discovered.is_empty());
+            assert!(
+                retrieve_for_scope(&http, base, &actor, org, company, "", None, &[identity])
+                    .await
+                    .is_err()
+            );
+            return;
+        }
+        assert_eq!(discovered.len(), 1);
+        assert_eq!(discovered[0].guide_id, identity.guide_id);
+        assert_eq!(discovered[0].revision, identity.revision);
+        assert_eq!(discovered[0].review_state, "draft");
+        // No previous conversation references are supplied. A second independent
+        // HTTP client must discover the same exact authorized saved document.
+        let fresh = retrieve_for_scope(
+            &reqwest::Client::new(),
+            base,
+            &actor,
+            org,
+            company,
+            text("query"),
+            Some("accounting"),
+            &[],
+        )
+        .await
+        .expect("independent conversation discovery");
+        assert_eq!(fresh, discovered);
+        let historical = GuideIdentity {
+            revision: 1,
+            ..identity.clone()
+        };
+        let reattached =
+            retrieve_for_scope(&http, base, &actor, org, company, "", None, &[historical])
+                .await
+                .expect("exact historical reattachment");
+        assert_eq!(reattached[0].revision, 1);
+        assert_eq!(reattached[0].review_state, "superseded");
+        assert!(retrieve_for_scope(
+            &http,
+            base,
+            &denied,
+            org,
+            company,
+            "",
+            None,
+            std::slice::from_ref(&identity),
+        )
+        .await
+        .is_err());
+        assert!(retrieve_for_scope(
+            &http,
+            base,
+            &non_member,
+            org,
+            company,
+            "",
+            None,
+            std::slice::from_ref(&identity),
+        )
+        .await
+        .is_err());
+        assert!(retrieve_for_scope(
+            &http,
+            base,
+            &actor,
+            org,
+            number("otherCompanyId"),
+            "",
+            None,
+            &[identity],
+        )
+        .await
+        .is_err());
+    }
 }
