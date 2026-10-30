@@ -14,7 +14,7 @@ const ids = (options: Parameters<typeof buildNavGroups>[1]) =>
 describe("Finance Alpha global discovery", () => {
   it("keeps the agreed Finance and supporting entry points and removes empty groups", () => {
     expect(ids({ workspaceProfile: "finance-alpha" }).sort()).toEqual([
-      "accounting", "approvals", "calendar", "crm", "documents", "expenses", "messages",
+      "accounting", "approvals", "calendar", "crm", "documents", "expenses",
       "overview", "purchasing", "reports", "sales", "settings", "subscriptions", "tasks",
     ].sort())
     expect(buildNavGroups((key) => key, { workspaceProfile: "finance-alpha" })
@@ -27,6 +27,20 @@ describe("Finance Alpha global discovery", () => {
     const finance = ids({ workspaceProfile: "finance-alpha" })
     expect(ids({ workspaceProfile: "finance-alpha", firstOrgProfile: true, isAdmin: true }))
       .toEqual(firstOrg.filter((id) => finance.includes(id)))
+  })
+
+  it("hides deferred Alpha features across discovery and Settings while keeping the full profile available", () => {
+    const finance = ids({ workspaceProfile: "finance-alpha" })
+    for (const id of ["messages", "journal", "notebook"]) {
+      expect(finance).not.toContain(id)
+      expect(isWorkspaceSurfaceVisible("finance-alpha", id)).toBe(false)
+      expect(isWorkspaceSurfaceVisible("full", id)).toBe(true)
+    }
+    expect(isWorkspaceHrefVisible("finance-alpha", "/messages/42?tab=activity")).toBe(false)
+    expect(isWorkspaceHrefVisible("full", "/messages/42?tab=activity")).toBe(true)
+    expect(isWorkspaceFormModuleVisible("finance-alpha", "journal")).toBe(false)
+    expect(isWorkspaceFormModuleVisible("full", "journal")).toBe(true)
+    expect(isWorkspaceSurfaceVisible("finance-alpha", "ai-assistant")).toBe(true)
   })
 
   it("filters Settings forms without removing runtime forms for linked workflows", () => {

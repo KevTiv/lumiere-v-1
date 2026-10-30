@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test"
 import { activeTabEntityTable, gotoModule, scalarQueryId } from "./helpers"
 
-const VISIBLE = ["overview", "tasks", "approvals", "accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar", "messages", "settings"]
-const HIDDEN = ["inventory", "distributor", "pos", "manufacturing", "map", "fleet", "helpdesk", "workflows", "hr", "projects", "proposals", "forensics", "trackers", "ai-skills", "ai-action-drafts", "iot"]
+const VISIBLE = ["overview", "tasks", "approvals", "accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar", "settings"]
+const HIDDEN = ["messages", "inventory", "distributor", "pos", "manufacturing", "map", "fleet", "helpdesk", "workflows", "hr", "projects", "proposals", "forensics", "trackers", "ai-skills", "ai-action-drafts", "iot"]
 const sidebar = (page: Page) => page.locator('[data-testid="dashboard-sidebar"]:visible')
 
 async function expectFinanceNavigation(page: Page) {
@@ -21,6 +21,9 @@ async function expectFinanceNavigation(page: Page) {
     links.map((link) => link.getAttribute("href")?.slice(1)).sort(),
   )).toEqual([...VISIBLE].sort())
   for (const id of HIDDEN) await expect(sidebar(page).getByTestId(`sidebar-link-${id}`)).toHaveCount(0)
+  await expect(sidebar(page).getByRole("button", { name: "Open Journal", exact: true })).toHaveCount(0)
+  await expect(sidebar(page).getByRole("button", { name: "Open Notebook", exact: true })).toHaveCount(0)
+  await expect(page.getByTestId("notification-bell")).toHaveCount(0)
 }
 
 async function expectVisibleReceipt(page: Page, receiptId: number) {
@@ -67,7 +70,7 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       for (const name of ["Accounting", "Sales", "Purchasing", "Reports", "Expenses", "Settings"]) {
         await expect(palette.getByRole("option", { name, exact: true })).toBeVisible()
       }
-      for (const name of ["Inventory", "Manufacturing", "Projects", "Human Resources", "AI Skills", "IoT"]) {
+      for (const name of ["Messages", "Journal", "Notebook", "Inventory", "Manufacturing", "Projects", "Human Resources", "AI Skills", "IoT"]) {
         await expect(palette.getByRole("option", { name, exact: true })).toHaveCount(0)
       }
       const box = await palette.boundingBox()
@@ -107,10 +110,11 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
     await page.keyboard.press("Escape")
     await page.getByTestId("settings-section-form-config").click()
     const cards = page.locator('[data-testid^="form-config-module-"]:visible')
-    await expect(cards).toHaveCount(10)
-    for (const id of ["accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar", "journal"]) {
+    await expect(cards).toHaveCount(9)
+    for (const id of ["accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar"]) {
       await expect(page.getByTestId(`form-config-module-${id}`)).toBeVisible()
     }
+    await expect(page.getByTestId("form-config-module-journal")).toHaveCount(0)
     for (const id of ["inventory", "hr", "projects", "manufacturing", "helpdesk", "proposals", "forensic"]) {
       await expect(page.getByTestId(`form-config-module-${id}`)).toHaveCount(0)
     }
