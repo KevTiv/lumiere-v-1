@@ -331,10 +331,10 @@ promote_image_one() {
   fi
   before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
 
-  # A service source is an environment-scoped setting. Submit one patch so the
-  # image switch and removal of every repository selector are a single commit;
-  # otherwise Railway can briefly resolve the old repo/branch while promoting
-  # the new image. Piped JSON also keeps this safe in a non-TTY CI runner.
+  # Request an image-only source in one environment-scoped patch. The CLI may
+  # omit null repository selectors, so the applied source must be read back
+  # before a retry. A repository-connected service needs a native source switch
+  # first. Piped JSON also keeps this safe in a non-TTY CI runner.
   local source_patch edit_result
   source_patch="$(jq -cn \
     --arg service_id "$service_id" \
@@ -367,24 +367,58 @@ promote_image_one() {
     return 1
   fi
 
-  # Re-running a release at the same digest is a no-op configuration patch and
-  # therefore creates no deployment. Explicitly redeploy only in that case.
-  if [[ "$(jq -r '.committed' <<<"$edit_result")" != true ]]; then
-    echo "[railway-release] $service: source already matched; redeploying exact image"
+  # A committed patch can still be an unchanged source and create no deployment.
+  # Verify the applied image-only source before any explicit retry; null repo
+  # selectors in a patch do not prove that Railway detached a repository.
+  local snapshot deployment_id="" retry_result
+  if ! snapshot="$(existing_service_snapshot "$service_id")" ||
+      ! jq -e --arg image "$image" \
+        '.source.image == $image and (.source.repo == null or .source.repo == "")' \
+        >/dev/null <<<"$snapshot"; then
+    echo "[railway-release] $service: applied source does not match the requested image-only configuration" >&2
+    dump_diagnostics "$service"
+    return 1
+  fi
+
+  if jq -e --arg image "$image" --argjson before "$before_ids" '
+      .latestDeployment as $latest
+      | $latest.status == "SUCCESS" and $latest.canRedeploy == true
+        and $latest.meta.image == $image
+        and ($before | index($latest.id)) != null
+    ' >/dev/null <<<"$snapshot"; then
+    # The CLI redeploys its latest deployment by default. Only use this path
+    # when that existing deployment is already the exact requested digest.
+    echo "[railway-release] $service: unchanged deployed image; forcing an exact-image retry"
+    if ! retry_result="$(timeout "$UPLOAD_TIMEOUT_SECONDS" railway redeploy \
+      --project "$RAILWAY_PROJECT_ID" \
+      --environment "$RAILWAY_ENVIRONMENT" \
+      --service "$service_id" \
+      --yes \
+      --json)" || ! deployment_id="$(jq -er --argjson before "$before_ids" '
+        .id | select(type == "string" and length > 0)
+        | select(. as $id | ($before | index($id)) == null)
+      ' <<<"$retry_result")"; then
+      dump_diagnostics "$service"
+      return 1
+    fi
+  elif [[ "$(jq -r '.committed' <<<"$edit_result")" != true ]] &&
+      ! jq -e --argjson before "$before_ids" '
+        .latestDeployment.id | select(type == "string" and length > 0)
+        | select(. as $id | ($before | index($id)) == null)
+      ' >/dev/null <<<"$snapshot"; then
+    echo "[railway-release] $service: source already matched; deploying the verified image source"
     if ! timeout "$UPLOAD_TIMEOUT_SECONDS" railway redeploy \
       --project "$RAILWAY_PROJECT_ID" \
       --environment "$RAILWAY_ENVIRONMENT" \
-      --service "$service" \
-      --from-source \
-      --yes \
-      --json >/dev/null; then
+      --service "$service_id" \
+      --from-source --yes --json >/dev/null; then
       dump_diagnostics "$service"
       return 1
     fi
   fi
 
-  local deployment_id
-  if ! deployment_id="$(wait_for_new_deployment "$service" "$before_ids")"; then
+  if [[ -z "$deployment_id" ]] &&
+      ! deployment_id="$(wait_for_new_deployment "$service" "$before_ids")"; then
     echo "[railway-release] $service: source promotion returned but no new deployment appeared" >&2
     dump_diagnostics "$service"
     return 1
