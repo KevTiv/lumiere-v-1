@@ -45,7 +45,14 @@ fn append_custom_values_and_audits(
                 && row.timestamp == ctx.timestamp
                 && (row.table_name == audit_model
                     || (row.table_name == "record_custom_field_value"
-                        && row.company_id == Some(company_id)))
+                        && row.company_id == Some(company_id)
+                        && row
+                            .new_values
+                            .as_deref()
+                            .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                            .is_some_and(|value| {
+                                value.get("model").and_then(|model| model.as_str()) == Some(model)
+                            })))
         })
         .collect();
     audits.sort_by_key(|row| row.id);
