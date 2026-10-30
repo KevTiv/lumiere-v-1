@@ -197,7 +197,7 @@ fn seed_analytic_account(
             name: name.clone(),
             code: None,
             active: true,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             partner_id: None,
             plan_id: None,
             root_id: None,
@@ -295,7 +295,7 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
             name: "WC Misc".into(),
             code: journal_code.clone(),
             type_: JournalType::General,
-            currency_id: Some(1),
+            currency_id: Some(fixture.currency_id),
             default_account_id: Some(expense_id),
             suspense_account_id: None,
             loss_account_id: None,
@@ -393,7 +393,7 @@ pub fn test_mileage_line_from_rate(ctx: &ReducerContext) -> Result<(), String> {
         UpsertExpenseMileageRateParams {
             company_id: Some(fixture.company_id),
             name: "ATO km".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             rate_per_unit: 0.85,
             unit: "km".into(),
             effective_from: None,
@@ -420,7 +420,7 @@ pub fn test_mileage_line_from_rate(ctx: &ReducerContext) -> Result<(), String> {
             date: ctx.timestamp,
             unit_amount: 0.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -459,7 +459,7 @@ pub fn test_mileage_line_from_rate(ctx: &ReducerContext) -> Result<(), String> {
             date: ctx.timestamp,
             unit_amount: 0.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -509,7 +509,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             description: None,
             active: true,
             sequence: 1,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             partner_id: Some(fixture.partner_id),
             partner_email: None,
             partner_phone: None,
@@ -574,7 +574,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             company_id: Some(fixture.company_id),
             employee_id,
             name: "Alloc Sheet".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             notes: None,
             accounting_date: None,
         },
@@ -597,7 +597,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             date: ctx.timestamp,
             unit_amount: 200.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -822,6 +822,18 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
 
     submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;
     submit_expense_sheet(ctx, fixture.organization_id, sheet_id)?;
+    let submitted = ctx
+        .db
+        .expense_sheet()
+        .id()
+        .find(&sheet_id)
+        .ok_or("submitted sheet")?;
+    if submitted.currency_id != fixture.currency_id
+        || submitted.company_currency_id != fixture.currency_id
+        || submitted.currency_rate != 1.0
+    {
+        return Err("same-currency expense fixture must use its actual company currency and unit FX snapshot".into());
+    }
     approve_expense_sheet_impl(ctx, fixture.organization_id, sheet_id, true)?;
     post_expense_sheet(
         ctx,
@@ -870,6 +882,11 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
         .ok_or("rebill move")?;
     if mv.move_type != MoveType::OutInvoice || mv.state != AccountMoveState::Posted {
         return Err("rebill move must be posted OutInvoice".into());
+    }
+    if mv.currency_id != fixture.currency_id || mv.company_currency_id != fixture.currency_id {
+        return Err(
+            "rebill must retain the fixture's canonical transaction and company currency".into(),
+        );
     }
     // Only billable 60% → 120
     if (mv.amount_total - 120.0).abs() > 0.01 {
@@ -948,7 +965,7 @@ pub fn test_per_diem_rate(ctx: &ReducerContext) -> Result<(), String> {
         UpsertExpensePerDiemRateParams {
             company_id: Some(fixture.company_id),
             name: "NYC".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             location_code: "US-NYC".into(),
             amount_per_day: 75.0,
             effective_from: None,
@@ -974,7 +991,7 @@ pub fn test_per_diem_rate(ctx: &ReducerContext) -> Result<(), String> {
             date: ctx.timestamp,
             unit_amount: 0.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -1023,7 +1040,7 @@ pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), Str
         UpsertExpenseMileageRateParams {
             company_id: Some(fixture.company_id),
             name: "Windowed km".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             rate_per_unit: 1.0,
             unit: "km".into(),
             effective_from: Some(days_offset(ctx, -10)),
@@ -1050,7 +1067,7 @@ pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), Str
             date: ctx.timestamp,
             unit_amount: 0.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -1080,7 +1097,7 @@ pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), Str
         UpsertExpenseMileageRateParams {
             company_id: Some(fixture.company_id),
             name: "Current km".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             rate_per_unit: 0.5,
             unit: "km".into(),
             effective_from: Some(days_offset(ctx, -1)),
@@ -1106,7 +1123,7 @@ pub fn test_mileage_rate_effective_dates(ctx: &ReducerContext) -> Result<(), Str
             date: ctx.timestamp,
             unit_amount: 0.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -1327,7 +1344,7 @@ pub fn test_allocation_tax_split_on_post(ctx: &ReducerContext) -> Result<(), Str
             company_id: Some(fixture.company_id),
             employee_id,
             name: "TaxAlloc Sheet".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             notes: None,
             accounting_date: None,
         },
@@ -1350,7 +1367,7 @@ pub fn test_allocation_tax_split_on_post(ctx: &ReducerContext) -> Result<(), Str
             date: ctx.timestamp,
             unit_amount: 100.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![tax_def_id],
