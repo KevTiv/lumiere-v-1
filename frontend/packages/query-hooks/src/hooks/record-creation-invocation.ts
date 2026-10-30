@@ -52,7 +52,12 @@ function decode(raw: string, scope: InvocationScope, model: ConfigurableCreation
   return pending
 }
 
-function exactResult(pending: PendingRecordCreation, rows: readonly RowValueMap[]): string | undefined {
+export function readPendingRecordCreation(scope: InvocationScope, model: ConfigurableCreationModel, storage: ReceiptStorage): PendingRecordCreation | undefined {
+  const raw = storage.getItem(recordCreationStorageKey(scope, model))
+  return raw == null ? undefined : decode(raw, scope, model)
+}
+
+export function exactRecordCreationResult(pending: PendingRecordCreation, rows: readonly RowValueMap[]): string | undefined {
   const id = `${pending.organizationId}:${pending.companyId}:${pending.model}:${pending.operationKey}`
   const matches = rows.filter((row) => row.id === id)
   if (matches.length > 1) throw new WorkflowError("conflict", "Multiple saved records claim the same creation identity")
@@ -96,7 +101,7 @@ export async function executeRecordCreation(
   const rows = await ports.read(pending?.operationKey ?? "capability_probe")
   ports.assertScope()
   if (pending) {
-    const savedId = exactResult(pending, rows)
+    const savedId = exactRecordCreationResult(pending, rows)
     if (savedId) { storage.removeItem(storageKey); return savedId }
     if (pending.payloadJson !== payloadJson) {
       if (pending.phase !== "rejected") throw new WorkflowError("conflict", "A previous save is unresolved. Restore its entered values and check it before creating a different record.")
@@ -122,7 +127,7 @@ export async function executeRecordCreation(
     throw error
   }
   ports.assertScope()
-  const savedId = exactResult(pending, await ports.read(pending.operationKey))
+  const savedId = exactRecordCreationResult(pending, await ports.read(pending.operationKey))
   ports.assertScope()
   if (!savedId) throw new WorkflowError("server_failure", "Save was acknowledged but its exact record could not be read. Check this attempt again; do not create a replacement.")
   storage.removeItem(storageKey)

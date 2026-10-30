@@ -14,14 +14,20 @@ export function useRecordCreationTransport(organizationId: bigint, companyId: bi
   const { identity } = useErpSession()
   const actorHex = identity?.replace(/^0x/i, "").toLowerCase() ?? ""
   const stamp = `${organizationId}:${companyId}:${actorHex}`
-  const live = useRef(stamp)
-  live.current = stamp
-  useEffect(() => () => { live.current = "unmounted" }, [])
+  const live = useRef({ stamp, mounted: false })
+  if (live.current.stamp !== stamp) live.current = { stamp, mounted: false }
+  // Each scope transition gets a distinct lifetime, including A -> B -> A.
+  // StrictMode may clean up and re-run this same lifetime's initial effect.
+  const lifetime = live.current
+  useEffect(() => {
+    lifetime.mounted = true
+    return () => { lifetime.mounted = false }
+  }, [lifetime])
 
   return async (payloadJson: string, metadata: unknown, makeCommand: (metadata: string) => { urlPath: string; init: RequestInit }): Promise<string> => {
     if (companyId == null || companyId <= 0n) throw new WorkflowError("validation", "Company scope is required to create this record")
     const scope = { organizationId, companyId, actorHex }
-    const assertScope = () => { if (live.current !== stamp) throw new WorkflowError("conflict", "Actor or company changed. The saved attempt remains in its original scope.") }
+    const assertScope = () => { if (live.current !== lifetime || !lifetime.mounted) throw new WorkflowError("conflict", "Actor or company changed. The saved attempt remains in its original scope.") }
     assertScope()
     if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.locks) {
       throw new WorkflowError("validation", "This browser cannot safely coordinate record creation retries")
