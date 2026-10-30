@@ -1416,7 +1416,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 13);
+        assert_eq!(ledger.released.len(), 14);
         // The v0.3.80 migration 1 that existing databases recorded.
         assert_eq!(
             checksum(&ledger.released[0].sql),
@@ -1474,9 +1474,14 @@ mod tests {
             checksum(&ledger.released[12].sql),
             "sha256:4f75a0928ea64cf18ac4db7d86129509ec1a23ac114383dc1ea31ec93a9b9701"
         );
+        assert_eq!(ledger.released[13].version, 29);
+        assert_eq!(
+            checksum(&ledger.released[13].sql),
+            "sha256:67d31c68770fa0fa1c89be7e66b2b685e4fb036c300829ade7fcaa92517fd48a"
+        );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (29, "0029_durable_projection_delta")
+            (30, "0030_durable_projection_delta")
         );
     }
     #[test]

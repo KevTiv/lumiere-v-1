@@ -26,6 +26,47 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("opens substantial contextual answers as unsaved guides with their ERP sources", async () => {
+    const onOpenGuide = vi.fn()
+    const content = "## Review this vendor bill\n\n" + "Check the supplier, lines, and linked records before posting. ".repeat(6)
+    const source = { kind: "live" as const, trust: "authoritative" as const, entity_type: "account_move", entity_id: "52", href: "/accounting/52" }
+    render(<AIChatPanel open docked onClose={vi.fn()} context={{ module: "accounting", companyId: 7 }} config={{ onOpenGuide }} initialMessages={[{ id: "42", role: "assistant", content, timestamp: new Date(), sources: [source], metadata: { runId: 11 } }]} />)
+    fireEvent.click(await screen.findByTestId("assistant-guide-card"))
+    expect(onOpenGuide).toHaveBeenCalledWith({ messageId: "42", draft: expect.objectContaining({ title: "Review this vendor bill", markdown: content, module: "accounting", companyId: "7", runId: "11", sources: [source], draftKey: "message:42" }) })
+  })
+
+  it("opens saved guide references without using stored document bodies", async () => {
+    const onOpenGuide = vi.fn()
+    const reference = { guideId: "9007199254740993", revision: 2, title: "Bill posting guide", module: "accounting" }
+    render(<AIChatPanel open onClose={vi.fn()} config={{ onOpenGuide, guideLibraryHref: "/documents/knowledge?module=accounting" }} initialMessages={[{ id: "42", role: "assistant", content: "This guide may help.", timestamp: new Date(), guides: [reference] }]} />)
+    fireEvent.click(await screen.findByTestId("assistant-guide-card"))
+    expect(onOpenGuide).toHaveBeenCalledWith({ messageId: "42", reference })
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/documents/knowledge?module=accounting")
+  })
+
+  it("opens both the generated answer and a related saved guide as separate documents", async () => {
+    const onOpenGuide = vi.fn()
+    const content = "## Current vendor bill checks\n\n" + "Review this bill using the current supplier and linked ERP records. ".repeat(6)
+    const reference = { guideId: "9007199254740993", revision: 2, title: "Saved posting procedure", module: "accounting" }
+    const source = { kind: "live" as const, trust: "authoritative" as const, entity_type: "account_move", entity_id: "52", href: "/accounting/52" }
+    render(<AIChatPanel open docked onClose={vi.fn()} context={{ module: "accounting", companyId: 7 }} config={{ onOpenGuide }} initialMessages={[{ id: "44", role: "assistant", content, timestamp: new Date(), guides: [reference], sources: [source] }]} />)
+    const cards = await screen.findAllByTestId("assistant-guide-card")
+    expect(cards).toHaveLength(2)
+    fireEvent.click(screen.getByRole("button", { name: /Saved posting procedure/ }))
+    expect(onOpenGuide).toHaveBeenNthCalledWith(1, { messageId: "44", reference })
+    fireEvent.click(screen.getByRole("button", { name: /Current vendor bill checks/ }))
+    expect(onOpenGuide).toHaveBeenNthCalledWith(2, { messageId: "44", draft: expect.objectContaining({ draftKey: "message:44", markdown: content, module: "accounting", companyId: "7", sources: [source] }) })
+  })
+
+  it("offers the single generated HTML fence as a derivative while retaining the answer", async () => {
+    const onOpenGuide = vi.fn()
+    const html = `<h1>Vendor bill checks</h1><p>${"Check the linked ERP records. ".repeat(10)}</p>`
+    const content = `## Vendor bill guide\n\n\`\`\`html\n${html}\n\`\`\``
+    render(<AIChatPanel open onClose={vi.fn()} context={{ module: "accounting", companyId: 7 }} config={{ onOpenGuide }} initialMessages={[{ id: "43", role: "assistant", content, timestamp: new Date() }]} />)
+    fireEvent.click(await screen.findByTestId("assistant-guide-card"))
+    expect(onOpenGuide).toHaveBeenCalledWith({ messageId: "43", draft: expect.objectContaining({ markdown: content, html }) })
+  })
+
   it("does not publish an old scope's late answer into a new scoped panel", async () => {
     let resolve!: (reply: { content: string }) => void
     const oldSend = vi.fn(() => new Promise<{ content: string }>((done) => { resolve = done }))

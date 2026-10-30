@@ -9,7 +9,8 @@ rough sizing (S/M/L), not commitments.
 **Plan revision:** 2026-09-21. AIH-13–19 add evidence and intellectual
 provenance requirements; AIH-20–24 add interactive execution/recovery to base
 gates; AIH-25/26 are later specialist/extension admission; AIH-27/28 come from
-the T3 Orchestrator V2 adoption review (2026-10-27).
+the T3 Orchestrator V2 adoption review (2026-10-27). AIH-29 adds the Alpha
+assistant help-document scope (2026-10-28); implementation and acceptance are pending.
 
 For post-H5 work, this issue list is interpreted through
 `governed-intelligence-program-architecture.md`,
@@ -1219,6 +1220,32 @@ principal; each call is recorded as a run naming the external client.
 cannot approve a draft, and loses access immediately on revocation. Calls are
 indistinguishable from internal runs in audit, spend and evidence records apart
 from the client identity. Stays disabled until separately admitted.
+
+---
+
+### AIH-29 — Contextual ERP assistance and persistent help documents (Alpha)
+
+**Status:** core implementation and local checks complete; see [evidence and remaining admission checks](../plan/alpha-assistant-help-artifacts-status.md). Full Alpha acceptance and matching contract release remain pending; verified-guide promotion/compatibility filtering are not claimed.
+**Plan ref:** [Alpha contextual ERP assistant and help documents](./alpha-assistant-help-artifacts-plan.md).
+**Depends on:** current governed answer/evidence admission, existing ERP operation owners,
+Documents/Knowledge access and revision contracts, and document/RAG retrieval acceptance.
+**Size:** L, delivered as HELP-01 through HELP-05.
+
+Keep contextual chat at the ERP side. Ground explanations in authorized current
+records and use existing draft/review flows to help users enter information and
+continue across workflows. Open generated Markdown/static HTML from message cards
+in a modal above the ERP or a dedicated in-app document view, preserving the same
+conversation and task state. Save guides through the KnowledgeArticle owner with
+immutable revisions, module/workflow associations, sources, and accurate save/review
+state. Reuse and cite permitted applicable revisions in later conversations.
+
+**Acceptance:** prove actual ERP source values and snapshot freshness, permitted
+record-entry/recovery handoffs, modal/full-page return continuity, durable
+save/reload/reopen, exact-revision retrieval in a new chat, stale-edit conflict and
+retry deduplication, denied/revoked/company-switch behavior, safe rendering, and
+responsive keyboard operation. A returned artifact body is not a saved document;
+a working viewer does not certify retrieval. This Alpha addition grants no new
+financial execution authority and does not close existing pilot gates.
 
 ---
 

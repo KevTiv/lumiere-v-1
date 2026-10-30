@@ -34,6 +34,10 @@ use crate::{
         },
     },
     retrieval_policy::optional_retrieval,
+    routes::guide_retrieval::{
+        recheck_related_guides, retrieve_related_guides, validate_guide_refs, GuideIdentity,
+        RelatedGuide,
+    },
     routes::passage_retrieval::{
         authorize_and_resolve, recheck_before_release, AuthorizedEvidence, EvidenceAccess,
         EvidenceScope, LiveEvidenceAccess, ReleaseCheck, ResolvedPassage, RAG_MAX_EVIDENCE_ROWS,
@@ -78,6 +82,10 @@ pub struct RagRequest {
     /// Optional BFF-provided entity allowlist for live snapshot reads.
     #[serde(default)]
     pub allowed_entity_types: Vec<String>,
+    /// User-selected saved guide revisions. Identities are selectors only;
+    /// their content and current access are resolved by the document owner.
+    #[serde(default)]
+    pub guide_refs: Vec<GuideIdentity>,
 }
 
 fn default_limit() -> u64 {
@@ -119,6 +127,11 @@ pub struct RagResponse {
     pub answer: String,
     pub sources: Vec<RagSource>,
     pub retrieval_degraded: bool,
+    /// Related saved documents, never implicitly promoted to evidence for the
+    /// generated answer. A draft remains visibly a draft.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub related_guides: Vec<RelatedGuide>,
+    pub guide_retrieval_degraded: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub run_id: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -142,6 +155,8 @@ fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
         answer: "No relevant information found for your query.".to_string(),
         sources: Vec::new(),
         retrieval_degraded,
+        related_guides: Vec::new(),
+        guide_retrieval_degraded: false,
         run_id: None,
         agent_id: None,
         provider: None,
@@ -593,6 +608,8 @@ pub async fn post_rag(
     if req.query.trim().is_empty() {
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
+    validate_guide_refs(&req.guide_refs)
+        .map_err(|error| AppError::BadRequest(error.to_string()))?;
     let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
         .map_err(|error| AppError::Forbidden(error.to_string()))?;
 
@@ -623,6 +640,24 @@ pub async fn post_rag(
         .as_ref()
         .and_then(|c| c.module.as_deref())
         .unwrap_or("-");
+
+    // The saved-guide API, not a vector payload or browser-provided body,
+    // decides visibility. These references are kept outside model context:
+    // a saved generated draft is not independent corroboration of its claims.
+    let related = retrieve_related_guides(
+        &state,
+        &actor,
+        org_id,
+        req.company_id,
+        &req.query,
+        req.ui_context
+            .as_ref()
+            .and_then(|context| context.module.as_deref()),
+        &req.guide_refs,
+    )
+    .await;
+    let mut related_guides = related.references;
+    let mut guide_retrieval_degraded = related.degraded;
 
     // Retrieve relevant company-scoped chunks (optionally filtered by content type)
     let include_types = normalized_include_types(req.include_types.as_deref());
@@ -813,7 +848,17 @@ pub async fn post_rag(
             duration_ms = started.elapsed().as_millis() as u64,
             "RAG query answered (no hits)"
         );
-        return Ok(Json(no_relevant_information_response(retrieval_degraded)));
+        let fresh_guides =
+            recheck_related_guides(&state, &actor, org_id, req.company_id, &related_guides).await;
+        related_guides = fresh_guides.references;
+        guide_retrieval_degraded |= fresh_guides.degraded;
+        let mut response = no_relevant_information_response(retrieval_degraded);
+        if !related_guides.is_empty() {
+            response.answer = "Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified.".to_string();
+        }
+        response.related_guides = related_guides;
+        response.guide_retrieval_degraded = guide_retrieval_degraded;
+        return Ok(Json(response));
     }
 
     ensure_allowed_action(&agent, "chat").map_err(|e| AppError::Forbidden(e.to_string()))?;
@@ -1030,6 +1075,13 @@ pub async fn post_rag(
         sources.extend(ranked.into_iter().map(|s| s.rag_source));
     }
 
+    // Generation/review can take time. Re-read guide authority now, including
+    // when the model did not cite a guide (guide bodies never entered it).
+    let fresh_guides =
+        recheck_related_guides(&state, &actor, org_id, req.company_id, &related_guides).await;
+    related_guides = fresh_guides.references;
+    guide_retrieval_degraded |= fresh_guides.degraded;
+
     tracing::info!(
         company_id = req.company_id,
         org_id,
@@ -1047,6 +1099,8 @@ pub async fn post_rag(
         answer,
         sources,
         retrieval_degraded,
+        related_guides,
+        guide_retrieval_degraded,
         run_id,
         agent_id,
         provider,
@@ -1093,6 +1147,8 @@ fn rag_stream_metadata(response: &RagResponse) -> Value {
         "provider": response.provider,
         "model": response.model,
         "retrieval_degraded": response.retrieval_degraded,
+        "related_guides": response.related_guides,
+        "guide_retrieval_degraded": response.guide_retrieval_degraded,
         "verification": response.verification,
         "provenance": response.provenance,
     })
@@ -1377,6 +1433,8 @@ mod tests {
             answer: release.answer.clone(),
             sources,
             retrieval_degraded: false,
+            related_guides: Vec::new(),
+            guide_retrieval_degraded: false,
             run_id: None,
             agent_id: Some(1),
             provider: Some("test".into()),

@@ -4322,6 +4322,10 @@
       "name": "run_iot_relational_integrity_test",
       "shape_fingerprint": "sha256:4ef9a5a48db9b95950427acc942baf11415ccdd31255900b0c6774f07338366a"
     },
+    "erp.run_knowledge_guide_tests": {
+      "name": "run_knowledge_guide_tests",
+      "shape_fingerprint": "sha256:da5281bcafc68e58955915ecc20e54927a8f4203ab9ca99f4e3d657e52827c09"
+    },
     "erp.run_manufacturing_actual_cost_valuation_test": {
       "name": "run_manufacturing_actual_cost_valuation_test",
       "shape_fingerprint": "sha256:0d473f20e1f7554e76452334769514456003a67af77fc7f1be7983c1eb85f498"
@@ -4689,6 +4693,10 @@
     "erp.save_import_mapping_template": {
       "name": "save_import_mapping_template",
       "shape_fingerprint": "sha256:392257623d593a5057b036e6a8a83ab98979c7837f04eda25252a3a5515249a6"
+    },
+    "erp.save_knowledge_guide": {
+      "name": "save_knowledge_guide",
+      "shape_fingerprint": "sha256:e03c08a3bbb0b3a5f92d13e30b1f5b5de73da8376f240d008dc509a82b0cf9ef"
     },
     "erp.save_presentation_module": {
       "name": "save_presentation_module",
@@ -6240,6 +6248,14 @@
       "current_operations_fingerprint": "sha256:eebf34b06e570a36bbb01d8c5036eea9a9561e4cf6d726afbe28badeaad143c8",
       "operation_count": 1484,
       "reason": "release on top of v0.3.153: add edit_ai_run_follow_up, enqueue_ai_run_follow_up, fire_ai_run_budget_resume, park_ai_run_for_budget, promote_ai_run_follow_up, reorder_ai_run_follow_up, resolve_ai_run_budget_park, withdraw_ai_run_follow_up; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.157",
+      "previous_ir_sha256": "sha256:9c0d5bcef8cadfdce4321829560b98b0a36d7c5cfc1765962f5f9cfbb7c53fbd",
+      "previous_operations_fingerprint": "sha256:eebf34b06e570a36bbb01d8c5036eea9a9561e4cf6d726afbe28badeaad143c8",
+      "current_operations_fingerprint": "sha256:ac4b4c8fe7bb8f83a28e45c3dba118445a676fffa885292cab25749f0cf3d941",
+      "operation_count": 1486,
+      "reason": "release on top of v0.3.157: add run_knowledge_guide_tests, save_knowledge_guide; change the shape of none"
     }
   ]
 }

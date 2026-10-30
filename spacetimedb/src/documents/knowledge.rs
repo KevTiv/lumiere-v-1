@@ -298,6 +298,10 @@ pub fn create_knowledge_article(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "knowledge_article", "create")?;
 
+    if let Some(parent_id) = params.parent_id {
+        super::knowledge_guides::guard_article_content(ctx, parent_id)?;
+    }
+
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     let is_root = params.parent_id.is_none();
@@ -422,6 +426,8 @@ pub fn update_knowledge_article(
         .find(&article_id)
         .ok_or("Article not found")?;
 
+    super::knowledge_guides::guard_article_content(ctx, article_id)?;
+
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());
     }
@@ -524,6 +530,8 @@ pub fn lock_knowledge_article(
         .find(&article_id)
         .ok_or("Article not found")?;
 
+    super::knowledge_guides::guard_article_access(ctx, &article)?;
+
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());
     }
@@ -577,6 +585,8 @@ pub fn unlock_knowledge_article(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    super::knowledge_guides::guard_article_access(ctx, &article)?;
 
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());
@@ -632,6 +642,8 @@ pub fn set_article_published(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    super::knowledge_guides::guard_article_content(ctx, article_id)?;
 
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());
@@ -692,6 +704,8 @@ pub fn add_article_member(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    super::knowledge_guides::guard_article_access(ctx, &article)?;
 
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());
@@ -754,6 +768,8 @@ pub fn remove_article_member(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    super::knowledge_guides::guard_article_access(ctx, &article)?;
 
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());
@@ -819,6 +835,8 @@ pub fn delete_knowledge_article(
         .id()
         .find(&article_id)
         .ok_or("Article not found")?;
+
+    super::knowledge_guides::guard_article_access(ctx, &article)?;
 
     if article.organization_id != organization_id {
         return Err("Article does not belong to this organization".to_string());

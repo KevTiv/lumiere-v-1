@@ -1,5 +1,7 @@
 // AI Chat Panel Types - Similar to v0/Zed IDE ACP
 
+import type { GuideReference, OpenGuideRequest } from "./assistant-guide-types"
+
 export type CitationKind = "live" | "passage" | "activity" | "web"
 export type CitationTrust = "authoritative" | "persisted" | "retrieved"
 
@@ -42,6 +44,8 @@ export interface ChatMessage {
   actions?: ChatAction[]
   /** Retrieved memory / RAG citations (assistant messages) */
   sources?: ChatMessageSourceRef[]
+  /** References only: saved content must be reauthorized when opened. */
+  guides?: GuideReference[]
   metadata?: {
     model?: string
     tokens?: number
@@ -116,6 +120,9 @@ export interface AIChatConfig {
   onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
   /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
   onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>
+  /** Opens a prepared preview or reauthorizes a saved guide in the host workspace. */
+  onOpenGuide?: (request: OpenGuideRequest) => void | Promise<void>
+  guideLibraryHref?: string
 }
 
 export interface ContextProvider {

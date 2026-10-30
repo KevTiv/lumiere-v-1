@@ -33,6 +33,8 @@
     "first-org-fixture:check": "node ./scripts/seed-test-user.mjs --check-manifest",
     "e2e-seed-fixture": "node ./scripts/e2e-seed-fixture.mjs",
     "test:e2e:subscriptions-ui": "playwright test --config playwright.subscriptions-ui.config.ts",
+    "test:assistant-guides": "node --import tsx --test lib/assistant-guides.test.ts app/api/ai/_lib/guide-references.test.ts",
+    "test:e2e:assistant-guides": "playwright test --config playwright.assistant-guides.config.ts",
     "test:e2e:sales-workflow": "playwright test --config playwright.sales-workflow.config.ts",
     "test:e2e:productivity-ui": "playwright test --config playwright.productivity-ui.config.ts",
     "test:productivity:models": "node --import tsx --test lib/business-workspace-navigation.test.ts lib/productivity-data.test.ts lib/calendar-create-params.test.ts components/daily-work-navigation.test.ts components/work-board/activity-deadline-groups.test.ts 'app/(modules)/approvals/approval-inbox-view.test.ts' 'app/(modules)/calendar/calendar-event.test.ts' 'app/(modules)/documents/document-browser-navigation.test.ts' 'app/(modules)/documents/file-browser-rows.test.ts' 'app/(modules)/messages/message-conversations.test.ts' 'app/(modules)/messages/message-record.test.ts'"

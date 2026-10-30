@@ -8,6 +8,7 @@ import type { ApiSession } from '@/lib/api-session'
 
 import type { JsonObject } from './route-helpers'
 import { boundedInteger, positiveInteger, validateCompanyScope } from './route-helpers'
+import { parseRagGuideReferences, type RagGuideReference } from './guide-references'
 
 export const MAX_INCLUDE_TYPES = 8
 
@@ -42,6 +43,7 @@ export interface RagPayload {
   identity_hex: string
   include_types?: string[]
   ui_context?: unknown
+  guide_refs?: RagGuideReference[]
 }
 
 export type RagPrepareResult =
@@ -70,6 +72,16 @@ export async function prepareRagPayload(params: {
     }
   }
 
+  let guideRefs: RagGuideReference[] | undefined
+  try {
+    guideRefs = parseRagGuideReferences(body.guide_refs)
+  } catch (error) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid guide references' }, { status: 400 }),
+    }
+  }
+
   const companyId = positiveInteger(body.companyId ?? body.company_id)
   const scopeError = await validateCompanyScope(session, companyId)
   if (scopeError) return { ok: false, response: scopeError }
@@ -88,6 +100,7 @@ export async function prepareRagPayload(params: {
   }
   if (include_types?.length) payload.include_types = include_types
   if (ui_context) payload.ui_context = ui_context
+  if (guideRefs) payload.guide_refs = guideRefs
 
   return { ok: true, payload }
 }

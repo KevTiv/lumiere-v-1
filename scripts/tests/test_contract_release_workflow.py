@@ -66,6 +66,15 @@ class ContractReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("--sort=name --mtime='UTC 1970-01-01'", packager)
         self.assertIn('sha256sum "$ARCHIVE"', packager)
 
+    def test_release_refreshes_browser_operations_after_installing_the_new_pin(self):
+        release = (ROOT / ".github/workflows/release-contracts.yml").read_text()
+        pin = release.split("      - name: Pin the release\n", 1)[1]
+        install = pin.index("pnpm --dir frontend install --frozen-lockfile")
+        regenerate = pin.index("pnpm --dir frontend contracts:generate-browser-operations")
+        self.assertLess(install, regenerate)
+        commit = release.split("      - name: Commit the pin\n", 1)[1]
+        self.assertIn("frontend/packages/stdb/src/generated/browser-operation-ids.ts", commit)
+
 
 if __name__ == "__main__":
     unittest.main()

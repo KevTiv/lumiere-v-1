@@ -34,6 +34,9 @@ import {
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
+import { AssistantGuideCard } from "./assistant-guide-viewer"
+import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guide-types"
+import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
@@ -43,6 +46,7 @@ interface ChatReply {
   runId?: number
   sources?: ChatMessageSourceRef[]
   actions?: ChatAction[]
+  guides?: GuideReference[]
 }
 
 interface AIChatPanelProps {
@@ -141,6 +145,7 @@ export function AIChatPanel({
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [guideError, setGuideError] = useState<string | null>(null)
   const active = useRef(true)
   useEffect(() => {
     active.current = true
@@ -331,6 +336,7 @@ export function AIChatPanel({
               : streamedActions.length > 0
                 ? streamedActions
                 : undefined,
+          guides: reply.guides,
           metadata: {
             duration: Math.round(t1 - t0),
             runId: reply.runId,
@@ -351,6 +357,7 @@ export function AIChatPanel({
           timestamp: new Date(),
           sources: reply.sources && reply.sources.length > 0 ? reply.sources : undefined,
           actions: reply.actions && reply.actions.length > 0 ? reply.actions : undefined,
+          guides: reply.guides,
           metadata: {
             duration: Math.round(t1 - t0),
             runId: reply.runId,
@@ -477,6 +484,16 @@ export function AIChatPanel({
     [config, citeStatus],
   )
 
+  const handleOpenGuide = async (request: OpenGuideRequest) => {
+    if (!config?.onOpenGuide) return
+    setGuideError(null)
+    try {
+      await config.onOpenGuide(request)
+    } catch (cause) {
+      setGuideError(cause instanceof Error ? cause.message : t("aiChat.guide.openFailed", { defaultValue: "The document could not be opened. Try again." }))
+    }
+  }
+
   if (!open) return null
 
   return (
@@ -544,10 +561,13 @@ export function AIChatPanel({
         </div>
       </header>
 
+      {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-xs text-primary hover:underline sm:px-6"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}
+
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
           <div className={cn("mx-auto w-full max-w-[820px] px-4 py-8 sm:px-8", docked ? "sm:px-4" : "sm:py-12")}>
           {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
+          {guideError ? <p role="alert" className="mb-4 break-words text-sm text-destructive">{guideError}</p> : null}
           {historySaveFailed ? <p role="alert" className="mb-4 break-words rounded-md border p-3 text-sm">{t("aiChat.historySaveFailed", { defaultValue: "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed." })}</p> : null}
             {messages.length === 0 ? (
               <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
@@ -604,6 +624,21 @@ export function AIChatPanel({
                       )}>
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
+                      {message.role === "assistant" && config?.onOpenGuide ? <>
+                        {message.guides?.map((reference) => <AssistantGuideCard key={`${reference.guideId}:${reference.revision}`} title={reference.title ?? t("aiChat.guide.savedGuide", { defaultValue: "Saved ERP guide" })} module={reference.module} revision={reference.revision} onOpen={() => void handleOpenGuide({ messageId: message.id, reference })} />)}
+                        {!isLoading && message.content.trim().length >= 240 && context?.companyId ? <AssistantGuideCard title={message.content.split("\n").find((line) => line.trim())?.replace(/^#{1,6}\s*/, "").replace(/\*\*/g, "").slice(0, 100) ?? t("aiChat.guide.newGuide", { defaultValue: "ERP guidance" })} module={context.module ?? context.activeView} onOpen={() => void handleOpenGuide({ messageId: message.id, draft: {
+                          draftKey: `message:${message.id}`,
+                          title: message.content.split("\n").find((line) => line.trim())?.replace(/^#{1,6}\s*/, "").replace(/\*\*/g, "").slice(0, 100) ?? "ERP guidance",
+                          markdown: message.content,
+                          html: extractGuideHtmlDerivative(message.content),
+                          module: context.module ?? "general",
+                          companyId: String(context.companyId),
+                          workflow: context.activeTab,
+                          sources: message.sources ?? [],
+                          originMessageId: message.id,
+                          runId: message.metadata?.runId != null ? String(message.metadata.runId) : undefined,
+                        } })} /> : null}
+                      </> : null}
                       {message.role === "assistant" && message.sources != null && message.sources.length > 0 && (
                         <div className="mt-2 w-full max-w-full rounded-lg border border-border bg-card p-3 text-xs leading-5 text-muted-foreground">
                           <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
