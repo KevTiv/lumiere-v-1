@@ -51,6 +51,14 @@ fn snapshot_for_rows(
     let snapshots = rows
         .iter()
         .map(|row| {
+            for (camel, snake) in [
+                ("analyticAccountId", "analytic_account_id"),
+                ("projectId", "project_id"),
+            ] {
+                if row.get(camel).or_else(|| row.get(snake)).is_none() {
+                    return Err(invalid());
+                }
+            }
             let id = |camel: &str, snake: &str| row_u64(row, camel, snake).map_err(|_| invalid());
             let metadata = match row.get("metadata") {
                 Some(Value::Null) => None,
@@ -236,6 +244,23 @@ mod tests {
         assert!(require_read(&actor, 42).is_err());
         actor.role_permissions.clear();
         assert!(require_read(&actor, 42).is_err());
+    }
+
+    #[test]
+    fn snapshot_requires_explicit_optional_fields_and_preserves_full_width_ids() {
+        let row = json!({"id":"9007199254740993","organizationId":"42","companyId":"7","expenseId":"9",
+            "projectId":null,"analyticAccountId":"8","sharePercent":100.0,"amount":12.34567,"billable":false,"metadata":null});
+        let original = snapshot_for_rows(42, 7, 9, &[row.clone()]).unwrap();
+        let mut missing = row.clone();
+        missing.as_object_mut().unwrap().remove("projectId");
+        assert!(snapshot_for_rows(42, 7, 9, &[missing]).is_err());
+        let mut changed = row;
+        changed["amount"] = json!(12.34568);
+        assert_ne!(original, snapshot_for_rows(42, 7, 9, &[changed]).unwrap());
+        assert_ne!(
+            snapshot_for_rows(42, 7, 9, &[]).unwrap(),
+            snapshot_for_rows(42, 7, 10, &[]).unwrap()
+        );
     }
 
     #[test]
