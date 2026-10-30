@@ -90,9 +90,15 @@ including three new positive/denied-evidence cases; the other 211 files were
 unchanged. Fixture lint passed with zero warnings.
 The Purchasing type-debt baseline decreased from 2,261 to 2,244 occurrences.
 The codegen ledger checksum test passes and regeneration classifies exactly 524
-tables with all 15 ledger migrations released. Final immutable pin, integrated
-API authorization/C4 tests, browser regressions and real-service guide gate
-remain required before the draft PR is ready.
+tables with all 15 ledger migrations released. Final API-source regression
+execution passed all 30 cases: creation recovery 9, expense allocation 13,
+retention 6, exclusion capture validation 1 and the actual Rust application
+catalog checksum check 1. This local build used the pre-release 0.3.158 bindings;
+matching-pin hosted validation remains required. A first local HTTP fixture run
+was denied loopback binding by the execution sandbox; the unchanged tests passed
+when run with loopback network access. Final immutable pin, C4 upgrade execution,
+integrated frontend types/browser regressions and real-service guide gate remain
+required before the draft PR is ready.
 
 Known limits: Lead records retain their existing organization-shared schema,
 while operating-company admission, custom values and recovery receipts are exact.
