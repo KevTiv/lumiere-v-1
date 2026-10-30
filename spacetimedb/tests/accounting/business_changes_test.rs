@@ -1,6 +1,6 @@
 //! Persisted proof for the first trusted Accounting change-history producer.
 
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 use crate::accounting::journal_entries::{
     account_move, account_move_line, update_account_move_line, UpdateAccountMoveLineParams,
