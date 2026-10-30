@@ -34,7 +34,7 @@ Additional deploy environment:
   RUST_RUNTIME_IMAGE (exact image digest expected for redeploy-source)
 
 Optional safety controls:
-  RAILWAY_EXPECTED_REGION       Verify RAILWAY_REPLICA_REGION through railway ssh.
+  RAILWAY_EXPECTED_REGION       Verify active deployment placement using Railway metadata.
 EOF
 }
 
@@ -188,6 +188,55 @@ existing_service_snapshot() {
       '
 }
 
+applied_service_source() {
+  local service_id="$1" environment_id="$2"
+  # The CLI resolves the project-token context and validates this explicit
+  # environment ID. Filter immediately: config also contains decrypted variables.
+  timeout 45 railway environment config \
+    --environment "$environment_id" --json 2>/dev/null | jq -ce \
+      --arg service "$service_id" '
+        select(type == "object") | .services | select(type == "object")
+        | .[$service] | select(type == "object" and .isDeleted != true)
+        | .source | select(type == "object") | {image: .image, repo: .repo}
+      ' 2>/dev/null
+}
+
+wait_for_applied_source() {
+  local service_id="$1" image="$2" environment_id="$3"
+  local deadline=$((SECONDS + GATE_TIMEOUT_SECONDS))
+  local snapshot source
+  while (( SECONDS < deadline )); do
+    if ! snapshot="$(existing_service_snapshot "$service_id" 2>/dev/null)" ||
+        ! jq -e --arg environment "$environment_id" '
+          .environmentId == $environment and has("source")
+          and (.source == null or
+            ((.source | type) == "object" and (.source | has("repo"))
+              and (.source.repo == null or .source.repo == "")))
+        ' >/dev/null <<<"$snapshot"; then
+      echo "[railway-release] $service_id: missing scoped source evidence or repository still attached" >&2
+      return 1
+    fi
+    # ServiceInstance.source may be null or show an older image. Only the
+    # applied environment config is authoritative for the requested image.
+    if ! source="$(applied_service_source "$service_id" "$environment_id")"; then
+      echo "[railway-release] $service_id: could not read applied environment source" >&2
+      return 1
+    fi
+    if ! jq -e '.repo == null or .repo == ""' >/dev/null <<<"$source"; then
+      echo "[railway-release] $service_id: applied source still has a repository attached" >&2
+      return 1
+    fi
+    if jq -e --arg image "$image" '.image == $image' >/dev/null <<<"$source"; then
+      printf '%s\n' "$snapshot"
+      return 0
+    fi
+    echo "[railway-release] $service_id: waiting for applied image source to converge" >&2
+    sleep "$POLL_SECONDS"
+  done
+  echo "[railway-release] $service_id: applied source did not converge to the requested image" >&2
+  return 1
+}
+
 wait_for_existing_success() {
   local service="$1"
   local deadline=$((SECONDS + GATE_TIMEOUT_SECONDS))
@@ -324,9 +373,14 @@ promote_image_one() {
   local image="$2"
   [[ "$image" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] \
     || die "promote-image requires an immutable GHCR digest"
-  local before_ids service_id
+  local before_ids service_id environment_id initial_snapshot
   if ! service_id="$(resolve_service_id "$service")"; then
     dump_diagnostics "$service"
+    return 1
+  fi
+  if ! initial_snapshot="$(existing_service_snapshot "$service_id")" ||
+      ! environment_id="$(jq -er '.environmentId | select(type == "string" and length > 0)' <<<"$initial_snapshot")"; then
+    echo "[railway-release] $service: could not validate the target environment before promotion" >&2
     return 1
   fi
   before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
@@ -358,8 +412,8 @@ promote_image_one() {
     return 1
   fi
 
-  if ! jq -e \
-    '(.committed == true and .staged == true) or
+  if ! jq -e --arg environment "$environment_id" \
+    '(.committed == true and .staged == true and .environmentId == $environment) or
      (.committed == false and .staged == false)' \
     >/dev/null <<<"$edit_result"; then
     echo "[railway-release] $service: environment source edit returned an invalid result" >&2
@@ -368,13 +422,10 @@ promote_image_one() {
   fi
 
   # A committed patch can still be an unchanged source and create no deployment.
-  # Verify the applied image-only source before any explicit retry; null repo
-  # selectors in a patch do not prove that Railway detached a repository.
+  # Wait for the canonical applied config, independently of the instance image
+  # projection. Null repo selectors do not prove repository detachment.
   local snapshot deployment_id="" retry_result
-  if ! snapshot="$(existing_service_snapshot "$service_id")" ||
-      ! jq -e --arg image "$image" \
-        '.source.image == $image and (.source.repo == null or .source.repo == "")' \
-        >/dev/null <<<"$snapshot"; then
+  if ! snapshot="$(wait_for_applied_source "$service_id" "$image" "$environment_id")"; then
     echo "[railway-release] $service: applied source does not match the requested image-only configuration" >&2
     dump_diagnostics "$service"
     return 1
