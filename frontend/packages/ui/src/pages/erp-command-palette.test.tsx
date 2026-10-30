@@ -43,6 +43,7 @@ vi.mock("../lib/navigation-catalog", () => ({
         { surfaceId: "crm", label: "CRM", href: "/crm", icon: () => null, resource: "module:crm" },
         { surfaceId: "inventory", label: "Inventory", href: "/inventory", icon: () => null, resource: "module:inventory" },
         { surfaceId: "purchasing", label: "Purchasing", href: "/purchasing", icon: () => null, resource: "module:purchasing" },
+        { surfaceId: "messages", label: "Messages", href: "/messages", icon: () => null, resource: "module:messages" },
       ],
     },
   ].map((group) => ({ ...group, items: group.items.filter((item) => isWorkspaceSurfaceVisible(options?.workspaceProfile ?? "full", item.surfaceId)) })),
@@ -110,6 +111,25 @@ function type(text: string) {
 }
 
 describe("ErpCommandPalette records", () => {
+  it.each(["finance-alpha", "full"] as const)("keeps deferred feature actions aligned with the %s profile", (profile) => {
+    const onOpenNotebook = vi.fn()
+    const onOpenJournal = vi.fn()
+    const onOpenAIChat = vi.fn()
+    render(<WorkspaceProfileProvider value={profile}><ErpCommandPalette open onOpenNotebook={onOpenNotebook} onOpenJournal={onOpenJournal} onOpenAIChat={onOpenAIChat} /></WorkspaceProfileProvider>)
+    expect(screen.getByRole("option", { name: "nav.aiAssistant" })).toBeTruthy()
+    if (profile === "finance-alpha") {
+      expect(screen.queryByRole("option", { name: "Messages" })).toBeNull()
+      expect(screen.queryByRole("option", { name: "nav.notebook" })).toBeNull()
+      expect(screen.queryByRole("option", { name: "nav.journal" })).toBeNull()
+    } else {
+      expect(screen.getByRole("option", { name: "Messages" })).toBeTruthy()
+      fireEvent.click(screen.getByRole("option", { name: "nav.notebook" }))
+      expect(onOpenNotebook).toHaveBeenCalledOnce()
+      fireEvent.click(screen.getByRole("option", { name: "nav.journal" }))
+      expect(onOpenJournal).toHaveBeenCalledOnce()
+    }
+  })
+
   it("does not query or offer hidden modules under the Finance Alpha provider", () => {
     render(<WorkspaceProfileProvider value="finance-alpha"><ErpCommandPalette recordHref={recordHref} /></WorkspaceProfileProvider>)
     act(() => { fireEvent.keyDown(window, { key: "k", ctrlKey: true }) })

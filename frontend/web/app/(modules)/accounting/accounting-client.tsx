@@ -1,5 +1,6 @@
 "use client"
 import { buildManualInvoiceCatalog, manualInvoiceAccountChoices, manualInvoiceJournalChoices, manualInvoiceTaxChoices } from "./features/manual-invoice-catalog"
+import { journalImportReadinessAction } from "./journal-import-readiness"
 import { useTaxDeadlineAdministration } from "./features/use-tax-deadline-administration"
 import { useTaxGroupAdministration } from "./features/use-tax-group-administration"
 import { useTaxJurisdictionAdministration } from "./features/use-tax-jurisdiction-administration"
@@ -1246,6 +1247,7 @@ function AccountingClientReady({
       invoice: evaluateAccountingSetupReadiness(accountingSetup, "invoice"),
       bill: evaluateAccountingSetupReadiness(accountingSetup, "bill"),
       import: evaluateAccountingSetupReadiness(accountingSetup, "import"),
+      "journal-import": evaluateAccountingSetupReadiness(accountingSetup, "journal-import"),
     }),
     [accountingSetup],
   )
@@ -1309,7 +1311,7 @@ function AccountingClientReady({
     [requestAccountingAction],
   )
   const openAccountingMoveImport = useCallback(
-    () => requestAccountingAction("import", () => setCsvKind("accountMove")),
+    () => requestAccountingAction("journal-import", () => setCsvKind("accountMove")),
     [requestAccountingAction],
   )
   const openAccountingMoveLineImport = useCallback(
@@ -4552,6 +4554,13 @@ function AccountingClientReady({
         throw new Error("The journal import contains duplicate column names.")
       }
 
+      const readiness = evaluateAccountingSetupReadiness(
+        accountingSetup, journalImportReadinessAction(headers, parsed.rows),
+      )
+      if (accountingSetupDataState.status !== "ready" || !readiness.isReady) {
+        throw new Error(readiness.blockingItems[0]?.reason ?? "Accounting setup data must be ready before importing.")
+      }
+
       const { parentMapping, lineMapping } = accountMoveBundleMappings(headers)
       const split = splitAccountMoveImportCsv({
         headers,
@@ -4568,7 +4577,7 @@ function AccountingClientReady({
         fileNamePrefix: "journal-entry",
       })
     },
-    [submitAccountMoveBundle],
+    [accountingSetup, accountingSetupDataState.status, submitAccountMoveBundle],
   )
 
   const importOutstandingDocuments = useCallback(
