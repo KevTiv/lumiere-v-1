@@ -330,7 +330,7 @@ fn invalidate_guide_knowledge(
         for version_id in versions {
             mark_version_needs_review(ctx, version_id);
         }
-    }
+    };
 }
 
 /// Existing article membership/lock/delete operations remain the access owner,
