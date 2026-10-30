@@ -190,7 +190,8 @@ describe("reviewed bank settlement lifecycle recovery", () => {
   it("checks a persisted closed approval before enabling explicit abandonment and fresh review", async () => {
     const saved = attempt(), source = lifecycleSource(saved)
     const onCheckStatus = vi.fn().mockResolvedValue({ status: "lifecycle", attempt: saved })
-    const onRecover = vi.fn().mockResolvedValue({ status: "lifecycle", attempt: { ...saved, status: "abandoned" } })
+    let finishRecovery!: (outcome: ReconciliationOutcome) => void
+    const onRecover = vi.fn((_request: BankSettlementRecoveryRequest) => new Promise<ReconciliationOutcome>((resolve) => { finishRecovery = resolve }))
     const onOperationLockChange = vi.fn(), onConfirm = vi.fn()
     render(<ReconciliationWorkbench actorKey="operator-1" source={source} canReconcile canRecover={() => true} onConfirm={onConfirm} onCheckStatus={onCheckStatus} onRecover={onRecover} onOperationLockChange={onOperationLockChange} createRecoveryKey={() => "abandon-1"} />)
     await screen.findByText("Check the saved settlement before continuing")
@@ -205,10 +206,17 @@ describe("reviewed bank settlement lifecycle recovery", () => {
     expect(confirm.disabled).toBe(true)
     fireEvent.click(screen.getByRole("checkbox", { name: recoveryReviewLabel }))
     fireEvent.click(confirm)
+    await screen.findByText("Confirming the reviewed settlement recovery…")
+    expect(onOperationLockChange).toHaveBeenLastCalledWith(true)
+    expect(screen.queryByText("Unposted settlement draft abandoned")).toBeNull()
+    expect(onRecover).toHaveBeenCalledOnce()
+    expect(onConfirm).not.toHaveBeenCalled()
+    finishRecovery({ status: "lifecycle", attempt: { ...saved, status: "abandoned" } })
     await screen.findByText("Unposted settlement draft abandoned")
     expect(onRecover).toHaveBeenCalledOnce()
     expect(onRecover.mock.calls[0]![0]).toMatchObject({ organizationId: "1", companyId: "4", statementId: "2", lineId: "10", paymentId: "88", action: "abandon", reason: "Supplier approval was cancelled", idempotencyKey: "abandon-1", moveLineIds: ["40", "41"] })
-    expect(onOperationLockChange).toHaveBeenLastCalledWith(false)
+    // The parent lock is notified by an effect, after the terminal DOM commits.
+    await waitFor(() => expect(onOperationLockChange).toHaveBeenLastCalledWith(false))
     fireEvent.click(screen.getByText("Review another line"))
     expect(screen.queryByText("Check the saved settlement before continuing")).toBeNull()
     expect(screen.getByTestId("reconciliation-confirm")).toBeTruthy()

@@ -26,6 +26,15 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("reports unavailable assistance without inventing financial data when no transport is configured", async () => {
+    render(<AIChatPanel open onClose={vi.fn()} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "@sales sales summary" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await screen.findByText("aiChat.turn.notConfigured")
+    expect(screen.queryByText(/284,392|1,847|Revenue:/)).toBeNull()
+  })
+
+
   it("opens substantial contextual answers as unsaved guides with their ERP sources", async () => {
     const onOpenGuide = vi.fn()
     const content = "## Review this vendor bill\n\n" + "Check the supplier, lines, and linked records before posting. ".repeat(6)

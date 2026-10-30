@@ -16,7 +16,7 @@ import {
 
 export type { AiUiContext } from "../ai-ui-context"
 
-import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
+import { httpResponseError, responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
 export function useAiActionDraft() {
   return useMutation({
@@ -44,7 +44,7 @@ export function useAiActionDraft() {
           ...(args.teamMemberId != null ? { team_member_id: args.teamMemberId } : {}),
         }),
       })
-      if (!r.ok) throw new Error(await parseAiError(r))
+      if (!r.ok) throw await httpResponseError(r)
       const wire = (await r.json()) as { drafts?: GatewayActionDraftWireDto[] }
       return normalizeGatewayActionDraftResponse(wire)
     },
