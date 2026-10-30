@@ -262,6 +262,16 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "account-accounts".to_string(),
+        ["allowed_journal_ids"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
+        "subscription-amendments".to_string(),
+        // Exact renewal readback needs its durable idempotency receipt after
+        // ordinary field authorization. Explicit masks still decide selection.
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "account-assets".to_string(),
         ["depreciation_board_ids"]
             .into_iter()
@@ -498,6 +508,11 @@ fn field_resource_matches(configured: &str, resource_key: &str) -> bool {
     if configured == "*" || configured == resource_key {
         return true;
     }
+    // Parent field restrictions also govern exact-expense allocations. Do not
+    // alias two different tables: aliases canonicalize policy grants too.
+    if resource_key == "expense-allocations" && field_resource_matches(configured, "expenses") {
+        return true;
+    }
     let configured_norm = configured.replace('-', "_");
     let resource_norm = resource_key.replace('-', "_");
     if configured_norm == resource_norm {
@@ -605,6 +620,9 @@ pub fn has_resource_read_permission(
     }
     if resource_read_denied(access, resource_key) {
         return false;
+    }
+    if resource_key == "expense-allocations" {
+        return has_resource_read_permission(Some(access), "expenses");
     }
     if permission_allowed(access, resource_key, "read") {
         return true;
@@ -2595,6 +2613,77 @@ mod tests {
         for field in ["date", "total_amount", "currency_id"] {
             assert!(!masked.iter().any(|column| column == field));
         }
+    }
+
+    #[test]
+    fn alpha_default_and_saved_result_projections_use_schema_fields_and_respect_masks() {
+        for (resource, row_type, fields) in [
+            ("account-journals", "AccountJournal", &["currency_id"][..]),
+            (
+                "account-accounts",
+                "AccountAccount",
+                &["allowed_journal_ids", "is_off_balance"][..],
+            ),
+            ("employees", "HrEmployee", &["user_id", "deleted_at"][..]),
+            ("pricelists", "ProductPricelist", &["company_id"][..]),
+            (
+                "subscriptions",
+                "Subscription",
+                &["close_date", "close_reason_id"][..],
+            ),
+            (
+                "crm-conversation-messages",
+                "CrmConversationMessage",
+                &["operational_message_id"][..],
+            ),
+        ] {
+            let schema = sql_column_list_for_generated_type(row_type).expect("released SQL schema");
+            let projected = resolve_http_sql_columns(resource, None).expect("default projection");
+            for field in fields {
+                assert!(schema.iter().any(|column| column == field), "{row_type}.{field}");
+                assert!(projected.iter().any(|column| column == field), "{resource}.{field}");
+            }
+            let permission = format!("{resource}:read");
+            let mut access = field_access(&[&permission]);
+            select_fields(&mut access, resource, &["id"]);
+            let masked = resolve_http_sql_columns(resource, Some(&access)).expect("masked projection");
+            for field in fields {
+                if *field == "company_id" {
+                    // Company provenance is a mandatory scope discriminator.
+                    assert!(masked.iter().any(|column| column == field));
+                } else {
+                    assert!(!masked.iter().any(|column| column == field), "masked {resource}.{field}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expense_allocations_preserve_parent_scope_and_apply_expense_field_masks() {
+        let access = field_access(&["hr_expense:read"]);
+        assert!(has_resource_read_permission(Some(&access), "expense-allocations"));
+        let columns = resolve_http_sql_columns("expense-allocations", Some(&access)).unwrap();
+        for field in ["id", "organization_id", "company_id", "expense_id", "amount", "share_percent", "analytic_account_id", "project_id", "billable"] {
+            assert!(columns.iter().any(|column| column == field), "allocation {field}");
+        }
+        let mut masked_access = access;
+        select_fields(&mut masked_access, "hr_expense", &["name"]);
+        let masked = resolve_http_sql_columns("expense-allocations", Some(&masked_access)).unwrap();
+        for field in ["amount", "share_percent", "analytic_account_id", "project_id", "billable"] {
+            assert!(!masked.iter().any(|column| column == field), "masked allocation {field}");
+        }
+        for field in ["id", "organization_id", "company_id", "expense_id"] {
+            assert!(masked.iter().any(|column| column == field), "mandatory allocation {field}");
+        }
+        let mut denied = field_access(&["hr_expense:read"]);
+        denied.org_permissions.push(ActionPermission {
+            resource: "hr_expense".into(),
+            action: "read".into(),
+            allow: false,
+        });
+        assert!(!has_resource_read_permission(Some(&denied), "expense-allocations"));
+        assert_eq!(canonical_policy_resource("hr_expense"), "hr_expense");
+        assert_eq!(canonical_policy_resource("hr_expense_allocation"), "hr_expense_allocation");
     }
 
     #[test]

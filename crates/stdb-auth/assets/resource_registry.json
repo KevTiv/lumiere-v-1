@@ -38,7 +38,9 @@
       "opening_credit",
       "currency_id",
       "user_type_id",
-      "group_id"
+      "group_id",
+      "allowed_journal_ids",
+      "is_off_balance"
     ],
     "mandatory": [
       "id",
@@ -105,7 +107,8 @@
       "company_id",
       "active",
       "type",
-      "default_account_id"
+      "default_account_id",
+      "currency_id"
     ],
     "mandatory": [
       "id",
@@ -1498,7 +1501,8 @@
       "body",
       "status",
       "provider_message_id",
-      "metadata"
+      "metadata",
+      "operational_message_id"
     ],
     "mandatory": [
       "id",
@@ -2019,7 +2023,9 @@
       "job_title",
       "job_id",
       "parent_id",
-      "is_active"
+      "is_active",
+      "user_id",
+      "deleted_at"
     ],
     "mandatory": [
       "id",
@@ -2047,6 +2053,27 @@
       "organization_id"
     ],
     "table": "hr_expense_advance"
+  },
+  "expense-allocations": {
+    "aliases": [
+      "expense-allocations",
+      "hr_expense_allocation"
+    ],
+    "default_restricted": [
+      "analytic_account_id",
+      "project_id",
+      "share_percent",
+      "amount",
+      "billable",
+      "metadata"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id",
+      "expense_id"
+    ],
+    "table": "hr_expense_allocation"
   },
   "expense-card-statement-unmatched": {
     "aliases": [
@@ -4480,7 +4507,8 @@
     "default_restricted": [
       "name",
       "currency_id",
-      "is_active"
+      "is_active",
+      "company_id"
     ],
     "mandatory": [
       "id",
@@ -6729,7 +6757,8 @@
       "notes",
       "company_id",
       "subscription_id",
-      "metadata"
+      "metadata",
+      "created_by"
     ],
     "mandatory": [
       "id",
@@ -7092,7 +7121,9 @@
       "health",
       "invoice_count",
       "pricelist_id",
-      "created_at"
+      "created_at",
+      "close_date",
+      "close_reason_id"
     ],
     "mandatory": [
       "id",

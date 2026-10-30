@@ -248,11 +248,7 @@
     "search": "Search modules and records"
   },
   "common": {
-    "select": {
-      "search": "Search options…",
-      "options": "Options",
-      "noMatches": "No matching options"
-    },
+    "select": "Select",
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
@@ -533,7 +529,8 @@
     "moduleNavigation": {
       "overview": "Overview",
       "area": "Task area"
-    }
+    },
+    "explainError": "Explain this error"
   },
   "navigation": {
     "overview": "Overview",
@@ -3680,7 +3677,34 @@
       "contentOverride": "Edited for this document",
       "contentInherited": "Company default",
       "contentEmpty": "No text",
-      "documentContentHint": "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text."
+      "documentContentHint": "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text.",
+      "choicesChanged": "Accounting choices changed. Your selections are retained. Review the journal and accounts before saving.",
+      "keepChoices": "Keep current accounting choices",
+      "unsupportedCustomFields": "This form contains a custom field that invoice entry cannot save yet. Ask your administrator to use a supported field type without conditional visibility. No document has been created.",
+      "journalAccountSource": "From the selected journal's configured default account. You can change it for this document.",
+      "productAccountSource": "From the selected product's configured account. You can change it for this document.",
+      "singleAccountSuggestion": "Selected because it was the only eligible account. This is a suggestion, not a configured business default.",
+      "unavailableLineAccount": "The selected item account is unavailable for this journal and currency. Choose an eligible account; the other item details are retained.",
+      "singleJournalSuggestion": "Selected because it was the only eligible journal. This is a suggestion, not a configured business default.",
+      "chooseJournal": "Several journals are available. Choose the journal for this document.",
+      "unavailableJournal": "The selected journal is no longer available. Choose an active journal; your entries are retained.",
+      "chooseCounterpart": "Several eligible accounts are available. Choose the receivable or payable account for this document.",
+      "unavailableCounterpart": "The selected receivable or payable account is unavailable for this journal and currency. Choose an eligible account; your entries are retained.",
+      "oneTagPerLine": "Enter one tag per line.",
+      "customValidation": {
+        "unsupported": "This configured field is not supported by invoice entry.",
+        "required": "Complete this required field.",
+        "finiteNumber": "Enter a finite number.",
+        "numberLimits": "Enter a number within the configured limits.",
+        "boolean": "Choose a yes or no value.",
+        "distinctText": "Choose distinct text values.",
+        "text": "Enter a text value.",
+        "option": "Choose an available configured option.",
+        "textLength": "Use the configured text length.",
+        "email": "Enter a valid email address.",
+        "format": "Use the configured format.",
+        "invalidPattern": "The configured validation pattern is invalid."
+      }
     },
     "assetSchedule": {
       "generateFailed": "The saved schedule could not be confirmed. Refresh before you try again.",
@@ -10738,6 +10762,19 @@
         "quote": "Quote",
         "code": "Code"
       }
+    },
+    "retentionPreview": {
+      "scopeChanged": "Your company or document permissions changed. Reopen the purge preview.",
+      "hidden": "{{count}} affected documents cannot be reviewed with your current document access. The organization-wide purge is blocked.",
+      "empty": "No reviewable documents are currently eligible for this purge. No purge was requested.",
+      "title": "Review documents before permanent purge",
+      "purge": "Permanently purge",
+      "schedule": "Schedule purge",
+      "orgScope": "This action covers the entire organization, across companies. It permanently removes eligible recycle-bin documents and their versions.",
+      "held": "{{count}} documents are excluded by active legal holds.",
+      "delayed": "Scheduled in {{seconds}} seconds. This preview includes documents whose retention expires by that time. Eligibility and legal holds are checked again when the job runs; the final set can change.",
+      "company": "Company",
+      "finalCheck": "The scope is refreshed before requesting the purge. Purged documents cannot be restored."
     }
   },
   "helpdesk": {
@@ -11718,7 +11755,7 @@
         "generate-invoice": "Create a draft invoice for the next billing period. Usage, taxes and other adjustments are calculated when saved. This action does not collect payment.",
         "pay-invoice": "Record a payment already received. A draft invoice will be posted first. The payment reduces the invoice balance; this action does not charge the customer.",
         "amend": "Change the selected contract line immediately. Review the new price and quantity before confirming.",
-        "renew": "Extend the subscription term by the selected number of billing periods. Renewal does not collect payment.",
+        "renew": "Advance the next invoice date by the selected number of billing periods. Renewal does not collect payment.",
         "cancel": "Close this subscription immediately and revoke service access. You can also create a credit note for a selected posted invoice.",
         "ingest-usage": "Record a usage event for this subscription. Charges are calculated separately.",
         "rate-usage": "Calculate charges for up to 100 pending usage events. This action does not create an invoice.",
@@ -11751,6 +11788,32 @@
       "openCatalog": "Open sales catalog (new tab)",
       "planSetup": "A plan needs a product, a price list and an active invoice journal. Complete the missing setup in the catalog and accounting, then refresh. Your entries are retained.",
       "inheritedCustomer": "Inherited from the selected sales order"
+    },
+    "lifecycle": {
+      "title": "Dates & renewal",
+      "dateUnavailable": "Date unavailable",
+      "contractEnd": "Contractual end date",
+      "contractEndUnavailable": "No contractual end date is stored",
+      "closedAt": "Closed on",
+      "renewal": "Renewal availability",
+      "closure": {
+        "not-closed": "Not closed",
+        "unavailable": "Closure date unavailable"
+      },
+      "renewalState": {
+        "available": "Available for this subscription state",
+        "not-active": "Unavailable in this subscription state",
+        "unavailable": "Subscription state unavailable"
+      },
+      "lastRenewal": "Last recorded renewal",
+      "renewalRecorded": "{{date}} · Version {{version}}",
+      "history": {
+        "none-recorded": "No renewal is recorded in the available history",
+        "unavailable": "Renewal history unavailable"
+      },
+      "renewalEffect": "Renewal advances the next invoice date by the selected billing periods. It does not set a contractual end date or collect payment.",
+      "checkRenewal": "Check renewal status",
+      "renewalUnknown": "This renewal request is retained. Check its saved result before starting another renewal. Checking status sends no renewal request."
     }
   },
   "expenses": {
@@ -12269,7 +12332,8 @@
         "singleUnitHint": "Quick capture records one unit. This amount is the expense amount before any server calculation.",
         "financeSourcesRequired": "Journals or accounts could not be loaded. Retry the lookup before continuing. Your entries are retained.",
         "financeSourcesDenied": "You do not have access to the journals or accounts needed for this action. Ask your administrator to check your access.",
-        "financeSourcesLoading": "Loading journals and accounts. Your entries are retained."
+        "financeSourcesLoading": "Loading journals and accounts. Your entries are retained.",
+        "employeeDefaultHint": "Selected from the active employee record linked to your signed-in account in this company. Change it if you are entering an expense for someone else."
       }
     },
     "operationsTab": "Operations",
@@ -12342,6 +12406,18 @@
         "denied": "Access restricted",
         "error": "Choices could not be verified",
         "partial": "Choices could not be verified"
+      },
+      "loadedHint": "These are the saved allocations for this expense. Review every row before saving your changes.",
+      "save": "Save allocations",
+      "readUnavailable": "Saved allocations could not be verified. Retry the read before editing or saving.",
+      "changed": "Saved allocations changed since this editor opened. Your edits are retained. Close and reopen this expense to review the current saved rows before replacing them.",
+      "loadBeforeEdit": "Load this expense's saved allocations before making changes.",
+      "read": {
+        "loading": "Loading saved allocations…",
+        "denied": "Access to this expense's allocations is restricted.",
+        "error": "Saved allocations could not be verified.",
+        "partial": "Saved allocations could not be verified.",
+        "ready": "Loading saved allocations…"
       }
     }
   },
@@ -12885,7 +12961,25 @@
       "templatesLoading": "Loading message templates…",
       "showEvidence": "Review saved recipients and content",
       "approve": "Approve",
-      "reject": "Reject"
+      "reject": "Reject",
+      "providerDelivered": "Provider confirmed delivery",
+      "providerAccepted": "Provider accepted; delivery is not confirmed",
+      "providerFailed": "Provider reported failure",
+      "providerUnavailable": "No verified provider delivery receipt is available.",
+      "providerReference": "Provider reference",
+      "exclusionsUnavailable": "The complete creation-time exclusion reasons are unavailable for this batch. Current contact preferences cannot establish why a recipient was excluded earlier.",
+      "excludedRecipients": "Excluded at batch creation",
+      "invoice": "Invoice",
+      "contact": "Contact",
+      "exclusionReasons": {
+        "contact_inactive": "The contact is deleted or merged.",
+        "channel_opted_out": "The contact opted out of this channel.",
+        "no_eligible_primary_identity": "No eligible primary contact identity is available.",
+        "invoice_unavailable": "The invoice is unavailable.",
+        "invoice_not_outstanding_posted_customer_invoice": "The invoice is outside the selected scope or is not an outstanding posted customer invoice.",
+        "invoice_has_no_contact": "The invoice has no customer contact.",
+        "contact_unavailable": "The customer contact is unavailable."
+      }
     }
   },
   "pos": {
