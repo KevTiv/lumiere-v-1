@@ -172,7 +172,7 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
     // Startup upgrades the frozen v13 prefix through the whole current catalog,
-    // including migration 27's history partitions and migration 29's guide tables.
+    // including history partitions, guide tables and creation receipts.
     let expected_new_tables = [
         "ai_run_budget_park",
         "ai_run_budget_resume_job",
@@ -204,6 +204,7 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         "mrp_workcenter_cost_rate",
         "purchase_order_creation_operation",
         "purchase_receipt_operation",
+        "record_creation_receipt",
         "user_invite_acceptance",
         "workflow_cancellation_repair_receipt",
         "workflow_human_task_resubmission",
@@ -364,6 +365,7 @@ async fn exercise_financial_alpha_upgrade(pool: &Pool) -> Result<()> {
     for table in [
         "purchase_order_creation_operation",
         "purchase_receipt_operation",
+        "record_creation_receipt",
         "bank_statement_settlement_attempt",
         "bank_statement_settlement_reversal",
     ] {
