@@ -504,3 +504,129 @@ pub fn quotation_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     }
     Ok(())
 }
+
+pub fn purchase_order_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::purchasing::order_creation_operations::{
+        create_purchase_order_once, purchase_order_creation_operation,
+        CreatePurchaseOrderOnceParams,
+    };
+    use crate::purchasing::purchase_orders::purchase_order;
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let mut vendor = contact_input(&fixture, "{}".into());
+    vendor.is_vendor = true;
+    create_contact(ctx, org, vendor)?;
+    let vendor_id = ctx
+        .db
+        .contact()
+        .contact_by_org()
+        .filter(&org)
+        .find(|row| row.name == "Atomic custom contact")
+        .ok_or("custom PO vendor missing")?
+        .id;
+    configure_form(ctx, org, "purchasing", "new-purchase-order")?;
+    let params = CreatePurchaseOrderOnceParams {
+        operation_key: "configured-po".into(),
+        partner_id: vendor_id,
+        currency_id: fixture.currency_id,
+        origin: None,
+        partner_ref: None,
+        notes: None,
+        date_planned: None,
+        payment_term_id: None,
+        fiscal_position_id: None,
+        incoterm_id: None,
+        incoterm_location: None,
+        is_quantity_copy: None,
+        metadata: Some(r#"{"custom:reference":"Accepted"}"#.into()),
+    };
+    let before = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .count();
+    create_purchase_order_once(ctx, org, fixture.company_id, params.clone())?;
+    let id = format!("{org}:{}:configured-po", fixture.company_id);
+    let receipt = ctx
+        .db
+        .purchase_order_creation_operation()
+        .id()
+        .find(&id)
+        .ok_or("configured PO receipt missing")?;
+    let record_id = receipt.purchase_order_id;
+    create_purchase_order_once(ctx, org, fixture.company_id, params.clone())?;
+    let values: Vec<_> = ctx
+        .db
+        .record_custom_field_value()
+        .iter()
+        .filter(|row| {
+            row.organization_id == org
+                && row.company_id == fixture.company_id
+                && row.model == "purchase_order"
+                && row.record_id == record_id
+        })
+        .collect();
+    if ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|row| row.organization_id == org)
+        .count()
+        != before + 1
+        || values.len() != 1
+        || values[0].value_json != r#""Accepted""#
+    {
+        return Err("configured PO replay lost or duplicated base/custom rows".into());
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&org)
+        .filter(|commit| {
+            commit.operation_id == "erp.create_purchase_order_once" && commit.correlation_id == id
+        })
+        .collect();
+    if commits.len() != 1 {
+        return Err("PO creation replay duplicated durable source commit".into());
+    }
+    let rows: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&org)
+        .filter(|row| row.commit_sequence == commits[0].sequence)
+        .collect();
+    for table in [
+        "purchase_order",
+        "record_custom_field_value",
+        "purchase_order_creation_operation",
+        "document_sequence",
+    ] {
+        if rows.iter().filter(|row| row.table_name == table).count() != 1 {
+            return Err(format!("PO source commit missing {table}"));
+        }
+    }
+    let mut invalid = params.clone();
+    invalid.operation_key = "invalid-configured-po".into();
+    invalid.metadata = Some(r#"{"custom:reference":false}"#.into());
+    if create_purchase_order_once(ctx, org, fixture.company_id, invalid).is_ok()
+        || ctx
+            .db
+            .purchase_order()
+            .iter()
+            .filter(|row| row.organization_id == org)
+            .count()
+            != before + 1
+    {
+        return Err("invalid configured PO created a partial base order".into());
+    }
+    let mut changed = params;
+    changed.notes = Some("Changed request".into());
+    if create_purchase_order_once(ctx, org, fixture.company_id, changed).is_ok() {
+        return Err("PO creation key accepted changed payload".into());
+    }
+    Ok(())
+}
