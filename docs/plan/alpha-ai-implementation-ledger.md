@@ -181,7 +181,11 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   and precise limits are committed under docs/plan/alpha-activation-evidence/.
 - Docker daemon access is healthy with normal network-enabled sandbox access.
   A dedicated PostgreSQL 16 test container is healthy; isolated SpacetimeDB
-  tooling is installed and development module/API builds are underway. No existing
-  database, production configuration, provider or tenant has been used.
+  tooling is installed. The development module built serially, passed pinned WASM
+  validation and was published to a new local database. Canonical baseline fixtures
+  were prepared in the disposable stack; the AA-08 test creates a separate orgless
+  account and seeds no business records in its new organization. Native API build
+  remains in progress. No existing database, production configuration, provider or
+  production tenant has been used.
 - No new end-to-end journey accepted. No PR merges, production deployments, contract publications,
-  live provider dispatches or business-state mutations performed by this program.
+  live provider dispatches or production business-state mutations performed by this program.
