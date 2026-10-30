@@ -3,7 +3,7 @@ import test from "node:test"
 import { documentCreateCommand, documentFolderCreateCommand } from "./document-create-command"
 
 test("source folders encode company scope and every optional struct field", () => {
-  const command = documentFolderCreateCommand({ companyId: 4097n, name: "Source archive", description: "Historic CSVs", parentId: undefined, sequence: 10, isHidden: false, isReadonly: false, isFavorite: false, isAccessRestricted: false })
+  const command = documentFolderCreateCommand({ companyId: 4097n, name: "Source archive", description: "Historic CSVs", parentId: undefined, storageId: undefined, residencyRegion: undefined, metadata: undefined, sequence: 10, isHidden: false, isReadonly: false, isFavorite: false, isAccessRestricted: false })
   const body = JSON.parse(String(command.init.body))
   assert.equal(command.urlPath, "/api/operations/erp.create_document_folder")
   assert.deepEqual(body.companyId, { some: 4097 })
@@ -14,7 +14,7 @@ test("source folders encode company scope and every optional struct field", () =
 })
 
 test("an organization folder keeps an explicit absent company scope", () => {
-  const body = JSON.parse(String(documentFolderCreateCommand({ name: "Source archive", sequence: 10, isHidden: false, isReadonly: false, isFavorite: false, isAccessRestricted: false }).init.body))
+  const body = JSON.parse(String(documentFolderCreateCommand({ name: "Source archive", description: undefined, parentId: undefined, storageId: undefined, residencyRegion: undefined, metadata: undefined, sequence: 10, isHidden: false, isReadonly: false, isFavorite: false, isAccessRestricted: false }).init.body))
   assert.deepEqual(body.companyId, { none: [] })
 })
 
