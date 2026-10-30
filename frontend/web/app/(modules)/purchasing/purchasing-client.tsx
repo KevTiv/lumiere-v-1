@@ -5,6 +5,7 @@ import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
+import { PurchaseDiscrepancyPanel } from "./purchase-discrepancy-panel"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
@@ -411,7 +412,7 @@ function PurchasingClientLoaded({
   const purchasingTabIds = useMemo(
     () => {
       const workTabId = moduleWorkBoardTabId(moduleConfig)
-      return [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", ...(workTabId ? [workTabId] : [])]
+      return [...moduleConfig.tabs.map((tab) => tab.id), "discrepancies", "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", ...(workTabId ? [workTabId] : [])]
     },
     [moduleConfig],
   )
@@ -2355,6 +2356,18 @@ function PurchasingClientLoaded({
             return tab
           }),
           {
+            id: "discrepancies",
+            label: t("purchasing.discrepancies.title", { defaultValue: "Discrepancies" }),
+            type: "custom" as const,
+            customContent: <PurchaseDiscrepancyPanel
+              scope={{ organizationId: orgId, companyId: operatingCompanyId }}
+              partialQueue={ordersPartialReceipt} overBilledQueue={linesOverBilled} orders={orders} lines={lines}
+              pickings={stockPickings} bills={accountMoves}
+              states={{ partial: ordersPartialReceiptRead.state, overBilled: linesOverBilledRead.state,
+                orders: ordersRead.state, lines: linesRead.state,
+                receipts: moduleQueryState(receiptQuery), bills: moduleQueryState(billQuery) }} />,
+          },
+          {
             id: "blanket-orders",
             label: t("purchasing.blanketOrders.tab", { defaultValue: "Blanket Orders" }),
             type: "custom" as const,
@@ -2432,6 +2445,20 @@ function PurchasingClientLoaded({
       products,
       uoms,
       currencies,
+      orgId,
+      operatingCompanyId,
+      ordersPartialReceipt,
+      linesOverBilled,
+      orders,
+      lines,
+      stockPickings,
+      accountMoves,
+      ordersPartialReceiptRead.state,
+      linesOverBilledRead.state,
+      ordersRead.state,
+      linesRead.state,
+      receiptQuery,
+      billQuery,
       createPurchaseBlanketOrder,
       editPartnerBankFormConfig,
       deletePartnerBank,
