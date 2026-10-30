@@ -50,6 +50,13 @@ export function onboardingFiscalYearEnd(monthValue: unknown, dayValue: unknown):
 export const DEFAULT_FISCAL_YEAR_END_MONTH = 12
 export const DEFAULT_FISCAL_YEAR_END_DAY = 31
 
+/** Parse only the exact code returned by the authenticated bootstrap authority. */
+export function additionalOnboardingCode(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || !('additionalOrganizationCode' in payload)) return null
+  const code = payload.additionalOrganizationCode
+  return typeof code === 'string' && /^[A-Z0-9_]{2,32}$/.test(code) ? code : null
+}
+
 export type OnboardingStepId = 'welcome' | 'create-tenant'
 
 export const ONBOARDING_STEPS: ReadonlyArray<{

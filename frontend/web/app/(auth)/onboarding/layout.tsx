@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
+import { approvedAdditionalOrganizationCode } from '@/lib/onboarding-approval.server'
 
 export default async function OnboardingLayout({
   children,
@@ -8,7 +9,7 @@ export default async function OnboardingLayout({
   if (!hasAuthenticatedIdentity(session)) {
     redirect('/sign-in')
   }
-  if (session?.organizationId) {
+  if (session?.organizationId && !await approvedAdditionalOrganizationCode(session)) {
     redirect('/overview')
   }
   return <>{children}</>

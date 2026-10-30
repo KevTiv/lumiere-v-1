@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod business_history;
+mod import_reviews;
 mod knowledge_guides;
 mod record_creations;
 

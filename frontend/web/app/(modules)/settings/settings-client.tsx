@@ -38,7 +38,7 @@ import {
   useUpdateUserEmail,
   useUpdateWhatsappCredentials,
 } from "@lumiere/query-hooks/hooks/auth"
-import { GuidedImportWizard } from "@/lib/guided-import-wizard"
+import { DataImportWorkspace } from "@/lib/data-import-workspace"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
@@ -904,7 +904,7 @@ function SettingsLoaded({
       icon: Upload,
       content: (
         <section className="rounded-xl border border-border bg-card p-4">
-          <GuidedImportWizard organizationId={organizationId} />
+          <DataImportWorkspace organizationId={organizationId} />
         </section>
       ),
     },

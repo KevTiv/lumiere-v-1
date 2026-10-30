@@ -116,3 +116,36 @@ registry, Notebook account sync/execution and optional provider activation remai
 outside this wave. English-alpha behavior is the target; new common recovery keys
 use explicit English fallback in partial locale packs where translations are not
 supplied. Independent accountant/device and served-release acceptance remain open.
+
+## Integration after import-review storage
+
+Main `d9a14a21` adds the source-review workspace and three PostgreSQL-only
+platform tables. Its ordered production release `41130971634` completed storage
+migration 30 before this branch was merged. That migration's name, change set,
+SQL and checksum remain unchanged. Creation receipts therefore use application
+migration 31, change set 20, referencing the unchanged generated ledger SQL
+`0030_durable_projection_delta.sql`. Generated and application migration numbers
+are separate identities; immutable contracts `0.3.159` remain valid.
+
+The root application catalog is version 31, checksum
+`sha256:ece6a58a3b87d41e3cc3c5e3afd55b1c02628f9da3e393169002c55460a9eb85`.
+Upgrade coverage follows guides 29, deployed import reviews 30, then receipts 31,
+preserving source reviews, prior rows, receipt IDs and history through restart.
+A disposable database containing the earlier unmerged receipt-based application
+migration 30 must fail closed. No automatic history rewrite or production data
+repair is introduced. Published SQL, tags and archives are unchanged.
+The release verifier checks each generated SQL filename and checksum against
+an actual catalog reference, so an application number alone cannot admit an
+unregistered generated migration.
+
+Confirmed source handoffs now stay inside the mounted import wizard. Loading
+another source requires confirmation for an idle draft and preserves the current
+file and mapping on cancellation. Active or unresolved imports block replacement;
+the existing request identity and result-check/retry owner remain intact. The
+wizard rechecks current work after confirmation before replacing any draft.
+
+The Sales browser fixture now reads the canonical quotation receipt for its
+submitted operation key and uses `recordId`; the former receipt endpoint and
+receipt-ID assumption are retired. The configured-lead browser case exercises
+required-field rejection, atomic values and receipt, lost-response recovery and
+reload without a second create. Final integrated results remain on PR #331.
