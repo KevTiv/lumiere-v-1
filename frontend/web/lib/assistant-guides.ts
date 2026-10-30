@@ -1,4 +1,4 @@
-import type { GuideDocument, GuideDraft, GuideReference, GuideVerificationInput, GuideReviewInput, OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
+import type { GuideDocument, GuideDraft, GuideReference, GuideVerificationInput, GuideVerificationChoice, GuideReviewInput, OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
 import { AI_WORKSPACE_SCOPES } from "./ai-workspace-scope"
 import { recordPageHref } from "./record-page-href"
 
@@ -201,7 +201,7 @@ function documentFromResponse(value: unknown): GuideDocument {
         (evidence.canNominate !== undefined && typeof evidence.canNominate !== "boolean") || (evidence.canReview !== undefined && typeof evidence.canReview !== "boolean") ||
         (evidence.entryId !== undefined && !guideId(evidence.entryId)) || (evidence.versionId !== undefined && !guideId(evidence.versionId)) ||
         (evidence.reviewEpoch !== undefined && (!Number.isSafeInteger(evidence.reviewEpoch) || evidence.reviewEpoch < 0)) ||
-        (evidence.reviews !== undefined && (!Array.isArray(evidence.reviews) || evidence.reviews.some((review) => !review || !["source_fidelity", "domain_interpretation", "implementation"].includes(review.kind) || !["accepted", "rejected"].includes(review.outcome) || typeof review.reviewer !== "string")))) throw new Error("Invalid guide review evidence")
+        (evidence.reviews !== undefined && (!Array.isArray(evidence.reviews) || evidence.reviews.some((review) => !review || !["source_fidelity", "domain_interpretation", "implementation"].includes(review.kind) || !["accepted", "rejected"].includes(review.outcome) || typeof review.reviewer !== "string" || (review.reviewerName !== undefined && typeof review.reviewerName !== "string"))))) throw new Error("Invalid guide review evidence")
   }
   if (guide.reviewState === "verified" && !guide.reviewEvidence?.verified) throw new Error("Guide verification is missing current review evidence")
   if (guide.sources.some((source) => !source || typeof source !== "object" || Array.isArray(source) ||
@@ -218,6 +218,10 @@ type GuideResponse = {
   error?: unknown
   guide?: unknown
   guides?: unknown
+  guideId?: unknown
+  companyId?: unknown
+  revision?: unknown
+  choices?: unknown
 }
 
 async function guideJson(url: string, init?: RequestInit): Promise<GuideResponse> {
@@ -285,6 +289,18 @@ export async function saveAssistantGuide(draft: GuideDraft, requestKey: string, 
 
 export async function requestGuideVerification(guide: GuideDocument, evidence: GuideVerificationInput): Promise<GuideDocument> {
   return changeGuideReview(guide, "verification", evidence)
+}
+
+export async function guideVerificationChoices(guide: GuideDocument): Promise<GuideVerificationChoice[]> {
+  if (!guideId(guide.guideId) || !guideId(guide.companyId) || !guideRevision(guide.revision)) throw new Error("Invalid guide review scope")
+  const body = await guideJson(`/api/knowledge/guides/${guide.guideId}/verification?${new URLSearchParams({companyId:guide.companyId,revision:String(guide.revision)})}`)
+  if (body.guideId !== guide.guideId || body.companyId !== guide.companyId || body.revision !== guide.revision || !Array.isArray(body.choices) || body.choices.length>200) throw new Error("Guide evidence response did not match its scope or revision")
+  return body.choices.map((raw: unknown) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid guide evidence choice")
+    const choice = raw as GuideVerificationChoice
+    if (!guideId(choice.decisionId) || typeof choice.title !== "string" || typeof choice.summary !== "string" || !Array.isArray(choice.sourceLabels) || choice.sourceLabels.some((label)=>typeof label !== "string") || !Array.isArray(choice.sourcePassageIds) || !choice.sourcePassageIds.length || choice.sourcePassageIds.some((id)=>!guideId(id)) || !Array.isArray(choice.claimIds) || !choice.claimIds.length || choice.claimIds.some((id)=>!guideId(id))) throw new Error("Invalid guide evidence choice")
+    return choice
+  })
 }
 
 export async function recordGuideReview(guide: GuideDocument, review: GuideReviewInput): Promise<GuideDocument> {

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import { isSavedGuide, type GuideDraft, type GuideDocument, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
-import { assistantGuideHistory, guideAccessRevoked, guidePageHref, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide } from "@/lib/assistant-guides"
+import { assistantGuideHistory, guideAccessRevoked, guidePageHref, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide, guideVerificationChoices, requestGuideVerification, recordGuideReview } from "@/lib/assistant-guides"
 import { AI_WORKSPACE_SCOPES } from "@/lib/ai-workspace-scope"
 
 const GUIDE_MODULE_OPTIONS = AI_WORKSPACE_SCOPES.filter((option) => option.value.startsWith("module:")).map((option) => ({ value: option.value.slice(7), label: option.label }))
@@ -128,6 +128,18 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The guide could not be opened.") }
   }
 
+  const updateReview = async (action: (guide: GuideDocument) => Promise<GuideDocument>) => {
+    if (!document || !isSavedGuide(document) || verificationUnavailable || currentScope.current !== scope) throw new Error("Reopen the current guide before reviewing.")
+    const epoch = generation.current
+    setBusy(true)
+    try {
+      const guide = await action(document)
+      if (epoch !== generation.current || currentScope.current !== scope) throw new Error("The company changed. Reopen the guide to check its review.")
+      ++verificationRead.current
+      setState({scope,document:guide})
+    } finally { if(epoch===generation.current)setBusy(false) }
+  }
+
   if (!request) return null
   if (!document) return <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
     <DialogContent>
@@ -141,6 +153,15 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
     document={document} onSave={save} busy={busy} error={error} history={history}
     verificationUnavailable={verificationUnavailable} onRetryVerification={() => retryVerification.current?.()}
     moduleOptions={GUIDE_MODULE_OPTIONS}
+    onLoadVerificationChoices={async()=>{
+      if(!document || !isSavedGuide(document) || verificationUnavailable || currentScope.current!==scope) throw new Error("Reopen the current guide before selecting evidence.")
+      const epoch=generation.current
+      const choices=await guideVerificationChoices(document)
+      if(epoch!==generation.current || currentScope.current!==scope)throw new Error("The company changed. Reopen the guide before selecting evidence.")
+      return choices
+    }}
+    onRequestVerification={(input)=>updateReview((guide)=>requestGuideVerification(guide,input))}
+    onRecordReview={(input)=>updateReview((guide)=>recordGuideReview(guide,input))}
     onAsk={(question, draftOverride) => {
       if (verificationUnavailable) return Promise.reject(new Error("Retry the guide access check before asking."))
       return onAsk(document, question, draftOverride)

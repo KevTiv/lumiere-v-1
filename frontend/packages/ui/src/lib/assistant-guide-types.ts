@@ -40,12 +40,13 @@ export interface GuideDocument extends GuideDraft, Omit<GuideReference, "title" 
     reviewEpoch?: number
     canNominate?: boolean
     canReview?: boolean
-    reviews?: { kind: string; outcome: string; reviewer: string }[]
+    reviews?: { kind: string; outcome: string; reviewer: string; reviewerName?: string }[]
   }
 }
 
 export type GuideVerificationInput = { sourcePassageIds: string[]; claimIds: string[]; decisionIds: string[] }
 export type GuideReviewInput = { reviewKind: "source_fidelity" | "domain_interpretation" | "implementation"; outcome: "accepted" | "rejected"; note?: string }
+export type GuideVerificationChoice = { decisionId: string; title: string; summary: string; sourceLabels: string[]; sourcePassageIds: string[]; claimIds: string[] }
 
 export interface GuideRevisionSummary {
   revision: number

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { AssistantGuideModal, AssistantGuideViewer, buildGuideHtmlPreview, guideMarkdownWithoutHtml } from "./assistant-guide-viewer"
 import { extractGuideHtmlDerivative, isSavedGuide, safeGuideHref } from "../lib/assistant-guide-types"
 import type { GuideDocument, GuideDraft } from "../lib/assistant-guide-types"
@@ -12,6 +12,7 @@ const draft: GuideDraft = { draftKey: "message:11", title: "Review a vendor bill
 const saved: GuideDocument = { ...draft, guideId: "9007199254740993", revision: 2, headRevision: 2, reviewState: "draft", canWrite: true }
 
 afterEach(cleanup)
+beforeAll(()=>{ if(typeof globalThis.PointerEvent==="undefined")Object.defineProperty(globalThis,"PointerEvent",{value:MouseEvent,configurable:true}) })
 
 describe("ERP help document viewer", () => {
   it("retains an unsaved draft and its changes when persistence fails", async () => {
@@ -129,7 +130,39 @@ describe("guide content boundaries", () => {
     render(<AssistantGuideViewer document={{ ...saved, reviewState: "verified", compatibility: "unknown", reviewEvidence: { state: "approved", verified: true, reviews: [{ kind: "source_fidelity", outcome: "accepted", reviewer: "a".repeat(64) }] } }} />)
     expect(screen.getByLabelText("Guide verification").textContent).toContain("independent evidence, domain and implementation reviews")
     expect(screen.getByLabelText("Guide verification").textContent).toContain("Product and workflow compatibility have not been established")
-    expect(screen.getByTitle("a".repeat(64))).toBeTruthy()
+    expect(screen.getByText("Reviewer details unavailable")).toBeTruthy()
+    expect(screen.getByText("a".repeat(64)).closest("details")).toBeTruthy()
+  })
+
+  it("selects named canonical evidence and explicitly submits the exact revision for review", async () => {
+    const onRequestVerification = vi.fn(async()=>{})
+    const onLoadVerificationChoices = vi.fn(async()=>[{decisionId:"44",title:"Bill checks decision",summary:"Use the current reviewed bill policy.",sourceLabels:["Bill review policy"],sourcePassageIds:["9007199254740993"],claimIds:["43"]}])
+    const onDirtyChange=vi.fn()
+    render(<AssistantGuideViewer document={{...saved,compatibility:"unknown",reviewEvidence:{state:"not_requested",verified:false,canNominate:true}}} onLoadVerificationChoices={onLoadVerificationChoices} onRequestVerification={onRequestVerification} onDirtyChange={onDirtyChange} />)
+    expect(onRequestVerification).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button",{name:"Request verification"}))
+    await screen.findByText("Bill review policy")
+    const submit=screen.getByRole("button",{name:"Submit this revision for review"})
+    expect(submit.hasAttribute("disabled")).toBe(true)
+    fireEvent.click(screen.getByRole("checkbox",{name:"Bill checks decision"}))
+    await waitFor(()=>expect(onDirtyChange).toHaveBeenLastCalledWith(true))
+    expect(screen.getByRole("link",{name:"Inspect this evidence"}).getAttribute("href")).toBe("/ai-harness?tab=evidence-reviewer&kind=decision&id=44&companyId=7")
+    fireEvent.click(submit)
+    await waitFor(()=>expect(onRequestVerification).toHaveBeenCalledWith({sourcePassageIds:["9007199254740993"],claimIds:["43"],decisionIds:["44"]}))
+    expect(screen.queryByRole("textbox",{name:/IDs/})).toBeNull()
+  })
+
+  it("keeps the guide visible when canonical evidence is missing or access is denied", async () => {
+    const onLoadVerificationChoices=vi.fn(async()=>[])
+    const {rerender}=render(<AssistantGuideViewer document={{...saved,reviewEvidence:{state:"not_requested",verified:false,canNominate:true}}} onLoadVerificationChoices={onLoadVerificationChoices} onRequestVerification={vi.fn()} />)
+    fireEvent.click(screen.getByRole("button",{name:"Request verification"}))
+    await screen.findByText(/No current reviewed evidence is linked/)
+    expect(screen.getByRole("heading",{name:saved.title})).toBeTruthy()
+    expect(screen.queryByRole("button",{name:"Submit this revision for review"})).toBeNull()
+    rerender(<AssistantGuideViewer document={{...saved,reviewEvidence:{state:"not_requested",verified:false,canNominate:true}}} onLoadVerificationChoices={async()=>{throw new Error("Evidence inspection is not permitted")}} onRequestVerification={vi.fn()} />)
+    fireEvent.click(screen.getByRole("button",{name:"Request verification"}))
+    expect((await screen.findByRole("alert")).textContent).toContain("not permitted")
+    expect(screen.getByRole("heading",{name:saved.title})).toBeTruthy()
   })
 
   it("extracts only one closed bounded HTML fence from an admitted answer", () => {

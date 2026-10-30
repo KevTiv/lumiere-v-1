@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const apiBase = 'http://127.0.0.1:8082'
@@ -112,6 +112,89 @@ async function probe(fixture, env) {
     'real_authority_guides_lifecycle', '--', '--ignored', '--nocapture'], { ...env, GUIDE_LIVE_FIXTURE: path }, 120_000)
 }
 
+async function nativeFixtureId(env, table, clause) {
+  assert.match(table, /^ai_evidence_(source|source_version|passage|claim|decision)$/)
+  const response = await fetch(`${stdbBase}/v1/database/${moduleName}/sql`, { method: 'POST',
+    headers: { Authorization: `Bearer ${env.STDB_SERVER_TOKEN}`, 'Content-Type': 'text/plain' },
+    body: `SELECT id FROM ${table} WHERE ${clause} LIMIT 2`, signal: AbortSignal.timeout(10_000) })
+  assert.equal(response.status, 200, 'Isolated native fixture read must succeed')
+  const result = await response.json()
+  const rows = result[0]?.rows
+  assert.equal(rows?.length, 1, 'Exactly one native evidence fixture row is required')
+  const id = Number(rows[0][0])
+  assert.ok(Number.isSafeInteger(id) && id > 0, 'Fixture identity must be exact')
+  return id
+}
+
+async function verificationLifecycle(admin, ordinary, financeRole, companyId, fixture, env) {
+  const org = fixture.orgId
+  const unique = `guide-review-${randomBytes(6).toString('hex')}`
+  await operation(admin, 'update_role', { roleId: Number(financeRole.id), params: guideRoleUpdateParams([
+    ...financeRole.permissions, 'knowledge_article:*', 'ai_evidence_claim:update', 'ai_evidence_decision:update', 'ai_knowledge_review:update',
+  ]) })
+  ordinary = await login('fixture.finance@example.test')
+  const body = 'Review the current bill and its evidence before posting.'
+  const hash = createHash('sha256').update(body).digest('hex')
+  await operation(admin, 'record_ai_evidence_source', { companyId, params: { source_kind: 'policy', source_key: unique,
+    title: 'Bill review policy', author_attribution: 'known', authors: ['Isolated guide acceptance reviewer'], author_organization: none, scope: 'company', retention_policy: 'hash_only' } })
+  const sourceId = await nativeFixtureId(env, 'ai_evidence_source', `organization_id = ${org} AND company_id = ${companyId} AND source_key = '${unique}'`)
+  await operation(admin, 'record_ai_evidence_source_version', { companyId, sourceId, params: { version: '1', edition: none,
+    publication_date_micros: none, uri: none, retrieved_at_micros: none, content_hash: some(hash), snapshot_ref: none,
+    origin: 'erp_policy', verification: 'inspected', supersedes_version_id: none } })
+  const sourceVersionId = await nativeFixtureId(env, 'ai_evidence_source_version', `organization_id = ${org} AND source_id = ${sourceId}`)
+  await operation(admin, 'record_ai_evidence_passage', { companyId, params: { source_kind: 'policy', source_key: unique,
+    source_version: '1', passage_key: 'bill-checks', passage_text: body, effective_from_micros: none, effective_to_micros: none,
+    applicability: ['module:accounting'], source_version_id: some(sourceVersionId), coordinates: ['section:bill-checks'], text_origin: 'original', processor_ref: none } })
+  const passageId = await nativeFixtureId(env, 'ai_evidence_passage', `organization_id = ${org} AND source_key = '${unique}'`)
+  await operation(admin, 'record_ai_evidence_claim', { companyId, params: { kind: 'sourced_fact', statement: body,
+    supporting_passage_ids: [passageId], contradicting_passage_ids: [], calculation_ref: none, assumptions: [], contribution_id: none,
+    verification_method: 'none', verification_outcome: 'unverified', verification_note: none, supersedes_claim_id: none } })
+  const claimId = await nativeFixtureId(env, 'ai_evidence_claim', `organization_id = ${org} AND company_id = ${companyId} AND statement = '${body}'`)
+  await operation(ordinary, 'review_ai_evidence_claim', { companyId, claimId, params: { verification_outcome: 'supported', verification_note: some('Checked the exact isolated policy passage.') } })
+  await operation(admin, 'record_ai_evidence_decision', { companyId, params: { title: unique, adopted_claim_ids: [claimId], supporting_claim_ids: [],
+    applicability: ['module:accounting'], alternatives: [], adaptations: [], assumptions: [], rationale: 'Apply the reviewed bill checks before posting.', contribution_id: none, supersedes_decision_id: none } })
+  const decisionId = await nativeFixtureId(env, 'ai_evidence_decision', `organization_id = ${org} AND company_id = ${companyId} AND title = '${unique}'`)
+  await operation(ordinary, 'review_ai_evidence_decision', { companyId, decisionId, params: { outcome: 'accepted', note: some('Reviewed the linked, supported policy claim.') } })
+  const draft = { companyId: String(companyId), requestKey: `${unique}-save`, draftKey: unique, title: 'Current bill checks', module: 'accounting', markdown: body, language: 'en',
+    sources: [{ kind: 'passage', trust: 'persisted', passage_id: passageId, source_kind: 'policy', source_key: unique, label: 'Bill review policy' }] }
+  const saved = (await request('/v1/knowledge/guides', admin, draft)).guide
+  await operation(admin, 'add_article_member', { articleId: Number(saved.guideId), member: { __identity__: `0x${ordinary.identity.replace(/^0x/, '')}` } })
+  const evidence = { companyId: String(companyId), revision: 1, sourcePassageIds: [String(passageId)], claimIds: [String(claimId)], decisionIds: [String(decisionId)] }
+  const choices = await request(`/v1/knowledge/guides/${saved.guideId}/verification?companyId=${companyId}&revision=1`, admin)
+  assert.ok(choices.choices.some((choice) => choice.decisionId === String(decisionId) && choice.sourceLabels.includes('Bill review policy')), 'The authorized picker must offer named canonical evidence')
+  let candidate = (await request(`/v1/knowledge/guides/${saved.guideId}/verification`, admin, evidence)).guide
+  const retried = (await request(`/v1/knowledge/guides/${saved.guideId}/verification`, admin, evidence)).guide
+  assert.equal(retried.reviewEvidence.versionId, candidate.reviewEvidence.versionId, 'Nomination retries must not create another candidate')
+  assert.equal(candidate.reviewState, 'draft')
+  await request(`/v1/knowledge/guides/${saved.guideId}/reviews`, admin, { companyId: String(companyId), revision: 1, reviewKind: 'source_fidelity', outcome: 'accepted' }, 422)
+  for (const reviewKind of ['source_fidelity', 'domain_interpretation', 'implementation']) {
+    candidate = (await request(`/v1/knowledge/guides/${saved.guideId}/reviews`, ordinary, { companyId: String(companyId), revision: 1, reviewKind, outcome: 'accepted', note: 'Reviewed the exact saved guide revision and canonical evidence.' })).guide
+    assert.equal(candidate.reviewState, reviewKind === 'implementation' ? 'verified' : 'draft')
+  }
+  const key = `guide:${saved.guideId}:revision:1`
+  await probe({ ...fixture, verificationKey: key, expectReusable: true }, env)
+  await operation(admin, 'remove_article_member', { articleId: Number(saved.guideId), member: { __identity__: `0x${admin.identity.replace(/^0x/, '')}` } })
+  await request(guidePath(saved.guideId, companyId, 1), admin, undefined, 404)
+  await probe({ ...fixture, verificationKey: key, expectReusable: false }, env)
+  await operation(ordinary, 'add_article_member', { articleId: Number(saved.guideId), member: { __identity__: `0x${admin.identity.replace(/^0x/, '')}` } })
+  await probe({ ...fixture, verificationKey: key, expectReusable: true }, env)
+  const revised = (await request('/v1/knowledge/guides', admin, { ...draft, guideId: saved.guideId, expectedRevision: 1, requestKey: `${unique}-revise`, markdown: `${body}\nRecheck the current period.` })).guide
+  assert.equal(revised.reviewState, 'draft')
+  const historical = (await request(guidePath(saved.guideId, companyId, 1), admin)).guide
+  assert.equal(historical.reviewEvidence.state, 'needs_review')
+  assert.equal(historical.reviewEvidence.reviewEpoch, candidate.reviewEvidence.reviewEpoch + 1)
+  await probe({ ...fixture, verificationKey: key, expectReusable: false }, env)
+  await request(`/v1/knowledge/guides/${saved.guideId}/verification`, admin, { ...evidence, revision: 2 })
+  for (const reviewKind of ['source_fidelity', 'domain_interpretation', 'implementation']) await request(`/v1/knowledge/guides/${saved.guideId}/reviews`, ordinary, { companyId: String(companyId), revision: 2, reviewKind, outcome: 'accepted' })
+  const revisedKey = `guide:${saved.guideId}:revision:2`
+  await probe({ ...fixture, verificationKey: revisedKey, expectReusable: true }, env)
+  await operation(admin, 'record_ai_evidence_source_change', { companyId, sourceVersionId, params: { change_kind: 'corrected', replacement_version_id: none, reason: 'The isolated source changed; previous guide reviews must be invalidated.' } })
+  const stale = (await request(guidePath(saved.guideId, companyId, 2), admin)).guide
+  assert.equal(stale.reviewState, 'needs_review')
+  await probe({ ...fixture, verificationKey: revisedKey, expectReusable: false }, env)
+  console.log('[guide-lifecycle] Actual nomination, independent reviews, revision/source invalidation and revocation accepted.')
+}
+
 async function main() {
   requireIsolatedCi(process.env)
   await mkdir(logDir, { recursive: true })
@@ -211,6 +294,7 @@ async function main() {
     guideId: first.guideId, revision: 2, query: keyword,
     token: admin.token, identity: admin.identity, deniedToken: reader.token, deniedIdentity: reader.identity,
     nonMemberToken: ordinary.token, nonMemberIdentity: ordinary.identity }
+  await verificationLifecycle(admin, ordinary, financeRole, companyId, fixture, env)
   await probe(fixture, env)
   // No republish, reseed or migration between shutdown and reconnect. A fresh
   // API process and STDB process must reconstruct the same actual saved rows.

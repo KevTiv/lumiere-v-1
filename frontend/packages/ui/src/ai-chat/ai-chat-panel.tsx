@@ -903,5 +903,5 @@ export function AIChatPanel({
       </div>
     </section>
   )
-  return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
+  return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
 }

@@ -35,6 +35,200 @@ fn key(id: u64, revision: u64) -> String {
     format!("guide:{id}:revision:{revision}")
 }
 
+/// The existing evidence inspection grant and canonical evidence scope own this
+/// named picker. Saved source pointers are selectors, never read authority.
+pub(super) async fn choices(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Query(q): Query<ReadQuery>,
+    OrgSession { session, .. }: OrgSession,
+) -> Result<Json<Value>, ApiError> {
+    let ctx = context(&state, &session, q.company_id).await?;
+    let grants = crate::routes::ai_capabilities::resolve_effective_capability_grants(
+        &state,
+        ctx.organization_id(),
+        ctx.actor_identity(),
+        chrono::Utc::now().timestamp_micros(),
+    )
+    .await?;
+    let Some(bound) = grants
+        .iter()
+        .find(|grant| grant.capability_key == "ai.evidence.inspect")
+    else {
+        return Err(ApiError::Forbidden(
+            "guide evidence inspection is not permitted".into(),
+        ));
+    };
+    let id = positive_id(&id)?;
+    let current = head(&state, &ctx, q.company_id, id).await?;
+    let guide = revision(&state, &ctx, q.company_id, &current, q.revision).await?;
+    if guide["revision"] != guide["headRevision"] {
+        return Err(ApiError::Conflict(
+            "choose evidence for the current guide revision".into(),
+        ));
+    }
+    let mut passage_ids = Vec::new();
+    for source in guide["sources"].as_array().into_iter().flatten() {
+        if let Some(id) = source
+            .get("passage_id")
+            .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+            .filter(|id| *id > 0)
+        {
+            if !passage_ids.contains(&id) {
+                passage_ids.push(id);
+            }
+        }
+    }
+    let org = ctx.organization_id();
+    let company = q.company_id;
+    let mut passages = std::collections::BTreeMap::new();
+    for passage_id in passage_ids.into_iter().take(30) {
+        let rows = state.stdb.query_sql(&format!("SELECT id, organization_id, company_id, source_kind, source_key, source_version, source_version_id, status, text_state FROM ai_evidence_passage WHERE organization_id = {org} AND id = {passage_id} LIMIT 1")).await.map_err(ApiError::internal)?;
+        let Some(passage) = rows.first() else {
+            continue;
+        };
+        if string(passage, "status") != Some("current")
+            || string(passage, "text_state") != Some("present")
+        {
+            continue;
+        }
+        let label = if let Some(version_id) = u64_value(passage, "source_version_id") {
+            let versions = state.stdb.query_sql(&format!("SELECT source_id, status FROM ai_evidence_source_version WHERE organization_id = {org} AND id = {version_id} LIMIT 1")).await.map_err(ApiError::internal)?;
+            let Some(version) = versions.first() else {
+                continue;
+            };
+            if string(version, "status") != Some("current") {
+                continue;
+            }
+            let Some(source_id) = u64_value(version, "source_id") else {
+                continue;
+            };
+            let sources = state.stdb.query_sql(&format!("SELECT title, organization_id, company_id, scope FROM ai_evidence_source WHERE organization_id = {org} AND id = {source_id} LIMIT 1")).await.map_err(ApiError::internal)?;
+            let Some(source) = sources.first() else {
+                continue;
+            };
+            if !(string(source, "scope") == Some("organization")
+                || (string(source, "scope") == Some("company")
+                    && u64_value(source, "company_id") == Some(company)))
+            {
+                continue;
+            }
+            string(source, "title").unwrap_or("Source").to_owned()
+        } else {
+            if u64_value(passage, "company_id") != Some(company) {
+                continue;
+            }
+            format!(
+                "{} · {}",
+                string(passage, "source_kind").unwrap_or("Source"),
+                string(passage, "source_key").unwrap_or("")
+            )
+        };
+        passages.insert(passage_id, label);
+    }
+    let mut options = Vec::new();
+    if !passages.is_empty() {
+        let claims = state.stdb.query_sql(&format!("SELECT id, supporting_passage_ids, verification_method, verification_outcome FROM ai_evidence_claim WHERE organization_id = {org} AND company_id = {company} AND status = 'current' LIMIT 201")).await.map_err(ApiError::internal)?;
+        let decisions = state.stdb.query_sql(&format!("SELECT id, title, rationale, adopted_claim_ids, supporting_claim_ids FROM ai_evidence_decision WHERE organization_id = {org} AND company_id = {company} AND status = 'accepted' LIMIT 201")).await.map_err(ApiError::internal)?;
+        if claims.len() > 200 || decisions.len() > 200 {
+            return Err(ApiError::Unprocessable(
+                "guide evidence selection exceeds its current bound".into(),
+            ));
+        }
+        let eligible: std::collections::BTreeMap<u64, Vec<u64>> = claims
+            .iter()
+            .filter_map(|claim| {
+                let refs = row_ids(claim, "supporting_passage_ids");
+                (string(claim, "verification_method") == Some("human_reviewed")
+                    && string(claim, "verification_outcome") == Some("supported")
+                    && !refs.is_empty()
+                    && refs.iter().all(|id| passages.contains_key(id)))
+                .then(|| Some((u64_value(claim, "id")?, refs)))
+                .flatten()
+            })
+            .collect();
+        for decision in decisions {
+            let mut claims = row_ids(&decision, "adopted_claim_ids");
+            claims.extend(row_ids(&decision, "supporting_claim_ids"));
+            claims.sort_unstable();
+            claims.dedup();
+            if claims.is_empty() || !claims.iter().all(|id| eligible.contains_key(id)) {
+                continue;
+            }
+            let mut refs: Vec<u64> = claims
+                .iter()
+                .flat_map(|id| eligible[id].iter().copied())
+                .collect();
+            refs.sort_unstable();
+            refs.dedup();
+            let Some(decision_id) = u64_value(&decision, "id") else {
+                continue;
+            };
+            options.push(json!({"decisionId":decision_id.to_string(),"title":string(&decision,"title").unwrap_or("Reviewed decision"),"summary":string(&decision,"rationale").unwrap_or("").chars().take(400).collect::<String>(),"sourceLabels":refs.iter().filter_map(|id|passages.get(id)).collect::<Vec<_>>(),"sourcePassageIds":refs.iter().map(u64::to_string).collect::<Vec<_>>(),"claimIds":claims.iter().map(u64::to_string).collect::<Vec<_>>()}));
+        }
+    }
+    let final_head = head(&state, &ctx, company, id).await?;
+    if field(&final_head, "latest_revision") != &guide["revision"] {
+        return Err(ApiError::Conflict(
+            "guide changed while loading evidence".into(),
+        ));
+    }
+    resolve_membership_company_id(
+        &state.stdb,
+        org,
+        ctx.actor_identity(),
+        Some(company),
+        "guide membership changed",
+    )
+    .await?;
+    ctx.require_current_placement(&state.organization_placements)?;
+    let rows: usize = options
+        .iter()
+        .map(|option| {
+            1 + option["sourcePassageIds"].as_array().map_or(0, Vec::len)
+                + option["claimIds"].as_array().map_or(0, Vec::len)
+        })
+        .sum();
+    let payload = json!({"schemaVersion":1,"guideId":id.to_string(),"companyId":company.to_string(),"revision":guide["revision"],"choices":options});
+    if rows as u64 > u64::from(bound.max_rows)
+        || serde_json::to_vec(&payload)
+            .map_err(ApiError::internal)?
+            .len() as u64
+            > bound.max_bytes
+    {
+        return Err(ApiError::Unprocessable(
+            "guide evidence exceeds the current inspection grant; narrow its sources".into(),
+        ));
+    }
+    let fresh_grants = crate::routes::ai_capabilities::resolve_effective_capability_grants(
+        &state,
+        org,
+        ctx.actor_identity(),
+        chrono::Utc::now().timestamp_micros(),
+    )
+    .await?;
+    if !fresh_grants.iter().any(|grant| {
+        grant.capability_key == "ai.evidence.inspect"
+            && u64::from(grant.max_rows) >= rows as u64
+            && grant.max_bytes
+                >= serde_json::to_vec(&payload).map_or(u64::MAX, |bytes| bytes.len() as u64)
+    }) {
+        return Err(ApiError::Forbidden(
+            "guide evidence inspection grant changed".into(),
+        ));
+    }
+    Ok(Json(payload))
+}
+
+fn row_ids(row: &Value, key: &str) -> Vec<u64> {
+    field(row, key)
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+        .collect()
+}
+
 pub(super) async fn evidence(
     state: &AppState,
     ctx: &TrustedOperationContext,
@@ -72,9 +266,29 @@ pub(super) async fn evidence(
     let reviews = state.stdb.query_sql(&format!("SELECT id, review_kind, outcome, review_epoch, reviewer_uid FROM ai_knowledge_review WHERE organization_id = {org} AND company_id = {company} AND version_id = {candidate_id} LIMIT 201")).await.map_err(ApiError::internal)?;
     let dependencies = state.stdb.query_sql(&format!("SELECT requirement, state, acknowledged_by FROM ai_evidence_dependency WHERE organization_id = {org} AND company_id = {company} AND dependent_kind = 'knowledge_version' AND dependent_id = {candidate_id} LIMIT 201")).await.map_err(ApiError::internal)?;
     let verified = verification_allowed(head, rev, entry, candidate, &reviews, &dependencies);
-    let current_reviews: Vec<Value> = ["source_fidelity", "domain_interpretation", "implementation"].into_iter().filter_map(|kind| {
+    let mut current_reviews: Vec<Value> = ["source_fidelity", "domain_interpretation", "implementation"].into_iter().filter_map(|kind| {
         reviews.iter().filter(|row| string(row,"review_kind") == Some(kind) && u64_value(row,"review_epoch") == u64_value(candidate,"review_epoch")).max_by_key(|row|u64_value(row,"id").unwrap_or(0)).map(|row|json!({"kind":kind,"outcome":field(row,"outcome"),"reviewer":field(row,"reviewer_uid")}))
     }).collect();
+    if stdb_auth::has_resource_field_read_permission(
+        Some(ctx.field_access()),
+        "user-profile",
+        "name",
+    ) {
+        for review in &mut current_reviews {
+            let Some(reviewer) = review["reviewer"]
+                .as_str()
+                .and_then(|identity| identity_sql_literal(identity).ok())
+            else {
+                continue;
+            };
+            let profiles = state.stdb.query_sql(&format!("SELECT name FROM user_profile WHERE organization_id = {org} AND identity = {reviewer} LIMIT 2")).await.map_err(ApiError::internal)?;
+            if let [profile] = profiles.as_slice() {
+                if let Some(name) = string(profile, "name").filter(|name| !name.trim().is_empty()) {
+                    review["reviewerName"] = json!(name);
+                }
+            }
+        }
+    }
     Ok(
         json!({"state":string(candidate,"review_state").unwrap_or("candidate"),"verified":verified,"entryId":entry_id.to_string(),"versionId":candidate_id.to_string(),"reviewEpoch":u64_value(candidate,"review_epoch"),"canNominate":false,"canReview":can_review,"reviews":current_reviews}),
     )
@@ -210,7 +424,7 @@ pub(super) async fn record_review(
     {
         return Err(ApiError::BadRequest("invalid guide review".into()));
     }
-    dispatch_session_reducer(&state,&session,"review_ai_knowledge_entry_version",json!([ctx.organization_id(),company,positive_id(version_id)?,{"review_kind":body.review_kind,"outcome":body.outcome,"note":body.note}])).await?;
+    dispatch_session_reducer(&state,&session,"review_ai_knowledge_entry_version",json!([ctx.organization_id(),company,positive_id(version_id)?,{"review_kind":body.review_kind,"outcome":body.outcome,"note":body.note.as_ref().map(|note|json!({"some":note})).unwrap_or_else(||json!({"none":[]}))}])).await?;
     let guide = revision(&state, &ctx, company, &current, Some(body.revision)).await?;
     Ok(Json(json!({"schemaVersion":1,"guide":guide})))
 }

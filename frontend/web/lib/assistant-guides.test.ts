@@ -11,7 +11,22 @@ import {
   guideRequestInScope,
   requestGuideVerification,
   recordGuideReview,
+  guideVerificationChoices,
 } from "./assistant-guides"
+
+test("named guide evidence is bound to the exact company/revision and keeps IDs out of lossy numbers", async()=>{
+  const prior=globalThis.fetch
+  const document={guideId:"42",revision:2,companyId:"7",draftKey:"d",title:"Guide",markdown:"Checks",module:"accounting",sources:[],reviewState:"draft" as const}
+  const choice={decisionId:"9007199254740993",title:"Reviewed bill checks",summary:"Review policy before posting",sourceLabels:["Bill review policy"],sourcePassageIds:["9007199254740994"],claimIds:["9007199254740995"]}
+  try{
+    globalThis.fetch=async()=>Response.json({schemaVersion:1,guideId:"42",companyId:"7",revision:2,choices:[choice]})
+    assert.deepEqual(await guideVerificationChoices(document),[choice])
+    globalThis.fetch=async()=>Response.json({schemaVersion:1,guideId:"42",companyId:"8",revision:2,choices:[choice]})
+    await assert.rejects(guideVerificationChoices(document),/scope or revision/)
+    globalThis.fetch=async()=>Response.json({schemaVersion:1,guideId:"42",companyId:"7",revision:2,choices:[{...choice,sourcePassageIds:[Number(choice.sourcePassageIds[0])]}]})
+    await assert.rejects(guideVerificationChoices(document),/Invalid guide evidence choice/)
+  }finally{globalThis.fetch=prior}
+})
 
 test("guide review selectors preserve exact scope and refuse unsupported verification claims", async () => {
   const prior = globalThis.fetch

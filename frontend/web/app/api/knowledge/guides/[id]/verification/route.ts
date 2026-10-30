@@ -4,3 +4,7 @@ import { forwardToApiServerRequired } from "@/lib/api-server-forward"
 export function POST(request: NextRequest) {
   return forwardToApiServerRequired(request)
 }
+
+export function GET(request: NextRequest) {
+  return forwardToApiServerRequired(request)
+}

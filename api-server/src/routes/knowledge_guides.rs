@@ -29,7 +29,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/knowledge/guides/:id/history", get(history))
         .route(
             "/knowledge/guides/:id/verification",
-            axum::routing::post(review::nominate),
+            get(review::choices).post(review::nominate),
         )
         .route(
             "/knowledge/guides/:id/reviews",

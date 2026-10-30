@@ -10,7 +10,7 @@ import { AssistantGuideViewer } from "@lumiere/ui"
 import { useUnsavedChangesGuard } from "@lumiere/ui/forms/use-unsaved-changes-guard"
 import type { GuideDocument } from "@lumiere/ui/lib/assistant-guide-types"
 import { useAssistantGuideConversation } from "@/lib/assistant-guide-context"
-import { assistantGuideHistory, guideAccessRevoked, guideId as parseGuideId, guideLibraryHref, guideReturnHref, guideRevision, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide } from "@/lib/assistant-guides"
+import { assistantGuideHistory, guideAccessRevoked, guideId as parseGuideId, guideLibraryHref, guideReturnHref, guideRevision, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide, guideVerificationChoices, requestGuideVerification, recordGuideReview } from "@/lib/assistant-guides"
 
 export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
   const { organizationId, identity } = useErpSession()
@@ -105,6 +105,33 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
       : !parseGuideId(guideId) || revision === null ? <p role="alert">{t("aiChat.guide.invalidReference", { defaultValue: "This guide link is invalid." })}</p>
       : guide ? <div className="flex h-[calc(100dvh-10rem)] min-h-96 flex-col overflow-hidden rounded-xl border border-border bg-background">
         <AssistantGuideViewer document={guide} history={history} busy={busy} error={error} onDirtyChange={setDirty}
+          onLoadVerificationChoices={async()=>{
+            const epoch=sequence.current
+            if(verificationUnavailable || currentScope.current!==scope)throw new Error("Reopen the current guide before selecting evidence.")
+            const choices=await guideVerificationChoices(guide)
+            if(epoch!==sequence.current || currentScope.current!==scope)throw new Error("The company changed. Reopen the guide before selecting evidence.")
+            return choices
+          }}
+          onRequestVerification={async(input)=>{
+            const epoch=sequence.current
+            if(verificationUnavailable || currentScope.current!==scope)throw new Error("Reopen the current guide before requesting review.")
+            setBusy(true)
+            try{
+              const document=await requestGuideVerification(guide,input)
+              if(epoch!==sequence.current || currentScope.current!==scope)throw new Error("The company changed. Reopen the guide to check its review.")
+              ++verificationRead.current;latestDocument.current=document;setState({scope,document})
+            }finally{if(epoch===sequence.current)setBusy(false)}
+          }}
+          onRecordReview={async(input)=>{
+            const epoch=sequence.current
+            if(verificationUnavailable || currentScope.current!==scope)throw new Error("Reopen the current guide before reviewing.")
+            setBusy(true)
+            try{
+              const document=await recordGuideReview(guide,input)
+              if(epoch!==sequence.current || currentScope.current!==scope)throw new Error("The company changed. Reopen the guide to check its review.")
+              ++verificationRead.current;latestDocument.current=document;setState({scope,document})
+            }finally{if(epoch===sequence.current)setBusy(false)}
+          }}
           verificationUnavailable={verificationUnavailable} onRetryVerification={() => retryVerification.current?.()}
           onRevisionChange={changeRevision}
           onAsk={conversation.ready ? async (question, draftOverride) => {
