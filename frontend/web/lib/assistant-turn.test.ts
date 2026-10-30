@@ -81,3 +81,18 @@ test("an HTTP request timeout cannot establish a rejected or safe-to-retry outco
   assert.equal(turnFailure(new HttpResponseError(408, "request timed out")), "outcome_unknown")
   assert.equal(turnFailure(new HttpResponseError(504, "gateway timed out")), "outcome_unknown")
 })
+
+test("JSON and completed SSE preserve exact related-guide identities without document bodies", async () => {
+  const raw = { answer: "Related guide", sources: [], related_guides: [{ guideId: "9007199254740993", revision: 2, title: "Saved help", module: "accounting", companyId: "7", markdown: "Not persisted chat evidence" }] }
+  const expected = [{ guideId: "9007199254740993", revision: 2, title: "Saved help", module: "accounting" }]
+  assert.deepEqual(assistantAnswer(raw).guides, expected)
+  const reply = await readAssistantStream(sse(complete.replace('{"sources":["source"],"run_id":7}', JSON.stringify(raw))), data => assistantAnswerMetadata(JSON.parse(data)))
+  assert.deepEqual(reply.guides, expected)
+})
+
+test("malformed related-guide metadata cannot hide an independently prepared draft", async () => {
+  for (const related_guides of [[null], [{ guideId: 9007199254740992, revision: 1 }], [{ guideId: "7", revision: 0 }], [{ guideId: "7", revision: 1, title: {} }]]) {
+    const result = await coordinateAssistantTurn({ answer: async () => assistantAnswer({ answer: "Answer", sources: [], related_guides }), drafts: async () => [42], isCurrent: () => true })
+    assert.deepEqual(result, { answer: { kind: "outcome_unknown" }, drafts: { kind: "ready", value: [42] } })
+  }
+})

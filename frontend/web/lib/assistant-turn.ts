@@ -1,3 +1,5 @@
+import type { GuideReference } from "@lumiere/ui/lib/assistant-guide-types"
+import { guideId, guideRevision } from "./assistant-guides"
 import type { AiRagSource } from "@lumiere/query-hooks/hooks/ai-memory"
 import { HttpResponseError } from "@lumiere/api-client/response-error"
 
@@ -86,9 +88,9 @@ export async function readAssistantStream<T>(response: Response, parseMetadata: 
 }
 
 /** Fail closed before joining an answer to independently prepared draft cards. */
-export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[]; model?: string; run_id?: number } {
+export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[]; model?: string; run_id?: number; guides?: GuideReference[] } {
   if (value == null || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assistant metadata")
-  const raw = value as { sources?: unknown; model?: unknown; run_id?: unknown }
+  const raw = value as { sources?: unknown; model?: unknown; run_id?: unknown; related_guides?: unknown }
   if (!Array.isArray(raw.sources)) throw new Error("Invalid assistant sources")
   for (const item of raw.sources) {
     if (item == null || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid assistant source")
@@ -104,7 +106,18 @@ export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[
   }
   if (raw.model != null && typeof raw.model !== "string") throw new Error("Invalid assistant model")
   if (raw.run_id != null && (typeof raw.run_id !== "number" || !Number.isSafeInteger(raw.run_id) || raw.run_id <= 0)) throw new Error("Invalid assistant run")
-  return { sources: raw.sources as AiRagSource[], model: typeof raw.model === "string" ? raw.model : undefined, run_id: typeof raw.run_id === "number" ? raw.run_id : undefined }
+  let guides: GuideReference[] | undefined
+  if (raw.related_guides != null) {
+    if (!Array.isArray(raw.related_guides) || raw.related_guides.length > 10) throw new Error("Invalid assistant guides")
+    guides = raw.related_guides.map((item: unknown) => {
+      if (item == null || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid assistant guide")
+      const ref = item as { guideId?: unknown; revision?: unknown; title?: unknown; module?: unknown }
+      const id = guideId(ref.guideId), revision = guideRevision(ref.revision)
+      if (!id || revision == null || (ref.title != null && typeof ref.title !== "string") || (ref.module != null && typeof ref.module !== "string")) throw new Error("Invalid assistant guide reference")
+      return { guideId: id, revision, title: typeof ref.title === "string" ? ref.title : undefined, module: typeof ref.module === "string" ? ref.module : undefined }
+    })
+  }
+  return { sources: raw.sources as AiRagSource[], guides, model: typeof raw.model === "string" ? raw.model : undefined, run_id: typeof raw.run_id === "number" ? raw.run_id : undefined }
 }
 
 export function assistantAnswer(value: unknown) {
