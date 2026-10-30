@@ -11,7 +11,9 @@ function source(): ReviewRow {
   ],proposed:{quantity:null,unit_price:"4800",amount:"4800",sale_price:"4800",cost_price:"3000"}},values:{quantity:null,unit_price:"4800",amount:"4800",sale_price:"4800",cost_price:"3000"},state:"needs_review",revision:1,reason:null,reviewedAt:null,reviewedBy:null }
 }
 
-test("a missing weight stays uncertain, then explicit correction is saved and survives reload", async ({ page }) => {
+test("a missing weight stays uncertain, then explicit correction is saved and survives reload", async ({ page }, testInfo) => {
+  // This first route compiles a large shared form fixture, then proves a full reload.
+  test.setTimeout(90_000)
   let item=source()
   let writes=0
   const detail=():ReviewDetail=>({id:"1",title:"Historic source review",targetEntity:"product",sourceFile:"historic-shop.csv",items:[item,{...source(),id:"12",source:{...source().source,key:"other-product",label:"Other unresolved product"}}],history:item.revision>1?[{itemId:item.id,revision:item.revision,values:item.values,state:item.state,reason:item.reason!,actor:"ab".repeat(32),createdAt:"2026-10-30T12:00:00Z"}]:[]})
@@ -48,6 +50,7 @@ test("a missing weight stays uncertain, then explicit correction is saved and su
   await page.getByRole("row").filter({hasText:"Synthetic sausage"}).getByRole("button",{name:"Review and correct"}).click()
   await expect(page.getByRole("dialog").getByLabel("Actual weight (kg)",{exact:true})).toHaveValue("1")
   await expect(page.getByRole("dialog").getByText("Source value: 8",{exact:true})).toBeVisible()
+  await page.screenshot({path:testInfo.outputPath("saved-correction-source-retained.png"),fullPage:true})
   await page.getByRole("dialog").getByRole("button",{name:"Cancel",exact:true}).click()
   await page.getByRole("button",{name:"Continue import (1 confirmed)"}).click()
   await expect(page.getByTestId("reviewed-csv")).toContainText("1,4800,4800")
