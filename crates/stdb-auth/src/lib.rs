@@ -4,6 +4,8 @@ mod erp_subscriptions;
 mod field_policy;
 mod resource_registry;
 
+pub use lumiere_policy_core::additional_tenant::AdditionalTenantApproval;
+
 pub use erp_subscriptions::{
     auth_subscriptions, create_client_subscriptions, erp_org_extra_where,
     full_client_subscription_resources_vec, subscription_queries_for_resource,

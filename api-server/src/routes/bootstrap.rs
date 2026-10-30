@@ -238,7 +238,15 @@ async fn bootstrap_tenant_post(
     if session.identity_hex == "unknown" {
         return Err(ApiError::Unauthorized); // same message bucket as Next "Identity not resolved"
     }
-    if session.organization_id.is_some() {
+    let additional_approval = std::env::var("LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL").ok();
+    let approved_additional_tenant = additional_approval
+        .as_deref()
+        .and_then(stdb_auth::AdditionalTenantApproval::parse)
+        .zip(session.organization_id)
+        .is_some_and(|(approval, source_id)| {
+            approval.permits_request(&session.identity_hex, source_id, &body.organization.code)
+        });
+    if session.organization_id.is_some() && !approved_additional_tenant {
         return Err(ApiError::Conflict(
             "Already belongs to an organization".into(),
         ));
@@ -272,7 +280,15 @@ async fn bootstrap_currencies_get(
         return Err(ApiError::Unauthorized);
     }
 
-    if let Some(organization_id) = session.organization_id {
+    let additional_approval = std::env::var("LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL").ok();
+    let approved_source = additional_approval
+        .as_deref()
+        .and_then(stdb_auth::AdditionalTenantApproval::parse)
+        .zip(session.organization_id)
+        .is_some_and(|(approval, source_id)| {
+            approval.permits_source(&session.identity_hex, source_id)
+        });
+    if let Some(organization_id) = session.organization_id.filter(|_| !approved_source) {
         let context = TrustedOperationContext::for_resource_read(&state, &session)?;
         let mut currencies = context
             .client()

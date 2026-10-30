@@ -18,6 +18,11 @@ on:
         required: false
         default: ''
         type: string
+      alpha_additional_tenant_approval:
+        description: Exact identity:source-organization-id:target-code exception; empty denies
+        required: false
+        default: ''
+        type: string
 
 env:
   CONTRACTS_MODULE_ARTIFACT: contracts-module
@@ -46,8 +51,9 @@ jobs:
         id: alpha-policy
         env:
           ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
+          ALPHA_ADDITIONAL_TENANT_APPROVAL: ${{ inputs.alpha_additional_tenant_approval }}
         run: |
-          policy_hash="$(printf '%s' "$ALPHA_FOUNDER_IDENTITIES" | sha256sum | cut -d ' ' -f 1)"
+          policy_hash="$(printf '%s\0%s' "$ALPHA_FOUNDER_IDENTITIES" "$ALPHA_ADDITIONAL_TENANT_APPROVAL" | sha256sum | cut -d ' ' -f 1)"
           echo "digest=$policy_hash" >> "$GITHUB_OUTPUT"
 
       - name: Restore compiled contracts module
@@ -70,6 +76,7 @@ jobs:
         env:
           LUMIERE_ENABLE_DEV_REDUCERS: '0'
           LUMIERE_ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
+          LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL: ${{ inputs.alpha_additional_tenant_approval }}
         run: |
           if [[ '${{ inputs.production }}' == 'true' ]]; then
             make contracts-module-production-ci
