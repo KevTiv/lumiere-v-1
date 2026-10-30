@@ -298,7 +298,7 @@ async fn guide_review_keeps_fixed_internal_contract_and_human_scoped_sats_transp
             json!(9007199254740993u64),
             json!({"review_kind":"implementation","outcome":"accepted","note":note}),
         ];
-        execute_reducer_call(&context, contract, args.clone())
+        let _ = execute_reducer_call(&context, contract, args.clone())
             .await
             .unwrap();
         assert_eq!(calls.lock().unwrap().last(), Some(&json!(args)));
