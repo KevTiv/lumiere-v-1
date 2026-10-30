@@ -242,6 +242,14 @@ pub fn nominate_knowledge_guide(
         return Err("only the saved revision author can request its verification".into());
     }
     let key = guide_knowledge_key(guide_id, expected_revision);
+    // Evidence lists are sets. Reordering the same reviewed selection on a
+    // lost-response retry must not conflict or create another candidate.
+    let mut source_passage_ids = source_passage_ids;
+    let mut claim_ids = claim_ids;
+    let mut decision_ids = decision_ids;
+    source_passage_ids.sort_unstable();
+    claim_ids.sort_unstable();
+    decision_ids.sort_unstable();
     let content = AiKnowledgeVersionContent {
         title: revision.title,
         body: revision.markdown,
