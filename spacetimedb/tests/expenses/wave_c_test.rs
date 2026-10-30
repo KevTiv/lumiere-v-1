@@ -2,6 +2,9 @@
 //! Also Wave G travel/alloc integrity: rate effective dates, kind-safe update, tax split.
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
+use crate::accounting::analytic_accounting::{
+    account_analytic_account, create_analytic_account, CreateAnalyticAccountParams,
+};
 use crate::accounting::chart_of_accounts::{
     account_account, account_account_type, account_journal, create_account_account,
     create_account_account_type, create_account_journal, CreateAccountAccountParams,
@@ -14,10 +17,11 @@ use crate::accounting::tax_management::{
 };
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::expenses::expense_depth::{
-    create_expense_project_rebill, hr_expense_allocation, hr_expense_mileage_rate,
-    hr_expense_per_diem_rate, set_expense_allocations, upsert_expense_mileage_rate,
-    upsert_expense_per_diem_rate, CreateExpenseProjectRebillParams, ExpenseAllocationLineParams,
-    SetExpenseAllocationsParams, UpsertExpenseMileageRateParams, UpsertExpensePerDiemRateParams,
+    allocation_snapshot, allocations_for_expense, create_expense_project_rebill,
+    hr_expense_allocation, hr_expense_mileage_rate, hr_expense_per_diem_rate,
+    set_expense_allocations, upsert_expense_mileage_rate, upsert_expense_per_diem_rate,
+    CreateExpenseProjectRebillParams, ExpenseAllocationLineParams, SetExpenseAllocationsParams,
+    UpsertExpenseMileageRateParams, UpsertExpensePerDiemRateParams,
 };
 use crate::expenses::expenses::{
     approve_expense_sheet_impl, create_expense, create_expense_sheet, expense_sheet, hr_expense,
@@ -39,6 +43,41 @@ struct ExpenseAccounts {
     payable_id: u64,
     receivable_id: u64,
     income_id: u64,
+}
+
+fn seed_analytic_account(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    name: &str,
+) -> Result<u64, String> {
+    let name = format!("{name} {}", fixture.company_id);
+    create_analytic_account(
+        ctx,
+        fixture.organization_id,
+        CreateAnalyticAccountParams {
+            company_id: Some(fixture.company_id),
+            name: name.clone(),
+            code: None,
+            active: true,
+            currency_id: 1,
+            partner_id: None,
+            plan_id: None,
+            root_id: None,
+            group_id: None,
+            parent_id: None,
+            color: None,
+            is_required_in_move_lines: false,
+            is_required_in_distribution: false,
+            is_root_plan: false,
+            metadata: None,
+        },
+    )?;
+    ctx.db
+        .account_analytic_account()
+        .iter()
+        .find(|row| row.organization_id == fixture.organization_id && row.name == name)
+        .map(|row| row.id)
+        .ok_or("analytic account missing after create".into())
 }
 
 fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAccounts, String> {
@@ -457,6 +496,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
         fixture.organization_id,
         line_id,
         SetExpenseAllocationsParams {
+            expected_snapshot: None,
             lines: vec![
                 ExpenseAllocationLineParams {
                     analytic_account_id: None,
@@ -484,6 +524,93 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
         .sum();
     if (alloc_sum - 200.0).abs() > 0.01 {
         return Err(format!("alloc sum expected 200, got {alloc_sum}"));
+    }
+
+    // A review token is compared inside the same transaction that deletes/replaces rows.
+    let expense = ctx.db.hr_expense().id().find(&line_id).ok_or("expense")?;
+    let baseline = allocation_snapshot(&expense, &allocations_for_expense(ctx, line_id))?;
+    for expected_snapshot in [None, Some("v1:stale-review".into())] {
+        if set_expense_allocations(
+            ctx,
+            fixture.organization_id,
+            line_id,
+            SetExpenseAllocationsParams {
+                lines: vec![],
+                expected_snapshot,
+            },
+        )
+        .is_ok()
+        {
+            return Err("unreviewed/stale clearing must fail".into());
+        }
+        if allocation_snapshot(&expense, &allocations_for_expense(ctx, line_id))? != baseline {
+            return Err("rejected stale clear changed saved allocations".into());
+        }
+    }
+    for line in [
+        ExpenseAllocationLineParams {
+            project_id: Some(project_id),
+            analytic_account_id: None,
+            share_percent: f64::NAN,
+            billable: false,
+            metadata: None,
+        },
+        ExpenseAllocationLineParams {
+            project_id: None,
+            analytic_account_id: Some(u64::MAX),
+            share_percent: 100.0,
+            billable: false,
+            metadata: None,
+        },
+    ] {
+        if set_expense_allocations(
+            ctx,
+            fixture.organization_id,
+            line_id,
+            SetExpenseAllocationsParams {
+                lines: vec![line],
+                expected_snapshot: Some(baseline.clone()),
+            },
+        )
+        .is_ok()
+        {
+            return Err("invalid allocations must fail before replacement".into());
+        }
+        if allocation_snapshot(&expense, &allocations_for_expense(ctx, line_id))? != baseline {
+            return Err("invalid replacement changed saved allocations".into());
+        }
+    }
+    let lines = allocations_for_expense(ctx, line_id)
+        .iter()
+        .map(|row| ExpenseAllocationLineParams {
+            analytic_account_id: row.analytic_account_id,
+            project_id: row.project_id,
+            share_percent: row.share_percent,
+            billable: row.billable,
+            metadata: row.metadata.clone(),
+        })
+        .collect();
+    set_expense_allocations(
+        ctx,
+        fixture.organization_id,
+        line_id,
+        SetExpenseAllocationsParams {
+            lines,
+            expected_snapshot: Some(baseline.clone()),
+        },
+    )?;
+    if set_expense_allocations(
+        ctx,
+        fixture.organization_id,
+        line_id,
+        SetExpenseAllocationsParams {
+            lines: vec![],
+            expected_snapshot: Some(baseline),
+        },
+    )
+    .is_ok()
+    {
+        return Err("a snapshot from before another save must not clear current rows".into());
     }
 
     submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;
@@ -1048,21 +1175,24 @@ pub fn test_allocation_tax_split_on_post(ctx: &ReducerContext) -> Result<(), Str
         .map(|e| e.id)
         .ok_or("line")?;
 
+    let analytic_a = seed_analytic_account(ctx, &fixture, "Tax allocation A")?;
+    let analytic_b = seed_analytic_account(ctx, &fixture, "Tax allocation B")?;
     set_expense_allocations(
         ctx,
         fixture.organization_id,
         line_id,
         SetExpenseAllocationsParams {
+            expected_snapshot: None,
             lines: vec![
                 ExpenseAllocationLineParams {
-                    analytic_account_id: Some(1),
+                    analytic_account_id: Some(analytic_a),
                     project_id: None,
                     share_percent: 60.0,
                     billable: false,
                     metadata: None,
                 },
                 ExpenseAllocationLineParams {
-                    analytic_account_id: Some(2),
+                    analytic_account_id: Some(analytic_b),
                     project_id: None,
                     share_percent: 40.0,
                     billable: false,

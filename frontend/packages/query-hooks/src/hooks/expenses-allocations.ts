@@ -18,6 +18,19 @@ export interface ExpenseAllocationReadRow {
   metadata?: unknown
 }
 
+export interface ExpenseAllocationReadSnapshot {
+  rows: ExpenseAllocationReadRow[]
+  snapshot: string
+}
+
+function allocationSnapshot(value: unknown): ExpenseAllocationReadSnapshot {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !("data" in value) || !("snapshot" in value)
+    || Object.keys(value).length !== 2 || typeof value.snapshot !== "string" || !/^v1:[a-f0-9]{64}$/.test(value.snapshot)) {
+    throw new QueryResponseDecodeError("Expense allocation response requires a complete saved snapshot")
+  }
+  return { rows: decodeQueryListResponse({ data: value.data }, allocationRow), snapshot: value.snapshot }
+}
+
 function allocationRow(value: unknown): ExpenseAllocationReadRow {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new QueryResponseDecodeError("Expense allocation must be an object")
@@ -45,7 +58,7 @@ export function expenseAllocationsQueryOptions(scope: ExpenseAllocationsScope) {
       const path: string = `/api/query/expense-allocations?${query}`
       const response = await apiFetch(path)
       if (!response.ok) throw await httpResponseError(response, "Failed to read this expense's saved allocations")
-      return decodeQueryListResponse(await response.json(), allocationRow)
+      return allocationSnapshot(await response.json())
     },
     enabled: allowed,
     staleTime: 0,

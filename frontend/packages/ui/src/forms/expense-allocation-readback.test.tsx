@@ -3,14 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { useExpenseAllocationReadback } from "../../../../web/app/(modules)/expenses/use-expense-allocation-readback"
 
 const state = vi.hoisted(() => ({ query: {} as {
-  data: unknown[]; isLoading: boolean; isError: boolean; isSuccess: boolean; isFetching: boolean;
+  data: { rows: unknown[]; snapshot: string }; isLoading: boolean; isError: boolean; isSuccess: boolean; isFetching: boolean;
   error?: unknown; refetch: ReturnType<typeof vi.fn>;
 } }))
 vi.mock("@lumiere/query-hooks/hooks/expenses-allocations", () => ({ useExpenseAllocations: () => state.query }))
 const row = (patch: object = {}) => ({ id: "90", organizationId: "1", companyId: "2", expenseId: "7",
   projectId: "8", analyticAccountId: null, sharePercent: 100, amount: 12.345, billable: true, metadata: null, ...patch })
 const scope = { organizationId: 1n, companyId: 2n, expenseId: 7n, identity: "actor" }
-function query(data = [row()]) {
+const snapshot = `v1:${"a".repeat(64)}`
+function query(rows = [row()]) {
+  const data = { rows, snapshot }
   return { data, isLoading: false, isError: false, isSuccess: true, isFetching: false,
     refetch: vi.fn(async () => ({ data })) }
 }
@@ -18,7 +20,7 @@ afterEach(cleanup)
 
 describe("saved allocation editor readback", () => {
   it("waits for the first verified read and retains its baseline across a failed refresh", async () => {
-    state.query = { ...query(), data: [], isLoading: true, isSuccess: false, isFetching: true }
+    state.query = { ...query([]), isLoading: true, isSuccess: false, isFetching: true }
     const { result, rerender } = renderHook(() => useExpenseAllocationReadback(scope, "Cannot verify", "Changed"))
     expect(result.current.initialized).toBe(false)
     state.query = query()
@@ -33,7 +35,7 @@ describe("saved allocation editor readback", () => {
     state.query = query()
     rerender()
     expect(result.current.ready).toBe(true)
-    await act(async () => { await result.current.verifyBeforeSave() })
+    await act(async () => { expect(await result.current.verifyBeforeSave()).toBe(snapshot) })
     expect(state.query.refetch).toHaveBeenCalledTimes(1)
   })
 
@@ -53,10 +55,27 @@ describe("saved allocation editor readback", () => {
     state.query = query()
     const { result } = renderHook(() => useExpenseAllocationReadback(scope, "Cannot verify", "Changed"))
     await waitFor(() => expect(result.current.ready).toBe(true))
-    state.query.refetch.mockResolvedValue({ data: [row({ amount: 14 })] })
+    state.query.refetch.mockResolvedValue({ data: { rows: [row({ amount: 14 })], snapshot } })
     await expect(result.current.verifyBeforeSave()).rejects.toThrow("Changed")
-    state.query.refetch.mockResolvedValue({ data: [row({ companyId: "3" })] })
+    state.query.refetch.mockResolvedValue({ data: { rows: [row({ companyId: "3" })], snapshot } })
     await expect(result.current.verifyBeforeSave()).rejects.toThrow("Cannot verify")
+  })
+
+  it("rechecks current write admission after an awaited read and rejects another server snapshot", async () => {
+    state.query = query()
+    const { result, rerender } = renderHook(({ current }) => useExpenseAllocationReadback(current, "Cannot verify", "Changed"),
+      { initialProps: { current: { ...scope, enabled: true } } })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    state.query.refetch.mockResolvedValue({ data: { rows: [row()], snapshot: `v1:${"b".repeat(64)}` } })
+    await expect(result.current.verifyBeforeSave()).rejects.toThrow("Changed")
+    let resolve: ((value: unknown) => void) | undefined
+    state.query.refetch.mockImplementation(() => new Promise((complete) => { resolve = complete }))
+    const pending = result.current.verifyBeforeSave()
+    const assertOldAdmission = result.current.assertCurrentAdmission
+    rerender({ current: { ...scope, enabled: false } })
+    expect(() => assertOldAdmission()).toThrow("Cannot verify")
+    resolve?.({ data: { rows: [row()], snapshot } })
+    await expect(pending).rejects.toThrow("Cannot verify")
   })
 
   it("clears protected saved data after denial or parent deletion and on actor/company changes", async () => {

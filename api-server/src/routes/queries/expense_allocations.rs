@@ -1,14 +1,90 @@
 //! Exact-parent allocation reads. An empty vector means a verified expense has no allocations.
 
 use crate::error::ApiError;
-use crate::query_exec::resolve_membership_company_id;
+use crate::query_exec::{resolve_membership_company_id, row_u64};
 use crate::trusted_context::TrustedOperationContext;
-use serde_json::Value;
+use serde_json::{json, Value};
 use stdb_auth::{
-    has_resource_read_permission, select_org_and_company_scoped_sql, FieldAccessContext,
+    has_resource_read_permission, resolve_http_sql_columns, select_org_and_company_scoped_sql,
+    FieldAccessContext,
 };
 
 const ALLOCATION_LIMIT: usize = 1_000;
+const SNAPSHOT_FIELDS: &[&str] = &[
+    "id",
+    "organization_id",
+    "company_id",
+    "expense_id",
+    "analytic_account_id",
+    "project_id",
+    "share_percent",
+    "amount",
+    "billable",
+    "metadata",
+];
+
+fn require_snapshot_fields(access: &FieldAccessContext) -> Result<(), ApiError> {
+    let columns = resolve_http_sql_columns("expense-allocations", Some(access))
+        .map_err(ApiError::Internal)?;
+    if SNAPSHOT_FIELDS
+        .iter()
+        .any(|field| !columns.iter().any(|column| column == field))
+    {
+        return Err(ApiError::Forbidden(
+            "Read access to all saved allocation fields is required to edit allocations".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn snapshot_for_rows(
+    org: u64,
+    company: u64,
+    expense: u64,
+    rows: &[Value],
+) -> Result<String, ApiError> {
+    use sha2::{Digest, Sha256};
+    use stdb_auth::{allocation_snapshot_bytes, AllocationSnapshotRow};
+    let invalid = || {
+        ApiError::Unavailable("The complete saved allocation snapshot could not be verified".into())
+    };
+    let snapshots = rows
+        .iter()
+        .map(|row| {
+            let id = |camel: &str, snake: &str| row_u64(row, camel, snake).map_err(|_| invalid());
+            let metadata = match row.get("metadata") {
+                Some(Value::Null) => None,
+                Some(Value::String(text)) => Some(text.as_str()),
+                _ => return Err(invalid()),
+            };
+            Ok(AllocationSnapshotRow {
+                id: id("id", "id")?.ok_or_else(invalid)?,
+                organization_id: id("organizationId", "organization_id")?.ok_or_else(invalid)?,
+                company_id: id("companyId", "company_id")?.ok_or_else(invalid)?,
+                expense_id: id("expenseId", "expense_id")?.ok_or_else(invalid)?,
+                analytic_account_id: id("analyticAccountId", "analytic_account_id")?,
+                project_id: id("projectId", "project_id")?,
+                share_percent: row
+                    .get("sharePercent")
+                    .or_else(|| row.get("share_percent"))
+                    .and_then(Value::as_f64)
+                    .ok_or_else(invalid)?,
+                amount: row
+                    .get("amount")
+                    .and_then(Value::as_f64)
+                    .ok_or_else(invalid)?,
+                billable: row
+                    .get("billable")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(invalid)?,
+                metadata,
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+    let bytes =
+        allocation_snapshot_bytes(org, company, expense, &snapshots).map_err(|_| invalid())?;
+    Ok(format!("v1:{:x}", Sha256::digest(bytes)))
+}
 
 fn require_read(access: &FieldAccessContext, organization_id: u64) -> Result<(), ApiError> {
     if access.organization_id != organization_id
@@ -57,9 +133,10 @@ pub(super) async fn read(
     context: &TrustedOperationContext,
     requested_company_id: Option<u64>,
     expense_id: Option<u64>,
-) -> Result<Vec<Value>, ApiError> {
+) -> Result<Value, ApiError> {
     let org = context.organization_id();
     require_read(context.field_access(), org)?;
+    require_snapshot_fields(context.field_access())?;
     let requested_company = requested_company_id.filter(|id| *id > 0).ok_or_else(|| {
         ApiError::BadRequest("companyId is required for expense allocations".into())
     })?;
@@ -100,7 +177,7 @@ pub(super) async fn read(
         expense,
         context.field_access(),
     )?;
-    let rows = context
+    let mut rows = context
         .client()
         .query_sql(&sql)
         .await
@@ -110,7 +187,30 @@ pub(super) async fn read(
             "Expense allocations exceed the supported review size".into(),
         ));
     }
-    Ok(rows)
+    let snapshot = snapshot_for_rows(org, company, expense, &rows)?;
+    // These identities are passed back to a mutation. Preserve every u64 through JSON.parse.
+    for row in &mut rows {
+        for (camel, snake) in [
+            ("id", "id"),
+            ("organizationId", "organization_id"),
+            ("companyId", "company_id"),
+            ("expenseId", "expense_id"),
+            ("analyticAccountId", "analytic_account_id"),
+            ("projectId", "project_id"),
+        ] {
+            if let Some(fields) = row.as_object_mut() {
+                let key = if fields.contains_key(camel) {
+                    camel
+                } else {
+                    snake
+                };
+                if let Some(id) = fields.get(key).and_then(Value::as_u64) {
+                    fields.insert(key.into(), Value::String(id.to_string()));
+                }
+            }
+        }
+    }
+    Ok(json!({"data": rows, "snapshot": snapshot}))
 }
 
 #[cfg(test)]
@@ -172,6 +272,7 @@ mod tests {
             &actor,
         )
         .unwrap();
+        assert!(require_snapshot_fields(&actor).is_err());
         assert!(sql.contains("billable"));
         for field in [
             "analytic_account_id",
@@ -257,12 +358,17 @@ mod tests {
     async fn http_read_verifies_membership_and_parent_before_returning_saved_rows() {
         let fixture = fixture(true, vec![json!({"id":9007199254740993u64,"organization_id":42,"company_id":7,"expense_id":9,
             "project_id":null,"analytic_account_id":8,"share_percent":100.0,"amount":12.34567,"billable":false,"metadata":"saved"})]).await;
-        let rows = read(&fixture.context, Some(7), Some(9)).await.unwrap();
+        let response = read(&fixture.context, Some(7), Some(9)).await.unwrap();
+        let rows = response["data"].as_array().unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0]["id"], 9007199254740993u64);
-        assert_eq!(rows[0]["expenseId"], 9);
+        assert_eq!(rows[0]["id"], "9007199254740993");
+        assert_eq!(rows[0]["expenseId"], "9");
         assert_eq!(rows[0]["amount"], 12.34567);
         assert_eq!(rows[0]["metadata"], "saved");
+        assert_eq!(
+            response["snapshot"],
+            snapshot_for_rows(42, 7, 9, rows).unwrap()
+        );
         let queries = fixture.queries.lock().unwrap();
         let parent = queries
             .iter()

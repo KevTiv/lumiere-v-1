@@ -240,7 +240,7 @@ function ExpensesClientLoaded({
   const allocationReadback = useExpenseAllocationReadback({
     organizationId: orgId, companyId: operatingCompanyId, identity,
     expenseId: workflowForm?.kind === "setAllocations" ? optionalBigIntU64(workflowForm.row.id) : undefined,
-    enabled: workflowForm?.kind === "setAllocations" && expensesUsable,
+    enabled: workflowForm?.kind === "setAllocations" && expensesUsable && permissionsReady !== false && checkPermission("hr_expense", "write").allowed,
   }, t("expenses.allocations.readUnavailable", { defaultValue: "Saved allocations could not be verified. Retry the read before editing or saving." }),
   t("expenses.allocations.changed", { defaultValue: "Saved allocations changed since this editor opened. Your edits are retained. Close and reopen this expense to review the current saved rows before replacing them." }))
 
@@ -978,10 +978,11 @@ function ExpensesClientLoaded({
         t("expenses.allocations.invalidRow", { defaultValue: "Each allocation needs a current company project or active analytic account, a share greater than 0 and at most 100, and a billable choice. Correct invalid or unavailable selections; your rows are retained." }),
         t("expenses.ops.shareTotalInvalid"),
       )
-      await allocationReadback.verifyBeforeSave()
+      const expectedSnapshot = await allocationReadback.verifyBeforeSave()
+      allocationReadback.assertCurrentAdmission()
       await setExpenseAllocations.mutateAsync({
         expenseId: rowId(workflowForm.row),
-        params: { lines },
+        params: { lines, expectedSnapshot },
       })
     }
     setWorkflowForm(null)

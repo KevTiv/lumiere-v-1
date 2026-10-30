@@ -10,18 +10,19 @@ interface AllocationSnapshot {
   scope: string
   rows: ExpenseAllocationDraft[]
   fingerprint: string
+  serverSnapshot: string
 }
 
 /** Bind an editor once to a verified read; subsequent refreshes never replace entered rows. */
 export function useExpenseAllocationReadback(scope: ExpenseAllocationsScope, invalidMessage: string, changedMessage: string) {
   const query = useExpenseAllocations(scope)
   const key = `${scope.identity ?? ""}:${scope.organizationId}:${scope.companyId}:${scope.expenseId ?? ""}`
-  const currentScope = useRef(key)
-  currentScope.current = key
+  const currentScope = useRef({ key, admitted: scope.enabled !== false })
+  currentScope.current = { key, admitted: scope.enabled !== false }
   const [snapshot, setSnapshot] = useState<AllocationSnapshot | null>(null)
   const [decodeError, setDecodeError] = useState<string | null>(null)
   const failureStatus = query.error && typeof query.error === "object" && "status" in query.error ? query.error.status : undefined
-  const state = failureStatus === 404 || failureStatus === 410 ? { status: "denied" as const } : moduleQueryState(query)
+  const state = failureStatus === 404 || failureStatus === 410 ? { status: "denied" as const } : moduleQueryState({ ...query, data: query.data?.rows })
   const activeSnapshot = state.status !== "denied" && snapshot?.scope === key ? snapshot : null
   useEffect(() => {
     setSnapshot(null)
@@ -32,16 +33,16 @@ export function useExpenseAllocationReadback(scope: ExpenseAllocationsScope, inv
       setSnapshot(null)
       return
     }
-    if (scope.enabled === false || !scope.expenseId || !query.isSuccess || query.isFetching || activeSnapshot) return
+    if (scope.enabled === false || !scope.expenseId || !query.isSuccess || query.isFetching || activeSnapshot || !query.data) return
     try {
-      const rows = savedExpenseAllocationDrafts(query.data ?? [], scope.organizationId, scope.companyId, scope.expenseId, invalidMessage)
-      setSnapshot({ scope: key, rows, fingerprint: expenseAllocationFingerprint(query.data ?? []) })
+      const rows = savedExpenseAllocationDrafts(query.data.rows, scope.organizationId, scope.companyId, scope.expenseId, invalidMessage)
+      setSnapshot({ scope: key, rows, fingerprint: expenseAllocationFingerprint(query.data.rows), serverSnapshot: query.data.snapshot })
       setDecodeError(null)
     } catch {
       setDecodeError(invalidMessage)
     }
   }, [key, state.status, scope.enabled, scope.expenseId, scope.organizationId, scope.companyId, query.isSuccess, query.isFetching, query.data, activeSnapshot, invalidMessage])
-  const changed = Boolean(activeSnapshot && query.isSuccess && expenseAllocationFingerprint(query.data ?? []) !== activeSnapshot.fingerprint)
+  const changed = Boolean(activeSnapshot && query.isSuccess && query.data && (expenseAllocationFingerprint(query.data.rows) !== activeSnapshot.fingerprint || query.data.snapshot !== activeSnapshot.serverSnapshot))
   const ready = Boolean(scope.enabled !== false && activeSnapshot && state.status === "ready" && !query.isFetching && !decodeError && !changed)
   return {
     rows: activeSnapshot?.rows,
@@ -50,12 +51,16 @@ export function useExpenseAllocationReadback(scope: ExpenseAllocationsScope, inv
     ready,
     error: decodeError ?? (changed ? changedMessage : null),
     retry: () => { void query.refetch() },
+    assertCurrentAdmission: () => {
+      if (currentScope.current.key !== key || !currentScope.current.admitted) throw new Error(invalidMessage)
+    },
     verifyBeforeSave: async () => {
-      if (!ready || !activeSnapshot || !scope.expenseId || currentScope.current !== key) throw new Error(invalidMessage)
+      if (!ready || !activeSnapshot || !scope.expenseId || currentScope.current.key !== key || !currentScope.current.admitted) throw new Error(invalidMessage)
       const refreshed = await query.refetch({ throwOnError: true })
-      if (currentScope.current !== key) throw new Error(invalidMessage)
-      savedExpenseAllocationDrafts(refreshed.data ?? [], scope.organizationId, scope.companyId, scope.expenseId, invalidMessage)
-      if (expenseAllocationFingerprint(refreshed.data ?? []) !== activeSnapshot.fingerprint) throw new Error(changedMessage)
+      if (currentScope.current.key !== key || !currentScope.current.admitted || !refreshed.data) throw new Error(invalidMessage)
+      savedExpenseAllocationDrafts(refreshed.data.rows, scope.organizationId, scope.companyId, scope.expenseId, invalidMessage)
+      if (expenseAllocationFingerprint(refreshed.data.rows) !== activeSnapshot.fingerprint || refreshed.data.snapshot !== activeSnapshot.serverSnapshot) throw new Error(changedMessage)
+      return refreshed.data.snapshot
     },
   }
 }
