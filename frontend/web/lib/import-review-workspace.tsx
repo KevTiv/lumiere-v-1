@@ -6,7 +6,8 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { useTranslation } from "@lumiere/i18n"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { resolveIdentityLabel } from "@lumiere/ui/lib/identity-label"
-import { FormModal, type FormConfig, type FormValues } from "@lumiere/ui"
+import { FormModal, type FormConfig } from "@lumiere/ui"
+import type { FormValues } from "@lumiere/ui/lib/form-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -37,7 +38,7 @@ function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: {
   const { t } = useTranslation()
   const cache = useQueryClient()
   const identityLabels = useIdentityLabelMap(organizationId)
-  const sourceLabel = (item: ReviewRow) => `${item.source.source.file} · ${t(item.source.source.rowBasis === "import_row" ? "settings.importReview.importRow" : "settings.importReview.sourceLine", { defaultValue: item.source.source.rowBasis === "import_row" ? "Import row {{row}}" : "Source line {{row}}", row: item.source.source.row })}`
+  const sourceLabel = (item: ReviewRow) => `${item.source.source.file} · ${t(item.source.source.rowBasis === "import_row" ? "settings.importReview.importRow" : "settings.importReview.sourceLine", { defaultValue: item.source.source.rowBasis === "import_row" ? "Import row {{row}}" : "Source row {{row}}", row: item.source.source.row })}`
   const [selectedId, setSelectedId] = useState(initialId ?? "")
   const [selected, setSelected] = useState<ReviewRow | null>(null)
   const [busy, setBusy] = useState(false)
