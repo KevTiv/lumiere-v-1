@@ -226,6 +226,7 @@ jobs:
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
         run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture --test-threads=1
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import_reviews:: -- --nocapture --test-threads=1
           bash scripts/tests/test-ai-index-migration.sh
