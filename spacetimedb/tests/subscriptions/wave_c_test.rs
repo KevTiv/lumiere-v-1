@@ -5,6 +5,8 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{account_move, post_invoice};
+use crate::core::audit::audit_log;
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
@@ -28,6 +30,121 @@ use crate::subscriptions::tables::{
 };
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, JournalType, MoveType};
+
+fn require_exact_renewal_capture(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    subscription_id: u64,
+    expected_date: Timestamp,
+) -> Result<(), String> {
+    let amendments: Vec<_> = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&subscription_id)
+        .filter(|row| row.amendment_type == "renew")
+        .collect();
+    let [amendment] = amendments.as_slice() else {
+        return Err("expected one immutable renewal amendment".into());
+    };
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&organization_id)
+        .filter(|row| row.operation_id == "erp.renew_subscription")
+        .collect();
+    let [commit] = commits.as_slice() else {
+        return Err("renewal must emit one source commit, including after replay".into());
+    };
+    if commit.actor_identity != ctx.sender()
+        || commit.correlation_id != format!("renewal:{subscription_id}:{}", amendment.id)
+        || commit.row_change_count != 3
+    {
+        return Err("renewal source commit lost its actor or exact amendment identity".into());
+    }
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&organization_id)
+        .filter(|row| row.commit_sequence == commit.sequence)
+        .collect();
+    for table in ["subscription", "subscription_amendment", "audit_log"] {
+        if changes.iter().filter(|row| row.table_name == table).count() != 1 {
+            return Err(format!("renewal source omitted exact {table}"));
+        }
+    }
+    for change in &changes {
+        let row: serde_json::Value = serde_json::from_str(
+            change
+                .row_json
+                .as_deref()
+                .ok_or("renewal source row is incomplete")?,
+        )
+        .map_err(|e| e.to_string())?;
+        if row["organization_id"].as_u64() != Some(organization_id) {
+            return Err("renewal source captured another organization".into());
+        }
+        if change.table_name == "subscription" {
+            let date = serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(
+                &expected_date,
+            ))
+            .map_err(|e| e.to_string())?;
+            if row["id"].as_u64() != Some(subscription_id)
+                || row["company_id"].as_u64() != Some(company_id)
+                || row["state"] != "active"
+                || row["recurring_next_date"] != date
+            {
+                return Err(
+                    "renewal source did not capture its exact resulting billing state".into(),
+                );
+            }
+        } else if change.table_name == "subscription_amendment" {
+            let metadata: serde_json::Value = serde_json::from_str(
+                row["metadata"]
+                    .as_str()
+                    .ok_or("renewal receipt metadata missing")?,
+            )
+            .map_err(|e| e.to_string())?;
+            if row["id"].as_u64() != Some(amendment.id)
+                || row["company_id"].as_u64() != Some(company_id)
+                || row["subscription_id"].as_u64() != Some(subscription_id)
+                || metadata["idempotency_key"] != format!("renew-once-{subscription_id}")
+                || metadata["request_fingerprint"]
+                    .as_str()
+                    .is_none_or(|value| value.len() != 64)
+            {
+                return Err(
+                    "renewal durable amendment lost its complete scoped request receipt".into(),
+                );
+            }
+        } else {
+            let audit = ctx
+                .db
+                .audit_log()
+                .id()
+                .find(&row["id"].as_u64().ok_or("renewal audit identity missing")?)
+                .ok_or("renewal audit missing")?;
+            let exact =
+                serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&audit))
+                    .map_err(|e| e.to_string())?;
+            if audit.organization_id != organization_id
+                || audit.company_id != Some(company_id)
+                || audit.user_identity != ctx.sender()
+                || audit.record_id != subscription_id
+                || audit.table_name != "subscription"
+                || row != exact
+            {
+                return Err(
+                    "renewal source audit does not match the canonical actor/company action".into(),
+                );
+            }
+        }
+    }
+    Ok(())
+}
 
 fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
     let org_id = fixture.organization_id;
@@ -601,6 +718,7 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
     {
         return Err("renewal replay advanced billing or created another amendment".into());
     }
+    require_exact_renewal_capture(ctx, org_id, company_id, sub_id, after)?;
     if renew_subscription(
         ctx,
         org_id,
@@ -708,6 +826,7 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
                 .into(),
         );
     }
+    require_exact_renewal_capture(ctx, org_id, company_id, sub_id, after)?;
     if !closed.metadata.contains("entitlement_revoke_pending") {
         return Err("expected entitlement revoke hook in metadata".into());
     }

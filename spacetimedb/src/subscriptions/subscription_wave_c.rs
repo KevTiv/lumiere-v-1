@@ -10,9 +10,13 @@ use crate::accounting::journal_entries::{
 };
 use crate::accounting::line_params::blank_journal_line;
 use crate::accounting::relations::{require_active_currency_id, require_active_journal};
+use crate::core::audit::AuditLog;
 use crate::core::organization::company;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{
+    check_permission, write_audit_log_v2, write_audit_log_v2_returning, AuditLogParams,
+};
 use crate::inventory::stock::require_product_in_org;
 use crate::subscriptions::billing_helpers::{
     calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,
@@ -947,7 +951,7 @@ pub fn renew_subscription(
         })
         .unwrap_or_default(),
     );
-    write_audit_log_v2(
+    let audit = write_audit_log_v2_returning(
         ctx,
         organization_id,
         AuditLogParams {
@@ -964,6 +968,62 @@ pub fn renew_subscription(
             ),
         },
     );
+    record_renewal_commit(
+        ctx,
+        organization_id,
+        company_id,
+        subscription_id,
+        &amendment,
+        &audit,
+    )?;
+    Ok(())
+}
+
+/// Capture the exact renewed state and immutable request receipt in the same transaction.
+fn record_renewal_commit(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    subscription_id: u64,
+    amendment: &SubscriptionAmendment,
+    audit: &AuditLog,
+) -> Result<(), String> {
+    let subscription = load_owned_subscription(ctx, organization_id, company_id, subscription_id)?;
+    if amendment.organization_id != organization_id
+        || amendment.company_id != company_id
+        || amendment.subscription_id != subscription_id
+        || amendment.amendment_type != "renew"
+        || amendment.created_by != ctx.sender()
+        || audit.organization_id != organization_id
+        || audit.company_id != Some(company_id)
+        || audit.record_id != subscription_id
+        || audit.table_name != "subscription"
+        || audit.user_identity != ctx.sender()
+    {
+        return Err("renewal durable capture does not match its authoritative scope".into());
+    }
+    let changes = vec![
+        RowChange::upsert_stdb_row(
+            "subscription",
+            serde_json::json!({"id": subscription_id}),
+            &subscription,
+        )?,
+        RowChange::upsert_stdb_row(
+            "subscription_amendment",
+            serde_json::json!({"id": amendment.id}),
+            amendment,
+        )?,
+        RowChange::upsert_stdb_row("audit_log", serde_json::json!({"id": audit.id}), audit)?,
+    ];
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.renew_subscription".into(),
+            correlation_id: format!("renewal:{subscription_id}:{}", amendment.id),
+            changes,
+        },
+    )?;
     Ok(())
 }
 
