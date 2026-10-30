@@ -32,6 +32,7 @@ import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-cl
 import { dispatchNamedOperation } from "../operation-dispatch"
 import { resolveDocumentVersionEffect } from "./document-version-effect"
 import { resolveDocumentCreateEffect } from "./document-create-effect"
+import { documentCreateCommand, documentFolderCreateCommand, type DocumentFolderCreateInput } from "./document-create-command"
 import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
 import {
   executeOperationWithCanonicalReadback,
@@ -178,7 +179,7 @@ export function useCreateDocument(organizationId: bigint, companyId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateDocumentParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
+      const { urlPath, init } = documentCreateCommand(companyId, params)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document')
     },
@@ -196,7 +197,7 @@ export function useCreateDocumentWithRef(organizationId: bigint, companyId: bigi
     mutationFn: async (params) => {
       const before = await fetchQueryList("/api/query/documents", "Failed to read documents")
       if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Document scope or permissions changed before submission")
-      const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
+      const { urlPath, init } = documentCreateCommand(companyId, params)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
       const after = await fetchQueryList("/api/query/documents", "Failed to read documents")
@@ -566,12 +567,9 @@ export function useCreateDocumentSignatureRequest(organizationId: bigint) {
 
 export function useCreateDocumentFolder(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<void, Error, DocumentFolderCreateInput>({
     mutationFn: async (params) => {
-      const companyId = params.companyId != null ? String(params.companyId) : null
-      const payload = companyId === null ? params : { ...params, companyId: undefined }
-
-      const { urlPath, init } = stdbBffCommandPost("create_document_folder", { companyId: companyId, params: stdbParamsToJson(payload as object) })
+      const { urlPath, init } = documentFolderCreateCommand(params)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document folder')
     },
