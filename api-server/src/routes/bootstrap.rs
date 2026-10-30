@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::HeaderMap,
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ use tower_cookies::Cookies;
 
 use crate::commands::dispatch_tenant_bootstrap;
 use crate::error::ApiError;
-use crate::session::resolve_api_session;
+use crate::session::{membership_rows_for_identity, resolve_api_session};
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::stdb_identity_hex_hint;
@@ -238,7 +238,15 @@ async fn bootstrap_tenant_post(
     if session.identity_hex == "unknown" {
         return Err(ApiError::Unauthorized); // same message bucket as Next "Identity not resolved"
     }
-    if session.organization_id.is_some() {
+    let additional_approval = std::env::var("LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL").ok();
+    let approved_additional_tenant = additional_approval
+        .as_deref()
+        .and_then(stdb_auth::AdditionalTenantApproval::parse)
+        .zip(session.organization_id)
+        .is_some_and(|(approval, source_id)| {
+            approval.permits_request(&session.identity_hex, source_id, &body.organization.code)
+        });
+    if session.organization_id.is_some() && !approved_additional_tenant {
         return Err(ApiError::Conflict(
             "Already belongs to an organization".into(),
         ));
@@ -272,7 +280,15 @@ async fn bootstrap_currencies_get(
         return Err(ApiError::Unauthorized);
     }
 
-    if let Some(organization_id) = session.organization_id {
+    let additional_approval = std::env::var("LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL").ok();
+    let approved_source = additional_approval
+        .as_deref()
+        .and_then(stdb_auth::AdditionalTenantApproval::parse)
+        .zip(session.organization_id)
+        .is_some_and(|(approval, source_id)| {
+            approval.permits_source(&session.identity_hex, source_id)
+        });
+    if let Some(organization_id) = session.organization_id.filter(|_| !approved_source) {
         let context = TrustedOperationContext::for_resource_read(&state, &session)?;
         let mut currencies = context
             .client()
@@ -307,15 +323,156 @@ async fn bootstrap_currencies_get(
     Ok(Json(json!({ "data": currencies })))
 }
 
+#[derive(Debug, Deserialize)]
+struct BootstrapLookup {
+    code: String,
+}
+
+fn lookup_code_is_valid(code: &str) -> bool {
+    (2..=32).contains(&code.len())
+        && code
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+fn row_id(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+        .filter(|id| *id > 0)
+}
+
+/// Bootstrap metadata discovery follows the verified identity's memberships,
+/// rather than the currently selected tenant. It exposes no ERP record data.
+fn owned_bootstrap_organization(
+    organizations: &[Value],
+    memberships: &[Value],
+    code: &str,
+) -> Result<Value, ApiError> {
+    let owned: Vec<_> = organizations
+        .iter()
+        .filter(|org| {
+            let Some(id) = row_id(org, "id", "id") else {
+                return false;
+            };
+            org.get("code").and_then(Value::as_str) == Some(code)
+                && org
+                    .get("isActive")
+                    .or_else(|| org.get("is_active"))
+                    .and_then(Value::as_bool)
+                    == Some(true)
+                && row_id(org, "organizationId", "organization_id") == Some(id)
+                && memberships.iter().any(|member| {
+                    row_id(member, "organizationId", "organization_id") == Some(id)
+                        && member
+                            .get("isActive")
+                            .or_else(|| member.get("is_active"))
+                            .and_then(Value::as_bool)
+                            == Some(true)
+                })
+        })
+        .collect();
+    match owned.as_slice() {
+        [org] => Ok(json!({"id": org["id"], "name": org["name"], "code": org["code"]})),
+        [] => Err(ApiError::NotFound("organization not found".into())),
+        _ => Err(ApiError::Conflict("organization code is ambiguous".into())),
+    }
+}
+
+async fn bootstrap_tenant_get(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Query(lookup): Query<BootstrapLookup>,
+) -> Result<Json<Value>, ApiError> {
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    let hint = stdb_identity_hex_hint(&headers, &cookies);
+    let cookie = cookies.get("stdb_token").map(|c| c.value().to_string());
+    let session = resolve_api_session(&state, auth, cookie.as_deref(), hint.as_deref())
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    if !lookup_code_is_valid(&lookup.code) {
+        return Err(ApiError::BadRequest(
+            "choose a valid organization code".into(),
+        ));
+    }
+    let memberships = membership_rows_for_identity(&state, &session.identity_hex, true).await?;
+    // Code has a strict ASCII allowlist above; no quote or SQL syntax is accepted.
+    let organizations = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT id, organization_id, name, code, is_active FROM organization WHERE code = '{}'",
+            lookup.code,
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(
+        json!({"data": owned_bootstrap_organization(&organizations, &memberships, &lookup.code)?}),
+    ))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/bootstrap/currencies", get(bootstrap_currencies_get))
-        .route("/bootstrap/tenant", post(bootstrap_tenant_post))
+        .route(
+            "/bootstrap/tenant",
+            get(bootstrap_tenant_get).post(bootstrap_tenant_post),
+        )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bootstrap_lookup_requires_active_self_owned_membership_and_minimizes_output() {
+        let org = json!({"id": "42", "organizationId": "42", "name": "Farm", "code": "FARM", "isActive": true, "email": "private@example.com"});
+        let member = json!({"organizationId": "42", "isActive": true});
+        assert_eq!(
+            owned_bootstrap_organization(&[org.clone()], &[member.clone()], "FARM")
+                .expect("owned organization"),
+            json!({"id":"42","name":"Farm","code":"FARM"})
+        );
+        assert!(owned_bootstrap_organization(&[org.clone()], &[], "FARM").is_err());
+        assert!(owned_bootstrap_organization(
+            &[org.clone()],
+            &[json!({"organizationId":42,"isActive":false})],
+            "FARM"
+        )
+        .is_err());
+        assert!(owned_bootstrap_organization(
+            &[org.clone()],
+            &[json!({"organizationId":1,"isActive":true})],
+            "FARM"
+        )
+        .is_err());
+        assert!(owned_bootstrap_organization(&[org.clone()], &[member.clone()], "OTHER").is_err());
+        let mut invalid = org.clone();
+        invalid["organizationId"] = json!(1);
+        assert!(owned_bootstrap_organization(&[invalid], &[member.clone()], "FARM").is_err());
+        let mut inactive = org.clone();
+        inactive["isActive"] = json!(false);
+        assert!(owned_bootstrap_organization(&[inactive], &[member.clone()], "FARM").is_err());
+        assert!(owned_bootstrap_organization(&[org.clone(), org], &[member], "FARM").is_err());
+    }
+
+    #[test]
+    fn bootstrap_lookup_rejects_sql_syntax_and_unbounded_codes() {
+        assert!(lookup_code_is_valid("UMUNUPFU_MUGISHA"));
+        for code in [
+            "",
+            "A",
+            "FARM' OR true",
+            "FARM;SELECT",
+            "FARM ",
+            "*",
+            &"A".repeat(33),
+        ] {
+            assert!(!lookup_code_is_valid(code));
+        }
+    }
 
     #[test]
     fn bootstrap_reducer_wire_uses_snake_case_and_stdb_options() {

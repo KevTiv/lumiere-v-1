@@ -288,6 +288,29 @@ pub struct CompanyVerticalPack {
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
+/// Match the compiled exception against complete, unfiltered membership history.
+fn additional_tenant_is_approved(ctx: &ReducerContext, target_code: &str) -> bool {
+    use lumiere_policy_core::additional_tenant::AdditionalTenantApproval;
+    let Some(approval) = option_env!("LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL")
+        .and_then(AdditionalTenantApproval::parse)
+    else {
+        return false;
+    };
+    approval.permits_history(
+        &ctx.sender().to_hex().to_string(),
+        target_code,
+        ctx.db
+            .user_organization()
+            .user_org_by_user()
+            .filter(&ctx.sender())
+            .map(|row| (row.organization_id, row.is_active)),
+    ) && !ctx
+        .db
+        .organization()
+        .iter()
+        .any(|org| org.code == target_code)
+}
+
 /// Shared insert path for `create_organization` and `bootstrap_new_tenant`.
 pub(crate) fn insert_organization_with_owner(
     ctx: &ReducerContext,
@@ -300,10 +323,12 @@ pub(crate) fn insert_organization_with_owner(
         .filter(&ctx.sender())
         .next()
         .is_some();
-    crate::core::alpha_admission::require_alpha_founder(
-        &ctx.sender().to_hex().to_string(),
-        has_membership_history,
-    )?;
+    if !additional_tenant_is_approved(ctx, &params.code) {
+        crate::core::alpha_admission::require_alpha_founder(
+            &ctx.sender().to_hex().to_string(),
+            has_membership_history,
+        )?;
+    }
 
     if params.name.is_empty() {
         return Err("Organization name cannot be empty".to_string());
@@ -429,7 +454,7 @@ pub fn bootstrap_new_tenant(
         .user_organization()
         .iter()
         .any(|uo| uo.user_identity == ctx.sender() && uo.is_active);
-    if already_member {
+    if already_member && !additional_tenant_is_approved(ctx, &params.organization.code) {
         return Err("Already a member of an organization".to_string());
     }
 

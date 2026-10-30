@@ -6,6 +6,13 @@ import { type NextRequest } from 'next/server'
 import { forwardToApiServerRequired } from '@/lib/api-server-forward'
 import { captureServerEvent } from '@/lib/posthog-server'
 
+/** Read only the authenticated user's own organization bootstrap metadata. */
+export async function GET(request: NextRequest) {
+  const response = await forwardToApiServerRequired(request)
+  response.headers.set('Cache-Control', 'no-store')
+  return response
+}
+
 export async function POST(request: NextRequest) {
   let orgName: string | undefined
   let currencyId: number | undefined
