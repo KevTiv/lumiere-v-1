@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import type { FormConfig } from "../../lib/form-types"
 import { mergeRuntimeFormConfig } from "../../lib/runtime-form-config"
 import { useFormConfiguration } from "./use-form-config"
+import { runtimeCustomFieldCreateIssues, type CustomFieldCreateIssue } from "../custom-field-create-admission"
 
 export interface UseRuntimeFormModalConfigOptions {
   staticConfig: FormConfig
@@ -31,6 +32,7 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
   customFieldIds: string[]
   /** True when a SpacetimeDB form_config row exists (id > 0). */
   runtimeFromDatabase: boolean
+  customFieldCreateIssues: CustomFieldCreateIssue[]
 } {
   const {
     staticConfig,
@@ -61,6 +63,7 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
       }),
     [staticConfig, runtime, preferStdbVisibility, runtimeFromDatabase],
   )
+  const customFieldCreateIssues = useMemo(() => runtimeCustomFieldCreateIssues(runtime), [runtime])
 
   return {
     config: merged.config,
@@ -68,5 +71,6 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
     error: error ?? (merged.bindingErrors.length ? merged.bindingErrors.join("; ") : null),
     customFieldIds: merged.customFieldIds,
     runtimeFromDatabase,
+    customFieldCreateIssues,
   }
 }

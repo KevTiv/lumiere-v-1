@@ -24,6 +24,7 @@ import { useConfirmDialog } from "../hooks/use-confirm-dialog"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/collapsible"
 import { InvoiceCustomFieldInput } from "./invoice-custom-field-input"
+import { runtimeCustomFieldCreateIssues } from "../forms/custom-field-create-admission"
 import { invoiceCustomFieldError, invoiceCustomFieldSupported, invoiceCustomFieldMessages, type InvoiceCustomField, type InvoiceCustomValue } from "./invoice-custom-fields"
 
 const emptyProfile: InvoicePersonalizationProfile = { logoUrl: "", accent: "teal", email: "", phone: "", website: "", notice: "", terms: "", paymentInstructions: "", footer: "" }
@@ -269,8 +270,9 @@ function ReleasedCreateInvoiceModal({
   const currencyOption = currencyOptions.find((option) => option.value === journal?.currencyId)
   const currency = { id: journal?.currencyId, code: currencyOption?.code }
   const money = (value: number) => formatInvoiceMoney(value, currency)
-  const requiredCustomOk = customFields.every((field) => invoiceCustomFieldError(field, customFieldValue(field)) == null)
-  const unsupportedCustomFields = customFields.filter((field) => !invoiceCustomFieldSupported(field))
+  const customCreationBlocked = customFields.some((field) => !invoiceCustomFieldSupported(field))
+    || runtimeCustomFieldCreateIssues(formConfig).length > 0
+  const requiredCustomOk = !customCreationBlocked && customFields.every((field) => invoiceCustomFieldError(field, customFieldValue(field)) == null)
   const validInvoiceDate = invoiceDate !== "" && !Number.isNaN(Date.parse(invoiceDate))
   const validDueDate = dueDate === "" || (
     !Number.isNaN(Date.parse(dueDate)) && Date.parse(dueDate) >= Date.parse(invoiceDate)
@@ -384,7 +386,7 @@ function ReleasedCreateInvoiceModal({
         setFormEdited(true); setJournalSuggested(false); setCounterpartSuggested(false)
         setLineItems((previous) => previous.map((line) => ({ ...line, accountSource: "selected" })))
       }}>{t("accounting.authoring.keepChoices", { defaultValue: "Keep current accounting choices" })}</Button></div> : null}
-      {unsupportedCustomFields.length ? <ReadinessMessage>{t("accounting.authoring.unsupportedCustomFields", { defaultValue: "This form contains a custom field that invoice entry cannot save yet. Ask your administrator to review its type, choices, validation and visibility. No document has been created." })}</ReadinessMessage> : null}
+      {customCreationBlocked ? <ReadinessMessage>{t("accounting.authoring.unsupportedCustomFields", { defaultValue: "This form contains a custom field that invoice entry cannot save yet. Ask your administrator to review its type, choices, validation and visibility. No document has been created." })}</ReadinessMessage> : null}
       <fieldset disabled={locked || saving || companyMismatch || !personalizationReady} className="min-w-0 space-y-6" onChangeCapture={() => setFormEdited(true)}>
         <section className="space-y-4" aria-label={t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}><div><h3 className="font-semibold">{t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.documentDetailsHint", { defaultValue: "Start with the customer or vendor, dates and reference." })}</p></div>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -1,9 +1,8 @@
 import type { ParsedFormField } from "../forms/config/types"
+import { configuredCustomFieldCreateIssue } from "../forms/custom-field-create-admission"
 
 export type InvoiceCustomValue = string | number | boolean | string[]
 export type InvoiceCustomField = Pick<ParsedFormField, "fieldId" | "label" | "type" | "validation" | "options" | "visibleWhen">
-
-const supportedTypes = new Set(["Text", "Email", "Tel", "Url", "Textarea", "Number", "Rating", "Slider", "Select", "Radio", "MultiSelect", "UserSelect", "Tags", "Checkbox", "Switch", "Date", "Time", "DateTime"])
 
 export const invoiceCustomFieldMessages = {
   unsupported: "This configured field is not supported by invoice entry.",
@@ -21,9 +20,7 @@ export const invoiceCustomFieldMessages = {
 }
 
 export function invoiceCustomFieldSupported(field: InvoiceCustomField): boolean {
-  return supportedTypes.has(field.type) && !field.visibleWhen
-    && (!field.validation.pattern || field.validation.pattern === "email")
-    && (field.type !== "UserSelect" || field.options.length > 0)
+  return configuredCustomFieldCreateIssue(field) == null
 }
 
 /** The canonical create owner revalidates these values before any business write. */

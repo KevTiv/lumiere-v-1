@@ -6,6 +6,8 @@ import type { FormConfig } from "../lib/form-types"
 import { FormModal } from "./form-modal"
 import { useRuntimeFormModalConfig } from "./hooks/use-runtime-form-modal-config"
 import { metadataFromCustomFields } from "./utils/metadata-defaults"
+import { useTranslation } from "@lumiere/i18n"
+import { customFieldCreateReasonMessages, resolvedCustomFieldCreateIssues } from "./custom-field-create-admission"
 
 export interface RuntimeFormModalProps {
   open: boolean
@@ -62,7 +64,8 @@ export function RuntimeFormModal({
   submissionDisabled = false,
   ...rest
 }: RuntimeFormModalProps) {
-  const { config, isLoading, error, customFieldIds } = useRuntimeFormModalConfig({
+  const { t } = useTranslation()
+  const { config, isLoading, error, customFieldIds, customFieldCreateIssues = [] } = useRuntimeFormModalConfig({
     staticConfig,
     moduleId,
     formId,
@@ -76,13 +79,20 @@ export function RuntimeFormModal({
     return transformConfig ? transformConfig(config) : config
   }, [config, transformConfig])
 
-  // The create owner opts in. Inspect the resolved fields, including required,
-  // disabled and conditional fields: folding even an empty/false custom value
-  // into metadata would reach an unsupported non-atomic follow-up write.
-  const customFieldCreationBlocked = Boolean(staticConfig.customFieldCreateUnavailableMessage)
+  const atomicCreate = staticConfig.customFieldCreateCapability === "atomic-configured-v1"
+  const admissionIssues = atomicCreate ? [...customFieldCreateIssues, ...resolvedCustomFieldCreateIssues(resolvedConfig)]
+    .filter((issue, index, all) => all.findIndex((other) => other.fieldId === issue.fieldId && other.reason === issue.reason) === index) : []
+  // Legacy owners still block every custom field until their canonical create
+  // operation can commit it atomically. Admitted owners block only unsupported definitions.
+  const legacyCustomFieldCreationBlocked = Boolean(staticConfig.customFieldCreateUnavailableMessage)
     && resolvedConfig.sections.some((section) => section.fields.some((field) =>
       field.name.startsWith("custom:") || field.id.startsWith("custom:"),
     ))
+  const customFieldCreationBlocked = legacyCustomFieldCreationBlocked || admissionIssues.length > 0
+  const admissionError = admissionIssues.length ? t("common.customFieldCreateAdmission.blocked", {
+    defaultValue: "This form cannot create a record with these configured fields yet: {{fields}}. Ask an administrator to review them. No record has been created. Your entries are retained.",
+    fields: admissionIssues.map((issue) => `${issue.label} (${t(`common.customFieldCreateAdmission.reasons.${issue.reason}`, { defaultValue: customFieldCreateReasonMessages[issue.reason] })})`).join(", "),
+  }) : undefined
 
   const handleSubmit = React.useCallback(
     async (data: Record<string, unknown>) => {
@@ -113,18 +123,22 @@ export function RuntimeFormModal({
   }
 
   const runtimeConfigFailed = error != null
-  const submissionBlocked = runtimeConfigFailed && runtimeConfigFailureMode === "block"
+  const submissionBlocked = runtimeConfigFailed && (runtimeConfigFailureMode === "block" || atomicCreate)
   const runtimeConfigError = submissionBlocked
     ? `Runtime form configuration is unavailable. Submission is disabled. ${error}`
     : customFieldCreationBlocked
-      ? [staticConfig.customFieldCreateUnavailableMessage, submitError].filter(Boolean).join(" ")
+      ? [admissionError ?? staticConfig.customFieldCreateUnavailableMessage, submitError].filter(Boolean).join(" ")
       : submitError
+  const displayConfig = runtimeConfigFailed ? staticConfig : resolvedConfig
+  const admittedConfig = atomicCreate && (submissionBlocked || customFieldCreationBlocked)
+    ? { ...displayConfig, sections: displayConfig.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({ ...field, disabled: true })) })) }
+    : displayConfig
 
   return (
     <FormModal
       open={open}
       onOpenChange={onOpenChange}
-      config={runtimeConfigFailed ? staticConfig : resolvedConfig}
+      config={admittedConfig}
       onSubmit={submissionBlocked || customFieldCreationBlocked ? undefined : runtimeConfigFailed ? onSubmit : handleSubmit}
       submissionDisabled={submissionBlocked || customFieldCreationBlocked || submissionDisabled}
       submitError={runtimeConfigError}

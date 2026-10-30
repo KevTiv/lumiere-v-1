@@ -8,7 +8,11 @@ import { resolveInvoiceProfile, type InvoiceDocumentSnapshot } from "@lumiere/er
 import type { InvoiceCustomField } from "./invoice-custom-fields"
 
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
-const configuredFields = vi.hoisted(() => ({ fields: [] as (InvoiceCustomField & { isEnabled: boolean })[] }))
+const configuredFields = vi.hoisted(() => ({
+  fields: [] as (InvoiceCustomField & { isEnabled: boolean })[],
+  sourceFields: [] as (InvoiceCustomField & { isEnabled: boolean })[],
+  customFields: [] as (InvoiceCustomField & { isEnabled: boolean })[],
+}))
 vi.mock("../forms/hooks/use-form-config", () => ({ useFormConfiguration: () => ({ config: configuredFields }) }))
 
 // Exercise the invoice workflow with deterministic native selection; the browser
@@ -27,7 +31,7 @@ vi.mock("@/components/ui/select", () => ({
 
 afterEach(cleanup)
 beforeAll(() => { globalThis.PointerEvent ??= MouseEvent as typeof PointerEvent })
-beforeEach(() => { configuredFields.fields = [] })
+beforeEach(() => { configuredFields.fields = []; configuredFields.sourceFields = []; configuredFields.customFields = [] })
 
 const options = {
   companyId: 1n,
@@ -49,6 +53,18 @@ const seller = { name: "Alpha Legal Company", address: ["123 Main Street", "Pari
 const snapshot: InvoiceDocumentSnapshot = { schemaVersion: 1, profileVersionIds: { organization: "1", company: "2" }, seller, profile, notes: "Saved invoice notes" }
 
 describe("invoice workspace", () => {
+  it("does not treat hydrated organization users as stored custom-field create options", () => {
+    const stored: InvoiceCustomField & { isEnabled: boolean } = { fieldId: "custom:reviewer", label: "Reviewer", type: "UserSelect", isEnabled: true, options: [], validation: { required: false } }
+    configuredFields.sourceFields = [stored]
+    configuredFields.fields = [{ ...stored, options: [{ value: "actor", label: "Authorized organization user" }] }]
+    const onSave = vi.fn()
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
+    fillInvoice()
+    expect(screen.getByText(/This form contains a custom field that invoice entry cannot save yet/)).toBeTruthy()
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
   it("sends numeric zero and an explicit No custom boolean with their JSON types", async () => {
     configuredFields.fields = [
       { fieldId: "custom:count", label: "Count", type: "Number", options: [], isEnabled: true, validation: { required: true, min: 0 } },

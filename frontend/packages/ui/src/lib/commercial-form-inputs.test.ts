@@ -9,10 +9,10 @@ void i18n.init({ lng: "en", resources: { en: { translation: {} } }, initImmediat
 const fields = (config: FormConfig) => config.sections.flatMap((section) => section.fields)
 
 describe("CRM task forms", () => {
-  it("declares the custom-create limit before entry on every base CRM create form", () => {
+  it("admits configured atomic creation on every base CRM create form", () => {
     for (const form of [newLeadForm(i18n.t), newOpportunityForm(i18n.t), newContactForm(i18n.t)]) {
-      expect(form.customFieldCreateUnavailableMessage).toContain("Creation is disabled before any record is created")
-      expect(form.customFieldCreateUnavailableMessage).toContain("administrator")
+      expect(form.customFieldCreateCapability).toBe("atomic-configured-v1")
+      expect(form.customFieldCreateUnavailableMessage).toBeUndefined()
     }
   })
   it("starts enquiries as new and keeps contact constraints while separating optional notes", () => {
