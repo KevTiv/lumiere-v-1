@@ -49,7 +49,7 @@ a focused test is not whole-package acceptance.
 | AA-05 | BLOCKED | Existing #309 owner; coordinator integration only | #309, no replacement branch | #309 integration + AA-01 | Existing viewer/storage/scoped revision/retrieval implementation and green CI | Authenticated save/reload/new-chat retrieval, revocation/stale edit/restart proof; Explain this error and verified guidance promotion remain separate |
 | AA-06 | REVIEW | Qualification worker + independent QA | codex/alpha-ai-skill-qualification / #318 | AA-00 | Collector consistency fixes; 212 Python tests, manifest/catalog checks; independent review of 8422d1b6 passes | Tenant release readback, approved provider profiles/budget/test tenant, independent certification, staged disable/rollback remain blocked externally |
 | AA-07 | BLOCKED | Reports/UI owner (coordinator until assigned) | — | AA-01 | Existing owner reports/charts, saved run inspector and artifact/document surfaces | Typed report/record/artifact intents and provenance-preserving normal-user navigation not accepted; arbitrary code/HTML/SQL tools deferred |
-| AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | No local authenticated services/auth state. Fixture/typecheck passes cannot close canonical saved-result or live-provider gates |
+| AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | Disposable authenticated stack ready; first-contact test executing. Broader saved-effect/AI/recovery gates remain pending; fixture/typecheck passes cannot close them |
 
 ## Source states (distinct from admission)
 
@@ -151,7 +151,8 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
 
 - #318 at 8422d1b6: 212 script tests pass; catalog/finance manifests and diff checks
   pass. Independent QA found no blockers and reran all eight collector tests.
-  Hosted CI/E2E/runtime-image checks started; no hosted conclusion claimed yet.
+  All 21 exact-head hosted checks now pass, including CI/E2E gates and all three P0
+  shards. This does not close tenant activation or provider qualification gates.
 - AA-01 frontend #321 at 482507e5: ten turn regressions and seven shared UI tests
   pass; full web unit command passes 138 files with no skips. All 11 workspace
   TypeScript checks pass. I18n, type-debt (2261), operation transport, catalog/finance
@@ -185,7 +186,12 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   validation and was published to a new local database. Canonical baseline fixtures
   were prepared in the disposable stack; the AA-08 test creates a separate orgless
   account and seeds no business records in its new organization. Native API build
-  remains in progress. No existing database, production configuration, provider or
-  production tenant has been used.
+  passed with one job and debug symbols disabled; checksum migrations, API health,
+  canonical seven test personas and warmed web sign-in pass. Restart recovered the
+  exact existing module/fixture organization without reseeding. The real AA-08
+  fresh-tenant/contact test is now executing; an initial extra-currency assertion
+  used the wrong test route and is being corrected to the canonical currency owner.
+  No contact creation or AI call occurred in that failed attempt. No existing
+  database, production configuration, provider or production tenant has been used.
 - No new end-to-end journey accepted. No PR merges, production deployments, contract publications,
   live provider dispatches or production business-state mutations performed by this program.
