@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
 import { randomUUID } from "node:crypto"
 import { stbTimestampMicros } from "@lumiere/erp-shared/stb-timestamp"
 
@@ -43,6 +44,7 @@ async function fillManualInvoice(page: Page, description: string): Promise<void>
   await chooseFirstPartner(page)
   await page.getByTestId("create-invoice-line-description").fill(description)
   await page.getByTestId("create-invoice-line-unit-price").fill("90")
+  await reviewInvoiceAccountingChoices(page)
   await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
 }
 
@@ -251,6 +253,7 @@ test.describe(
       await modal.getByTestId("create-invoice-line-description").fill(description)
       await modal.getByLabel("Item 1 quantity", { exact: true }).fill("2")
       await modal.getByTestId("create-invoice-line-unit-price").fill("37.50")
+      await reviewInvoiceAccountingChoices(page)
       await modal.locator("#create-invoice-date").fill(invoiceDate)
       await modal.locator("#create-invoice-due-date").fill(dueDate)
       await expect(modal.getByRole("textbox", { name: "Currency", exact: true })).toHaveAttribute("readonly", "")

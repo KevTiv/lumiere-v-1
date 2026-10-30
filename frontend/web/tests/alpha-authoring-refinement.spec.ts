@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "./invoice-accounting-choices"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
 const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQaPj/HwAFAgKfdqhGyQAAAABJRU5ErkJggg==", "base64")
@@ -58,6 +59,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 720 
         await modal.getByRole("textbox", { name: "Reference", exact: true }).fill("Commercial reference A17")
         await modal.getByTestId("create-invoice-line-description").fill("Alpha task review service")
         await modal.getByTestId("create-invoice-line-unit-price").fill("37.50")
+        await reviewInvoiceAccountingChoices(page)
         if (kind === "invoice") {
           const content = modal.getByTestId("create-invoice-content-toggle")
           await expect(content).toHaveAttribute("aria-expanded", "false")
@@ -158,6 +160,7 @@ test("long invoice rejection stays in the scroll body and leaves actions reachab
   await choose(page, modal.getByTestId("create-invoice-partner"), "Synthetic customer")
   await modal.getByTestId("create-invoice-line-description").fill("Retained service description")
   await modal.getByTestId("create-invoice-line-unit-price").fill("49.50")
+  await reviewInvoiceAccountingChoices(page)
   const save = modal.getByTestId("create-invoice-save-draft")
   await save.click()
   const body = modal.getByTestId("create-invoice-scroll-body")

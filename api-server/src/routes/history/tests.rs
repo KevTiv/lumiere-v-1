@@ -109,6 +109,32 @@ fn private_evidence_is_field_projected_without_metadata_or_hidden_field_names() 
 }
 
 #[test]
+fn explicit_line_additions_preserve_account_currency_and_lifecycle_without_widening_fields() {
+    let mut row = evidence(
+        2,
+        json!([
+            {"field":"account_id","before":null,"after":"18446744073709551615"},
+            {"field":"currency_id","before":null,"after":"9007199254740993"},
+            {"field":"debit","before":null,"after":"0"}
+        ]),
+    );
+    row["operation"] = json!(ADD_OPERATION);
+    let fields = require_access(&access(GRANTS, Some(&["account_id", "debit"]))).unwrap();
+    let entry = project_entry(&row, 42, 7, 9, &fields).unwrap().unwrap();
+    assert_eq!(entry.operation, ADD_OPERATION);
+    assert_eq!(entry.changes.len(), 2);
+    assert_eq!(
+        entry.changes[0].after.as_deref(),
+        Some("18446744073709551615")
+    );
+    assert!(!serde_json::to_string(&entry)
+        .unwrap()
+        .contains("currency_id"));
+    row["changes_json"] = json!(json!([{"field":"debit","before":"0","after":"1"}]).to_string());
+    assert!(project_entry(&row, 42, 7, 9, &fields).is_err());
+}
+
+#[test]
 fn source_and_history_grants_are_separate_and_denies_apply() {
     for grants in [
         &[][..],

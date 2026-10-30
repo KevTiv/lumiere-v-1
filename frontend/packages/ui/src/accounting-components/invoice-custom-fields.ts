@@ -22,12 +22,14 @@ export const invoiceCustomFieldMessages = {
 
 export function invoiceCustomFieldSupported(field: InvoiceCustomField): boolean {
   return supportedTypes.has(field.type) && !field.visibleWhen
+    && (!field.validation.pattern || field.validation.pattern === "email")
+    && (field.type !== "UserSelect" || field.options.length > 0)
 }
 
 /** The canonical create owner revalidates these values before any business write. */
 export function invoiceCustomFieldError(field: InvoiceCustomField, value: InvoiceCustomValue | undefined): keyof typeof invoiceCustomFieldMessages | undefined {
   if (!invoiceCustomFieldSupported(field)) return "unsupported"
-  if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
+  if (value === undefined || (typeof value === "string" && value.trim() === "") || (Array.isArray(value) && value.length === 0)) {
     return field.validation.required ? "required" : undefined
   }
   if (["Number", "Rating", "Slider"].includes(field.type)) {
@@ -44,12 +46,9 @@ export function invoiceCustomFieldError(field: InvoiceCustomField, value: Invoic
     if (selected.some((item) => !field.options.some((option) => option.value === item && !option.disabled))) return "option"
   }
   if (typeof value === "string") {
-    if ((field.validation.minLength != null && value.length < field.validation.minLength) || (field.validation.maxLength != null && value.length > field.validation.maxLength)) return "textLength"
-    if (field.type === "Email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "email"
-    if (field.validation.pattern) {
-      try { if (!new RegExp(field.validation.pattern).test(value)) return "format" }
-      catch { return "invalidPattern" }
-    }
+    const length = Array.from(value).length
+    if ((field.validation.minLength != null && length < field.validation.minLength) || (field.validation.maxLength != null && length > field.validation.maxLength)) return "textLength"
+    if ((field.type === "Email" || field.validation.pattern === "email") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "email"
   }
   return undefined
 }

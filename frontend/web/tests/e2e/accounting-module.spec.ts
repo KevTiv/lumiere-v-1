@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
@@ -374,6 +375,7 @@ test.describe("Accounting module e2e", () => {
     await firstPartner.click()
     await page.getByTestId("create-invoice-line-description").fill("Smoke line")
     await page.getByTestId("create-invoice-line-unit-price").fill("50")
+    await reviewInvoiceAccountingChoices(page)
     const saveDraft = page.getByTestId("create-invoice-save-draft")
     if (await saveDraft.isDisabled()) {
       await page.getByTestId("create-invoice-modal").getByRole("button", { name: /^cancel$/i }).click()

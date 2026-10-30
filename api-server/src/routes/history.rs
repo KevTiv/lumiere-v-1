@@ -1,6 +1,6 @@
 //! Source-authorized reads of private, reducer-captured business change evidence.
 //!
-//! The initial contract covers Accounting draft line edits only. It deliberately
+//! The contract covers explicit Accounting draft line additions and ordinary edits. It deliberately
 //! does not read caller-authored audit rows or imply complete historical coverage.
 
 use std::collections::{HashMap, HashSet};
@@ -39,6 +39,8 @@ const MAX_PAGE_SIZE: u32 = 50;
 const MAX_WINDOWS: usize = 4;
 const MAX_EVIDENCE_BYTES: usize = 65_536;
 const OPERATION: &str = "update_account_move_line";
+const ADD_OPERATION: &str = "add_account_move_line";
+const OPERATIONS: [&str; 2] = [OPERATION, ADD_OPERATION];
 const COLUMNS: &str = "id, organization_id, company_id, resource, record_id, subject_resource, subject_record_id, operation, actor_identity, occurred_at, schema_version, changes_json";
 const VISIBLE_FIELDS: &[&str] = &[
     "name",
@@ -52,6 +54,8 @@ const VISIBLE_FIELDS: &[&str] = &[
     "credit_currency",
     "partner_id",
     "analytic_account_id",
+    "account_id",
+    "currency_id",
 ];
 
 #[derive(Debug, Deserialize)]
@@ -115,7 +119,7 @@ struct HistoryPage {
 #[derive(Debug, Serialize)]
 struct HistoryCoverage {
     status: &'static str,
-    operations: [&'static str; 1],
+    operations: [&'static str; 2],
     message: &'static str,
 }
 
@@ -211,6 +215,9 @@ fn project_entry(
     record: u64,
     allowed_fields: &HashSet<String>,
 ) -> Result<Option<HistoryEntry>, ApiError> {
+    let operation = cell(row, "operation", "operation")
+        .and_then(Value::as_str)
+        .ok_or_else(malformed_evidence)?;
     if number(row, "organization_id", "organizationId") != Some(org)
         || number(row, "company_id", "companyId") != Some(company)
         || number(row, "record_id", "recordId") != Some(record)
@@ -218,7 +225,7 @@ fn project_entry(
         || cell(row, "resource", "resource").and_then(Value::as_str) != Some("account_move")
         || cell(row, "subject_resource", "subjectResource").and_then(Value::as_str)
             != Some("account_move_line")
-        || cell(row, "operation", "operation").and_then(Value::as_str) != Some(OPERATION)
+        || !OPERATIONS.contains(&operation)
     {
         return Err(malformed_evidence());
     }
@@ -241,6 +248,7 @@ fn project_entry(
     for change in &changes {
         if !seen.insert(&change.field)
             || change.before == change.after
+            || (operation == ADD_OPERATION && change.before.is_some())
             || (!VISIBLE_FIELDS.contains(&change.field.as_str()) && change.field != "metadata")
         {
             return Err(malformed_evidence());
@@ -258,7 +266,7 @@ fn project_entry(
         .ok_or_else(malformed_evidence)?;
     Ok(Some(HistoryEntry {
         id: id.to_string(),
-        operation: OPERATION.into(),
+        operation: operation.into(),
         actor_identity: actor,
         occurred_at: occurred_at(
             cell(row, "occurred_at", "occurredAt").ok_or_else(malformed_evidence)?,
@@ -438,8 +446,8 @@ async fn read_account_move_history(
     Ok(HistoryPage {
         schema_version: 1, record_id: record.to_string(), company_id: company.to_string(), data: visible, next_cursor,
         coverage: HistoryCoverage {
-            status: "partial", operations: [OPERATION],
-            message: "Only captured ordinary, non-purchase-order draft journal-line edits are included. Quantity/price bill corrections, metadata, deleted-line history and earlier or other operations are not included.",
+            status: "partial", operations: OPERATIONS,
+            message: "Only captured explicit draft journal-line additions and ordinary non-purchase-order draft-line edits are included. Automatically generated lines, quantity/price bill corrections, metadata, deleted-line history, and earlier or other operations are not included.",
         },
     })
 }

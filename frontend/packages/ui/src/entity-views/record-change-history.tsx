@@ -48,6 +48,8 @@ export function RecordChangeHistory({
     amount_residual_currency: t("recordChanges.fields.residualCurrency"),
     debit_currency: t("recordChanges.fields.debitCurrency"),
     credit_currency: t("recordChanges.fields.creditCurrency"),
+    account_id: t("recordChanges.fields.account", { defaultValue: "Account" }),
+    currency_id: t("recordChanges.fields.currency", { defaultValue: "Currency" }),
   };
 
   if (state === "loading") {
@@ -148,7 +150,8 @@ export function RecordChangeHistory({
                     className="block break-words font-medium"
                     data-testid="record-change-summary"
                   >
-                    {t("recordChanges.fieldsChanged", {
+                    {t(entry.operation === "add_account_move_line" ? "recordChanges.lineAdded" : "recordChanges.fieldsChanged", {
+                      ...(entry.operation === "add_account_move_line" ? { defaultValue: "Added journal item: {{fields}}" } : {}),
                       fields: fieldList.format(
                         entry.changes.map(
                           (change) => fieldLabels[change.field] ?? change.field,

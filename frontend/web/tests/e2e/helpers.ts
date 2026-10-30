@@ -12,3 +12,5 @@ export {
   fetchSaleOrderIdByOpportunityId,
   fetchSaleOrderIdsByOpportunityId,
 } from "./helpers-exact-sale-order"
+
+export { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
