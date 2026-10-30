@@ -78,8 +78,10 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   const router = useRouter()
   const { identity } = useErpSession()
   const actorScope = `${identity ?? ''}:${orgId}:${operatingCompanyId}`
-  const liveScope = useRef(actorScope)
-  liveScope.current = actorScope
+  const liveScope = useRef({ stamp: actorScope, mounted: false })
+  if (liveScope.current.stamp !== actorScope) liveScope.current = { stamp: actorScope, mounted: false }
+  const actorLifetime = liveScope.current
+  useEffect(() => { actorLifetime.mounted = true; return () => { actorLifetime.mounted = false } }, [actorLifetime])
   const { checkPermission, permissionsReady } = useRBAC()
   const [target, setTarget] = useState<{ action: SubscriptionActionId; id: bigint; scope: string } | null>(null)
   const [renewalAttempt, setRenewalAttempt] = useState<RenewalAttempt | null>(null)
@@ -139,7 +141,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   const amend = useAmendSubscription(orgId, operatingCompanyId)
   const pause = usePauseSubscription(orgId, operatingCompanyId)
   const resume = useResumeSubscription(orgId, operatingCompanyId)
-  const renew = useRenewSubscription(orgId, operatingCompanyId, identity)
+  const renew = useRenewSubscription(orgId, operatingCompanyId, identity, Boolean(enabled && permitted && sourceState.status === 'ready' && target?.scope === actorScope))
   const cancel = useCancelSubscription(orgId, operatingCompanyId)
   const ingestUsage = useIngestSubscriptionUsageEvent(orgId, operatingCompanyId)
   const rateUsage = useRateSubscriptionUsageEvents(orgId, operatingCompanyId)
@@ -203,7 +205,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   ] }]
 
   const submit = async (values: FormValues) => {
-    if (!usable || !target || !subscription || liveScope.current !== target.scope) throw new Error(t('subscriptions.workflow.selectionChanged'))
+    if (!usable || !target || !subscription || liveScope.current !== actorLifetime || !actorLifetime.mounted) throw new Error(t('subscriptions.workflow.selectionChanged'))
     const subscriptionId = target.id
     switch (action) {
       case 'activate':
@@ -234,12 +236,12 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
         try {
           await renew.mutateAsync({ subscriptionId, request, params: buildRenewSubscriptionParams({ ...request }), reconcileOnly })
           completeRenewalAttempt(retainedScope, request.idempotencyKey)
-          if (liveScope.current !== target.scope) return
+          if (liveScope.current !== actorLifetime || !actorLifetime.mounted) return
           setRenewalAttempt(null)
         } catch (error) {
           const phase = error instanceof OperationRequestError && error.retry !== 'reconcile' ? 'rejected' : 'unknown'
           const retained = retainRenewalAttempt(retainedScope, request, phase)
-          if (liveScope.current === target.scope) setRenewalAttempt(retained)
+          if (liveScope.current === actorLifetime && actorLifetime.mounted) setRenewalAttempt(retained)
           throw error
         }
         break

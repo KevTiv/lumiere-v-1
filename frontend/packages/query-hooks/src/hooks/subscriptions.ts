@@ -10,6 +10,7 @@ import { stdbBffCommandPost } from '@lumiere/stdb/commands';
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { invalidateStdbQueryResources } from './stdb';
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from '../http';
@@ -815,8 +816,17 @@ export function useRenewSubscription(
   organizationId: bigint,
   companyId?: bigint,
   actorIdentity?: string | null,
+  admitted = true,
 ) {
   const qc = useQueryClient();
+  const stamp = `${organizationId}:${companyId}:${actorIdentity ?? ''}:${admitted}`;
+  const live = useRef({ stamp, mounted: false });
+  if (live.current.stamp !== stamp) live.current = { stamp, mounted: false };
+  const lifetime = live.current;
+  useEffect(() => {
+    lifetime.mounted = true;
+    return () => { lifetime.mounted = false; };
+  }, [lifetime]);
   return useMutation<
     ResolvedOperationEffectOutcome<SubscriptionRenewalEffectRef>,
     Error,
@@ -824,18 +834,25 @@ export function useRenewSubscription(
   >({
     retry: false,
     mutationFn: async ({ subscriptionId, params, request, reconcileOnly }) => {
+      const assertScope = () => {
+        if (!admitted || !lifetime.mounted || live.current !== lifetime) throw new Error('Renewal actor, company or admission changed. The retained request has been kept.');
+      };
+      assertScope();
       const activeCompanyId = requireSelectedCompany(companyId);
       if (!actorIdentity) throw new Error('The authenticated actor is required for renewal recovery');
       const encodedParams = stdbParamsToJson(params as object, 'RenewSubscriptionParams');
       requireMatchingRenewalCommand(encodedParams, request);
-      const resolveEffect = async () => resolveSubscriptionRenewalEffect(
-        await fetchQueryList('/api/query/subscription-amendments', 'Renewal history could not be verified'),
-        organizationId, activeCompanyId, subscriptionId, actorIdentity, request,
-      );
-      return executeSubscriptionRenewal({
+      const resolveEffect = async () => {
+        assertScope();
+        const rows = await fetchQueryList('/api/query/subscription-amendments', 'Renewal history could not be verified');
+        assertScope();
+        return resolveSubscriptionRenewalEffect(rows, organizationId, activeCompanyId, subscriptionId, actorIdentity, request);
+      };
+      const outcome = await executeSubscriptionRenewal({
         resolveEffect,
         reconcileOnly,
         dispatch: async () => {
+          assertScope();
           const { urlPath, init } = stdbBffCommandPost('renew_subscription', {
             companyId: activeCompanyId, subscriptionId,
             params: encodedParams,
@@ -845,6 +862,8 @@ export function useRenewSubscription(
         afterDispatch: () => invalidateSubscriptionLifecycle(qc, organizationId),
         readbackAttempts: 6, readbackDelayMs: 150,
       });
+      assertScope();
+      return outcome;
     },
   });
 }
