@@ -232,3 +232,30 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
 Final #309 refresh: current main remains `8fee8fd5`. #309 remains open at
 `f2d5e8e`; its failed authenticated lifecycle/P0 gates block AA-05 integration.
 This program's passing contact acceptance does not satisfy any guide gate.
+
+## Authorized merge checkpoint
+
+The user explicitly authorized merging the Alpha stack to main. Current refreshed
+main is `51dc54867ba66703518c4edbc0964391da0d8a63`, including #309 at merge
+`23404cbb` and #324. #309's final head `8e19e48b` passed all 31 checks; its earlier
+failed lifecycle/P0 observations above are historical. Main now consumes immutable
+contracts **0.3.158**. No release, pin, migration or certification is rewritten.
+
+Before merging, each independent feature branch incorporated that main revision.
+#321's shared-shell overlap was resolved with guide reauthorization, unsaved edits,
+originating context, related references, history pointers and callbacks retained.
+Twelve turn cases (including exact-u64 guide references and malformed metadata),
+16 guide helpers and 38 shared guide/chat cases pass; independent QA reviewed the
+integration. #318 passed all 217 script tests; #319 passed 24 RAG and six guide
+fixture cases (one existing real-service case remains ignored and is not acceptance).
+#322 passed web TypeScript, model/source checks and four responsive fixtures on158.
+
+The updated testing branch `12842169` contains the actual refreshed heads of
+#318/#319/#321/#322. #323 merged it at `3852aa6e` and remains a two-test-file diff
+against its testing base. Its recovery-test race correction remains intact.
+PRs will be merged sequentially after their current checks pass, then #323 will
+be retargeted to main and verified as the same bounded test diff. Full Alpha
+acceptance and live-provider qualification remain separate from source merging.
+
+The repository's existing release-main workflow automatically follows successful
+main CI. This task does not dispatch a separate deployment or alter that workflow.
