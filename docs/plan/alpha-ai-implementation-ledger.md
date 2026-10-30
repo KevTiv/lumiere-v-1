@@ -49,7 +49,7 @@ a focused test is not whole-package acceptance.
 | AA-05 | BLOCKED | Existing #309 owner; coordinator integration only | #309, no replacement branch | #309 integration + AA-01 | Existing viewer/storage/scoped revision/retrieval implementation and green CI | Authenticated save/reload/new-chat retrieval, revocation/stale edit/restart proof; Explain this error and verified guidance promotion remain separate |
 | AA-06 | REVIEW | Qualification worker + independent QA | codex/alpha-ai-skill-qualification / #318 | AA-00 | Collector consistency fixes; 212 Python tests, manifest/catalog checks; independent review of 8422d1b6 passes | Tenant release readback, approved provider profiles/budget/test tenant, independent certification, staged disable/rollback remain blocked externally |
 | AA-07 | BLOCKED | Reports/UI owner (coordinator until assigned) | — | AA-01 | Existing owner reports/charts, saved run inspector and artifact/document surfaces | Typed report/record/artifact intents and provenance-preserving normal-user navigation not accepted; arbitrary code/HTML/SQL tools deferred |
-| AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | Disposable authenticated stack ready; first-contact test executing. Broader saved-effect/AI/recovery gates remain pending; fixture/typecheck passes cannot close them |
+| AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance / #323 (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | Authenticated first-contact test passes on disposable stack. Broader saved-effect/AI/recovery gates remain pending; fixture/typecheck passes cannot close them |
 
 ## Source states (distinct from admission)
 
@@ -189,9 +189,14 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   passed with one job and debug symbols disabled; checksum migrations, API health,
   canonical seven test personas and warmed web sign-in pass. Restart recovered the
   exact existing module/fixture organization without reseeding. The real AA-08
-  fresh-tenant/contact test is now executing; an initial extra-currency assertion
-  used the wrong test route and is being corrected to the canonical currency owner.
-  No contact creation or AI call occurred in that failed attempt. No existing
+  fresh-tenant/contact test passes (one test, 37.3s) after correcting an initial
+  test-only currency route error; that failed attempt created no contact or AI
+  request. Exact saved contact scope/identity survive reload, with one create POST
+  and zero AI requests. Test-only #323 is stacked against the testing branch.
+  See [authenticated evidence](alpha-ai-acceptance-evidence/README.md). No existing
   database, production configuration, provider or production tenant has been used.
-- No new end-to-end journey accepted. No PR merges, production deployments, contract publications,
+- Accepted bounded evidence: fresh organization → normal CRM first contact →
+  exact canonical record after reload in the disposable development stack. This
+  does not accept full AA-02/08 or the AI handoff/recovery/financial/guide journeys.
+  No PR merges, production deployments, contract publications,
   live provider dispatches or production business-state mutations performed by this program.
