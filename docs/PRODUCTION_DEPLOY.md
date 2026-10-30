@@ -176,7 +176,12 @@ rejected before any Railway change.
 For each image-based service, the release submits an environment-scoped Railway
 configuration patch requesting the exact `source.image` and null repository
 selectors. Railway's CLI can omit those nulls, so the release reads back the
-applied source and stops if a repository is still attached or the image differs.
+applied environment configuration and waits within the source gate timeout for
+its image to equal the requested digest. The service-instance source can show
+an older image or be explicitly null; it is not the configured-image authority.
+Both reads must confirm no repository attachment, and missing or denied source
+evidence fails the release. Configuration reads filter source fields immediately
+so decrypted variables are never logged or retained by the release script.
 Before the first image-based release of a repository-connected service, switch
 its source through Railway's native image-source connection and verify the
 repository is detached.

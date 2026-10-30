@@ -44,7 +44,7 @@ prove authentication, provisioning, persisted business effects or provider use.
 
 [320px screenshot](activation-320.png) · [1440px screenshot](activation-1440.png)
 
-## Remaining acceptance
+## Acceptance remaining after the original slice
 
 Keep AA-02 partial until a fresh authenticated organization completes setup,
 opens a canonical form, saves a meaningful record and returns to refreshed
@@ -54,7 +54,29 @@ supported-language operator acceptance remain open. Current source does not
 provide a trusted per-record demo marker, so existing records are never claimed
 to prove completion of real business work. No deployment is included.
 
-There are no contract or migration changes; the pin remains `0.3.157`.
+The original slice changed no contracts or migrations and used pin `0.3.157`.
 Reverting the Overview import/render removes this discovery surface without
 altering normal ERP operations. PRs #309, #312 and #313 retain their ownership;
 integration must retain their guide and translation changes.
+
+## Main integration on 2026-10-30
+
+Merged main `51dc54867ba66703518c4edbc0964391da0d8a63` into this branch at
+`96417ae9247da2c0728d6b1f5d97c2c51dd7dd05`. Main now includes the contextual
+guides from #309, their released `0.3.158` contracts, and #324's release-source
+readback fix. This branch retains those changes without generated-output edits.
+The only package-script difference from main remains the activation model test;
+both separate guide test scripts are retained unchanged. The English catalog is
+unchanged from main apart from the additive activation namespace.
+
+Frozen offline installation, eleven activation model cases, both guide helper
+test files, i18n, type-debt, immutable browser transport, three-consumer vendored
+`0.3.158` verification, ERP catalog and finance manifest checks pass after the
+merge. The screenshots above retain the original implementation's synthetic
+scope; they are not authenticated ERP acceptance.
+
+Web TypeScript and the same four focused viewport cases also pass on the
+integrated source (42.5 seconds for the browser run). The coordinator's separate
+disposable first-contact acceptance evidence is linked from PR #322 and owned
+by AA-08; it must not be confused with this component fixture or production-image
+acceptance at the new contracts pin.

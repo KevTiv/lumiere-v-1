@@ -511,6 +511,7 @@ export function ExpensesCapturePanel({
               <SelectTrigger
                 className="min-w-0 max-w-full"
                 id="capture-employee"
+                aria-controls="capture-employee-options"
                 data-testid="expenses-capture-employee"
               >
                 <SelectValue
@@ -519,7 +520,7 @@ export function ExpensesCapturePanel({
                   )}
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent id="capture-employee-options">
                 <SelectGroup>
                   {scopedEmployees.map((row) => (
                     <SelectItem key={String(row.id)} value={String(row.id)}>
@@ -539,6 +540,7 @@ export function ExpensesCapturePanel({
               <SelectTrigger
                 className="min-w-0 max-w-full"
                 id="capture-pricelist"
+                aria-controls="capture-pricelist-options"
                 data-testid="expenses-capture-pricelist"
               >
                 <SelectValue
@@ -547,7 +549,7 @@ export function ExpensesCapturePanel({
                   )}
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent id="capture-pricelist-options">
                 <SelectGroup>
                   {pricelists.map((row) => (
                     <SelectItem key={String(row.id)} value={String(row.id)}>

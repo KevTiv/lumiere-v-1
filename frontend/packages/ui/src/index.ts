@@ -348,3 +348,5 @@ export { useUnsavedChangesGuard } from "./forms/use-unsaved-changes-guard"
 
 export { DashboardWidgetRenderer } from "./pages/dashboard-widget-renderer"
 export * from "./accounting-components/asset-depreciation-schedule";
+export * from "./lib/assistant-guide-types";
+export * from "./ai-chat/assistant-guide-viewer";
