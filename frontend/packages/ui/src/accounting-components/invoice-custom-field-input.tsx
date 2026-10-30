@@ -26,7 +26,7 @@ export function InvoiceCustomFieldInput({ field, value, onChange }: InvoiceCusto
   if (["Select", "Radio", "UserSelect"].includes(field.type)) {
     return <div className="space-y-2"><Label htmlFor={id}>{label}</Label>
       <Select disabled={disabled} value={radixSelectControlledValue(typeof value === "string" ? value : undefined, field.options)} onValueChange={(next) => onChange(storedValueFromRadixSelect(next))}>
-        <SelectTrigger id={id} data-testid={testId}><SelectValue placeholder={t("common.select", { defaultValue: "Select" })} /></SelectTrigger>
+        <SelectTrigger id={id} data-testid={testId}><SelectValue placeholder={t("common.selectPrompt", { defaultValue: "Select" })} /></SelectTrigger>
         <SelectContent>{field.options.map((option, index) => <SelectItem key={`${option.value}-${index}`} value={radixSelectItemValue(option, index)} disabled={option.disabled}>{option.label}</SelectItem>)}</SelectContent>
       </Select>
     </div>
@@ -45,7 +45,7 @@ export function InvoiceCustomFieldInput({ field, value, onChange }: InvoiceCusto
   if (["Checkbox", "Switch"].includes(field.type)) {
     return <div className="space-y-2"><Label htmlFor={id}>{label}</Label>
       <Select disabled={disabled} value={typeof value === "boolean" ? String(value) : ""} onValueChange={(next) => onChange(next === "true")}>
-        <SelectTrigger id={id} data-testid={testId}><SelectValue placeholder={t("common.select", { defaultValue: "Select" })} /></SelectTrigger>
+        <SelectTrigger id={id} data-testid={testId}><SelectValue placeholder={t("common.selectPrompt", { defaultValue: "Select" })} /></SelectTrigger>
         <SelectContent><SelectItem value="true">{t("common.yes", { defaultValue: "Yes" })}</SelectItem><SelectItem value="false">{t("common.no", { defaultValue: "No" })}</SelectItem></SelectContent>
       </Select>
     </div>

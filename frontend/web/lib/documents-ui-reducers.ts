@@ -24,6 +24,7 @@ export const DOCUMENTS_UI_REDUCERS = [
   "lock_document",
   "lock_knowledge_article",
   "purge_expired_documents",
+  "purge_reviewed_expired_documents",
   "record_document_view",
   "release_document_legal_hold",
   "restore_document",

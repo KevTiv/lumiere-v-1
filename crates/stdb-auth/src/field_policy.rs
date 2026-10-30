@@ -272,6 +272,12 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "expense-allocations".to_string(),
+        // The exact allocation baseline includes authorized metadata. A
+        // masked field cannot be used to approve a full-row replacement.
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "account-assets".to_string(),
         ["depreciation_board_ids"]
             .into_iter()

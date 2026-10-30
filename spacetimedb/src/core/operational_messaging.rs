@@ -396,13 +396,13 @@ fn batch_metadata(metadata: Option<String>, exclusions: Vec<serde_json::Value>) 
     Some(serde_json::Value::Object(object).to_string())
 }
 
-fn capture_batch_creation(
+fn prepare_batch_creation_changes(
     ctx: &ReducerContext,
     batch: &MessageBatch,
     operation: &'static str,
-) -> Result<(), String> {
+) -> Result<Option<Vec<RowChange>>, String> {
     let Some(company_id) = batch.company_id else {
-        return Ok(());
+        return Ok(None);
     };
     let metadata: serde_json::Value = serde_json::from_str(
         batch
@@ -418,6 +418,7 @@ fn capture_batch_creation(
     let captured = capture_business_change(
         ctx,
         BusinessChangeInput {
+            audit_action: "CREATE",
             organization_id: batch.organization_id,
             company_id,
             resource: "message_batch",
@@ -460,15 +461,28 @@ fn capture_batch_creation(
         serde_json::json!({"id":captured.audit.id}),
         &captured.audit,
     )?);
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id: batch.organization_id,
-            operation_id: format!("erp.{operation}"),
-            correlation_id: format!("message-batch:{}:created", batch.id),
-            changes,
-        },
-    )?;
+    Ok(Some(changes))
+}
+
+fn capture_message_batch_creation(ctx: &ReducerContext, batch: &MessageBatch) -> Result<(), String> {
+    let Some(changes) = prepare_batch_creation_changes(ctx, batch, "create_message_batch")? else { return Ok(()); };
+    record_organization_commit(ctx, OrganizationCommitInput {
+        organization_id: batch.organization_id,
+        operation_id: "erp.create_message_batch".to_string(),
+        correlation_id: format!("message-batch:{}:created", batch.id),
+        changes,
+    })?;
+    Ok(())
+}
+
+fn capture_invoice_reminder_batch_creation(ctx: &ReducerContext, batch: &MessageBatch) -> Result<(), String> {
+    let Some(changes) = prepare_batch_creation_changes(ctx, batch, "create_invoice_reminder_batch")? else { return Ok(()); };
+    record_organization_commit(ctx, OrganizationCommitInput {
+        organization_id: batch.organization_id,
+        operation_id: "erp.create_invoice_reminder_batch".to_string(),
+        correlation_id: format!("message-batch:{}:created", batch.id),
+        changes,
+    })?;
     Ok(())
 }
 
@@ -1031,7 +1045,7 @@ pub fn create_invoice_reminder_batch(
         });
     }
 
-    capture_batch_creation(ctx, &batch, "create_invoice_reminder_batch")?;
+    capture_invoice_reminder_batch_creation(ctx, &batch)?;
 
     write_audit_log_v2(
         ctx,
@@ -1167,7 +1181,7 @@ pub fn create_message_batch(
         });
     }
 
-    capture_batch_creation(ctx, &batch, "create_message_batch")?;
+    capture_message_batch_creation(ctx, &batch)?;
 
     write_audit_log_v2(
         ctx,

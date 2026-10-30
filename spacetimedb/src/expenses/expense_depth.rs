@@ -596,11 +596,10 @@ pub fn set_expense_allocations(
     if expense.organization_id != organization_id {
         return Err("Expense belongs to a different organization".to_string());
     }
-    crate::workflow::authorization::require_workflow_company_access(
+    crate::documents::knowledge_guides::require_company_membership(
         ctx,
         organization_id,
         expense.company_id,
-        ctx.sender(),
     )?;
     if expense.state != ExpenseState::Draft {
         return Err("Only draft expenses can change allocations".to_string());

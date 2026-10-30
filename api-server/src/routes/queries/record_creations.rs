@@ -2,7 +2,7 @@
 //! This deliberately does not register a general receipt-table resource.
 
 use crate::error::ApiError;
-use crate::query_exec::{resolve_crm_company_id, resolve_sales_company_id};
+use crate::query_exec::{preserve_query_timestamp_precision, resolve_crm_company_id, resolve_sales_company_id};
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use serde_json::{json, Value};
@@ -24,6 +24,20 @@ fn valid_key(key: &str) -> bool {
         && key
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+fn exact_response(mut rows: Vec<Value>) -> Value {
+    for row in &mut rows {
+        for field in ["organizationId", "organization_id", "companyId", "company_id", "recordId", "record_id"] {
+            if let Some(value) = row.get_mut(field) {
+                if let Some(id) = value.as_u64() {
+                    *value = Value::String(id.to_string());
+                }
+            }
+        }
+    }
+    preserve_query_timestamp_precision(&mut rows);
+    json!({"data": rows})
 }
 
 pub(super) async fn read_record_creation(
@@ -79,12 +93,29 @@ pub(super) async fn read_record_creation(
         .await
         .map_err(ApiError::internal)?;
     context.require_current_placement(&state.organization_placements)?;
-    Ok(Some(json!({"data": data})))
+    Ok(Some(exact_response(data)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn recovery_wire_response_keeps_full_width_saved_identity_and_timestamp() {
+        use axum::{body::to_bytes, response::IntoResponse, Json};
+        let response = Json(exact_response(vec![json!({
+            "id":"1:2:contact:attempt", "organizationId":1_u64,
+            "companyId":9_007_199_254_740_995_u64,
+            "recordId":9_007_199_254_740_993_u64,
+            "createdAt":{"microsSinceUnixEpoch":9_007_199_254_740_993_i64}
+        })])).into_response();
+        let bytes = to_bytes(response.into_body(), 16_384).await.unwrap();
+        let decoded: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(decoded["data"][0]["recordId"], "9007199254740993");
+        assert_eq!(decoded["data"][0]["companyId"], "9007199254740995");
+        assert_eq!(decoded["data"][0]["organizationId"], "1");
+        assert_eq!(decoded["data"][0]["createdAt"]["microsSinceUnixEpoch"], "9007199254740993");
+    }
 
     #[test]
     fn only_admitted_exact_resources_select_receipts() {

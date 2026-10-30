@@ -350,7 +350,33 @@
     "moduleNavigation": {
       "overview": "Incamake",
       "area": "Igice cy’akazi"
-    }
+    },
+    "explainError": "Sobanura iri kosa",
+    "creationRecovery": {
+      "title": "Review an earlier save",
+      "hint": "An earlier save is retained for this company. Check it before starting a replacement.",
+      "review": "Review entered values",
+      "reviewHint": "These are the entries retained for the earlier save. Your current form stays open. Checking status does not send another save.",
+      "check": "Check save status",
+      "openSaved": "Open saved record in a new tab",
+      "finish": "Finish review",
+      "emptyValue": "Empty",
+      "entriesUnavailable": "The retained entries could not be displayed. Check the save status before starting another record.",
+      "models": {
+        "crm_lead": "Lead",
+        "opportunity": "Opportunity",
+        "contact": "Contact",
+        "sale_order": "Quotation"
+      },
+      "status": {
+        "pending": "Save needs review",
+        "unknown": "No saved result was confirmed. Keep this request and check again.",
+        "saved": "The earlier record is saved. Open it to review, then finish this review. Your current form has not been saved by this check.",
+        "unavailable": "The save could not be checked. The retained request has been kept.",
+        "denied": "Access to this save is unavailable. Its entries are hidden."
+      }
+    },
+    "selectPrompt": "Hitamo"
   },
   "navigation": {
     "overview": "Incamake",

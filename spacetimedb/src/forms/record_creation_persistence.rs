@@ -79,7 +79,7 @@ fn append_creation_receipt(
         .db
         .record_creation_receipt()
         .id()
-        .find(receipt_id)
+        .find(receipt_id.to_string())
         .ok_or("creation receipt disappeared before durable capture")?;
     if row.organization_id != organization_id
         || row.company_id != company_id
@@ -360,7 +360,7 @@ pub(crate) fn record_purchase_order_creation(
         .db
         .purchase_order_creation_operation()
         .id()
-        .find(receipt_id)
+        .find(receipt_id.to_string())
         .ok_or("purchase creation receipt missing")?;
     if receipt.organization_id != organization_id
         || receipt.company_id != company_id

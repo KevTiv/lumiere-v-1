@@ -20,6 +20,8 @@ use std::sync::Arc;
 use stdb_auth::{has_resource_read_permission, registry_get};
 
 mod activity_work;
+mod expense_allocations;
+mod record_creations;
 mod replenishment;
 mod task_assignees;
 
@@ -29,6 +31,8 @@ pub(crate) struct OrgQuery {
     organization_id: Option<u64>,
     #[serde(rename = "companyId")]
     company_id: Option<u64>,
+    #[serde(rename = "expenseId")]
+    expense_id: Option<u64>,
     cursor: Option<String>,
     #[serde(rename = "operationKey", alias = "operation_key")]
     operation_key: Option<String>,
@@ -216,6 +220,24 @@ pub(crate) async fn get_query(
                 .await?;
         context.require_current_placement(&state.organization_placements)?;
         return Ok(Json(json!({"data": data})));
+    }
+
+    if resource == "expense-allocations" {
+        let response = expense_allocations::read(&context, q.company_id, q.expense_id).await?;
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(response));
+    }
+
+    if let Some(data) = record_creations::read_record_creation(
+        &state,
+        &context,
+        &resource,
+        q.company_id,
+        q.operation_key.as_deref(),
+    )
+    .await?
+    {
+        return Ok(Json(data));
     }
 
     // Private workflow tables are not readable with the user JWT; use the module

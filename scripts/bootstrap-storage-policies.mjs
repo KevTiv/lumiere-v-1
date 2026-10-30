@@ -24,7 +24,7 @@ const schemaPath = path.join(
 const policyPath = path.join(repoRoot, "lumiere-codegen", "storage-policy-manifest.json");
 const resourceRegistryPath = path.join(repoRoot, "crates", "stdb-auth", "assets", "resource_registry.json");
 const checkOnly = process.argv.includes("--check");
-const EXPECTED_SCHEMA_TABLES = 523;
+const EXPECTED_SCHEMA_TABLES = 524;
 
 // C0 no longer permits application-level platform-global tables. Former
 // exceptions must be organization-owned in schema source before policy
@@ -141,6 +141,7 @@ const EXPLICIT_MODULES = {
   org_schema_migration: "core",
   password_reset_token: "core",
   policy_snapshot: "core",
+  record_creation_receipt: "forms",
   privacy_consent: "core",
   queue_attempt: "core",
   queue_effect_receipt: "core",

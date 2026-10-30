@@ -6940,7 +6940,9 @@
       "table": "hr_expense_allocation",
       "module": "hr",
       "rationale": "Reviewed child aggregate: expense_id references hr_expense.id.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "expense-allocations"
+      ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -13003,6 +13005,37 @@
       "hot_retention": "always",
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "record_creation_receipt",
+      "module": "forms",
+      "rationale": "Immutable actor/company/model-bound configurable creation receipt; retain exact result and complete payload fingerprint for recovery.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/exact-creation-replay-identity",
       "dependency_behavior": "independent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",

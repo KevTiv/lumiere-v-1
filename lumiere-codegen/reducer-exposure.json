@@ -5054,6 +5054,21 @@
       "name": "withdraw_ai_run_follow_up",
       "exposure": "denied",
       "reason": "trusted lifecycle gateway only; author identity, continuation and capability authority are server-validated"
+    },
+    {
+      "name": "nominate_knowledge_guide",
+      "exposure": "session",
+      "reason": "Exact author/current-revision guide nomination; canonical complete evidence selection deduplicated through existing knowledge owner."
+    },
+    {
+      "name": "purge_reviewed_expired_documents",
+      "exposure": "session",
+      "reason": "Exact reviewed organization-wide eligible document set compared inside canonical purge transaction; stale scope rejects."
+    },
+    {
+      "name": "run_configured_record_creation_tests",
+      "exposure": "denied",
+      "reason": "Development-only native configured creation regression; never session exposed."
     }
   ]
 }

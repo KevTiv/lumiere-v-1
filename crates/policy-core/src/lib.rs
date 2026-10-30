@@ -1,6 +1,7 @@
 //! Provider-independent permission evaluation shared by API reads and reducers.
 
 pub mod additional_tenant;
+pub mod expense_allocations;
 
 /// An already scoped policy grant for the authenticated user or an effective role.
 pub struct Grant<'a> {
