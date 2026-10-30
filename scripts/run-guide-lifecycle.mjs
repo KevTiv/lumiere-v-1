@@ -34,6 +34,12 @@ export function requireIsolatedCi(env) {
   assert.match(env.GITHUB_SHA ?? '', /^[0-9a-f]{40}$/, 'An exact CI commit is required')
 }
 
+// SATS named products require every field, including absent Option values.
+// Keep this fixture aligned with the native UpdateRoleParams wire schema.
+export function guideRoleUpdateParams(permissions) {
+  return { name: none, description: none, permissions: some(permissions), is_active: some(true), metadata: none }
+}
+
 async function stop(child) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return
   const closed = once(child, 'close')
@@ -179,8 +185,8 @@ async function main() {
   const roles = (await request('/v1/query/roles', admin)).data
   const financeRole = roles.find((role) => role.name === 'fixture-finance-accounting')
   assert.ok(financeRole && Array.isArray(financeRole.permissions), 'Exact ordinary-member role is required')
-  await operation(admin, 'update_role', { roleId: Number(financeRole.id), params: { name: none, description: none,
-    permissions: some([...financeRole.permissions, 'knowledge_article:*']), is_active: some(true) } })
+  await operation(admin, 'update_role', { roleId: Number(financeRole.id),
+    params: guideRoleUpdateParams([...financeRole.permissions, 'knowledge_article:*']) })
   const ordinary = await login('fixture.finance@example.test')
   const own = (await request('/v1/knowledge/guides', ordinary, { ...draft, requestKey: 'ordinary-own-guide', title: 'Ordinary member instructions' })).guide
   assert.equal(own.companyId, String(companyId))
