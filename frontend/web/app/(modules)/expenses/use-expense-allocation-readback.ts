@@ -17,8 +17,20 @@ interface AllocationSnapshot {
 export function useExpenseAllocationReadback(scope: ExpenseAllocationsScope, invalidMessage: string, changedMessage: string) {
   const query = useExpenseAllocations(scope)
   const key = `${scope.identity ?? ""}:${scope.organizationId}:${scope.companyId}:${scope.expenseId ?? ""}`
-  const currentScope = useRef({ key, admitted: scope.enabled !== false })
-  currentScope.current = { key, admitted: scope.enabled !== false }
+  const admitted = scope.enabled !== false
+  const currentScope = useRef({ key, admitted, mounted: false })
+  if (currentScope.current.key !== key || currentScope.current.admitted !== admitted) {
+    currentScope.current = { key, admitted, mounted: false }
+  }
+  // Returning to the same key creates a new editor lifetime; old reads cannot resume.
+  const lifetime = currentScope.current
+  useEffect(() => {
+    lifetime.mounted = true
+    return () => { lifetime.mounted = false }
+  }, [lifetime])
+  const assertCurrentAdmission = () => {
+    if (currentScope.current !== lifetime || !lifetime.mounted || !lifetime.admitted) throw new Error(invalidMessage)
+  }
   const [snapshot, setSnapshot] = useState<AllocationSnapshot | null>(null)
   const [decodeError, setDecodeError] = useState<string | null>(null)
   const failureStatus = query.error && typeof query.error === "object" && "status" in query.error ? query.error.status : undefined
@@ -51,13 +63,13 @@ export function useExpenseAllocationReadback(scope: ExpenseAllocationsScope, inv
     ready,
     error: decodeError ?? (changed ? changedMessage : null),
     retry: () => { void query.refetch() },
-    assertCurrentAdmission: () => {
-      if (currentScope.current.key !== key || !currentScope.current.admitted) throw new Error(invalidMessage)
-    },
+    assertCurrentAdmission,
     verifyBeforeSave: async () => {
-      if (!ready || !activeSnapshot || !scope.expenseId || currentScope.current.key !== key || !currentScope.current.admitted) throw new Error(invalidMessage)
+      assertCurrentAdmission()
+      if (!ready || !activeSnapshot || !scope.expenseId) throw new Error(invalidMessage)
       const refreshed = await query.refetch({ throwOnError: true })
-      if (currentScope.current.key !== key || !currentScope.current.admitted || !refreshed.data) throw new Error(invalidMessage)
+      assertCurrentAdmission()
+      if (!refreshed.data) throw new Error(invalidMessage)
       savedExpenseAllocationDrafts(refreshed.data.rows, scope.organizationId, scope.companyId, scope.expenseId, invalidMessage)
       if (expenseAllocationFingerprint(refreshed.data.rows) !== activeSnapshot.fingerprint || refreshed.data.snapshot !== activeSnapshot.serverSnapshot) throw new Error(changedMessage)
       return refreshed.data.snapshot

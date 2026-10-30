@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { useExpenseAllocationReadback } from "../../../../web/app/(modules)/expenses/use-expense-allocation-readback"
+import { StrictMode, type ReactNode } from "react"
 
 const state = vi.hoisted(() => ({ query: {} as {
   data: { rows: unknown[]; snapshot: string }; isLoading: boolean; isError: boolean; isSuccess: boolean; isFetching: boolean;
@@ -92,6 +93,41 @@ describe("saved allocation editor readback", () => {
       expect(result.current.rows).toBeUndefined()
       unmount()
     }
+  })
+
+  it("invalidates a deferred save check through A → B → A even when the original snapshot still matches", async () => {
+    state.query = query()
+    const { result, rerender } = renderHook(({ current }) => useExpenseAllocationReadback(current, "Cannot verify", "Changed"),
+      { initialProps: { current: scope }, wrapper: ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode> })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    let resolve: ((value: unknown) => void) | undefined
+    state.query.refetch.mockImplementation(() => new Promise((complete) => { resolve = complete }))
+    const post = vi.fn()
+    const pending = result.current.verifyBeforeSave().then(post)
+    const oldAssert = result.current.assertCurrentAdmission
+    state.query = { ...query(), isLoading: true, isSuccess: false, isFetching: true }
+    rerender({ current: { ...scope, companyId: 3n } })
+    rerender({ current: scope })
+    state.query = query()
+    rerender({ current: scope })
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    expect(() => oldAssert()).toThrow("Cannot verify")
+    resolve?.({ data: { rows: [row()], snapshot } })
+    await expect(pending).rejects.toThrow("Cannot verify")
+    expect(post).not.toHaveBeenCalled()
+    expect(await result.current.verifyBeforeSave()).toBe(snapshot)
+  })
+
+  it("invalidates deferred reads when the editor unmounts", async () => {
+    state.query = query()
+    const { result, unmount } = renderHook(() => useExpenseAllocationReadback(scope, "Cannot verify", "Changed"))
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    let resolve: ((value: unknown) => void) | undefined
+    state.query.refetch.mockImplementation(() => new Promise((complete) => { resolve = complete }))
+    const pending = result.current.verifyBeforeSave()
+    unmount()
+    resolve?.({ data: { rows: [row()], snapshot } })
+    await expect(pending).rejects.toThrow("Cannot verify")
   })
 
   it("rejects masked/malformed initial rows and recognizes a verified empty allocation vector", async () => {
