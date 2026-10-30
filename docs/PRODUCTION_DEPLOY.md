@@ -173,13 +173,19 @@ The release also reads `org.opencontainers.image.revision` from the pulled image
 and requires it to equal `release_sha`; a digest built from another commit is
 rejected before any Railway change.
 
-For each shared-runtime service, the release submits one environment-scoped
-Railway configuration patch that sets `source.image` to the exact digest while
-clearing `source.repo`, `source.branch`, `source.commitSha`, and
-`source.upstreamUrl`. The atomic source switch triggers the deployment. A retry
-at an already-configured digest explicitly redeploys the same source. Every
-phase then checks Railway's deployment metadata against the requested digest
-and stops the release on a mismatch.
+For each image-based service, the release submits an environment-scoped Railway
+configuration patch requesting the exact `source.image` and null repository
+selectors. Railway's CLI can omit those nulls, so the release reads back the
+applied source and stops if a repository is still attached or the image differs.
+Before the first image-based release of a repository-connected service, switch
+its source through Railway's native image-source connection and verify the
+repository is detached.
+
+A committed configuration patch can leave an unchanged image without creating
+a deployment. When the existing successful deployment already uses the exact
+requested digest, the release explicitly redeploys that build and verifies the
+returned new deployment ID. Every phase then checks the completed deployment's
+image metadata against the requested digest and stops on a mismatch.
 
 Building the image never deploys it. Promotion remains explicit and ordered by
 the release workflow, so a newly published image cannot replace production
