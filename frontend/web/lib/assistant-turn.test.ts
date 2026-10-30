@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { HttpResponseError } from "@lumiere/api-client/response-error"
-import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream } from "./assistant-turn"
+import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream, turnFailure } from "./assistant-turn"
 
 const metadata = (raw: string): { sources: string[]; run_id: number } => {
   const parsed = JSON.parse(raw)
@@ -75,4 +75,9 @@ test("malformed JSON and SSE source envelopes retain independently prepared draf
       assert.deepEqual(result, { answer: { kind: "outcome_unknown" }, drafts: { kind: "ready", value: [42] } })
     }
   }
+})
+
+test("an HTTP request timeout cannot establish a rejected or safe-to-retry outcome", () => {
+  assert.equal(turnFailure(new HttpResponseError(408, "request timed out")), "outcome_unknown")
+  assert.equal(turnFailure(new HttpResponseError(504, "gateway timed out")), "outcome_unknown")
 })

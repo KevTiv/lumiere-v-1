@@ -10,6 +10,7 @@ export type AssistantTurn<A, D> = {
 
 export function turnFailure(error: unknown): TurnFailure {
   if (error instanceof HttpResponseError) {
+    if (error.status === 408) return "outcome_unknown"
     if (error.status === 401 || error.status === 403) return "denied"
     if ([404, 429, 503].includes(error.status)) return "unavailable"
     if (error.status >= 400 && error.status < 500) return "failed"
@@ -103,7 +104,7 @@ export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[
   }
   if (raw.model != null && typeof raw.model !== "string") throw new Error("Invalid assistant model")
   if (raw.run_id != null && (typeof raw.run_id !== "number" || !Number.isSafeInteger(raw.run_id) || raw.run_id <= 0)) throw new Error("Invalid assistant run")
-  return { sources: raw.sources as AiRagSource[], model: raw.model as string | undefined, run_id: raw.run_id as number | undefined }
+  return { sources: raw.sources as AiRagSource[], model: typeof raw.model === "string" ? raw.model : undefined, run_id: typeof raw.run_id === "number" ? raw.run_id : undefined }
 }
 
 export function assistantAnswer(value: unknown) {
