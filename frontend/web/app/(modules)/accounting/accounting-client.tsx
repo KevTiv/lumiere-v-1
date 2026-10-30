@@ -2146,16 +2146,10 @@ function AccountingClientReady({
   const analyticLineEditFormConfig = useMemo(() => {
     const base = editAnalyticLineForm(t)
     if (!analyticLineEdit) return base
-    const rawTags = analyticLineEdit.tagIds
-    const tagIdsStr =
-      Array.isArray(rawTags) && rawTags.length > 0
-        ? rawTags.map((x) => String(x)).join(", ")
-        : ""
     return mergeFieldDefaultValues(base, {
       lineId: String(analyticLineEdit.id ?? ""),
       name: String(analyticLineEdit.name ?? ""),
       amount: Number(analyticLineEdit.amount ?? 0),
-      tagIds: tagIdsStr,
     })
   }, [analyticLineEdit, t])
 
@@ -2349,6 +2343,8 @@ function AccountingClientReady({
         ...formData,
         unitAmount: formData.unitAmount ?? formData.amount,
       })
+      // This editor has no tag picker. Ignore tags retained by an older browser draft.
+      delete params.tagIds
       await updateAnalyticLine.mutateAsync({
         lineId: id,
         params: analyticParamsToJson(params, "UpdateAnalyticLineParams"),
