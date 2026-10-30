@@ -21,6 +21,8 @@ import { useExpenses, useExpenseSheets } from "@lumiere/query-hooks/hooks/expens
 import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { ExpenseRecordPicker } from "./expense-record-picker"
+import { ExpenseTextField } from "./expense-text-field"
+import { FieldGroup } from "@lumiere/ui/components/field"
 import { companyWorkflowRows, workflowOptions } from "./expense-workflow-model"
 import { currencyOptionsFromRows } from "../../../lib/form-lookup"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -142,19 +144,18 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
       <section className="space-y-2 border-t pt-3" data-testid="expenses-admin-advances">
         <h3 className="text-sm font-medium">{t("expenses.admin.advancesTitle")}</h3>
         <p className="text-xs text-muted-foreground">{t("expenses.admin.advancesDescription")}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <FieldGroup className="grid items-start gap-4 sm:grid-cols-2">
           <ExpenseRecordPicker label={t("expenses.workflowUi.employee")} value={advEmployeeId} onChange={setAdvEmployeeId}
             options={employeeOptions} disabled={busy || employeeRead.state.status !== "ready"} testId="expenses-admin-adv-employee" />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.advanceName")}
+          <ExpenseTextField
+            label={t("expenses.admin.advanceName")}
             value={advName}
             onChange={(e) => setAdvName(e.target.value)}
             data-testid="expenses-admin-adv-name"
           />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.amount")}
+          <ExpenseTextField
+            label={t("expenses.admin.amount")}
+            inputMode="decimal"
             value={advAmount}
             onChange={(e) => setAdvAmount(e.target.value)}
             data-testid="expenses-admin-adv-amount"
@@ -169,7 +170,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
             options={accountOptions} disabled={busy || accountRead.state.status !== "ready"} testId="expenses-admin-adv-account" />
           <Button
             type="button"
-            size="sm"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
             disabled={
               busy || !advanceReady ||
               !advEmployeeId ||
@@ -199,7 +200,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           >
             {t("expenses.admin.createAdvance")}
           </Button>
-        </div>
+        </FieldGroup>
 
         {advances.length > 0 ? (
           <ul className="text-xs space-y-1" data-testid="expenses-admin-advance-list">
@@ -217,21 +218,21 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           <p className="text-xs text-muted-foreground">{t("expenses.admin.noAdvances")}</p>
         )}
 
-        <div className="grid gap-2 sm:grid-cols-3">
+        <FieldGroup className="grid items-start gap-4 sm:grid-cols-3">
           <ExpenseRecordPicker label={t("expenses.workflowUi.advance")} value={applyAdvanceId} onChange={setApplyAdvanceId}
             options={workflowOptions(advances)} disabled={busy || advancesQ.state.status !== "ready"} testId="expenses-admin-apply-advance-id" />
           <ExpenseRecordPicker label={t("expenses.workflowUi.report")} value={applySheetId} onChange={setApplySheetId}
             options={reportOptions} disabled={busy || reportRead.state.status !== "ready"} testId="expenses-admin-apply-sheet-id" />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.amount")}
+          <ExpenseTextField
+            label={t("expenses.admin.amount")}
+            inputMode="decimal"
             value={applyAmount}
             onChange={(e) => setApplyAmount(e.target.value)}
             data-testid="expenses-admin-apply-amount"
           />
           <Button
             type="button"
-            size="sm"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-3"
             variant="outline"
             disabled={busy || !applyReady || !applyAdvanceId || !applySheetId || !applyAmount}
             data-testid="expenses-admin-apply-advance"
@@ -247,26 +248,25 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           >
             {t("expenses.admin.applyAdvance")}
           </Button>
-        </div>
+        </FieldGroup>
       </section>
 
       {/* Policy exceptions */}
       <section className="space-y-2 border-t pt-3" data-testid="expenses-admin-exceptions">
         <h3 className="text-sm font-medium">{t("expenses.admin.exceptionsTitle")}</h3>
         <p className="text-xs text-muted-foreground">{t("expenses.admin.exceptionsDescription")}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <FieldGroup className="grid items-start gap-4 sm:grid-cols-2">
           <ExpenseRecordPicker label={t("expenses.workflowUi.expense")} value={excExpenseId} onChange={setExcExpenseId}
             options={expenseOptions} disabled={busy || expenseRead.state.status !== "ready"} testId="expenses-admin-exc-expense" />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.exceptionReason")}
+          <ExpenseTextField
+            label={t("expenses.admin.exceptionReason")}
             value={excReason}
             onChange={(e) => setExcReason(e.target.value)}
             data-testid="expenses-admin-exc-reason"
           />
           <Button
             type="button"
-            size="sm"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
             disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === excExpenseId) || !excExpenseId || !excReason.trim()}
             data-testid="expenses-admin-request-exception"
             onClick={() =>
@@ -280,7 +280,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           >
             {t("expenses.admin.requestException")}
           </Button>
-        </div>
+        </FieldGroup>
 
         {exceptions.length > 0 ? (
           <ul className="space-y-2" data-testid="expenses-admin-exception-list">
@@ -335,9 +335,8 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
         ) : (
           <p className="text-xs text-muted-foreground">{t("expenses.admin.noExceptions")}</p>
         )}
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm w-full max-w-md"
-          placeholder={t("expenses.admin.rejectReason")}
+        <ExpenseTextField
+          label={t("expenses.admin.rejectReason")}
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}
           data-testid="expenses-admin-reject-reason"
@@ -348,51 +347,50 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
       <section className="space-y-2 border-t pt-3" data-testid="expenses-admin-fraud">
         <h3 className="text-sm font-medium">{t("expenses.admin.fraudTitle")}</h3>
         <p className="text-xs text-muted-foreground">{t("expenses.admin.fraudDescription")}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <FieldGroup className="grid items-start gap-4 sm:grid-cols-2">
           <ExpenseRecordPicker label={t("expenses.workflowUi.expense")} value={fraudExpenseId} onChange={setFraudExpenseId}
             options={expenseOptions} disabled={busy || expenseRead.state.status !== "ready"} testId="expenses-admin-fraud-expense" />
-          <input
-            className="rounded-md border bg-background px-2 py-1.5 text-sm"
-            placeholder={t("expenses.admin.fraudReason")}
+          <ExpenseTextField
+            label={t("expenses.admin.fraudReason")}
             value={fraudReason}
             onChange={(e) => setFraudReason(e.target.value)}
             data-testid="expenses-admin-fraud-reason"
           />
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === fraudExpenseId) || !fraudExpenseId}
-            data-testid="expenses-admin-set-fraud"
-            onClick={() =>
-              void run(async () => {
-                await fraudHold.mutateAsync({
-                  expenseId: fraudExpenseId,
-                  fraudHold: true,
-                  fraudReason: fraudReason.trim() || undefined,
-                })
-              }, t("expenses.admin.fraudSet"), expenseReady && expenseOptions.some(option => option.value === fraudExpenseId))
-            }
-          >
-            {t("expenses.admin.setFraudHold")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === fraudExpenseId) || !fraudExpenseId}
-            data-testid="expenses-admin-clear-fraud"
-            onClick={() =>
-              void run(async () => {
-                await fraudHold.mutateAsync({
-                  expenseId: fraudExpenseId,
-                  fraudHold: false,
-                })
-              }, t("expenses.admin.fraudCleared"), expenseReady && expenseOptions.some(option => option.value === fraudExpenseId))
-            }
-          >
-            {t("expenses.admin.clearFraudHold")}
-          </Button>
-        </div>
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <Button
+              type="button"
+              disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === fraudExpenseId) || !fraudExpenseId}
+              data-testid="expenses-admin-set-fraud"
+              onClick={() =>
+                void run(async () => {
+                  await fraudHold.mutateAsync({
+                    expenseId: fraudExpenseId,
+                    fraudHold: true,
+                    fraudReason: fraudReason.trim() || undefined,
+                  })
+                }, t("expenses.admin.fraudSet"), expenseReady && expenseOptions.some(option => option.value === fraudExpenseId))
+              }
+            >
+              {t("expenses.admin.setFraudHold")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === fraudExpenseId) || !fraudExpenseId}
+              data-testid="expenses-admin-clear-fraud"
+              onClick={() =>
+                void run(async () => {
+                  await fraudHold.mutateAsync({
+                    expenseId: fraudExpenseId,
+                    fraudHold: false,
+                  })
+                }, t("expenses.admin.fraudCleared"), expenseReady && expenseOptions.some(option => option.value === fraudExpenseId))
+              }
+            >
+              {t("expenses.admin.clearFraudHold")}
+            </Button>
+          </div>
+        </FieldGroup>
       </section>
     </div>
   )

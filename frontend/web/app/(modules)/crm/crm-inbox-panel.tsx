@@ -206,13 +206,13 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                     <Badge variant="outline">{String(msg.direction)}</Badge>
                     <span className="text-muted-foreground text-xs">{String(msg.status)}</span>
                   </div>
-                  <p>{String(msg.body)}</p>
+                  <p className="[overflow-wrap:anywhere]">{String(msg.body)}</p>
                 </li>
               ))}
             </ul>
             <div className="space-y-2">
               <Label htmlFor="crm-inbox-body">{t("crm.inbox.compose", "Outbound message")}</Label>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Input
                   id="crm-inbox-body"
                   value={body}
@@ -220,7 +220,6 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                   placeholder={t("crm.inbox.placeholder", "Type a message…")}
                 />
                 <Button
-                  size="sm"
                   aria-label={t("crm.inbox.queueMessage", { defaultValue: "Queue message" })}
                   disabled={!ready || !body.trim() || busy}
                   onClick={() => {

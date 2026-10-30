@@ -5,8 +5,8 @@ const FINANCE_MODULES = new Set([
   "accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses",
 ])
 const FINANCE_SUPPORT = new Set([
-  "overview", "tasks", "approvals", "documents", "calendar", "messages", "settings",
-  "journal", "notebook", "ai-assistant",
+  "overview", "tasks", "approvals", "documents", "calendar", "settings",
+  "ai-assistant",
 ])
 const FINANCE_IMPORT_TARGETS = new Set([
   "contact", "vendor", "lead", "product", "sale_order", "purchase_order", "opportunity",
@@ -25,7 +25,7 @@ export function isWorkspaceHrefVisible(profile: WorkspaceProfile, href: string):
 
 /** Settings catalogs only. Keep the runtime form registry complete for linked workflows. */
 export function isWorkspaceFormModuleVisible(profile: WorkspaceProfile, moduleId: string): boolean {
-  return profile === "full" || FINANCE_MODULES.has(moduleId) || ["documents", "calendar", "journal"].includes(moduleId)
+  return profile === "full" || FINANCE_MODULES.has(moduleId) || ["documents", "calendar"].includes(moduleId)
 }
 
 /** Products and employee reference data support Finance without exposing stock or payroll imports. */

@@ -4,6 +4,9 @@ import { useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { I18nProvider, useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
+import { Field, FieldGroup, FieldLabel } from "@lumiere/ui/components/field"
+import { ExpenseTextField } from "../../../../app/(modules)/expenses/expense-text-field"
+import { ExpenseRecordPicker } from "../../../../app/(modules)/expenses/expense-record-picker"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import {
   Select,
@@ -32,11 +35,27 @@ function SelectControls() {
   const [single, setSingle] = useState("02")
   const [multiple, setMultiple] = useState(["02", "14", "missing"])
   const [record, setRecord] = useState("")
+  const [reference, setReference] = useState("")
+  const [savedReference, setSavedReference] = useState("")
+  const [linkedRecord, setLinkedRecord] = useState("01")
   return (
       <main className="mx-auto max-w-xl space-y-6 p-4">
         <p>Synthetic select fixture. No backend operations.</p>
         <Button onClick={() => setOpen(true)}>Open select dialog</Button>
         <Button onClick={() => setPostingOpen(true)}>Open posting form</Button>
+        <FieldGroup className="grid items-end gap-4 sm:grid-cols-4" data-testid="control-sizing-sample">
+          <ExpenseTextField label="Control reference" value={reference} onChange={(event) => setReference(event.target.value)} data-testid="control-reference" />
+          <Field>
+            <FieldLabel htmlFor="control-type">Control type</FieldLabel>
+            <Select defaultValue="draft">
+              <SelectTrigger id="control-type" data-testid="control-choice"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup><SelectItem value="draft">Draft</SelectItem><SelectItem value="posted">Posted</SelectItem></SelectGroup></SelectContent>
+            </Select>
+          </Field>
+          <ExpenseRecordPicker label="Control record" value={linkedRecord} onChange={setLinkedRecord} options={options} testId="control-record" />
+          <Button data-testid="control-save" onClick={() => setSavedReference(reference)}>Save controls</Button>
+        </FieldGroup>
+        <output data-testid="control-saved-reference">{savedReference}</output>
         <FormModal
           open={postingOpen}
           onOpenChange={setPostingOpen}

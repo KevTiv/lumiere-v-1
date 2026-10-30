@@ -83,7 +83,7 @@ const SelectTrigger = React.forwardRef<
       aria-haspopup={searchable ? "dialog" : "listbox"}
       ref={ref}
       className={cn(
-        "flex h-10 w-full pointer-coarse:min-h-11 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+        "flex h-9 w-full min-w-0 pointer-coarse:min-h-11 items-center justify-between rounded-lg border border-input bg-background px-3 py-1.5 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
         className,
       )}
       {...props}

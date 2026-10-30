@@ -23,6 +23,8 @@ import {
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import { ExpenseRecordPicker } from "./expense-record-picker"
+import { ExpenseTextField } from "./expense-text-field"
+import { FieldGroup } from "@lumiere/ui/components/field"
 import { cardMatchCandidates, companyWorkflowRows, workflowOptions } from "./expense-workflow-model"
 import { moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
@@ -131,36 +133,34 @@ export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organi
         options={currencyOptions} disabled={busy || currencyState.status !== "ready"} testId="expenses-ops-currency" />
       {section === "cards" && <>
       <ModuleDataNotice state={expensesRead.state} /><ModuleDataNotice state={cardsRead.state} />
-      <div className="grid gap-2 sm:grid-cols-2" data-testid="expenses-ops-card-match">
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.externalRef")}
+      <FieldGroup className="grid items-start gap-4 sm:grid-cols-2" data-testid="expenses-ops-card-match">
+        <ExpenseTextField
+          label={t("expenses.ops.externalRef")}
           value={externalRef}
           onChange={(e) => setExternalRef(e.target.value)}
           data-testid="expenses-ops-external-ref"
         />
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.merchantKey")}
+        <ExpenseTextField
+          label={t("expenses.ops.merchantKey")}
           value={merchantKey}
           onChange={(e) => setMerchantKey(e.target.value)}
         />
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.amount")}
+        <ExpenseTextField
+          label={t("expenses.ops.amount")}
+          inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           data-testid="expenses-ops-amount"
         />
-        <input
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          placeholder={t("expenses.ops.fxFee")}
+        <ExpenseTextField
+          label={t("expenses.ops.fxFee")}
+          inputMode="decimal"
           value={fxFee}
           onChange={(e) => setFxFee(e.target.value)}
         />
         <Button
           type="button"
-          size="sm"
+          className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
           disabled={busy || currencyState.status !== "ready" || !externalRef.trim() || !amount || !currencyOptions.some(option => option.value === currencyId)}
           data-testid="expenses-ops-create-statement"
           onClick={() =>
@@ -184,7 +184,7 @@ export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organi
           options={expenseOptions} disabled={busy || !matchReady} testId="expenses-ops-expense-id" />
         <Button
           type="button"
-          size="sm"
+          className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
           variant="outline"
           disabled={busy || !matchReady || !statementOptions.some(option => option.value === statementLineId) || !expenseOptions.some(option => option.value === expenseId)}
           data-testid="expenses-ops-match"
@@ -200,13 +200,12 @@ export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organi
           {t("expenses.ops.match")}
         </Button>
 
-      </div>
+      </FieldGroup>
 
       <details className="rounded-md border p-3 space-y-2">
         <summary>{t("expenses.workflowUi.unmatchTitle")}</summary>
         <p className="text-sm text-muted-foreground">{t("expenses.workflowUi.unmatchHint")}</p>
-        <label htmlFor="expense-unmatch-statement">{t("expenses.ops.statementLineId")}</label>
-        <input id="expense-unmatch-statement" className="rounded-md border p-2" value={unmatchStatementId} onChange={event => setUnmatchStatementId(event.target.value)} />
+        <ExpenseTextField id="expense-unmatch-statement" label={t("expenses.ops.statementLineId")} inputMode="numeric" value={unmatchStatementId} onChange={event => setUnmatchStatementId(event.target.value)} />
         <Button variant="outline" disabled={busy || !optionalBigIntU64(unmatchStatementId)} data-testid="expenses-ops-unmatch"
           onClick={() => { void run(async () => { await unmatchStmt.mutateAsync({ statementLineId: unmatchStatementId }) }, t("expenses.ops.unmatched")) }}>{t("expenses.ops.unmatch")}</Button>
       </details>

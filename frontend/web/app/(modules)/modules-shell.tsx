@@ -1,6 +1,7 @@
 "use client"
 
-import { WorkspaceProfileProvider } from "@lumiere/ui/lib/workspace-profile-context"
+import { WorkspaceProfileProvider, useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
@@ -533,6 +534,10 @@ function ModulesContent({
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const workspaceProfile = useWorkspaceProfile()
+  const messagesVisible = isWorkspaceSurfaceVisible(workspaceProfile, "messages")
+  const journalVisible = isWorkspaceSurfaceVisible(workspaceProfile, "journal")
+  const notebookVisible = isWorkspaceSurfaceVisible(workspaceProfile, "notebook")
   const { organizationId } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
@@ -558,14 +563,14 @@ function ModulesContent({
       <DashboardWorkspace
         forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
         onOpenSearch={() => setIsSearchOpen(true)}
-        notifications={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}
+        notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
         sidebar={
           <DashboardSidebar
             firstOrgProfile={firstOrgProfile}
             forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
             navBadges={navBadges}
-            onOpenJournal={() => setIsJournalOpen(true)}
-            onOpenNotebook={() => setIsNotebookOpen(true)}
+            onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
+            onOpenNotebook={notebookVisible ? () => setIsNotebookOpen(true) : undefined}
             onOpenAIChat={openAiChat}
             onSignOut={() => void performSignOut()}
             userProfile={currentUserProfile.data}
@@ -588,14 +593,16 @@ function ModulesContent({
               }}
             />
 
-            <NotebookPanel
-              open={isNotebookOpen}
-              onClose={() => setIsNotebookOpen(false)}
-              onAIChat={openAiChat}
-              dataContext={{}}
-            />
+            {notebookVisible && (
+              <NotebookPanel
+                open={isNotebookOpen}
+                onClose={() => setIsNotebookOpen(false)}
+                onAIChat={openAiChat}
+                dataContext={{}}
+              />
+            )}
 
-            <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
+            {journalVisible && <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />}
 
             <ErpCommandPalette
               open={isSearchOpen}
@@ -603,8 +610,8 @@ function ModulesContent({
               firstOrgProfile={firstOrgProfile}
               recordHref={recordPageHref}
               onOpenAIChat={openAiChat}
-              onOpenNotebook={() => setIsNotebookOpen(true)}
-              onOpenJournal={() => setIsJournalOpen(true)}
+              onOpenNotebook={notebookVisible ? () => setIsNotebookOpen(true) : undefined}
+              onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
             />
           </>
         }
