@@ -13,6 +13,12 @@ pub struct AdditionalTenantApproval<'a> {
 }
 
 impl<'a> AdditionalTenantApproval<'a> {
+    /// The exact organization code fixed by this approval.
+    #[must_use]
+    pub fn target_code(&self) -> &'a str {
+        self.target_code
+    }
+
     /// Parse one approval, rejecting lists, whitespace, wildcards and zero IDs.
     #[must_use]
     pub fn parse(policy: &'a str) -> Option<Self> {

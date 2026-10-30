@@ -68,7 +68,7 @@ export function reviewedImportSource(detail: ReviewDetail): ReviewedImportSource
   return { targetEntity: detail.targetEntity, fileName: `reviewed-${detail.id}.csv`, csv: [[...headers, ...provenance], ...csvRows].map(row => row.map(escapeCsvField).join(",")).join("\n") }
 }
 
-export function reviewArithmetic(values: Record<string, unknown>): string | null {
+export function reviewArithmetic(values: { quantity?: unknown; unit_price?: unknown }): string | null {
   const parse = (value: unknown): bigint | null => {
     if (typeof value !== "string" || !/^-?\d{1,12}(?:\.\d{1,6})?$/.test(value)) return null
     const negative = value.startsWith("-")

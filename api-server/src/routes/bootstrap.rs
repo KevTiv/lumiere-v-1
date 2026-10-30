@@ -281,14 +281,25 @@ async fn bootstrap_currencies_get(
     }
 
     let additional_approval = std::env::var("LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL").ok();
-    let approved_source = additional_approval
+    let approval = additional_approval
         .as_deref()
         .and_then(stdb_auth::AdditionalTenantApproval::parse)
-        .zip(session.organization_id)
-        .is_some_and(|(approval, source_id)| {
-            approval.permits_source(&session.identity_hex, source_id)
+        .filter(|approval| {
+            session
+                .organization_id
+                .is_some_and(|id| approval.permits_source(&session.identity_hex, id))
         });
-    if let Some(organization_id) = session.organization_id.filter(|_| !approved_source) {
+    let additional_code = if let Some(approval) = approval {
+        let memberships =
+            membership_rows_for_identity(&state, &session.identity_hex, false).await?;
+        eligible_additional_code(&approval, &session.identity_hex, &memberships)
+    } else {
+        None
+    };
+    if let Some(organization_id) = session
+        .organization_id
+        .filter(|_| additional_code.is_none())
+    {
         let context = TrustedOperationContext::for_resource_read(&state, &session)?;
         let mut currencies = context
             .client()
@@ -320,7 +331,29 @@ async fn bootstrap_currencies_get(
         })
         .collect::<Vec<_>>();
 
-    Ok(Json(json!({ "data": currencies })))
+    Ok(Json(
+        json!({ "data": currencies, "additionalOrganizationCode": additional_code }),
+    ))
+}
+
+fn eligible_additional_code<'a>(
+    approval: &stdb_auth::AdditionalTenantApproval<'a>,
+    identity: &str,
+    memberships: &[Value],
+) -> Option<&'a str> {
+    // Invalid membership rows must consume the quota, not disappear from history.
+    let history = memberships.iter().map(|row| {
+        (
+            row_id(row, "organizationId", "organization_id").unwrap_or(0),
+            row.get("isActive")
+                .or_else(|| row.get("is_active"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        )
+    });
+    approval
+        .permits_history(identity, approval.target_code(), history)
+        .then_some(approval.target_code())
 }
 
 #[derive(Debug, Deserialize)]
@@ -425,6 +458,33 @@ pub fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn onboarding_offer_requires_exact_actor_and_all_membership_history() {
+        let actor = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        let policy = format!("{actor}:1:FARM_ORG");
+        let approval = stdb_auth::AdditionalTenantApproval::parse(&policy).expect("valid approval");
+        let source = json!({"organization_id": 1, "is_active": true});
+        assert_eq!(
+            eligible_additional_code(&approval, actor, &[source.clone()]),
+            Some("FARM_ORG")
+        );
+        for rows in [
+            vec![],
+            vec![json!({"organization_id":1,"is_active":false})],
+            vec![
+                source.clone(),
+                json!({"organization_id":2,"is_active":false}),
+            ],
+            vec![source.clone(), json!({})],
+        ] {
+            assert_eq!(eligible_additional_code(&approval, actor, &rows), None);
+        }
+        assert_eq!(
+            eligible_additional_code(&approval, "other", &[source]),
+            None
+        );
+    }
 
     #[test]
     fn bootstrap_lookup_requires_active_self_owned_membership_and_minimizes_output() {

@@ -10,7 +10,7 @@ import * as crypto from 'node:crypto'
 function loadSource(file: string, dependencies: Record<string, unknown>, globals: Record<string, unknown> = {}) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8')
   const compiled = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
   dependencies['./workos-config'] ??= { workOsRedirectUri: () => 'https://web.test/auth/callback' }
   dependencies['@/lib/workos-config'] ??= { workOsRedirectUri: () => 'https://web.test/auth/callback' }
@@ -37,6 +37,46 @@ function loadSource(file: string, dependencies: Record<string, unknown>, globals
 test('OAuth destinations reject absolute, protocol-relative, backslash and control redirects', () => {
   for (const path of ['https://evil.test', '//evil.test', '/\\evil.test', '/\nevil', '/\tevil']) assert.equal(safeAuthReturnTo(path), '/overview')
   assert.equal(safeAuthReturnTo('/accounting?tab=invoices'), '/accounting?tab=invoices')
+})
+
+test('existing members enter onboarding only with an authenticated unused approval', async () => {
+  for (const scenario of [
+    { identity: false, organizationId: undefined, code: null, destination: '/sign-in' },
+    { identity: true, organizationId: undefined, code: null, destination: null },
+    { identity: true, organizationId: 1, code: null, destination: '/overview' },
+    { identity: true, organizationId: 1, code: 'FARM_ORG', destination: null },
+  ]) {
+    let approvalReads = 0
+    const session = { identityHex: scenario.identity ? 'ab'.repeat(32) : 'unknown', organizationId: scenario.organizationId }
+    const layout = loadSource('../app/(auth)/onboarding/layout.tsx', {
+      'next/navigation': { redirect: (path: string) => { throw new Error(`redirect:${path}`) } },
+      '@/lib/browser-session': { getBrowserStdbSession: async () => session, hasAuthenticatedIdentity: () => scenario.identity },
+      '@/lib/onboarding-approval.server': { approvedAdditionalOrganizationCode: async () => { approvalReads++; return scenario.code } },
+      'react/jsx-runtime': { Fragment: 'fragment', jsx: (_tag: unknown, props: { children: unknown }) => props.children },
+    })
+    const render = () => layout.default({ children: 'setup' })
+    if (scenario.destination) await assert.rejects(render, new RegExp(`redirect:${scenario.destination}`))
+    else assert.equal(await render(), 'setup')
+    assert.equal(approvalReads, scenario.identity && scenario.organizationId ? 1 : 0)
+  }
+})
+
+test('onboarding approval reads the API with the user credential and fails closed', async () => {
+  const { additionalOnboardingCode } = await import('./onboarding-config')
+  for (const mode of ['allowed', 'denied', 'malformed', 'unavailable']) {
+    const api = loadSource('./onboarding-approval.server.ts', {
+      'server-only': {},
+      './api-server-forward': { resolveApiServerBaseUrl: () => 'http://api.test' },
+      './onboarding-config': { additionalOnboardingCode },
+    }, { fetch: async (url: string, init: RequestInit) => {
+      assert.equal(url, 'http://api.test/v1/bootstrap/currencies')
+      assert.equal(init.cache, 'no-store')
+      assert.equal(new Headers(init.headers).get('authorization'), 'Bearer user-token')
+      if (mode === 'unavailable') throw new Error('offline')
+      return new Response(JSON.stringify({ additionalOrganizationCode: mode === 'malformed' ? '*' : 'FARM_ORG' }), { status: mode === 'denied' ? 403 : 200 })
+    } })
+    assert.equal(await api.approvedAdditionalOrganizationCode({ stdbToken: 'user-token' }), mode === 'allowed' ? 'FARM_ORG' : null)
+  }
 })
 
 test('BFF forwards refreshed provider credentials and removes browser cookies and forged identity', async () => {

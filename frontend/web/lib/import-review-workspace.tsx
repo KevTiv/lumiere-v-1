@@ -6,7 +6,7 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { useTranslation } from "@lumiere/i18n"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { resolveIdentityLabel } from "@lumiere/ui/lib/identity-label"
-import { FormModal, type FormConfig } from "@lumiere/ui"
+import { FormModal, type FormConfig, type FormValues } from "@lumiere/ui"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -76,7 +76,7 @@ function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: {
     finally { setBusy(false) }
   }
   const open = (item: ReviewRow) => { setSelected(item); setRequestKey(crypto.randomUUID()); setError(null) }
-  const save = async (values: Record<string, unknown>) => {
+  const save = async (values: FormValues) => {
     if (!selected) return
     setBusy(true); setError(null)
     try {

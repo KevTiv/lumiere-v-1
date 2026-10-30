@@ -22,6 +22,7 @@ import {
   onboardingTimezones,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_FISCAL_YEAR_END_DAY,
+  additionalOnboardingCode,
 } from "@/lib/onboarding-config"
 import { POST_AUTH_PATHS } from "@/lib/post-auth-destination"
 import { performSignOut } from "@/lib/auth-sign-out"
@@ -38,6 +39,7 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
+  const [approvedCode, setApprovedCode] = useState<string | null>(null)
   const [timezone, setTimezone] = useState("")
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
   const [browserTimezone, setBrowserTimezone] = useState("")
@@ -67,6 +69,9 @@ export default function OnboardingPage() {
         const response = await apiFetch("/api/bootstrap/currencies", { signal: controller.signal })
         if (!response.ok) throw new Error(t("auth.onboarding.errors.failedToCreate"))
         const payload = (await response.json()) as { data?: BootstrapCurrency[] }
+        const additionalCode = additionalOnboardingCode(payload)
+        setApprovedCode(additionalCode)
+        if (additionalCode) setCode(additionalCode)
         const activeCurrencies = payload.data ?? []
         setCurrencies(activeCurrencies)
         if (activeCurrencies.length === 0) setError(t("auth.onboarding.errors.failedToCreate"))
@@ -179,12 +184,13 @@ export default function OnboardingPage() {
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 8))}
+              readOnly={approvedCode !== null}
               required
-              pattern="[A-Z0-9]+"
-              maxLength={8}
+              pattern={approvedCode ? "[A-Z0-9_]+" : "[A-Z0-9]+"}
+              maxLength={approvedCode ? 32 : 8}
               placeholder={t("auth.onboarding.shortCodePlaceholder")}
             />
-            <p className="text-xs text-muted-foreground">{t("auth.onboarding.shortCodeHint")}</p>
+            <p className="text-xs text-muted-foreground">{approvedCode ? t("auth.onboarding.approvedCodeHint", { defaultValue: "This code is fixed by your organization approval. Your existing organization stays available." }) : t("auth.onboarding.shortCodeHint")}</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
