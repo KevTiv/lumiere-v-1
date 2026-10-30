@@ -151,6 +151,12 @@ fn form(model: &str) -> Result<(&'static str, &'static str), String> {
     }
 }
 
+/// Metadata-only create owners treat the exact envelope company as intent.
+/// The caller must still resolve it canonically and authorize membership.
+pub(crate) fn requested_creation_company(metadata: Option<&str>) -> Result<Option<u64>, String> {
+    envelope(metadata).map(|(request, _)| request.map(|(_, company)| company))
+}
+
 fn validate_type(
     key: &str,
     field_type: &FieldType,
@@ -450,11 +456,10 @@ pub(crate) fn prepare_creation<T: spacetimedb_sats::ser::Serialize>(
     if requested_company != company_id {
         return Err("creation company does not match authoritative scope".to_string());
     }
-    crate::workflow::authorization::require_workflow_company_access(
+    crate::documents::knowledge_guides::require_company_membership(
         ctx,
         organization_id,
         company_id,
-        ctx.sender(),
     )?;
     let payload = serde_json::to_vec(spacetimedb_sats::serde::SerdeWrapper::from_ref(params))
         .map_err(|_| "creation input cannot be fingerprinted")?;

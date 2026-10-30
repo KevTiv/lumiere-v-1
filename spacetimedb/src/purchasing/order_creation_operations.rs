@@ -162,11 +162,10 @@ pub fn create_purchase_order_once(
     params: CreatePurchaseOrderOnceParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
-    crate::workflow::authorization::require_workflow_company_access(
+    crate::documents::knowledge_guides::require_company_membership(
         ctx,
         organization_id,
         company_id,
-        ctx.sender(),
     )?;
 
     let id = scoped_creation_id(organization_id, company_id, &params.operation_key)?;

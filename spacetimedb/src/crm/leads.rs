@@ -459,7 +459,10 @@ pub fn create_lead(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "lead", "create")?;
 
-    let operating_company_id = company_id_from_scope(ctx, organization_id, None)?;
+    let requested_company =
+        crate::forms::record_creation::requested_creation_company(params.metadata.as_deref())?;
+    require_single_company_crm_scope(ctx, organization_id, requested_company)?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, requested_company)?;
     let (creation, replay) = crate::forms::record_creation::prepare_creation(
         ctx,
         organization_id,
@@ -476,9 +479,8 @@ pub fn create_lead(
         return Err("Lead name cannot be empty".to_string());
     }
 
-    // Leads do not yet support explicit company selection (`company_id` is always
-    // unscoped below); `None` always satisfies the Phase 0 CRM containment guard.
-    require_single_company_crm_scope(ctx, organization_id, None)?;
+    // The lead row remains organization-shared. The validated envelope scopes
+    // the create receipt/EAV values; legacy no-envelope callers keep the default.
 
     if let Some(source_id) = params.source_id {
         validate_lead_source(ctx, organization_id, source_id)?;
