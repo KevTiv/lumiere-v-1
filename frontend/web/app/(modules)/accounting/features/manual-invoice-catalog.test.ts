@@ -211,3 +211,14 @@ test("invoice and bill catalogs keep distinct partners, journals and commercial 
     ["2"],
   )
 })
+
+test("active catalogs preserve configured journal defaults and exact account currency restrictions", () => {
+  const result = buildManualInvoiceCatalog({
+    accounts: [account({ id: 9007199254740993n, currencyId: 9007199254740995n })],
+    contacts: [],
+    journals: [journal({ defaultAccountId: 9007199254740993n })],
+    products: [], taxes: [], taxGroups: [], defaultCurrencyId: 1n, operatingCompanyId: 9n,
+  })
+  assert.equal(result.invoice.journals[0]?.defaultAccountId, "9007199254740993")
+  assert.equal(result.invoice.commercial[0]?.currencyId, "9007199254740995")
+})

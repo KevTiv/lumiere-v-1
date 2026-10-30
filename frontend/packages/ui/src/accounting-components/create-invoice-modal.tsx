@@ -23,6 +23,8 @@ import { ModuleDataNotice } from "../pages/module-data-notice"
 import { useConfirmDialog } from "../hooks/use-confirm-dialog"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/collapsible"
+import { InvoiceCustomFieldInput } from "./invoice-custom-field-input"
+import { invoiceCustomFieldError, invoiceCustomFieldSupported, invoiceCustomFieldMessages, type InvoiceCustomField, type InvoiceCustomValue } from "./invoice-custom-fields"
 
 const emptyProfile: InvoicePersonalizationProfile = { logoUrl: "", accent: "teal", email: "", phone: "", website: "", notice: "", terms: "", paymentInstructions: "", footer: "" }
 const emptySeller: InvoiceDocumentSnapshot["seller"] = { name: "", address: [], taxId: "", registrationNumber: "", email: "", phone: "", website: "" }
@@ -36,9 +38,9 @@ const contentFields = [
 type ContentKey = typeof contentFields[number]["key"]
 
 export interface ManualInvoiceOption { value: string; label: string }
-export interface ManualInvoiceJournalOption extends ManualInvoiceOption { currencyId: string }
+export interface ManualInvoiceJournalOption extends ManualInvoiceOption { currencyId: string; defaultAccountId?: string }
 export interface ManualInvoiceCurrencyOption extends ManualInvoiceOption { code?: string }
-export interface ManualInvoiceAccountOption extends ManualInvoiceOption { allowedJournalIds?: string[] }
+export interface ManualInvoiceAccountOption extends ManualInvoiceOption { allowedJournalIds?: string[]; currencyId?: string }
 export interface ManualInvoiceTaxOption extends ManualInvoiceOption {
   amount: number
   amountType: "Percent" | "Fixed" | "Division"
@@ -95,6 +97,7 @@ export interface InvoiceFormPayload {
 interface LineItem {
   id: string; description: string; quantity: number; unitPrice: number; discount: number
   accountId: string; taxId: string; productId: string
+  accountSource?: "journal" | "only" | "product" | "selected"
 }
 
 const NONE = "__none__"
@@ -118,6 +121,7 @@ interface ReleasedCreateInvoiceModalProps {
   onSave: (params: CreateManualAccountInvoiceParams) => Promise<OperationEffectOutcome<CanonicalRecordRef>>
   onCheckStatus: (params: CreateManualAccountInvoiceParams) => Promise<CanonicalRecordRef | null>
   onResolved?: (ref: CanonicalRecordRef) => void
+  onExplainError?: (message: string) => void
   journalOptions: ManualInvoiceJournalOption[]
   partnerOptions: ManualInvoiceOption[]
   counterpartAccountOptions: ManualInvoiceAccountOption[]
@@ -135,7 +139,7 @@ interface ReleasedCreateInvoiceModalProps {
 }
 
 function ReleasedCreateInvoiceModal({
-  open, kind = "invoice", companyId, onClose, onSave, onCheckStatus, onResolved,
+  open, kind = "invoice", companyId, onClose, onSave, onCheckStatus, onResolved, onExplainError,
   journalOptions, partnerOptions, counterpartAccountOptions, lineAccountOptions,
   taxOptions = [], productOptions = [], paymentTermOptions = [], currencyOptions = [], organizationId,
   formId = kind === "bill" ? "new-bill" : "new-invoice",
@@ -148,13 +152,15 @@ function ReleasedCreateInvoiceModal({
   const [partnerId, setPartnerId] = useState("")
   const [counterpartAccountId, setCounterpartAccountId] = useState("")
   const [journalId, setJournalId] = useState("")
+  const [journalSuggested, setJournalSuggested] = useState(false)
+  const [counterpartSuggested, setCounterpartSuggested] = useState(false)
   const [invoiceDate, setInvoiceDate] = useState(today)
   const [dueDate, setDueDate] = useState("")
   const [paymentTermId, setPaymentTermId] = useState("")
   const [reference, setReference] = useState("")
   const [paymentReference, setPaymentReference] = useState("")
   const [notes, setNotes] = useState("")
-  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+  const [customValues, setCustomValues] = useState<Record<string, InvoiceCustomValue>>({})
   const [lineItems, setLineItems] = useState<LineItem[]>([newLine()])
   const [requestId, setRequestId] = useState<string | null>(null)
   const [unknownParams, setUnknownParams] = useState<CreateManualAccountInvoiceParams | null>(null)
@@ -188,36 +194,57 @@ function ReleasedCreateInvoiceModal({
     () => (formConfig?.fields ?? []).filter((field) => field.isEnabled && isCustomField(field.fieldId)),
     [formConfig?.fields],
   )
+  const customFieldValue = (field: InvoiceCustomField): InvoiceCustomValue | undefined => {
+    const value = customValues[field.fieldId]
+    return field.type === "Tags" && typeof value === "string" ? value.split("\n").filter((item) => item !== "") : value
+  }
   const locked = unknownParams !== null
 
   useLayoutEffect(() => {
     if (!open || locked || companyMismatch || saving) return
-    setJournalId((previous) => previous && journalOptions.some((option) => option.value === previous)
-      ? previous : (journalOptions[0]?.value ?? ""))
-  }, [journalOptions, locked, open, companyMismatch, saving])
+    if (!journalId && journalOptions.length === 1) {
+      setJournalId(journalOptions[0]!.value)
+      setJournalSuggested(true)
+    }
+  }, [journalId, journalOptions, locked, open, companyMismatch, saving])
 
   const journal = journalOptions.find((option) => option.value === journalId)
   const counterpartOptions = useMemo(
     () => counterpartAccountOptions.filter((option) =>
-      !option.allowedJournalIds?.length || option.allowedJournalIds.includes(journalId)),
-    [counterpartAccountOptions, journalId],
+      (!option.allowedJournalIds?.length || option.allowedJournalIds.includes(journalId)) &&
+      (!option.currencyId || option.currencyId === journal?.currencyId)),
+    [counterpartAccountOptions, journalId, journal?.currencyId],
   )
   const commercialOptions = useMemo(
     () => lineAccountOptions.filter((option) =>
-      !option.allowedJournalIds?.length || option.allowedJournalIds.includes(journalId)),
-    [journalId, lineAccountOptions],
+      (!option.allowedJournalIds?.length || option.allowedJournalIds.includes(journalId)) &&
+      (!option.currencyId || option.currencyId === journal?.currencyId)),
+    [journalId, journal?.currencyId, lineAccountOptions],
   )
 
   useLayoutEffect(() => {
-    if (!open || locked || companyMismatch || saving) return
-    setCounterpartAccountId((previous) => previous && counterpartOptions.some((option) => option.value === previous)
-      ? previous : (counterpartOptions[0]?.value ?? ""))
+    if (!open || locked || companyMismatch || saving || !journal) return
+    if (!counterpartAccountId && counterpartOptions.length === 1) {
+      setCounterpartAccountId(counterpartOptions[0]!.value)
+      setCounterpartSuggested(true)
+    }
+    const journalDefault = commercialOptions.find((option) => option.value === journal.defaultAccountId)
     setLineItems((previous) => previous.map((line) => ({
       ...line,
-      accountId: line.accountId && commercialOptions.some((option) => option.value === line.accountId)
-        ? line.accountId : (commercialOptions[0]?.value ?? ""),
+      ...(line.accountId ? {} : journalDefault
+        ? { accountId: journalDefault.value, accountSource: "journal" as const }
+        : commercialOptions.length === 1
+          ? { accountId: commercialOptions[0]!.value, accountSource: "only" as const } : {}),
     })))
-  }, [commercialOptions, counterpartOptions, locked, open, companyMismatch, saving])
+  }, [commercialOptions, counterpartOptions, counterpartAccountId, journal, lineItems.length, locked, open, companyMismatch, saving])
+
+  const accountingSelectionsValid = Boolean(journal && partnerOptions.some((option) => option.value === partnerId)
+    && counterpartOptions.some((option) => option.value === counterpartAccountId))
+    && lineItems.every((line) => commercialOptions.some((option) => option.value === line.accountId))
+  const accountingChoicesChanged = (journalSuggested && (journalOptions.length !== 1 || journalOptions[0]?.value !== journalId))
+    || (counterpartSuggested && (counterpartOptions.length !== 1 || counterpartOptions[0]?.value !== counterpartAccountId))
+    || lineItems.some((line) => (line.accountSource === "journal" && journal?.defaultAccountId !== line.accountId)
+      || (line.accountSource === "only" && (commercialOptions.length !== 1 || commercialOptions[0]?.value !== line.accountId)))
 
   const updateLine = (id: string, patch: Partial<LineItem>) =>
     setLineItems((previous) => previous.map((line) => line.id === id ? { ...line, ...patch } : line))
@@ -229,6 +256,7 @@ function ReleasedCreateInvoiceModal({
       description: product?.description || line.description,
       unitPrice: product?.price ?? line.unitPrice,
       accountId: product?.accountId || line.accountId,
+      accountSource: product?.accountId ? "product" : line.accountSource,
       taxId: product?.taxIds[0] || line.taxId,
     })
   }
@@ -241,18 +269,18 @@ function ReleasedCreateInvoiceModal({
   const currencyOption = currencyOptions.find((option) => option.value === journal?.currencyId)
   const currency = { id: journal?.currencyId, code: currencyOption?.code }
   const money = (value: number) => formatInvoiceMoney(value, currency)
-  const requiredCustomOk = customFields.every((field) =>
-    !field.validation.required || String(customValues[field.fieldId] ?? "").trim() !== "")
+  const requiredCustomOk = customFields.every((field) => invoiceCustomFieldError(field, customFieldValue(field)) == null)
+  const unsupportedCustomFields = customFields.filter((field) => !invoiceCustomFieldSupported(field))
   const validInvoiceDate = invoiceDate !== "" && !Number.isNaN(Date.parse(invoiceDate))
   const validDueDate = dueDate === "" || (
     !Number.isNaN(Date.parse(dueDate)) && Date.parse(dueDate) >= Date.parse(invoiceDate)
   )
-  const canSave = !locked && !saving && !companyMismatch && personalizationReady && !defaultsChanged && Boolean(journal && partnerId && counterpartAccountId)
+  const canSave = !locked && !saving && !companyMismatch && personalizationReady && !defaultsChanged && !accountingChoicesChanged && accountingSelectionsValid
     && lineItems.every((line) => line.description.trim() && line.accountId && line.quantity > 0 && line.unitPrice >= 0)
     && validInvoiceDate && validDueDate && requiredCustomOk
   const dirty = formEdited || Object.keys(contentOverrides).length > 0 || partnerId !== "" || invoiceDate !== today || dueDate !== "" || paymentTermId !== ""
     || reference !== "" || paymentReference !== "" || notes !== ""
-    || Object.values(customValues).some((value) => value !== "") || lineItems.length !== 1
+    || Object.keys(customValues).length > 0 || lineItems.length !== 1
     || lineItems.some((line) => line.description !== "" || line.quantity !== 1 || line.unitPrice !== 0
       || line.taxId !== "" || line.discount !== 0 || line.productId !== "")
   const navigationDialog = useUnsavedChangesGuard(open && dirty, open && saving)
@@ -266,12 +294,14 @@ function ReleasedCreateInvoiceModal({
 
   const buildParams = (): CreateManualAccountInvoiceParams => {
     if (companyMismatch || !personalizationReady || defaultsChanged) throw new Error("Review the current company and invoice defaults before saving.")
+    if (!accountingSelectionsValid || accountingChoicesChanged) throw new Error("Review the current journal and account choices before saving. Your entries are retained.")
+    if (!requiredCustomOk) throw new Error("Review the configured custom fields before saving. Your entries are retained.")
     if (!journal) throw new Error("Select an accounting journal")
     const idempotencyKey = requestId ?? crypto.randomUUID().replaceAll("-", "")
     if (!requestId) setRequestId(idempotencyKey)
-    const custom = Object.fromEntries(
-      customFields.map((field) => [field.fieldId, customValues[field.fieldId]] as const),
-    )
+    const custom = Object.fromEntries(customFields
+      .filter((field) => Object.hasOwn(customValues, field.fieldId))
+      .map((field) => [field.fieldId, customFieldValue(field)] as const))
     const metadata = JSON.stringify({
       ...custom,
       notes,
@@ -307,6 +337,7 @@ function ReleasedCreateInvoiceModal({
     setDueDate(""); setPaymentTermId(""); setReference(""); setPaymentReference(""); setNotes("")
     setCustomValues({}); setLineItems([newLine()]); setRequestId(null); setUnknownParams(null); setError(null)
     setContentOverrides({}); setFormEdited(false); setDraftCompanyId(companyId); setDocumentDefaults(currentDefaults())
+    setJournalSuggested(false); setCounterpartSuggested(false)
   }
   const resolve = (ref: CanonicalRecordRef) => { reset(); onResolved?.(ref); onClose() }
   const save = async () => {
@@ -343,12 +374,17 @@ function ReleasedCreateInvoiceModal({
     <DialogContent data-testid="create-invoice-modal" className="flex h-[min(94dvh,960px)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1480px,calc(100%-3rem))]">
       <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
       <div ref={scrollBodyRef} data-testid="create-invoice-scroll-body" className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
-      {error ? <p role="alert" className="mb-4 rounded-md border bg-destructive/5 p-3 text-sm text-destructive [overflow-wrap:anywhere]">{error}</p> : null}
+      {error ? <div className="mb-4 space-y-2 rounded-md border bg-destructive/5 p-3 text-sm [overflow-wrap:anywhere]"><p role="alert" className="text-destructive">{error}</p>{onExplainError ? <Button type="button" variant="outline" size="sm" onClick={() => onExplainError(error)}>{t("common.explainError", { defaultValue: "Explain this error" })}</Button> : null}</div> : null}
       <FinanceReviewWorkspace previewTabTestId="create-invoice-preview-toggle" editor={
       <div className="min-w-0">
       {companyMismatch ? <p role="alert" className="mb-4 rounded-md border p-3 text-sm">This draft belongs to company #{String(draftCompanyId)}. Switch back to continue. Your entries and any previous action are preserved.</p> : null}
       {kind === "invoice" ? <ModuleDataNotice state={personalizationState} /> : null}
       {defaultsChanged ? <div role="status" className="mb-4 space-y-2 rounded-md border p-3 text-sm"><p>Company invoice settings changed. Review the latest defaults before saving. Your explicit changes and notes will be kept.</p><Button variant="outline" disabled={locked || saving} onClick={() => setDocumentDefaults(currentDefaults())}>Apply current invoice defaults</Button></div> : null}
+      {accountingChoicesChanged ? <div role="status" className="mb-4 space-y-2 rounded-md border p-3 text-sm"><p>{t("accounting.authoring.choicesChanged", { defaultValue: "Accounting choices changed. Your selections are retained. Review the journal and accounts before saving." })}</p><Button variant="outline" disabled={locked || saving || companyMismatch || !accountingSelectionsValid} onClick={() => {
+        setFormEdited(true); setJournalSuggested(false); setCounterpartSuggested(false)
+        setLineItems((previous) => previous.map((line) => ({ ...line, accountSource: "selected" })))
+      }}>{t("accounting.authoring.keepChoices", { defaultValue: "Keep current accounting choices" })}</Button></div> : null}
+      {unsupportedCustomFields.length ? <ReadinessMessage>{t("accounting.authoring.unsupportedCustomFields", { defaultValue: "This form contains a custom field that invoice entry cannot save yet. Ask your administrator to use a supported field type without conditional visibility. No document has been created." })}</ReadinessMessage> : null}
       <fieldset disabled={locked || saving || companyMismatch || !personalizationReady} className="min-w-0 space-y-6" onChangeCapture={() => setFormEdited(true)}>
         <section className="space-y-4" aria-label={t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}><div><h3 className="font-semibold">{t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.documentDetailsHint", { defaultValue: "Start with the customer or vendor, dates and reference." })}</p></div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -363,8 +399,15 @@ function ReleasedCreateInvoiceModal({
         {partnerOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Add an active vendor before recording a bill." : "Add an active customer before creating an invoice."}</ReadinessMessage> : null}
         {counterpartOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active payable account before recording a bill." : "Configure an active receivable account before creating an invoice."}</ReadinessMessage> : null}
         {commercialOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active expense account before recording a bill." : "Configure an active income account before creating an invoice."}</ReadinessMessage> : null}
-        {customFields.length ? <div className="grid gap-4 md:grid-cols-2">{customFields.map((field) =>
-          <div key={field.fieldId} className="space-y-2"><Label>{field.label}{field.validation.required ? " *" : ""}</Label><Input data-testid={`create-invoice-custom-${field.fieldId}`} value={customValues[field.fieldId] ?? ""} onChange={(event) => setCustomValues((previous) => ({ ...previous, [field.fieldId]: event.target.value }))} /></div>)}</div> : null}
+        {customFields.length ? <div className="grid gap-4 md:grid-cols-2">{customFields.map((field) => {
+          const value = customValues[field.fieldId]
+          const change = (next: InvoiceCustomValue) => { setFormEdited(true); setCustomValues((previous) => ({ ...previous, [field.fieldId]: next })) }
+          const fieldError = Object.hasOwn(customValues, field.fieldId) ? invoiceCustomFieldError(field, customFieldValue(field)) : undefined
+          return <div key={field.fieldId} className="space-y-2">
+            <InvoiceCustomFieldInput field={field} value={value} onChange={change} />
+            {fieldError ? <p className="text-xs text-destructive">{t(`accounting.authoring.customValidation.${fieldError}`, { defaultValue: invoiceCustomFieldMessages[fieldError] })}</p> : null}
+          </div>
+        })}</div> : null}
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 border-t pt-5"><h3 className="font-semibold">{t("accounting.forms.newInvoice.lineItems")}</h3><Button type="button" variant="outline" size="sm" onClick={() => setLineItems((previous) => [...previous, newLine(crypto.randomUUID())])}><Plus className="mr-2 h-4 w-4" />{t("accounting.forms.newInvoice.addItem")}</Button></div>
           {lineItems.map((line, index) => <div key={line.id} className="rounded-lg border bg-muted/15 p-4">
@@ -376,7 +419,10 @@ function ReleasedCreateInvoiceModal({
             <div className="space-y-2"><Label>Unit price</Label><Input aria-label={`Item ${index + 1} unit price`} data-testid={index === 0 ? "create-invoice-line-unit-price" : undefined} type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) })} /></div>
             <FieldSelect label="Tax" value={line.taxId || NONE} onChange={(value) => updateLine(line.id, { taxId: value === NONE ? "" : value })} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
             <div className="space-y-2"><Label>Discount %</Label><Input aria-label={`Item ${index + 1} discount percent`} type="number" min={0} max={100} value={line.discount} onChange={(event) => updateLine(line.id, { discount: Number(event.target.value) })} /></div>
-            <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
+            <div className="space-y-2"><FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value, accountSource: "selected" })} options={commercialOptions} />
+              {line.accountSource === "journal" ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.journalAccountSource", { defaultValue: "From the selected journal's configured default account. You can change it for this document." })}</p> : line.accountSource === "product" ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.productAccountSource", { defaultValue: "From the selected product's configured account. You can change it for this document." })}</p> : line.accountSource === "only" ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.singleAccountSuggestion", { defaultValue: "Selected because it was the only eligible account. This is a suggestion, not a configured business default." })}</p> : null}
+              {line.accountId && !commercialOptions.some((option) => option.value === line.accountId) ? <ReadinessMessage>{t("accounting.authoring.unavailableLineAccount", { defaultValue: "The selected item account is unavailable for this journal and currency. Choose an eligible account; the other item details are retained." })}</ReadinessMessage> : null}
+            </div>
           </div><div className="mt-4 flex justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Line amount</span><span className="font-medium tabular-nums">{money(line.quantity * line.unitPrice * (1 - line.discount / 100))}</span></div></div>)}
         </div>
         <section className="space-y-4 border-t pt-5" aria-label={t("accounting.authoring.paymentDetails", { defaultValue: "Payment details" })}>
@@ -389,8 +435,14 @@ function ReleasedCreateInvoiceModal({
         <section className="space-y-4 border-t pt-5" aria-label={t("accounting.authoring.accountingDetails", { defaultValue: "Accounting details" })}>
           <div><h3 className="font-semibold">{t("accounting.authoring.accountingDetails", { defaultValue: "Accounting details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.accountingSelectionHint", { defaultValue: "Review the journal and accounts before saving. The journal sets the currency." })}</p></div>
           <div className="grid gap-4 sm:grid-cols-2">
-          <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={(value) => { setFormEdited(true); setJournalId(value) }} options={journalOptions} />
-          <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartAccountId(value) }} options={counterpartOptions} />
+          <div className="space-y-2"><FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={(value) => { setFormEdited(true); setJournalSuggested(false); setJournalId(value) }} options={journalOptions} />
+            {journalSuggested ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.singleJournalSuggestion", { defaultValue: "Selected because it was the only eligible journal. This is a suggestion, not a configured business default." })}</p> : !journalId && journalOptions.length > 1 ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.chooseJournal", { defaultValue: "Several journals are available. Choose the journal for this document." })}</p> : null}
+            {journalId && !journal ? <ReadinessMessage>{t("accounting.authoring.unavailableJournal", { defaultValue: "The selected journal is no longer available. Choose an active journal; your entries are retained." })}</ReadinessMessage> : null}
+          </div>
+          <div className="space-y-2"><FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartSuggested(false); setCounterpartAccountId(value) }} options={counterpartOptions} />
+            {counterpartSuggested ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.singleAccountSuggestion", { defaultValue: "Selected because it was the only eligible account. This is a suggestion, not a configured business default." })}</p> : !counterpartAccountId && counterpartOptions.length > 1 ? <p className="text-xs text-muted-foreground">{t("accounting.authoring.chooseCounterpart", { defaultValue: "Several eligible accounts are available. Choose the receivable or payable account for this document." })}</p> : null}
+            {counterpartAccountId && !counterpartOptions.some((option) => option.value === counterpartAccountId) ? <ReadinessMessage>{t("accounting.authoring.unavailableCounterpart", { defaultValue: "The selected receivable or payable account is unavailable for this journal and currency. Choose an eligible account; your entries are retained." })}</ReadinessMessage> : null}
+          </div>
           </div>
         </section>
         {kind === "invoice" ? <Collapsible className="flex min-w-0 flex-col gap-3 border-t pt-5">
