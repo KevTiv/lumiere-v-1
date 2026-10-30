@@ -110,10 +110,11 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
     await page.keyboard.press("Escape")
     await page.getByTestId("settings-section-form-config").click()
     const cards = page.locator('[data-testid^="form-config-module-"]:visible')
-    await expect(cards).toHaveCount(10)
-    for (const id of ["accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar", "journal"]) {
+    await expect(cards).toHaveCount(9)
+    for (const id of ["accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar"]) {
       await expect(page.getByTestId(`form-config-module-${id}`)).toBeVisible()
     }
+    await expect(page.getByTestId("form-config-module-journal")).toHaveCount(0)
     for (const id of ["inventory", "hr", "projects", "manufacturing", "helpdesk", "proposals", "forensic"]) {
       await expect(page.getByTestId(`form-config-module-${id}`)).toHaveCount(0)
     }
