@@ -38,8 +38,8 @@ a focused test is not whole-package acceptance.
 
 | ID | Status | Owner | Branch / PR | Dependencies | Evidence required / current evidence | Blockers and deliberately deferred capabilities |
 | --- | --- | --- | --- | --- | --- | --- |
-| AA-00 | ACTIVE | Coordinator + independent QA | codex/alpha-ai-coordination | None | Exact baseline/PR/contracts readback; code-derived matrix and exclusive assignments below | Final independent ledger review and integrated staging evidence pending |
-| AA-01 | ACTIVE | Coordinator; backend worker | codex/alpha-ai-unified-turns; codex/alpha-ai-turn-backend | AA-00 scoped | Existing server RAG and stream share gated publication. First slice removes duplicate fallback, silent draft failure, incomplete SSE success and shared UI mock financial facts; backend bounds multilingual excerpts safely | Full server-authorized intent/capability routing, clarification contract and finance/form dispatch remain unaccepted; no new execution authority |
+| AA-00 | REVIEW | Coordinator + independent QA | codex/alpha-ai-coordination | None | Exact baseline/PR/contracts readback; code-derived matrix and exclusive assignments below | Independent ledger source review passed; integrated staging evidence remains a program gate |
+| AA-01 | ACTIVE | Coordinator; backend worker | codex/alpha-ai-unified-turns / #321; codex/alpha-ai-turn-backend / #319 | AA-00 scoped | Existing server RAG and stream share gated publication. First slice removes duplicate fallback, silent draft failure, incomplete SSE success and shared UI mock financial facts; backend bounds multilingual excerpts safely | Full server-authorized intent/capability routing, clarification contract and finance/form dispatch remain unaccepted; no new execution authority |
 | AA-02 | ACTIVE | Activation worker | codex/alpha-ai-assisted-activation | AA-00; later AA-01 | Existing bootstrap currency/timezone/year-end and Accounting readiness reused. First slice reads current scoped ERP state for a deterministic role-aware first-task checklist | Fresh-tenant first-record browser journey; complete Sales/Expense prerequisite checks and sample-data provenance pending |
 | AA-03 | BLOCKED | Forms owner (coordinator until assigned) | — | AA-01 accepted contract + certified canonical form owner | Existing contact/order/expense forms and AI form-suggestion path; exact permitted proposals and attachment retention need integrated proof | Cross-module typed bridge not accepted. Do not advertise automatic save, unsupported invoice creation or invented relations |
 | AA-04 | BLOCKED | Recovery owner (coordinator until assigned) | — | AA-01/03 | Existing action-draft review, effect lifecycle, expense outbox and run recovery owners | Exact request→draft→command→record readback and interrupted-business-effect E2E pending; no uncertain redispatch |
@@ -133,9 +133,23 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
 - #318 at 8422d1b6: 212 script tests pass; catalog/finance manifests and diff checks
   pass. Independent QA found no blockers and reran all eight collector tests.
   Hosted CI/E2E/runtime-image checks started; no hosted conclusion claimed yet.
-- AA-01 frontend implementation under review: single presentation coordinator,
-  complete-stream requirement, explicit partial outcomes and mock removal. Focused
-  shared UI: seven tests pass. Full web unit command: 138 test files pass, no skips.
-  Remaining checks and independent review recorded at the next checkpoint.
+- AA-01 frontend #321 at b6ed68bb: nine turn regressions and seven shared UI tests
+  pass; full web unit command passes 138 files with no skips. All 11 workspace
+  TypeScript checks pass. I18n, type-debt (2261), operation transport, catalog/finance
+  manifests and vendored 0.3.157 checks pass. Independent QA found malformed source
+  projection could hide a successful draft; validation now occurs inside each
+  coordinated attempt and the regression passes. Re-review found no remaining blocker.
+- Backend #319 at 8c7b3f43: original UTF-8 panic reproduced, fix preserves the byte
+  disclosure limit, all 24 focused RAG tests pass. Formatting, catalog/manifests and
+  independent source review pass; no #309 guide hunks duplicated.
+- AA-00 #320: independent ledger review found no overclaim or ownership issue; all
+  currently reported hosted checks completed without failures (documentation-only
+  browser/build skips are not runtime acceptance).
+- Local testing branch codex/alpha-ai-integration-review combines #318/#319/#321
+  by cherry-pick, without changing main or merging any PR. Frozen install, 212
+  script tests, catalog and finance manifest checks pass. AA-02 integration is next.
+- Docker daemon access is healthy with normal network-enabled sandbox access.
+  Disposable authenticated stack provisioning is being assessed; missing running
+  services alone are not treated as an unrecoverable environment blocker.
 - No new end-to-end journey accepted. No merges, deployments, contract publications,
   live provider dispatches or business-state mutations performed by this program.
