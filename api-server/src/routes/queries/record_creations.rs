@@ -2,7 +2,9 @@
 //! This deliberately does not register a general receipt-table resource.
 
 use crate::error::ApiError;
-use crate::query_exec::{preserve_query_timestamp_precision, resolve_crm_company_id, resolve_sales_company_id};
+use crate::query_exec::{
+    preserve_query_timestamp_precision, resolve_crm_company_id, resolve_sales_company_id,
+};
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use serde_json::{json, Value};
@@ -28,7 +30,14 @@ fn valid_key(key: &str) -> bool {
 
 fn exact_response(mut rows: Vec<Value>) -> Value {
     for row in &mut rows {
-        for field in ["organizationId", "organization_id", "companyId", "company_id", "recordId", "record_id"] {
+        for field in [
+            "organizationId",
+            "organization_id",
+            "companyId",
+            "company_id",
+            "recordId",
+            "record_id",
+        ] {
             if let Some(value) = row.get_mut(field) {
                 if let Some(id) = value.as_u64() {
                     *value = Value::String(id.to_string());
@@ -108,13 +117,17 @@ mod tests {
             "companyId":9_007_199_254_740_995_u64,
             "recordId":9_007_199_254_740_993_u64,
             "createdAt":{"microsSinceUnixEpoch":9_007_199_254_740_993_i64}
-        })])).into_response();
+        })]))
+        .into_response();
         let bytes = to_bytes(response.into_body(), 16_384).await.unwrap();
         let decoded: Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(decoded["data"][0]["recordId"], "9007199254740993");
         assert_eq!(decoded["data"][0]["companyId"], "9007199254740995");
         assert_eq!(decoded["data"][0]["organizationId"], "1");
-        assert_eq!(decoded["data"][0]["createdAt"]["microsSinceUnixEpoch"], "9007199254740993");
+        assert_eq!(
+            decoded["data"][0]["createdAt"]["microsSinceUnixEpoch"],
+            "9007199254740993"
+        );
     }
 
     #[test]

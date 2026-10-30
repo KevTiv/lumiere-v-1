@@ -140,7 +140,11 @@ fn validate(params: &SaveKnowledgeGuideParams) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn require_company_membership(ctx: &ReducerContext, org: u64, company: u64) -> Result<(), String> {
+pub(crate) fn require_company_membership(
+    ctx: &ReducerContext,
+    org: u64,
+    company: u64,
+) -> Result<(), String> {
     require_company_in_organization(ctx, org, company)?;
     let memberships: Vec<_> = ctx
         .db

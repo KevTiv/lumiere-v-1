@@ -51,8 +51,8 @@ use hr::{maybe_log_hr_pii_read, read_direct_reports, read_employees, read_my_emp
 use messaging::read_queued_mail_messages;
 use row_values::row_company_matches;
 pub(crate) use row_values::{
-    filter_and_strip_soft_deleted, filter_resource_archived_rows, has_iot_read_permission, row_u64,
-    preserve_query_timestamp_precision,
+    filter_and_strip_soft_deleted, filter_resource_archived_rows, has_iot_read_permission,
+    preserve_query_timestamp_precision, row_u64,
 };
 
 pub async fn execute_resource_query(

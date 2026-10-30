@@ -3802,6 +3802,9 @@
   "KnowledgeGuide": {
     "workflow": "string"
   },
+  "KnowledgeGuideActorProfileRead": {
+    "metadata": "string"
+  },
   "KnowledgeGuideRevision": {
     "html": "string",
     "workflow_version": "string",
@@ -5020,7 +5023,8 @@
     "metadata": "string"
   },
   "RenewSubscriptionParams": {
-    "notes": "string"
+    "notes": "string",
+    "idempotency_key": "string"
   },
   "ReopenTimesheetsParams": {
     "company_id": "u64",
@@ -5332,6 +5336,9 @@
   "SetDocumentRetentionParams": {
     "classification_id": "u64",
     "retention_days": "u32"
+  },
+  "SetExpenseAllocationsParams": {
+    "expected_snapshot": "string"
   },
   "SetExpenseFraudHoldParams": {
     "fraud_reason": "string",

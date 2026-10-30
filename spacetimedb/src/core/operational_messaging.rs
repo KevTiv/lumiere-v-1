@@ -464,25 +464,43 @@ fn prepare_batch_creation_changes(
     Ok(Some(changes))
 }
 
-fn capture_message_batch_creation(ctx: &ReducerContext, batch: &MessageBatch) -> Result<(), String> {
-    let Some(changes) = prepare_batch_creation_changes(ctx, batch, "create_message_batch")? else { return Ok(()); };
-    record_organization_commit(ctx, OrganizationCommitInput {
-        organization_id: batch.organization_id,
-        operation_id: "erp.create_message_batch".to_string(),
-        correlation_id: format!("message-batch:{}:created", batch.id),
-        changes,
-    })?;
+fn capture_message_batch_creation(
+    ctx: &ReducerContext,
+    batch: &MessageBatch,
+) -> Result<(), String> {
+    let Some(changes) = prepare_batch_creation_changes(ctx, batch, "create_message_batch")? else {
+        return Ok(());
+    };
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: batch.organization_id,
+            operation_id: "erp.create_message_batch".to_string(),
+            correlation_id: format!("message-batch:{}:created", batch.id),
+            changes,
+        },
+    )?;
     Ok(())
 }
 
-fn capture_invoice_reminder_batch_creation(ctx: &ReducerContext, batch: &MessageBatch) -> Result<(), String> {
-    let Some(changes) = prepare_batch_creation_changes(ctx, batch, "create_invoice_reminder_batch")? else { return Ok(()); };
-    record_organization_commit(ctx, OrganizationCommitInput {
-        organization_id: batch.organization_id,
-        operation_id: "erp.create_invoice_reminder_batch".to_string(),
-        correlation_id: format!("message-batch:{}:created", batch.id),
-        changes,
-    })?;
+fn capture_invoice_reminder_batch_creation(
+    ctx: &ReducerContext,
+    batch: &MessageBatch,
+) -> Result<(), String> {
+    let Some(changes) =
+        prepare_batch_creation_changes(ctx, batch, "create_invoice_reminder_batch")?
+    else {
+        return Ok(());
+    };
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: batch.organization_id,
+            operation_id: "erp.create_invoice_reminder_batch".to_string(),
+            correlation_id: format!("message-batch:{}:created", batch.id),
+            changes,
+        },
+    )?;
     Ok(())
 }
 

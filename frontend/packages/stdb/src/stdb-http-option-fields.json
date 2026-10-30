@@ -3802,6 +3802,9 @@
   "KnowledgeGuide": [
     "workflow"
   ],
+  "KnowledgeGuideActorProfileRead": [
+    "metadata"
+  ],
   "KnowledgeGuideRevision": [
     "html",
     "workflow_version",
@@ -5020,7 +5023,8 @@
     "metadata"
   ],
   "RenewSubscriptionParams": [
-    "notes"
+    "notes",
+    "idempotency_key"
   ],
   "ReopenTimesheetsParams": [
     "company_id",
@@ -5332,6 +5336,9 @@
   "SetDocumentRetentionParams": [
     "classification_id",
     "retention_days"
+  ],
+  "SetExpenseAllocationsParams": [
+    "expected_snapshot"
   ],
   "SetExpenseFraudHoldParams": [
     "fraud_reason",
