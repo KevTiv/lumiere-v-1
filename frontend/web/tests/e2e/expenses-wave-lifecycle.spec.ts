@@ -121,7 +121,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expect(cardFields.getByLabel("Merchant reference", { exact: true })).toBeVisible()
     await expect(cardFields.getByLabel("Amount", { exact: true })).toHaveAttribute("inputmode", "decimal")
     await expect(cardFields.getByLabel("FX fee", { exact: true })).toHaveAttribute("inputmode", "decimal")
-    await expect(page.getByPlaceholder("FX fee")).toBeVisible()
+    await expect(cardFields.getByLabel("FX fee", { exact: true })).toBeVisible()
 
     // Allocations: create a Draft expense via BFF (seed rows are often Approved), then open form.
     const organizationId = await fetchSessionOrganizationId(page)
@@ -258,7 +258,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const ref = smokeName("stmt")
     await page.getByTestId("expenses-ops-external-ref").fill(ref)
     await page.getByTestId("expenses-ops-amount").fill("33")
-    await page.getByPlaceholder("FX fee").fill("1.25")
+    await page.getByTestId("expenses-ops-panel").getByLabel("FX fee", { exact: true }).fill("1.25")
     await page.getByTestId("expenses-ops-currency").click()
     await page.getByRole("option", { name: /USD/ }).first().click()
     await page.getByTestId("expenses-ops-create-statement").click()
