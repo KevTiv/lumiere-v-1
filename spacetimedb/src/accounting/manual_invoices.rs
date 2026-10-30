@@ -409,6 +409,17 @@ pub fn create_manual_account_invoice(
     }
 
     let expected_journal_type = expected_journal_type(&params.move_type)?;
+    let custom_fields = crate::forms::record_creation::prepare_owned_custom_fields(
+        ctx,
+        organization_id,
+        "accounting",
+        if params.move_type == MoveType::InInvoice {
+            "new-bill"
+        } else {
+            "new-invoice"
+        },
+        params.metadata.as_deref(),
+    )?;
     let journal = require_active_journal(
         ctx,
         organization_id,
@@ -666,6 +677,15 @@ pub fn create_manual_account_invoice(
             ],
             metadata: None,
         },
+    );
+
+    crate::forms::record_creation::persist_new_record_fields(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account_move",
+        move_record.id,
+        &custom_fields,
     );
 
     record_result(

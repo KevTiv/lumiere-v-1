@@ -175,7 +175,6 @@ import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import { purchaseOrderListFieldAliases } from "@lumiere/ui/lib/purchasing-entity-configs"
-import { orderNeedsCustomFieldSave } from "@/lib/commercial-order-form-params"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
@@ -2580,9 +2579,6 @@ function PurchasingClientLoaded({
         pricelists as Array<{ id: unknown; currencyId?: unknown }>,
       )
       if (params == null) throw new Error(t("purchasing.forms.refinement.requiredOrderContext", { defaultValue: "Choose a vendor and an available price list with a currency, then check the expected delivery date. Your entries have been retained." }))
-      if (orderNeedsCustomFieldSave(params.metadata)) {
-        throw new Error(t("purchasing.forms.refinement.customFieldsBlocked", { defaultValue: "Custom fields cannot be saved together with this purchase order yet. No purchase order was created. Your entries have been retained." }))
-      }
       await createPurchaseOrder.mutateAsync(params)
     } else if (action === "createPurchaseRequisition") {
       const params = toCreatePurchaseRequisitionParams(formData)

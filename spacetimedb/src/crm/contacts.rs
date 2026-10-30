@@ -324,6 +324,20 @@ pub fn create_contact(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact", "create")?;
 
+    require_single_company_crm_scope(ctx, organization_id, params.company_id)?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let (creation, replay) = crate::forms::record_creation::prepare_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "contact",
+        params.metadata.as_deref(),
+        &params,
+    )?;
+    if replay.is_some() {
+        return Ok(());
+    }
+
     if params.name.is_empty() {
         return Err("Contact name cannot be empty".to_string());
     }
@@ -333,9 +347,6 @@ pub fn create_contact(
         .display_name
         .clone()
         .unwrap_or_else(|| params.name.clone());
-
-    require_single_company_crm_scope(ctx, organization_id, params.company_id)?;
-    let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
     validate_company_identifier_for_packs(
         ctx,
@@ -408,6 +419,15 @@ pub fn create_contact(
         merge_target_id: None,
         metadata: params.metadata,
     });
+
+    crate::forms::record_creation::finish_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "contact",
+        contact.id,
+        creation,
+    )?;
 
     write_audit_log_v2(
         ctx,

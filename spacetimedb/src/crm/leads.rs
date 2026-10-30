@@ -459,6 +459,19 @@ pub fn create_lead(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "lead", "create")?;
 
+    let operating_company_id = company_id_from_scope(ctx, organization_id, None)?;
+    let (creation, replay) = crate::forms::record_creation::prepare_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "crm_lead",
+        params.metadata.as_deref(),
+        &params,
+    )?;
+    if replay.is_some() {
+        return Ok(());
+    }
+
     if params.name.is_empty() {
         return Err("Lead name cannot be empty".to_string());
     }
@@ -532,6 +545,15 @@ pub fn create_lead(
         deleted_at: None,
         metadata: params.metadata,
     });
+
+    crate::forms::record_creation::finish_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "crm_lead",
+        lead.id,
+        creation,
+    )?;
 
     write_audit_log_v2(
         ctx,

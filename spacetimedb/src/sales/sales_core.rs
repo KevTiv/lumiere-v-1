@@ -572,6 +572,18 @@ pub(crate) fn create_sale_order_record(
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     check_permission(ctx, organization_id, "sale_order", "create")?;
 
+    let (creation, replay) = crate::forms::record_creation::prepare_creation(
+        ctx,
+        organization_id,
+        company_id,
+        "sale_order",
+        params.metadata.as_deref(),
+        &params,
+    )?;
+    if let Some(id) = replay {
+        return Ok(id);
+    }
+
     let partner = ctx
         .db
         .contact()
@@ -819,6 +831,15 @@ pub(crate) fn create_sale_order_record(
         write_date: ctx.timestamp,
         ..order
     });
+
+    crate::forms::record_creation::finish_creation(
+        ctx,
+        organization_id,
+        company_id,
+        "sale_order",
+        order.id,
+        creation,
+    )?;
 
     write_audit_log_v2(
         ctx,

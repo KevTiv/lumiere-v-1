@@ -880,6 +880,13 @@ fn create_purchase_order_record_impl(
     }
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let custom_fields = crate::forms::record_creation::prepare_owned_custom_fields(
+        ctx,
+        organization_id,
+        "purchasing",
+        "new-purchase-order",
+        params.metadata.as_deref(),
+    )?;
     require_purchase_order_header_relations(
         ctx,
         organization_id,
@@ -959,6 +966,15 @@ fn create_purchase_order_record_impl(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    crate::forms::record_creation::persist_new_record_fields(
+        ctx,
+        organization_id,
+        company_id,
+        "purchase_order",
+        order.id,
+        &custom_fields,
+    );
 
     write_audit_log_v2(
         ctx,

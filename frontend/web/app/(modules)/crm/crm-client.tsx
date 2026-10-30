@@ -1,6 +1,5 @@
 "use client"
 import { Button } from "@lumiere/ui/components/button"
-import { assertCrmCreateCustomFieldsSupported } from "./crm-create-custom-fields"
 
 import { crmContactListRow, crmLeadListRow } from "@/lib/crm-list-rows"
 import { crmContactListFieldAliases, crmLeadListFieldAliases, crmOpportunityListFieldAliases } from "@lumiere/ui/lib/crm-entity-configs"
@@ -668,7 +667,7 @@ function CrmClientLoaded({
     [t, openOpportunityOptions, productFieldOptions, uomFieldOptions, accountTaxes],
   )
 
-  const createLead = useCreateLead(orgId)
+  const createLead = useCreateLead(orgId, { companyId: operatingCompanyId })
   const createOpportunity = useCreateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
   const createOpportunityLine = useCreateOpportunityLine(orgId, { companyId: operatingCompanyId ?? undefined })
   const updateOpportunity = useUpdateOpportunity(orgId, { companyId: operatingCompanyId ?? undefined })
@@ -2376,8 +2375,8 @@ function CrmClientLoaded({
       const p = toCreateLeadParams(formData)
       if (!p) throw new Error(t("crm.forms.validation.createLead", { defaultValue: "Enter the lead contact name before saving." }))
       if (p) {
-        assertCrmCreateCustomFieldsSupported(p.metadata, t("crm.forms.customFieldsCreateUnavailable", { defaultValue: "Saving custom fields during creation is not available yet. Your entries are retained and no record was created." }))
-        await createLead.mutateAsync(p)
+        const savedId = await createLead.mutateAsync(p)
+        router.push(buildModuleTabHref("crm", "leads", { id: savedId }))
         phCapture("lead_created", { organization_id: organizationId })
       }
     } else if (action === "createOpportunity") {
@@ -2385,15 +2384,15 @@ function CrmClientLoaded({
       const p = toCreateOpportunityParams(formData)
       if (!p) throw new Error(t("crm.forms.validation.createOpportunity", { defaultValue: "Enter an opportunity name and select a pipeline stage." }))
       if (p) {
-        assertCrmCreateCustomFieldsSupported(p.metadata, t("crm.forms.customFieldsCreateUnavailable", { defaultValue: "Saving custom fields during creation is not available yet. Your entries are retained and no record was created." }))
-        await createOpportunity.mutateAsync(p)
+        const savedId = await createOpportunity.mutateAsync(p)
+        router.push(buildModuleTabHref("crm", "opportunities", { id: savedId }))
       }
     } else if (action === "createContact") {
       const p = toCreateContactParams(formData)
       if (!p) throw new Error(t("crm.forms.validation.createContact", { defaultValue: "Enter a contact name before saving." }))
       if (p) {
-        assertCrmCreateCustomFieldsSupported(p.metadata, t("crm.forms.customFieldsCreateUnavailable", { defaultValue: "Saving custom fields during creation is not available yet. Your entries are retained and no record was created." }))
-        await createContact.mutateAsync(p)
+        const savedId = await createContact.mutateAsync(p)
+        router.push(buildModuleTabHref("crm", "contacts", { id: savedId }))
       }
     } else if (action === "createActivity") {
       if (moduleQueryState(activityTypesQuery).status !== "ready" || activityTypeOptions.length === 0) throw new Error(t("crm.workflow.reasons.activityTypeRequired"))

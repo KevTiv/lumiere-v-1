@@ -47,6 +47,7 @@ import type {
 
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
 import { createdSaleOrderId, withSaleOrderReceipt } from './sales-create-receipt'
+import { useRecordCreationTransport } from './record-creation-http'
 import { invalidateQueryResources } from "./workflow"
 import {
   ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
@@ -295,9 +296,15 @@ export async function createSaleOrderDraftCommand(params: CreateSaleOrderParams,
 
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
+  const create = useRecordCreationTransport(organizationId, companyId, "sale_order")
   return useMutation<{ orderId?: string }, Error, CreateSaleOrderParams>({
     retry: false,
-    mutationFn: (params) => createSaleOrderDraftCommand(params, organizationId, companyId),
+    mutationFn: async (params) => {
+      const scoped = withCompanyScope(params, companyId)
+      const orderId = await create(JSON.stringify(stdbParamsToJson(scoped, "CreateSaleOrderParams")), params.metadata,
+        (metadata) => stdbBffCommandPost("create_sale_order", { params: stdbParamsToJson({ ...scoped, metadata }, "CreateSaleOrderParams") }))
+      return { orderId }
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] }),
   })
 }

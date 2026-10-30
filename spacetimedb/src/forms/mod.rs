@@ -23,6 +23,7 @@ use crate::core::organization::require_company_in_organization;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
+use crate::crm::opportunities::opportunity;
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::fleet::fleet::fleet_vehicle;
 use crate::helpdesk::tickets::helpdesk_ticket;
@@ -41,6 +42,7 @@ use crate::subscriptions::tables::subscription;
 use crate::types::AccountMoveState;
 
 pub mod migrations;
+pub(crate) mod record_creation;
 
 /// Max custom-field entries accepted in one EAV upsert (bounds WASM work).
 const MAX_CUSTOM_FIELD_ENTRIES: usize = 64;
@@ -70,6 +72,7 @@ const ALLOWED_CUSTOM_FIELD_MODELS: &[&str] = &[
     "hr_payslip",
     "fleet_vehicle",
     "crm_lead",
+    "opportunity",
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -638,7 +641,20 @@ fn ensure_record_allows_custom_field_writes(
         "hr_contract" => require_org_and_company!(ctx.db.hr_contract(), "hr_contract"),
         "hr_expense" => require_org_and_company!(ctx.db.hr_expense(), "hr_expense"),
         "expense_sheet" => require_org_and_company!(ctx.db.expense_sheet(), "expense_sheet"),
-        "contact" => require_org_only!(ctx.db.contact(), "contact"),
+        "contact" => {
+            let row = ctx
+                .db
+                .contact()
+                .id()
+                .find(&record_id)
+                .ok_or("Contact not found")?;
+            if row.organization_id != organization_id
+                || row.company_id.is_some_and(|id| id != company_id)
+                || row.deleted_at.is_some()
+            {
+                return Err("Contact is unavailable in this organization and company".into());
+            }
+        }
         "product" | "product_template" => require_org_only!(ctx.db.product(), "product"),
         "project_project" => require_org_and_company!(ctx.db.project_project(), "project_project"),
         "project_task" => require_org_and_company!(ctx.db.project_task(), "project_task"),
@@ -649,6 +665,20 @@ fn ensure_record_allows_custom_field_writes(
         "hr_payslip" => require_org_and_company!(ctx.db.hr_payslip(), "hr_payslip"),
         "fleet_vehicle" => require_org_and_company!(ctx.db.fleet_vehicle(), "fleet_vehicle"),
         "crm_lead" => require_org_only!(ctx.db.lead(), "crm_lead"),
+        "opportunity" => {
+            let row = ctx
+                .db
+                .opportunity()
+                .id()
+                .find(&record_id)
+                .ok_or("Opportunity not found")?;
+            if row.organization_id != organization_id
+                || row.company_id.is_some_and(|id| id != company_id)
+                || row.deleted_at.is_some()
+            {
+                return Err("Opportunity is unavailable in this organization and company".into());
+            }
+        }
         _ => {}
     }
     Ok(())
