@@ -24,8 +24,9 @@ Candidate identities come from the [report proposal](../../infra/railway/pilots/
 and [finance proposals](../../infra/skill-releases/finance/).
 The [usability status](erp-skills-professional-usability-status.md) supersedes the
 older versions in the [finance implementation history](finance-skill-expansion-status.md).
-Main pins immutable application contracts 0.3.157; #309 separately owns the
-0.3.158 guide contract integration. This slice changes neither pin nor binding.
+The original base pins immutable application contracts 0.3.157. The subsequent
+main integration below retains #309's released 0.3.158 guide contracts. This
+slice changes neither pin nor binding.
 
 ## Implemented collector behavior
 
@@ -76,3 +77,14 @@ tenant certification/promotion, staged activation, rollback and deployed user
 acceptance were not run here. No production setup, release or deployment is
 authorized by this preparation PR. Rollback is reverting the offline collector
 change; it has no runtime switch or business effect to reverse.
+
+## Main integration before merge
+
+Merged fresh main `51dc54867ba66703518c4edbc0964391da0d8a63`, including
+#309's guide contracts 0.3.158 and #324's applied-release readback correction,
+without conflicts. The PR delta remains the four qualification files; generated
+contracts, guide implementation, source bindings and release infrastructure come
+unchanged from main. The eight benchmark tests, all 217 Python script tests
+(no skips or failures), catalog/source-bound manifest checks and whitespace check
+pass on the integrated tree. Current-head hosted CI
+and independent review remain required before merging this PR.
