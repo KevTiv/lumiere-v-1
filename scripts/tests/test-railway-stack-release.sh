@@ -11,13 +11,17 @@ set -euo pipefail
 case "${1:-}" in
   deployment)
     [[ "${2:-}" == list ]]
-    if [[ -n "${TEST_RAILWAY_DEPLOYMENTS_FILE:-}" ]]; then
+    deployments_file="${TEST_RAILWAY_DEPLOYMENTS_FILE:-}"
+    if [[ -n "${TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE:-}" && -f "${TEST_REDEPLOY_ARGS_FILE:-}" ]]; then
+      deployments_file="$TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE"
+    fi
+    if [[ -n "$deployments_file" ]]; then
       limit=20
       args=("$@")
       for ((i=0; i < ${#args[@]}; i++)); do
         [[ "${args[$i]}" != --limit ]] || limit="${args[$((i + 1))]}"
       done
-      jq --argjson limit "$limit" '.[:$limit]' "$TEST_RAILWAY_DEPLOYMENTS_FILE"
+      jq --argjson limit "$limit" '.[:$limit]' "$deployments_file"
     else
       printf '[{"id":"dep-1","status":"SUCCESS"}]\n'
     fi
@@ -53,7 +57,7 @@ case "${1:-}" in
     ;;
   redeploy)
     printf '%s\n' "$*" >"${TEST_REDEPLOY_ARGS_FILE:?}"
-    printf '{"status":"queued"}\n'
+    printf '{"id":"%s"}\n' "${TEST_REDEPLOY_ID:-dep-forced}"
     ;;
   *)
     echo "unexpected railway invocation: $*" >&2
@@ -236,7 +240,15 @@ source_patch_file="$TMP/source-patch.json"
 source_args_file="$TMP/source-args.txt"
 redeploy_args_file="$TMP/redeploy-args.txt"
 service_list_args_file="$TMP/service-list-args.txt"
-env "${common_env[@]}" \
+jq --arg image "$runtime_digest" '
+  .environments.edges[0].node.serviceInstances.edges = [{node: {
+    serviceId: "service-api-id", serviceName: "api-server", environmentId: "environment-test",
+    source: {image: $image, repo: null},
+    latestDeployment: {id: "dep-2", status: "SUCCESS", canRedeploy: true, meta: {image: $image}}
+  }}]
+' "$TMP/active-services.json" >"$TMP/runtime-source.json"
+source_env=("${common_env[@]}" "TEST_RAILWAY_STATUS_FILE=$TMP/runtime-source.json")
+env "${source_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
   TEST_SOURCE_ARGS_FILE="$source_args_file" \
@@ -267,7 +279,7 @@ grep -Fq -- '--environment production' "$service_list_args_file"
 grep -Fq -- '--json' "$service_list_args_file"
 test ! -e "$redeploy_args_file"
 
-if env "${common_env[@]}" \
+if env "${source_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_RAILWAY_SERVICES_JSON='[{"id":"service-one","name":"api-server"},{"id":"service-two","name":"api-server"}]' \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
@@ -281,7 +293,11 @@ if env "${common_env[@]}" \
   exit 1
 fi
 
-env "${common_env[@]}" \
+jq '.environments.edges[0].node.serviceInstances.edges[0].node.latestDeployment |=
+  (.id = "dep-1" | .meta.image = "older-image")' \
+  "$TMP/runtime-source.json" >"$TMP/older-source-deployment.json"
+env "${source_env[@]}" \
+  TEST_RAILWAY_STATUS_FILE="$TMP/older-source-deployment.json" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_ENV_EDIT_COMMITTED=false \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
@@ -296,17 +312,99 @@ env "${common_env[@]}" \
   ' _ "$ROOT/scripts/railway-stack-release.sh"
 grep -Fq -- '--project project-test' "$redeploy_args_file"
 grep -Fq -- '--environment production' "$redeploy_args_file"
-grep -Fq -- '--service api-server' "$redeploy_args_file"
+grep -Fq -- '--service service-api-id' "$redeploy_args_file"
 grep -Fq -- '--from-source' "$redeploy_args_file"
+
+# An already fresh deployment must not trigger a second explicit retry, even
+# when the edit result reports that its configuration patch was unchanged.
+rm "$redeploy_args_file"
+env "${source_env[@]}" \
+  RUST_RUNTIME_IMAGE="$runtime_digest" \
+  TEST_ENV_EDIT_COMMITTED=false \
+  TEST_SOURCE_PATCH_FILE="$source_patch_file" \
+  TEST_SOURCE_ARGS_FILE="$source_args_file" \
+  TEST_REDEPLOY_ARGS_FILE="$redeploy_args_file" \
+  bash -c '
+    source "$1"
+    wait_for_new_deployment() { printf "dep-2\n"; }
+    wait_for_terminal_success() { :; }
+    deployment_image() { printf "%s\n" "$RUST_RUNTIME_IMAGE"; }
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh"
+test ! -e "$redeploy_args_file"
+
+# A committed source patch can be a no-op. Exercise the actual retry polling
+# and immutable image verification, rather than mocking a fresh deployment.
+jq '.environments.edges[0].node.serviceInstances.edges[0].node.latestDeployment.id = "dep-1"' \
+  "$TMP/runtime-source.json" >"$TMP/unchanged-source.json"
+jq -n --arg image "$runtime_digest" '[{id: "dep-1", status: "SUCCESS", meta: {image: $image}}]' \
+  >"$TMP/retry-before.json"
+jq -n --arg image "$runtime_digest" '[{id: "dep-forced", status: "SUCCESS", meta: {image: $image}}]' \
+  >"$TMP/retry-after.json"
+retry_env=("${source_env[@]}"
+  "RUST_RUNTIME_IMAGE=$runtime_digest"
+  "TEST_RAILWAY_STATUS_FILE=$TMP/unchanged-source.json"
+  "TEST_RAILWAY_DEPLOYMENTS_FILE=$TMP/retry-before.json"
+  "TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE=$TMP/retry-after.json"
+  "TEST_SOURCE_PATCH_FILE=$source_patch_file"
+  "TEST_SOURCE_ARGS_FILE=$source_args_file"
+  "TEST_REDEPLOY_ARGS_FILE=$TMP/retry-args.txt")
+env "${retry_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server
+grep -Fq -- '--service service-api-id' "$TMP/retry-args.txt"
+if grep -Fq -- '--from-source' "$TMP/retry-args.txt"; then
+  echo "unchanged verified image was redeployed from source" >&2
+  exit 1
+fi
+
+rm "$TMP/retry-args.txt"
+for source_filter in \
+  '.source.repo = "owner/repository"' \
+  '.source.image = "ghcr.io/kevtiv/other@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' \
+  'del(.source)'; do
+  jq ".environments.edges[0].node.serviceInstances.edges[0].node |= ($source_filter)" \
+    "$TMP/unchanged-source.json" >"$TMP/mismatched-source.json"
+  if env "${retry_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/mismatched-source.json" \
+    bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >/dev/null 2>&1; then
+    echo "source mismatch unexpectedly passed: $source_filter" >&2
+    exit 1
+  fi
+  test ! -e "$TMP/retry-args.txt"
+done
+
+jq '.environments.edges[0].node.serviceInstances.edges[0].node.latestDeployment.meta.image = "older-image"' \
+  "$TMP/unchanged-source.json" >"$TMP/older-deployed-image.json"
+if env "${retry_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/older-deployed-image.json" \
+  bash -c '
+    source "$1"
+    wait_for_new_deployment() { return 1; }
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh" >/dev/null 2>&1; then
+  echo "older deployed build unexpectedly passed as the requested image" >&2
+  exit 1
+fi
+test ! -e "$TMP/retry-args.txt"
+
+jq '.[0].meta.image = "wrong-image"' "$TMP/retry-after.json" >"$TMP/retry-wrong-image.json"
+if env "${retry_env[@]}" TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE="$TMP/retry-wrong-image.json" \
+  bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >/dev/null 2>&1; then
+  echo "retry accepted a deployment with the wrong image" >&2
+  exit 1
+fi
 
 # Publisher promotion must use its own image and require a positive marker
 # from the new deployment, just like storage migrations.
 publisher_digest="ghcr.io/kevtiv/lumiere-v-1-spacetimedb-publisher@sha256:$(printf 'b%.0s' {1..64})"
+jq --arg image "$publisher_digest" '
+  .environments.edges[0].node.serviceInstances.edges[0].node |=
+    (.serviceId = "publisher-id" | .serviceName = "spacetimedb-publisher"
+      | .source.image = $image | .latestDeployment.meta.image = $image)
+' "$TMP/runtime-source.json" >"$TMP/publisher-source.json"
 for publisher_logs in 'SpacetimeDB publish and schema verification passed' 'publish failed'; do
   expected_status=0
   [[ "$publisher_logs" == 'publish failed' ]] && expected_status=1
   actual_status=0
   env "${common_env[@]}" \
+    TEST_RAILWAY_STATUS_FILE="$TMP/publisher-source.json" \
     STDB_PUBLISHER_IMAGE="$publisher_digest" \
     TEST_RAILWAY_SERVICES_JSON='[{"id":"publisher-id","name":"spacetimedb-publisher"}]' \
     TEST_RAILWAY_LOGS="$publisher_logs" \
