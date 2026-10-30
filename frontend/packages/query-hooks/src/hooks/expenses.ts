@@ -817,8 +817,10 @@ export function useSetExpenseAllocations(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to set expense allocations'))
     },
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['expense-allocations', rqBigIntKey(organizationId)] })
+    },
   })
 }
 

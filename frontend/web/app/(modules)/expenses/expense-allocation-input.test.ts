@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { allocationLookupRows, expenseAllocationLines } from "./expense-allocation-input"
+import { allocationLookupRows, expenseAllocationLines, savedExpenseAllocationDrafts, expenseAllocationFingerprint } from "./expense-allocation-input"
 
 const projects = new Set(["9007199254740993", "2"])
 const accounts = new Set(["3"])
@@ -50,5 +50,43 @@ describe("expense allocation replacement", () => {
     assert.deepEqual(allocationLookupRows(rows, 1n, 2n, true).map((row) => String(row.id)), ["9007199254740993"])
     assert.deepEqual(allocationLookupRows(rows, 1n, 0n), [])
     assert.throws(() => expenseAllocationLines([line()], new Set(), accounts, "Unavailable project", "Total"), /Unavailable project/)
+  })
+})
+
+const saved = (patch: object = {}) => ({ id: "9007199254740993", organizationId: 1n, companyId: 2n, expenseId: 7n,
+  projectId: "9007199254740993", analyticAccountId: null, sharePercent: 100, amount: 123.456789,
+  billable: false, metadata: '{"costCenter":"A"}', ...patch })
+const read = (rows: ReturnType<typeof saved>[]) => savedExpenseAllocationDrafts(rows, 1n, 2n, 7n, "Cannot verify saved allocations")
+
+describe("expense allocation saved read", () => {
+  it("round trips exact saved identifiers, share precision and opaque metadata", () => {
+    const drafts = read([saved({ sharePercent: 33.333333333 }), saved({ id: "4", sharePercent: 66.666666667 })])
+    assert.equal(drafts[0].sharePercent, "33.333333333")
+    assert.equal(drafts[0].projectId, "9007199254740993")
+    const parsed = parse(drafts)
+    assert.equal(parsed[0].metadata, '{"costCenter":"A"}')
+    assert.equal(parsed[0].billable, false)
+    assert.equal(parsed[0].projectId, 9007199254740993n)
+    assert.deepEqual(read([]), [])
+  })
+  it("rejects foreign, duplicate and masked rows instead of silently starting replacement data", () => {
+    for (const patch of [{ organizationId: 3n }, { companyId: 3n }, { expenseId: 8n }, { projectId: undefined },
+      { projectId: null }, { analyticAccountId: "bad" }, { sharePercent: "100" }, { sharePercent: NaN },
+      { amount: undefined }, { billable: undefined }, { metadata: {} }, { id: 9007199254740992 }]) {
+      assert.throws(() => read([saved(patch)]), /Cannot verify/)
+    }
+    const masked = saved()
+    delete (masked as { metadata?: unknown }).metadata
+    assert.throws(() => read([masked]), /Cannot verify/)
+    assert.throws(() => read([saved(), saved()]), /Cannot verify/)
+  })
+  it("preserves an unavailable relation for correction and detects any saved change independent of row order", () => {
+    assert.equal(read([saved({ projectId: "999" })])[0].projectId, "999")
+    const first = saved()
+    const second = saved({ id: "4" })
+    assert.equal(expenseAllocationFingerprint([first, second]), expenseAllocationFingerprint([second, first]))
+    for (const patch of [{ amount: 123.45678 }, { sharePercent: 99.99 }, { billable: true }, { metadata: null }, { id: "5" }]) {
+      assert.notEqual(expenseAllocationFingerprint([first]), expenseAllocationFingerprint([saved(patch)]))
+    }
   })
 })

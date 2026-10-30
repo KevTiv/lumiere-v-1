@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
-import { ExpenseAllocationLines, newExpenseAllocationDraft, type ExpenseAllocationChoices, type ExpenseAllocationField } from "../forms/expense-allocation-lines"
+import { ExpenseAllocationLines, newExpenseAllocationDraft, type ExpenseAllocationChoices, type ExpenseAllocationDraft, type ExpenseAllocationField } from "../forms/expense-allocation-lines"
 
 const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
 
@@ -657,11 +657,13 @@ export const reimburseExpenseReportForm = (t: TFunction): FormConfig => ({
 
 export const setExpenseAllocationsForm = (t: TFunction, choices: ExpenseAllocationChoices = {
   projectOptions: [], analyticAccountOptions: [], projectsState: { status: "loading" }, analyticAccountsState: { status: "loading" },
-}, disabled = false): FormConfig => ({
+}, disabled = false, savedRows?: readonly ExpenseAllocationDraft[]): FormConfig => ({
   id: "set-expense-allocations",
   title: t("expenses.forms.setAllocations.title"),
-  description: t("expenses.allocations.replacementHint", { defaultValue: "Existing allocations are not loaded here. Saving replaces all allocations on this expense with the rows below. Review every row before saving." }),
-  submitLabel: t("expenses.allocations.replace", { defaultValue: "Replace allocations" }),
+  description: savedRows === undefined
+    ? t("expenses.allocations.replacementHint", { defaultValue: "Existing allocations are not loaded here. Saving replaces all allocations on this expense with the rows below. Review every row before saving." })
+    : t("expenses.allocations.loadedHint", { defaultValue: "These are the saved allocations for this expense. Review every row before saving your changes." }),
+  submitLabel: savedRows === undefined ? t("expenses.allocations.replace", { defaultValue: "Replace allocations" }) : t("expenses.allocations.save", { defaultValue: "Save allocations" }),
   sections: [
     {
       id: "allocation-lines",
@@ -669,7 +671,7 @@ export const setExpenseAllocationsForm = (t: TFunction, choices: ExpenseAllocati
       fields: [
         {
           id: "allocationLines", name: "allocationLines", type: "custom", width: "full",
-          component: ExpenseAllocationLines, defaultValue: [newExpenseAllocationDraft(true)], disabled, ...choices,
+          component: ExpenseAllocationLines, defaultValue: savedRows?.length ? [...savedRows] : [newExpenseAllocationDraft(true)], disabled, ...choices,
         } as ExpenseAllocationField,
         {
           id: "confirmAllocationReplacement", name: "confirmAllocationReplacement", type: "checkbox", width: "full", required: true, defaultValue: false,

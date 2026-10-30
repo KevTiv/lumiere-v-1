@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import {
   createExpenseReceiptAndResolveId,
   useCreateExpense,
@@ -51,7 +52,8 @@ import {
   type ExpenseCapturePayload,
 } from "../../../lib/expense-capture-outbox"
 import { newExpenseReceiptClientRequestId } from "../../../lib/expenses-create-params"
-import { expenseCompanyLookupRows, expenseCreateContext } from "./expense-capture-input"
+import { expenseCompanyLookupRows, expenseCreateContext, expenseDefaultEmployee, expensePricelistLookupRows } from "./expense-capture-input"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
@@ -67,14 +69,19 @@ export function ExpensesCapturePanel({
   const { t } = useTranslation()
   const orgId = BigInt(organizationId)
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const { identity } = useErpSession()
   const createExpense = useCreateExpense(orgId, companyId)
-  const { data: employees = [] } = useEmployees(orgId)
+  const employeesQuery = useEmployees(orgId)
+  const employees = employeesQuery.data ?? []
   const { data: pricelists = [] } = usePricelists(orgId)
   const { data: currencies = [] } = useCurrencies()
   const currencyLabels = currencyCodeMap(currencies)
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
   const scopedEmployees = expenseCompanyLookupRows(employees, orgId, companyId)
+  const scopedPricelists = expensePricelistLookupRows(pricelists, orgId, companyId)
+  const defaultEmployee = moduleQueryState(employeesQuery).status === "ready"
+    ? expenseDefaultEmployee(employees, orgId, companyId, identity) : undefined
   const mileageOptions = expenseRateRowsToSelectOptions(
     expenseCompanyLookupRows(mileageRates, orgId, companyId),
   )
@@ -105,6 +112,15 @@ export function ExpensesCapturePanel({
     [organizationId, deviceId, tick],
   )
   const [employeeId, setEmployeeId] = useState("")
+  const employeeWasChosen = useRef(false)
+  const employeeScope = `${identity ?? ""}:${orgId}:${companyId}`
+  useEffect(() => {
+    employeeWasChosen.current = false
+    setEmployeeId("")
+  }, [employeeScope])
+  useEffect(() => {
+    if (defaultEmployee && !employeeWasChosen.current) setEmployeeId((current) => current || defaultEmployee)
+  }, [defaultEmployee, employeeScope])
   const [pricelistId, setPricelistId] = useState("")
   const [name, setName] = useState("")
   const [amount, setAmount] = useState("")
@@ -123,7 +139,7 @@ export function ExpensesCapturePanel({
   const [perDiemRateId, setPerDiemRateId] = useState("")
 
   const buildPayload = (): ExpenseCapturePayload | null => {
-    const currencyId = pricelists.find(
+    const currencyId = scopedPricelists.find(
       (row) => String(row.id) === pricelistId,
     )?.currencyId
     if (
@@ -239,7 +255,7 @@ export function ExpensesCapturePanel({
 
   const captureDelayedSync = async () => {
     try {
-      expenseCreateContext({ employeeId, pricelistId }, employees, pricelists, orgId, companyId, t)
+      expenseCreateContext({ employeeId, pricelistId }, employees, scopedPricelists, orgId, companyId, t)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("expenses.capture.validation"))
       return
@@ -507,7 +523,7 @@ export function ExpensesCapturePanel({
             <FieldLabel htmlFor="capture-employee">
               {t("expenses.forms.newExpense.fields.employeeId")}
             </FieldLabel>
-            <Select value={employeeId} onValueChange={setEmployeeId}>
+            <Select value={employeeId} onValueChange={(value) => { employeeWasChosen.current = true; setEmployeeId(value) }}>
               <SelectTrigger
                 className="min-w-0 max-w-full"
                 id="capture-employee"
@@ -530,7 +546,9 @@ export function ExpensesCapturePanel({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            <FieldDescription>{t("expenses.forms.capture.employeeHint", { defaultValue: "Select the employee who incurred this expense. This is separate from your signed-in account." })}</FieldDescription>
+            <FieldDescription>{employeeId && employeeId === defaultEmployee
+              ? t("expenses.forms.capture.employeeDefaultHint", { defaultValue: "Selected from the active employee record linked to your signed-in account in this company. Change it if you are entering an expense for someone else." })
+              : t("expenses.forms.capture.employeeHint", { defaultValue: "Select the employee who incurred this expense. This is separate from your signed-in account." })}</FieldDescription>
           </Field>
           <Field className="min-w-0">
             <FieldLabel htmlFor="capture-pricelist">
@@ -551,7 +569,7 @@ export function ExpensesCapturePanel({
               </SelectTrigger>
               <SelectContent id="capture-pricelist-options">
                 <SelectGroup>
-                  {pricelists.map((row) => (
+                  {scopedPricelists.map((row) => (
                     <SelectItem key={String(row.id)} value={String(row.id)}>
                       {String(row.name)}{currencyLabels.get(String(row.currencyId)) ? ` · ${currencyLabels.get(String(row.currencyId))}` : ""}
                     </SelectItem>
