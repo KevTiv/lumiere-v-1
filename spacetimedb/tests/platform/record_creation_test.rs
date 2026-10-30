@@ -304,6 +304,7 @@ fn company_boundary(
         .ok_or("creation role missing")?;
     let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
         .ok_or("creation profile missing")?;
+    let was_superuser = profile.is_superuser;
     ctx.db.user_organization().id().update(UserOrganization {
         company_id: Some(fixture.company_id),
         ..membership.clone()
@@ -314,7 +315,7 @@ fn company_boundary(
     });
     ctx.db.user_profile().id().update(UserProfile {
         is_superuser: false,
-        ..profile.clone()
+        ..profile
     });
     let before = ctx.db.contact().contact_by_org().filter(&org).count();
     params.company_id = Some(branch);
@@ -330,7 +331,12 @@ fn company_boundary(
     }
     ctx.db.user_organization().id().update(membership);
     ctx.db.role().id().update(original_role);
-    ctx.db.user_profile().id().update(profile);
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("creation profile disappeared")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: was_superuser,
+        ..profile
+    });
     Ok(())
 }
 
