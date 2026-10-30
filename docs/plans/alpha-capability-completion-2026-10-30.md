@@ -66,8 +66,8 @@ A private `record_creation_receipt` is the single new durable table. The strict
 census remains exact: 524 tables, all organization owned, with five existing
 persistence protocol relations. Generated migration 30 is frozen in the ledger
 and registered in the application catalog; migration 29 and prior checksums
-remain unchanged. The established release workflow allocates and pins the next
-immutable contract version. The first release attempt correctly rejected the
+remain unchanged. The established release workflow published and pinned immutable contracts
+`0.3.159` in run `41114895044`, including clean regeneration/drift verification. The first release attempt correctly rejected the
 unregistered pending migration, before publishing a contract tag.
 
 The exact hosted production-profile module from commit `1b2eb6cc` passed all
@@ -95,7 +95,7 @@ retention 6, exclusion capture validation 1 and the actual Rust application
 catalog checksum check 1. This local build used the pre-release 0.3.158 bindings;
 matching-pin hosted validation remains required. A first local HTTP fixture run
 was denied loopback binding by the execution sandbox; the unchanged tests passed
-when run with loopback network access. Final immutable pin, C4 upgrade execution,
+when run with loopback network access. C4 upgrade execution, matching-pin
 integrated frontend types/browser regressions and real-service guide gate remain
 required before the draft PR is ready.
 
