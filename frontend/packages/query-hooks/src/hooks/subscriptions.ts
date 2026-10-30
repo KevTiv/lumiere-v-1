@@ -859,7 +859,9 @@ export function useRenewSubscription(
           });
           return decodeOperationDispatch(await apiFetch(urlPath, init), 'Failed to renew subscription');
         },
-        afterDispatch: () => invalidateSubscriptionLifecycle(qc, organizationId),
+        afterDispatch: async () => {
+          await invalidateSubscriptionLifecycle(qc, organizationId);
+        },
         readbackAttempts: 6, readbackDelayMs: 150,
       });
       assertScope();
