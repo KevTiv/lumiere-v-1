@@ -67,7 +67,37 @@ class BenchmarkTests(unittest.TestCase):
         self.assertTrue(report['complete'])
         self.assertEqual(group['successfulTasks'],1)
         self.assertEqual(group['criticalFailures'],1)
+        self.assertEqual(group['firstPassRate'],0.5)
+        self.assertFalse(group['cases'][1]['success'])
+        self.assertTrue(group['cases'][1]['reportedTaskSuccess'])
         self.assertAlmostEqual(group['costPerSuccessfulTaskUsd'],0.2)
+
+    def test_incorrect_or_failed_outcomes_do_not_count_as_first_pass_success(self):
+        for changes in [{'correctOutcome':False}, {'taskSuccess':False}, {'criticalFailure':True}]:
+            with self.subTest(changes=changes):
+                row={**self.result(), **changes}
+                group=benchmark.summarize([self.trials[0]],[row])['groups'][0]
+                self.assertEqual(group['successfulTasks'],0)
+                self.assertEqual(group['successRate'],0)
+                self.assertEqual(group['firstPassRate'],0)
+                self.assertIsNone(group['costPerSuccessfulTaskUsd'])
+                self.assertFalse(group['cases'][0]['success'])
+
+    def test_live_denials_without_dispatch_remain_distinct_from_provider_measurements(self):
+        trials=self.trials[:3]
+        denied={**self.result(trials[0]), 'executionMode':'admitted_live'}
+        provider={**self.result(trials[1]), 'executionMode':'admitted_live',
+                  'providerCalls':2, 'totalCostUsd':0.1}
+        replay=self.result(trials[2])
+        report=benchmark.summarize(trials,[denied,provider,replay])
+        self.assertTrue(report['complete'])
+        groups={group['evidenceClass']:group for group in report['groups']}
+        self.assertEqual(set(groups),{'live_provider','live_without_provider','fixture_replay'})
+        self.assertEqual(groups['live_provider']['completedTrials'],1)
+        self.assertEqual(groups['live_without_provider']['successfulTasks'],1)
+        self.assertEqual(groups['fixture_replay']['completedTrials'],1)
+        self.assertEqual(groups['live_provider']['costPerSuccessfulTaskUsd'],0.1)
+        self.assertIn('not provider qualification', report['qualification'])
 
     def test_all_skills_have_a_distinct_review_scenario_set(self):
         remaining=json.loads((catalog.ROOT/'erp-skills/evals/review-cases.json').read_text())['skills']

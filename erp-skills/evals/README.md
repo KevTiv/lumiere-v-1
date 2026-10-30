@@ -77,7 +77,18 @@ python3 -m unittest discover -s scripts/tests -p 'test_erp_skill_benchmark.py'
 
 The report shows missing trials, per-skill/profile/configuration success and
 critical failures, cost per successful task, variance and p50/p95 latency. A
-critical failure cannot count as task success. Wilson intervals describe trial
+successful task requires both `taskSuccess` and `correctOutcome`, without a
+critical failure. First-pass success also requires that successful outcome;
+failure without repairs is not first-pass success. Case rows retain the reported
+success flag beside the derived result so inconsistent grading stays visible.
+
+Groups include `evidenceClass`: `live_provider` for admitted live trials with
+observed provider calls, `live_without_provider` for admitted live outcomes with
+zero calls, and `fixture_replay`. A correct permission denial or budget rejection
+can complete a task without dispatching a provider; it must not inflate the
+provider's success rate. The collector classifies submitted metrics, and does not
+authenticate their provenance or replace review of the referenced run and spend.
+Wilson intervals describe trial
 proportions; repeated trials of the same case are correlated and cannot establish
 model equivalence. Group results by scenario and retain paired comparisons for
 review. An incomplete run, a replay pass or an aggregate score never grants tenant
