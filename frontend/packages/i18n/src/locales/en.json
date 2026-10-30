@@ -14038,6 +14038,8 @@
       "stepPreview": "4. Preview",
       "stepImport": "5. Import",
       "analyze": "Analyze with AI",
+      "preparedProducts": "Preview prepared product CSV",
+      "preparedProductsHint": "Use exact CSV headers and explicit prices and units. No AI request is made. Uncertain rows can be saved for review.",
       "analyzing": "Analyzing…",
       "analyzed": "Column mapping suggested — review and continue.",
       "sourceColumns": "Source columns",
