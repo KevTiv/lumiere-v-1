@@ -4,6 +4,8 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { guideLibraryHref } from "@/lib/assistant-guides"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -1538,6 +1540,7 @@ function DocumentsClientLoaded({
 
   return (
     <>
+      {operatingCompanyId ? <div className="mb-3 flex justify-end"><Link href={guideLibraryHref(String(operatingCompanyId))} className="text-sm text-primary underline underline-offset-4">{t("aiChat.guide.savedGuides", { defaultValue: "Saved guides" })}</Link></div> : null}
       {processingToolbarError ? (
         <p className="text-sm text-destructive mb-2" role="alert">
           {processingToolbarError}

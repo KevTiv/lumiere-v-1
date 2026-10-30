@@ -71,6 +71,11 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
             "title": title,
             "content": released,
             "run_id": ctx.run_id,
+            // Preparing admitted content is separate from the user's
+            // write-authorized Save guide operation. A tool reply must never
+            // fabricate the durable guide identity shown by the client.
+            "persistence_state": "unsaved",
+            "saved": false,
         }),
         citations: vec![],
         row_count: None,

@@ -3799,6 +3799,15 @@
     "parent_id",
     "metadata"
   ],
+  "KnowledgeGuide": [
+    "workflow"
+  ],
+  "KnowledgeGuideRevision": [
+    "html",
+    "workflow_version",
+    "origin_message_id",
+    "origin_run_id"
+  ],
   "Lead": [
     "email",
     "phone",

@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod business_history;
+mod knowledge_guides;
 
 static DATABASE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -171,7 +172,7 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
     // Startup upgrades the frozen v13 prefix through the whole current catalog,
-    // including migration 27's history parent and all sixteen hash partitions.
+    // including migration 27's history partitions and migration 29's guide tables.
     let expected_new_tables = [
         "ai_run_budget_park",
         "ai_run_budget_resume_job",
@@ -195,6 +196,8 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         "business_change_p13",
         "business_change_p14",
         "business_change_p15",
+        "knowledge_guide",
+        "knowledge_guide_revision",
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",

@@ -4712,6 +4712,8 @@ const PARAMS_RUN_INVENTORY_WAVE_RELEASE_TEST: &[ReducerParam] = &[
 ];
 const PARAMS_RUN_IOT_RELATIONAL_INTEGRITY_TEST: &[ReducerParam] = &[
 ];
+const PARAMS_RUN_KNOWLEDGE_GUIDE_TESTS: &[ReducerParam] = &[
+];
 const PARAMS_RUN_MANUFACTURING_ACTUAL_COST_VALUATION_TEST: &[ReducerParam] = &[
 ];
 const PARAMS_RUN_MANUFACTURING_BOM_BYPRODUCT_OUTPUT_EXACT_EFFECT_TEST: &[ReducerParam] = &[
@@ -4904,6 +4906,24 @@ const PARAMS_SAVE_IMPORT_MAPPING_TEMPLATE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "template_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SaveImportMappingTemplateParams") },
+];
+const PARAMS_SAVE_KNOWLEDGE_GUIDE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "guide_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+    ReducerParam { name: "expected_revision", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+    ReducerParam { name: "request_key", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "draft_key", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "title", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "module", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "workflow", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "markdown", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "html", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "language", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "workflow_version", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "sources_json", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "origin_message_id", kind: ScalarKind::OptionalString, ref_target: None },
+    ReducerParam { name: "origin_run_id", kind: ScalarKind::OptionalString, ref_target: None },
 ];
 const PARAMS_SAVE_PRESENTATION_MODULE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -7572,6 +7592,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "run_inventory_warehouse_sync_test", contract_operation_id: "erp.run_inventory_warehouse_sync_test", params: PARAMS_RUN_INVENTORY_WAREHOUSE_SYNC_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_inventory_wave_release_test", contract_operation_id: "erp.run_inventory_wave_release_test", params: PARAMS_RUN_INVENTORY_WAVE_RELEASE_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_iot_relational_integrity_test", contract_operation_id: "erp.run_iot_relational_integrity_test", params: PARAMS_RUN_IOT_RELATIONAL_INTEGRITY_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_knowledge_guide_tests", contract_operation_id: "erp.run_knowledge_guide_tests", params: PARAMS_RUN_KNOWLEDGE_GUIDE_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_manufacturing_actual_cost_valuation_test", contract_operation_id: "erp.run_manufacturing_actual_cost_valuation_test", params: PARAMS_RUN_MANUFACTURING_ACTUAL_COST_VALUATION_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_manufacturing_bom_byproduct_output_exact_effect_test", contract_operation_id: "erp.run_manufacturing_bom_byproduct_output_exact_effect_test", params: PARAMS_RUN_MANUFACTURING_BOM_BYPRODUCT_OUTPUT_EXACT_EFFECT_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_manufacturing_bom_routing_lifecycle_test", contract_operation_id: "erp.run_manufacturing_bom_routing_lifecycle_test", params: PARAMS_RUN_MANUFACTURING_BOM_ROUTING_LIFECYCLE_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
@@ -7664,6 +7685,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "run_workflow_runtime_tests", contract_operation_id: "erp.run_workflow_runtime_tests", params: PARAMS_RUN_WORKFLOW_RUNTIME_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_workflow_subject_snapshot_tests", contract_operation_id: "erp.run_workflow_subject_snapshot_tests", params: PARAMS_RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_import_mapping_template", contract_operation_id: "erp.save_import_mapping_template", params: PARAMS_SAVE_IMPORT_MAPPING_TEMPLATE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "save_knowledge_guide", contract_operation_id: "erp.save_knowledge_guide", params: PARAMS_SAVE_KNOWLEDGE_GUIDE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "save_presentation_module", contract_operation_id: "erp.save_presentation_module", params: PARAMS_SAVE_PRESENTATION_MODULE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_proposal_version", contract_operation_id: "erp.save_proposal_version", params: PARAMS_SAVE_PROPOSAL_VERSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "schedule_document_retention_purge", contract_operation_id: "erp.schedule_document_retention_purge", params: PARAMS_SCHEDULE_DOCUMENT_RETENTION_PURGE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -9053,6 +9075,7 @@ pub mod reducer_names {
     pub const RUN_INVENTORY_WAREHOUSE_SYNC_TEST: ReducerName = ReducerName::new("run_inventory_warehouse_sync_test");
     pub const RUN_INVENTORY_WAVE_RELEASE_TEST: ReducerName = ReducerName::new("run_inventory_wave_release_test");
     pub const RUN_IOT_RELATIONAL_INTEGRITY_TEST: ReducerName = ReducerName::new("run_iot_relational_integrity_test");
+    pub const RUN_KNOWLEDGE_GUIDE_TESTS: ReducerName = ReducerName::new("run_knowledge_guide_tests");
     pub const RUN_MANUFACTURING_ACTUAL_COST_VALUATION_TEST: ReducerName = ReducerName::new("run_manufacturing_actual_cost_valuation_test");
     pub const RUN_MANUFACTURING_BOM_BYPRODUCT_OUTPUT_EXACT_EFFECT_TEST: ReducerName = ReducerName::new("run_manufacturing_bom_byproduct_output_exact_effect_test");
     pub const RUN_MANUFACTURING_BOM_ROUTING_LIFECYCLE_TEST: ReducerName = ReducerName::new("run_manufacturing_bom_routing_lifecycle_test");
@@ -9145,6 +9168,7 @@ pub mod reducer_names {
     pub const RUN_WORKFLOW_RUNTIME_TESTS: ReducerName = ReducerName::new("run_workflow_runtime_tests");
     pub const RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS: ReducerName = ReducerName::new("run_workflow_subject_snapshot_tests");
     pub const SAVE_IMPORT_MAPPING_TEMPLATE: ReducerName = ReducerName::new("save_import_mapping_template");
+    pub const SAVE_KNOWLEDGE_GUIDE: ReducerName = ReducerName::new("save_knowledge_guide");
     pub const SAVE_PRESENTATION_MODULE: ReducerName = ReducerName::new("save_presentation_module");
     pub const SAVE_PROPOSAL_VERSION: ReducerName = ReducerName::new("save_proposal_version");
     pub const SCHEDULE_DOCUMENT_RETENTION_PURGE: ReducerName = ReducerName::new("schedule_document_retention_purge");
@@ -10522,6 +10546,7 @@ macro_rules! reducer_call {
     ("run_inventory_warehouse_sync_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_INVENTORY_WAREHOUSE_SYNC_TEST, $args) };
     ("run_inventory_wave_release_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_INVENTORY_WAVE_RELEASE_TEST, $args) };
     ("run_iot_relational_integrity_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_IOT_RELATIONAL_INTEGRITY_TEST, $args) };
+    ("run_knowledge_guide_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_KNOWLEDGE_GUIDE_TESTS, $args) };
     ("run_manufacturing_actual_cost_valuation_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_MANUFACTURING_ACTUAL_COST_VALUATION_TEST, $args) };
     ("run_manufacturing_bom_byproduct_output_exact_effect_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_MANUFACTURING_BOM_BYPRODUCT_OUTPUT_EXACT_EFFECT_TEST, $args) };
     ("run_manufacturing_bom_routing_lifecycle_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_MANUFACTURING_BOM_ROUTING_LIFECYCLE_TEST, $args) };
@@ -10614,6 +10639,7 @@ macro_rules! reducer_call {
     ("run_workflow_runtime_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_RUNTIME_TESTS, $args) };
     ("run_workflow_subject_snapshot_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS, $args) };
     ("save_import_mapping_template", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_IMPORT_MAPPING_TEMPLATE, $args) };
+    ("save_knowledge_guide", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_KNOWLEDGE_GUIDE, $args) };
     ("save_presentation_module", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PRESENTATION_MODULE, $args) };
     ("save_proposal_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PROPOSAL_VERSION, $args) };
     ("schedule_document_retention_purge", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SCHEDULE_DOCUMENT_RETENTION_PURGE, $args) };
