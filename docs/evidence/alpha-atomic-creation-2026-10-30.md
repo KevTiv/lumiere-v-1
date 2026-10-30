@@ -6,6 +6,7 @@ Baseline: `fbb9a6b56b9a93bce4cd105b85f9099b6dff87a0`. This packet implements H2 
 
 - CRM lead, opportunity and contact creation and Sales quotation creation validate the complete native request, custom definitions and exact form scope before business writes. The base record, typed EAV values and an immutable actor/company-scoped creation receipt commit in one reducer transaction.
 - The reserved `__lumiere_create_v1` metadata envelope carries an exact company string and operation key. Native code derives the actor and full typed-request SHA-256 fingerprint. Changed input or another actor cannot reuse the key.
+- Metadata-only Lead creation resolves the requested envelope company and uses the existing CRM capability gate and canonical company-membership policy. Legacy requests without an envelope retain the default company. The Lead table remains organization-shared; this packet does not introduce company-private Lead records. Receipt and EAV scope follow the authorized selected company.
 - Frontend create hooks retain the original complete request under actor/organization/company/model scope before dispatch, use Web Locks for cross-tab coordination and disable automatic mutation retries. They check the exact private receipt before a user-requested retry and replay identical bytes with the same key. A changed draft cannot replace an unresolved request or be reported saved when an older attempt resolves.
 - The private `lead-creations`, `opportunity-creations`, `contact-creations` and `quotation-creations` reads use current authorization, membership-derived company and exact creator/model/key filters. They expose receipt identity, not business-record contents or a general receipt feed.
 - Purchase orders reuse `create_purchase_order_once` and its existing receipt. Custom fields are validated/persisted inside the same canonical create transaction; unkeyed Purchase Order creation does not admit them.
@@ -31,6 +32,8 @@ Text, finite numbers, booleans, configured options, string arrays and valid date
 ## Runtime cases added; execution still required
 
 `run_configured_record_creation_tests` is registered in `run_all_platform_tests`. It invokes real Contact, quotation and keyed Purchase Order owners and checks base/EAV/receipt identity, no duplicates on replay, rejected changed payload, invalid/missing/empty/null custom values, role restrictions and company boundaries. It also checks exact durable source-commit rows and no additional commit on replay.
+
+The same runtime gate includes selected-company Lead creation with a false-superuser administrator holding an exact live `*:*` role, ordinary bound/default membership, expired/inactive additive roles, a valid additive administrator and ambiguous membership. The fixture explicitly opts into the existing CRM multi-company capability so policy assertions do not pass merely because the rollout guard blocked them.
 
 `run_accounting_post_invoice_test` includes the extended manual invoice scenario. It checks a real balanced invoice plus custom values and receipt, replay stability, invalid-custom-field rejection without a base move and exact C2 coverage. Existing invoice tax, posting and effect assertions remain.
 

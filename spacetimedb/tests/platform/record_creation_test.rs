@@ -2,7 +2,9 @@
 //! calls caught inside one test transaction: validation must precede base writes.
 use spacetimedb::{ReducerContext, Table};
 
-use crate::core::organization::{company, create_company, CreateCompanyParams};
+use crate::core::organization::{
+    company, create_company, organization_settings, CreateCompanyParams, OrganizationSettings,
+};
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::users::{
@@ -703,6 +705,36 @@ pub fn selected_company_lead_lifecycle(ctx: &ReducerContext) -> Result<(), Strin
         .find(|row| row.id != fixture.company_id)
         .ok_or("lead branch missing")?
         .id;
+    // Admit this isolated fixture to the existing CRM multi-company capability;
+    // the assertions below must exercise membership policy, not the rollout guard.
+    match ctx.db.organization_settings().organization_id().find(&org) {
+        Some(settings) => {
+            let mut flags = settings.feature_flags.clone();
+            if !flags
+                .iter()
+                .any(|flag| flag == crate::crm::CRM_MULTI_COMPANY_FLAG)
+            {
+                flags.push(crate::crm::CRM_MULTI_COMPANY_FLAG.into());
+            }
+            ctx.db
+                .organization_settings()
+                .organization_id()
+                .update(OrganizationSettings {
+                    feature_flags: flags,
+                    ..settings
+                });
+        }
+        None => {
+            ctx.db.organization_settings().insert(OrganizationSettings {
+                organization_id: org,
+                module_config: None,
+                feature_flags: vec![crate::crm::CRM_MULTI_COMPANY_FLAG.into()],
+                integration_keys: None,
+                updated_at: ctx.timestamp,
+                metadata: Some(r#"{"harness":"selected-company-lead"}"#.into()),
+            });
+        }
+    }
     let membership = ctx
         .db
         .user_organization()
