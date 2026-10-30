@@ -39,13 +39,13 @@ export function GuideVerificationActions({ document, disabled, onLoad, onNominat
   }
 
   return <div className="mt-3 space-y-3">
-    {canNominate ? <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void perform(async () => { setChoices(await onLoad!()); setExpanded(true) })}>{t("aiChat.guide.requestVerification", { defaultValue: "Request verification" })}</Button> : null}
+    {canNominate ? <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void perform(async () => { const next=await onLoad!();setChoices(next);setSelected((current)=>current.filter((value)=>next.some((choice)=>choice.decisionId===value)));setExpanded(true) })}>{t("aiChat.guide.requestVerification", { defaultValue: "Request verification" })}</Button> : null}
     {expanded && canNominate && choices ? <div className="space-y-3">
       <p>{t("aiChat.guide.selectEvidence", { defaultValue: "Choose reviewed evidence already linked to this revision. The request creates a private review candidate; it does not approve or execute this guide." })}</p>
       {choices.length ? choices.map((choice) => <div key={choice.decisionId} className="space-y-1 rounded-md border border-border p-3">
         <label htmlFor={`${id}-${choice.decisionId}`} className="flex items-start gap-2 font-medium"><Checkbox id={`${id}-${choice.decisionId}`} aria-label={choice.title} checked={selected.includes(choice.decisionId)} disabled={busy} onCheckedChange={(checked) => setSelected((current) => checked ? [...current.filter((value)=>value!==choice.decisionId),choice.decisionId] : current.filter((value)=>value!==choice.decisionId))} />{choice.title}</label>
         <p>{choice.summary}</p><p>{choice.sourceLabels.join(" · ")}</p>
-        {BigInt(choice.decisionId)<=BigInt(Number.MAX_SAFE_INTEGER) ? <a className="text-primary underline" href={`/ai-harness?${new URLSearchParams({ tab:"evidence-reviewer",kind:"decision",id:choice.decisionId,companyId:document.companyId })}`}>{t("aiChat.guide.inspectEvidence", { defaultValue: "Inspect this evidence" })}</a> : null}
+        {BigInt(choice.decisionId)<=BigInt(Number.MAX_SAFE_INTEGER) ? <a className="text-primary underline" target="_blank" rel="noopener noreferrer" href={`/ai-harness?${new URLSearchParams({ tab:"evidence-reviewer",kind:"decision",id:choice.decisionId,companyId:document.companyId })}`}>{t("aiChat.guide.inspectEvidence", { defaultValue: "Inspect this evidence" })}</a> : null}
       </div>) : <p role="status">{t("aiChat.guide.noReviewEvidence", { defaultValue: "No current reviewed evidence is linked to this revision. Review its sources and justifying decision before requesting verification." })}</p>}
       {choices.length ? <Button type="button" size="sm" disabled={busy || !selected.length} onClick={() => void perform(async () => {
         const chosen = choices.filter((choice)=>selected.includes(choice.decisionId))
