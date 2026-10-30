@@ -1,6 +1,6 @@
 "use client"
 import { buildManualInvoiceCatalog, manualInvoiceAccountChoices, manualInvoiceJournalChoices, manualInvoiceTaxChoices } from "./features/manual-invoice-catalog"
-import { journalImportReadinessAction } from "./journal-import-readiness"
+import { journalImportReadinessAction, journalLineImportReadinessAction } from "./journal-import-readiness"
 import { useTaxDeadlineAdministration } from "./features/use-tax-deadline-administration"
 import { useTaxGroupAdministration } from "./features/use-tax-group-administration"
 import { useTaxJurisdictionAdministration } from "./features/use-tax-jurisdiction-administration"
@@ -1315,7 +1315,7 @@ function AccountingClientReady({
     [requestAccountingAction],
   )
   const openAccountingMoveLineImport = useCallback(
-    () => requestAccountingAction("import", () => setCsvKind("accountMoveLine")),
+    () => requestAccountingAction("journal-import", () => setCsvKind("accountMoveLine")),
     [requestAccountingAction],
   )
   const openOutstandingDocumentImport = useCallback(
@@ -5948,7 +5948,17 @@ function AccountingClientReady({
               await importOutstandingDocuments(text, "cutover_open_residual")
             else if (csvKind === "historicalDocumentsForPaymentReplay")
               await importOutstandingDocuments(text, "reconstruct_original_total")
-            else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
+            else if (csvKind === "accountMoveLine") {
+              const parsed = parseCsvText(text)
+              const action = journalLineImportReadinessAction(
+                parsed.headers.map(header => header.trim().toLowerCase()), parsed.rows, allMoves, operatingCompanyId,
+              )
+              const readiness = evaluateAccountingSetupReadiness(accountingSetup, action)
+              if (accountingSetupDataState.status !== "ready" || allMovesRead.state.status !== "ready" || !readiness.isReady) {
+                throw new Error(readiness.blockingItems[0]?.reason ?? "Accounting setup and journal entries must be ready before importing lines.")
+              }
+              await csvImports.importAccountMoveLine.mutateAsync(text)
+            }
             else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
             else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
             else if (csvKind === "budgetLine") await csvImports.importBudgetLine.mutateAsync(text)
