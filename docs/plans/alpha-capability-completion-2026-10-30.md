@@ -9,13 +9,17 @@ does not certify these new changes or the later main revision.
 
 | Packet | Owner | Implementation scope | Current state |
 | --- | --- | --- | --- |
-| H1 | accounting_completion | Correct invoice defaults, eligibility and provenance; preserve explicit stale choices; existing trusted-history coverage | Implemented; integrated checks pending |
-| H2 | creation_completion | Atomic native custom fields for CRM, quotation, purchase order and Accounting creation; scoped durable creation receipts and uncertain-save recovery | Implemented; integrated checks pending |
-| H3 | expenses_completion | Authorized saved allocation readback and retained edits; validated employee/currency inputs | Implemented; integrated checks pending |
-| H4 | billing_completion | Exact closure/renewal evidence; idempotent renewal and readback through existing amendment owner | Implemented; integrated checks pending |
-| H5a | documents_completion | Authoritative retention preview; recipient exclusions and actual provider delivery receipts | Implemented; integrated checks pending |
-| H5b | assistant_completion | Existing independent-review guide adapter, source freshness and bounded contextual error help | Implemented; integrated checks pending |
-| Integration | coordinator | Shared projections, registries/codegen, contract release, translations, test registration, independent review and PR evidence | Implemented; integrated checks pending |
+| H1 | accounting_completion | Correct invoice defaults, eligibility and provenance; preserve explicit stale choices; existing trusted-history coverage | Implemented; final gates tracked in PR #331 |
+| H2 | creation_completion | Atomic native custom fields for CRM, quotation, purchase order and Accounting creation; scoped durable creation receipts and uncertain-save recovery | Implemented; final gates tracked in PR #331 |
+| H3 | expenses_completion | Authorized saved allocation readback and retained edits; validated employee/currency inputs | Implemented; final gates tracked in PR #331 |
+| H4 | billing_completion | Exact closure/renewal evidence; idempotent renewal and readback through existing amendment owner | Implemented; final gates tracked in PR #331 |
+| H5a | documents_completion | Authoritative retention preview; recipient exclusions and actual provider delivery receipts | Implemented; final gates tracked in PR #331 |
+| H5b | assistant_completion | Existing independent-review guide adapter, source freshness and bounded contextual error help | Implemented; final gates tracked in PR #331 |
+| Integration | coordinator | Shared projections, registries/codegen, contract release, translations, test registration, independent review and PR evidence | Implemented; final gates tracked in PR #331 |
+
+Final hosted gate outcomes and any subsequent evidence are recorded in
+[PR #331](https://github.com/KevTiv/lumiere-v-1/pull/331). This file records the
+implementation checkpoint without creating another source revision for each CI result.
 
 Each owner uses a separate worktree. Shared generated artifacts and immutable
 contract versions are integrated once by the coordinator. Domain code remains
@@ -95,9 +99,13 @@ retention 6, exclusion capture validation 1 and the actual Rust application
 catalog checksum check 1. This local build used the pre-release 0.3.158 bindings;
 matching-pin hosted validation remains required. A first local HTTP fixture run
 was denied loopback binding by the execution sandbox; the unchanged tests passed
-when run with loopback network access. C4 upgrade execution, matching-pin
-integrated frontend types/browser regressions and real-service guide gate remain
-required before the draft PR is ready.
+when run with loopback network access. All eleven workspace, web and mobile typechecks passed serially against the
+verified 0.3.159 archive. The employee-default field union and a Purchasing
+fixture type were corrected, with 22 focused cases and zero-warning lint passing.
+The real PostgreSQL C4 group passed all 12 cases on the pre-pin source, including
+the named 29→30 receipt preservation/restart case. Final matching-pin hosted
+gates, browser regressions and real-service guide acceptance remain required
+before the draft PR is ready; their results are recorded on PR #331.
 
 Known limits: Lead records retain their existing organization-shared schema,
 while operating-company admission, custom values and recovery receipts are exact.
