@@ -10,6 +10,7 @@ const JOB_TABLES: Record<string, string> = {
   timesheet: "project_timesheet", workcenter: "mrp_workcenter",
 }
 export function trackedImportEntity(entity: string): string { return JOB_TABLES[entity] ?? entity }
+export function isExplicitProductPrice(value: string): boolean { return /^\d{1,12}(?:\.\d{1,6})?$/.test(value.trim()) }
 
 export function guidedImportRequest(args: { organizationId: bigint; companyId: number; entity: string; csv: string; fileName: string; companies: readonly { id: unknown; currencyId?: unknown }[] }) {
   const entity = trackedImportEntity(args.entity)
@@ -22,7 +23,7 @@ export function guidedImportRequest(args: { organizationId: bigint; companyId: n
   if (entity === "product") {
     const parsed = parseCsvText(args.csv)
     const prices = ["sale_price", "cost_price"].map(key => parsed.headers.indexOf(key))
-    if (prices.some(index => index < 0) || parsed.rows.some(row => prices.some(index => !/^\d{1,12}(?:\.\d{1,6})?$/.test((row[index] ?? "").trim())))) {
+    if (prices.some(index => index < 0) || parsed.rows.some(row => prices.some(index => !isExplicitProductPrice(row[index] ?? "")))) {
       throw new Error("Enter an explicit sale price and cost price for every product. Save unknown prices for review.")
     }
   }

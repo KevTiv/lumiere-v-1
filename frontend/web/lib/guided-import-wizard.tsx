@@ -10,6 +10,9 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest } from "@lumiere/query-hooks/hooks/csv-import-request"
 import { guidedImportRequest, trackedImportEntity } from "./guided-import-request"
+import { previewPreparedProducts, type ProductImportReference } from "./prepared-product-preview"
+import { useProductCategories } from "@lumiere/query-hooks/hooks/inventory/products"
+import { useUoms } from "@lumiere/query-hooks/hooks/inventory/uom"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api-fetch"
 import { REVIEW_TARGETS, reviewDatasetFromCsv, type ReviewedImportSource } from "./import-review-model"
@@ -92,6 +95,16 @@ export type GuidedImportWizardProps = {
   onReviewSaved?: (id: string) => void
 }
 
+function PreparedProductPreviewButton({ organizationId, disabled, onPreview }: { organizationId: bigint; disabled: boolean; onPreview: (categories: readonly ProductImportReference[], uoms: readonly ProductImportReference[]) => void }) {
+  const { t } = useTranslation()
+  const categoriesQuery = useProductCategories(organizationId)
+  const uomsQuery = useUoms(organizationId)
+  return <div className="space-y-1">
+    <Button type="button" variant="outline" disabled={disabled || categoriesQuery.isFetching || uomsQuery.isFetching} onClick={() => onPreview(categoriesQuery.data ?? [], uomsQuery.data ?? [])}>{t("settings.import.preparedProducts", { defaultValue: "Preview prepared product CSV" })}</Button>
+    <p className="text-xs text-muted-foreground">{t("settings.import.preparedProductsHint", { defaultValue: "Use exact CSV headers and explicit prices and units. No AI request is made. Uncertain rows can be saved for review." })}</p>
+  </div>
+}
+
 export function GuidedImportWizard({ organizationId, initialSource, onReviewSaved }: GuidedImportWizardProps) {
   const { t } = useTranslation()
   const workspaceProfile = useWorkspaceProfile()
@@ -122,6 +135,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
   const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
   const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
+  const [preparedPreview, setPreparedPreview] = useState(false)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [previewResult, setPreviewResult] = useState<ImportPreviewResponse | null>(null)
   const [duplicateStates, setDuplicateStates] = useState<ImportDuplicateRowState[]>([])
@@ -221,6 +235,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
   const resetFlow = useCallback(() => {
     setStep("upload")
     setAnalysis(null)
+    setPreparedPreview(false)
     setMapping({})
     setPreviewResult(null)
     setDuplicateStates([])
@@ -307,6 +322,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
     setError(null)
     setStatus(null)
     setPreviewResult(null)
+    setPreparedPreview(false)
     setDuplicateStates([])
     setStep("analyze")
     try {
@@ -339,6 +355,17 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
       setError(e instanceof Error ? e.message : String(e))
     }
   }, [analyze, csvText, headers, rows, selectedTemplate, selectedTemplateId, targetEntity, t])
+
+  const runPreparedPreview = (categories: readonly ProductImportReference[], uoms: readonly ProductImportReference[]) => {
+    setError(null); setStatus(null); setConfirmImportWithErrors(false)
+    try {
+      const result = previewPreparedProducts({ csv: csvText, organizationId, categories, uoms })
+      setAnalysis(result.analysis); setMapping(result.mapping); setPreviewResult(result.preview)
+      setAppliedTemplateId(null); setPreparedPreview(true)
+      setDuplicateStates(defaultDuplicateActions(detectImportDuplicates({ entity: entityOption, previewRows: result.preview.rows, mapping: result.mapping, products: productsQuery.data ?? [] })))
+      setStep("preview")
+    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
+  }
 
   const runPreview = useCallback(async () => {
     if (!csvText.trim() || Object.keys(mapping).length === 0) return
@@ -400,7 +427,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
       )
       return
     }
-    if (previewErrors.length > 0 && !confirmImportWithErrors) {
+    if (previewErrors.length > 0 && (preparedPreview || !confirmImportWithErrors)) {
       setError(
         t(
           "settings.import.confirmErrorsRequired",
@@ -497,6 +524,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
     queryClient,
     previewResult,
     previewErrors.length,
+    preparedPreview,
     rows,
     sourceFileName,
     sourceFormat,
@@ -777,7 +805,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
               </div>
             </div>
           ) : null}
-          {previewErrors.length > 0 ? (
+          {previewErrors.length > 0 && !preparedPreview ? (
             <label className="flex items-center gap-2 text-sm text-destructive">
               <input
                 type="checkbox"
@@ -795,6 +823,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        {step === "upload" && targetEntity === "product" && csvText.trim() ? <PreparedProductPreviewButton organizationId={orgId} disabled={busy || analyze.isPending} onPreview={runPreparedPreview} /> : null}
         {step === "import" && importRequest && !importedJobId ? <>
           <Button type="button" variant="outline" disabled={busy} onClick={() => void runImport(true)}>{t("settings.importReview.checkResult", { defaultValue: "Check import result" })}</Button>
           <Button type="button" variant="outline" disabled={busy} onClick={() => void runImport()}>{t("settings.importReview.retrySame", { defaultValue: "Retry same submission" })}</Button>
@@ -822,7 +851,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
           </Button>
         ) : null}
         {step === "preview" ? (
-          <Button type="button" disabled={busy} onClick={() => void runImport()}>
+          <Button type="button" disabled={busy || (preparedPreview && previewErrors.length > 0)} onClick={() => void runImport()}>
             {t("settings.import.run", "Import")}
           </Button>
         ) : null}
