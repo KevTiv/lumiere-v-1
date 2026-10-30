@@ -20,6 +20,25 @@ const readySetup: AccountingSetupReadinessInput = {
 };
 
 describe("evaluateAccountingSetupReadiness", () => {
+  it("allows general journal drafts without inventing invoice or tax setup", () => {
+    const setup: AccountingSetupReadinessInput = {
+      ...readySetup,
+      salesJournalConfigured: false,
+      purchaseJournalConfigured: false,
+      receivableAccountConfigured: false,
+      payableAccountConfigured: false,
+      incomeAccountConfigured: false,
+      expenseAccountConfigured: false,
+      taxConfiguration: "missing",
+    };
+    expect(evaluateAccountingSetupReadiness(setup, "journal-import").isReady).toBe(true);
+    for (const action of ["invoice", "bill", "import"] as const) {
+      expect(evaluateAccountingSetupReadiness(setup, action).blockingItems.map(item => item.id)).toContain("tax-configuration");
+    }
+    for (const field of ["companyConfigured", "baseCurrencyConfigured", "fiscalYearConfigured", "openPeriodAvailable"] as const) {
+      expect(evaluateAccountingSetupReadiness({ ...setup, [field]: false }, "journal-import").isReady).toBe(false);
+    }
+  });
   it("reports a fully configured setup as ready", () => {
     const result = evaluateAccountingSetupReadiness(readySetup);
 

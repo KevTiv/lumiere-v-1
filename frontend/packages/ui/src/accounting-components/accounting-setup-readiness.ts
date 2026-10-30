@@ -1,4 +1,4 @@
-export type AccountingReadinessAction = "invoice" | "bill" | "import";
+export type AccountingReadinessAction = "invoice" | "bill" | "import" | "journal-import";
 
 export type AccountingTaxReadiness =
   | "ready"
@@ -51,7 +51,8 @@ export interface AccountingSetupReadinessResult {
   advisoryItems: AccountingReadinessItem[];
 }
 
-const ALL_ACTIONS = ["invoice", "bill", "import"] as const;
+const ALL_ACTIONS = ["invoice", "bill", "import", "journal-import"] as const;
+const TAX_ACTIONS = ["invoice", "bill", "import"] as const;
 const INVOICE_ACTIONS = ["invoice", "import"] as const;
 const BILL_ACTIONS = ["bill", "import"] as const;
 
@@ -189,7 +190,7 @@ export function evaluateAccountingSetupReadiness(
     items.push(
       blockingItem(
         "tax-configuration",
-        ALL_ACTIONS,
+        TAX_ACTIONS,
         "Tax configuration",
         "Taxes must be configured or explicitly marked as not required before accounting data is entered.",
         "Configure taxes",

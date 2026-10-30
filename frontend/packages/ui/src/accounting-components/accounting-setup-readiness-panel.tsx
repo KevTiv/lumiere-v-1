@@ -51,6 +51,11 @@ const ACTION_COPY: Record<
     readyTitle: "Accounting import is ready",
     blockedTitle: "Accounting import needs setup",
   },
+  "journal-import": {
+    subject: "import draft general journal entries",
+    readyTitle: "General journal import is ready",
+    blockedTitle: "General journal import needs setup",
+  },
 };
 
 export function AccountingSetupReadinessPanel({
