@@ -160,7 +160,7 @@ export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organi
         />
         <Button
           type="button"
-          className="w-fit max-w-full whitespace-normal sm:col-span-2"
+          className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
           disabled={busy || currencyState.status !== "ready" || !externalRef.trim() || !amount || !currencyOptions.some(option => option.value === currencyId)}
           data-testid="expenses-ops-create-statement"
           onClick={() =>
@@ -184,7 +184,7 @@ export function ExpensesOpsPanel({ organizationId, section = "cards" }: { organi
           options={expenseOptions} disabled={busy || !matchReady} testId="expenses-ops-expense-id" />
         <Button
           type="button"
-          className="w-fit max-w-full whitespace-normal sm:col-span-2"
+          className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
           variant="outline"
           disabled={busy || !matchReady || !statementOptions.some(option => option.value === statementLineId) || !expenseOptions.some(option => option.value === expenseId)}
           data-testid="expenses-ops-match"

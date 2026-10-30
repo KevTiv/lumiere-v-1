@@ -170,7 +170,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
             options={accountOptions} disabled={busy || accountRead.state.status !== "ready"} testId="expenses-admin-adv-account" />
           <Button
             type="button"
-            className="w-fit max-w-full whitespace-normal sm:col-span-2"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
             disabled={
               busy || !advanceReady ||
               !advEmployeeId ||
@@ -232,7 +232,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           />
           <Button
             type="button"
-            className="w-fit max-w-full whitespace-normal sm:col-span-3"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-3"
             variant="outline"
             disabled={busy || !applyReady || !applyAdvanceId || !applySheetId || !applyAmount}
             data-testid="expenses-admin-apply-advance"
@@ -266,7 +266,7 @@ export function ExpensesAdminPanel({ organizationId }: { organizationId: number 
           />
           <Button
             type="button"
-            className="w-fit max-w-full whitespace-normal sm:col-span-2"
+            className="h-auto min-h-9 w-fit max-w-full whitespace-normal sm:col-span-2"
             disabled={busy || !expenseReady || !expenseOptions.some(option => option.value === excExpenseId) || !excExpenseId || !excReason.trim()}
             data-testid="expenses-admin-request-exception"
             onClick={() =>
