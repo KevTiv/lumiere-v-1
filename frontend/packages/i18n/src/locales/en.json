@@ -1,4 +1,41 @@
 {
+  "activation": {
+    "tasks": {
+      "contact": "Add a contact",
+      "quotation": "Prepare a quotation",
+      "expense": "Capture an expense",
+      "accounting": "Set up accounting",
+      "reports": "Review reports"
+    },
+    "guidance": {
+      "contact": "Open Contacts, choose New contact and enter the details. Save in the form, then return here to refresh the checks.",
+      "quotation": "In Sales, choose New quotation, then select a customer, currency and price list. Add products and review their prices before confirming an order.",
+      "expense": "Use the expense capture form to choose an employee, product and price list, enter the amount and attach a receipt. Saving a draft does not approve or reimburse it.",
+      "accounting": "Accounting checks your fiscal years, open periods, journals, accounts and taxes. Follow the setup actions to complete missing details before posting.",
+      "reports": "Open Reports and choose your company, accounting period and report. Check its sources and limitations before using a preview for a financial decision."
+    },
+    "states": {
+      "ready": "Available",
+      "missing": "Needs setup",
+      "unavailable": "Could not verify"
+    },
+    "checks": {
+      "company": "Current company access",
+      "currency": "Company base currency assigned",
+      "fiscal": "Company fiscal year-end recorded",
+      "contact": "Saved contact in this company",
+      "customer": "Saved customer in this company"
+    },
+    "title": "Getting started",
+    "description": "Choose a first task for your role. Check your company settings and find the form you need.",
+    "permissionsUnavailable": "Current permissions are unavailable. Refresh your session before choosing a task.",
+    "scopeNote": "Review saved records before using them for business; they may include sample data. Each form checks required fields and your current permissions when you save.",
+    "selectCompany": "Select a company in the workspace company selector to check its setup and start a task.",
+    "chooseTask": "What would you like to do first?",
+    "noTasks": "No supported first task is available for your current permissions. Ask your organization administrator for the access needed for your work.",
+    "companySettings": "Review company settings",
+    "refresh": "Refresh checks"
+  },
   "recordChanges": {
     "title": "Changes",
     "permission": "Business change history",
