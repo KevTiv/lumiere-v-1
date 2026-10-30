@@ -59,6 +59,18 @@ def wilson(successes, total):
     return [max(0, center-margin), min(1, center+margin)]
 
 
+def successful_task(result):
+    """A claimed task success needs a correct outcome and no critical failure."""
+    return result['taskSuccess'] and result['correctOutcome'] and not result['criticalFailure']
+
+
+def evidence_class(result):
+    """Keep valid pre-dispatch denials separate from observed provider trials."""
+    if result['executionMode'] == 'immutable_fixture_replay':
+        return 'fixture_replay'
+    return 'live_provider' if result['providerCalls'] > 0 else 'live_without_provider'
+
+
 def summarize(trials, results):
     expected = {trial['trialId']:trial for trial in trials}
     if len(expected) != len(trials):
@@ -91,25 +103,27 @@ def summarize(trials, results):
             raise ValueError('fixture replay cannot report provider spend')
         if result['firstPass'] and (result['repairs'] or result['fallbacks']):
             raise ValueError('first-pass result cannot include repair or fallback')
-        groups[(trial['skill'],trial['configuration'],trial['profile'],result['executionMode'])].append(result)
+        groups[(trial['skill'],trial['configuration'],trial['profile'],result['executionMode'],evidence_class(result))].append(result)
     summary=[]
-    for (skill,config,profile,mode), rows in sorted(groups.items()):
-        successful=sum(r['taskSuccess'] and not r['criticalFailure'] for r in rows)
+    for (skill,config,profile,mode,evidence), rows in sorted(groups.items()):
+        successful=sum(successful_task(r) for r in rows)
         latency=sorted(r['latencyMs'] for r in rows)
-        entry={'skill':skill,'configuration':config,'profile':profile,'executionMode':mode,
+        entry={'skill':skill,'configuration':config,'profile':profile,'executionMode':mode,'evidenceClass':evidence,
                'completedTrials':len(rows),'successfulTasks':successful,
                'successRate':successful/len(rows),'successWilson95':wilson(successful,len(rows)),
                'criticalFailures':sum(r['criticalFailure'] for r in rows),
-               'firstPassRate':sum(r['firstPass'] for r in rows)/len(rows),
+               'firstPassRate':sum(successful_task(r) and r['firstPass'] for r in rows)/len(rows),
                'correctOutcomeRate':sum(r['correctOutcome'] for r in rows)/len(rows),
                'costPerSuccessfulTaskUsd':sum(r['totalCostUsd'] for r in rows)/successful if successful else None,
                'p50LatencyMs':statistics.median(latency),'p95LatencyMs':latency[max(0,math.ceil(.95*len(latency))-1)],
                'metrics':{key:stats([r[key] for r in rows]) for key in ['totalCostUsd','inputTokens','outputTokens','providerCalls','repairs','fallbacks']},
-               'cases':[{'trialId':r['trialId'],'success':r['taskSuccess'],'criticalFailure':r['criticalFailure'],'gradeEvidence':r['gradeEvidence']} for r in rows]}
+               'cases':[{'trialId':r['trialId'],'success':successful_task(r),
+                         'reportedTaskSuccess':r['taskSuccess'],'correctOutcome':r['correctOutcome'],
+                         'criticalFailure':r['criticalFailure'],'gradeEvidence':r['gradeEvidence']} for r in rows]}
         summary.append(entry)
     return {'expectedTrials':len(trials),'observedTrials':len(results),'complete':len(seen)==len(expected),
             'missingTrialIds':sorted(set(expected)-seen),'groups':summary,
-            'qualification':'Metrics only. Missing trials, replay results and aggregate scores never grant certification or activation. Repetitions share cases; trial confidence intervals are descriptive, not proof of model equivalence.'}
+            'qualification':'Metrics only. Live results without provider calls measure runtime outcomes, not provider qualification. Missing trials, replay results and aggregate scores never grant certification or activation. Repetitions share cases; trial confidence intervals are descriptive, not proof of model equivalence.'}
 
 
 def read_jsonl(path):
