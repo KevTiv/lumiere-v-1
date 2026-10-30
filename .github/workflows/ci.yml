@@ -268,8 +268,9 @@ jobs:
       - name: Document evidence ingestion tests
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib evidence_ingestion::tests
 
-      - name: Assistant guide access and save transport
+      - name: Assistant guide access, evidence review and save transport
         run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::ai_evidence::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::knowledge_guides::tests
           python3 scripts/run-required-cargo-tests.py --locked -p stdb-auth detail_field_access_honors
 
