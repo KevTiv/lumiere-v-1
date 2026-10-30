@@ -25,11 +25,12 @@ test("a review copy retains bad and missing source cells without confirming them
 
 test("only confirmed corrections enter the next import and a cleared value stays cleared", () => {
   const row: ReviewRow = { id: "42", source: { key: "sausage", label: "Sausage", source: { file: "shop.csv", row: 8, sha256: "a".repeat(64) }, issue: "Weight unknown", fields: [{ key: "name", label: "Name", kind: "text", sourceValue: "Sausage", required: true }, { key: "sale_price", label: "Price", kind: "decimal", sourceValue: "600", required: false }], proposed: { name: "Sausage", sale_price: "4800" } }, values: { name: "Sausage", sale_price: null }, state: "confirmed", revision: 2, reason: "Price removed pending source check", reviewedBy: "actor", reviewedAt: "2026-10-30" }
-  const detail: ReviewDetail = { id: "1", title: "History", targetEntity: "product", sourceFile: "shop.csv", items: [row, { ...row, id: "43", state: "needs_review" }, { ...row, id: "44", state: "excluded" }], history: [] }
+  const detail: ReviewDetail = { id: "1", title: "History", targetEntity: "source_observation", sourceFile: "shop.csv", items: [row, { ...row, id: "43", state: "needs_review" }, { ...row, id: "44", state: "excluded" }], history: [] }
   const result = parseCsvText(reviewedImportSource(detail).csv)
   assert.equal(result.rows.length, 1)
   assert.equal(result.rows[0][result.headers.indexOf("sale_price")], "")
   assert.equal(result.rows[0][result.headers.indexOf("_source_row")], "8")
   assert.equal(result.rows[0][result.headers.indexOf("_review_revision")], "2")
   assert.equal(row.source.fields[1].sourceValue, "600")
+  assert.throws(() => reviewedImportSource({ ...detail, targetEntity: "product" }), /explicit sale price and cost price/)
 })

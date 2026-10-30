@@ -34,6 +34,16 @@ pub(super) struct SourceReference {
     pub file: String,
     pub row: u32,
     pub sha256: String,
+    #[serde(default)]
+    pub row_basis: RowBasis,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum RowBasis {
+    #[default]
+    SourceLine,
+    ImportRow,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -72,6 +82,14 @@ fn key(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
+}
+
+fn field_key(value: &str) -> bool {
+    key(value)
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        && !matches!(value, "constructor" | "prototype")
 }
 
 /// Exact fixed-point validation for review values, with no floating-point coercion.
@@ -204,7 +222,7 @@ pub(super) fn validate_dataset(data: &Dataset) -> Result<(), String> {
         }
         let mut field_keys = BTreeSet::new();
         for field in &item.fields {
-            if !key(&field.key)
+            if !field_key(&field.key)
                 || !field_keys.insert(&field.key)
                 || field.label.is_empty()
                 || field.label.len() > 200

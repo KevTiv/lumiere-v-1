@@ -6,13 +6,15 @@ function source(): ReviewRow {
     {key:"quantity",label:"Actual weight (kg)",kind:"decimal",sourceValue:"8",required:true},
     {key:"unit_price",label:"Price per kg (RWF)",kind:"decimal",sourceValue:"600",required:true},
     {key:"amount",label:"Total (RWF)",kind:"decimal",sourceValue:"4800",required:true},
-  ],proposed:{quantity:null,unit_price:"4800",amount:"4800"}},values:{quantity:null,unit_price:"4800",amount:"4800"},state:"needs_review",revision:1,reason:null,reviewedAt:null,reviewedBy:null }
+    {key:"sale_price",label:"Sale price (RWF/kg)",kind:"decimal",sourceValue:"4800",required:true},
+    {key:"cost_price",label:"Synthetic cost (RWF/kg)",kind:"decimal",sourceValue:"3000",required:true},
+  ],proposed:{quantity:null,unit_price:"4800",amount:"4800",sale_price:"4800",cost_price:"3000"}},values:{quantity:null,unit_price:"4800",amount:"4800",sale_price:"4800",cost_price:"3000"},state:"needs_review",revision:1,reason:null,reviewedAt:null,reviewedBy:null }
 }
 
 test("a missing weight stays uncertain, then explicit correction is saved and survives reload", async ({ page }) => {
   let item=source()
   let writes=0
-  const detail=():ReviewDetail=>({id:"1",title:"Historic source review",targetEntity:"product",sourceFile:"historic-shop.csv",items:[item,{...source(),id:"12",source:{...source().source,label:"Other unresolved product"}}],history:item.revision>1?[{itemId:item.id,revision:item.revision,values:item.values,state:item.state,reason:item.reason!,actor:"ab".repeat(32),createdAt:"2026-10-30T12:00:00Z"}]:[]})
+  const detail=():ReviewDetail=>({id:"1",title:"Historic source review",targetEntity:"product",sourceFile:"historic-shop.csv",items:[item,{...source(),id:"12",source:{...source().source,key:"other-product",label:"Other unresolved product"}}],history:item.revision>1?[{itemId:item.id,revision:item.revision,values:item.values,state:item.state,reason:item.reason!,actor:"ab".repeat(32),createdAt:"2026-10-30T12:00:00Z"}]:[]})
   await page.route("**/api/query/**", route=>route.fulfill({json:{data:[]}}))
   await page.route("**/api/import-reviews**", async route=>{
     if(route.request().method()==="PATCH") {

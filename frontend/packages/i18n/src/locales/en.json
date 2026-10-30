@@ -14990,7 +14990,15 @@
         "confirmed": "Confirmed",
         "excluded": "Excluded",
         "all": "All"
-      }
+      },
+      "moduleSpecific": "These source corrections are saved. Use Accounting or the relevant module to create complete business records.",
+      "importPending": "The import is running. Check its result before starting another submission.",
+      "receiptSummary": "Imported {{count}} rows. {{errors}} rows need correction.",
+      "receiptStatus": "Import status: {{status}}.",
+      "checkResult": "Check import result",
+      "retrySame": "Retry same submission",
+      "importRow": "Import row {{row}}",
+      "sourceLine": "Source line {{row}}"
     }
   },
   "reports": {
