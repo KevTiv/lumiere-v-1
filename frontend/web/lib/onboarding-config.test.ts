@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { isOnboardingTimezone, onboardingFiscalYearEnd, onboardingTimezones } from "./onboarding-config"
+import { additionalOnboardingCode, isOnboardingTimezone, onboardingFiscalYearEnd, onboardingTimezones } from "./onboarding-config"
+
+test("an additional organization offer requires an explicit valid code", () => {
+  assert.equal(additionalOnboardingCode({ additionalOrganizationCode: "UMUNUPFU_MUGISHA" }), "UMUNUPFU_MUGISHA")
+  for (const payload of [null, {}, { data: [] }, { additionalOrganizationCode: true }, { additionalOrganizationCode: "*" }, { additionalOrganizationCode: "FARM ORG" }, { additionalOrganizationCode: "X".repeat(33) }]) assert.equal(additionalOnboardingCode(payload), null)
+})
 
 test("onboarding timezones include regional choices, UTC and the browser suggestion", () => {
   const choices = onboardingTimezones("Pacific/Chatham")

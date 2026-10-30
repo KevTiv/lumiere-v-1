@@ -1,10 +1,18 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
-import { assertCsvSafeForAi } from "@lumiere/erp-shared/csv-import-safety"
+import { assertCsvSafeForAi, parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
+import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
+import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { guidedImportRequest, trackedImportEntity } from "./guided-import-request"
+import { useQueryClient } from "@tanstack/react-query"
+import { apiFetch } from "@/lib/api-fetch"
+import { REVIEW_TARGETS, reviewDatasetFromCsv, type ReviewedImportSource } from "./import-review-model"
 import {
   useAnalyzeImportMapping,
   usePreviewImportMapping,
@@ -80,12 +88,19 @@ function importJobCount(job: ImportJobRow, camel: keyof ImportJobRow, snake: key
 
 export type GuidedImportWizardProps = {
   organizationId: number
+  initialSource?: ReviewedImportSource
+  onReviewSaved?: (id: string) => void
 }
 
-export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) {
+export function GuidedImportWizard({ organizationId, initialSource, onReviewSaved }: GuidedImportWizardProps) {
   const { t } = useTranslation()
   const workspaceProfile = useWorkspaceProfile()
   const orgId = BigInt(organizationId)
+  const companyId = useOperatingCompanyId(organizationId)
+  const companiesQuery = useCompanies(organizationId, organizationId > 0)
+  const trackedImport = useTrackedCsvImport()
+  const queryClient = useQueryClient()
+  const initialParsed = useMemo(() => initialSource ? parseCsvText(initialSource.csv) : null, [initialSource])
 
   const analyze = useAnalyzeImportMapping()
   const preview = usePreviewImportMapping()
@@ -98,12 +113,12 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
   const contactsQuery = useContacts(orgId)
   const productsQuery = useProducts(orgId)
 
-  const [wizardKey, setWizardKey] = useState("contact")
+  const [wizardKey, setWizardKey] = useState(initialSource?.targetEntity ?? "contact")
   const [step, setStep] = useState<WizardStep>("upload")
-  const [csvText, setCsvText] = useState("")
-  const [headers, setHeaders] = useState<string[]>([])
-  const [rows, setRows] = useState<string[][]>([])
-  const [sourceFileName, setSourceFileName] = useState("")
+  const [csvText, setCsvText] = useState(initialSource?.csv ?? "")
+  const [headers, setHeaders] = useState<string[]>(initialParsed?.headers ?? [])
+  const [rows, setRows] = useState<string[][]>(initialParsed?.rows ?? [])
+  const [sourceFileName, setSourceFileName] = useState(initialSource?.fileName ?? "")
   const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
   const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
@@ -119,6 +134,8 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [importedJobId, setImportedJobId] = useState<string | null>(null)
+  const [importRequest, setImportRequest] = useState<CsvImportRequest | null>(null)
+  const importRequestRef = useRef<CsvImportRequest | null>(null)
   const [rollbackConfirmId, setRollbackConfirmId] = useState<string | null>(null)
   const importErrorsQuery = useImportJobErrors(orgId, importedJobId != null)
 
@@ -134,7 +151,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     () =>
       jobsForEntity(
         (importJobsQuery.data ?? []) as unknown as ImportJobRow[],
-        targetEntity,
+        trackedImportEntity(targetEntity),
         5,
       ),
     [importJobsQuery.data, targetEntity],
@@ -213,6 +230,8 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     setSelectedTemplateId(null)
     setAppliedTemplateId(null)
     setImportedJobId(null)
+    setImportRequest(null)
+    importRequestRef.current = null
     setRollbackConfirmId(null)
     analyze.reset()
     preview.reset()
@@ -220,6 +239,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
   const onEntityChange = useCallback(
     (nextKey: string) => {
+      if (importRequestRef.current) return
       if (!isWorkspaceImportTargetVisible(workspaceProfile, nextKey)) return
       setWizardKey(nextKey)
       resetFlow()
@@ -235,13 +255,14 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
   const onFile = useCallback(
     async (file: File | null) => {
-      if (!file) return
+      if (!file || importRequestRef.current) return
       const templateId = selectedTemplateId
       setError(null)
       resetFlow()
       setSelectedTemplateId(templateId)
       try {
         const parsed = await readImportFile(file)
+        if (importRequestRef.current) return
         assertCsvSafeForAi(parsed.headers, parsed.rows.slice(0, 50))
         setCsvText(parsed.csvText)
         setHeaders(parsed.headers)
@@ -251,6 +272,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
         setSourceSheetName(parsed.sheetName)
         setStep("upload")
       } catch (e) {
+        if (importRequestRef.current) return
         setError(e instanceof Error ? e.message : String(e))
         setCsvText("")
         setHeaders([])
@@ -348,11 +370,27 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     [previewResult],
   )
   const previewWarnings = previewResult?.warnings.length ?? 0
+  const saveForReview = async () => {
+    if (!companyId || !previewResult || busy) return
+    setBusy(true); setError(null)
+    try {
+      const dataset = await reviewDatasetFromCsv({ title: sourceFileName || entityOption.label, targetEntity, fileName: sourceFileName || "source.csv", csv: csvText, headers, rows, mapping, requiredFields: analysis?.mappings.filter(item => item.required).map(item => item.target_field) ?? [], issues: previewResult.validation_errors })
+      const response = await apiFetch("/api/import-reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ companyId, dataset }) })
+      const result = await response.json()
+      if (!response.ok || typeof result.id !== "string") throw new Error(result.error ?? "Source review could not be saved.")
+      await queryClient.invalidateQueries({ queryKey: ["import-reviews", organizationId, companyId] })
+      onReviewSaved?.(result.id)
+      resetFlow(); setCsvText(""); setHeaders([]); setRows([]); setSourceFileName("")
+      setStatus(t("settings.importReview.saved", { defaultValue: "Saved as a source draft. Review the uncertain rows below." }))
+    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
+    finally { setBusy(false) }
+  }
   const duplicateSkipCount = duplicateStates.filter((item) => item.action === "skip").length
   const mappedColumnCount = Object.values(mapping).filter((value) => value !== "__skip__").length
 
-  const runImport = useCallback(async () => {
+  const runImport = useCallback(async (lookupOnly = false) => {
     if (!csvText.trim()) return
+    if (!companyId) { setError(t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })); return }
     if (!previewResult || previewResult.rows.length !== rows.length) {
       setError(
         t(
@@ -381,38 +419,26 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       )
       const importCsv = buildMappedImportCsv(headers, rows, mapping, skipRows)
 
-      const importRes = await fetch(`/api/import/${targetEntity}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: importCsv }),
-      })
-      const importJson = (await importRes.json()) as {
-        ok?: boolean
-        outcome?: "converged" | "unknown"
-        rowsImported?: number
-        record?: { resource?: string; id?: string; href?: string }
-        reason?: string
-        error?: string
+      const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", companies: companiesQuery.data ?? [] })
+      importRequestRef.current = request
+      setImportRequest(request)
+      setStep("import")
+      const importJson = lookupOnly ? await fetchCsvImportReceipt(request, apiFetch, true) : await trackedImport.mutateAsync(request)
+      await queryClient.invalidateQueries({ predicate: query => csvImportInvalidatesQuery(query.queryKey, request) })
+      if (importJson.status === "pending") {
+        setStatus(t("settings.importReview.importPending", { defaultValue: "The import is running. Check its result before starting another submission." }))
+        return
       }
-      if (!importRes.ok) throw new Error(importJson.error ?? "Import failed")
-      if (!importJson.ok || importJson.outcome !== "converged" || !importJson.record?.id) {
-        throw new Error(
-          t(
-            "settings.import.outcomeUnknown",
-            "The import was accepted, but its job could not be identified. Review import history before you retry.",
-          ),
-        )
-      }
-
-      const jobId = importJson.record.id
+      const jobId = importJson.jobId
       setImportedJobId(jobId)
       setStep("import")
       setStatus(
-        t("settings.import.done", "Imported {{count}} rows.", {
-          count: importJson.rowsImported ?? 0,
-        }),
+        importJson.status === "success" || importJson.status === "partial"
+          ? t("settings.importReview.receiptSummary", { defaultValue: "Imported {{count}} rows. {{errors}} rows need correction.", count: importJson.rowsImported, errors: importJson.errorRows })
+          : t("settings.importReview.receiptStatus", { defaultValue: "Import status: {{status}}.", status: importJson.status }),
       )
 
+      if (!["success", "partial"].includes(importJson.status)) { await importJobsQuery.refetch(); return }
       try {
         await finalizeImport.mutateAsync({
           jobId: BigInt(jobId),
@@ -457,6 +483,8 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     }
   }, [
     appliedTemplateId,
+    companiesQuery.data,
+    companyId,
     confirmImportWithErrors,
     csvText,
     duplicateStates,
@@ -465,6 +493,8 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     importErrorsQuery,
     importJobsQuery,
     mapping,
+    orgId,
+    queryClient,
     previewResult,
     previewErrors.length,
     rows,
@@ -472,6 +502,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
     sourceFormat,
     sourceSheetName,
     targetEntity,
+    trackedImport,
     t,
   ])
 
@@ -534,7 +565,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       <div className="flex flex-wrap gap-3 items-end">
         <label className="text-sm space-y-1">
           <span className="block text-muted-foreground">{t("settings.import.entity", "Entity")}</span>
-          <Select value={wizardKey} onValueChange={onEntityChange}>
+          <Select value={wizardKey} onValueChange={onEntityChange} disabled={busy || !!importRequest}>
             <SelectTrigger className="min-w-[200px]" data-testid="guided-import-entity">
               <SelectValue />
             </SelectTrigger>
@@ -565,6 +596,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
           </span>
           <Select
             value={selectedTemplateId ?? NO_TEMPLATE}
+            disabled={busy || !!importRequest}
             onValueChange={(value) => {
               const next = value === NO_TEMPLATE ? null : value
               setSelectedTemplateId(next)
@@ -591,6 +623,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
           </span>
           <input
             type="file"
+            disabled={busy || !!importRequest}
             accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
             data-testid="guided-import-file"
@@ -762,6 +795,10 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        {step === "import" && importRequest && !importedJobId ? <>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => void runImport(true)}>{t("settings.importReview.checkResult", { defaultValue: "Check import result" })}</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => void runImport()}>{t("settings.importReview.retrySame", { defaultValue: "Retry same submission" })}</Button>
+        </> : null}
         {(step === "upload" || step === "analyze") && csvText.trim() ? (
           <Button
             type="button"
@@ -780,12 +817,17 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
           </Button>
         ) : null}
         {step === "preview" ? (
+          <Button type="button" variant="outline" disabled={busy || !companyId || !REVIEW_TARGETS.has(targetEntity) || rows.length > 1000} onClick={() => void saveForReview()}>
+            {t("settings.importReview.saveForReview", { defaultValue: "Save for review" })}
+          </Button>
+        ) : null}
+        {step === "preview" ? (
           <Button type="button" disabled={busy} onClick={() => void runImport()}>
             {t("settings.import.run", "Import")}
           </Button>
         ) : null}
         {step !== "upload" ? (
-          <Button type="button" variant="outline" disabled={busy} onClick={resetFlow}>
+          <Button type="button" variant="outline" disabled={busy || (!!importRequest && !importedJobId)} onClick={resetFlow}>
             {t("settings.import.startOver", "Start over")}
           </Button>
         ) : null}
