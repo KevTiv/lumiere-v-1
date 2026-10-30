@@ -49,7 +49,7 @@ a focused test is not whole-package acceptance.
 | AA-05 | BLOCKED | Existing #309 owner; coordinator integration only | #309, no replacement branch | #309 integration + AA-01 | Existing viewer/storage/scoped revision/retrieval implementation and green CI | Authenticated save/reload/new-chat retrieval, revocation/stale edit/restart proof; Explain this error and verified guidance promotion remain separate |
 | AA-06 | REVIEW | Qualification worker + independent QA | codex/alpha-ai-skill-qualification / #318 | AA-00 | Collector consistency fixes; 212 Python tests, manifest/catalog checks; independent review of 8422d1b6 passes | Tenant release readback, approved provider profiles/budget/test tenant, independent certification, staged disable/rollback remain blocked externally |
 | AA-07 | BLOCKED | Reports/UI owner (coordinator until assigned) | — | AA-01 | Existing owner reports/charts, saved run inspector and artifact/document surfaces | Typed report/record/artifact intents and provenance-preserving normal-user navigation not accepted; arbitrary code/HTML/SQL tools deferred |
-| AA-08 | ACTIVE | Independent QA | Read-only review; browser branch not yet assigned | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | No local authenticated services/auth state. Fixture/typecheck passes cannot close canonical saved-result or live-provider gates |
+| AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | No local authenticated services/auth state. Fixture/typecheck passes cannot close canonical saved-result or live-provider gates |
 
 ## Supported-journey readiness by operation
 
@@ -88,7 +88,7 @@ Maximum three implementation workers plus coordinator and independent QA.
 | Backend worker | ai-gateway/src/routes/rag.rs only; live snapshot excerpt function/tests, disjoint from #309 guide hunks | Multilingual response panic fix, no prompt/executor/binding changes |
 | Activation worker | New Overview activation-checklist model/tests/panel; explicit transfer of minimal overview-client.tsx import/render only | Deterministic current-scope checklist; coordinator integrates locale/test additions |
 | Qualification worker | scripts/erp_skill_benchmark.py, its tests, eval README and qualification status | #318, independent against main |
-| Independent QA | Read-only implementation review; future cross-cutting browser test ownership requires assignment | Review first slices, then integrated authenticated acceptance. Never author and independently accept the same implementation |
+| Independent QA | Independent implementation review; one focused alpha-assisted-activation.spec.ts in an isolated worktree now assigned | Review first slices, then integrated authenticated acceptance. Never author and independently accept the same implementation |
 | Existing PR owners | #309 guide history/storage/contract pin; #312/#313 broad translations; #317 infrastructure | No rebase, merge, promotion, deployment or unsolicited comments to their owners |
 
 Stack only after dependencies are stable; independent slices target main. Shared
@@ -154,7 +154,9 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   the shared web package test-script conflict retains both test lists. Integrated
   web unit command passes 139 test files, and direct execution passes ten turn and
   eleven activation cases. Combined i18n, type-debt, transport and vendored checks
-  pass. The workspace-wide integrated typecheck is in progress.
+  pass. The first integrated workspace typecheck was killed with exit 137 during
+  concurrent module/API compilation (nine package passes). Build stages are now
+  serialized; a fresh final typecheck is required, not counted as passed.
 - AA-02 #322 at 31ae7ce4: eleven model cases, full web suite, web TypeScript and
   source checks pass. Independent QA reran all four synthetic browser cases on the
   committed head at 320/390/768/1440px and inspected the mobile screenshot. The
