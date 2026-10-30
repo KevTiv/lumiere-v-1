@@ -160,6 +160,7 @@ pub fn run_knowledge_guide_tests(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_configured_record_creation_tests(ctx: &ReducerContext) -> Result<(), String> {
+    record_creation_test::selected_company_lead_lifecycle(ctx)?;
     record_creation_test::contact_lifecycle(ctx)?;
     record_creation_test::quotation_lifecycle(ctx)?;
     record_creation_test::purchase_order_lifecycle(ctx)

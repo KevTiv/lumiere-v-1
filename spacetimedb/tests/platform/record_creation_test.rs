@@ -3,13 +3,14 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
-use crate::core::permissions::{role, Role};
+use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::users::{
     find_user_profile_for_organization, user_organization, user_profile, UserOrganization,
     UserProfile,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
+use crate::crm::leads::{create_lead, lead, CreateLeadParams};
 use crate::forms::record_creation::record_creation_receipt;
 use crate::forms::{
     form_config, publish_form_configuration, record_custom_field_value, set_form_role_config,
@@ -628,5 +629,233 @@ pub fn purchase_order_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
     if create_purchase_order_once(ctx, org, fixture.company_id, changed).is_ok() {
         return Err("PO creation key accepted changed payload".into());
     }
+    Ok(())
+}
+
+fn lead_input(company: u64, key: &str) -> CreateLeadParams {
+    CreateLeadParams {
+        name: format!("Selected company lead {key}"),
+        priority: "normal".into(),
+        state: "new".into(),
+        expected_revenue: 0.0,
+        probability: 0.0,
+        tag_ids: vec![],
+        email: None,
+        phone: None,
+        mobile: None,
+        company_name: None,
+        contact_name: None,
+        title: None,
+        street: None,
+        city: None,
+        zip: None,
+        country_code: None,
+        website: None,
+        industry: None,
+        source_id: None,
+        campaign_id: None,
+        medium_id: None,
+        referred_by: None,
+        description: None,
+        user_id: None,
+        stage_id: None,
+        team_id: None,
+        partner_id: None,
+        date_deadline: None,
+        metadata: Some(metadata(company, key, serde_json::json!("Accepted"))),
+    }
+}
+
+pub fn selected_company_lead_lifecycle(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    // Legacy callers have no selected-company protocol and retain the default.
+    let mut legacy = lead_input(fixture.company_id, "legacy-default");
+    legacy.metadata = None;
+    create_lead(ctx, org, legacy)?;
+    configure_form(ctx, org, "crm", "new-lead")?;
+    create_company(
+        ctx,
+        org,
+        CreateCompanyParams {
+            name: "Selected lead branch".into(),
+            code: format!("LB{}", fixture.company_id),
+            currency_id: fixture.currency_id,
+            fiscal_year_end_month: 12,
+            fiscal_year_end_day: 31,
+            is_parent: false,
+            parent_id: None,
+            tax_id: None,
+            company_registry: None,
+            address_street: None,
+            address_city: None,
+            address_zip: None,
+            address_country_code: None,
+            metadata: None,
+        },
+    )?;
+    let branch = ctx
+        .db
+        .company()
+        .company_by_org()
+        .filter(&org)
+        .find(|row| row.id != fixture.company_id)
+        .ok_or("lead branch missing")?
+        .id;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org && row.is_active)
+        .ok_or("lead member missing")?;
+    let original_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("lead role missing")?;
+    let profile =
+        find_user_profile_for_organization(ctx, ctx.sender(), org).ok_or("lead profile missing")?;
+    let was_superuser = profile.is_superuser;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: Some(fixture.company_id),
+        ..membership.clone()
+    });
+    // An exact live global role grants the same explicit company switch as API.
+    ctx.db.role().id().update(Role {
+        permissions: vec!["*:*".into()],
+        ..original_role.clone()
+    });
+    let selected = lead_input(branch, "admin-selected-branch");
+    create_lead(ctx, org, selected.clone())?;
+    create_lead(ctx, org, selected)?;
+    let receipt_id = format!("{org}:{branch}:crm_lead:admin-selected-branch");
+    let receipt = ctx
+        .db
+        .record_creation_receipt()
+        .id()
+        .find(&receipt_id)
+        .ok_or("selected branch lead receipt missing")?;
+    if receipt.company_id != branch
+        || receipt.created_by != ctx.sender()
+        || ctx.db.lead().id().find(&receipt.record_id).is_none()
+    {
+        return Err("selected branch lead was retargeted or its identity was lost".into());
+    }
+    let values: Vec<_> = ctx
+        .db
+        .record_custom_field_value()
+        .iter()
+        .filter(|row| {
+            row.organization_id == org
+                && row.model == "crm_lead"
+                && row.record_id == receipt.record_id
+        })
+        .collect();
+    if values.len() != 1
+        || values[0].company_id != branch
+        || values[0].value_json != r#""Accepted""#
+    {
+        return Err("selected branch lead custom fields were retargeted to default company".into());
+    }
+    let count = || ctx.db.lead().lead_by_org().filter(&org).count();
+    let before_denied = count();
+    // A resource wildcard grants this operation, never all-company authority.
+    ctx.db.role().id().update(Role {
+        permissions: vec!["lead:*".into()],
+        ..original_role.clone()
+    });
+    if create_lead(ctx, org, lead_input(branch, "ordinary-bound-denied")).is_ok()
+        || count() != before_denied
+    {
+        return Err("ordinary bound member created a branch lead".into());
+    }
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: None,
+        ..membership.clone()
+    });
+    create_lead(
+        ctx,
+        org,
+        lead_input(fixture.company_id, "ordinary-default-allowed"),
+    )?;
+    let after_default = count();
+    if create_lead(ctx, org, lead_input(branch, "ordinary-unbound-denied")).is_ok()
+        || count() != after_default
+    {
+        return Err("unbound ordinary member bypassed default company".into());
+    }
+    let global = ctx.db.role().insert(Role {
+        id: 0,
+        name: "Selected lead additive administrator".into(),
+        permissions: vec!["*:*".into()],
+        is_system: false,
+        ..original_role.clone()
+    });
+    let assignment = ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: ctx.sender(),
+        organization_id: org,
+        role_id: global.id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: Some(ctx.timestamp),
+        is_active: true,
+        metadata: None,
+    });
+    if create_lead(ctx, org, lead_input(branch, "expired-global-denied")).is_ok()
+        || count() != after_default
+    {
+        return Err("expired additive role granted another company".into());
+    }
+    ctx.db
+        .user_role_assignment()
+        .id()
+        .update(UserRoleAssignment {
+            expires_at: None,
+            ..assignment.clone()
+        });
+    create_lead(ctx, org, lead_input(branch, "live-additive-allowed"))?;
+    let after_additive = count();
+    ctx.db.role().id().update(Role {
+        is_active: false,
+        ..global.clone()
+    });
+    if create_lead(ctx, org, lead_input(branch, "inactive-global-denied")).is_ok()
+        || count() != after_additive
+    {
+        return Err("inactive additive role granted another company".into());
+    }
+    let duplicate = ctx.db.user_organization().insert(UserOrganization {
+        id: 0,
+        ..membership.clone()
+    });
+    if create_lead(
+        ctx,
+        org,
+        lead_input(fixture.company_id, "ambiguous-member-denied"),
+    )
+    .is_ok()
+        || count() != after_additive
+    {
+        return Err("ambiguous membership granted lead creation".into());
+    }
+    ctx.db.user_organization().id().delete(&duplicate.id);
+    ctx.db.user_role_assignment().id().delete(&assignment.id);
+    ctx.db.role().id().delete(&global.id);
+    ctx.db.user_organization().id().update(membership);
+    ctx.db.role().id().update(original_role);
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("lead profile disappeared")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: was_superuser,
+        ..profile
+    });
     Ok(())
 }
