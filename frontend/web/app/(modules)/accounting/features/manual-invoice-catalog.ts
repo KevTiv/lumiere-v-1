@@ -6,6 +6,7 @@ import {
   accountIsEligibleManualInvoiceTaxPosting,
   accountMatchesManualInvoiceLineType,
 } from "@lumiere/erp-shared"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 // Preserve the existing legacy field aliases inside the catalog boundary.
 // Public inputs remain the canonical generated resource rows.
 type ManualInvoiceAccountLookup = {
@@ -135,7 +136,9 @@ export function buildManualInvoiceCatalog({
   const accountsFor = (kind: "invoice" | "bill", counterpart: boolean) =>
     (accounts as readonly ManualInvoiceAccountLookup[])
       .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey)
-      .filter((row) => row.deprecated === false && row.isOffBalance !== true)
+      .filter((row) => row.deprecated === false && row.isOffBalance === false && Array.isArray(row.allowedJournalIds))
+      .filter((row) => Object.hasOwn(row, "currencyId") || Object.hasOwn(row, "currency_id"))
+      .filter((row) => row.currencyId == null && row.currency_id == null || Boolean(parseStrictU64(row.currencyId ?? row.currency_id)))
       .filter(
         (row) =>
           enumTag(counterpart ? row.internalType : row.internalGroup) ===
@@ -178,7 +181,8 @@ export function buildManualInvoiceCatalog({
       .filter(
         (row) => enumTag(row.type ?? row.type_) === (kind === "invoice" ? "Sale" : "Purchase"),
       )
-      .filter((row) => BigInt(String(row.currencyId ?? row.currency_id ?? defaultCurrencyId)) > 0n)
+      .filter((row) => Object.hasOwn(row, "currencyId") || Object.hasOwn(row, "currency_id"))
+      .filter((row) => Boolean(parseStrictU64(row.currencyId ?? row.currency_id ?? defaultCurrencyId)))
       .map((row) => ({
         value: String(row.id),
         label: `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id)}`,

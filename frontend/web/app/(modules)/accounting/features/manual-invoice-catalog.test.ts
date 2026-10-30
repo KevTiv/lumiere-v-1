@@ -18,6 +18,8 @@ const account = (overrides: Partial<Account> = {}): Account => ({
   code: "4000",
   name: "Revenue",
   deprecated: false,
+  isOffBalance: false,
+  allowedJournalIds: [],
   currencyId: undefined,
   internalType: { tag: "Income" },
   internalGroup: { tag: "Income" },
@@ -221,4 +223,25 @@ test("active catalogs preserve configured journal defaults and exact account cur
   })
   assert.equal(result.invoice.journals[0]?.defaultAccountId, "9007199254740993")
   assert.equal(result.invoice.commercial[0]?.currencyId, "9007199254740995")
+})
+
+test("an unavailable company currency cannot become a journal currency or a render exception", () => {
+  const result = buildManualInvoiceCatalog({
+    accounts: [], contacts: [], journals: [journal()], products: [], taxes: [], taxGroups: [],
+    defaultCurrencyId: 0n, operatingCompanyId: 9n,
+  })
+  assert.deepEqual(result.invoice.journals, [])
+})
+
+test("masked eligibility fields cannot become unrestricted account or currency suggestions", () => {
+  const maskedAccount = { ...account() }
+  delete maskedAccount.allowedJournalIds
+  const maskedJournal = { ...journal() }
+  delete maskedJournal.currencyId
+  const result = buildManualInvoiceCatalog({
+    accounts: [maskedAccount], contacts: [], journals: [maskedJournal], products: [], taxes: [], taxGroups: [],
+    defaultCurrencyId: 1n, operatingCompanyId: 9n,
+  })
+  assert.deepEqual(result.invoice.commercial, [])
+  assert.deepEqual(result.invoice.journals, [])
 })
