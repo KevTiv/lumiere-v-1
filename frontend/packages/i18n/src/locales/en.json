@@ -13071,7 +13071,26 @@
       "send": "send"
     },
     "requestFailed": "The assistant request failed. Review the error and your message before sending again.",
-    "historySaveFailed": "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed."
+    "historySaveFailed": "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed.",
+    "turn": {
+      "loadingCompany": "Loading companies. Select a company before asking the assistant.",
+      "companyRequired": "Select or create a company, then open the assistant again.",
+      "notConfigured": "AI assistance is unavailable. You can continue using the ERP forms and reports.",
+      "noDraft": "No supported action draft was prepared. Use the existing ERP form to continue.",
+      "reviewDrafts": "Review the prepared action drafts below. Preparing or approving a draft does not confirm a saved business result.",
+      "answer": {
+        "denied": "Your current access does not permit this answer. Check your company and permissions.",
+        "unavailable": "The assistant is unavailable for this request. You can continue using the ERP.",
+        "failed": "The assistant could not answer this request. Check the required inputs.",
+        "outcome_unknown": "The answer could not be confirmed. No request was retried automatically. Check saved runs before trying again."
+      },
+      "draft": {
+        "denied": "Your current access does not permit preparing this draft. Check your company and permissions.",
+        "unavailable": "Draft preparation is unavailable for this request. Use the existing ERP form to continue.",
+        "failed": "The draft request was rejected. Check its required inputs before preparing a new request.",
+        "outcome_unknown": "Draft preparation could not be confirmed. Check Approvals for the original draft before trying again; this request was not retried."
+      }
+    }
   },
   "aiHarness": {
     "reportAnalysis": {
