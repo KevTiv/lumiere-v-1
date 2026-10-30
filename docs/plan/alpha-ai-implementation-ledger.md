@@ -7,7 +7,10 @@ No package is accepted from code existence or a fixture-only test.
 ## Refreshed baseline and existing work
 
 Fetched `origin/main` before editing: **3d6f32c23ba4a569f83d752ac0b2257e43799397**.
-The supplied reference is still current. GitHub's exact-main check readback has
+The initial supplied reference was current before editing. Main later advanced to
+**8fee8fd507f948e75be99fb27d0b2344cab6db78** through #317 only; its three
+infrastructure files are disjoint from these feature slices. The local testing
+branch incorporates that main update. The initial exact-main check readback had
 31 completed successful checks, including Rust, contracts drift, frontend,
 all six full browser shards, CI/E2E gates and ordered stack release. A successful
 release workflow is deployment evidence, not acceptance of the new work here.
@@ -22,7 +25,7 @@ release workflow is deployment evidence, not acceptance of the new work here.
 | #309 | Open at 49355068b8cf783129086c016f917c48dee3a610. Guide implementation and history remain owned there; CI and all P0 shards currently pass. Integrated authenticated guide acceptance is still pending in its status document. Do not duplicate it. |
 | #312 | Open at ce7f357f32a8e33ada8d69e41ac0f1a7ba8790b2. CI gate passes; E2E gate fails. Owns broad Alpha translations, including shell, shared chat and Overview. Keep our edits narrow and resolve overlap when integrated. |
 | #313 | Open stacked on #312 at 48df6868cd2e559707245f70c75509598594cb51. CI/E2E gates fail. Owns remaining module/mobile translations. |
-| #317 | Open infrastructure retry follow-up. Reserved release/CI/manifests untouched by this program. |
+| #317 | Now merged in 8fee8fd5 during implementation. Three disjoint infrastructure files were incorporated into the local testing branch; no release/CI/manifests authored by this program. |
 
 Main consumes immutable contracts **v0.3.157**. #309 owns the already published
 **v0.3.158** guide pin and migration 29. Neither release is rewritten here.
@@ -40,7 +43,7 @@ a focused test is not whole-package acceptance.
 | --- | --- | --- | --- | --- | --- | --- |
 | AA-00 | REVIEW | Coordinator + independent QA | codex/alpha-ai-coordination | None | Exact baseline/PR/contracts readback; code-derived matrix and exclusive assignments below | Independent ledger source review passed; integrated staging evidence remains a program gate |
 | AA-01 | ACTIVE | Coordinator; backend worker | codex/alpha-ai-unified-turns / #321; codex/alpha-ai-turn-backend / #319 | AA-00 scoped | Existing server RAG and stream share gated publication. First slice removes duplicate fallback, silent draft failure, incomplete SSE success and shared UI mock financial facts; backend bounds multilingual excerpts safely | Full server-authorized intent/capability routing, clarification contract and finance/form dispatch remain unaccepted; no new execution authority |
-| AA-02 | ACTIVE | Activation worker | codex/alpha-ai-assisted-activation | AA-00; later AA-01 | Existing bootstrap currency/timezone/year-end and Accounting readiness reused. First slice reads current scoped ERP state for a deterministic role-aware first-task checklist | Fresh-tenant first-record browser journey; complete Sales/Expense prerequisite checks and sample-data provenance pending |
+| AA-02 | REVIEW | Activation worker | codex/alpha-ai-assisted-activation / #322 | AA-00; later AA-01 | Existing bootstrap currency/timezone/year-end and Accounting readiness reused. First slice reads current scoped ERP state for a deterministic role-aware first-task checklist | Fresh-tenant first-record browser journey; complete Sales/Expense prerequisite checks and sample-data provenance pending |
 | AA-03 | BLOCKED | Forms owner (coordinator until assigned) | — | AA-01 accepted contract + certified canonical form owner | Existing contact/order/expense forms and AI form-suggestion path; exact permitted proposals and attachment retention need integrated proof | Cross-module typed bridge not accepted. Do not advertise automatic save, unsupported invoice creation or invented relations |
 | AA-04 | BLOCKED | Recovery owner (coordinator until assigned) | — | AA-01/03 | Existing action-draft review, effect lifecycle, expense outbox and run recovery owners | Exact request→draft→command→record readback and interrupted-business-effect E2E pending; no uncertain redispatch |
 | AA-05 | BLOCKED | Existing #309 owner; coordinator integration only | #309, no replacement branch | #309 integration + AA-01 | Existing viewer/storage/scoped revision/retrieval implementation and green CI | Authenticated save/reload/new-chat retrieval, revocation/stale edit/restart proof; Explain this error and verified guidance promotion remain separate |
@@ -133,7 +136,7 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
 - #318 at 8422d1b6: 212 script tests pass; catalog/finance manifests and diff checks
   pass. Independent QA found no blockers and reran all eight collector tests.
   Hosted CI/E2E/runtime-image checks started; no hosted conclusion claimed yet.
-- AA-01 frontend #321 at b6ed68bb: nine turn regressions and seven shared UI tests
+- AA-01 frontend #321 at 482507e5: ten turn regressions and seven shared UI tests
   pass; full web unit command passes 138 files with no skips. All 11 workspace
   TypeScript checks pass. I18n, type-debt (2261), operation transport, catalog/finance
   manifests and vendored 0.3.157 checks pass. Independent QA found malformed source
@@ -147,9 +150,20 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   browser/build skips are not runtime acceptance).
 - Local testing branch codex/alpha-ai-integration-review combines #318/#319/#321
   by cherry-pick, without changing main or merging any PR. Frozen install, 212
-  script tests, catalog and finance manifest checks pass. AA-02 integration is next.
+  script tests, catalog and finance manifest checks pass. AA-02 is now integrated;
+  the shared web package test-script conflict retains both test lists. Integrated
+  web unit command passes 139 test files, and direct execution passes ten turn and
+  eleven activation cases. Combined i18n, type-debt, transport and vendored checks
+  pass. The workspace-wide integrated typecheck is in progress.
+- AA-02 #322 at 31ae7ce4: eleven model cases, full web suite, web TypeScript and
+  source checks pass. Independent QA reran all four synthetic browser cases on the
+  committed head at 320/390/768/1440px and inspected the mobile screenshot. The
+  actual New contact form does not set customer classification, so first-task
+  contact creation and quotation customer prerequisites remain distinct. Screenshots
+  and precise limits are committed under docs/plan/alpha-activation-evidence/.
 - Docker daemon access is healthy with normal network-enabled sandbox access.
-  Disposable authenticated stack provisioning is being assessed; missing running
-  services alone are not treated as an unrecoverable environment blocker.
+  A dedicated PostgreSQL 16 test container is healthy; isolated SpacetimeDB
+  tooling is installed and development module/API builds are underway. No existing
+  database, production configuration, provider or tenant has been used.
 - No new end-to-end journey accepted. No merges, deployments, contract publications,
   live provider dispatches or business-state mutations performed by this program.
