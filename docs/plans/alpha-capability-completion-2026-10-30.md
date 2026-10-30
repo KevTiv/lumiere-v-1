@@ -23,7 +23,7 @@ with its canonical transaction, authorization, evidence and receipt owner.
 
 ## Reconciled dependencies
 
-- Open PR #328 owns general-journal import readiness. This work does not replace it.
+- Merged PR #328 owns general-journal import readiness and is included here.
 - Open #325/#326 own legacy skill discovery and form-proposal decoding.
 - Open #312/#313 own wider translation coverage; new keys here remain localized.
 - Open #251 owns WhatsApp provider changes; this packet only reads existing evidence.
@@ -64,16 +64,35 @@ no FX rule or financial assertion was relaxed to accommodate sentinel IDs.
 
 A private `record_creation_receipt` is the single new durable table. The strict
 census remains exact: 524 tables, all organization owned, with five existing
-persistence protocol relations. Migration 30 is pending generation; released
-migration 29 and prior checksums remain unchanged. The established release
-workflow allocates and pins the next immutable contract version.
+persistence protocol relations. Generated migration 30 is frozen in the ledger
+and registered in the application catalog; migration 29 and prior checksums
+remain unchanged. The established release workflow allocates and pins the next
+immutable contract version. The first release attempt correctly rejected the
+unregistered pending migration, before publishing a contract tag.
 
-The preliminary local module passed configured creation, Accounting,
-Documents, Messaging and guide lifecycle runtime calls. Expense and subscription
-runtime tests exposed fixture currency sentinels; fixes require a fresh final
-module and rerun. These preliminary results are not final-source acceptance.
-Initial simultaneous local native/WASM builds exceeded memory; a serialized
-unoptimized schema build succeeded. Hosted canonical builds remain required.
+The exact hosted production-profile module from commit `1b2eb6cc` passed all
+seven isolated native suites: configured creation, Accounting, Expenses,
+Subscriptions, Documents, Messaging and guides. The ZIP artifact is
+`13005350711`, SHA-256
+`7d33a40558693fd9f0047adaa177d7d771db3740a28878e6bef6b5d6af702c52`;
+the module SHA-256 is
+`39c9e435b00b81d6427fc9b1a67de0062d2c17a1bcbdf046864e7b838baf495a`.
+The subsequent fixes in this checkpoint do not change native module sources.
+The original local builds exceeded memory; acceptance uses this successful
+canonical hosted build instead. Earlier fixture currency failures were corrected
+without weakening their economic assertions.
+
+Integrated query-hooks passed 576 tests, ERP-shared 170, registered web helpers
+142, STDB transport files 8, presentation-core files 3 and guide helper files 2.
+The full UI run passed 1,464 tests and found five failures in one fixture missing
+the new exclusions-hook mock. The corrected fixture then passed all 13 cases,
+including three new positive/denied-evidence cases; the other 211 files were
+unchanged. Fixture lint passed with zero warnings.
+The Purchasing type-debt baseline decreased from 2,261 to 2,244 occurrences.
+The codegen ledger checksum test passes and regeneration classifies exactly 524
+tables with all 15 ledger migrations released. Final immutable pin, integrated
+API authorization/C4 tests, browser regressions and real-service guide gate
+remain required before the draft PR is ready.
 
 Known limits: Lead records retain their existing organization-shared schema,
 while operating-company admission, custom values and recovery receipts are exact.
