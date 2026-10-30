@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useContext, useMemo, useRef } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -9,6 +9,7 @@ import { Building2, ChevronDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { NavigationEditorContext } from "../forms/navigation-guard-context"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,13 +33,30 @@ interface CompanySwitcherProps {
 
 export function CompanySwitcher({ collapsed = false, className }: CompanySwitcherProps) {
   const { t } = useTranslation()
-  const { organizationId, setActiveCompanyId, activeCompanyReady } = useErpSession()
+  const { identity, organizationId, companyIds, setActiveCompanyId, activeCompanyReady } = useErpSession()
+  const navigation = useContext(NavigationEditorContext)
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const companiesQuery = useCompanies(orgId, orgReady)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
   const companies = companiesQuery.data ?? []
+  const currentScope = JSON.stringify([identity, organizationId])
+  const latest = useRef({ currentScope, operatingCompanyId, activeCompanyReady, companyIds, setActiveCompanyId, companies })
+  latest.current = { currentScope, operatingCompanyId, activeCompanyReady, companyIds, setActiveCompanyId, companies }
+  const switchCompany = (id: number) => {
+    if (!Number.isSafeInteger(id) || id <= 0 || id === operatingCompanyId) return
+    const requestedScope = currentScope
+    const apply = () => {
+      const current = latest.current
+      // A pending prompt cannot carry a selection into another actor/org or revoked membership.
+      if (current.currentScope !== requestedScope || !current.activeCompanyReady || current.operatingCompanyId === id
+        || !current.companyIds?.includes(id) || !current.companies.some((row) => Number(row.id) === id)) return
+      current.setActiveCompanyId?.(id)
+    }
+    if (navigation) navigation.proceed(apply)
+    else apply()
+  }
 
   const currentCompany = useMemo(
     () => companies.find((row) => Number(row.id) === operatingCompanyId),
@@ -122,7 +140,7 @@ export function CompanySwitcher({ collapsed = false, className }: CompanySwitche
           return (
             <DropdownMenuItem
               key={String(row.id)}
-              onClick={() => setActiveCompanyId?.(id)}
+              onClick={() => switchCompany(id)}
               className="flex items-center gap-2 py-2"
               data-testid={`company-switcher-option-${id}`}
             >

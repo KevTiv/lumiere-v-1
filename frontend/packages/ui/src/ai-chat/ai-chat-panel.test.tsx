@@ -67,6 +67,29 @@ describe("AI chat workspace", () => {
     expect(onOpenGuide).toHaveBeenCalledWith({ messageId: "43", draft: expect.objectContaining({ markdown: content, html }) })
   })
 
+  it("does not publish an old scope's late answer into a new scoped panel", async () => {
+    let resolve!: (reply: { content: string }) => void
+    const oldSend = vi.fn(() => new Promise<{ content: string }>((done) => { resolve = done }))
+    const { rerender } = render(<AIChatPanel key="company-7" open onClose={vi.fn()} onSendMessage={oldSend} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Private company seven question" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    rerender(<AIChatPanel key="company-8" open onClose={vi.fn()} initialMessages={[]} />)
+    await act(async () => { resolve({ content: "Private company seven answer" }) })
+    expect(screen.queryByText("Private company seven question")).toBeNull()
+    expect(screen.queryByText("Private company seven answer")).toBeNull()
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("")
+  })
+  it("shows history-save failure without hiding the available answer", async () => {
+    const onSendMessage = vi.fn(async () => ({ content: "Review the posted invoices first." }))
+    const { rerender } = render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "What should I review?" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await screen.findByText("Review the posted invoices first.")
+    rerender(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} historySaveFailed />)
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.historySaveFailed")
+    expect(screen.getByText("Review the posted invoices first.")).toBeTruthy()
+    expect(onSendMessage).toHaveBeenCalledOnce()
+  })
   it("retains a failed request in the editor and shows the transport failure", async () => {
     const onStreamMessage = vi.fn(async () => { throw new Error("Service unavailable") })
     render(<AIChatPanel open onClose={vi.fn()} onStreamMessage={onStreamMessage} />)

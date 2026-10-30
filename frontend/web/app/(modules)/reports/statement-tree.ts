@@ -177,10 +177,7 @@ export function buildStatementRows(
 }
 
 /** Drill-down href into the Accounting journal items tab (`move-lines`) for one account. */
-export function journalItemsHref(accountId: string | null): string | null {
-  if (accountId == null || !/^\d+$/.test(accountId)) return null
-  return `/accounting?tab=move-lines&filter=${encodeURIComponent(`accountId:${accountId}`)}`
-}
+export { statementJournalHref as journalItemsHref } from "./statement-drilldown"
 
 /**
  * A statement figure in the viewer's locale: the currency's own decimals when a code is known

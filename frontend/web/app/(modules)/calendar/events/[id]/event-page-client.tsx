@@ -442,7 +442,7 @@ function CalendarEventPageLoaded({
             privacy: variantTag(event.privacy).toLowerCase() || 'public',
             location: event.location ? String(event.location) : '',
             description: event.description ? String(event.description) : '',
-          })}
+          }, 'create')}
           isPending={createEvent.isPending}
           closeOnSubmit={false}
           submitError={duplicateError}

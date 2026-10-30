@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
+import { browserWorkScope, readBrowserNotebooks, saveBrowserNotebook, deleteBrowserNotebook, importBrowserNotebook } from "./browser-notebooks"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -37,9 +39,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NotebookCellComponent } from "./notebook-cell"
-import type { Notebook, NotebookCell, CellOutput, KernelState } from "@/lib/notebook-types"
+import type { Notebook, NotebookCell, KernelState } from "@/lib/notebook-types"
 import { mlSnippets, reportTemplates } from "@/lib/notebook-types"
 import { downloadTextFile } from "@/lib/ui-exports"
+import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 
 interface NotebookPanelProps {
   open: boolean
@@ -66,131 +69,20 @@ const createCell = (type: "code" | "markdown"): NotebookCell => ({
   updatedAt: new Date(),
 })
 
-// Simulated Python execution
-const simulateExecution = async (code: string, _context?: unknown): Promise<CellOutput> => {
-  await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000))
-
-  // Simple pattern matching for demo responses
-  if (code.includes("print(") || code.includes("df.head()")) {
-    const match = code.match(/print\(["'](.+?)["']\)/)
-    if (match) {
-      return {
-        id: generateId(),
-        type: "text",
-        content: match[1],
-        timestamp: new Date(),
-        executionTime: Math.floor(Math.random() * 100) + 50,
-      }
-    }
-    if (code.includes("df.head()")) {
-      return {
-        id: generateId(),
-        type: "table",
-        content: "DataFrame output",
-        data: [
-          ["", "date", "revenue", "orders", "customers"],
-          ["0", "2024-01-01", "$12,450", "145", "89"],
-          ["1", "2024-01-02", "$15,230", "178", "112"],
-          ["2", "2024-01-03", "$11,890", "132", "78"],
-          ["3", "2024-01-04", "$18,760", "203", "145"],
-          ["4", "2024-01-05", "$14,320", "167", "98"],
-        ],
-        timestamp: new Date(),
-        executionTime: Math.floor(Math.random() * 200) + 100,
-      }
-    }
-  }
-
-  if (code.includes("describe()")) {
-    return {
-      id: generateId(),
-      type: "text",
-      content: `       revenue    orders  customers
-count     30.00     30.00      30.00
-mean   14523.45    156.32      98.45
-std     3245.67     34.21      28.12
-min     8934.00     89.00      45.00
-25%    12100.00    132.00      78.00
-50%    14200.00    154.00      96.00
-75%    16800.00    178.00     118.00
-max    22450.00    234.00     167.00`,
-      timestamp: new Date(),
-      executionTime: Math.floor(Math.random() * 150) + 80,
-    }
-  }
-
-  if (code.includes("plt.") || code.includes("plot")) {
-    return {
-      id: generateId(),
-      type: "chart",
-      content: "matplotlib figure rendered",
-      timestamp: new Date(),
-      executionTime: Math.floor(Math.random() * 300) + 200,
-    }
-  }
-
-  if (code.includes("model.fit") || code.includes("LinearRegression") || code.includes("RandomForest")) {
-    return {
-      id: generateId(),
-      type: "text",
-      content: `Model trained successfully.
-R² Score: 0.8734
-RMSE: 1245.67
-Features importance:
-  - orders: 0.45
-  - customers: 0.32
-  - day_of_week: 0.23`,
-      timestamp: new Date(),
-      executionTime: Math.floor(Math.random() * 500) + 300,
-    }
-  }
-
-  if (code.includes("import")) {
-    return {
-      id: generateId(),
-      type: "text",
-      content: "Modules imported successfully.",
-      timestamp: new Date(),
-      executionTime: Math.floor(Math.random() * 50) + 20,
-    }
-  }
-
-  if (code.includes("error") || code.includes("Error")) {
-    return {
-      id: generateId(),
-      type: "error",
-      content: `Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
-NameError: name 'undefined_var' is not defined`,
-      timestamp: new Date(),
-      executionTime: Math.floor(Math.random() * 30) + 10,
-    }
-  }
-
-  // Default response
-  return {
-    id: generateId(),
-    type: "text",
-    content: code.includes("=") ? "" : `Out: ${code.slice(0, 50)}...`,
-    timestamp: new Date(),
-    executionTime: Math.floor(Math.random() * 100) + 30,
-  }
+function newNotebook(): Notebook {
+  return { id: generateId(), title: "Untitled Notebook", cells: [createCell("markdown"), createCell("code")],
+    metadata: { category: "analysis" }, createdAt: new Date(), updatedAt: new Date() }
 }
 
-export function NotebookPanel({ open, onClose, onAIChat, dataContext }: NotebookPanelProps) {
+export function NotebookPanel(props: NotebookPanelProps) {
+  const scope = browserWorkScope(useErpSession())
+  return <ScopedNotebookPanel key={scope ?? "no-scope"} {...props} scope={scope} />
+}
+
+function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelProps & { scope: string | null }) {
   const { t } = useTranslation()
-  const [notebook, setNotebook] = useState<Notebook>({
-    id: generateId(),
-    title: "Untitled Notebook",
-    cells: [createCell("markdown"), createCell("code")],
-    metadata: {
-      kernelSpec: { name: "python3", language: "python", displayName: "Python 3" },
-      category: "analysis",
-    },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })
-  
+  const [notebook, setNotebook] = useState<Notebook>(newNotebook)
+
   const [selectedCellId, setSelectedCellId] = useState<string | null>(notebook.cells[0]?.id || null)
   const [kernel, setKernel] = useState<KernelState>({
     status: "idle",
@@ -204,13 +96,70 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
   const [savedNotebook, setSavedNotebook] = useState<Notebook | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  const [savedNotebooks, setSavedNotebooks] = useState<Notebook[]>([])
+  const [storageReady, setStorageReady] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [pendingOpen, setPendingOpen] = useState<Notebook | null>(null)
+  const importRef = useRef<HTMLInputElement>(null)
+  const translate = useRef(t)
+  translate.current = t
+  useEffect(() => {
+    if (!scope) { setStorageReady(true); return }
+    try {
+      const catalog = readBrowserNotebooks(window.localStorage, scope)
+      setSavedNotebooks(catalog.notebooks)
+      const active = catalog.notebooks.find((item) => item.id === catalog.activeId)
+      if (active) { setNotebook(active); setSavedNotebook(active); setSelectedCellId(active.cells[0]?.id ?? null) }
+    } catch {
+      setSaveError(translate.current("ui.notebook.restoreError", { defaultValue: "Saved notebooks could not be read. Your browser data was left unchanged. Export current work before repairing browser storage." }))
+    } finally { setStorageReady(true) }
+  }, [scope])
+
+  const unsaved = savedNotebook !== notebook && (!!savedNotebook || notebook.title !== "Untitled Notebook" || notebook.cells.some((cell) => cell.content.trim()))
+  const navigationGuard = useUnsavedChangesGuard(unsaved)
+  const openNotebook = (next: Notebook) => {
+    setNotebook(next); setSavedNotebook(savedNotebooks.find((item) => item.id === next.id) === next ? next : null)
+    setSelectedCellId(next.cells[0]?.id ?? null); setPendingOpen(null); setActiveTab("notebook"); setSaveError(null)
+  }
+  const requestOpen = (next: Notebook) => {
+    if (unsaved) setPendingOpen(next)
+    else openNotebook(next)
+  }
+  const importFile = async (file?: File) => {
+    if (!file) return
+    try {
+      if (file.size > 2_000_000) throw new Error("File too large")
+      const imported = importBrowserNotebook(await file.text())
+      // Imports are new local work, never silent replacements of an existing notebook.
+      requestOpen({ ...imported, id: generateId(), updatedAt: new Date() })
+    } catch {
+      setSaveError(t("ui.notebook.importError", { defaultValue: "This file is not a supported notebook (maximum 2 MB and 100 code or markdown cells). Your current notebook is unchanged." }))
+    }
+  }
+
   const handleSave = () => {
     setSaveError(null)
     try {
-      window.localStorage.setItem(`lumiere.notebook.${notebook.id}`, JSON.stringify({ ...notebook, updatedAt: new Date() }))
-      setSavedNotebook(notebook)
+      if (!scope || !storageReady) throw new Error("Select an authorized company first")
+      const snapshot = { ...notebook, updatedAt: new Date() }
+      const catalog = saveBrowserNotebook(window.localStorage, scope, snapshot, savedNotebook)
+      setSavedNotebooks(catalog.notebooks)
+      setNotebook(snapshot)
+      setSavedNotebook(snapshot)
     } catch {
       setSaveError(t("ui.notebook.saveError", { defaultValue: "Could not save in this browser. Your notebook is still open. Export a copy, or free browser storage and try again." }))
+    }
+  }
+
+  const deleteSaved = () => {
+    if (!scope || !pendingDelete) return
+    try {
+      const catalog = deleteBrowserNotebook(window.localStorage, scope, pendingDelete)
+      setSavedNotebooks(catalog.notebooks)
+      if (pendingDelete === notebook.id) setSavedNotebook(null)
+      setPendingDelete(null); setSaveError(null)
+    } catch {
+      setSaveError(t("ui.notebook.deleteError", { defaultValue: "The saved copy could not be deleted. Your open notebook is unchanged." }))
     }
   }
 
@@ -264,46 +213,11 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
     })
   }, [])
 
-  const runCell = useCallback(async (cellId: string) => {
-    const cell = notebook.cells.find((c) => c.id === cellId)
-    if (!cell || cell.type !== "code") return
+  const runCell = useCallback((_cellId: string) => {
+    setSaveError(t("ui.notebook.executionUnavailable", { defaultValue: "Code execution is unavailable in this notebook. No code was run and no ERP data was read. Export your code to an appropriate runtime." }))
+  }, [t])
 
-    setKernel((prev) => ({ ...prev, status: "busy" }))
-    updateCell(cellId, { status: "running", outputs: [] })
-
-    try {
-      const output = await simulateExecution(cell.content, dataContext)
-      setKernel((prev) => ({
-        ...prev,
-        status: "idle",
-        executionCount: prev.executionCount + 1,
-      }))
-      updateCell(cellId, {
-        status: "success",
-        outputs: [output],
-        executionCount: kernel.executionCount + 1,
-      })
-    } catch {
-      setKernel((prev) => ({ ...prev, status: "idle" }))
-      updateCell(cellId, {
-        status: "error",
-        outputs: [{
-          id: generateId(),
-          type: "error",
-          content: "Execution failed",
-          timestamp: new Date(),
-        }],
-      })
-    }
-  }, [notebook.cells, dataContext, kernel.executionCount, updateCell])
-
-  const runAllCells = useCallback(async () => {
-    for (const cell of notebook.cells) {
-      if (cell.type === "code") {
-        await runCell(cell.id)
-      }
-    }
-  }, [notebook.cells, runCell])
+  const runAllCells = () => runCell("")
 
   const clearAllOutputs = useCallback(() => {
     setNotebook((prev) => ({
@@ -313,7 +227,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
     setKernel((prev) => ({ ...prev, executionCount: 0 }))
   }, [])
 
-  const loadTemplate = useCallback((templateId: string) => {
+  const loadTemplate = (templateId: string) => {
     const template = reportTemplates.find((t) => t.id === templateId)
     if (!template) return
 
@@ -322,15 +236,9 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
       content: c.content || "",
     }))
 
-    setNotebook((prev) => ({
-      ...prev,
-      title: template.name,
-      cells,
-      metadata: { ...prev.metadata, category: template.category },
-      updatedAt: new Date(),
-    }))
-    setSelectedCellId(cells[0]?.id || null)
-  }, [])
+    requestOpen({ ...newNotebook(), title: template.name, cells,
+      metadata: { category: template.category }, updatedAt: new Date() })
+  }
 
   const insertSnippet = useCallback((snippetKey: keyof typeof mlSnippets) => {
     if (!selectedCellId) return
@@ -348,7 +256,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
     }
   }, [onAIChat])
 
-  if (!open) return null
+  if (!open) return navigationGuard
 
   return (
     <div
@@ -362,6 +270,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           : "fixed inset-0 z-50 h-dvh w-full sm:relative sm:inset-auto sm:h-screen sm:w-[32vw] sm:min-w-[400px] sm:shrink-0"
       )}
     >
+      {navigationGuard}
       {/* Header */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/30">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -398,21 +307,21 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
             )}
           >
             <Cpu className="h-2.5 w-2.5 mr-1" />
-            {kernel.status}
+            {t("ui.notebook.editorOnly", { defaultValue: "Editor only" })}
           </Badge>
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={runAllCells} title="Run All">
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled onClick={runAllCells} title="Code execution unavailable" aria-label="Code execution unavailable">
             <Play className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearAllOutputs} title="Clear Outputs">
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })} aria-label={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} disabled={!scope || !storageReady} title={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })} aria-label={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })}>
             <Save className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport} title="Export">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport} title="Export notebook" aria-label="Export notebook">
             <Download className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
@@ -431,7 +340,17 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         </div>
       </div>
 
-      <p className="shrink-0 border-b px-3 py-2 text-xs text-muted-foreground">{t("ui.notebook.localHint", { defaultValue: "Notebook contents are saved only in this browser. Code output is a preview." })}</p>
+      <p className="shrink-0 border-b px-3 py-2 text-xs text-muted-foreground">{t("ui.notebook.browserHint", { defaultValue: "Saved notebooks stay in this browser for this company and user. They do not sync to your account." })}</p>
+      {!scope ? <p role="status" className="shrink-0 border-b px-3 py-2 text-xs text-muted-foreground">{t("ui.notebook.scopeRequired", { defaultValue: "Select an authorized operating company to save and reopen browser notebooks. You can still export this work." })}</p> : null}
+      <p className="shrink-0 border-b px-3 py-2 text-xs text-muted-foreground">{t("ui.notebook.executionHint", { defaultValue: "Code editing only. No Python runtime or live ERP data connection is available here." })}</p>
+      {pendingDelete ? <div role="alert" className="shrink-0 space-y-2 border-b p-3 text-sm">
+        <p>{t("ui.notebook.deleteConfirm", { defaultValue: "Delete this saved browser copy? It cannot be recovered here. Your currently open edits stay available for export." })}</p>
+        <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setPendingDelete(null)}>{t("common.cancel", { defaultValue: "Cancel" })}</Button><Button size="sm" variant="destructive" onClick={deleteSaved}>{t("ui.notebook.deleteSaved", { defaultValue: "Delete saved copy" })}</Button></div>
+      </div> : null}
+      {pendingOpen ? <div role="alert" className="shrink-0 space-y-2 border-b p-3 text-sm">
+        <p>{t("ui.notebook.replaceUnsaved", { defaultValue: "Opening another notebook replaces your unsaved edits. Save or export them first, or confirm discard." })}</p>
+        <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setPendingOpen(null)}>{t("ui.notebook.keepEditing", { defaultValue: "Keep editing" })}</Button><Button size="sm" variant="destructive" onClick={() => openNotebook(pendingOpen)}>{t("ui.notebook.discardAndOpen", { defaultValue: "Discard edits and open" })}</Button></div>
+      </div> : null}
       {saveError ? <p role="alert" className="shrink-0 break-words px-3 py-2 text-sm text-destructive">{saveError}</p> : null}
       {/* Toolbar */}
       <div className="flex shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5 border-b border-border bg-muted/20">
@@ -502,7 +421,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
 
         <Badge variant="outline" className="text-[9px] h-5">
           <Database className="h-2.5 w-2.5 mr-1" />
-          ERP Data Connected
+          {t("ui.notebook.noDataConnection", { defaultValue: "No live data connection" })}
         </Badge>
       </div>
 
@@ -556,6 +475,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
                     onMoveUp={() => moveCell(cell.id, "up")}
                     onMoveDown={() => moveCell(cell.id, "down")}
                     onRun={() => runCell(cell.id)}
+                    executionAvailable={false}
                     onAIAssist={handleAIAssist}
                     canMoveUp={index > 0}
                     canMoveDown={index < notebook.cells.length - 1}
@@ -591,26 +511,15 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
 
           {activeTab === "files" && (
             <ScrollArea className="flex-1 p-4">
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-3">Recent Notebooks</p>
-                {["Sales Analysis Q1.ipynb", "Customer Segmentation.ipynb", "Inventory Forecast.ipynb"].map((file) => (
-                  <div
-                    key={file}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
-                  >
-                    <File className="h-3.5 w-3.5 text-warning" />
-                    <span className="text-xs">{file}</span>
-                  </div>
-                ))}
-                <div className="border-t border-border my-3" />
-                <p className="text-xs font-medium text-muted-foreground mb-3">Data Sources</p>
-                {["sales_data.csv", "inventory.csv", "customers.csv"].map((file) => (
-                  <div
-                    key={file}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer"
-                  >
-                    <Database className="h-3.5 w-3.5 text-info" />
-                    <span className="text-xs">{file}</span>
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground">{t("ui.notebook.savedNotebooks", { defaultValue: "Notebooks saved in this browser for this company and user" })}</p>
+                <Button size="sm" variant="outline" onClick={() => requestOpen(newNotebook())}>{t("ui.notebook.new", { defaultValue: "New notebook" })}</Button>
+                <Button size="sm" variant="outline" onClick={() => importRef.current?.click()}>{t("ui.notebook.import", { defaultValue: "Import notebook JSON" })}</Button>
+                <input ref={importRef} type="file" accept=".json,application/json" className="sr-only" aria-label={t("ui.notebook.importFile", { defaultValue: "Notebook JSON file" })} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; void importFile(file) }} />
+                {savedNotebooks.length === 0 ? <p className="text-xs text-muted-foreground">{t("ui.notebook.noSavedNotebooks", { defaultValue: "No saved notebooks in this scope. Save a notebook to reopen it here." })}</p> : savedNotebooks.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 rounded border p-2">
+                    <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm hover:text-primary" onClick={() => requestOpen(item)}><File className="size-4 shrink-0" /><span className="min-w-0 break-words">{item.title || "Untitled Notebook"}</span></button>
+                    <Button size="sm" variant="ghost" aria-label={`Delete saved notebook ${item.title}`} onClick={() => setPendingDelete(item.id)}>{t("common.delete", { defaultValue: "Delete" })}</Button>
                   </div>
                 ))}
               </div>
@@ -618,41 +527,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           )}
 
           {activeTab === "variables" && (
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-3">Kernel Variables</p>
-                <div className="text-xs space-y-1 font-mono">
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-info">df</span>
-                    <span className="text-muted-foreground">DataFrame (30 rows)</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-info">model</span>
-                    <span className="text-muted-foreground">LinearRegression</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-success">X_train</span>
-                    <span className="text-muted-foreground">ndarray (24, 3)</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-success">y_train</span>
-                    <span className="text-muted-foreground">ndarray (24,)</span>
-                  </div>
-                </div>
-                <div className="border-t border-border my-3" />
-                <p className="text-xs font-medium text-muted-foreground mb-3">Execution Stats</p>
-                <div className="text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span>Cells executed:</span>
-                    <span className="font-mono">{kernel.executionCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Kernel status:</span>
-                    <span className="font-mono">{kernel.status}</span>
-                  </div>
-                </div>
-              </div>
-            </ScrollArea>
+            <div className="p-4 text-sm text-muted-foreground">{t("ui.notebook.noRuntime", { defaultValue: "No runtime is connected. Variables and execution results are unavailable." })}</div>
           )}
         </div>
       </div>
@@ -662,7 +537,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <div className={cn("w-1.5 h-1.5 rounded-full", kernel.status === "idle" ? "bg-success" : "bg-info")} />
-            {t("ui.notebook.preview", { defaultValue: "Local preview" })}
+            {t("ui.notebook.editorMode", { defaultValue: "Local notebook editor" })}
           </span>
           <span>{notebook.cells.length} cells</span>
         </div>

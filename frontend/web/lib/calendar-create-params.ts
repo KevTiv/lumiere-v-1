@@ -3,18 +3,11 @@
  */
 
 import type { CreateCalendarEventParams } from "@lumiere/stdb/types"
-import type { Timestamp } from "spacetimedb"
 
 import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
-
-function requiredTimestampFromForm(v: unknown): Timestamp | null {
-  if (v == null || String(v).trim() === "") return null
-  const d = new Date(String(v))
-  if (Number.isNaN(d.getTime())) return null
-  return stbTimestampFromDate(d)
-}
+import { calendarEventFormRange } from "./calendar-event-range"
 
 export function toCreateCalendarEventParams(
   formData: Record<string, unknown>,
@@ -22,16 +15,13 @@ export function toCreateCalendarEventParams(
   const name = String(formData.name ?? "").trim()
   if (!name) return null
 
-  const start = requiredTimestampFromForm(formData.start)
-  const stop = requiredTimestampFromForm(formData.stop)
-  if (start == null || stop == null) return null
-  // Match the reducer: equal timestamps are valid, including all-day events.
-  if (new Date(String(formData.stop)).getTime() < new Date(String(formData.start)).getTime()) return null
+  const range = calendarEventFormRange(formData)
+  if (!range) return null
 
   return {
     name,
-    start,
-    stop,
+    start: stbTimestampFromDate(range.start),
+    stop: stbTimestampFromDate(range.stop),
     allday: Boolean(formData.allday),
     privacy: String(formData.privacy ?? "public"),
     showAs: "busy",

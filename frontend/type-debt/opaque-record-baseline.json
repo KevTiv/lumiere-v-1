@@ -278,7 +278,7 @@
   "web/app/(modules)/messages/message-record.ts": 1,
   "web/app/(modules)/messages/messages-client.tsx": 7,
   "web/app/(modules)/modules-shell.tsx": 2,
-  "web/app/(modules)/overview/overview-client.tsx": 28,
+  "web/app/(modules)/overview/overview-client.tsx": 20,
   "web/app/(modules)/pos/pos-client.tsx": 1,
   "web/app/(modules)/pos/pos-order-rows.ts": 1,
   "web/app/(modules)/pos/pos-session.ts": 2,

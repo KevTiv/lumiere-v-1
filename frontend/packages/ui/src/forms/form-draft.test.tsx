@@ -191,6 +191,20 @@ describe("ModularForm drafts", () => {
     fireEvent.click(screen.getByTestId("discard-changes-confirm"))
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(stored()).toBeNull()
+    // The dialog can remain mounted during its closing animation.
+    expect(field("description").value).toBe("")
+    settle()
+    expect(stored()).toBeNull()
+  })
+
+  it("does not save a pending draft after explicit discard", () => {
+    render(<FormModal open onOpenChange={vi.fn()} config={config} onSubmit={() => {}} />)
+    edit("description", "Pending draft")
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
+    fireEvent.click(screen.getByTestId("discard-changes-confirm"))
+    settle()
+    expect(stored()).toBeNull()
+    expect(field("description").value).toBe("")
   })
 })
 

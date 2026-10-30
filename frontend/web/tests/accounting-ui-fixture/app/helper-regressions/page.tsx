@@ -11,6 +11,7 @@ import { postExpenseReportForm } from '@lumiere/ui/lib/expenses-form-configs';
 import { newMailMessageForm } from '@lumiere/ui/lib/messages-form-configs';
 import { newSaleOrderForm } from '@lumiere/ui/lib/sales-form-configs';
 import type { FormConfig } from '@lumiere/ui/lib/form-types';
+import { EntityTable } from '@lumiere/ui/entity-views/entity-table';
 
 function Fixture() {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ function Fixture() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'quotation' | 'posting' | 'message'>('quotation');
   const [saved, setSaved] = useState('');
+  const [openedReport, setOpenedReport] = useState('');
   const config = useMemo<FormConfig>(() => {
     const base = mode === 'quotation' ? newSaleOrderForm(t) : mode === 'posting' ? postExpenseReportForm(t) : newMailMessageForm(t);
     const accountOptions = [{ value: '1168', label: '2000 — Accounts Payable' }, ...Array.from({ length: 100 }, (_, i) => ({ value: String(i + 1), label: `${4000 + i} — Expense account ${i + 1}` }))];
@@ -41,6 +43,14 @@ function Fixture() {
     <Button onClick={() => { setMode('posting'); setOpen(true); }}>Post expense report</Button>
     <Button onClick={() => { setMode('message'); setOpen(true); }}>Message</Button>
     <output data-testid="saved-fixture">{saved}</output>
+    <output data-testid="opened-report">{openedReport}</output>
+    <section role="tabpanel" aria-label="Expense reports">
+      <EntityTable config={{ mode: 'table', rowKey: 'id', rowSelectionToggleOnClick: false,
+        columns: [{ key: 'name', label: 'Report' }],
+        actions: [{ id: 'submit-sheets', label: 'Submit reports', requiresSelection: true, onClick: () => {} }],
+      }} data={[{ id: 'report-1', name: 'Synthetic expense report' }]}
+        onRowClick={(row) => setOpenedReport(String(row.id))} />
+    </section>
     <FormModal config={config} open={open} onOpenChange={setOpen} draft={false}
       onSubmit={async (data) => setSaved(JSON.stringify(data))} />
   </main>;

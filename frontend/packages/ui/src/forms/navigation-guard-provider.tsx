@@ -57,7 +57,12 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
       try { action() } finally { bypass.current = false }
     })
   }, [allow, hasEdits, isSaving])
+  // Consumers must not re-register editors whenever translations/router callbacks change.
+  const latestRun = useRef(run)
+  latestRun.current = run
+  const proceed = useCallback((action: () => void) => latestRun.current(action), [])
   const value = useMemo(() => ({
+    proceed,
     register: (read: () => NavigationEditorState) => {
       editors.current.add(read)
       return () => {
@@ -70,7 +75,7 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
       if (!hasEdits()) dismiss()
       if (!isSaving()) flushAfterSave()
     },
-  }), [dismiss, hasEdits, isSaving, flushAfterSave])
+  }), [dismiss, hasEdits, isSaving, flushAfterSave, proceed])
   const guardedRouter = useMemo(() => router ? {
     ...router,
     push: (...args: Parameters<typeof router.push>) => run(() => router.push(...args), true),

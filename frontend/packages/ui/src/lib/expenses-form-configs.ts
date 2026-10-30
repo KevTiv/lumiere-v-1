@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
+import { ExpenseAllocationLines, newExpenseAllocationDraft, type ExpenseAllocationChoices, type ExpenseAllocationField } from "../forms/expense-allocation-lines"
 
 const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
 
@@ -654,58 +655,27 @@ export const reimburseExpenseReportForm = (t: TFunction): FormConfig => ({
   ],
 })
 
-function allocationLineFields(t: TFunction, n: 1 | 2 | 3 | 4) {
-  const required = n === 1
-  return [
-    {
-      id: `analyticAccountId${n}`,
-      name: `analyticAccountId${n}`,
-      type: "text" as const,
-      label: t(`expenses.forms.setAllocations.fields.analyticAccountId${n}`),
-      width: "1/2" as const,
-    },
-    {
-      id: `projectId${n}`,
-      name: `projectId${n}`,
-      type: "select" as const,
-      options: emptySelect,
-      searchable: true,
-      label: t(`expenses.forms.setAllocations.fields.projectId${n}`),
-      width: "1/2" as const,
-    },
-    {
-      id: `sharePercent${n}`,
-      name: `sharePercent${n}`,
-      type: "number" as const,
-      label: t(`expenses.forms.setAllocations.fields.sharePercent${n}`),
-      required,
-      defaultValue: n === 1 ? 100 : undefined,
-      width: "1/2" as const,
-    },
-    {
-      id: `billable${n}`,
-      name: `billable${n}`,
-      type: "checkbox" as const,
-      label: t(`expenses.forms.setAllocations.fields.billable${n}`),
-      defaultValue: n === 1,
-      width: "1/2" as const,
-    },
-  ]
-}
-
-export const setExpenseAllocationsForm = (t: TFunction): FormConfig => ({
+export const setExpenseAllocationsForm = (t: TFunction, choices: ExpenseAllocationChoices = {
+  projectOptions: [], analyticAccountOptions: [], projectsState: { status: "loading" }, analyticAccountsState: { status: "loading" },
+}, disabled = false): FormConfig => ({
   id: "set-expense-allocations",
   title: t("expenses.forms.setAllocations.title"),
-  description: t("expenses.forms.setAllocations.description"),
+  description: t("expenses.allocations.replacementHint", { defaultValue: "Existing allocations are not loaded here. Saving replaces all allocations on this expense with the rows below. Review every row before saving." }),
+  submitLabel: t("expenses.allocations.replace", { defaultValue: "Replace allocations" }),
   sections: [
     {
       id: "allocation-lines",
       title: t("expenses.forms.setAllocations.sections.lines"),
       fields: [
-        ...allocationLineFields(t, 1),
-        ...allocationLineFields(t, 2),
-        ...allocationLineFields(t, 3),
-        ...allocationLineFields(t, 4),
+        {
+          id: "allocationLines", name: "allocationLines", type: "custom", width: "full",
+          component: ExpenseAllocationLines, defaultValue: [newExpenseAllocationDraft(true)], disabled, ...choices,
+        } as ExpenseAllocationField,
+        {
+          id: "confirmAllocationReplacement", name: "confirmAllocationReplacement", type: "checkbox", width: "full", required: true, defaultValue: false,
+          label: t("expenses.allocations.confirmReplacement", { defaultValue: "I have reviewed these rows and want to replace this expense's allocations." }),
+          validation: { custom: (value) => value === true ? null : t("expenses.allocations.confirmRequired", { defaultValue: "Confirm that you want these rows to replace the existing allocations." }) },
+        },
       ],
     },
   ],

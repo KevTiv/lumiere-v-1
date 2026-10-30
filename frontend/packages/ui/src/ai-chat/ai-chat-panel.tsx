@@ -61,6 +61,8 @@ interface AIChatPanelProps {
   config?: Partial<AIChatConfig>
   context?: ChatContext
   initialMessages?: ChatMessage[]
+  /** History persistence is separate from obtaining an answer or executing an action. */
+  historySaveFailed?: boolean
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
   onSendMessage?: (userText: string) => Promise<ChatReply>
   onStreamMessage?: (
@@ -134,6 +136,7 @@ export function AIChatPanel({
   config,
   context,
   initialMessages,
+  historySaveFailed,
   onSendMessage,
   onStreamMessage,
 }: AIChatPanelProps) {
@@ -143,6 +146,11 @@ export function AIChatPanel({
   const [isLoading, setIsLoading] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [guideError, setGuideError] = useState<string | null>(null)
+  const active = useRef(true)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
   const [showCommands, setShowCommands] = useState(false)
   const [commandFilter, setCommandFilter] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -276,6 +284,7 @@ export function AIChatPanel({
 
         const reply = await onStreamMessage(userMessage.content, {
           onDelta: (delta) => {
+            if (!active.current) return
             streamedContent += delta
             setMessages((prev) =>
               prev.map((message) =>
@@ -286,6 +295,7 @@ export function AIChatPanel({
             )
           },
           onSources: (sources) => {
+            if (!active.current) return
             streamedSources = sources
             setMessages((prev) =>
               prev.map((message) =>
@@ -296,6 +306,7 @@ export function AIChatPanel({
             )
           },
           onActions: (actions) => {
+            if (!active.current) return
             streamedActions = actions
             setMessages((prev) =>
               prev.map((message) =>
@@ -306,6 +317,7 @@ export function AIChatPanel({
             )
           },
         })
+        if (!active.current) return
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
           id: assistantId,
@@ -370,8 +382,10 @@ export function AIChatPanel({
         }
       }
 
+      if (!active.current) return
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
+      if (!active.current) return
       const msg = err instanceof Error ? err.message : String(err)
       setSendError(msg)
       setInput((current) => current === "" ? userMessage.content : current)
@@ -385,7 +399,7 @@ export function AIChatPanel({
         },
       ])
     } finally {
-      setIsLoading(false)
+      if (active.current) setIsLoading(false)
     }
   }
 
@@ -554,6 +568,7 @@ export function AIChatPanel({
           <div className={cn("mx-auto w-full max-w-[820px] px-4 py-8 sm:px-8", docked ? "sm:px-4" : "sm:py-12")}>
           {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
           {guideError ? <p role="alert" className="mb-4 break-words text-sm text-destructive">{guideError}</p> : null}
+          {historySaveFailed ? <p role="alert" className="mb-4 break-words rounded-md border p-3 text-sm">{t("aiChat.historySaveFailed", { defaultValue: "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed." })}</p> : null}
             {messages.length === 0 ? (
               <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">

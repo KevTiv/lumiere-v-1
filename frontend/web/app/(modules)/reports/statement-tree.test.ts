@@ -91,12 +91,17 @@ describe("buildStatementRows", () => {
 })
 
 describe("journalItemsHref", () => {
-  it("links to the move-lines tab filtered by account", () => {
-    assert.equal(journalItemsHref("12"), "/accounting?tab=move-lines&filter=accountId%3A12")
+  const report = { id: "1", companyId: "7", dateFrom: "2026-10-01", dateTo: "2026-10-31", targetMove: "posted", filterAccountIds: [], filterAnalyticAccountIds: [], filterPartnerIds: [], filterJournalIds: [] }
+  it("links to the move-lines tab with the reviewed report scope", () => {
+    const params = new URL(journalItemsHref("12", report, "/reports?report=1")!, "https://lumiere.invalid").searchParams
+    assert.equal(params.get("tab"), "move-lines")
+    assert.equal(params.get("statementAccount"), "12")
+    assert.equal(params.get("statementReport"), "1")
+    assert.equal(params.get("companyId"), "7")
   })
   it("returns null without an account id", () => {
-    assert.equal(journalItemsHref(null), null)
-    assert.equal(journalItemsHref("abc"), null)
+    assert.equal(journalItemsHref(null, report, "/reports"), null)
+    assert.equal(journalItemsHref("abc", report, "/reports"), null)
   })
 })
 

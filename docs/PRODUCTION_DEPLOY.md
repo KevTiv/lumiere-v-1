@@ -287,11 +287,15 @@ production; development infrastructure and data remain deferred.
 The production control plane reports `europe-west4`; the exact runtime zone is
 `europe-west4-drams3a`. The manifest records these identifiers separately.
 Preflight checks configured replicas, including explicit configuration for a
-service that has never deployed. The ordered rollout still verifies the exact
-`RAILWAY_REPLICA_REGION` after deployment. It does not move existing volumes.
+service that has never deployed. The infrastructure gate verifies the successful
+active deployment's recorded placement, resolving only Railway's explicit
+deprecated-region mapping to the exact runtime zone. It requires running replicas
+and does not depend on an SSH key or account-scoped token. It does not move volumes.
 
-1. Existing `Postgres`, `kong-postgres` and `spacetimedb` deployments must be successful and
-   report the configured EU `RAILWAY_REPLICA_REGION`. `qdrant` is required only
+1. Existing `Postgres`, `kong-postgres` and `spacetimedb` deployments must be successful,
+   active and running in the expected EU zone. A newer watch-path `SKIPPED`
+   record does not replace that active deployment; failed or pending deployments
+   still block rollout. `qdrant` is required only
    when `enable_ai=true`. Kong uses shared counters in its dedicated PostgreSQL
    database; Redis is not part of the baseline production topology.
 2. The one-shot `spacetimedb-publisher` builds the lean production module from the release commit, publishes

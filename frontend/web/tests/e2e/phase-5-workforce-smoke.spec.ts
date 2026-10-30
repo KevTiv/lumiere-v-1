@@ -91,7 +91,9 @@ test.describe("Workforce modules e2e @phase-5", () => {
       await openExpensesTab(page, "expense-sheets")
       await expect(page.getByTestId("entity-action-csv-sheets")).toBeVisible()
       await expect(page.getByText("Import reports (CSV)")).toBeVisible()
+      const reportListUrl = page.url()
       await expectRowActionsOffered(page, ["submit-sheets", "post-sheets", "reimburse-sheets"])
+      await expect(page).toHaveURL(reportListUrl)
       await expectNoAppError(page)
     })
 

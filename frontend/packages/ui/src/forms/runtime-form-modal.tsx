@@ -76,9 +76,17 @@ export function RuntimeFormModal({
     return transformConfig ? transformConfig(config) : config
   }, [config, transformConfig])
 
+  // The create owner opts in. Inspect the resolved fields, including required,
+  // disabled and conditional fields: folding even an empty/false custom value
+  // into metadata would reach an unsupported non-atomic follow-up write.
+  const customFieldCreationBlocked = Boolean(staticConfig.customFieldCreateUnavailableMessage)
+    && resolvedConfig.sections.some((section) => section.fields.some((field) =>
+      field.name.startsWith("custom:") || field.id.startsWith("custom:"),
+    ))
+
   const handleSubmit = React.useCallback(
     async (data: Record<string, unknown>) => {
-      if (!onSubmit) return
+      if (!onSubmit || customFieldCreationBlocked) return
       if (foldCustomFieldsIntoMetadata && customFieldIds.length > 0) {
         const metadata = metadataFromCustomFields(data, customFieldIds)
         const core = { ...data }
@@ -90,7 +98,7 @@ export function RuntimeFormModal({
       }
       await onSubmit(data)
     },
-    [onSubmit, foldCustomFieldsIntoMetadata, customFieldIds],
+    [onSubmit, foldCustomFieldsIntoMetadata, customFieldIds, customFieldCreationBlocked],
   )
 
   if (open && isLoading) {
@@ -108,15 +116,17 @@ export function RuntimeFormModal({
   const submissionBlocked = runtimeConfigFailed && runtimeConfigFailureMode === "block"
   const runtimeConfigError = submissionBlocked
     ? `Runtime form configuration is unavailable. Submission is disabled. ${error}`
-    : submitError
+    : customFieldCreationBlocked
+      ? [staticConfig.customFieldCreateUnavailableMessage, submitError].filter(Boolean).join(" ")
+      : submitError
 
   return (
     <FormModal
       open={open}
       onOpenChange={onOpenChange}
       config={runtimeConfigFailed ? staticConfig : resolvedConfig}
-      onSubmit={submissionBlocked ? undefined : runtimeConfigFailed ? onSubmit : handleSubmit}
-      submissionDisabled={submissionBlocked || submissionDisabled}
+      onSubmit={submissionBlocked || customFieldCreationBlocked ? undefined : runtimeConfigFailed ? onSubmit : handleSubmit}
+      submissionDisabled={submissionBlocked || customFieldCreationBlocked || submissionDisabled}
       submitError={runtimeConfigError}
       {...rest}
     />
