@@ -257,7 +257,7 @@ pub(super) async fn evidence(
     };
     let entry_id = u64_value(entry, "id")
         .ok_or_else(|| ApiError::Internal("invalid guide review entry".into()))?;
-    let versions = state.stdb.query_sql(&format!("SELECT id, title, body, create_uid, review_state, review_epoch, applicability FROM ai_knowledge_entry_version WHERE organization_id = {org} AND company_id = {company} AND entry_id = {entry_id} LIMIT 2")).await.map_err(ApiError::internal)?;
+    let versions = state.stdb.query_sql(&format!("SELECT id, title, body, create_uid, review_state, review_epoch, applicability, source_passage_ids, claim_ids, decision_ids FROM ai_knowledge_entry_version WHERE organization_id = {org} AND company_id = {company} AND entry_id = {entry_id} LIMIT 2")).await.map_err(ApiError::internal)?;
     let [candidate] = versions.as_slice() else {
         return Ok(json!({"state":"conflict","verified":false}));
     };
@@ -265,7 +265,9 @@ pub(super) async fn evidence(
         .ok_or_else(|| ApiError::Internal("invalid guide review version".into()))?;
     let reviews = state.stdb.query_sql(&format!("SELECT id, review_kind, outcome, review_epoch, reviewer_uid FROM ai_knowledge_review WHERE organization_id = {org} AND company_id = {company} AND version_id = {candidate_id} LIMIT 201")).await.map_err(ApiError::internal)?;
     let dependencies = state.stdb.query_sql(&format!("SELECT requirement, state, acknowledged_by FROM ai_evidence_dependency WHERE organization_id = {org} AND company_id = {company} AND dependent_kind = 'knowledge_version' AND dependent_id = {candidate_id} LIMIT 201")).await.map_err(ApiError::internal)?;
-    let verified = verification_allowed(head, rev, entry, candidate, &reviews, &dependencies);
+    let sources_current = references_current(state, org, company, candidate).await?;
+    let verified = sources_current
+        && verification_allowed(head, rev, entry, candidate, &reviews, &dependencies);
     let mut current_reviews: Vec<Value> = ["source_fidelity", "domain_interpretation", "implementation"].into_iter().filter_map(|kind| {
         reviews.iter().filter(|row| string(row,"review_kind") == Some(kind) && u64_value(row,"review_epoch") == u64_value(candidate,"review_epoch")).max_by_key(|row|u64_value(row,"id").unwrap_or(0)).map(|row|json!({"kind":kind,"outcome":field(row,"outcome"),"reviewer":field(row,"reviewer_uid")}))
     }).collect();
@@ -290,8 +292,99 @@ pub(super) async fn evidence(
         }
     }
     Ok(
-        json!({"state":string(candidate,"review_state").unwrap_or("candidate"),"verified":verified,"entryId":entry_id.to_string(),"versionId":candidate_id.to_string(),"reviewEpoch":u64_value(candidate,"review_epoch"),"canNominate":false,"canReview":can_review,"reviews":current_reviews}),
+        json!({"state":if !sources_current && string(candidate,"review_state")==Some("approved") {"needs_review"}else{string(candidate,"review_state").unwrap_or("candidate")},"verified":verified,"entryId":entry_id.to_string(),"versionId":candidate_id.to_string(),"reviewEpoch":u64_value(candidate,"review_epoch"),"canNominate":false,"canReview":can_review,"reviews":current_reviews}),
     )
+}
+
+/// Recheck canonical records as well as dependency edges: legacy passage status
+/// changes do not necessarily append a source-change event or escalate an edge.
+async fn references_current(
+    state: &AppState,
+    org: u64,
+    company: u64,
+    candidate: &Value,
+) -> Result<bool, ApiError> {
+    use std::collections::BTreeSet;
+    let mut claims: BTreeSet<u64> = row_ids(candidate, "claim_ids").into_iter().collect();
+    let decisions: BTreeSet<u64> = row_ids(candidate, "decision_ids").into_iter().collect();
+    let mut passages: BTreeSet<u64> = row_ids(candidate, "source_passage_ids")
+        .into_iter()
+        .collect();
+    if decisions.is_empty() || decisions.len() > 32 || claims.len() > 32 || passages.len() > 32 {
+        return Ok(false);
+    }
+    let csv = |ids: &BTreeSet<u64>| ids.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
+    let decision_rows=state.stdb.query_sql(&format!("SELECT id, status, adopted_claim_ids, supporting_claim_ids FROM ai_evidence_decision WHERE organization_id = {org} AND company_id = {company} AND id IN ({}) LIMIT 201",csv(&decisions))).await.map_err(ApiError::internal)?;
+    if decision_rows.len() != decisions.len()
+        || decision_rows
+            .iter()
+            .any(|row| string(row, "status") != Some("accepted"))
+    {
+        return Ok(false);
+    }
+    for row in &decision_rows {
+        claims.extend(row_ids(row, "adopted_claim_ids"));
+        claims.extend(row_ids(row, "supporting_claim_ids"));
+    }
+    if claims.is_empty() || claims.len() > 200 {
+        return Ok(false);
+    }
+    let claim_rows=state.stdb.query_sql(&format!("SELECT id, status, supporting_passage_ids, contradicting_passage_ids FROM ai_evidence_claim WHERE organization_id = {org} AND company_id = {company} AND id IN ({}) LIMIT 201",csv(&claims))).await.map_err(ApiError::internal)?;
+    if claim_rows.len() != claims.len()
+        || claim_rows
+            .iter()
+            .any(|row| string(row, "status") != Some("current"))
+    {
+        return Ok(false);
+    }
+    for row in &claim_rows {
+        passages.extend(row_ids(row, "supporting_passage_ids"));
+        passages.extend(row_ids(row, "contradicting_passage_ids"));
+    }
+    if passages.is_empty() || passages.len() > 200 {
+        return Ok(false);
+    }
+    let passage_rows=state.stdb.query_sql(&format!("SELECT id, company_id, status, text_state, source_version_id FROM ai_evidence_passage WHERE organization_id = {org} AND id IN ({}) LIMIT 201",csv(&passages))).await.map_err(ApiError::internal)?;
+    if passage_rows.len() != passages.len()
+        || passage_rows.iter().any(|row| {
+            string(row, "status") != Some("current")
+                || string(row, "text_state") != Some("present")
+                || (u64_value(row, "source_version_id").is_none()
+                    && u64_value(row, "company_id") != Some(company))
+        })
+    {
+        return Ok(false);
+    }
+    let versions: BTreeSet<u64> = passage_rows
+        .iter()
+        .filter_map(|row| u64_value(row, "source_version_id"))
+        .collect();
+    if versions.is_empty() {
+        return Ok(true);
+    }
+    let version_rows=state.stdb.query_sql(&format!("SELECT id, source_id, status, verification FROM ai_evidence_source_version WHERE organization_id = {org} AND id IN ({}) LIMIT 201",csv(&versions))).await.map_err(ApiError::internal)?;
+    if version_rows.len() != versions.len()
+        || version_rows.iter().any(|row| {
+            string(row, "status") != Some("current")
+                || string(row, "verification") != Some("inspected")
+        })
+    {
+        return Ok(false);
+    }
+    let sources: BTreeSet<u64> = version_rows
+        .iter()
+        .filter_map(|row| u64_value(row, "source_id"))
+        .collect();
+    if sources.is_empty() {
+        return Ok(false);
+    }
+    let source_rows=state.stdb.query_sql(&format!("SELECT id, company_id, scope FROM ai_evidence_source WHERE organization_id = {org} AND id IN ({}) LIMIT 201",csv(&sources))).await.map_err(ApiError::internal)?;
+    Ok(source_rows.len() == sources.len()
+        && source_rows.iter().all(|row| {
+            string(row, "scope") == Some("organization")
+                || (string(row, "scope") == Some("company")
+                    && u64_value(row, "company_id") == Some(company))
+        }))
 }
 
 fn actor(value: &Value, key: &str) -> Option<String> {

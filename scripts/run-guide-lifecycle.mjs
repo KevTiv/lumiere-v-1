@@ -188,7 +188,10 @@ async function verificationLifecycle(admin, ordinary, financeRole, companyId, fi
   for (const reviewKind of ['source_fidelity', 'domain_interpretation', 'implementation']) await request(`/v1/knowledge/guides/${saved.guideId}/reviews`, ordinary, { companyId: String(companyId), revision: 2, reviewKind, outcome: 'accepted' })
   const revisedKey = `guide:${saved.guideId}:revision:2`
   await probe({ ...fixture, verificationKey: revisedKey, expectReusable: true }, env)
-  await operation(admin, 'record_ai_evidence_source_change', { companyId, sourceVersionId, params: { change_kind: 'corrected', replacement_version_id: none, reason: 'The isolated source changed; previous guide reviews must be invalidated.' } })
+  await operation(admin, 'set_ai_evidence_passage_status', { companyId, passageId, status: 'withdrawn' })
+  assert.equal((await request(guidePath(saved.guideId, companyId, 2), admin)).guide.reviewState, 'needs_review', 'Direct legacy passage changes must not leave a false verified badge')
+  await probe({ ...fixture, verificationKey: revisedKey, expectReusable: false }, env)
+  await operation(admin, 'record_ai_evidence_source_change', { companyId, sourceVersionId, params: { change_kind: 'superseded', replacement_version_id: none, reason: 'The isolated source changed; previous guide reviews must be invalidated.' } })
   const stale = (await request(guidePath(saved.guideId, companyId, 2), admin)).guide
   assert.equal(stale.reviewState, 'needs_review')
   await probe({ ...fixture, verificationKey: revisedKey, expectReusable: false }, env)
