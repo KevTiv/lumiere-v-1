@@ -78,6 +78,19 @@ test("uncertain empty read cannot replace an in-flight request with changed inpu
   assert.equal(writes, 1)
 })
 
+test("resolving an old attempt cannot report a different current draft as saved", async () => {
+  const storage = memory()
+  let committed = false
+  let writes = 0
+  const ports = { assertScope() {}, makeKey: () => "attempt-1", makeRequest: request,
+    read: async (key: string) => committed ? [receipt(key)] : [],
+    dispatch: async () => { writes++; committed = true; throw new Error("lost response") } }
+  await assert.rejects(executeRecordCreation(scope, model, payload, storage, ports), /lost response/)
+  await assert.rejects(executeRecordCreation(scope, model, '{"name":"Changed draft"}', storage, ports), /current changes have not been saved/)
+  assert.equal(writes, 1)
+  assert.ok(storage.getItem(recordCreationStorageKey(scope, model)), "retain the old attempt until explicit recovery acknowledgment")
+})
+
 test("explicit retry checks first and reuses the same immutable key and bytes", async () => {
   const storage = memory()
   const sent: string[] = []

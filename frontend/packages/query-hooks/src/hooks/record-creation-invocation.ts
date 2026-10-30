@@ -77,6 +77,12 @@ export function exactRecordCreationResult(pending: PendingRecordCreation, rows: 
 /** Mark only an explicit server-side rejection as safe to correct. Transport/5xx outcomes remain uncertain. */
 export class RecordCreationRejected extends Error {}
 
+export class EarlierRecordCreationResolved extends Error {
+  constructor(readonly recordId: string) {
+    super(`The earlier attempt saved record ${recordId}. Your current changes have not been saved. Review the saved attempt before continuing.`)
+  }
+}
+
 /** One explicit user attempt, with durable identity before POST and exact recovery before any replay. */
 export async function executeRecordCreation(
   scope: InvocationScope,
@@ -102,7 +108,11 @@ export async function executeRecordCreation(
   ports.assertScope()
   if (pending) {
     const savedId = exactRecordCreationResult(pending, rows)
-    if (savedId) { storage.removeItem(storageKey); return savedId }
+    if (savedId) {
+      if (pending.payloadJson !== payloadJson) throw new EarlierRecordCreationResolved(savedId)
+      storage.removeItem(storageKey)
+      return savedId
+    }
     if (pending.payloadJson !== payloadJson) {
       if (pending.phase !== "rejected") throw new WorkflowError("conflict", "A previous save is unresolved. Restore its entered values and check it before creating a different record.")
       pending = undefined
