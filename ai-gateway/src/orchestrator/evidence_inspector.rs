@@ -34,6 +34,9 @@ use serde::Serialize;
 use serde_json::Value;
 use stdb_client::StdbClient;
 
+#[path = "guide_source_authority.rs"]
+mod guide_source_authority;
+
 /// Longest excerpt returned for a passage.
 const MAX_EXCERPT_CHARS: usize = 1_000;
 /// Longest revision chain followed for an edited/forked component.
@@ -45,6 +48,10 @@ const MAX_REVISION_DEPTH: usize = 64;
 /// use an in-memory fake.
 #[async_trait]
 pub trait EvidenceRows: Send + Sync {
+    /// Current source resource/body policy, not a capability or saved membership snapshot.
+    async fn guide_source_read_allowed(&self, _viewer: Viewer) -> Result<bool> {
+        Ok(false)
+    }
     async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>>;
     /// Edges whose dependent is `(dependent_kind, id)`.
     async fn dependencies_of(
@@ -122,6 +129,9 @@ pub trait EvidenceRows: Send + Sync {
 
 #[async_trait]
 impl EvidenceRows for StdbClient {
+    async fn guide_source_read_allowed(&self, viewer: Viewer) -> Result<bool> {
+        guide_source_authority::allowed(self, viewer).await
+    }
     async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>> {
         let table = evidence_read_view(table)?;
         let rows = self
@@ -1608,17 +1618,21 @@ async fn knowledge_scope_allowed(
     if !guide_binding_access(rows, viewer, entry).await? {
         return Ok(false);
     }
+    let guide_bound = guide_binding(entry)?.is_some();
     let share_scope = text(entry, "shareScope").unwrap_or_default();
     let membership = match viewer.actor_identity {
-        Some(actor) => {
+        Some(actor) if !guide_bound => {
             rows.knowledge_membership(viewer.organization_id, viewer.company_id, actor)
                 .await?
         }
-        None => None,
+        _ => None,
     };
     Ok(match share_scope.as_str() {
         "organization" => true,
-        "personal" => membership.is_some() && identity(&entry, "ownerUid") == viewer.actor_identity,
+        "personal" => {
+            (guide_bound || membership.is_some())
+                && identity(&entry, "ownerUid") == viewer.actor_identity
+        }
         "team" => {
             membership.is_some()
                 && text(&entry, "teamRef")
@@ -1666,6 +1680,9 @@ async fn guide_binding_access(
     let Some(actor) = viewer.actor_identity else {
         return Ok(false);
     };
+    if !rows.guide_source_read_allowed(viewer).await? {
+        return Ok(false);
+    }
     let Some(guide) = rows
         .row("knowledge_guide", id)
         .await?
@@ -1793,6 +1810,9 @@ mod tests {
 
     #[derive(Default)]
     struct FakeRows {
+        guide_source_allowed: bool,
+        guide_source_max_checks: Option<usize>,
+        guide_source_checks: std::sync::atomic::AtomicUsize,
         tables: HashMap<(&'static str, u64), Value>,
         dependencies: Vec<Value>,
         entries: Vec<Value>,
@@ -1808,6 +1828,15 @@ mod tests {
 
     #[async_trait]
     impl EvidenceRows for FakeRows {
+        async fn guide_source_read_allowed(&self, _viewer: Viewer) -> Result<bool> {
+            let check = self
+                .guide_source_checks
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(self.guide_source_allowed
+                && self
+                    .guide_source_max_checks
+                    .is_none_or(|limit| check < limit))
+        }
         async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>> {
             Ok(self.tables.get(&(table, id)).cloned())
         }
@@ -2430,6 +2459,7 @@ mod tests {
     fn guide_knowledge_fixture() -> FakeRows {
         use sha2::{Digest, Sha256};
         let mut rows = knowledge_fixture("approved", "personal");
+        rows.guide_source_allowed = true;
         rows.entries[0]["entryKey"] = json!("guide:71:revision:2");
         rows.tables
             .insert(("ai_knowledge_entry", 20), rows.entries[0].clone());
@@ -2505,6 +2535,37 @@ mod tests {
                 .unwrap(),
             KnowledgeRetrieval::Denied { .. }
         ));
+    }
+
+    #[tokio::test]
+    async fn reusable_guide_body_is_denied_when_current_source_policy_is_revoked_before_or_during_read(
+    ) {
+        let viewer = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let mut denied = guide_knowledge_fixture();
+        denied.guide_source_allowed = false;
+        assert!(matches!(
+            retrieve_reusable_knowledge(&denied, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+        let mut revoked = guide_knowledge_fixture();
+        revoked.guide_source_max_checks = Some(1);
+        assert!(matches!(
+            retrieve_reusable_knowledge(&revoked, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+        assert_eq!(
+            revoked
+                .guide_source_checks
+                .load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
     }
 
     #[tokio::test]
