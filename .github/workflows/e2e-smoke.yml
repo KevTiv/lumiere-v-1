@@ -53,13 +53,22 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       valid: ${{ steps.scope.outputs.valid }}
-      run_e2e: ${{ steps.scope.outputs.run_e2e }}
+      run_e2e: ${{ steps.scope.outputs.run_e2e == 'true' || steps.guides.outputs.run_guides == 'true' }}
+      run_guides: ${{ steps.guides.outputs.run_guides }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: scope
         run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
+      - id: guides
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/guide-lifecycle-scope.py --github-output "$GITHUB_OUTPUT"
+      - name: Test guide lifecycle scope
+        run: python3 -m unittest discover -s scripts/tests -p 'test_guide_lifecycle_scope.py'
       - name: Test change classifier
         run: python3 -m unittest discover -s scripts/tests -p 'test_ci_change_scope.py'
       - name: Test domain aggregate certification execution
@@ -647,10 +656,87 @@ jobs:
           path: .tmp/e2e/
           retention-days: 7
 
+  guide-lifecycle:
+    name: Authenticated guide lifecycle
+    needs: [scope, build-e2e]
+    if: needs.scope.outputs.run_guides == 'true' && needs.build-e2e.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      STDB_HOST: http://127.0.0.1:3000
+      STDB_MODULE: lumiere-v1-local-e2e
+      LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
+      PG_HOST: 127.0.0.1
+      PG_PORT: "5432"
+      PG_DATABASE: lumiere
+      PG_USER: lumiere
+      PG_PASSWORD: lumiere
+      PG_TLS_MODE: disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: ./.github/actions/setup-spacetime-cli
+        with:
+          version: ${{ env.SPACETIME_CLI_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/prepare-contracts
+      - name: Identify Rust dependency cache environment
+        id: rust-dependency-environment
+        run: |
+          set -euo pipefail
+          : "${ImageOS:?runner image must be identified}"
+          : "${ImageVersion:?runner image version must be identified}"
+          printf 'image=%s-%s\n' "$ImageOS" "$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace-native-dev-deps-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-dependency-environment.outputs.image }}
+          workspaces: .
+          cache-workspace-crates: false
+          cache-bin: false
+          cache-on-failure: false
+      - name: Prepare pinned contracts and compile actual guide retrieval probe
+        run: |
+          make contracts-staging-from-pinned
+          cargo test --locked -p ai-gateway --bin gateway real_authority_guides_lifecycle --no-run
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-build-${{ github.sha }}
+          path: .ci
+      - name: Install and verify exact-commit E2E artifacts
+        run: scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"
+      - name: Run actual authenticated save, retrieval, revocation and restart lifecycle
+        run: |
+          node --test scripts/tests/test-guide-lifecycle.mjs
+          node scripts/run-guide-lifecycle.mjs
+      - name: Upload guide lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guide-lifecycle-${{ github.sha }}
+          path: .tmp/guide-lifecycle/
+          if-no-files-found: warn
+          retention-days: 7
+
   gate:
     name: E2E gate
     if: always()
-    needs: [scope, plan, build-e2e, e2e-smoke]
+    needs: [scope, plan, build-e2e, e2e-smoke, guide-lifecycle]
     runs-on: ubuntu-latest
     steps:
       - name: Require scope and E2E result
@@ -660,5 +746,9 @@ jobs:
           test "${{ needs.plan.result }}" = success
           case "${{ needs.scope.outputs.run_e2e }}:${{ needs.build-e2e.result }}:${{ needs.e2e-smoke.result }}" in
             true:success:success|false:skipped:skipped) ;;
+            *) exit 1 ;;
+          esac
+          case "${{ needs.scope.outputs.run_guides }}:${{ needs.guide-lifecycle.result }}" in
+            true:success|false:skipped) ;;
             *) exit 1 ;;
           esac

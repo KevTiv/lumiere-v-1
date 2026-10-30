@@ -11,13 +11,17 @@ set -euo pipefail
 case "${1:-}" in
   deployment)
     [[ "${2:-}" == list ]]
-    if [[ -n "${TEST_RAILWAY_DEPLOYMENTS_FILE:-}" ]]; then
+    deployments_file="${TEST_RAILWAY_DEPLOYMENTS_FILE:-}"
+    if [[ -n "${TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE:-}" && -f "${TEST_REDEPLOY_ARGS_FILE:-}" ]]; then
+      deployments_file="$TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE"
+    fi
+    if [[ -n "$deployments_file" ]]; then
       limit=20
       args=("$@")
       for ((i=0; i < ${#args[@]}; i++)); do
         [[ "${args[$i]}" != --limit ]] || limit="${args[$((i + 1))]}"
       done
-      jq --argjson limit "$limit" '.[:$limit]' "$TEST_RAILWAY_DEPLOYMENTS_FILE"
+      jq --argjson limit "$limit" '.[:$limit]' "$deployments_file"
     else
       printf '[{"id":"dep-1","status":"SUCCESS"}]\n'
     fi
@@ -31,14 +35,43 @@ case "${1:-}" in
     printf '%s\n' "${TEST_RAILWAY_LOGS:-}"
     ;;
   environment)
-    [[ "${2:-}" == edit ]]
-    cat >"${TEST_SOURCE_PATCH_FILE:?}"
-    printf '%s\n' "$*" >"${TEST_SOURCE_ARGS_FILE:?}"
-    if [[ "${TEST_ENV_EDIT_COMMITTED:-true}" == true ]]; then
-      printf '{"staged":true,"committed":true,"environmentId":"environment-test"}\n'
-    else
-      printf '{"staged":false,"committed":false,"message":"No changes to apply"}\n'
-    fi
+    case "${2:-}" in
+      edit)
+        cat >"${TEST_SOURCE_PATCH_FILE:?}"
+        printf '%s\n' "$*" >"${TEST_SOURCE_ARGS_FILE:?}"
+        if [[ "${TEST_ENV_EDIT_COMMITTED:-true}" == true ]]; then
+          printf '{"staged":true,"committed":true,"environmentId":"%s"}\n' "${TEST_EDIT_ENVIRONMENT_ID:-environment-test}"
+        else
+          printf '{"staged":false,"committed":false,"message":"No changes to apply"}\n'
+        fi
+        ;;
+      config)
+        # This CLI command has no --project flag. Its explicit environment ID
+        # must be the ID validated by the preceding project-scoped status read.
+        [[ " $* " == *" --environment environment-test "* ]]
+        [[ " $* " == *" --json "* ]]
+        [[ " $* " != *" --project "* ]]
+        if [[ -n "${TEST_CONFIG_ARGS_FILE:-}" ]]; then
+          printf '%s\n' "$*" >"$TEST_CONFIG_ARGS_FILE"
+        fi
+        if [[ "${TEST_CONFIG_DENIED:-false}" == true ]]; then
+          echo 'untrusted-config-error-must-not-be-logged' >&2
+          exit 51
+        fi
+        if [[ -n "${TEST_CONFIG_READ_COUNT_FILE:-}" ]]; then
+          count=0
+          [[ ! -f "$TEST_CONFIG_READ_COUNT_FILE" ]] || read -r count <"$TEST_CONFIG_READ_COUNT_FILE"
+          count=$((count + 1))
+          printf '%s\n' "$count" >"$TEST_CONFIG_READ_COUNT_FILE"
+          if [[ "$count" == 1 && -n "${TEST_CONFIG_INITIAL_FILE:-}" ]]; then
+            cat "$TEST_CONFIG_INITIAL_FILE"
+            exit 0
+          fi
+        fi
+        cat "${TEST_RAILWAY_CONFIG_FILE:?}"
+        ;;
+      *) exit 90 ;;
+    esac
     ;;
   service)
     [[ "${2:-}" == list ]]
@@ -53,7 +86,7 @@ case "${1:-}" in
     ;;
   redeploy)
     printf '%s\n' "$*" >"${TEST_REDEPLOY_ARGS_FILE:?}"
-    printf '{"status":"queued"}\n'
+    printf '{"id":"%s"}\n' "${TEST_REDEPLOY_ID:-dep-forced}"
     ;;
   *)
     echo "unexpected railway invocation: $*" >&2
@@ -236,7 +269,21 @@ source_patch_file="$TMP/source-patch.json"
 source_args_file="$TMP/source-args.txt"
 redeploy_args_file="$TMP/redeploy-args.txt"
 service_list_args_file="$TMP/service-list-args.txt"
-env "${common_env[@]}" \
+jq --arg image "$runtime_digest" '
+  .environments.edges[0].node.serviceInstances.edges = [{node: {
+    serviceId: "service-api-id", serviceName: "api-server", environmentId: "environment-test",
+    source: {image: $image, repo: null},
+    latestDeployment: {id: "dep-2", status: "SUCCESS", canRedeploy: true, meta: {image: $image}}
+  }}]
+' "$TMP/active-services.json" >"$TMP/runtime-source.json"
+# Canonical config is independent of the service-instance source projection.
+# Like CLI serialization, absent Option fields (including repo) are omitted.
+jq -n --arg image "$runtime_digest" '{services: {"service-api-id": {
+  source: {image: $image}, variables: {PRIVATE: {value: "config-private-sentinel"}}
+}}}' >"$TMP/runtime-config.json"
+source_env=("${common_env[@]}" "TEST_RAILWAY_STATUS_FILE=$TMP/runtime-source.json"
+  "TEST_RAILWAY_CONFIG_FILE=$TMP/runtime-config.json" "TEST_CONFIG_ARGS_FILE=$TMP/config-args.txt")
+env "${source_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
   TEST_SOURCE_ARGS_FILE="$source_args_file" \
@@ -265,9 +312,10 @@ grep -Fq -- '--json' "$source_args_file"
 grep -Fq -- '--project project-test' "$service_list_args_file"
 grep -Fq -- '--environment production' "$service_list_args_file"
 grep -Fq -- '--json' "$service_list_args_file"
+grep -Fq -- '--environment environment-test' "$TMP/config-args.txt"
 test ! -e "$redeploy_args_file"
 
-if env "${common_env[@]}" \
+if env "${source_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_RAILWAY_SERVICES_JSON='[{"id":"service-one","name":"api-server"},{"id":"service-two","name":"api-server"}]' \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
@@ -281,7 +329,11 @@ if env "${common_env[@]}" \
   exit 1
 fi
 
-env "${common_env[@]}" \
+jq '.environments.edges[0].node.serviceInstances.edges[0].node.latestDeployment |=
+  (.id = "dep-1" | .meta.image = "older-image")' \
+  "$TMP/runtime-source.json" >"$TMP/older-source-deployment.json"
+env "${source_env[@]}" \
+  TEST_RAILWAY_STATUS_FILE="$TMP/older-source-deployment.json" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_ENV_EDIT_COMMITTED=false \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \
@@ -296,17 +348,191 @@ env "${common_env[@]}" \
   ' _ "$ROOT/scripts/railway-stack-release.sh"
 grep -Fq -- '--project project-test' "$redeploy_args_file"
 grep -Fq -- '--environment production' "$redeploy_args_file"
-grep -Fq -- '--service api-server' "$redeploy_args_file"
+grep -Fq -- '--service service-api-id' "$redeploy_args_file"
 grep -Fq -- '--from-source' "$redeploy_args_file"
+
+# An already fresh deployment must not trigger a second explicit retry, even
+# when the edit result reports that its configuration patch was unchanged.
+rm "$redeploy_args_file"
+env "${source_env[@]}" \
+  RUST_RUNTIME_IMAGE="$runtime_digest" \
+  TEST_ENV_EDIT_COMMITTED=false \
+  TEST_SOURCE_PATCH_FILE="$source_patch_file" \
+  TEST_SOURCE_ARGS_FILE="$source_args_file" \
+  TEST_REDEPLOY_ARGS_FILE="$redeploy_args_file" \
+  bash -c '
+    source "$1"
+    wait_for_new_deployment() { printf "dep-2\n"; }
+    wait_for_terminal_success() { :; }
+    deployment_image() { printf "%s\n" "$RUST_RUNTIME_IMAGE"; }
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh"
+test ! -e "$redeploy_args_file"
+
+# A committed source patch can be a no-op. Exercise the actual retry polling
+# and immutable image verification, rather than mocking a fresh deployment.
+jq '.environments.edges[0].node.serviceInstances.edges[0].node.latestDeployment.id = "dep-1"' \
+  "$TMP/runtime-source.json" >"$TMP/unchanged-source.json"
+jq -n --arg image "$runtime_digest" '[{id: "dep-1", status: "SUCCESS", meta: {image: $image}}]' \
+  >"$TMP/retry-before.json"
+jq -n --arg image "$runtime_digest" '[{id: "dep-forced", status: "SUCCESS", meta: {image: $image}}]' \
+  >"$TMP/retry-after.json"
+retry_env=("${source_env[@]}"
+  "RUST_RUNTIME_IMAGE=$runtime_digest"
+  "TEST_RAILWAY_STATUS_FILE=$TMP/unchanged-source.json"
+  "TEST_RAILWAY_DEPLOYMENTS_FILE=$TMP/retry-before.json"
+  "TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE=$TMP/retry-after.json"
+  "TEST_SOURCE_PATCH_FILE=$source_patch_file"
+  "TEST_SOURCE_ARGS_FILE=$source_args_file"
+  "TEST_REDEPLOY_ARGS_FILE=$TMP/retry-args.txt")
+env "${retry_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server
+grep -Fq -- '--service service-api-id' "$TMP/retry-args.txt"
+if grep -Fq -- '--from-source' "$TMP/retry-args.txt"; then
+  echo "unchanged verified image was redeployed from source" >&2
+  exit 1
+fi
+
+rm "$TMP/retry-args.txt"
+# A stale instance image and an explicit GraphQL null source are valid when
+# canonical config proves the exact image and both reads prove no repo.
+for source_filter in \
+  '.source.image = "older-instance-image"' \
+  '.source = null'; do
+  jq ".environments.edges[0].node.serviceInstances.edges[0].node |= ($source_filter)" \
+    "$TMP/unchanged-source.json" >"$TMP/stale-instance-source.json"
+  env "${retry_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/stale-instance-source.json" \
+    bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server
+  test -e "$TMP/retry-args.txt"
+  rm "$TMP/retry-args.txt"
+done
+
+# A committed patch returns before the applied config necessarily converges.
+# Poll the canonical config and preserve the bound exact-image retry.
+jq '.services["service-api-id"].source.image = "older-config-image"' \
+  "$TMP/runtime-config.json" >"$TMP/delayed-config.json"
+env "${retry_env[@]}" RAILWAY_GATE_TIMEOUT_SECONDS=5 \
+  TEST_CONFIG_READ_COUNT_FILE="$TMP/config-count.txt" \
+  TEST_CONFIG_INITIAL_FILE="$TMP/delayed-config.json" \
+  bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server
+test "$(cat "$TMP/config-count.txt")" -ge 2
+rm "$TMP/retry-args.txt"
+
+for source_filter in \
+  '.source.repo = "owner/repository"' \
+  '.source = {image: "unknown-repo-evidence"}' \
+  'del(.source)'; do
+  jq ".environments.edges[0].node.serviceInstances.edges[0].node |= ($source_filter)" \
+    "$TMP/unchanged-source.json" >"$TMP/mismatched-source.json"
+  if env "${retry_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/mismatched-source.json" \
+    bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >/dev/null 2>&1; then
+    echo "source mismatch unexpectedly passed: $source_filter" >&2
+    exit 1
+  fi
+  test ! -e "$TMP/retry-args.txt"
+done
+
+reject_source_config() {
+  local name="$1" filter="$2"
+  jq "$filter" "$TMP/runtime-config.json" >"$TMP/rejected-config.json"
+  if env "${retry_env[@]}" RAILWAY_GATE_TIMEOUT_SECONDS=1 \
+    TEST_RAILWAY_CONFIG_FILE="$TMP/rejected-config.json" \
+    bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >"$TMP/rejected-config.log" 2>&1; then
+    echo "canonical source unexpectedly passed: $name" >&2
+    exit 1
+  fi
+  test ! -e "$TMP/retry-args.txt"
+  if grep -Fq 'config-private-sentinel' "$TMP/rejected-config.log"; then
+    echo 'configuration variables leaked into release diagnostics' >&2
+    exit 1
+  fi
+}
+reject_source_config 'missing services' 'del(.services)'
+reject_source_config 'missing service' '.services = {}'
+reject_source_config 'missing canonical source' 'del(.services["service-api-id"].source)'
+reject_source_config 'null canonical source' '.services["service-api-id"].source = null'
+reject_source_config 'missing canonical image' 'del(.services["service-api-id"].source.image)'
+reject_source_config 'wrong canonical image despite matching deployed image' \
+  '.services["service-api-id"].source.image = "different-image"'
+reject_source_config 'canonical repo attached despite detached status' \
+  '.services["service-api-id"].source.repo = "owner/repository"'
+reject_source_config 'deleted service' '.services["service-api-id"].isDeleted = true'
+if env "${retry_env[@]}" TEST_CONFIG_DENIED=true \
+  bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >"$TMP/denied-config.log" 2>&1; then
+  echo 'denied configuration read unexpectedly passed' >&2
+  exit 1
+fi
+test ! -e "$TMP/retry-args.txt"
+if grep -Eq 'config-private-sentinel|untrusted-config-error-must-not-be-logged' "$TMP/denied-config.log"; then
+  echo 'configuration read failure leaked untrusted output' >&2
+  exit 1
+fi
+
+# Reject wrong project/environment evidence before modifying any source.
+for scope_filter in \
+  '.id = "another-project"' \
+  '.environments.edges[0].node.name = "staging"' \
+  '.environments.edges[0].node.serviceInstances.edges[0].node.environmentId = "another-environment"'; do
+  jq "$scope_filter" "$TMP/unchanged-source.json" >"$TMP/wrong-source-scope.json"
+  if env "${retry_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/wrong-source-scope.json" \
+    TEST_SOURCE_PATCH_FILE="$TMP/wrong-scope-patch.json" \
+    bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >/dev/null 2>&1; then
+    echo "wrong source scope unexpectedly passed: $scope_filter" >&2
+    exit 1
+  fi
+  test ! -e "$TMP/wrong-scope-patch.json"
+  test ! -e "$TMP/retry-args.txt"
+done
+if env "${retry_env[@]}" TEST_EDIT_ENVIRONMENT_ID=another-environment \
+  bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >/dev/null 2>&1; then
+  echo 'source edit committed to the wrong environment unexpectedly passed' >&2
+  exit 1
+fi
+test ! -e "$TMP/retry-args.txt"
+
+# Readback output must contain only source fields, never decrypted config vars.
+env "${source_env[@]}" bash -c '
+  source "$1"
+  applied_service_source service-api-id environment-test
+' _ "$ROOT/scripts/railway-stack-release.sh" >"$TMP/filtered-source.json"
+jq -e --arg image "$runtime_digest" '. == {image: $image, repo: null}' "$TMP/filtered-source.json" >/dev/null
+
+jq '.environments.edges[0].node.serviceInstances.edges[0].node.latestDeployment.meta.image = "older-image"' \
+  "$TMP/unchanged-source.json" >"$TMP/older-deployed-image.json"
+if env "${retry_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/older-deployed-image.json" \
+  bash -c '
+    source "$1"
+    wait_for_new_deployment() { return 1; }
+    redeploy_source_one api-server
+  ' _ "$ROOT/scripts/railway-stack-release.sh" >/dev/null 2>&1; then
+  echo "older deployed build unexpectedly passed as the requested image" >&2
+  exit 1
+fi
+test ! -e "$TMP/retry-args.txt"
+
+jq '.[0].meta.image = "wrong-image"' "$TMP/retry-after.json" >"$TMP/retry-wrong-image.json"
+if env "${retry_env[@]}" TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE="$TMP/retry-wrong-image.json" \
+  bash "$ROOT/scripts/railway-stack-release.sh" redeploy-source api-server >/dev/null 2>&1; then
+  echo "retry accepted a deployment with the wrong image" >&2
+  exit 1
+fi
 
 # Publisher promotion must use its own image and require a positive marker
 # from the new deployment, just like storage migrations.
 publisher_digest="ghcr.io/kevtiv/lumiere-v-1-spacetimedb-publisher@sha256:$(printf 'b%.0s' {1..64})"
+jq --arg image "$publisher_digest" '
+  .environments.edges[0].node.serviceInstances.edges[0].node |=
+    (.serviceId = "publisher-id" | .serviceName = "spacetimedb-publisher"
+      | .source.image = $image | .latestDeployment.meta.image = $image)
+' "$TMP/runtime-source.json" >"$TMP/publisher-source.json"
+jq -n --arg image "$publisher_digest" '{services: {"publisher-id": {source: {image: $image}}}}' \
+  >"$TMP/publisher-config.json"
 for publisher_logs in 'SpacetimeDB publish and schema verification passed' 'publish failed'; do
   expected_status=0
   [[ "$publisher_logs" == 'publish failed' ]] && expected_status=1
   actual_status=0
   env "${common_env[@]}" \
+    TEST_RAILWAY_STATUS_FILE="$TMP/publisher-source.json" \
+    TEST_RAILWAY_CONFIG_FILE="$TMP/publisher-config.json" \
     STDB_PUBLISHER_IMAGE="$publisher_digest" \
     TEST_RAILWAY_SERVICES_JSON='[{"id":"publisher-id","name":"spacetimedb-publisher"}]' \
     TEST_RAILWAY_LOGS="$publisher_logs" \
