@@ -19,6 +19,9 @@ use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
+#[path = "messaging_exclusions.rs"]
+mod exclusions;
+
 fn to_unit_enum(value: &Value) -> Result<Value, ApiError> {
     match value {
         Value::String(s) => Ok(json!({ s: [] })),
@@ -394,6 +397,7 @@ async fn contact_preferences_put(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/messaging/batches/exclusions", get(exclusions::get))
         .route(
             "/messaging/templates",
             get(message_templates_get).post(message_templates_post),

@@ -6,6 +6,8 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
+use crate::core::business_changes::{capture_business_change, BusinessChangeInput};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contact_identities::contact_phone_identity;
 use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -288,6 +290,25 @@ fn resolve_message_recipient(
     contact_id: u64,
     channel: &MessageChannel,
 ) -> Result<Option<ResolvedMessageRecipient>, String> {
+    Ok(resolve_message_recipient_with_reason(
+        ctx,
+        organization_id,
+        company_id,
+        contact_id,
+        channel,
+    )?
+    .ok())
+}
+
+/// Reasons are captured while the canonical eligibility decision is made, not
+/// reconstructed later from mutable contact preferences.
+fn resolve_message_recipient_with_reason(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    contact_id: u64,
+    channel: &MessageChannel,
+) -> Result<Result<ResolvedMessageRecipient, &'static str>, String> {
     let contact_row = ctx
         .db
         .contact()
@@ -298,7 +319,7 @@ fn resolve_message_recipient(
         return Err("Contact does not belong to this organization".to_string());
     }
     if contact_row.deleted_at.is_some() || contact_row.merge_target_id.is_some() {
-        return Ok(None);
+        return Ok(Err("contact_inactive"));
     }
     if company_id.is_some() && contact_row.company_id != company_id {
         return Err("Contact does not belong to this company".to_string());
@@ -316,7 +337,7 @@ fn resolve_message_recipient(
                 && !preference.opted_in
         });
     if opted_out {
-        return Ok(None);
+        return Ok(Err("channel_opted_out"));
     }
 
     let identity = ctx
@@ -333,15 +354,162 @@ fn resolve_message_recipient(
         })
         .min_by_key(|identity| (!identity.is_preferred, identity.id));
 
-    Ok(identity.map(|identity| ResolvedMessageRecipient {
-        contact_id,
-        phone_identity_id: identity.id,
-        display_name: if contact_row.display_name.trim().is_empty() {
-            contact_row.name
-        } else {
-            contact_row.display_name
+    Ok(identity
+        .map(|identity| ResolvedMessageRecipient {
+            contact_id,
+            phone_identity_id: identity.id,
+            display_name: if contact_row.display_name.trim().is_empty() {
+                contact_row.name
+            } else {
+                contact_row.display_name
+            },
+        })
+        .ok_or("no_eligible_primary_identity"))
+}
+
+fn batch_exclusion(
+    model: &str,
+    record_id: u64,
+    contact_id: Option<u64>,
+    reason: &str,
+) -> serde_json::Value {
+    serde_json::json!({"model":model, "recordId":record_id.to_string(),
+        "contactId":contact_id.map(|id| id.to_string()), "reason":reason})
+}
+
+/// Always replace caller-supplied evidence with the server's exact snapshot.
+fn batch_metadata(metadata: Option<String>, exclusions: Vec<serde_json::Value>) -> Option<String> {
+    let mut object = match metadata {
+        Some(raw) => match serde_json::from_str::<serde_json::Value>(&raw) {
+            Ok(serde_json::Value::Object(object)) => object,
+            _ => serde_json::Map::from_iter([(
+                "user_metadata".into(),
+                serde_json::Value::String(raw),
+            )]),
         },
-    }))
+        None => serde_json::Map::new(),
+    };
+    object.insert(
+        "batch_exclusions_v1".into(),
+        serde_json::Value::Array(exclusions),
+    );
+    Some(serde_json::Value::Object(object).to_string())
+}
+
+fn capture_batch_creation(
+    ctx: &ReducerContext,
+    batch: &MessageBatch,
+    operation: &'static str,
+) -> Result<(), String> {
+    let Some(company_id) = batch.company_id else {
+        return Ok(());
+    };
+    let metadata: serde_json::Value = serde_json::from_str(
+        batch
+            .metadata
+            .as_deref()
+            .ok_or("batch exclusion snapshot is absent")?,
+    )
+    .map_err(|_| "batch exclusion snapshot is invalid")?;
+    let exclusions = metadata
+        .get("batch_exclusions_v1")
+        .ok_or("batch exclusion snapshot is absent")?
+        .to_string();
+    let captured = capture_business_change(
+        ctx,
+        BusinessChangeInput {
+            organization_id: batch.organization_id,
+            company_id,
+            resource: "message_batch",
+            record_id: batch.id,
+            subject_resource: "message_batch",
+            subject_record_id: batch.id,
+            operation,
+            before: serde_json::json!({"exclusions":null}),
+            after: serde_json::json!({"exclusions":exclusions}),
+            summary_only_changed_fields: vec![],
+        },
+    )?
+    .ok_or("batch exclusion capture produced no evidence")?;
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "message_batch",
+        serde_json::json!({"id":batch.id}),
+        batch,
+    )?];
+    for message in ctx
+        .db
+        .operational_message()
+        .operational_message_by_batch()
+        .filter(&batch.id)
+    {
+        changes.push(RowChange::upsert_stdb_row(
+            "operational_message",
+            serde_json::json!({"id":message.id}),
+            &message,
+        )?);
+    }
+    if let Some(change) = captured.change {
+        changes.push(RowChange::upsert_stdb_row(
+            "business_change",
+            serde_json::json!({"id":change.id}),
+            &change,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "audit_log",
+        serde_json::json!({"id":captured.audit.id}),
+        &captured.audit,
+    )?);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: batch.organization_id,
+            operation_id: format!("erp.{operation}"),
+            correlation_id: format!("message-batch:{}:created", batch.id),
+            changes,
+        },
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod batch_exclusion_tests {
+    use super::*;
+
+    #[test]
+    fn exclusion_snapshot_overwrites_caller_evidence_and_preserves_exact_ids() {
+        let actual = batch_exclusion(
+            "contact",
+            9_007_199_254_740_993,
+            Some(9_007_199_254_740_993),
+            "channel_opted_out",
+        );
+        let metadata = batch_metadata(
+            Some(r#"{"batch_exclusions_v1":[{"reason":"forged"}],"note":"keep"}"#.into()),
+            vec![actual.clone()],
+        )
+        .expect("metadata");
+        let parsed: serde_json::Value = serde_json::from_str(&metadata).expect("json");
+        assert_eq!(parsed["batch_exclusions_v1"], serde_json::json!([actual]));
+        assert_eq!(
+            parsed["batch_exclusions_v1"][0]["recordId"],
+            "9007199254740993"
+        );
+        assert_eq!(parsed["note"], "keep");
+    }
+
+    #[test]
+    fn absent_and_non_object_user_metadata_cannot_hide_the_snapshot() {
+        for input in [None, Some("not-json".into()), Some("[]".into())] {
+            let parsed: serde_json::Value =
+                serde_json::from_str(&batch_metadata(input.clone(), vec![]).expect("metadata"))
+                    .expect("json");
+            assert_eq!(parsed["batch_exclusions_v1"], serde_json::json!([]));
+            if let Some(raw) = input {
+                assert_eq!(parsed["user_metadata"], raw);
+            }
+        }
+    }
 }
 
 fn contact_batch_variables(
@@ -546,7 +714,9 @@ pub fn create_operational_message(
     )?
     .ok_or("Contact cannot receive messages on this channel")?;
     if params.phone_identity_id != 0 && recipient.phone_identity_id != params.phone_identity_id {
-        return Err("Selected phone identity is not the current eligible recipient identity".to_string());
+        return Err(
+            "Selected phone identity is not the current eligible recipient identity".to_string(),
+        );
     }
     let phone_identity_id = recipient.phone_identity_id;
 
@@ -706,7 +876,7 @@ pub fn create_invoice_reminder_batch(
     }
 
     let mut included = Vec::with_capacity(params.invoice_ids.len());
-    let mut excluded = 0_u64;
+    let mut exclusions = Vec::new();
     let mut sample = Vec::with_capacity(3);
     let mut seen = std::collections::BTreeSet::new();
     for invoice_id in params.invoice_ids {
@@ -714,7 +884,12 @@ pub fn create_invoice_reminder_batch(
             continue;
         }
         let Some(invoice) = ctx.db.account_move().id().find(&invoice_id) else {
-            excluded += 1;
+            exclusions.push(batch_exclusion(
+                "account_move",
+                invoice_id,
+                None,
+                "invoice_unavailable",
+            ));
             continue;
         };
         let is_scoped_company =
@@ -725,30 +900,58 @@ pub fn create_invoice_reminder_batch(
             || invoice.state != AccountMoveState::Posted
             || invoice.amount_residual <= 0.0
         {
-            excluded += 1;
+            exclusions.push(batch_exclusion(
+                "account_move",
+                invoice_id,
+                None,
+                "invoice_not_outstanding_posted_customer_invoice",
+            ));
             continue;
         }
         let Some(contact_id) = invoice.partner_id else {
-            excluded += 1;
+            exclusions.push(batch_exclusion(
+                "account_move",
+                invoice_id,
+                None,
+                "invoice_has_no_contact",
+            ));
             continue;
         };
         let Some(customer) = ctx.db.contact().id().find(&contact_id) else {
-            excluded += 1;
+            exclusions.push(batch_exclusion(
+                "account_move",
+                invoice_id,
+                Some(contact_id),
+                "contact_unavailable",
+            ));
             continue;
         };
         if customer.organization_id != organization_id || customer.deleted_at.is_some() {
-            excluded += 1;
+            exclusions.push(batch_exclusion(
+                "account_move",
+                invoice_id,
+                Some(contact_id),
+                "contact_unavailable",
+            ));
             continue;
         }
-        let Some(recipient) = resolve_message_recipient(
+        let recipient = match resolve_message_recipient_with_reason(
             ctx,
             organization_id,
             params.company_id,
             contact_id,
             &params.channel,
-        )? else {
-            excluded += 1;
-            continue;
+        )? {
+            Ok(recipient) => recipient,
+            Err(reason) => {
+                exclusions.push(batch_exclusion(
+                    "account_move",
+                    invoice_id,
+                    Some(contact_id),
+                    reason,
+                ));
+                continue;
+            }
         };
         let phone_identity_id = recipient.phone_identity_id;
         if sample.len() < 3 {
@@ -787,7 +990,7 @@ pub fn create_invoice_reminder_batch(
         subject_model: "account_move".to_string(),
         subject_query: Some(serde_json::json!({ "invoice_ids": invoice_ids }).to_string()),
         recipient_count: included.len() as u64,
-        excluded_count: excluded,
+        excluded_count: exclusions.len() as u64,
         preview_sample_ids: sample,
         approved_by: None,
         approved_at: None,
@@ -796,7 +999,7 @@ pub fn create_invoice_reminder_batch(
         rejection_reason: None,
         created_at: ctx.timestamp,
         created_by: ctx.sender(),
-        metadata: params.metadata,
+        metadata: batch_metadata(params.metadata, exclusions),
     });
 
     for (invoice_id, contact_id, phone_identity_id, variables, rendered_subject, rendered_body) in
@@ -827,6 +1030,8 @@ pub fn create_invoice_reminder_batch(
             metadata: None,
         });
     }
+
+    capture_batch_creation(ctx, &batch, "create_invoice_reminder_batch")?;
 
     write_audit_log_v2(
         ctx,
@@ -875,19 +1080,31 @@ pub fn create_message_batch(
     let subject_model = params.subject_model.clone();
 
     let mut included = Vec::new();
-    let mut excluded: u64 = 0;
+    let mut exclusions = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
     let mut sample: Vec<u64> = vec![];
 
     for contact_id in &params.candidate_contact_ids {
-        let Some(recipient) = resolve_message_recipient(
+        if !seen.insert(*contact_id) {
+            continue;
+        }
+        let recipient = match resolve_message_recipient_with_reason(
             ctx,
             organization_id,
             params.company_id,
             *contact_id,
             &channel,
-        )? else {
-            excluded += 1;
-            continue;
+        )? {
+            Ok(recipient) => recipient,
+            Err(reason) => {
+                exclusions.push(batch_exclusion(
+                    "contact",
+                    *contact_id,
+                    Some(*contact_id),
+                    reason,
+                ));
+                continue;
+            }
         };
         let variables = contact_batch_variables(&template, &recipient)?;
         let rendered_subject = render_subject(&template, &variables)?;
@@ -911,7 +1128,7 @@ pub fn create_message_batch(
         subject_model,
         subject_query: params.subject_query,
         recipient_count: included.len() as u64,
-        excluded_count: excluded,
+        excluded_count: exclusions.len() as u64,
         preview_sample_ids: sample,
         approved_by: None,
         approved_at: None,
@@ -920,7 +1137,7 @@ pub fn create_message_batch(
         rejection_reason: None,
         created_at: ctx.timestamp,
         created_by: ctx.sender(),
-        metadata: params.metadata,
+        metadata: batch_metadata(params.metadata, exclusions),
     });
 
     for (recipient, variables, rendered_subject, rendered_body) in included {
@@ -949,6 +1166,8 @@ pub fn create_message_batch(
             metadata: None,
         });
     }
+
+    capture_batch_creation(ctx, &batch, "create_message_batch")?;
 
     write_audit_log_v2(
         ctx,
@@ -1008,7 +1227,8 @@ fn validate_message_batch_for_approval(
         )?;
         if current.phone_identity_id != message.phone_identity_id {
             return Err(
-                "Batch recipient phone identity changed after preview; create a new batch".to_string(),
+                "Batch recipient phone identity changed after preview; create a new batch"
+                    .to_string(),
             );
         }
         let identity = ctx
@@ -1021,7 +1241,8 @@ fn validate_message_batch_for_approval(
             > message.created_at.to_micros_since_unix_epoch()
         {
             return Err(
-                "Batch recipient phone identity changed after preview; create a new batch".to_string(),
+                "Batch recipient phone identity changed after preview; create a new batch"
+                    .to_string(),
             );
         }
     }

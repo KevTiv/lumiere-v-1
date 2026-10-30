@@ -13,6 +13,7 @@ mod attachment;
 mod financial;
 mod pivot;
 mod quotations;
+mod retention;
 mod sales;
 
 use self::accounting::account_move_pdf;
@@ -24,6 +25,7 @@ use self::sales::sale_order_pdf;
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .merge(crate::document_blobs::blob_router())
+        .route("/documents/retention/preview", get(retention::preview))
         .route(
             "/documents/pdf/financial-report/:report_id",
             get(financial_report_pdf),

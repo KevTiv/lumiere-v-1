@@ -408,11 +408,12 @@ export function useSetDocumentRetention(organizationId: bigint) {
   })
 }
 
-export function usePurgeExpiredDocuments(organizationId: bigint) {
+export function usePurgeExpiredDocuments(organizationId: bigint, mayDispatch?: () => boolean) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async () => {
-      const { urlPath, init } = stdbBffCommandPost("purge_expired_documents", {  })
+    mutationFn: async (documentIds: readonly string[]) => {
+      if (mayDispatch && !mayDispatch()) throw new Error("Document scope or permissions changed. Reopen the purge preview.")
+      const { urlPath, init } = stdbBffCommandPost("purge_reviewed_expired_documents", { documentIds: documentIds.map(toScalarU64) })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
@@ -425,10 +426,11 @@ export function usePurgeExpiredDocuments(organizationId: bigint) {
   })
 }
 
-export function useScheduleDocumentRetentionPurge(organizationId: bigint) {
+export function useScheduleDocumentRetentionPurge(organizationId: bigint, mayDispatch?: () => boolean) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params?: { delaySeconds?: number }) => {
+      if (mayDispatch && !mayDispatch()) throw new Error("Document scope or permissions changed. Reopen the purge preview.")
       const k = rqBigIntKey(organizationId)
       const before = await fetchQueryList(
         "/api/query/document-retention-purge-jobs",
@@ -455,6 +457,7 @@ export function useScheduleDocumentRetentionPurge(organizationId: bigint) {
             organizationId,
           ),
         dispatch: async () => {
+          if (mayDispatch && !mayDispatch()) throw new Error("Document scope or permissions changed. Reopen the purge preview.")
           const { urlPath, init } = stdbBffCommandPost("schedule_document_retention_purge", {
             params: stdbParamsToJson(
               { delaySeconds: params?.delaySeconds ?? 60 } as object,
