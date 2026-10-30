@@ -41,15 +41,15 @@ a focused test is not whole-package acceptance.
 
 | ID | Status | Owner | Branch / PR | Dependencies | Evidence required / current evidence | Blockers and deliberately deferred capabilities |
 | --- | --- | --- | --- | --- | --- | --- |
-| AA-00 | REVIEW | Coordinator + independent QA | codex/alpha-ai-coordination | None | Exact baseline/PR/contracts readback; code-derived matrix and exclusive assignments below | Independent ledger source review passed; integrated staging evidence remains a program gate |
-| AA-01 | ACTIVE | Coordinator; backend worker | codex/alpha-ai-unified-turns / #321; codex/alpha-ai-turn-backend / #319 | AA-00 scoped | Existing server RAG and stream share gated publication. First slice removes duplicate fallback, silent draft failure, incomplete SSE success and shared UI mock financial facts; backend bounds multilingual excerpts safely | Full server-authorized intent/capability routing, clarification contract and finance/form dispatch remain unaccepted; no new execution authority |
-| AA-02 | REVIEW | Activation worker | codex/alpha-ai-assisted-activation / #322 | AA-00; later AA-01 | Existing bootstrap currency/timezone/year-end and Accounting readiness reused. First slice reads current scoped ERP state for a deterministic role-aware first-task checklist | Fresh-tenant first-record browser journey; complete Sales/Expense prerequisite checks and sample-data provenance pending |
+| AA-00 | REVIEW | Coordinator + independent QA | codex/alpha-ai-coordination / #320 | None | Exact baseline/PR/contracts readback; code-derived matrix and exclusive assignments below | Independent ledger source review passed; integrated staging evidence remains a program gate |
+| AA-01 | REVIEW | Coordinator; backend worker | codex/alpha-ai-unified-turns / #321; codex/alpha-ai-turn-backend / #319 | AA-00 scoped | Existing server RAG and stream share gated publication. First slice removes duplicate fallback, silent draft failure, incomplete SSE success and shared UI mock financial facts; backend bounds multilingual excerpts safely | Full server-authorized intent/capability routing, clarification contract and finance/form dispatch remain unaccepted; no new execution authority |
+| AA-02 | REVIEW | Activation worker | codex/alpha-ai-assisted-activation / #322 | AA-00; later AA-01 | Existing bootstrap currency/timezone/year-end and Accounting readiness reused. First slice reads current scoped ERP state for a deterministic role-aware first-task checklist | Owner first-contact journey passes; complete Sales/Expense prerequisite checks, ordinary-member/language acceptance and sample-data provenance pending |
 | AA-03 | BLOCKED | Forms owner (coordinator until assigned) | — | AA-01 accepted contract + certified canonical form owner | Existing contact/order/expense forms and AI form-suggestion path; exact permitted proposals and attachment retention need integrated proof | Cross-module typed bridge not accepted. Do not advertise automatic save, unsupported invoice creation or invented relations |
 | AA-04 | BLOCKED | Recovery owner (coordinator until assigned) | — | AA-01/03 | Existing action-draft review, effect lifecycle, expense outbox and run recovery owners | Exact request→draft→command→record readback and interrupted-business-effect E2E pending; no uncertain redispatch |
 | AA-05 | BLOCKED | Existing #309 owner; coordinator integration only | #309, no replacement branch | #309 integration + AA-01 | Existing viewer/storage/scoped revision/retrieval implementation and green CI | Authenticated save/reload/new-chat retrieval, revocation/stale edit/restart proof; Explain this error and verified guidance promotion remain separate |
 | AA-06 | REVIEW | Qualification worker + independent QA | codex/alpha-ai-skill-qualification / #318 | AA-00 | Collector consistency fixes; 212 Python tests, manifest/catalog checks; independent review of 8422d1b6 passes | Tenant release readback, approved provider profiles/budget/test tenant, independent certification, staged disable/rollback remain blocked externally |
 | AA-07 | BLOCKED | Reports/UI owner (coordinator until assigned) | — | AA-01 | Existing owner reports/charts, saved run inspector and artifact/document surfaces | Typed report/record/artifact intents and provenance-preserving normal-user navigation not accepted; arbitrary code/HTML/SQL tools deferred |
-| AA-08 | ACTIVE | Independent QA | codex/alpha-ai-e2e-acceptance / #323 (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | Authenticated first-contact test passes on disposable stack. Broader saved-effect/AI/recovery gates remain pending; fixture/typecheck passes cannot close them |
+| AA-08 | REVIEW | Independent QA | codex/alpha-ai-e2e-acceptance / #323 (one authenticated first-contact spec) | Selected P0 source + provisioned stack | Baseline history/onboarding/pilot helper checks pass; test/evidence inventory below; #318 independently reviewed | Authenticated first-contact test passes on disposable stack. Broader saved-effect/AI/recovery gates remain pending; fixture/typecheck passes cannot close them |
 
 ## Source states (distinct from admission)
 
@@ -64,14 +64,14 @@ a focused test is not whole-package acceptance.
 - Missing accepted evidence: current tenant release/certificate readback for the
   candidate versions, approved live-provider usefulness/settled-spend tests,
   integrated guide durability/revocation/restart proof, and full authenticated
-  first-record/action/insight/recovery journeys. Individual source implementations
+  member/action/insight/recovery journeys beyond the accepted owner first-contact path. Individual source implementations
   or local fixtures do not change these admission states.
 
 ## Supported-journey readiness by operation
 
 | Journey / module | Existing canonical owner and source evidence | Missing integration / acceptance boundary |
 | --- | --- | --- |
-| Sign-in → organization/company setup | Onboarding UI, lib/onboarding-config.ts, canonical bootstrap; cov23-operator-lifecycle.spec.ts | Setup is implemented; post-bootstrap role-aware dependency/first-record journey needs proof |
+| Sign-in → organization/company setup | Onboarding UI, lib/onboarding-config.ts, canonical bootstrap; cov23-operator-lifecycle.spec.ts | Owner setup → checklist → first contact now passes; broader dependency/member/language journeys remain unaccepted |
 | Selected record question | ai-ui-context.ts, erp-ai-context.tsx, scoped RAG request and live snapshot owners | Shell preserves module/tab/selection/company. Fresh permission and source revocation need live AI stack acceptance |
 | CRM contact/customer | Existing CRM create form, custom-field guard, crm-workflow tests | Existing business form, not certified AI handoff. Exact identity/allowed proposal and return context pending |
 | Sales quotation | Existing sale-order forms, canonical create/line/confirmation owners | AI preparation/handoff/readback not accepted; no invoice/posting authority inferred |
@@ -203,3 +203,28 @@ No skipped prerequisite, static check or in-memory mutation counts as acceptance
   does not accept full AA-02/08 or the AI handoff/recovery/financial/guide journeys.
   No PR merges, production deployments, contract publications,
   live provider dispatches or production business-state mutations performed by this program.
+
+## Latest review checkpoint
+
+- Six draft PRs are published: #318 qualification metrics, #319 RAG UTF-8,
+  #320 coordination/evidence, #321 safe turn coordination, #322 activation and
+  #323 the test-only authenticated journey (stacked on the integration branch).
+- Full integrated workspace TypeScript passes all 11 packages; the finalized
+  #323 test branch also passes its full web TypeScript check. The earlier
+  concurrent OOM is not counted as a pass; the final serial commands succeeded.
+- Integrated web unit command passes 139 files; script suite passes 212 tests;
+  focused turn/activation cases pass 10/11 respectively; shared chat passes seven
+  cases; the RAG worker's 24 focused cases pass. Four responsive synthetic cases
+  pass independently. All relevant transport, locale, source-manifest, type-debt
+  and vendored contract checks pass without gate changes.
+- Hosted snapshot: #318 passes all 21 checks. #319 has all three P0 shards passed
+  with its final E2E aggregator still pending. #321/#322 have remaining Rust,
+  frontend and/or browser checks; #323 has image/artifact planning checks pending.
+  No failed check was observed on these final heads. Documentation #320 has no
+  failing check; docs-only skips do not establish runtime acceptance.
+- Next bounded package is server-authorized assistant turn/capability routing,
+  followed by the permitted form bridge; do not expose uncertified operations.
+  Coordinate the shared shell/guide DTO with #309 and broad translations with
+  #312/#313. AA-03/04 remain dependent, #309 owns guide work, and live skill
+  certification/provider/production gates require their separately authorized
+  access and evidence. No full Alpha completion or promotion is declared.

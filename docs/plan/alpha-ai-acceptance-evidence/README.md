@@ -61,3 +61,6 @@ this test; it does not establish contact-save interruption/restart acceptance.
 Synthetic component tests separately cover 320/390/768/1440px and keyboard,
 company-switch and denied-read behavior. No AI provider/gateway was running, and
 no provider use, spend or candidate skill activation is implied.
+
+The final combined frontend typecheck passed all 11 packages with concurrency
+one. The finalized #323 test branch also passed the full web TypeScript check.
