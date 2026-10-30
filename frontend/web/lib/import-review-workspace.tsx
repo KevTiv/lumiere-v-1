@@ -45,6 +45,7 @@ function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: {
   const [error, setError] = useState<string | null>(null)
   const [requestKey, setRequestKey] = useState("")
   const [filter, setFilter] = useState("needs_review")
+  const [search, setSearch] = useState("")
   const list = useQuery({ queryKey: ["import-reviews", organizationId, companyId], queryFn: () => request<{ data: ReviewBatch[] }>(`/api/import-reviews?companyId=${companyId}`), retry: false })
   const detail = useQuery({ queryKey: ["import-review", organizationId, companyId, selectedId], queryFn: () => request<ReviewDetail>(`/api/import-reviews/${selectedId}?companyId=${companyId}`), enabled: !!selectedId, retry: false })
   const config = useMemo<FormConfig>(() => ({
@@ -61,7 +62,7 @@ function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: {
         { value: "confirmed", label: t("settings.importReview.confirmed", { defaultValue: "Confirm corrected values" }) },
         { value: "excluded", label: t("settings.importReview.excluded", { defaultValue: "Exclude from import" }) },
       ] },
-      { id: "_reason", name: "_reason", type: "textarea", label: t("settings.importReview.reason", { defaultValue: "Reason or supporting evidence" }), defaultValue: selected?.reason ?? "", description: t("settings.importReview.reasonHint", { defaultValue: "Required when you confirm or exclude a row. State any assumption that remains." }), rows: 3 },
+      { id: "_reason", name: "_reason", type: "textarea", format: "plain", label: t("settings.importReview.reason", { defaultValue: "Reason or supporting evidence" }), defaultValue: selected?.reason ?? "", description: t("settings.importReview.reasonHint", { defaultValue: "Required when you confirm or exclude a row. State any assumption that remains." }), rows: 3 },
     ] }],
   }), [selected, t])
 
@@ -105,8 +106,9 @@ function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: {
       </div></div>
       {!["product", "stock_location"].includes(detail.data.targetEntity) ? <p className="text-sm text-muted-foreground">{t("settings.importReview.moduleSpecific", { defaultValue: "These source corrections are saved. Use Accounting or the relevant module to create complete business records." })}</p> : null}
       <div className="flex flex-wrap gap-2" aria-label={t("settings.importReview.filterLabel", { defaultValue: "Filter review status" })}>{(["needs_review", "confirmed", "excluded", "all"] as const).map(state => <Button key={state} size="sm" variant={filter === state ? "secondary" : "outline"} aria-pressed={filter === state} onClick={() => setFilter(state)}>{t(`settings.importReview.filter.${state}`, { defaultValue: ({ needs_review: "Needs review", confirmed: "Confirmed", excluded: "Excluded", all: "All" })[state] })}</Button>)}</div>
+      <Field className="max-w-md"><FieldLabel htmlFor="review-search">{t("settings.importReview.search", { defaultValue: "Find an item or source file" })}</FieldLabel><Input id="review-search" type="search" value={search} onChange={event => setSearch(event.target.value)} /></Field>
       <Table><TableHeader><TableRow><TableHead>{t("settings.importReview.item", { defaultValue: "Item" })}</TableHead><TableHead>{t("settings.importReview.source", { defaultValue: "Source" })}</TableHead><TableHead>{t("settings.importReview.question", { defaultValue: "Uncertainty" })}</TableHead><TableHead>{t("settings.importReview.status", { defaultValue: "Status" })}</TableHead><TableHead><span className="sr-only">{t("settings.importReview.actions", { defaultValue: "Actions" })}</span></TableHead></TableRow></TableHeader><TableBody>
-        {detail.data.items.filter(item => filter === "all" || item.state === filter).map(item => <TableRow key={item.id}><TableCell>{item.source.label}</TableCell><TableCell>{sourceLabel(item)}</TableCell><TableCell className="max-w-sm whitespace-normal">{item.source.issue}</TableCell><TableCell>{t(`settings.importReview.filter.${item.state}`, { defaultValue: item.state.replaceAll("_", " ") })}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => open(item)}>{t("settings.importReview.correct", { defaultValue: "Review and correct" })}</Button></TableCell></TableRow>)}
+        {detail.data.items.filter(item => (filter === "all" || item.state === filter) && `${item.source.label} ${item.source.source.file} ${item.source.issue}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())).map(item => <TableRow key={item.id}><TableCell>{item.source.label}</TableCell><TableCell>{sourceLabel(item)}</TableCell><TableCell className="max-w-sm whitespace-normal">{item.source.issue}</TableCell><TableCell>{t(`settings.importReview.filter.${item.state}`, { defaultValue: item.state.replaceAll("_", " ") })}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => open(item)}>{t("settings.importReview.correct", { defaultValue: "Review and correct" })}</Button></TableCell></TableRow>)}
       </TableBody></Table>
       {detail.data.history.length ? <details><summary className="cursor-pointer text-sm font-medium">{t("settings.importReview.history", { defaultValue: "Recent decisions" })}</summary><ul className="mt-2 flex flex-col gap-2 text-sm">{detail.data.history.map(entry => <li key={`${entry.itemId}:${entry.revision}`}>{entry.createdAt} · {resolveIdentityLabel(entry.actor, identityLabels)} · {entry.reason}</li>)}</ul></details> : null}
     </> : null}

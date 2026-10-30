@@ -14998,7 +14998,8 @@
       "checkResult": "Check import result",
       "retrySame": "Retry same submission",
       "importRow": "Import row {{row}}",
-      "sourceLine": "Source row {{row}}"
+      "sourceLine": "Source row {{row}}",
+      "search": "Find an item or source file"
     }
   },
   "reports": {
