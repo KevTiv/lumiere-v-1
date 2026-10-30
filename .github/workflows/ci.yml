@@ -341,8 +341,8 @@ jobs:
         run: |
           spacetime call lumiere-ci-contracts run_configured_record_creation_tests --server local -y --no-config
           spacetime call lumiere-ci-contracts run_accounting_post_invoice_test --server local -y --no-config
-          spacetime call lumiere-ci-contracts run_expenses_wave_c_test --server local -y --no-config
-          spacetime call lumiere-ci-contracts run_subscriptions_wave_c_test --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_all_expenses_tests --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_all_subscriptions_tests --server local -y --no-config
           spacetime call lumiere-ci-contracts run_documents_wave_c_tests --server local -y --no-config
           spacetime call lumiere-ci-contracts run_core_operational_messaging_test --server local -y --no-config
           spacetime call lumiere-ci-contracts run_knowledge_guide_tests --server local -y --no-config

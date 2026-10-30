@@ -376,7 +376,17 @@
         "denied": "Access to this save is unavailable. Its entries are hidden."
       }
     },
-    "selectPrompt": "Choisir"
+    "selectPrompt": "Choisir",
+    "customFieldCreateAdmission": {
+      "blocked": "This form cannot create a record with these configured fields yet: {{fields}}. Ask an administrator to review them. No record has been created. Your entries are retained.",
+      "reasons": {
+        "unsupportedType": "unsupported field type",
+        "conditionalVisibility": "conditional visibility is not supported during creation",
+        "validationPattern": "this validation pattern is not supported during creation",
+        "unavailableChoices": "no stored selectable options are available",
+        "ambiguousDefinition": "more than one field definition uses this key"
+      }
+    }
   },
   "navigation": {
     "overview": "Vue d’ensemble",
