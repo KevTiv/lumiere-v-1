@@ -9,9 +9,9 @@ function invalid(): never {
   throw new Error("AI form suggestions could not be verified.")
 }
 
-function record(value: unknown): Record<string, unknown> {
+function objectInput(value: unknown): object {
   if (value === null || typeof value !== "object" || Array.isArray(value)) invalid()
-  return value as Record<string, unknown>
+  return value
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -23,7 +23,7 @@ function optionalString(value: unknown): string | undefined {
 function sources(value: unknown): AiFormSuggestionSource[] {
   if (!Array.isArray(value)) invalid()
   return value.map((item) => {
-    const source = record(item)
+    const source = objectInput(item) as { type?: unknown; label?: unknown; value?: unknown; field?: unknown }
     if (typeof source.type !== "string" || !source.type.trim()) invalid()
     return {
       type: source.type,
@@ -69,15 +69,16 @@ export function decodeAiFormSuggestions(
   value: unknown,
   fields: readonly AiFormFieldSchema[],
 ): AiFormSuggestResponse {
-  const response = record(value)
+  const response = objectInput(value) as { suggestions?: unknown; validation_notes?: unknown; sources?: unknown }
   const byName = new Map(fields.map((field) => [field.name, field]))
   if (byName.size !== fields.length) invalid()
   const suggestions: Record<string, AiFormSuggestion> = {}
-  for (const [name, raw] of Object.entries(record(response.suggestions))) {
+  const entries = Object.entries(objectInput(response.suggestions)) as Array<[string, unknown]>
+  for (const [name, raw] of entries) {
     if (name === "__proto__" || name === "constructor" || name === "prototype") invalid()
     const field = byName.get(name)
     if (!field) invalid()
-    const suggestion = record(raw)
+    const suggestion = objectInput(raw) as { value?: unknown; confidence?: unknown; note?: unknown; sources?: unknown }
     fieldValue(field, suggestion.value)
     if (typeof suggestion.confidence !== "number" || !Number.isFinite(suggestion.confidence)
       || suggestion.confidence < 0 || suggestion.confidence > 1) invalid()
@@ -90,7 +91,7 @@ export function decodeAiFormSuggestions(
   }
   if (!Array.isArray(response.validation_notes)) invalid()
   const validation_notes = response.validation_notes.map((item): AiFormSuggestResponse["validation_notes"][number] => {
-    const note = record(item)
+    const note = objectInput(item) as { field?: unknown; message?: unknown; severity?: unknown }
     if (typeof note.message !== "string" || !note.message.trim()) invalid()
     const severity = optionalString(note.severity)
     if (severity !== undefined && severity !== "info" && severity !== "warning" && severity !== "error") invalid()
