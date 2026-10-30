@@ -152,6 +152,24 @@ fn validate_type(
     if !valid {
         return Err(format!("{key} has an unsupported or invalid value type"));
     }
+    if let Some(text) = value.as_str().filter(|value| !value.is_empty()) {
+        let valid_date = match field_type {
+            FieldType::Date => chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok(),
+            FieldType::Time => {
+                chrono::NaiveTime::parse_from_str(text, "%H:%M").is_ok()
+                    || chrono::NaiveTime::parse_from_str(text, "%H:%M:%S").is_ok()
+            }
+            FieldType::DateTime => {
+                chrono::DateTime::parse_from_rfc3339(text).is_ok()
+                    || chrono::NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M").is_ok()
+                    || chrono::NaiveDateTime::parse_from_str(text, "%Y-%m-%dT%H:%M:%S").is_ok()
+            }
+            _ => true,
+        };
+        if !valid_date {
+            return Err(format!("{key} must contain a valid date or time"));
+        }
+    }
     if matches!(
         field_type,
         FieldType::Select | FieldType::Radio | FieldType::MultiSelect | FieldType::UserSelect
@@ -259,6 +277,28 @@ fn validate_entries_for_form(
             return Err(format!(
                 "{} is required by this creation form",
                 field.field_id
+            ));
+        }
+    }
+    for personal in ctx.db.user_custom_field().iter().filter(|field| {
+        field.configuration_id == config_id
+            && field.organization_id == organization_id
+            && field.user_id == ctx.sender()
+    }) {
+        let data: serde_json::Value = serde_json::from_str(&personal.field_data_json)
+            .map_err(|_| "invalid personal custom-field definition")?;
+        if data
+            .get("validation")
+            .and_then(|validation| validation.get("required"))
+            .and_then(|required| required.as_bool())
+            == Some(true)
+            && !entries
+                .iter()
+                .any(|entry| entry.field_key == personal.field_id)
+        {
+            return Err(format!(
+                "{} is required by this creation form",
+                personal.field_id
             ));
         }
     }
@@ -619,6 +659,38 @@ mod tests {
             &FieldType::Select,
             &serde_json::json!("allowed"),
             &options
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn custom_dates_validate_calendar_values_without_losing_date_only_context() {
+        assert!(validate_type(
+            "custom:date",
+            &FieldType::Date,
+            &serde_json::json!("2026-02-30"),
+            &[]
+        )
+        .is_err());
+        assert!(validate_type(
+            "custom:date",
+            &FieldType::Date,
+            &serde_json::json!("2026-10-30"),
+            &[]
+        )
+        .is_ok());
+        assert!(validate_type(
+            "custom:time",
+            &FieldType::Time,
+            &serde_json::json!("25:61"),
+            &[]
+        )
+        .is_err());
+        assert!(validate_type(
+            "custom:datetime",
+            &FieldType::DateTime,
+            &serde_json::json!("2026-10-30T09:30"),
+            &[]
         )
         .is_ok());
     }

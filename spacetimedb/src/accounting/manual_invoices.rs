@@ -392,6 +392,12 @@ pub fn create_manual_account_invoice(
     check_permission(ctx, organization_id, "account_move", "create")?;
     check_permission(ctx, organization_id, "account_move_line", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        params.company_id,
+        ctx.sender(),
+    )?;
     validate_request_token(&params.idempotency_key)?;
 
     let payload_fingerprint = format!("{params:?}");
