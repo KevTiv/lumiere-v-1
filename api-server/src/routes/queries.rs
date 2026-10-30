@@ -21,6 +21,8 @@ use stdb_auth::{has_resource_read_permission, registry_get};
 
 mod activity_work;
 mod expense_allocations;
+#[cfg(test)]
+mod read_reauthorization_test;
 mod record_creations;
 mod replenishment;
 mod task_assignees;
@@ -223,7 +225,8 @@ pub(crate) async fn get_query(
     }
 
     if resource == "expense-allocations" {
-        let response = expense_allocations::read(&context, q.company_id, q.expense_id).await?;
+        let response =
+            expense_allocations::read(&state.stdb, &context, q.company_id, q.expense_id).await?;
         context.require_current_placement(&state.organization_placements)?;
         return Ok(Json(response));
     }

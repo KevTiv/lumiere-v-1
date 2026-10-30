@@ -2,12 +2,14 @@
 
 use crate::error::ApiError;
 use crate::query_exec::{resolve_membership_company_id, row_u64};
+use crate::session::load_field_access_context;
 use crate::trusted_context::TrustedOperationContext;
 use serde_json::{json, Value};
 use stdb_auth::{
     has_resource_read_permission, resolve_http_sql_columns, select_org_and_company_scoped_sql,
     FieldAccessContext,
 };
+use stdb_client::StdbClient;
 
 const ALLOCATION_LIMIT: usize = 1_000;
 const SNAPSHOT_FIELDS: &[&str] = &[
@@ -138,6 +140,7 @@ fn scoped_sql(
 }
 
 pub(super) async fn read(
+    owner: &StdbClient,
     context: &TrustedOperationContext,
     requested_company_id: Option<u64>,
     expense_id: Option<u64>,
@@ -195,6 +198,22 @@ pub(super) async fn read(
             "Expense allocations exceed the supported review size".into(),
         ));
     }
+    // Field policy is enforced by this owner, not by the public SQL tables.
+    // Recheck after protected source awaits before issuing an editable snapshot.
+    let current_access = load_field_access_context(owner, context.actor_identity(), org)
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or_else(|| ApiError::Forbidden("Expense allocation read access changed".into()))?;
+    require_read(&current_access, org)?;
+    require_snapshot_fields(&current_access)?;
+    resolve_membership_company_id(
+        context.client(),
+        org,
+        context.actor_identity(),
+        Some(company),
+        "Cannot read expense allocations in another company",
+    )
+    .await?;
     let snapshot = snapshot_for_rows(org, company, expense, &rows)?;
     // These identities are passed back to a mutation. Preserve every u64 through JSON.parse.
     for row in &mut rows {
@@ -311,79 +330,28 @@ mod tests {
         assert!(sql.contains("organization_id = 42 AND company_id = 7 AND expense_id = 9"));
     }
 
-    struct Fixture {
-        context: TrustedOperationContext,
-        queries: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
-        task: tokio::task::JoinHandle<()>,
-    }
+    use super::super::read_reauthorization_test::{
+        fixture as policy_fixture, Fixture, Revocation, Source,
+    };
 
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            self.task.abort();
-        }
-    }
-
-    async fn fixture(parent_exists: bool, allocations: Vec<Value>) -> Fixture {
-        use axum::{http::HeaderMap, routing::post, Json, Router};
-        use std::sync::{Arc, Mutex};
-        let queries = Arc::new(Mutex::new(Vec::new()));
-        let recorded = queries.clone();
-        let router = Router::new().route("/v1/database/expenses/sql", post(move |headers: HeaderMap, sql: String| {
-            let recorded = recorded.clone();
-            let allocations = allocations.clone();
-            async move {
-                assert_eq!(headers.get("authorization").unwrap(), "Bearer actor-token");
-                recorded.lock().unwrap().push(sql.clone());
-                assert!(sql.contains("organization_id = 42"), "{sql}");
-                let rows = if sql.contains(" FROM user_organization ") {
-                    vec![json!({"id":1,"organization_id":42,"company_id":7,"is_active":true,"role_id":1})]
-                } else if sql.contains(" FROM user_role_assignment ") { vec![]
-                } else if sql.contains(" FROM role ") {
-                    vec![json!({"id":1,"name":"Clerk","permissions":["hr_expense:read"],"is_active":true})]
-                } else if sql.contains(" FROM hr_expense_allocation ") {
-                    assert!(sql.contains("company_id = 7 AND expense_id = 9"));
-                    allocations
-                } else if sql.contains(" FROM hr_expense ") {
-                    assert!(sql.contains("company_id = 7 AND id = 9"));
-                    if parent_exists { vec![json!({"id":9,"organization_id":42,"company_id":7})] } else { vec![] }
-                } else { panic!("Unexpected SQL: {sql}") };
-                let columns: Vec<_> = sql.strip_prefix("SELECT ").unwrap().split_once(" FROM ").unwrap().0.split(", ").collect();
-                Json(json!([{"schema":{"elements":columns.iter().map(|column|json!({"name":{"some":column}})).collect::<Vec<_>>()},
-                    "rows":rows.iter().map(|row|columns.iter().map(|column|row.get(*column).cloned().unwrap_or(Value::Null)).collect::<Vec<_>>()).collect::<Vec<_>>() }]))
-            }
-        }));
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let task = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
-        let mut actor = access();
-        actor.identity_hex = "ab".repeat(32);
-        let context = TrustedOperationContext::from_session(
-            &crate::session::ApiSession {
-                stdb_token: "actor-token".into(),
-                identity_hex: actor.identity_hex.clone(),
-                organization_id: Some(42),
-                field_access: Some(actor),
+    async fn fixture(parent_exists: bool, rows: Vec<Value>) -> Fixture {
+        policy_fixture(
+            Source::Allocations {
+                parent_exists,
+                rows,
             },
-            stdb_client::StdbClient::new(
-                format!("http://{address}"),
-                "expenses".into(),
-                "actor-token".into(),
-            ),
-            crate::trusted_context::RESOURCE_QUERY_OPERATION_ID,
+            Revocation::None,
         )
-        .unwrap();
-        Fixture {
-            context,
-            queries,
-            task,
-        }
+        .await
     }
 
     #[tokio::test]
     async fn http_read_verifies_membership_and_parent_before_returning_saved_rows() {
         let fixture = fixture(true, vec![json!({"id":9007199254740993u64,"organization_id":42,"company_id":7,"expense_id":9,
             "project_id":null,"analytic_account_id":8,"share_percent":100.0,"amount":12.34567,"billable":false,"metadata":"saved"})]).await;
-        let response = read(&fixture.context, Some(7), Some(9)).await.unwrap();
+        let response = read(&fixture.owner, &fixture.context, Some(7), Some(9))
+            .await
+            .unwrap();
         let rows = response["data"].as_array().unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["id"], "9007199254740993");
@@ -410,7 +378,7 @@ mod tests {
     async fn unavailable_parent_or_foreign_company_never_reads_children() {
         let missing = fixture(false, vec![]).await;
         assert!(matches!(
-            read(&missing.context, Some(7), Some(9)).await,
+            read(&missing.owner, &missing.context, Some(7), Some(9)).await,
             Err(ApiError::NotFound(_))
         ));
         assert!(!missing
@@ -421,7 +389,7 @@ mod tests {
             .any(|q| q.contains(" FROM hr_expense_allocation ")));
         let foreign = fixture(true, vec![]).await;
         assert!(matches!(
-            read(&foreign.context, Some(8), Some(9)).await,
+            read(&foreign.owner, &foreign.context, Some(8), Some(9)).await,
             Err(ApiError::Forbidden(_))
         ));
         assert!(
@@ -446,8 +414,71 @@ mod tests {
         )
         .await;
         assert!(matches!(
-            read(&fixture.context, Some(7), Some(9)).await,
+            read(&fixture.owner, &fixture.context, Some(7), Some(9)).await,
             Err(ApiError::Unavailable(_))
+        ));
+    }
+
+    async fn rejects_policy_changed_during_source_read(revocation: Revocation) {
+        let fixture = policy_fixture(Source::Allocations { parent_exists: true, rows: vec![json!({"id":1,"organization_id":42,"company_id":7,"expense_id":9,
+            "project_id":null,"analytic_account_id":8,"share_percent":100.0,"amount":12.34567,"billable":false,"metadata":"private allocation"})] }, revocation).await;
+        assert!(matches!(
+            read(&fixture.owner, &fixture.context, Some(7), Some(9)).await,
+            Err(ApiError::Forbidden(_))
+        ));
+        let queries = fixture.queries.lock().unwrap();
+        let source = queries
+            .iter()
+            .position(|sql| sql.contains(" FROM hr_expense_allocation "))
+            .unwrap();
+        let refreshed = queries
+            .iter()
+            .position(|sql| sql.contains(" FROM user_profile "))
+            .unwrap();
+        assert!(
+            source < refreshed,
+            "current policy must be loaded after saved rows were read"
+        );
+    }
+
+    #[tokio::test]
+    async fn late_resource_revocation_never_returns_allocation_values() {
+        rejects_policy_changed_during_source_read(Revocation::ResourcePermission).await;
+    }
+
+    #[tokio::test]
+    async fn late_field_narrowing_never_issues_a_stale_editable_snapshot() {
+        rejects_policy_changed_during_source_read(Revocation::AllocationFields).await;
+    }
+
+    #[tokio::test]
+    async fn late_membership_revocation_never_returns_allocation_values() {
+        rejects_policy_changed_during_source_read(Revocation::Membership).await;
+    }
+
+    #[tokio::test]
+    async fn late_company_change_never_returns_original_company_allocations() {
+        rejects_policy_changed_during_source_read(Revocation::Company).await;
+    }
+
+    #[tokio::test]
+    async fn late_profile_deactivation_never_returns_allocation_values() {
+        rejects_policy_changed_during_source_read(Revocation::InactiveProfile).await;
+    }
+
+    #[tokio::test]
+    async fn unavailable_current_policy_never_falls_back_to_the_session_snapshot() {
+        let fixture = policy_fixture(
+            Source::Allocations {
+                parent_exists: true,
+                rows: vec![],
+            },
+            Revocation::AuthorityUnavailable,
+        )
+        .await;
+        assert!(matches!(
+            read(&fixture.owner, &fixture.context, Some(7), Some(9)).await,
+            Err(ApiError::Internal(_))
         ));
     }
 }
