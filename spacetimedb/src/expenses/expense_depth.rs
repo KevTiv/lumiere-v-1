@@ -16,7 +16,8 @@ use crate::expenses::expenses::{
     expense_sheet, hr_expense, metadata_str_eq, HrExpense, HrExpenseSheet,
 };
 use crate::helpers::{
-    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2,
+    write_audit_log_v2_returning, AuditLogParams,
 };
 use crate::projects::project_accounting::{
     project_margin_snapshot, refresh_project_margin_for_projects,
@@ -265,6 +266,49 @@ pub(crate) fn allocation_snapshot(
     )
     .map_err(str::to_owned)?;
     Ok(format!("v1:{:x}", Sha256::digest(bytes)))
+}
+
+/// The exact replacement outcome, including removed child identities, is reconstructable.
+fn record_expense_allocation_commit(
+    ctx: &ReducerContext,
+    expense: &HrExpense,
+    previous: &[HrExpenseAllocation],
+    inserted: &[HrExpenseAllocation],
+    audit: &crate::core::audit::AuditLog,
+) -> Result<(), String> {
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "hr_expense",
+        serde_json::json!({"id": expense.id}),
+        expense,
+    )?];
+    for row in previous {
+        changes.push(RowChange::delete(
+            "hr_expense_allocation",
+            serde_json::json!({"id": row.id}),
+        ));
+    }
+    for row in inserted {
+        changes.push(RowChange::upsert_stdb_row(
+            "hr_expense_allocation",
+            serde_json::json!({"id": row.id}),
+            row,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "audit_log",
+        serde_json::json!({"id": audit.id}),
+        audit,
+    )?);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: expense.organization_id,
+            operation_id: "erp.set_expense_allocations".into(),
+            correlation_id: format!("expense:{}:allocations:audit:{}", expense.id, audit.id),
+            changes,
+        },
+    )?;
+    Ok(())
 }
 
 // ── Statutory mileage helpers (AU/NZ packs) ───────────────────────────────────
@@ -586,6 +630,7 @@ pub fn set_expense_allocations(
     expense_id: u64,
     params: SetExpenseAllocationsParams,
 ) -> Result<(), String> {
+    const MAX_ALLOCATION_ROWS: usize = 1_000;
     check_permission(ctx, organization_id, "hr_expense", "update")?;
     let expense = ctx
         .db
@@ -607,7 +652,19 @@ pub fn set_expense_allocations(
     if !expense.total_amount.is_finite() {
         return Err("Expense amount must be finite before changing allocations".into());
     }
-    let existing = allocations_for_expense(ctx, expense_id);
+    if params.lines.len() > MAX_ALLOCATION_ROWS {
+        return Err("Expense allocations exceed the supported review size".into());
+    }
+    let existing: Vec<_> = ctx
+        .db
+        .hr_expense_allocation()
+        .allocation_by_expense()
+        .filter(&expense_id)
+        .take(MAX_ALLOCATION_ROWS + 1)
+        .collect();
+    if existing.len() > MAX_ALLOCATION_ROWS {
+        return Err("Expense allocations exceed the supported review size".into());
+    }
     let current_snapshot = allocation_snapshot(&expense, &existing)?;
     lumiere_policy_core::expense_allocations::require_reviewed_allocation_snapshot(
         params.expected_snapshot.as_deref(),
@@ -616,8 +673,11 @@ pub fn set_expense_allocations(
     )
     .map_err(str::to_owned)?;
     if params.lines.is_empty() {
+        if existing.is_empty() {
+            return Ok(());
+        }
         clear_allocations_for_expense(ctx, expense_id);
-        write_audit_log_v2(
+        let audit = write_audit_log_v2_returning(
             ctx,
             organization_id,
             AuditLogParams {
@@ -631,6 +691,7 @@ pub fn set_expense_allocations(
                 metadata: Some(r#"{"cleared":true}"#.into()),
             },
         );
+        record_expense_allocation_commit(ctx, &expense, &existing, &[], &audit)?;
         return Ok(());
     }
 
@@ -687,9 +748,10 @@ pub fn set_expense_allocations(
     }
 
     clear_allocations_for_expense(ctx, expense_id);
+    let mut inserted = Vec::with_capacity(params.lines.len());
     for line in params.lines {
         let amount = expense.total_amount * (line.share_percent / 100.0);
-        ctx.db.hr_expense_allocation().insert(HrExpenseAllocation {
+        let row = ctx.db.hr_expense_allocation().insert(HrExpenseAllocation {
             id: 0,
             organization_id,
             company_id: expense.company_id,
@@ -701,8 +763,9 @@ pub fn set_expense_allocations(
             billable: line.billable,
             metadata: line.metadata,
         });
+        inserted.push(row);
     }
-    write_audit_log_v2(
+    let audit = write_audit_log_v2_returning(
         ctx,
         organization_id,
         AuditLogParams {
@@ -716,6 +779,7 @@ pub fn set_expense_allocations(
             metadata: None,
         },
     );
+    record_expense_allocation_commit(ctx, &expense, &existing, &inserted, &audit)?;
     Ok(())
 }
 

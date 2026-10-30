@@ -15,6 +15,7 @@ use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
+use crate::core::audit::audit_log;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::expenses::expense_depth::{
     allocation_snapshot, allocations_for_expense, create_expense_project_rebill,
@@ -43,6 +44,143 @@ struct ExpenseAccounts {
     payable_id: u64,
     receivable_id: u64,
     income_id: u64,
+}
+
+fn allocation_commit_count(ctx: &ReducerContext, org: u64) -> usize {
+    ctx.db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == org && commit.operation_id == "erp.set_expense_allocations"
+        })
+        .count()
+}
+
+fn assert_allocation_commit(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    expense_id: u64,
+    deleted_ids: &[u64],
+) -> Result<(), String> {
+    let commit = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|commit| {
+            commit.organization_id == fixture.organization_id
+                && commit.operation_id == "erp.set_expense_allocations"
+        })
+        .max_by_key(|commit| commit.sequence)
+        .ok_or("allocation source commit missing")?;
+    let inserted = allocations_for_expense(ctx, expense_id);
+    let mut changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .iter()
+        .filter(|change| {
+            change.organization_id == fixture.organization_id
+                && change.commit_sequence == commit.sequence
+        })
+        .collect();
+    changes.sort_by_key(|change| change.ordinal);
+    if changes.len() != deleted_ids.len() + inserted.len() + 2
+        || commit.row_change_count as usize != changes.len()
+    {
+        return Err(
+            "allocation commit must contain exactly parent, old tombstones, new rows and audit"
+                .into(),
+        );
+    }
+    let mut deleted = Vec::new();
+    let mut upserts = Vec::new();
+    let mut audit_count = 0;
+    for (index, change) in changes.iter().enumerate() {
+        let identity: serde_json::Value =
+            serde_json::from_str(&change.row_identity_json).map_err(|e| e.to_string())?;
+        let id = identity["id"]
+            .as_u64()
+            .ok_or("allocation commit row identity invalid")?;
+        if change.change_kind == "delete" {
+            if change.table_name != "hr_expense_allocation" || change.row_json.is_some() {
+                return Err("invalid allocation tombstone".into());
+            }
+            deleted.push(id);
+            continue;
+        }
+        let actual: serde_json::Value = serde_json::from_str(
+            change
+                .row_json
+                .as_deref()
+                .ok_or("complete allocation commit row missing")?,
+        )
+        .map_err(|e| e.to_string())?;
+        let expected = match change.table_name.as_str() {
+            "hr_expense" => {
+                if index != 0 || id != expense_id {
+                    return Err("allocation parent context must precede children".into());
+                }
+                let row = ctx
+                    .db
+                    .hr_expense()
+                    .id()
+                    .find(&id)
+                    .ok_or("allocation parent missing")?;
+                serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+            }
+            "hr_expense_allocation" => {
+                let row = inserted
+                    .iter()
+                    .find(|row| row.id == id)
+                    .ok_or("commit contains unrelated allocation")?;
+                if row.organization_id != fixture.organization_id
+                    || row.company_id != fixture.company_id
+                    || row.expense_id != expense_id
+                {
+                    return Err("allocation commit scope mismatch".into());
+                }
+                upserts.push(id);
+                serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(row))
+            }
+            "audit_log" => {
+                let row = ctx
+                    .db
+                    .audit_log()
+                    .id()
+                    .find(&id)
+                    .ok_or("allocation audit missing")?;
+                if row.organization_id != fixture.organization_id
+                    || row.company_id != Some(fixture.company_id)
+                    || row.record_id != expense_id
+                    || row.table_name != "hr_expense_allocation"
+                    || row.action
+                        != if inserted.is_empty() {
+                            "DELETE"
+                        } else {
+                            "UPDATE"
+                        }
+                {
+                    return Err("allocation commit audit belongs to another record".into());
+                }
+                audit_count += 1;
+                serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+            }
+            _ => return Err("allocation commit contains unrelated rows".into()),
+        }
+        .map_err(|e| e.to_string())?;
+        if change.change_kind != "upsert" || actual != expected {
+            return Err("allocation source commit did not capture the complete native row".into());
+        }
+    }
+    deleted.sort_unstable();
+    let mut expected_deleted = deleted_ids.to_vec();
+    expected_deleted.sort_unstable();
+    upserts.sort_unstable();
+    let mut expected_upserts: Vec<_> = inserted.iter().map(|row| row.id).collect();
+    expected_upserts.sort_unstable();
+    if deleted != expected_deleted || upserts != expected_upserts || audit_count != 1 {
+        return Err("allocation commit identities do not match the exact replacement".into());
+    }
+    Ok(())
 }
 
 fn seed_analytic_account(
@@ -528,6 +666,12 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
 
     // A review token is compared inside the same transaction that deletes/replaces rows.
     let expense = ctx.db.hr_expense().id().find(&line_id).ok_or("expense")?;
+    assert_allocation_commit(ctx, &fixture, line_id, &[])?;
+    let baseline_commits = allocation_commit_count(ctx, fixture.organization_id);
+    let original_ids: Vec<_> = allocations_for_expense(ctx, line_id)
+        .iter()
+        .map(|row| row.id)
+        .collect();
     let baseline = allocation_snapshot(&expense, &allocations_for_expense(ctx, line_id))?;
     for expected_snapshot in [None, Some("v1:stale-review".into())] {
         if set_expense_allocations(
@@ -545,6 +689,9 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
         }
         if allocation_snapshot(&expense, &allocations_for_expense(ctx, line_id))? != baseline {
             return Err("rejected stale clear changed saved allocations".into());
+        }
+        if allocation_commit_count(ctx, fixture.organization_id) != baseline_commits {
+            return Err("rejected allocation review must not emit a source commit".into());
         }
     }
     for line in [
@@ -579,6 +726,9 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
         if allocation_snapshot(&expense, &allocations_for_expense(ctx, line_id))? != baseline {
             return Err("invalid replacement changed saved allocations".into());
         }
+        if allocation_commit_count(ctx, fixture.organization_id) != baseline_commits {
+            return Err("invalid allocation replacement must not emit a source commit".into());
+        }
     }
     let lines = allocations_for_expense(ctx, line_id)
         .iter()
@@ -599,6 +749,10 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             expected_snapshot: Some(baseline.clone()),
         },
     )?;
+    assert_allocation_commit(ctx, &fixture, line_id, &original_ids)?;
+    if allocation_commit_count(ctx, fixture.organization_id) != baseline_commits + 1 {
+        return Err("one accepted replacement requires one source commit".into());
+    }
     if set_expense_allocations(
         ctx,
         fixture.organization_id,
@@ -611,6 +765,59 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
     .is_ok()
     {
         return Err("a snapshot from before another save must not clear current rows".into());
+    }
+    if allocation_commit_count(ctx, fixture.organization_id) != baseline_commits + 1 {
+        return Err("stale allocation retry must not emit a source commit".into());
+    }
+
+    let replaced = allocations_for_expense(ctx, line_id);
+    let deleted_ids: Vec<_> = replaced.iter().map(|row| row.id).collect();
+    let reviewed = allocation_snapshot(&expense, &replaced)?;
+    let restore = replaced
+        .iter()
+        .map(|row| ExpenseAllocationLineParams {
+            analytic_account_id: row.analytic_account_id,
+            project_id: row.project_id,
+            share_percent: row.share_percent,
+            billable: row.billable,
+            metadata: row.metadata.clone(),
+        })
+        .collect();
+    set_expense_allocations(
+        ctx,
+        fixture.organization_id,
+        line_id,
+        SetExpenseAllocationsParams {
+            lines: vec![],
+            expected_snapshot: Some(reviewed),
+        },
+    )?;
+    assert_allocation_commit(ctx, &fixture, line_id, &deleted_ids)?;
+    let cleared_commits = allocation_commit_count(ctx, fixture.organization_id);
+    set_expense_allocations(
+        ctx,
+        fixture.organization_id,
+        line_id,
+        SetExpenseAllocationsParams {
+            lines: vec![],
+            expected_snapshot: Some(allocation_snapshot(&expense, &[])?),
+        },
+    )?;
+    if allocation_commit_count(ctx, fixture.organization_id) != cleared_commits {
+        return Err("retrying an already empty clear must not emit an extra source commit".into());
+    }
+    set_expense_allocations(
+        ctx,
+        fixture.organization_id,
+        line_id,
+        SetExpenseAllocationsParams {
+            lines: restore,
+            expected_snapshot: Some(allocation_snapshot(&expense, &[])?),
+        },
+    )?;
+    assert_allocation_commit(ctx, &fixture, line_id, &[])?;
+    if allocation_commit_count(ctx, fixture.organization_id) != baseline_commits + 3 {
+        return Err("clear and restore must each emit exactly one source commit".into());
     }
 
     submit_expense(ctx, fixture.organization_id, line_id, sheet_id)?;
