@@ -125,6 +125,13 @@ describe("ERP help document viewer", () => {
 })
 
 describe("guide content boundaries", () => {
+  it("distinguishes independently reviewed guidance from unknown product compatibility", () => {
+    render(<AssistantGuideViewer document={{ ...saved, reviewState: "verified", compatibility: "unknown", reviewEvidence: { state: "approved", verified: true, reviews: [{ kind: "source_fidelity", outcome: "accepted", reviewer: "a".repeat(64) }] } }} />)
+    expect(screen.getByLabelText("Guide verification").textContent).toContain("independent evidence, domain and implementation reviews")
+    expect(screen.getByLabelText("Guide verification").textContent).toContain("Product and workflow compatibility have not been established")
+    expect(screen.getByTitle("a".repeat(64))).toBeTruthy()
+  })
+
   it("extracts only one closed bounded HTML fence from an admitted answer", () => {
     const html = "<h1>ERP guide</h1>"
     expect(extractGuideHtmlDerivative(`Here is the guide.\n\n\`\`\`html\n${html}\n\`\`\``)).toBe(html)

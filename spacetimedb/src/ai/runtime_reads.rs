@@ -23,7 +23,68 @@ use super::knowledge_entry::{
     AiKnowledgeEntry, AiKnowledgeEntryVersion, AiKnowledgeReview,
 };
 use super::spend_reads::authorized_organization_ids;
+use crate::documents::knowledge::knowledge_article__view;
+use crate::documents::knowledge_guides::{knowledge_guide__view, knowledge_guide_revision__view};
 use spacetimedb::ViewContext;
+
+/// Only the existing bound gateway reader can see this private-guide association.
+/// The gateway must additionally check the acting member, company and current revision.
+#[derive(Clone, spacetimedb::SpacetimeType)]
+pub struct KnowledgeGuideAuthorityRead {
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub revision: u32,
+    pub title: String,
+    pub content_hash: String,
+    pub revision_author: spacetimedb::Identity,
+    pub member_ids: Vec<spacetimedb::Identity>,
+    pub module: String,
+    pub language: String,
+}
+
+#[spacetimedb::view(accessor = knowledge_guide_authority_read, public, primary_key = id)]
+pub fn knowledge_guide_authority_read(ctx: &ViewContext) -> Vec<KnowledgeGuideAuthorityRead> {
+    let mut rows = Vec::new();
+    for org in authorized_organization_ids(ctx) {
+        for guide in ctx
+            .db
+            .knowledge_guide()
+            .knowledge_guide_by_org()
+            .filter(&org)
+        {
+            let Some(article) = ctx.db.knowledge_article().id().find(&guide.id) else {
+                continue;
+            };
+            let Some(revision) = ctx
+                .db
+                .knowledge_guide_revision()
+                .knowledge_guide_revision_by_guide()
+                .filter(&guide.id)
+                .find(|row| {
+                    row.organization_id == org
+                        && row.company_id == guide.company_id
+                        && row.revision == guide.latest_revision
+                })
+            else {
+                continue;
+            };
+            rows.push(KnowledgeGuideAuthorityRead {
+                id: guide.id,
+                organization_id: org,
+                company_id: guide.company_id,
+                revision: guide.latest_revision,
+                title: revision.title,
+                content_hash: revision.content_hash,
+                revision_author: revision.create_uid,
+                member_ids: article.member_ids,
+                module: guide.module,
+                language: revision.language,
+            });
+        }
+    }
+    rows
+}
 
 #[spacetimedb::view(accessor = ai_capability_execution_read, public, primary_key = id)]
 pub fn ai_capability_execution_read(ctx: &ViewContext) -> Vec<AiCapabilityExecution> {

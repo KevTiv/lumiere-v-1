@@ -6,6 +6,10 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::ai::knowledge_entry::{
+    ai_knowledge_entry, ai_knowledge_entry_version, create_ai_knowledge_entry,
+    mark_version_needs_review, AiKnowledgeVersionContent, CreateAiKnowledgeEntryParams,
+};
 use crate::core::organization::{
     default_company_id_for_organization, require_company_in_organization,
 };
@@ -179,6 +183,154 @@ fn require_member(ctx: &ReducerContext, article: &KnowledgeArticle) -> Result<()
         return Err("guide is locked by another user".to_string());
     }
     Ok(())
+}
+
+/// The reserved association names an immutable revision; a body copy alone is never a binding.
+pub(crate) fn guide_knowledge_key(guide_id: u64, revision: u32) -> String {
+    format!("guide:{guide_id}:revision:{revision}")
+}
+
+/// Nominate the author's exact saved revision through the existing evidence and independent
+/// review owner. This creates a personal, non-executable procedure candidate, never approval.
+#[reducer]
+#[allow(clippy::too_many_arguments)]
+pub fn nominate_knowledge_guide(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    guide_id: u64,
+    expected_revision: u32,
+    source_passage_ids: Vec<u64>,
+    claim_ids: Vec<u64>,
+    decision_ids: Vec<u64>,
+) -> Result<(), String> {
+    require_company_membership(ctx, organization_id, company_id)?;
+    check_permission(ctx, organization_id, "knowledge_article", "write")?;
+    check_permission(ctx, organization_id, "ai_knowledge_entry", "create")?;
+    let guide = ctx
+        .db
+        .knowledge_guide()
+        .id()
+        .find(&guide_id)
+        .ok_or("guide not found")?;
+    if guide.organization_id != organization_id || guide.company_id != company_id {
+        return Err("permission denied: guide scope mismatch".into());
+    }
+    if guide.latest_revision != expected_revision {
+        return Err("guide revision conflict: reload before requesting review".into());
+    }
+    let article = ctx
+        .db
+        .knowledge_article()
+        .id()
+        .find(&guide_id)
+        .ok_or("guide not found")?;
+    require_member(ctx, &article)?;
+    let revision = ctx
+        .db
+        .knowledge_guide_revision()
+        .knowledge_guide_revision_by_guide()
+        .filter(&guide_id)
+        .find(|row| {
+            row.revision == expected_revision
+                && row.organization_id == organization_id
+                && row.company_id == company_id
+        })
+        .ok_or("guide revision not found")?;
+    // Otherwise the guide author could nominate through somebody else and then review their own text.
+    if revision.create_uid != ctx.sender() {
+        return Err("only the saved revision author can request its verification".into());
+    }
+    let key = guide_knowledge_key(guide_id, expected_revision);
+    let content = AiKnowledgeVersionContent {
+        title: revision.title,
+        body: revision.markdown,
+        applicability: vec![
+            format!("language:{}", revision.language),
+            format!("module:{}", guide.module),
+            format!("guide:{guide_id}"),
+            format!("guide-revision:{expected_revision}"),
+        ],
+        source_passage_ids,
+        claim_ids,
+        decision_ids,
+        related_entry_ids: vec![],
+        nomination_signal: Some("manual".into()),
+    };
+    if let Some(entry) = ctx
+        .db
+        .ai_knowledge_entry()
+        .ai_knowledge_entry_by_key()
+        .filter((&organization_id, &company_id, &key))
+        .next()
+    {
+        let versions: Vec<_> = ctx
+            .db
+            .ai_knowledge_entry_version()
+            .ai_knowledge_entry_version_by_entry()
+            .filter(&entry.id)
+            .collect();
+        // A retry returns the existing candidate only for the same author and complete evidence selection.
+        if entry.owner_uid == ctx.sender()
+            && entry.kind == "procedure"
+            && entry.share_scope == "personal"
+            && versions.len() == 1
+            && versions.iter().all(|row| {
+                row.create_uid == ctx.sender()
+                    && row.title == content.title
+                    && row.body == content.body
+                    && row.applicability == content.applicability
+                    && row.source_passage_ids == content.source_passage_ids
+                    && row.claim_ids == content.claim_ids
+                    && row.decision_ids == content.decision_ids
+            })
+        {
+            return Ok(());
+        }
+        return Err("guide verification request conflict".into());
+    }
+    create_ai_knowledge_entry(
+        ctx,
+        organization_id,
+        company_id,
+        CreateAiKnowledgeEntryParams {
+            entry_key: key,
+            kind: "procedure".into(),
+            domain_tags: vec![format!("module:{}", guide.module)],
+            // Reuse may narrow this further through current guide membership; it must never publish private text.
+            share_scope: "personal".into(),
+            team_ref: None,
+            content,
+        },
+    )
+}
+
+fn invalidate_guide_knowledge(
+    ctx: &ReducerContext,
+    org: u64,
+    company: u64,
+    id: u64,
+    revision: u32,
+) {
+    let key = guide_knowledge_key(id, revision);
+    if let Some(entry) = ctx
+        .db
+        .ai_knowledge_entry()
+        .ai_knowledge_entry_by_key()
+        .filter((&org, &company, &key))
+        .next()
+    {
+        let versions: Vec<_> = ctx
+            .db
+            .ai_knowledge_entry_version()
+            .ai_knowledge_entry_version_by_entry()
+            .filter(&entry.id)
+            .map(|row| row.id)
+            .collect();
+        for version_id in versions {
+            mark_version_needs_review(ctx, version_id);
+        }
+    }
 }
 
 /// Existing article membership/lock/delete operations remain the access owner,
@@ -399,6 +551,13 @@ pub(crate) fn save_knowledge_guide_inner(
             create_date: ctx.timestamp,
         });
     if let Some(head) = previous_head {
+        invalidate_guide_knowledge(
+            ctx,
+            organization_id,
+            company_id,
+            guide_id,
+            head.latest_revision,
+        );
         ctx.db.knowledge_guide().id().update(KnowledgeGuide {
             latest_revision: next_revision,
             review_state: "draft".to_string(),

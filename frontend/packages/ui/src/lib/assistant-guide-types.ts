@@ -31,7 +31,21 @@ export interface GuideDocument extends GuideDraft, Omit<GuideReference, "title" 
   updatedAt?: string
   headRevision?: number
   canWrite?: boolean
+  compatibility?: "unknown"
+  reviewEvidence?: {
+    state: string
+    verified: boolean
+    entryId?: string
+    versionId?: string
+    reviewEpoch?: number
+    canNominate?: boolean
+    canReview?: boolean
+    reviews?: { kind: string; outcome: string; reviewer: string }[]
+  }
 }
+
+export type GuideVerificationInput = { sourcePassageIds: string[]; claimIds: string[]; decisionIds: string[] }
+export type GuideReviewInput = { reviewKind: "source_fidelity" | "domain_interpretation" | "implementation"; outcome: "accepted" | "rejected"; note?: string }
 
 export interface GuideRevisionSummary {
   revision: number

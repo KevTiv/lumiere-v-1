@@ -1,4 +1,4 @@
-import type { GuideDocument, GuideDraft, GuideReference, OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
+import type { GuideDocument, GuideDraft, GuideReference, GuideVerificationInput, GuideReviewInput, OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
 import { AI_WORKSPACE_SCOPES } from "./ai-workspace-scope"
 import { recordPageHref } from "./record-page-href"
 
@@ -194,6 +194,16 @@ function documentFromResponse(value: unknown): GuideDocument {
   }
   if (guide.canWrite !== undefined && typeof guide.canWrite !== "boolean") throw new Error("Invalid guide response")
   if (guide.headRevision !== undefined && !guideRevision(guide.headRevision)) throw new Error("Invalid guide response")
+  if (guide.compatibility !== undefined && guide.compatibility !== "unknown") throw new Error("Invalid guide compatibility")
+  if (guide.reviewEvidence !== undefined) {
+    const evidence = guide.reviewEvidence
+    if (!evidence || typeof evidence !== "object" || typeof evidence.state !== "string" || typeof evidence.verified !== "boolean" ||
+        (evidence.canNominate !== undefined && typeof evidence.canNominate !== "boolean") || (evidence.canReview !== undefined && typeof evidence.canReview !== "boolean") ||
+        (evidence.entryId !== undefined && !guideId(evidence.entryId)) || (evidence.versionId !== undefined && !guideId(evidence.versionId)) ||
+        (evidence.reviewEpoch !== undefined && (!Number.isSafeInteger(evidence.reviewEpoch) || evidence.reviewEpoch < 0)) ||
+        (evidence.reviews !== undefined && (!Array.isArray(evidence.reviews) || evidence.reviews.some((review) => !review || !["source_fidelity", "domain_interpretation", "implementation"].includes(review.kind) || !["accepted", "rejected"].includes(review.outcome) || typeof review.reviewer !== "string")))) throw new Error("Invalid guide review evidence")
+  }
+  if (guide.reviewState === "verified" && !guide.reviewEvidence?.verified) throw new Error("Guide verification is missing current review evidence")
   if (guide.sources.some((source) => !source || typeof source !== "object" || Array.isArray(source) ||
       !["live", "passage", "activity", "web"].includes(source.kind) ||
       !["authoritative", "persisted", "retrieved"].includes(source.trust) ||
@@ -270,6 +280,22 @@ export async function saveAssistantGuide(draft: GuideDraft, requestKey: string, 
   const document = documentFromResponse(body.guide)
   if (document.companyId !== draft.companyId || document.revision !== (reference ? reference.revision + 1 : 1) ||
       (reference && document.guideId !== reference.guideId)) throw new Error("Guide save response did not match the requested scope or revision")
+  return document
+}
+
+export async function requestGuideVerification(guide: GuideDocument, evidence: GuideVerificationInput): Promise<GuideDocument> {
+  return changeGuideReview(guide, "verification", evidence)
+}
+
+export async function recordGuideReview(guide: GuideDocument, review: GuideReviewInput): Promise<GuideDocument> {
+  return changeGuideReview(guide, "reviews", review)
+}
+
+async function changeGuideReview(guide: GuideDocument, action: "verification" | "reviews", fields: GuideVerificationInput | GuideReviewInput): Promise<GuideDocument> {
+  if (!guideId(guide.guideId) || !guideId(guide.companyId) || !guideRevision(guide.revision)) throw new Error("Invalid guide review scope")
+  const body = await guideJson(`/api/knowledge/guides/${guide.guideId}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ companyId: guide.companyId, revision: guide.revision, ...fields }) })
+  const document = documentFromResponse(body.guide)
+  if (document.companyId !== guide.companyId || document.guideId !== guide.guideId || document.revision !== guide.revision) throw new Error("Guide review response did not match its scope or revision")
   return document
 }
 

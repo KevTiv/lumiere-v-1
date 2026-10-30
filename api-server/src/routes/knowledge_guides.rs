@@ -20,12 +20,21 @@ use crate::{
 const HEAD_COLUMNS: &str =
     "id, organization_id, company_id, module, workflow, latest_revision, review_state";
 const REVISION_COLUMNS: &str = "id, organization_id, company_id, guide_id, revision, title, markdown, html, language, workflow_version, draft_key, sources_json, origin_message_id, origin_run_id, content_hash, request_key, create_uid, create_date";
+mod review;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/knowledge/guides", get(search).post(save))
         .route("/knowledge/guides/:id", get(read))
         .route("/knowledge/guides/:id/history", get(history))
+        .route(
+            "/knowledge/guides/:id/verification",
+            axum::routing::post(review::nominate),
+        )
+        .route(
+            "/knowledge/guides/:id/reviews",
+            axum::routing::post(review::record_review),
+        )
         .layer(axum::middleware::map_response(
             |mut response: axum::response::Response| async move {
                 response.headers_mut().insert(
@@ -209,7 +218,8 @@ fn project(head: &Value, revision: &Value, writable: bool) -> Result<Value, ApiE
         "title": field(revision,"title"), "markdown": field(revision,"markdown"), "html": field(revision,"html"),
         "module": field(head,"module"), "workflow": field(head,"workflow"),
         "language": field(revision,"language"), "workflowVersion": field(revision,"workflow_version"),
-        "productVersion": field(revision,"workflow_version"), "draftKey": field(revision,"draft_key"),
+        // Workflow metadata supplied while saving is not a product compatibility authority.
+        "productVersion": Value::Null, "compatibility": "unknown", "draftKey": field(revision,"draft_key"),
         "sources": sources, "originMessageId": field(revision,"origin_message_id"), "runId": field(revision,"origin_run_id"),
         "contentHash": field(revision,"content_hash"), "updatedAt": timestamp(field(revision,"create_date")),
         "reviewState": if version != latest { "superseded" } else { string(head, "review_state").unwrap_or("draft") },
@@ -257,7 +267,31 @@ async fn revision(
     // Recheck live membership after body fetch and before returning a projection.
     let current_head = self::head(state, ctx, company, id).await?;
     ctx.require_current_placement(&state.organization_placements)?;
-    project(&current_head, &rev, can_write(ctx.field_access()))
+    let mut guide = project(&current_head, &rev, can_write(ctx.field_access()))?;
+    let evidence = review::evidence(state, ctx, company, &current_head, &rev).await?;
+    let final_head = self::head(state, ctx, company, id).await?;
+    resolve_membership_company_id(
+        &state.stdb,
+        ctx.organization_id(),
+        ctx.actor_identity(),
+        Some(company),
+        "guide membership changed",
+    )
+    .await?;
+    ctx.require_current_placement(&state.organization_placements)?;
+    guide["headRevision"] = field(&final_head, "latest_revision").clone();
+    guide["reviewEvidence"] = evidence;
+    // An approved record without complete current independent reviews never becomes verified.
+    guide["reviewState"] = if version != u64_value(&final_head, "latest_revision").unwrap_or(0) {
+        json!("superseded")
+    } else if guide["reviewEvidence"]["verified"] == true {
+        json!("verified")
+    } else if guide["reviewEvidence"]["state"] == "needs_review" {
+        json!("needs_review")
+    } else {
+        json!("draft")
+    };
+    Ok(guide)
 }
 
 async fn read(
