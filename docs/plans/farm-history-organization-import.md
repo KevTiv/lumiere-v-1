@@ -67,7 +67,10 @@ No credential is sent to the browser or copied from another account.
    founder denial and the exact approved onboarding path.
 5. Submit the prepared bootstrap request through the user's WorkOS session. Read
    back the new organization, owner membership, role, company, currency, settings,
-   form configurations, audit evidence, and persisted tenant commit.
+   form configurations, audit evidence, and persisted tenant commit. The read-only
+   `GET /api/bootstrap/tenant?code=UMUNUPFU_MUGISHA` lookup returns basic metadata
+   only when the verified identity has an active membership in that organization.
+   Use it to recover the new ID before changing the session admission pin.
 6. Pin this user's WorkOS admission to the returned numeric organization ID and
    restart the API with that admission. The current WorkOS session resolver does
    not provide an organization switcher. Preserve the Alpha membership. Verify
@@ -95,10 +98,14 @@ the same source produces identical output.
 The source contains shop audit periods, separate customer sales, a January 2023
 debt snapshot, staff names with shop assignments, an October 2022 inventory
 count in pieces and kilograms, monthly summaries without a year, and templates.
-The KIMIRONKO file has early headings that name KICUKIRO. Retain both labels
-until the shop mapping is confirmed. Do not silently merge product spelling
-variants or ambiguous labels such as FILLET. Audit quantities lack a confirmed
-unit. Source rows that omit a quantity or amount remain unknown.
+The user confirmed kilograms for product quantities and RWF for currency.
+Retain source piece counts separately without inventing a fixed pieces-to-kg
+conversion. The user also authorized logical location corrections. The Kimironko
+file has long report sequences headed Kicukiro and Gisimenti before Kimironko.
+Prefer explicit dated report headings and preserve the continuous file ledger as
+a separate source series. Retain both original labels and the reason for each
+inference. Do not silently merge ambiguous product labels such as FILLET.
+Source rows that omit a quantity or amount remain unknown.
 
 The duplicate index covers primary product datasets. When supplementary rows
 differ, the source archive retains both versions and the audit is flagged. A
