@@ -54,7 +54,8 @@ import { useApprovalInboxCount } from "@lumiere/query-hooks/hooks/approvals"
 import { useRecordEvidenceContribution } from "@lumiere/query-hooks/hooks/ai-evidence-contributions"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
+import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext, useErpAiErrorQuestion } from "@/lib/erp-ai-context"
+import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { performSignOut } from "@/lib/auth-sign-out"
 import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream, type TurnFailure } from "@/lib/assistant-turn"
@@ -137,6 +138,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const [selectedScope, setSelectedScope] = useState("current")
   const [openGuide, setOpenGuide] = useState<{ scope: string; request: OpenGuideRequest } | null>(null)
   const guideConversation = useAssistantGuideConversation()
+  const errorQuestion = useErpAiErrorQuestion()
   const activeScope = useRef<string | null>(null)
   activeScope.current = actorHistoryScope
   const workspaceScope = useMemo(
@@ -408,7 +410,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           // Never fall back after dispatch: a missing reply does not prove no run occurred.
           return readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)))
         },
-        drafts: looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
+        drafts: !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
       })
       if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[] }
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
@@ -482,6 +484,8 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       config={chatConfig}
       context={chatContext}
       initialMessages={initialMessages}
+      composerRequest={errorQuestion}
+      modal={Boolean(errorQuestion)}
       historySaveFailed={failedHistoryScope === historyScope}
       contextOptions={AI_WORKSPACE_SCOPES}
       selectedContext={selectedScope}

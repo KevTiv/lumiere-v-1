@@ -26,6 +26,28 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("prepares an error question once without replacing an unsent draft or dispatching it", () => {
+    const onSendMessage = vi.fn()
+    const request = { id: "error-1", text: "Explain this ERP error using current authorized evidence.\nDisplayed error: Cannot post" }
+    const { rerender } = render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "My earlier unsent question" } })
+    rerender(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} composerRequest={request} />)
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe(`My earlier unsent question\n\n${request.text}`)
+    rerender(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} composerRequest={{ ...request }} />)
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe(`My earlier unsent question\n\n${request.text}`)
+    expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
+  it("keeps the same composer while error help opens in a keyboard-accessible modal", async () => {
+    const onSendMessage = vi.fn()
+    const { rerender } = render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Earlier draft" } })
+    rerender(<AIChatPanel open modal onClose={vi.fn()} onSendMessage={onSendMessage} composerRequest={{ id: "error-2", text: "Explain the error" }} />)
+    expect(await screen.findByRole("dialog")).toBeTruthy()
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Earlier draft\n\nExplain the error")
+    expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
   it("reports unavailable assistance without inventing financial data when no transport is configured", async () => {
     render(<AIChatPanel open onClose={vi.fn()} />)
     fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "@sales sales summary" } })

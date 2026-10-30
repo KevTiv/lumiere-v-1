@@ -59,6 +59,8 @@ export interface FormModalProps {
   submitSuccessMessage?: string
   /** Shown above the form body (e.g. API / validation errors while the dialog stays open). */
   submitError?: string | null
+  /** Opens contextual help for the displayed error without submitting or replacing the form. */
+  onExplainError?: (message: string) => void
   /** Passed to {@link ModularForm} — e.g. a destructive action beside Cancel / Submit. */
   formLeadingActions?: React.ReactNode
   /** Forwarded to {@link ModularForm} — e.g. parent mutation `isPending`. */
@@ -89,6 +91,7 @@ export function FormModal({
   showSubmitSuccessToast,
   submitSuccessMessage,
   submitError,
+  onExplainError,
   formLeadingActions,
   isPending,
   submissionDisabled,
@@ -229,6 +232,7 @@ export function FormModal({
             scrollable
             onSubmit={handleSubmit}
             submitError={submitError}
+            onExplainError={onExplainError}
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
             isPending={isPending}

@@ -6,10 +6,16 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
+  useRef,
   type ReactNode,
 } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
 import { deriveRouteContext, type AiUiContext } from "@lumiere/query-hooks/ai-ui-context"
+import { useErpSession } from "@lumiere/erp-session"
+import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { assistantHistoryScope } from "./assistant-history"
+import { assistantErrorQuestion, type AssistantErrorHelp } from "./assistant-error-help"
 import {
   ErpAiSelectionStateProvider,
   useErpAiSelectionReporter,
@@ -37,6 +43,8 @@ export type OpenErpAiChatOptions = {
 
 type ErpAiChatController = {
   open: () => void
+  explainError: (error: AssistantErrorHelp) => void
+  errorQuestion: { id: string; text: string } | null
 }
 
 const ErpAiChatControllerContext = createContext<ErpAiChatController | null>(null)
@@ -81,12 +89,35 @@ export function ErpAiChatControllerProvider({
   open: () => void
   children: ReactNode
 }) {
-  const value = useMemo(() => ({ open }), [open])
+  const { identity, organizationId } = useErpSession()
+  const companyId = useOperatingCompanyId(organizationId)
+  const scope = assistantHistoryScope(identity, organizationId, companyId)
+  const currentScope = useRef(scope)
+  currentScope.current = scope
+  const [request, setRequest] = useState<{ scope: string; id: string; text: string } | null>(null)
+  useEffect(() => { setRequest((current) => current?.scope === scope ? current : null) }, [scope])
+  const explainError = useCallback((error: AssistantErrorHelp) => {
+    if (!scope || currentScope.current !== scope) return
+    setRequest({ scope, id: crypto.randomUUID(), text: assistantErrorQuestion(error) })
+    open()
+  }, [open, scope])
+  const errorQuestion = request?.scope === scope ? request : null
+  const value = useMemo(() => ({ open, explainError, errorQuestion }), [open, explainError, errorQuestion])
   return (
     <ErpAiChatControllerContext.Provider value={value}>
       {children}
     </ErpAiChatControllerContext.Provider>
   )
+}
+
+/** Prepare an editable question in the current scoped conversation; no request is sent. */
+export function useExplainErpError(): (message: string, code?: string) => void {
+  const controller = useContext(ErpAiChatControllerContext)
+  return useCallback((message: string, code?: string) => controller?.explainError({ message, code }), [controller])
+}
+
+export function useErpAiErrorQuestion() {
+  return useContext(ErpAiChatControllerContext)?.errorQuestion ?? null
 }
 
 export function useErpAiRouteContext(): ErpAiRouteContext {
