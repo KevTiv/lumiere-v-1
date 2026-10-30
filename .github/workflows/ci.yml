@@ -261,6 +261,11 @@ jobs:
       - name: Document evidence ingestion tests
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib evidence_ingestion::tests
 
+      - name: Assistant guide access and save transport
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::knowledge_guides::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p stdb-auth detail_field_access_honors
+
       - name: Deterministic graduation conformance
         run: cargo test --locked -p ai-gateway --bin gateway deterministic_graduation_conformance_suite
 
@@ -414,6 +419,9 @@ jobs:
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 
+      - name: Unit tests (assistant guide references and persistence helpers)
+        run: pnpm --dir web test:assistant-guides
+
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
@@ -449,6 +457,9 @@ jobs:
       - name: Accounting next-action and authoring browser regressions
         working-directory: frontend/web
         run: pnpm exec playwright test --config playwright.accounting-ui.config.ts accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts
+
+      - name: Assistant document modal and dedicated-page browser regressions
+        run: pnpm --dir web test:e2e:assistant-guides
 
       - name: Upload frontend browser diagnostics
         if: failure()

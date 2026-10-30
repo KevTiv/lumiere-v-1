@@ -3799,6 +3799,15 @@
     "parent_id": "u64",
     "metadata": "string"
   },
+  "KnowledgeGuide": {
+    "workflow": "string"
+  },
+  "KnowledgeGuideRevision": {
+    "html": "string",
+    "workflow_version": "string",
+    "origin_message_id": "string",
+    "origin_run_id": "string"
+  },
   "Lead": {
     "email": "string",
     "phone": "string",

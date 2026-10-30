@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "operations": {
+    "run_knowledge_guide_tests": "erp.run_knowledge_guide_tests",
     "abandon_bank_statement_settlement": "erp.abandon_bank_statement_settlement",
     "accept_ai_provider_attempt": "erp.accept_ai_provider_attempt",
     "accept_sale_order_quotation": "erp.accept_sale_order_quotation",
@@ -1172,6 +1173,7 @@
     "run_workflow_runtime_tests": "erp.run_workflow_runtime_tests",
     "run_workflow_subject_snapshot_tests": "erp.run_workflow_subject_snapshot_tests",
     "save_import_mapping_template": "erp.save_import_mapping_template",
+    "save_knowledge_guide": "erp.save_knowledge_guide",
     "save_presentation_module": "erp.save_presentation_module",
     "save_proposal_version": "erp.save_proposal_version",
     "schedule_document_retention_purge": "erp.schedule_document_retention_purge",

@@ -778,6 +778,11 @@
             "name": "allowed_entity_types",
             "rustType": "Vec<String>",
             "required": false
+          },
+          {
+            "name": "guide_refs",
+            "rustType": "Vec<GuideIdentity>",
+            "required": false
           }
         ]
       },
