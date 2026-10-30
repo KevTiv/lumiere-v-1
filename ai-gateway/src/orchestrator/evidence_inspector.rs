@@ -2538,7 +2538,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reusable_guide_body_is_denied_when_current_source_policy_is_revoked_before_or_during_read(
+    async fn reusable_guide_body_is_denied_when_source_policy_is_revoked_before_or_after_inspection(
     ) {
         let viewer = Viewer {
             actor_identity: ActorIdentity::parse(&"a".repeat(64)),
@@ -2552,14 +2552,45 @@ mod tests {
                 .unwrap(),
             KnowledgeRetrieval::Denied { .. }
         ));
+        assert_eq!(
+            denied
+                .guide_source_checks
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
         let mut revoked = guide_knowledge_fixture();
-        revoked.guide_source_max_checks = Some(1);
+        // Entry admission and the inspector both see current authority. Revoke
+        // it before the final guard, so inspected text still cannot be served.
+        revoked.guide_source_max_checks = Some(2);
         assert!(matches!(
             retrieve_reusable_knowledge(&revoked, viewer, "guide:71:revision:2")
                 .await
                 .unwrap(),
             KnowledgeRetrieval::Denied { .. }
         ));
+        assert_eq!(
+            revoked
+                .guide_source_checks
+                .load(std::sync::atomic::Ordering::SeqCst),
+            3
+        );
+    }
+
+    #[tokio::test]
+    async fn reusable_guide_inspection_fails_closed_when_source_policy_is_revoked_during_read() {
+        let viewer = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let mut revoked = guide_knowledge_fixture();
+        // Admission succeeds, but the inspector's independent source check
+        // fails. Preserve its concealed error rather than returning guide text
+        // or converting arbitrary lineage/read failures into ordinary denials.
+        revoked.guide_source_max_checks = Some(1);
+        let error = retrieve_reusable_knowledge(&revoked, viewer, "guide:71:revision:2")
+            .await
+            .expect_err("revoked source access must not return a reusable guide");
+        assert_eq!(error.to_string(), "knowledge version 21 not found");
         assert_eq!(
             revoked
                 .guide_source_checks
