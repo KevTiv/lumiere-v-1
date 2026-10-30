@@ -53,6 +53,8 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream, type TurnFailure } from "@/lib/assistant-turn"
+import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
 import { recordPageHref } from "@/lib/record-page-href"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
@@ -276,25 +278,21 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return []
       if (!looksLikeActionDraftRequest(userText)) return []
 
-      try {
-        const draftResponse = await actionDraft.mutateAsync({
-          companyId: operatingCompanyId,
-          query: userText,
-          uiContext: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["uiContext"],
-        })
-        const gatewayDrafts = draftResponse.drafts ?? []
-        if (gatewayDrafts.length === 0) return []
-
-        const persisted = await persistActionDrafts.mutateAsync({
-          drafts: gatewayDrafts,
-          sourceQuery: userText,
-          uiContextJson: JSON.stringify(uiContext ?? null),
-        })
-        return persistedDraftsToChatActions(persisted, operatingCompanyId ?? undefined) as ChatAction[]
-      } catch (err) {
-        console.warn("Unable to create AI action draft", err)
-        return []
-      }
+      const draftScope = currentHistoryScope.current
+      const draftResponse = await actionDraft.mutateAsync({
+        companyId: operatingCompanyId,
+        query: userText,
+        uiContext: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["uiContext"],
+      })
+      if (currentHistoryScope.current !== draftScope) return []
+      const gatewayDrafts = draftResponse.drafts ?? []
+      if (gatewayDrafts.length === 0) return []
+      const persisted = await persistActionDrafts.mutateAsync({
+        drafts: gatewayDrafts,
+        sourceQuery: userText,
+        uiContextJson: JSON.stringify(uiContext ?? null),
+      })
+      return persistedDraftsToChatActions(persisted, operatingCompanyId) as ChatAction[]
     },
     [actionDraft, operatingCompanyId, orgReady, persistActionDrafts],
   )
@@ -357,173 +355,69 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     ],
   )
 
-  const onSendMessage = useCallback(
-    async (userText: string) => {
+  const runTurn = useCallback(
+    async (userText: string, stream = false) => {
       if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return {
-          content:
-            companiesQuery.isLoading
-              ? "Loading companies… Configure a legal entity first, then try again."
-              : "No company found for this organization. Create a company record, then open the ERP Assistant again.",
+          content: companiesQuery.isLoading
+            ? i18n.t("aiChat.turn.loadingCompany")
+            : i18n.t("aiChat.turn.companyRequired"),
           sources: [] as ChatMessageSourceRef[],
         }
       }
-
-      const started = typeof performance !== "undefined" ? performance.now() : Date.now()
+      const started = performance.now()
+      const requestScope = historyScope
+      const isCurrent = () => currentHistoryScope.current === requestScope
       const { includeTypes, uiContext } = buildRequestContext(userText)
-
-      const [out, draftActions] = await Promise.all([
-        rag.mutateAsync({
-          query: userText,
-          companyId: operatingCompanyId,
-          include_types: includeTypes,
-          ui_context: uiContext,
-        }),
-        resolveActionDrafts(userText, uiContext),
-      ])
-
-      const sources = (out.sources ?? []).map(mapRagSourceToChatSource)
-      const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
-      const assistantText =
-        draftActions.length > 0 && !out.answer.includes("draft")
-          ? `${out.answer}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`
-          : out.answer
-      void persistExchange({
-        userText,
-        assistantText,
-        sources,
-        uiContext,
-        durationMs: Math.round(finished - started),
-        model: out.model ?? null,
-        actions: draftActions.length > 0 ? draftActions : undefined,
-        runId: out.run_id,
+      const turn = await coordinateAssistantTurn({
+        isCurrent,
+        answer: async () => {
+          if (!stream) return assistantAnswer(await rag.mutateAsync({
+            query: userText, companyId: operatingCompanyId,
+            include_types: includeTypes, ui_context: uiContext,
+          }))
+          const response = await fetch("/api/ai/rag/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: userText, companyId: operatingCompanyId,
+              ...(includeTypes.length ? { include_types: includeTypes } : {}),
+              ...(uiContext ? { ui_context: uiContext } : {}),
+            }),
+          })
+          // Never fall back after dispatch: a missing reply does not prove no run occurred.
+          return readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)))
+        },
+        drafts: looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
       })
-
-      return {
-        content: assistantText,
-        runId: out.run_id,
-        sources,
-        actions: draftActions.length > 0 ? draftActions : undefined,
-      }
+      if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[] }
+      const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
+      const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
+      const draftActions = turn.drafts.kind === "ready" ? turn.drafts.value : []
+      const failureText = (phase: "answer" | "draft", failure: TurnFailure) => i18n.t(`aiChat.turn.${phase}.${failure}`)
+      const parts = [turn.answer.kind === "ready" ? turn.answer.value.answer : failureText("answer", turn.answer.kind)]
+      if (turn.drafts.kind === "ready") {
+        parts.push(draftActions.length ? i18n.t("aiChat.turn.reviewDrafts") : i18n.t("aiChat.turn.noDraft"))
+      } else if (turn.drafts.kind !== "not_requested") parts.push(failureText("draft", turn.drafts.kind))
+      const content = parts.join("\n\n")
+      void persistExchange({
+        userText, assistantText: content, sources, uiContext,
+        durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
+        actions: draftActions.length ? draftActions : undefined, runId: out?.run_id,
+      })
+      return { content, runId: out?.run_id, sources, actions: draftActions.length ? draftActions : undefined }
     },
-    [
-      buildRequestContext,
-      companiesQuery.isLoading,
-      operatingCompanyId,
-      orgReady,
-      persistExchange,
-      rag,
-      resolveActionDrafts,
-    ],
+    [orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange],
   )
-
-  const onStreamMessage = useCallback<
-    NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>
-  >(
-    async (userText, handlers) => {
-      if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
-        return onSendMessage(userText)
-      }
-
-      const started = typeof performance !== "undefined" ? performance.now() : Date.now()
-      const { includeTypes, uiContext } = buildRequestContext(userText)
-      const draftPromise = resolveActionDrafts(userText, uiContext)
-      const response = await fetch("/api/ai/rag/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: userText,
-          companyId: operatingCompanyId,
-          ...(includeTypes.length ? { include_types: includeTypes } : {}),
-          ...(uiContext ? { ui_context: uiContext } : {}),
-        }),
-      })
-
-      if (!response.ok || !response.body) {
-        return onSendMessage(userText)
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-      let content = ""
-      let sources: ChatMessageSourceRef[] = []
-      let resolvedModel: string | null = null
-      let resolvedRunId: number | undefined
-
-      const processEvent = (raw: string) => {
-        const lines = raw.split(/\r?\n/)
-        const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim()
-        const data = lines
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n")
-        if (event === "delta") {
-          content += data
-          handlers.onDelta(data)
-        } else if (event === "sources") {
-          const parsed = JSON.parse(data) as {
-            sources?: AiRagSource[]
-            model?: string
-            run_id?: number
-          }
-          sources = (parsed.sources ?? []).map(mapRagSourceToChatSource)
-          resolvedModel = parsed.model ?? null
-          resolvedRunId = parsed.run_id
-          handlers.onSources(sources)
-        }
-      }
-
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const parts = buffer.split(/\n\n/)
-        buffer = parts.pop() ?? ""
-        for (const part of parts) {
-          if (part.trim()) processEvent(part)
-        }
-      }
-      if (buffer.trim()) processEvent(buffer)
-
-      const draftActions = await draftPromise
-      if (draftActions.length > 0) {
-        handlers.onActions?.(draftActions)
-        if (!content.includes("draft")) {
-          content = `${content}\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`
-          handlers.onDelta(
-            `\n\nI've prepared ${draftActions.length} action draft${draftActions.length === 1 ? "" : "s"} below for your approval. Open Approvals in the sidebar to review the team inbox.`,
-          )
-        }
-      }
-
-      const finished = typeof performance !== "undefined" ? performance.now() : Date.now()
-      void persistExchange({
-        userText,
-        assistantText: content,
-        sources,
-        uiContext,
-        durationMs: Math.round(finished - started),
-        model: resolvedModel,
-        actions: draftActions.length > 0 ? draftActions : undefined,
-        runId: resolvedRunId,
-      })
-
-      return {
-        content,
-        runId: resolvedRunId,
-        sources,
-        actions: draftActions.length > 0 ? draftActions : undefined,
-      }
-    },
-    [
-      buildRequestContext,
-      operatingCompanyId,
-      onSendMessage,
-      orgReady,
-      persistExchange,
-      resolveActionDrafts,
-    ],
+  const onSendMessage = useCallback((text: string) => runTurn(text), [runTurn])
+  const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
+    async (text, handlers) => {
+      const reply = await runTurn(text, true)
+      handlers.onDelta(reply.content)
+      handlers.onSources(reply.sources)
+      if (reply.actions) handlers.onActions?.(reply.actions)
+      return reply
+    }, [runTurn],
   )
 
   return (
