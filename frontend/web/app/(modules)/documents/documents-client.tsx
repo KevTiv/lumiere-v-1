@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { guideLibraryHref } from "@/lib/assistant-guides"
-import { assertRetentionPreviewUnchanged, readRetentionPreview, type RetentionPreview } from "@lumiere/query-hooks/hooks/document-retention-preview"
+import { readRetentionPreview, type RetentionPreview } from "@lumiere/query-hooks/hooks/document-retention-preview"
+import { reviewRetentionPurgeScope, useRetentionPurgeAuthority } from "./retention-purge-review"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -339,11 +340,12 @@ function DocumentsClientLoaded({
     checkPermission("document_folder", "create").allowed
   const browserActionScope = useRef({ key: templateScopeKey, upload: false, createFolder: false })
   browserActionScope.current = { key: templateScopeKey, upload: canUploadDocument, createFolder: canCreateDocumentFolder }
-  const retentionAuthority = useRef({ key: templateScopeKey, immediate: false, scheduled: false, mounted: true })
-  retentionAuthority.current = { ...retentionAuthority.current, key: templateScopeKey,
-    immediate: browserScopeReady && checkPermission("document", "read").allowed && checkPermission("document", "delete").allowed,
-    scheduled: browserScopeReady && checkPermission("document", "read").allowed && checkPermission("document", "admin").allowed }
-  useEffect(() => { retentionAuthority.current.mounted = true; return () => { retentionAuthority.current.mounted = false } }, [])
+  const retentionAuthority = useRetentionPurgeAuthority(
+    templateScopeKey,
+    browserScopeReady && checkPermission("document", "read").allowed && checkPermission("document", "delete").allowed,
+    browserScopeReady && checkPermission("document", "read").allowed && checkPermission("document", "admin").allowed,
+    t("documents.retentionPreview.scopeChanged", { defaultValue: "Your company or document permissions changed. Reopen the purge preview." }),
+  )
   const assertBrowserAction = (action: "upload" | "createFolder") => {
     const current = browserActionScope.current
     if (current.key !== templateScopeKey || !current[action]) {
@@ -387,7 +389,7 @@ function DocumentsClientLoaded({
   const addDocumentVersion = useAddDocumentVersion(orgId)
   const ingestDocumentEvidence = useIngestDocumentEvidence(orgId)
   const setDocumentRetention = useSetDocumentRetention(orgId)
-  const purgeExpiredDocuments = usePurgeExpiredDocuments(orgId, () => retentionAuthority.current.mounted && retentionAuthority.current.key === templateScopeKey && retentionAuthority.current.immediate)
+  const purgeExpiredDocuments = usePurgeExpiredDocuments(orgId, () => retentionAuthority.mayDispatch(0))
   const applyDocumentLegalHold = useApplyDocumentLegalHold(orgId)
   const updateDocumentPresence = useUpdateDocumentPresence(orgId)
   const createKnowledgeArticle = useCreateKnowledgeArticle(orgId, operatingCompanyId)
@@ -400,7 +402,7 @@ function DocumentsClientLoaded({
   const removeArticleMember = useRemoveArticleMember(orgId)
   const updateKnowledgeCategory = useUpdateKnowledgeCategory(orgId)
   const deleteKnowledgeCategory = useDeleteKnowledgeCategory(orgId)
-  const scheduleRetentionPurge = useScheduleDocumentRetentionPurge(orgId, () => retentionAuthority.current.mounted && retentionAuthority.current.key === templateScopeKey && retentionAuthority.current.scheduled)
+  const scheduleRetentionPurge = useScheduleDocumentRetentionPurge(orgId, () => retentionAuthority.mayDispatch(1))
   const { askForm, cancelForm, formDialog } = useFormDialog()
   const { confirm: confirmDialog, dismiss: dismissConfirm, dialog: confirmDialogNode } = useConfirmDialog()
   useEffect(() => { dismissConfirm(); cancelForm() }, [templateScopeKey, dismissConfirm, cancelForm])
@@ -557,17 +559,13 @@ function DocumentsClientLoaded({
     },
   }
 
-  const reviewRetentionPurge = async (delaySeconds: number): Promise<RetentionPreview | null> => {
-    const assertAuthority = () => {
-      const current = retentionAuthority.current
-      if (!current.mounted || current.key !== templateScopeKey || !(delaySeconds === 0 ? current.immediate : current.scheduled)) throw new Error(t("documents.retentionPreview.scopeChanged", { defaultValue: "Your company or document permissions changed. Reopen the purge preview." }))
-    }
-    assertAuthority()
-    const preview = await readRetentionPreview(orgId, delaySeconds)
-    assertAuthority()
-    if (!preview.canProceed) throw new Error(t("documents.retentionPreview.hidden", { defaultValue: "{{count}} affected documents cannot be reviewed with your current document access. The organization-wide purge is blocked.", count: preview.unreviewableCount }))
-    if (preview.documents.length === 0) throw new Error(t("documents.retentionPreview.empty", { defaultValue: "No reviewable documents are currently eligible for this purge. No purge was requested." }))
-    const accepted = await confirmDialog({
+  const reviewRetentionPurge = (delaySeconds: number): Promise<RetentionPreview | null> => reviewRetentionPurgeScope(retentionAuthority, delaySeconds, {
+    read: () => readRetentionPreview(orgId, delaySeconds),
+    validate: (preview) => {
+      if (!preview.canProceed) throw new Error(t("documents.retentionPreview.hidden", { defaultValue: "{{count}} affected documents cannot be reviewed with your current document access. The organization-wide purge is blocked.", count: preview.unreviewableCount }))
+      if (preview.documents.length === 0) throw new Error(t("documents.retentionPreview.empty", { defaultValue: "No reviewable documents are currently eligible for this purge. No purge was requested." }))
+    },
+    confirm: (preview) => confirmDialog({
       title: t("documents.retentionPreview.title", { defaultValue: "Review documents before permanent purge" }),
       confirmLabel: delaySeconds === 0 ? t("documents.retentionPreview.purge", { defaultValue: "Permanently purge" }) : t("documents.retentionPreview.schedule", { defaultValue: "Schedule purge" }),
       description: <span className="block space-y-3">
@@ -578,13 +576,7 @@ function DocumentsClientLoaded({
         <span className="block">{t("documents.retentionPreview.finalCheck", { defaultValue: "The scope is refreshed before requesting the purge. Purged documents cannot be restored." })}</span>
       </span>,
     })
-    if (!accepted) return null
-    assertAuthority()
-    const current = await readRetentionPreview(orgId, delaySeconds)
-    assertAuthority()
-    assertRetentionPreviewUnchanged(preview, current)
-    return current
-  }
+  })
 
   const retentionPurgeAction: EntityAction = {
     id: "run-retention-purge",
@@ -619,7 +611,7 @@ function DocumentsClientLoaded({
       if (!(await reviewRetentionPurge(delaySeconds))) return
       await runKnowledgeCommand(
         title,
-        () => scheduleRetentionPurge.mutateAsync({ delaySeconds }),
+        () => { retentionAuthority.assertCurrent(delaySeconds); return scheduleRetentionPurge.mutateAsync({ delaySeconds }) },
         t("documents.knowledgeActions.retentionPurgeScheduled", {
           defaultValue: "Retention purge scheduled in {{seconds}} seconds",
           seconds: delaySeconds,
@@ -1196,6 +1188,7 @@ function DocumentsClientLoaded({
                     try {
                       const reviewed = await reviewRetentionPurge(0)
                       if (!reviewed) return
+                      retentionAuthority.assertCurrent(0)
                       await purgeExpiredDocuments.mutateAsync(reviewed.documents.map((document) => document.id))
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))

@@ -225,6 +225,7 @@ pub(super) async fn preview(
         now,
     )
     .await?;
+    context.require_current_placement(&state.organization_placements)?;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CACHE_CONTROL,
