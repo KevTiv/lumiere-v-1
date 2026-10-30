@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { calendarEventForView, calendarEventHref, calendarReturnHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
+import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, calendarReturnHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
 
 const t = (_key: string, options?: Record<string, unknown>) => String(options?.defaultValue ?? _key);
+
+test('new events keep a selected date and refuse invalid date defaults', () => {
+  assert.deepEqual(calendarEventCreationDefaults('2026-10-28'), { start: '2026-10-28T09:00', stop: '2026-10-28T10:00' });
+  assert.equal(calendarEventCreationDefaults('2026-02-29'), undefined);
+});
 
 test('an event links to its own page by id', () => {
   assert.equal(calendarEventHref({ id: 12 }), '/calendar/events/12');

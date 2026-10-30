@@ -26,6 +26,7 @@ test("overview reads enough to compute canonical payment residuals and bank queu
 })
 
 test("joined workspaces retain every secondary form and label dependency", () => {
+  assert.ok(accountingReadPlan("move-lines").has("financial-reports"), "statement drill-down must revalidate the saved report scope")
   assert.ok(accountingReadPlan("tax-schedules").has("tax-jurisdictions"))
   assert.ok(accountingReadPlan("analytic-lines").has("analytic-accounts"))
   assert.ok(accountingReadPlan("analytic-distribution").has("analytic-accounts"))

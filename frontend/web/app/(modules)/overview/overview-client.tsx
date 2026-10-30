@@ -18,9 +18,9 @@ import {
 } from "@lumiere/ui"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
 import { toDashboardSections, overviewDashboardWebOptions } from "@lumiere/ui/lib/presentation-dashboard"
-import { overviewDashboardDefinition, type OverviewDashboardData } from "@lumiere/presentation-core"
+import { overviewDashboardDefinition, type DashboardDefinition, type OverviewDashboardData } from "@lumiere/presentation-core"
 import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
-import { enumTag, moveTypeTagFromRow } from "@/lib/accounting-post-draft"
+import { enumTag } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders, type SaleOrder } from "@lumiere/query-hooks/hooks/sales"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
@@ -33,11 +33,14 @@ import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useExpenseSheetsToApprove } from "@lumiere/query-hooks/hooks/expenses"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { OwnerControlLoop } from "./owner-control-loop"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
+import { confirmedOrder, confirmedOrderTrend, orderDate, overduePostedInvoices, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
 
 interface OverviewClientProps {
   organizationId?: number
@@ -52,52 +55,17 @@ interface OverviewClientProps {
 }
 
 function matchesCompany(row: Record<string, unknown>, companyId: number | null): boolean {
-  if (companyId == null || companyId <= 0) return true
-  return Number(row.companyId ?? row.company_id ?? 0) === companyId
+  if (companyId == null || companyId <= 0) return false
+  return String(row.companyId ?? row.company_id ?? "") === String(companyId)
 }
 
 function isOpenSaleOrder(row: Record<string, unknown>): boolean {
-  const state = enumTag(row.state)
-  return state !== "Done" && state !== "Cancelled"
-}
-
-function isConfirmedSaleOrder(row: Record<string, unknown>): boolean {
-  const state = enumTag(row.state)
-  return state === "Sale" || state === "Done"
+  const state = enumTag(row.state).toLowerCase()
+  return state !== "" && !["done", "cancel", "cancelled"].includes(state)
 }
 
 function orderTimestampMs(row: Record<string, unknown>): number {
-  const raw = row.dateOrder ?? row.createDate ?? row.writeDate
-  if (raw == null) return 0
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return 0
-  return n > 1e15 ? n / 1000 : n
-}
-
-function timestampMs(value: unknown): number | null {
-  if (value == null) return null
-  if (typeof value === "object" && "microsSinceUnixEpoch" in (value as object)) {
-    const micros = Number((value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch)
-    return Number.isFinite(micros) && micros !== 0 ? micros / 1_000 : null
-  }
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric) || numeric === 0) return null
-  return numeric > 1e15 ? numeric / 1_000 : numeric
-}
-
-function lastSixMonthLabels(): string[] {
-  const labels: string[] = []
-  const now = new Date()
-  for (let i = 5; i >= 0; i -= 1) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    labels.push(d.toLocaleDateString(undefined, { month: "short" }))
-  }
-  return labels
-}
-
-function monthBucketKey(ms: number): string {
-  const d = new Date(ms)
-  return d.toLocaleDateString(undefined, { month: "short" })
+  return orderDate(row)?.getTime() ?? 0
 }
 
 function OverviewDashboardSkeleton() {
@@ -141,7 +109,7 @@ function OverviewClientLoaded({
   initialContacts,
 }: OverviewClientProps & { organizationId: number }) {
   useOverviewModuleSubscription()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
@@ -156,6 +124,8 @@ function OverviewClientLoaded({
   const paymentTransactionsQuery = usePaymentTransactions(orgId)
   const paymentReconciliationsQuery = usePaymentReconciliations(orgId)
   const messageBatchesQuery = useMessageBatches(orgId)
+  const currenciesQuery = useCurrencies()
+  const currencyCodes = useMemo(() => currencyCodeMap(currenciesQuery.data ?? []), [currenciesQuery.data])
   const expenseApprovalsQuery = useExpenseSheetsToApprove(orgId)
   const aiDraftsQuery = useAiActionDraftInboxCount(
     organizationId,
@@ -185,15 +155,19 @@ function OverviewClientLoaded({
     "payment-reconciliations": overviewResourceStatus(paymentReconciliationsQuery),
     "message-batches": overviewResourceStatus(messageBatchesQuery),
     "ai-action-drafts": overviewResourceStatus(aiDraftsQuery),
+    currencies: overviewResourceStatus(currenciesQuery),
   }
-  const salesState = resourceStatusLabel(resourceStates["sale-orders"])
-  const tasksState = resourceStatusLabel(resourceStates.tasks)
-  const contactsState = resourceStatusLabel(resourceStates.contacts)
-  const movesState = resourceStatusLabel(resourceStates["account-moves"])
+  const companyState = operatingCompanyId != null && operatingCompanyId > 0 ? undefined
+    : t("overview.financial.selectCompany", { defaultValue: "Select an operating company" })
+  const salesState = companyState ?? resourceStatusLabel(resourceStates["sale-orders"])
+  const tasksState = companyState ?? resourceStatusLabel(resourceStates.tasks)
+  const contactsState = companyState ?? resourceStatusLabel(resourceStates.contacts)
+  const movesState = companyState ?? resourceStatusLabel(resourceStates["account-moves"])
+  const currencyState = resourceStatusLabel(resourceStates.currencies)
   const aiState = resourceStatusLabel(resourceStates["ai-action-drafts"])
-  const paymentsState = resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"]))
-  const stockState = resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products))
-  const messagesState = resourceStatusLabel(resourceStates["message-batches"])
+  const paymentsState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"]))
+  const stockState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products))
+  const messagesState = companyState ?? resourceStatusLabel(resourceStates["message-batches"])
   const [timeRange, setTimeRange] = useState<TimeRangeValue>("30d")
   const [isHydrated, setIsHydrated] = useState(false)
 
@@ -220,23 +194,17 @@ function OverviewClientLoaded({
     () => contacts.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
     [contacts, operatingCompanyId],
   )
+  const ordersComplete = overviewFinancialInputsComplete(scopedOrders, "orders")
+  const invoicesComplete = overviewFinancialInputsComplete(scopedMoves, "invoices")
+  const incompleteFinancialData = t("overview.financial.incompleteSource", { defaultValue: "Required financial fields unavailable" })
 
   const periodMetrics = useMemo(() => {
-    const currentRevenue = scopedOrders
+    const currentOrders = scopedOrders
       .filter((order) => {
-        if (!isConfirmedSaleOrder(order as Record<string, unknown>)) return false
+        if (!confirmedOrder(order)) return false
         const ms = orderTimestampMs(order as Record<string, unknown>)
         return isTimestampInRange(ms, startMs, endMs)
       })
-      .reduce((sum, order) => sum + Number(order.amountTotal ?? 0), 0)
-
-    const previousRevenue = scopedOrders
-      .filter((order) => {
-        if (!isConfirmedSaleOrder(order as Record<string, unknown>)) return false
-        const ms = orderTimestampMs(order as Record<string, unknown>)
-        return isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
-      })
-      .reduce((sum, order) => sum + Number(order.amountTotal ?? 0), 0)
 
     const currentOpenOrders = scopedOrders.filter((order) => {
       if (!isOpenSaleOrder(order as Record<string, unknown>)) return false
@@ -251,50 +219,22 @@ function OverviewClientLoaded({
     }).length
 
     return {
-      currentRevenue,
-      revenueChange: percentChange(currentRevenue, previousRevenue),
+      currentOrders,
       currentOpenOrders,
       openOrdersChange: percentChange(currentOpenOrders, previousOpenOrders),
     }
   }, [scopedOrders, startMs, endMs, previousRange])
 
-  const salesTrendValues = useMemo(() => {
-    const monthLabels = lastSixMonthLabels()
-    const buckets = new Map<string, number>()
-    for (const label of monthLabels) buckets.set(label, 0)
-    for (const order of scopedOrders) {
-      if (!isConfirmedSaleOrder(order as Record<string, unknown>)) continue
-      const ms = orderTimestampMs(order as Record<string, unknown>)
-      if (ms <= 0) continue
-      const key = monthBucketKey(ms)
-      if (!buckets.has(key)) continue
-      buckets.set(key, (buckets.get(key) ?? 0) + Number(order.amountTotal ?? 0))
-    }
-    return monthLabels.map((month) => ({
-      month,
-      revenue: Math.round(buckets.get(month) ?? 0),
-    }))
-  }, [scopedOrders])
+  const salesTrendValues = useMemo(() => confirmedOrderTrend(scopedOrders, new Date(), i18n.language), [scopedOrders, i18n.language])
 
   const liveSections = useMemo(() => {
     const openTasks = scopedTasks.filter((task) => !task.isClosed).length
-    const { currentRevenue, revenueChange, currentOpenOrders, openOrdersChange } = periodMetrics
-
-    const invoices = scopedMoves.filter(
-      (m) => moveTypeTagFromRow(m as Record<string, unknown>) === "OutInvoice",
-    )
+    const { currentOrders, currentOpenOrders, openOrdersChange } = periodMetrics
     const nowMs = Date.now()
-    const overdueInvoices = invoices.filter((m) => {
-      const residual = Number(m.amountResidual ?? 0)
-      if (residual <= 0) return false
-      if (m.invoiceDateDue == null) return true
-      const dueMs = timestampMs(m.invoiceDateDue)
-      return dueMs != null && dueMs < nowMs
-    })
-    const overdueInvoiceTotal = overdueInvoices.reduce(
-      (sum, m) => sum + Number(m.amountResidual ?? 0),
-      0,
-    )
+    const overdueInvoices = overduePostedInvoices(scopedMoves)
+    const unavailableMoney = t("overview.financial.incompleteMoney", { defaultValue: "Amount or currency unavailable" })
+    const orderTotal = overviewMoneySummary(currentOrders, currencyCodes, "amountTotal", i18n.language)
+    const overdueTotal = overviewMoneySummary(overdueInvoices, currencyCodes, "amountResidual", i18n.language)
 
     const overdueTaskCount = scopedTasks.filter((task) => {
       if (task.isClosed) return false
@@ -305,8 +245,8 @@ function OverviewClientLoaded({
     const needsAttentionRows = [
       {
         reference: `${t("overview.dashboard.overdue")} Invoices`,
-        amount: movesState ?? String(overdueInvoices.length),
-        status: movesState ?? `$${Math.round(overdueInvoiceTotal).toLocaleString()}`,
+        amount: movesState ?? (!invoicesComplete ? incompleteFinancialData : String(overdueInvoices.length)),
+        status: movesState ?? currencyState ?? (!invoicesComplete ? incompleteFinancialData : overdueTotal == null ? unavailableMoney : overdueTotal || t("overview.financial.noOverdueBalance", { defaultValue: "No known overdue balance" })),
       },
       {
         reference: t("overview.dashboard.stats.pendingAiDrafts"),
@@ -323,24 +263,30 @@ function OverviewClientLoaded({
     const data: OverviewDashboardData = {
       metrics: {
         revenue: {
-          value: salesState ?? `$${Math.round(currentRevenue).toLocaleString()}`,
-          change: salesState ? undefined : revenueChange,
+          value: salesState ?? currencyState ?? (!ordersComplete ? incompleteFinancialData : orderTotal == null ? unavailableMoney : orderTotal || t("overview.financial.noConfirmedOrders", { defaultValue: "No confirmed orders" })),
         },
-        "open-sales-orders": { value: salesState ?? String(currentOpenOrders), change: salesState ? undefined : openOrdersChange },
+        "open-sales-orders": { value: salesState ?? (!ordersComplete ? incompleteFinancialData : String(currentOpenOrders)), change: salesState || !ordersComplete ? undefined : openOrdersChange },
         "open-tasks": { value: tasksState ?? String(openTasks) },
         contacts: { value: contactsState ?? String(scopedContacts.length) },
       },
       series: {
-        revenue: salesTrendValues.map(({ month, revenue }) => ({ label: month, value: revenue })),
+        revenue: salesTrendValues,
       },
       tables: { "needs-attention": needsAttentionRows },
     }
-    // A denied revenue read is not an empty (or zero-valued) chart.
-    const definition = salesState
-      ? { ...overviewDashboardDefinition, sections: overviewDashboardDefinition.sections.filter((section) => section.id !== "overview-revenue") }
-      : overviewDashboardDefinition
-    return toDashboardSections(definition, data, t, overviewDashboardWebOptions)
-  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, t])
+    // The shared presentation binding is retained; visible labels describe order values/counts.
+    const definition: DashboardDefinition = { ...overviewDashboardDefinition,
+      sections: overviewDashboardDefinition.sections
+        .filter((section) => !(salesState || !ordersComplete) || section.id !== "overview-revenue")
+        .map((section) => section.id === "overview-revenue" ? { ...section, widgets: [{ ...section.widgets[0],
+          series: [{ id: t("overview.financial.orders", { defaultValue: "Confirmed orders" }), binding: "revenue" }],
+        }] } : section),
+    }
+    return toDashboardSections(definition, data, (key) => key === "sales.dashboard.widgets.revenue"
+      ? t("overview.financial.confirmedOrderValue", { defaultValue: "Confirmed order value · by currency" })
+      : key === "overview.dashboard.widgets.salesTrend"
+        ? t("overview.financial.confirmedOrderTrend", { defaultValue: "Confirmed orders · last six months" }) : t(key), overviewDashboardWebOptions)
+  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, currencyState, currencyCodes, i18n.language, ordersComplete, invoicesComplete, incompleteFinancialData, t])
 
   const ownerControlLoop = useMemo(() => {
     const reconciledTransactionIds = new Set(paymentReconciliations.map((row) => String((row as Record<string, unknown>).paymentTransactionId ?? "")))
@@ -356,14 +302,10 @@ function OverviewClientLoaded({
       return Number(quant.availableQuantity ?? 0) <= Number(product?.reorderingMinQty ?? 0) || Boolean(quant.isOutdated)
     }).length
     const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval").length
-    const overdueInvoices = scopedMoves.filter((row) => {
-      const move = row as Record<string, unknown>
-      const due = timestampMs(move.invoiceDateDue)
-      return enumTag(move.state) === "Posted" && moveTypeTagFromRow(move) === "OutInvoice" && Number(move.amountResidual ?? 0) > 0 && due != null && due < Date.now()
-    }).length
+    const overdueInvoices = invoicesComplete ? overduePostedInvoices(scopedMoves).length : incompleteFinancialData
     const draftBills = scopedMoves.filter((row) => enumTag(row.moveType) === "InInvoice" && enumTag(row.state) === "Draft").length
     return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals, draftBills }
-  }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants])
+  }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData])
 
   const router = useRouter()
   const workspaceProfile = useWorkspaceProfile()
@@ -399,6 +341,7 @@ function OverviewClientLoaded({
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}
       />
+      <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today." })}</p>
       {isHydrated ? (
         <div className="flex flex-col gap-6">
           <section aria-label="Dashboard resource status" data-testid="overview-resource-status" className="space-y-1 text-sm">

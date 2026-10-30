@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { MessageCircleIcon, SendIcon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
@@ -32,6 +32,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 
 type Row = Record<string, unknown>
 
@@ -58,13 +60,34 @@ export interface CrmInboxPanelProps {
 export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const { data: conversations = [], isLoading } = useCrmConversations(organization)
-  const { data: messages = [] } = useCrmConversationMessages(organization)
-  const { data: phoneIdentities = [] } = useContactPhoneIdentities(organization)
+  const conversationsQuery = useCrmConversations(organization)
+  const messagesQuery = useCrmConversationMessages(organization)
+  const phoneIdentitiesQuery = useContactPhoneIdentities(organization)
+  const sourceState = mergeModuleStates([conversationsQuery, messagesQuery, phoneIdentitiesQuery].map(moduleQueryState))
+  const ready = sourceState.status === "ready"
+  const conversations = ready ? conversationsQuery.data ?? [] : []
+  const messages = ready ? messagesQuery.data ?? [] : []
+  const phoneIdentities = ready ? phoneIdentitiesQuery.data ?? [] : []
   const openConversation = useOpenCrmConversation(organization)
   const appendMessage = useAppendCrmConversationMessage(organization)
   const updateConversation = useUpdateCrmConversation(organization)
   const [body, setBody] = useState("")
+  const [actionError, setActionError] = useState<string | null>(null)
+  const scope = `${organizationId}:${contactId}`
+  const activeScope = useRef(scope)
+  activeScope.current = scope
+  useEffect(() => { setBody(""); setActionError(null) }, [organizationId, contactId])
+  const busy = openConversation.isPending || appendMessage.isPending || updateConversation.isPending
+  const submitting = useRef(false)
+  const runAction = async (action: () => Promise<unknown>) => {
+    if (!ready || busy || submitting.current) return
+    submitting.current = true
+    setActionError(null)
+    try { await action() }
+    catch (cause) {
+      if (activeScope.current === scope) setActionError(cause instanceof Error ? cause.message : t("crm.inbox.actionFailed", { defaultValue: "The request failed. Your message has been retained." }))
+    } finally { submitting.current = false }
+  }
 
   const conversation = useMemo(() => {
     return (
@@ -99,23 +122,23 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
         <CardDescription>
           {t(
             "crm.inbox.description",
-            "CRM conversation thread for WhatsApp intents (delivery via workers).",
+            "Review this contact's WhatsApp conversation. Queued messages have not yet been confirmed delivered.",
           )}
         </CardDescription>
         <CardAction className="flex gap-2">
           {!conversation ? (
             <Button
               size="sm"
-              disabled={openConversation.isPending || phoneIdentityId == null}
+              disabled={!ready || busy || phoneIdentityId == null}
               onClick={() =>
-                openConversation.mutate({
+                void runAction(() => openConversation.mutateAsync({
                   contactId,
                   channel: { tag: "WhatsApp" },
                   phoneIdentityId: phoneIdentityId ?? undefined,
                   externalThreadId: undefined,
                   assignedUserId: undefined,
                   metadata: undefined,
-                })
+                }))
               }
             >
               {t("crm.inbox.open", "Open thread")}
@@ -124,10 +147,10 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
             <Button
               size="sm"
               variant="outline"
-              disabled={updateConversation.isPending || !conversationId}
+              disabled={!ready || busy || !conversationId}
               onClick={() =>
                 conversationId &&
-                updateConversation.mutate({
+                void runAction(() => updateConversation.mutateAsync({
                   conversationId,
                   params: {
                     status: "closed",
@@ -135,7 +158,7 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                     externalThreadId: undefined,
                     metadata: undefined,
                   },
-                })
+                }))
               }
             >
               {t("crm.inbox.close", "Close")}
@@ -144,9 +167,11 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
+        <ModuleDataNotice state={sourceState} />
+        {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
+        {sourceState.status === "loading" ? (
           <p className="text-muted-foreground text-sm">{t("common.loading", "Loading…")}</p>
-        ) : !conversation || !conversationId ? (
+        ) : !ready ? null : !conversation || !conversationId ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -154,7 +179,9 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
               </EmptyMedia>
               <EmptyTitle>{t("crm.inbox.emptyTitle", "No open conversation")}</EmptyTitle>
               <EmptyDescription>
-                {t("crm.inbox.emptyDescription", "Open a WhatsApp thread for this contact.")}
+                {phoneIdentityId == null
+                  ? t("crm.inbox.phoneRequired", { defaultValue: "Add an eligible WhatsApp phone identity to this contact before opening a thread." })
+                  : t("crm.inbox.emptyDescription", "Open a WhatsApp thread for this contact.")}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -194,22 +221,26 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                 />
                 <Button
                   size="sm"
-                  disabled={!body.trim() || appendMessage.isPending}
+                  aria-label={t("crm.inbox.queueMessage", { defaultValue: "Queue message" })}
+                  disabled={!ready || !body.trim() || busy}
                   onClick={() => {
-                    appendMessage.mutate(
+                    const submittedBody = body.trim()
+                    void runAction(async () => {
+                      await appendMessage.mutateAsync(
                       {
                         conversationId,
                         params: {
                           direction: "outbound",
-                          body: body.trim(),
+                          body: submittedBody,
                           status: "queued",
                           providerMessageId: undefined,
                           operationalMessageId: undefined,
                           metadata: undefined,
                         },
                       },
-                      { onSuccess: () => setBody("") },
-                    )
+                      )
+                      if (activeScope.current === scope) setBody((current) => current.trim() === submittedBody ? "" : current)
+                    })
                   }}
                 >
                   <SendIcon className="size-4" />

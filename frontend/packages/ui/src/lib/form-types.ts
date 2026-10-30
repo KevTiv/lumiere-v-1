@@ -226,6 +226,8 @@ export interface FormConfig {
   description?: string
   /** When true, default layout omits the top title row (use inside another card). */
   hideTitle?: boolean
+  /** An explicit create-owner limit: configured custom fields cannot be committed atomically. */
+  customFieldCreateUnavailableMessage?: string
   /** When false, omits the footer (submit / cancel / reset). Default true. */
   showActions?: boolean
   sections: FormSection[]

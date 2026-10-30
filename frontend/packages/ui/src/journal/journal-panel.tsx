@@ -18,6 +18,9 @@ interface WebkitSpeechRecognitionResultEvent {
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
+import { browserWorkScope } from "../notebook/browser-notebooks"
+import { readBrowserJournal, writeBrowserJournal } from "./browser-journal"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -74,6 +77,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 import { runtimeFormRoleId } from "@/lib/runtime-form-role"
 
 interface Position {
@@ -126,13 +130,39 @@ function formatTimeAgo(
   return date.toLocaleDateString(locale)
 }
 
-export function JournalPanel({ open, onClose }: JournalPanelProps) {
+export function JournalPanel(props: JournalPanelProps) {
+  const scope = browserWorkScope(useErpSession())
+  return <ScopedJournalPanel key={scope ?? "no-scope"} {...props} scope={scope} />
+}
+
+function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scope: string | null }) {
   const { t, i18n } = useTranslation()
   const { currentUser } = useRBAC()
   const [notes, setNotes] = useState<WorkNote[]>([])
+  const [storageError, setStorageError] = useState<string | null>(null)
+  const [storageReady, setStorageReady] = useState(false)
+  const translate = useRef(t)
+  translate.current = t
+  useEffect(() => {
+    if (!scope) { setStorageReady(true); return }
+    try { setNotes(readBrowserJournal(window.localStorage, scope)) }
+    catch { setStorageError(translate.current("ui.journal.restoreError", { defaultValue: "Saved browser notes could not be read. Existing storage was left unchanged." })) }
+    finally { setStorageReady(true) }
+  }, [scope])
+  const saveNotes = (next: WorkNote[]): boolean => {
+    try {
+      if (!scope || !storageReady) throw new Error("Company context required")
+      writeBrowserJournal(window.localStorage, scope, next, notes)
+      setNotes(next); setStorageError(null); return true
+    } catch {
+      setStorageError(t("ui.journal.saveError", { defaultValue: "Notes could not be saved in this browser. Your entries are retained. Copy them before closing or repairing browser storage." }))
+      return false
+    }
+  }
   const [isComposing, setIsComposing] = useState(false)
   const [selectedType, setSelectedType] = useState<NoteType>("observation")
   const [content, setContent] = useState("")
+  const navigationGuard = useUnsavedChangesGuard(content.trim().length > 0)
   const [priority, setPriority] = useState<NotePriority>("normal")
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
@@ -409,7 +439,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
     if (!content.trim()) return
 
     const newNote: WorkNote = {
-      id: `note-${Date.now()}`,
+      id: `note-${crypto.randomUUID()}`,
       userId: currentUser?.id || "unknown",
       type: selectedType,
       content: content.trim(),
@@ -423,8 +453,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
       updatedAt: new Date().toISOString(),
     }
 
-    setNotes([newNote, ...notes])
-    resetForm()
+    if (saveNotes([newNote, ...notes])) resetForm()
   }
 
   const resetForm = () => {
@@ -436,7 +465,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   }
 
   const handleUpdateStatus = (noteId: string, newStatus: NoteStatus) => {
-    setNotes(notes.map((note) => {
+    saveNotes(notes.map((note) => {
       if (note.id === noteId) {
         return {
           ...note,
@@ -450,7 +479,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   }
 
   const handleDeleteNote = (noteId: string) => {
-    setNotes(notes.filter((note) => note.id !== noteId))
+    saveNotes(notes.filter((note) => note.id !== noteId))
   }
 
   const handleQuickNote = (type: NoteType) => {
@@ -459,7 +488,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
     setTimeout(() => textareaRef.current?.focus(), 100)
   }
 
-  if (!open) return null
+  if (!open) return navigationGuard
 
   return (
     <div
@@ -540,10 +569,14 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
         </div>
       </div>
 
+      {navigationGuard}
       {/* Panel body — hidden when minimized */}
       {!isMinimized && (
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <p className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground">{t("ui.journal.sessionHint", { defaultValue: "Notes stay in this page session. They are not saved to your account." })}</p>
+          <p className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground">{scope
+            ? t("ui.journal.browserHint", { defaultValue: "Personal working notes are saved in this browser for this company and user. They do not sync to your account and are not accounting journal entries." })
+            : t("ui.journal.scopeRequired", { defaultValue: "Select an authorized operating company to save personal browser notes. These notes are not accounting journal entries." })}</p>
+          {storageError ? <p role="alert" className="shrink-0 break-words px-4 py-2 text-xs text-destructive">{storageError}</p> : null}
           {/* Quick action bar */}
           <div className="px-4 py-3 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2 mb-3">
@@ -658,6 +691,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                   {/* Content */}
                   <div className="relative">
                     <Textarea
+                      aria-label={t("ui.journal.content", { defaultValue: "Working note" })}
                       ref={textareaRef}
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
@@ -769,7 +803,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                     <Button variant="ghost" size="sm" onClick={resetForm} className="h-7 text-xs">
                       {t("common.cancel")}
                     </Button>
-                    <Button size="sm" onClick={handleSubmit} disabled={!content.trim()} className="h-7 text-xs gap-1.5">
+                    <Button size="sm" onClick={handleSubmit} disabled={!content.trim() || !scope || !storageReady} className="h-7 text-xs gap-1.5">
                       <Send className="h-3 w-3" />
                       {t("ui.journal.actions.saveNote")}
                     </Button>

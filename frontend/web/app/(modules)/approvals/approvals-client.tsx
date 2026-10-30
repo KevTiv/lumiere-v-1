@@ -31,6 +31,8 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { CheckCircle2, ExternalLink, Hand, Loader2, Sparkles, XCircle } from "lucide-react"
 import { approvalInboxTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
+import { ApprovalSourceDetails } from "./approval-source-details"
+import { approvalRequestedEffect } from "./approval-source-summary"
 
 function hasValidOrganizationId(value?: number): value is number {
   return value != null && value > 0
@@ -221,6 +223,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
             const needsActorSelection = selectedActor == null
             const showActorSelection = row.directlyEligible !== true || actorOptions.length > 0
             const kind = approvalSubjectKind(model)
+            const requestedEffect = approvalRequestedEffect(row)
             const kindLabels = {
               purchaseOrder: t("approvals.review.kinds.purchaseOrder", { defaultValue: "Purchase order" }),
               salesOrder: t("approvals.review.kinds.salesOrder", { defaultValue: "Sales order" }),
@@ -266,11 +269,24 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                   ) : null}
                 </div>
 
+                <ApprovalSourceDetails organizationId={organizationId} companyId={humanTaskCompanyId(row)} model={model} subjectId={String(resId)} />
+                <p className="text-sm font-medium">{requestedEffect
+                  ? t("approvals.review.requestedEffect", { defaultValue: "Requested effect: {{effect}}", effect: requestedEffect })
+                  : t("approvals.review.effectNotExposed", { defaultValue: "The exact requested effect is not exposed here. Review the request in its source workspace before approving; approval can execute a business action." })}</p>
+
                 <details className="group rounded-lg border p-3">
                   <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary" data-testid={`approval-review-${taskId}`}>
                     {t("approvals.review.open", { defaultValue: "Review assignment" })}
                   </summary>
                   <div className="space-y-4 border-t pt-4">
+                    <details className="text-xs text-muted-foreground">
+                      <summary className="cursor-pointer py-2">{t("approvals.review.provenance", { defaultValue: "Review provenance" })}</summary>
+                      <dl className="grid gap-2 break-words sm:grid-cols-2">
+                        <div><dt>{t("approvals.review.taskRevision", { defaultValue: "Task revision" })}</dt><dd>{humanTaskRevision(row)}</dd></div>
+                        <div><dt>{t("approvals.review.workflowRevision", { defaultValue: "Workflow revision" })}</dt><dd>{row.instanceRevision ?? row.instance_revision ?? "—"}</dd></div>
+                        <div className="sm:col-span-2"><dt>{t("approvals.review.sourceRevision", { defaultValue: "Reviewed source revision" })}</dt><dd className="break-all font-mono">{row.subjectRevisionHash ?? row.subject_revision_hash ?? "—"}</dd></div>
+                      </dl>
+                    </details>
                     <p className="text-sm text-muted-foreground">
                       {recordHref
                         ? t("approvals.review.sourceHint", { defaultValue: "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow." })

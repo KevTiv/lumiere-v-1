@@ -115,13 +115,14 @@ import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-b
 import { documentBrowserHref, documentBrowserRecordHref, documentBrowserState } from "./document-browser-navigation"
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
+import { useAuthorizedPeople } from "@/lib/use-authorized-people"
+import { articleMemberOptions, currentArticleMember } from "./article-member-options"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { DocumentTemplateDesignerDialog, customizableDocumentTemplate, type DocumentTemplateDesignSource } from "./document-template-designer-dialog"
 import {
   canDeleteKnowledgeCategory,
   canRemoveArticleMember,
-  parseMemberIdentity,
   parseRetentionDelaySeconds,
   toKnowledgeCategoryUpdateBody,
 } from "./knowledge-actions"
@@ -310,13 +311,19 @@ function DocumentsClientLoaded({
     setBrowserViewState(documentBrowserState(new URLSearchParams(browserQuery)))
   }, [browserQuery])
   const identityLabels = useIdentityLabelMap(orgId)
+  const articlePeople = useAuthorizedPeople(organizationId)
 
   const documentsRead = moduleCollection(useDocuments(orgId, initialDocuments))
   const documents = documentsRead.rows
   const deletedDocumentsRead = moduleCollection(useDeletedDocuments(orgId, initialDeletedDocuments))
   const deletedDocuments = deletedDocumentsRead.rows
-  const articlesRead = moduleCollection(useKnowledgeArticles(orgId, initialArticles))
+  const articlesQuery = useKnowledgeArticles(orgId, initialArticles)
+  const articlesRead = moduleCollection(articlesQuery)
   const articles = articlesRead.rows
+  const articleMemberAuthority = useRef({ scopeKey: templateScopeKey, allowed: false, mounted: true })
+  articleMemberAuthority.current = { ...articleMemberAuthority.current, scopeKey: templateScopeKey,
+    allowed: templateScopeReady && templatePermissionsReady === true && checkPermission("knowledge_article", "read").allowed && checkPermission("knowledge_article", "write").allowed }
+  useEffect(() => { articleMemberAuthority.current.mounted = true; return () => { articleMemberAuthority.current.mounted = false } }, [])
   const categoriesRead = moduleCollection(useKnowledgeCategories(orgId, initialCategories))
   const categories = categoriesRead.rows
   const foldersRead = moduleCollection(useDocumentFolders(orgId, initialFolders))
@@ -401,7 +408,15 @@ function DocumentsClientLoaded({
   const csvImports = useDocumentsCsvImportMutations(orgId)
   const versionFormConfig = useMemo(() => uploadDocumentVersionForm(t), [t])
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
-  const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
+  const articleMemberFormConfig = useMemo<FormConfig>(() => {
+    const base = addArticleMemberForm(t)
+    return { ...base, description: articlePeople.status !== "ready"
+      ? t("peoplePicker.unavailable", { defaultValue: "Named active people could not be verified. Check organization people access and retry." })
+      : t("peoplePicker.hint", { defaultValue: "Choose named active members. Access and membership are checked again before saving." }),
+      sections: base.sections.map((section) => ({ ...section, fields: section.fields.map((field) => field.name === "member"
+        ? { id: field.id, name: field.name, type: "select" as const, searchable: true, required: true, width: field.width, label: t("peoplePicker.member", { defaultValue: "Organization member" }), options: articlePeople.options }
+        : field) })) }
+  }, [t, articlePeople.status, articlePeople.options])
 
   /** Run one command from a dialog; the reducer re-validates, so failures surface as an error toast. */
   const runKnowledgeCommand = async (title: string, work: () => Promise<unknown>, doneTitle?: string) => {
@@ -497,27 +512,39 @@ function DocumentsClientLoaded({
       const row = rows[0]
       if (!row) return
       const title = t("documents.knowledgeActions.removeMember", { defaultValue: "Remove member" })
+      const membership = articleMemberOptions(row, organizationId, articlePeople.status === "ready" ? articlePeople.options : [])
+      if (!articleMemberAuthority.current.allowed || membership.status !== "ready" || membership.options.length === 0) {
+        knowledgeInputError(title, t("peoplePicker.articleMembersUnavailable", { defaultValue: "This article's current member list is empty, unavailable or restricted. Refresh the article or ask an administrator before removing a member." }))
+        return
+      }
       const values = await askForm({
         title,
+        description: t("peoplePicker.articleRemovalHint", { defaultValue: "Choose an existing article member, including a person who has left the organization. Exact member identities distinguish unavailable or same-named profiles. Membership is checked again before removal." }),
         fields: [
           {
             id: "member",
             name: "member",
-            label: t("documents.knowledgeActions.memberIdentity", { defaultValue: "Member identity (hex)" }),
-            type: "text",
+            label: t("peoplePicker.articleMember", { defaultValue: "Existing article member" }),
+            type: "select",
+            searchable: true,
+            options: membership.options,
             required: true,
           },
         ],
       })
       if (values == null) return
-      const member = parseMemberIdentity(values)
-      if (member == null) {
-        knowledgeInputError(title, t("documents.knowledgeActions.memberRequired", { defaultValue: "Member identity is required." }))
-        return
-      }
-      await runKnowledgeCommand(title, () =>
-        removeArticleMember.mutateAsync({ articleId: row.id as string | number, member }),
-      )
+      await runKnowledgeCommand(title, async () => {
+        const requireAuthority = () => {
+          const current = articleMemberAuthority.current
+          if (!current.mounted || current.scopeKey !== templateScopeKey || !current.allowed) throw new Error(t("peoplePicker.articleAccessChanged", { defaultValue: "Your article access changed. Reopen the article before removing a member." }))
+        }
+        requireAuthority()
+        const refreshed = await articlesQuery.refetch()
+        requireAuthority()
+        const member = !refreshed.isError && refreshed.data ? currentArticleMember(refreshed.data, String(row.id), organizationId, values.member) : null
+        if (!member) throw new Error(t("peoplePicker.articleMemberChanged", { defaultValue: "The exact article membership could not be verified. Refresh the article and review its current members before retrying." }))
+        return removeArticleMember.mutateAsync({ articleId: row.id as string | number, member })
+      })
     },
   }
 
@@ -1630,7 +1657,8 @@ function DocumentsClientLoaded({
               setDocumentRowSubmitError(null)
             }
           }}
-          config={documentRowAction.form}
+          config={documentRowAction.action === "addArticleMember" ? articleMemberFormConfig : documentRowAction.form}
+          submissionDisabled={documentRowAction.action === "addArticleMember" && (articlePeople.status !== "ready" || articlePeople.options.length === 0)}
           isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={documentRowSubmitError}
@@ -1701,8 +1729,7 @@ function DocumentsClientLoaded({
                   params: toUpdateDocumentFolderParams(formData),
                 })
               } else if (documentRowAction.action === "addArticleMember") {
-                const member = String(formData.member ?? "").trim()
-                if (!member) throw new Error("Member identity is required")
+                const [member] = await articlePeople.validateSelection([formData.member])
                 await addArticleMember.mutateAsync({
                   articleId: documentRowAction.row.id as string | number,
                   member,

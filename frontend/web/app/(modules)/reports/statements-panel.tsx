@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useBalanceSheetLines,
@@ -54,6 +55,8 @@ function reportIdOf(row: Record<string, unknown>): string {
 export function StatementsPanel({ organizationId, financialReports, hideSelector = false, currencyCode }: StatementsPanelProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const statementReports = useMemo(
     () =>
@@ -242,7 +245,10 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
             </TableHeader>
             <TableBody>
               {visibleRows.map((r) => {
-                const href = journalItemsHref(r.accountId)
+                const returnParams = new URLSearchParams(searchParams?.toString() ?? "")
+                returnParams.set("tab", "reports")
+                returnParams.set("report", selected?.id ?? "")
+                const href = selected ? journalItemsHref(r.accountId, selected.row, `${pathname}?${returnParams.toString()}`) : null
                 const bold = r.kind !== "line"
                 const variance = statementVariance(r)
                 const isCollapsed = r.kind === "section" && collapsed.has(r.key)
@@ -274,7 +280,7 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
                           href={href}
                           className="underline-offset-2 hover:underline"
                           title={t("reports.statements.viewJournalItems", {
-                            defaultValue: "View journal items",
+                            defaultValue: "View current journal items for this report scope",
                           })}
                         >
                           {r.label}

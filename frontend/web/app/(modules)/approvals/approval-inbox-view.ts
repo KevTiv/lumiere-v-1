@@ -28,6 +28,7 @@ export function approvalSubjectKind(model: string | undefined): "purchaseOrder" 
     case "account_move": return "accountingDocument"
     case "account_payment":
     case "payment_transaction": return "payment"
+    case "hr_expense_sheet":
     case "expense_sheet": return "expenseReport"
     case "ai_action_draft": return "aiDraft"
     default: return "record"

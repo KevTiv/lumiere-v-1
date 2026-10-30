@@ -59,5 +59,13 @@ describe("commercial task form structure", () => {
     expect(fields(merged.config).find((candidate) => candidate.name === "partnerId")?.label).toBe("Customer account")
     expect(fields(merged.config).find((candidate) => candidate.name === "custom:purchaseCode")?.required).toBe(true)
     expect(merged.customFieldIds).toContain("custom:purchaseCode")
+    expect(merged.config.customFieldCreateUnavailableMessage).toContain("cannot be saved with a new quotation")
+  })
+  it("declares unsupported custom creation only on order headers, not safe line and specialist forms", () => {
+    expect(newSaleOrderForm(t).customFieldCreateUnavailableMessage).toContain("quotation")
+    expect(newPurchaseOrderForm(t).customFieldCreateUnavailableMessage).toContain("purchase order")
+    expect(addSaleOrderLineForm(t).customFieldCreateUnavailableMessage).toBeUndefined()
+    expect(createInvoiceFromSaleOrderForm(t).customFieldCreateUnavailableMessage).toBeUndefined()
+    expect(createBillFromPurchaseOrderForm(t).customFieldCreateUnavailableMessage).toBeUndefined()
   })
 })

@@ -12,6 +12,7 @@ import {
   scalarQueryId,
   signIn,
   smokeName,
+  chooseSelectOptionByTriggerValue,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
@@ -293,7 +294,16 @@ test.describe("COV-23 operator lifecycle", { tag: ["@p0", "@cov23"] }, () => {
       // Currency readiness proves hydration completed before filling controlled inputs.
       const submit = owner.locator('form button[type="submit"]')
       await expect(owner.locator("#currency")).toBeEnabled({ timeout: 30_000 })
-      await expect(submit).toBeEnabled({ timeout: 30_000 })
+      await expect(submit).toBeDisabled()
+      // Company accounting settings are explicit choices, not hidden USD/UTC defaults.
+      await chooseSelectOptionByTriggerValue(owner, owner.locator("#currency"), "USD")
+      await chooseSelectOptionByTriggerValue(owner, owner.locator("#timezone"), "Africa/Kigali")
+      await owner.getByLabel("Month (1–12)", { exact: true }).fill("6")
+      await owner.getByLabel("Day", { exact: true }).fill("30")
+      const setupConfirmation = owner.getByRole("checkbox", { name: "I have checked the base currency, company timezone and fiscal year-end.", exact: true })
+      await expect(setupConfirmation).toBeVisible()
+      await setupConfirmation.check({ timeout: 15_000 })
+      await expect(submit).toBeEnabled()
       await owner.locator("#name").fill(orgName)
       const shortCode = suffix.replace(/[^a-z0-9]/g, "").slice(-8).toUpperCase()
       await owner.locator("#code").fill(shortCode)
@@ -307,6 +317,12 @@ test.describe("COV-23 operator lifecycle", { tag: ["@p0", "@cov23"] }, () => {
         submit.click(),
       ])
       expect(bootstrap.ok(), await bootstrap.text()).toBe(true)
+      expect(bootstrap.request().postDataJSON()).toMatchObject({
+        organization: { timezone: "Africa/Kigali" },
+        defaultCompanyCurrencyCode: "USD",
+        fiscalYearEndMonth: 6,
+        fiscalYearEndDay: 30,
+      })
       await expect(owner.getByTestId("dashboard-sidebar").first()).toBeVisible({ timeout: 60_000 })
       await expect(owner).not.toHaveURL(/\/onboarding/)
 

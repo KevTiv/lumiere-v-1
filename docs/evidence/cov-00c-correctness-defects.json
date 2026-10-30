@@ -84,7 +84,7 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/forms/runtime-form-modal.tsx",
-          "markers": ["runtimeConfigFailureMode = \"block\"", "submissionDisabled={submissionBlocked || submissionDisabled}", "onSubmit={submissionBlocked ? undefined"]
+          "markers": ["runtimeConfigFailureMode = \"block\"", "submissionDisabled={submissionBlocked || customFieldCreationBlocked || submissionDisabled}", "onSubmit={submissionBlocked || customFieldCreationBlocked ? undefined"]
         }
       ]
     },

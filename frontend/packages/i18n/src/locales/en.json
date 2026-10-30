@@ -222,7 +222,7 @@
     "delete": "Delete",
     "confirm": "Confirm",
     "confirmAction": "Confirm action",
-    "loading": "Loading...",
+    "loading": "Loading…",
     "search": "Search",
     "export": "Export",
     "refresh": "Refresh",
@@ -359,7 +359,7 @@
       "stepDone": "Import status",
       "jobPending": "Waiting for import job status…",
       "jobNotFound": "Import started. Job status will appear here once SpacetimeDB finishes processing.",
-      "jobStatusTitle": "Import job",
+      "jobStatusTitle": "Import job status",
       "jobTotal": "Total rows",
       "jobImported": "Imported",
       "jobErrors": "Errors",
@@ -3361,7 +3361,7 @@
       "reconcileManual": "Reconcile (manual)",
       "unreconcileLine": "Unreconcile",
       "unreconcileConfirm": "Clear reconciliation for this line?",
-      "settlementLocked": "Settlement confirmed. Editing, unlinking and reversal are unavailable in this alpha.",
+      "settlementLocked": "Settlement confirmed. Use Focus line to inspect the saved settlement and any permitted recovery actions. Direct editing and unlinking remain locked.",
       "settlementPending": "Payment awaiting approval or settlement completion. Use Focus line to continue."
     },
     "fiscalYears": {
@@ -4544,7 +4544,8 @@
       "pipelineSourceUnavailable": "Pipeline stages could not be verified. Retry Pipeline setup before saving. Your entries are retained.",
       "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
       "openPipelineSetup": "Open Pipeline setup",
-      "customFieldsCreateUnavailable": "Saving custom fields during creation is not available yet. Your entries are retained and no record was created."
+      "customFieldsCreateUnavailable": "Saving custom fields during creation is not available yet. Your entries are retained and no record was created.",
+      "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved during creation yet. Creation is disabled before any record is created. Ask an administrator to use a form without custom fields. Your entries are retained."
     },
     "consent": {
       "tabLabel": "Consent",
@@ -4636,7 +4637,10 @@
       "emptyTitle": "No open conversation",
       "emptyDescription": "Open a WhatsApp thread for this contact.",
       "compose": "Outbound message",
-      "placeholder": "Type a message…"
+      "placeholder": "Type a message…",
+      "actionFailed": "The request failed. Your message has been retained.",
+      "phoneRequired": "Add an eligible WhatsApp phone identity to this contact before opening a thread.",
+      "queueMessage": "Queue message"
     },
     "relIntel": {
       "title": "Relationship intelligence",
@@ -7749,7 +7753,8 @@
         "requiredReceiptContext": "Choose a purchase line and enter a positive quantity. Check the lot or serial reference if supplied. Your entries have been retained.",
         "requiredInvoiceContext": "Choose a received purchase line and enter a positive invoiced quantity. Your entries have been retained.",
         "requiredBillContext": "Choose the purchase journal, expense account and vendor payable account, then check the bill date and adjustments. Your entries have been retained.",
-        "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
+        "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
+        "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved with a new purchase order yet. Creation is disabled before any purchase order is created. Ask an administrator to use a form without custom fields. Your entries are retained."
       }
     },
     "ops": {
@@ -8955,7 +8960,8 @@
         "customFieldsBlocked": "Custom fields cannot be saved together with this quotation yet. No quotation was created. Your entries have been retained.",
         "requiredLineContext": "Choose the order, product and unit of measure, then check quantity and price. Your entries have been retained.",
         "requiredInvoiceAccounts": "Choose the invoice journal, sales account and customer receivable account. Your entries have been retained.",
-        "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
+        "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
+        "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved with a new quotation yet. Creation is disabled before any quotation is created. Ask an administrator to use a form without custom fields. Your entries are retained."
       }
     },
     "actions": {
@@ -9877,7 +9883,11 @@
             "public": "Public",
             "private": "Private",
             "confidential": "Confidential"
-          }
+          },
+          "startDate": "Start date",
+          "lastDate": "Last day",
+          "lastDateHint": "Include this date in the event. For one day, choose the same date as the start.",
+          "privacyHint": "Public, private and confidential describe visibility within your workspace. They do not publish an event on the internet; your organization's access rules still apply."
         },
         "submit": "Create event"
       },
@@ -12267,6 +12277,35 @@
       "unmatchTitle": "Unmatch an existing statement line",
       "unmatchHint": "Enter the exact matched statement line ID. The current statement lookup provides unmatched lines only.",
       "reconciliationHint": "Match corporate card statement lines to expenses by name, amount and currency."
+    },
+    "allocations": {
+      "project": "Project",
+      "analyticAccount": "Analytic account",
+      "invalidDraft": "The retained allocation rows could not be read. Start replacement rows before saving.",
+      "startRows": "Start replacement rows",
+      "noChoices": "No company projects or active analytic accounts are available. Ask an administrator to complete allocation setup.",
+      "row": "Allocation {{number}}",
+      "noProject": "No project",
+      "projectUnavailable": "The selected project is unavailable. Clear it or choose a current company project.",
+      "noAnalyticAccount": "No analytic account",
+      "accountUnavailable": "The selected analytic account is unavailable. Clear it or choose an active company account.",
+      "share": "Share (%)",
+      "billable": "Billable to customer",
+      "total": "Allocated: {{total}}%. Total must equal 100%.",
+      "addRow": "Add allocation",
+      "removeLast": "Remove last allocation",
+      "replacementHint": "Existing allocations are not loaded here. Saving replaces all allocations on this expense with the rows below. Review every row before saving.",
+      "replace": "Replace allocations",
+      "confirmReplacement": "I have reviewed these rows and want to replace this expense's allocations.",
+      "confirmRequired": "Confirm that you want these rows to replace the existing allocations.",
+      "reviewRequired": "Confirm the replacement for a current draft expense you can edit. Your rows are retained.",
+      "invalidRow": "Each allocation needs a current company project or active analytic account, a share greater than 0 and at most 100, and a billable choice. Correct invalid or unavailable selections; your rows are retained.",
+      "sources": {
+        "loading": "Loading choices…",
+        "denied": "Access restricted",
+        "error": "Choices could not be verified",
+        "partial": "Choices could not be verified"
+      }
     }
   },
   "workflows": {
@@ -12782,6 +12821,34 @@
       "checkOutcome": "Check outcome",
       "postReply": "Post reply",
       "replyUnavailable": "Replying is unavailable for this source or your current access."
+    },
+    "batchReview": {
+      "searchChoices": "Search available recipients or invoices",
+      "selectedCount": "{{count}} selected",
+      "noMatches": "No matching choices. Your selections are retained.",
+      "sourceRequired": "Choose a company and restore the required records before continuing. Your entries are retained.",
+      "selectionChanged": "A selected record is no longer available. Review the current choices before saving.",
+      "approveTitle": "Approve message batch",
+      "rejectTitle": "Reject message batch",
+      "effect": "This records your review of the saved batch. Approval is not proof of sending or delivery.",
+      "confirmEvidence": "I have reviewed the saved recipients and rendered message content.",
+      "confirmRequired": "Verify all saved recipient content and confirm your review before approving.",
+      "reason": "Rejection reason",
+      "evidence": "Saved batch evidence",
+      "template": "Template",
+      "templateUnavailable": "Template details unavailable",
+      "incomplete": "The complete saved recipient content could not be verified. Approval is unavailable; restore the source records before continuing.",
+      "recipientUnavailable": "Recipient name unavailable",
+      "bodyUnavailable": "Message content unavailable",
+      "exclusionNotice": "Excluded recipients are counted above. Individual exclusion reasons are not available in this view. Check recipient consent and channel eligibility in the owning contact record.",
+      "reviewChanged": "This batch is no longer available for review. Refresh the batch list.",
+      "reasonRequired": "Enter a rejection reason. Your review has not been submitted.",
+      "companyRequired": "Choose an operating company to review batches or create messages.",
+      "loading": "Loading message batches…",
+      "templatesLoading": "Loading message templates…",
+      "showEvidence": "Review saved recipients and content",
+      "approve": "Approve",
+      "reject": "Reject"
     }
   },
   "pos": {
@@ -13003,7 +13070,8 @@
       "cmds": "cmds",
       "send": "send"
     },
-    "requestFailed": "The assistant request failed. Review the error and your message before sending again."
+    "requestFailed": "The assistant request failed. Review the error and your message before sending again.",
+    "historySaveFailed": "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed."
   },
   "aiHarness": {
     "reportAnalysis": {
@@ -13799,6 +13867,17 @@
         "vendor": "Vendor",
         "amount": "Amount"
       }
+    },
+    "financial": {
+      "selectCompany": "Select an operating company",
+      "incompleteMoney": "Amount or currency unavailable",
+      "noConfirmedOrders": "No confirmed orders",
+      "confirmedOrderValue": "Confirmed order value · by currency",
+      "confirmedOrderTrend": "Confirmed orders · last six months",
+      "orders": "Confirmed orders",
+      "incompleteSource": "Required financial fields unavailable",
+      "meaning": "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today.",
+      "noOverdueBalance": "No known overdue balance"
     }
   },
   "settings": {
@@ -14748,6 +14827,14 @@
         "title": "My profile",
         "description": "Your name, language and time zone."
       }
+    },
+    "importJob": {
+      "invalidJobId": "The import job identifier could not be verified. No rollback was submitted.",
+      "rollbackScope": "Roll back import #{{id}}: {{file}} ({{table}}).",
+      "rollbackEffect": "This removes records created by this import when the server confirms they are still eligible. Changed or dependent records can prevent rollback. Review the import and its row errors before continuing.",
+      "rollbackReadFailed": "The import could not be refreshed. No rollback was submitted. Retry the job source.",
+      "rollbackChanged": "The import changed or is no longer eligible. Review its current status before requesting rollback again.",
+      "errorsLoading": "Loading import row errors…"
     }
   },
   "reports": {
@@ -15481,7 +15568,7 @@
       "noReports": "No profit and loss, balance sheet or cash flow reports yet. Generate one in Financial Reports first.",
       "report": "Report",
       "subtotal": "Total {{name}}",
-      "viewJournalItems": "View journal items"
+      "viewJournalItems": "View current journal items for this report scope"
     },
     "periodContext": {
       "title": "Period close report review",
@@ -15606,6 +15693,14 @@
       },
       "existingOrientation": "Existing orientation: {{value}}",
       "saved": "Template layout saved"
+    },
+    "drilldown": {
+      "scopeUnavailable": "The saved report scope could not be verified. Return to the report and open its journal items again.",
+      "title": "Statement journal items",
+      "scope": "Report #{{report}} · company {{company}} · account {{account}} · {{from}} to {{to}} · {{basis}} entries",
+      "currentRows": "These are current authorized journal items in the saved report's scope. Later edits, opening balances, currency translation and cash-flow classification can explain differences from a saved statement.",
+      "return": "Return to saved report",
+      "invalid": "This report link is incomplete or invalid. No broader ledger has been displayed. Open the saved report and try its journal-items link again."
     }
   },
   "proposalWorkspace": {
@@ -16187,8 +16282,19 @@
       "errors": {
         "notConnected": "Not connected to server. Please wait a moment and try again.",
         "noConnection": "No connection",
-        "failedToCreate": "Failed to create organization"
-      }
+        "failedToCreate": "Failed to create organization",
+        "confirmSetup": "Choose a valid timezone and fiscal year-end, then confirm your company settings.",
+        "fiscalDate": "Enter a valid annual year-end, such as June 30 or December 31."
+      },
+      "chooseTimezone": "Choose timezone",
+      "browserTimezoneHint": "Browser suggestion: {{timezone}}. Confirm the timezone your company uses.",
+      "chooseCurrency": "Choose base currency",
+      "currencyHint": "Choose the company's accounting base currency. No currency is selected automatically.",
+      "fiscalYearEnd": "Fiscal year-end",
+      "fiscalMonth": "Month (1–12)",
+      "fiscalDay": "Day",
+      "fiscalHint": "Review the suggested December 31 year-end. Choose a month and day that exist every year.",
+      "confirmSetup": "I have checked the base currency, company timezone and fiscal year-end."
     },
     "nav": {
       "backToSignIn": "Back to sign in",
@@ -16623,7 +16729,12 @@
       },
       "title": "Work Notes",
       "type": "Type",
-      "sessionHint": "Notes stay in this page session. They are not saved to your account."
+      "sessionHint": "Notes stay in this page session. They are not saved to your account.",
+      "restoreError": "Saved browser notes could not be read. Existing storage was left unchanged.",
+      "saveError": "Notes could not be saved in this browser. Your entries are retained. Copy them before closing or repairing browser storage.",
+      "browserHint": "Personal working notes are saved in this browser for this company and user. They do not sync to your account and are not accounting journal entries.",
+      "scopeRequired": "Select an authorized operating company to save personal browser notes. These notes are not accounting journal entries.",
+      "content": "Working note"
     },
     "stock3d": {
       "categories": {
@@ -16711,7 +16822,28 @@
       "savedLocally": "Saved in this browser",
       "title": "Notebook",
       "titleField": "Notebook title",
-      "unsavedChanges": "Unsaved changes"
+      "unsavedChanges": "Unsaved changes",
+      "restoreError": "Saved notebooks could not be read. Your browser data was left unchanged. Export current work before repairing browser storage.",
+      "importError": "This file is not a supported notebook (maximum 2 MB and 100 code or markdown cells). Your current notebook is unchanged.",
+      "deleteError": "The saved copy could not be deleted. Your open notebook is unchanged.",
+      "executionUnavailable": "Code execution is unavailable in this notebook. No code was run and no ERP data was read. Export your code to an appropriate runtime.",
+      "editorOnly": "Editor only",
+      "browserHint": "Saved notebooks stay in this browser for this company and user. They do not sync to your account.",
+      "scopeRequired": "Select an authorized operating company to save and reopen browser notebooks. You can still export this work.",
+      "executionHint": "Code editing only. No Python runtime or live ERP data connection is available here.",
+      "deleteConfirm": "Delete this saved browser copy? It cannot be recovered here. Your currently open edits stay available for export.",
+      "deleteSaved": "Delete saved copy",
+      "replaceUnsaved": "Opening another notebook replaces your unsaved edits. Save or export them first, or confirm discard.",
+      "keepEditing": "Keep editing",
+      "discardAndOpen": "Discard edits and open",
+      "noDataConnection": "No live data connection",
+      "savedNotebooks": "Notebooks saved in this browser for this company and user",
+      "new": "New notebook",
+      "import": "Import notebook JSON",
+      "importFile": "Notebook JSON file",
+      "noSavedNotebooks": "No saved notebooks in this scope. Save a notebook to reopen it here.",
+      "noRuntime": "No runtime is connected. Variables and execution results are unavailable.",
+      "editorMode": "Local notebook editor"
     }
   },
   "workspace": {
@@ -16766,7 +16898,10 @@
       "undated": "No due date",
       "completed": "Completed",
       "due": "Due",
-      "deadlineUnavailable": "Due date unavailable"
+      "deadlineUnavailable": "Due date unavailable",
+      "coverage": "This inbox covers Accounting, Sales, Purchasing and Expenses. CRM follow-ups, subscription billing and report schedules remain in their own workspaces.",
+      "subscriptionBilling": "Subscriptions due to bill",
+      "reportSchedules": "Report schedules"
     }
   },
   "financeReview": {
@@ -16946,7 +17081,18 @@
       "sourceHint": "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow.",
       "sourceUnavailable": "A source record link is unavailable for this request. Review the request in its owning workspace before deciding.",
       "openHint": "This assignment is open. Claim it before deciding if the workflow requires a claimant.",
-      "claimedHint": "This assignment has been claimed. Check the source record and your selected acting principal before deciding."
+      "claimedHint": "This assignment has been claimed. Check the source record and your selected acting principal before deciding.",
+      "detailsRestricted": "Business details are not available through your source-record access. Open the owning workspace for permitted review.",
+      "detailsLoading": "Checking current business record…",
+      "detailsFailed": "Current business details could not be verified. No amount or party is assumed.",
+      "currentDetails": "Current authorized record details; this is not a frozen approval snapshot. Open the source to verify the requested change before deciding.",
+      "detailsMissing": "The exact source record is unavailable or outside your current scope. No substitute record is shown.",
+      "requestedEffect": "Requested effect: {{effect}}",
+      "effectNotExposed": "The exact requested effect is not exposed here. Review the request in its source workspace before approving; approval can execute a business action.",
+      "provenance": "Review provenance",
+      "taskRevision": "Task revision",
+      "workflowRevision": "Workflow revision",
+      "sourceRevision": "Reviewed source revision"
     }
   },
   "productivity": {
@@ -16961,5 +17107,22 @@
       "following": "Following",
       "messageBatches": "Message batches"
     }
+  },
+  "peoplePicker": {
+    "denied": "Organization people access is required. Ask an administrator to manage this assignment.",
+    "failed": "The people directory could not be loaded. Retry before choosing a person.",
+    "loading": "Loading authorized people…",
+    "empty": "No named active organization members are available in your authorized directory.",
+    "hint": "Choose named active members. Access and membership are checked again before saving.",
+    "principal": "Person delegating approval",
+    "delegate": "Person receiving delegation",
+    "unavailable": "Named active people could not be verified. Check organization people access and retry.",
+    "different": "Choose two different people.",
+    "member": "Organization member",
+    "articleRemovalHint": "Choose an existing article member, including a person who has left the organization. Exact member identities distinguish unavailable or same-named profiles. Membership is checked again before removal.",
+    "articleMember": "Existing article member",
+    "articleMembersUnavailable": "This article's current member list is empty, unavailable or restricted. Refresh the article or ask an administrator before removing a member.",
+    "articleAccessChanged": "Your article access changed. Reopen the article before removing a member.",
+    "articleMemberChanged": "The exact article membership could not be verified. Refresh the article and review its current members before retrying."
   }
 }

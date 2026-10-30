@@ -45,6 +45,7 @@ interface NotebookCellProps {
   onAIAssist: (content: string) => void
   canMoveUp: boolean
   canMoveDown: boolean
+  executionAvailable?: boolean
 }
 
 export function NotebookCellComponent({
@@ -60,6 +61,7 @@ export function NotebookCellComponent({
   onAIAssist,
   canMoveUp,
   canMoveDown,
+  executionAvailable = false,
 }: NotebookCellProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -85,7 +87,7 @@ export function NotebookCellComponent({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && e.shiftKey) {
+    if (e.key === "Enter" && e.shiftKey && executionAvailable) {
       e.preventDefault()
       onRun()
       setIsEditing(false)
@@ -185,8 +187,8 @@ export function NotebookCellComponent({
               size="icon"
               className="h-6 w-6"
               onClick={(e) => { e.stopPropagation(); onRun() }}
-              disabled={cell.status === "running"}
-              title="Run cell (Shift+Enter)"
+              disabled={!executionAvailable || cell.status === "running"}
+              title={executionAvailable ? "Run cell (Shift+Enter)" : "Code execution unavailable"}
             >
               {cell.status === "running" ? (
                 <Square className="h-3 w-3" />

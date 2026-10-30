@@ -5,6 +5,7 @@ const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> =
 
 export const newSaleOrderForm = (t: TFunction): FormConfig => ({
   id: "new-sale-order",
+  customFieldCreateUnavailableMessage: t("sales.forms.refinement.customFieldsCreateReadiness", { defaultValue: "This form includes custom fields that cannot be saved with a new quotation yet. Creation is disabled before any quotation is created. Ask an administrator to use a form without custom fields. Your entries are retained." }),
   title: t("sales.forms.newSaleOrder.title"),
   description: t("sales.forms.refinement.newOrderHelp", { defaultValue: "Save a draft quotation, then add products, quantities and prices before confirming the order." }),
   submitLabel: t("sales.forms.refinement.saveQuotation", { defaultValue: "Save draft quotation" }),
