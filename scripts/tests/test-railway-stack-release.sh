@@ -154,6 +154,42 @@ reject_infrastructure 'wrong environment' '.environments.edges[0].node.name = "s
 reject_infrastructure 'ambiguous service' \
   '.environments.edges[0].node.serviceInstances.edges += [.environments.edges[0].node.serviceInstances.edges[0]]'
 
+# Legacy immutable manifests require explicit region and replica evidence, and
+# use the same provider alias validation as modern maps.
+legacy_deploy='{region: "europe-west4", numReplicas: 1}'
+for modern_config in absent null; do
+  if [[ "$modern_config" == absent ]]; then
+    legacy_filter="$active_path.meta.serviceManifest.deploy = $legacy_deploy"
+  else
+    legacy_filter="$active_path.meta.serviceManifest.deploy = ($legacy_deploy + {multiRegionConfig: null})"
+  fi
+  jq "$legacy_filter" "$TMP/active-services.json" >"$TMP/legacy-region.json"
+  env "${common_env[@]}" TEST_RAILWAY_STATUS_FILE="$TMP/legacy-region.json" \
+    bash "$ROOT/scripts/railway-stack-release.sh" gate Postgres
+done
+
+reject_infrastructure 'legacy wrong region' \
+  "$active_path.meta.serviceManifest.deploy = {region: \"us-west2\", numReplicas: 1}"
+reject_infrastructure 'legacy missing region' \
+  "$active_path.meta.serviceManifest.deploy = {numReplicas: 1}"
+reject_infrastructure 'legacy empty region' \
+  "$active_path.meta.serviceManifest.deploy = {region: \"\", numReplicas: 1}"
+reject_infrastructure 'legacy invalid region type' \
+  "$active_path.meta.serviceManifest.deploy = {region: 42, numReplicas: 1}"
+reject_infrastructure 'legacy missing replicas' \
+  "$active_path.meta.serviceManifest.deploy = {region: \"europe-west4\"}"
+for replicas in null 0 -1 1.5 '"1"'; do
+  reject_infrastructure "legacy invalid replicas $replicas" \
+    "$active_path.meta.serviceManifest.deploy = {region: \"europe-west4\", numReplicas: $replicas}"
+done
+reject_infrastructure 'legacy ambiguous region mapping' \
+  "$active_path.meta.serviceManifest.deploy = $legacy_deploy
+    | $active_path.meta.deprecatedRegions += [{region: \"europe-west4\", replacementRegion: \"us-west2\"}]"
+for modern_config in '{}' '[]' false '"invalid"' '{"europe-west4": {numReplicas: 0}}'; do
+  reject_infrastructure "modern config cannot fall back: $modern_config" \
+    "$active_path.meta.serviceManifest.deploy = ($legacy_deploy + {multiRegionConfig: $modern_config})"
+done
+
 # Exact modern region names need no alias. Explicitly deleted placements do not
 # represent running replicas and may remain in a deployment's historical map.
 jq "$active_path.meta.serviceManifest.deploy.multiRegionConfig =

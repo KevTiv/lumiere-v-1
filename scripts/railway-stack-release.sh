@@ -140,8 +140,16 @@ verify_runtime_region() {
       | if ($matches | length) == 0 then $configured
         elif ($matches | length) == 1 then $matches[0]
         else null end;
-    .meta.serviceManifest.deploy.multiRegionConfig as $config
+    .meta.serviceManifest.deploy as $deploy
     | (.meta.deprecatedRegions // []) as $aliases
+    # Older immutable manifests record one explicit region and replica count.
+    # Never let legacy fields override an invalid or empty modern map.
+    | ($deploy
+        | if type != "object" then null
+          elif .multiRegionConfig != null then .multiRegionConfig
+          elif (.region | type) == "string" and (.region | length) > 0
+            then {(.region): {numReplicas: .numReplicas}}
+          else null end) as $config
     | if ($config | type) != "object" or ($aliases | type) != "array" then false
       else
         [$config | to_entries[] | select(.value != null)] as $placements
