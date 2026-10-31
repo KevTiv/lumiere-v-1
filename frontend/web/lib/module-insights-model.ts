@@ -1,10 +1,11 @@
+import { createHistoryBuckets, previousHistoryPeriod, resolveHistoryPeriod, type HistoryBounds, type HistoryPeriod } from "@lumiere/erp-shared/history-period"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { normalizedTag } from "@lumiere/erp-workflows"
-import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
+import { MODULE_HISTORY_FIELDS, moduleHistoryDateValue, moduleHistoryTimestampMs } from "@lumiere/ui/lib/module-history-filter"
 import { mergeModuleStates, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 
 export type InsightModule = "sales" | "crm" | "purchasing" | "expenses" | "reports"
-export type InsightPeriod = 30 | 90 | 180
+export type InsightPeriod = HistoryPeriod | 30 | 90 | 180
 /** Read projection only; never a command or a catch-all record. */
 export interface InsightRecord {
   id?: unknown; organizationId?: unknown; organization_id?: unknown
@@ -22,21 +23,20 @@ export interface InsightRecord {
 export interface InsightSource { rows: readonly InsightRecord[]; state: ModuleDataState }
 export interface ModuleInsightInput {
   module: InsightModule; organizationId: string | number | bigint; companyId: string | number | bigint
-  records: InsightSource; currencies: InsightSource; companyCurrencyId?: unknown
+  records: InsightSource; currencies: InsightSource; companyCurrencyId?: unknown; timeZone?: string
 }
 export interface InsightValue<T> { state: ModuleDataState; value: T | null }
 export interface InsightCurrency { id: string; label: string; decimals: number | null }
 export interface InsightQueue { key: string; records: Array<{ id: string; name: string; status: string }> }
 
-const DAY = 86_400_000
 const unavailable: ModuleDataState = { status: "partial" }
 const ready: ModuleDataState = { status: "ready" }
 export const insightDefinitions = {
-  sales: { model: "sale_order", tab: "orders", states: ["draft", "sent", "toapprove", "sale", "done", "cancelled"], eligible: ["sale", "done"], current: ["draft", "sent"], dateField: "dateOrder", more: ["ops", "deliveries", "returns", "commission-plans"] },
-  crm: { model: "opportunity", tab: "opportunities", states: ["open", "won", "lost"], eligible: ["open", "won"], current: ["open"], dateField: "createdAt", more: ["leads", "activities", "contacts"] },
-  purchasing: { model: "purchase_order", tab: "orders", states: ["draft", "sent", "toapprove", "purchase", "done", "cancelled"], eligible: ["purchase", "done"], current: ["purchase"], dateField: "dateOrder", more: ["requisitions", "vendors", "lines"] },
-  expenses: { model: "expense_sheet", tab: "expense-sheets", states: ["draft", "submitted", "approved", "posted", "done", "refused"], eligible: ["submitted", "approved", "posted", "done"], current: ["submitted"], dateField: "createdAt", more: ["expenses", "operations"] },
-  reports: { model: "financial_report", tab: "reports", states: ["draft", "generated", "exported", "archived"], eligible: ["draft", "generated", "exported", "archived"], current: ["generated", "exported"], dateField: "createDate", more: ["statements", "trial-balance", "scheduled-reports", "dashboards"] },
+  sales: { model: "sale_order", tab: MODULE_HISTORY_FIELDS.sales.tabId, states: ["draft", "sent", "toapprove", "sale", "done", "cancelled"], eligible: ["sale", "done"], current: ["draft", "sent"], dateField: MODULE_HISTORY_FIELDS.sales.dateField, more: ["ops", "deliveries", "returns", "commission-plans"] },
+  crm: { model: "opportunity", tab: MODULE_HISTORY_FIELDS.crm.tabId, states: ["open", "won", "lost"], eligible: ["open", "won"], current: ["open"], dateField: MODULE_HISTORY_FIELDS.crm.dateField, more: ["leads", "activities", "contacts"] },
+  purchasing: { model: "purchase_order", tab: MODULE_HISTORY_FIELDS.purchasing.tabId, states: ["draft", "sent", "toapprove", "purchase", "done", "cancelled"], eligible: ["purchase", "done"], current: ["purchase"], dateField: MODULE_HISTORY_FIELDS.purchasing.dateField, more: ["requisitions", "vendors", "lines"] },
+  expenses: { model: "expense_sheet", tab: MODULE_HISTORY_FIELDS.expenses.tabId, states: ["draft", "submitted", "approved", "posted", "done", "refused"], eligible: ["submitted", "approved", "posted", "done"], current: ["submitted"], dateField: MODULE_HISTORY_FIELDS.expenses.dateField, more: ["expenses", "operations"] },
+  reports: { model: "financial_report", tab: MODULE_HISTORY_FIELDS.reports.tabId, states: ["draft", "generated", "exported", "archived"], eligible: ["draft", "generated", "exported", "archived"], current: ["generated", "exported"], dateField: MODULE_HISTORY_FIELDS.reports.dateField, more: ["statements", "trial-balance", "scheduled-reports", "dashboards"] },
 } satisfies { [K in InsightModule]: { model: string; tab: string; states: string[]; eligible: string[]; current: string[]; dateField: string; more: string[] } }
 
 export function insightId(value: unknown): string {
@@ -92,7 +92,7 @@ export function insightRecordHref(module: InsightModule, id: string): string {
   return `/${module}?tab=${insightDefinitions[module].tab}&filter=${encodeURIComponent(`id:${id}`)}`
 }
 
-export function buildModuleInsights(input: ModuleInsightInput, days: InsightPeriod = 90, requestedCurrency?: string, now = new Date()) {
+export function buildModuleInsights(input: ModuleInsightInput, selection: InsightPeriod = "all", requestedCurrency?: string, now = new Date()) {
   const definition = insightDefinitions[input.module]
   const source = scope(input)
   const monetary = input.module !== "reports"
@@ -120,33 +120,43 @@ export function buildModuleInsights(input: ModuleInsightInput, days: InsightPeri
   const decimals = currency?.decimals
   const moneyState = monetary && decimals == null && classified.state.status === "ready" ? unavailable : classified.state
   const amountOf = (row: InsightRecord) => input.module === "crm" ? row.expectedRevenue ?? row.expected_revenue : input.module === "expenses" ? row.totalAmount ?? row.total_amount : row.amountTotal ?? row.amount_total
-  const dateOf = (row: InsightRecord) => requireValue(kpiDate(input.module === "sales" || input.module === "purchasing" ? row.dateOrder ?? row.date_order : input.module === "reports" ? row.createDate ?? row.create_date : row.createdAt ?? row.created_at)).getTime()
-  const endMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
-  const startMs = endMs - days * DAY, previousStartMs = startMs - days * DAY
+  const dateOf = (row: InsightRecord) => requireValue(moduleHistoryTimestampMs(moduleHistoryDateValue(row, definition.dateField), timeZone))
+  const selectedPeriod: HistoryPeriod = typeof selection === "number" ? `${selection}d` : selection
+  const timeZone = input.timeZone ?? "UTC"
+  const bounds = resolveHistoryPeriod(selectedPeriod, { now, timeZone })
+  const previousBounds = selectedPeriod === "all" ? null : previousHistoryPeriod(bounds, timeZone)
+  const startMs = bounds.startMs ?? -Infinity, endMs = bounds.endMs ?? Infinity
+  const previousStartMs = previousBounds?.startMs ?? null
+  const todayStart = resolveHistoryPeriod("today", { now, timeZone }).startMs!
   const current = classified.value?.filter((item) => (definition.current as readonly string[]).includes(item.status)) ?? []
   const totals = panel(moneyState, () => ({ amount: monetary ? major(current.reduce((total, item) => total + minor(amountOf(item.row), requireValue(decimals)), 0n), requireValue(decimals)) : current.length }))
   const counts = panel(classified.state, () => ({ current: input.module === "reports" ? classified.value!.filter((item) => item.status === "draft").length : current.length, total: selected.length, states: definition.states.map((status) => ({ status, count: classified.value!.filter((item) => item.status === status).length })) }))
   const activity = panel(classified.state, () => {
     const eligible = classified.value!.filter((item) => (definition.eligible as readonly string[]).includes(item.status)).map((item) => ({ ...item, time: dateOf(item.row) }))
-    const currentPeriod = eligible.filter((item) => item.time >= startMs && item.time <= now.getTime())
-    const previous = eligible.filter((item) => item.time >= previousStartMs && item.time < startMs)
+    const currentPeriod = eligible.filter((item) => item.time >= startMs && item.time < endMs)
+    const previous = previousBounds?.startMs == null || previousBounds.endMs == null ? []
+      : eligible.filter((item) => item.time >= previousBounds.startMs! && item.time < previousBounds.endMs!)
     return { current: currentPeriod, previous }
   })
   const period = panel(mergeModuleStates([moneyState, activity.state]), () => {
     const sum = (items: NonNullable<typeof activity.value>["current"]) => monetary ? major(items.reduce((total, item) => total + minor(amountOf(item.row), requireValue(decimals)), 0n), requireValue(decimals)) : items.length
-    const currentValue = sum(activity.value!.current), previousValue = sum(activity.value!.previous)
-    const months: Array<{ startMs: number; value: number; count: number }> = []
-    for (let month = Date.UTC(new Date(startMs).getUTCFullYear(), new Date(startMs).getUTCMonth(), 1); month < endMs;) {
-      const stamp = new Date(month), next = Date.UTC(stamp.getUTCFullYear(), stamp.getUTCMonth() + 1, 1)
-      const items = activity.value!.current.filter((item) => item.time >= month && item.time < next)
-      months.push({ startMs: month, value: sum(items), count: items.length })
-      month = next
-    }
-    return { current: currentValue, previous: previousValue, percent: previousValue === 0 ? null : (currentValue - previousValue) / Math.abs(previousValue) * 100, months }
+    const items = activity.value!.current
+    const currentValue = sum(items), previousValue = previousBounds ? sum(activity.value!.previous) : null
+    // Loaded-record bounds determine the drawing extent only, never an API coverage claim.
+    const chartBounds: HistoryBounds = items.reduce<HistoryBounds>((extent, item) => ({
+      startMs: extent.startMs === null ? item.time : Math.min(extent.startMs, item.time),
+      endMs: extent.endMs === null ? item.time + 1 : Math.max(extent.endMs, item.time + 1),
+    }), { startMs: bounds.startMs, endMs: bounds.endMs })
+    const buckets = createHistoryBuckets(chartBounds, { timeZone, maxBuckets: 36 })
+    const months = buckets.map((bucket) => {
+      const matches = items.filter((item) => item.time >= bucket.startMs && item.time < bucket.endMs)
+      return { ...bucket, value: sum(matches), count: matches.length }
+    })
+    return { current: currentValue, previous: previousValue, percent: previousValue == null || previousValue === 0 ? null : (currentValue - previousValue) / Math.abs(previousValue) * 100, months }
   })
   const periodCounts = panel(activity.state, () => {
     const count = (items: NonNullable<typeof activity.value>["current"]) => input.module === "reports" ? items.filter((item) => ["generated", "exported"].includes(item.status)).length : items.length
-    return { current: count(activity.value!.current), previous: count(activity.value!.previous) }
+    return { current: count(activity.value!.current), previous: previousBounds ? count(activity.value!.previous) : null }
   })
   const queues = panel(classified.state, (): InsightQueue[] => {
     const items = classified.value!
@@ -159,7 +169,7 @@ export function buildModuleInsights(input: ModuleInsightInput, days: InsightPeri
       const overdue = current.filter((item) => {
         const raw = item.row.dateDeadline ?? item.row.date_deadline
         if (raw == null && !("dateDeadline" in item.row) && !("date_deadline" in item.row)) throw new Error("missing deadline")
-        return raw != null && requireValue(kpiDate(raw)).getTime() < endMs - DAY
+        return raw != null && requireValue(moduleHistoryTimestampMs(raw, timeZone)) < todayStart
       })
       return [queue("open", current), queue("overdue", overdue), stateQueue("won")]
     }
@@ -169,10 +179,10 @@ export function buildModuleInsights(input: ModuleInsightInput, days: InsightPeri
       if (["full", "received"].includes(receipt.toLowerCase())) return false
       const raw = item.row.datePlanned ?? item.row.date_planned
       if (raw == null && !("datePlanned" in item.row) && !("date_planned" in item.row)) throw new Error("missing planned date")
-      return raw != null && requireValue(kpiDate(raw)).getTime() < endMs - DAY
+      return raw != null && requireValue(moduleHistoryTimestampMs(raw, timeZone)) < todayStart
     })
     return [stateQueue("draft"), stateQueue("toapprove"), queue("late", late)]
   })
   const recent = panel(classified.state, () => classified.value!.map((item) => ({ id: insightId(item.row.id), name: typeof item.row.name === "string" && item.row.name.trim() ? item.row.name : `#${insightId(item.row.id)}`, status: item.status, time: dateOf(item.row) })).filter((item) => item.time <= now.getTime()).sort((a, b) => b.time - a.time || a.id.localeCompare(b.id)).slice(0, 5))
-  return { module: input.module, definition, monetary, currency, currencies, selectedId, startMs, endMs, previousStartMs, asOfMs: now.getTime(), totals, counts, period, periodCounts, queues, recent }
+  return { module: input.module, definition, monetary, currency, currencies, selectedId, selectedPeriod, timeZone, bounds, previousBounds, startMs, endMs, previousStartMs, asOfMs: now.getTime(), totals, counts, period, periodCounts, queues, recent }
 }

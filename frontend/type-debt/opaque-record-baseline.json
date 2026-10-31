@@ -166,7 +166,7 @@
   "packages/ui/src/lib/runtime-list-config.ts": 3,
   "packages/ui/src/lib/sale-order-line-totals.ts": 1,
   "packages/ui/src/lib/sales-entity-configs.ts": 4,
-  "packages/ui/src/lib/stored-dashboard-resolver.ts": 18,
+  "packages/ui/src/lib/stored-dashboard-resolver.ts": 17,
   "packages/ui/src/pages/erp-command-palette-records.tsx": 1,
   "packages/ui/src/pages/module-view.tsx": 4,
   "packages/ui/src/pages/stored-dashboard-view.tsx": 2,

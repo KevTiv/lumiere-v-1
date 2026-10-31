@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { ArrowUpRight, ChartNoAxesCombined } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
+import { HistoryPeriodSelect } from "@lumiere/ui/components/history-period-select"
+import { serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { useHistoryPeriod } from "../lib/use-history-period"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Button } from "@lumiere/ui/components/button"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
@@ -12,7 +15,7 @@ import type { DashboardSection, AreaChartWidget, BarChartWidget } from "@lumiere
 import { reportExportSourceProvenance } from "@lumiere/ui/lib/report-export-provenance"
 import { DashboardGrid } from "../../packages/ui/src/pages/dashboard-grid"
 import { DashboardWidgetRenderer } from "../../packages/ui/src/pages/dashboard-widget-renderer"
-import { buildModuleInsights, insightDefinitions, insightRecordHref, type InsightPeriod, type ModuleInsightInput } from "../lib/module-insights-model"
+import { buildModuleInsights, insightDefinitions, insightRecordHref, type ModuleInsightInput } from "../lib/module-insights-model"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 function SourceNotice({ state }: { state: ModuleDataState }) {
@@ -42,26 +45,25 @@ export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange 
 
 function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }: ModuleInsightsProps) {
   const { t } = useTranslation()
-  const [days, setDays] = useState<InsightPeriod>(90)
+  const [period, setPeriod, invalidPeriod] = useHistoryPeriod()
   const [currencyId, setCurrencyId] = useState<string>()
   const [queueKey, setQueueKey] = useState<string>()
-  const model = useMemo(() => buildModuleInsights(input, days, currencyId, now), [input, days, currencyId, now])
+  const model = useMemo(() => buildModuleInsights(invalidPeriod ? { ...input, records: { rows: [], state: { status: "partial" } } } : input, period, currencyId, now), [input, period, currencyId, now, invalidPeriod])
   useEffect(() => { onPeriodRangeChange?.({ startMs: model.startMs, endMs: model.endMs }) }, [model.startMs, model.endMs, onPeriodRangeChange])
   const label = (key: string) => t(`moduleInsights.modules.${input.module}.${key}`)
   const status = (key: string) => t(`moduleInsights.states.${key}`)
   const money = (value: number) => `${new Intl.NumberFormat(undefined, { minimumFractionDigits: model.currency?.decimals ?? 2, maximumFractionDigits: model.currency?.decimals ?? 2 }).format(value)} ${model.currency?.label ?? ""}`
   const formatValue = (value: number) => model.monetary ? money(value) : new Intl.NumberFormat().format(value)
-  const date = (value: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" }).format(value)
-  const month = (value: number) => new Intl.DateTimeFormat(undefined, { month: "short", year: "2-digit", timeZone: "UTC" }).format(value)
+  const date = (value: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: model.timeZone }).format(value)
   const unit = model.monetary ? `${model.currency?.label ?? t("moduleInsights.unknownCurrency")} (#${model.selectedId || "—"})` : t("moduleInsights.records")
   const sectionId = (key: string) => `${input.module}-insights-${key}`
   const quickSections = sections.map((section) => ({ ...section, widgets: section.widgets.filter((widget) => widget.type === "quick-actions") })).filter((section) => section.widgets.length)
   const hasCompanyForecast = quickSections.some((section) => section.widgets.some((widget) => widget.type === "quick-actions" && widget.data.actions.some((action) => action.id === "create_forecast_snapshot")))
   const selectedQueue = model.queues.value?.find((queue) => queue.key === queueKey)
   const shownQueue = selectedQueue ?? model.queues.value?.[0]
-  const trend: AreaChartWidget = { id: sectionId("trend"), title: `${label("trend")} · ${unit}`, type: "area-chart", width: "full", useCard: false, data: { xAxisKey: "month", allowDecimals: model.monetary ? undefined : false, series: [{ name: label("measure"), color: "hsl(var(--chart-1))" }], values: (model.period.value?.months ?? []).map((point) => ({ month: month(point.startMs), [label("measure")]: point.value })) } }
+  const trend: AreaChartWidget = { id: sectionId("trend"), title: `${label("trend")} · ${unit}`, type: "area-chart", width: "full", useCard: false, data: { xAxisKey: "month", allowDecimals: model.monetary ? undefined : false, series: [{ name: label("measure"), color: "hsl(var(--chart-1))" }], values: (model.period.value?.months ?? []).map((point) => ({ month: point.label, [label("measure")]: point.value })) } }
   const breakdown: BarChartWidget = { id: sectionId("states"), title: label("distribution"), type: "bar-chart", width: "full", useCard: false, data: { categoryKey: "state", layout: "horizontal", allowDecimals: false, series: [{ name: t("moduleInsights.records"), color: "hsl(var(--chart-2))" }], values: (model.counts.value?.states ?? []).map((point) => ({ state: status(point.status), [t("moduleInsights.records")]: point.count })) } }
-  const previous = (value: number | undefined) => value === undefined ? null : <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.previous")}: {new Intl.NumberFormat().format(value)}</p>
+  const previous = (value: number | null | undefined) => value == null ? null : <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.previous")}: {new Intl.NumberFormat().format(value)}</p>
   const metric = (key: string, state: ModuleDataState, value: number | undefined, hint: ReactNode, monetary = false) => <div className="min-w-0 space-y-3 p-4 sm:p-5" data-testid={sectionId(key)}>
     <h3 className="text-xs font-medium leading-5 text-muted-foreground">{label(key)}</h3>
     {state.status === "ready" && value !== undefined ? <><p className={`${workspaceStyles.metricValue} break-words text-xl sm:text-2xl`}>{monetary ? formatValue(value) : new Intl.NumberFormat().format(value)}</p>{hint}</> : <SourceNotice state={state} />}
@@ -70,11 +72,11 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
   const chart = (widget: AreaChartWidget | BarChartWidget, state: ModuleDataState, hint: string, table: ReactNode, current = false) => <section className={`${workspaceStyles.surface} min-w-0 p-4 sm:p-5`} aria-label={widget.title} data-testid={widget.id}>
     <p className="mb-3 text-xs leading-5 text-muted-foreground">{hint}</p>
     {state.status === "ready" ? <>
-      <DashboardWidgetRenderer widget={widget} widthClass="min-w-0" emptyMessage={t("moduleInsights.zero")} exportProvenance={reportExportSourceProvenance({ organizationId: input.organizationId, companyId: input.companyId, dashboardId: `${input.module}-overview`, widgetId: widget.id, model: model.definition.model, domain: JSON.stringify({ currencyId: model.monetary ? model.selectedId : null, basis: current ? "current-record-states" : "current-eligible-records-by-creation-or-order-date", eligibleStates: current ? model.definition.states : model.definition.eligible, dateField: current ? null : model.definition.dateField, measure: current || !model.monetary ? "count" : input.module === "crm" ? "expectedRevenue" : input.module === "expenses" ? "totalAmount" : "amountTotal" }), groupBy: current ? "state" : "month", startMs: current ? model.asOfMs : model.startMs, endMs: current ? model.asOfMs : model.endMs })} />
+      <DashboardWidgetRenderer widget={widget} widthClass="min-w-0" emptyMessage={t("moduleInsights.zero")} exportProvenance={reportExportSourceProvenance({ organizationId: input.organizationId, companyId: input.companyId, dashboardId: `${input.module}-overview`, widgetId: widget.id, model: model.definition.model, domain: JSON.stringify({ currencyId: model.monetary ? model.selectedId : null, basis: current ? "current-record-states" : "current-eligible-records-by-creation-or-order-date", eligibleStates: current ? model.definition.states : model.definition.eligible, dateField: current ? null : model.definition.dateField, measure: current || !model.monetary ? "count" : input.module === "crm" ? "expectedRevenue" : input.module === "expenses" ? "totalAmount" : "amountTotal" }), groupBy: current ? "state" : model.period.value?.months[0]?.unit, timeZone: model.timeZone, period: current ? undefined : serializeHistoryPeriod(period), dateField: current ? undefined : model.definition.dateField, endExclusive: !current, startMs: current ? model.asOfMs : model.bounds.startMs ?? undefined, endMs: current ? model.asOfMs : model.bounds.endMs ?? undefined })} />
       <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.viewData")}</summary><div className="max-h-80 overflow-auto"><table className="w-full min-w-72 text-xs tabular-nums"><caption className="sr-only">{widget.title}</caption>{table}</table></div></details>
     </> : <><h3 className={`${workspaceStyles.sectionTitle} mb-3`}>{widget.title}</h3><SourceNotice state={state} /></>}
   </section>
-  const browseHref = `/${input.module}?tab=${insightDefinitions[input.module].tab}${model.monetary && model.selectedId ? `&filter=${encodeURIComponent(`${input.module === "crm" ? "companyCurrencyId" : "currencyId"}:${model.selectedId}`)}` : ""}`
+  const browseHref = `/${input.module}?tab=${insightDefinitions[input.module].tab}&period=${encodeURIComponent(serializeHistoryPeriod(period))}&periodTimeZone=${encodeURIComponent(model.timeZone)}&filter=${encodeURIComponent(`companyId:${String(input.companyId)}`)}${model.monetary && model.selectedId ? `&filter=${encodeURIComponent(`${input.module === "crm" ? "companyCurrencyId" : "currencyId"}:${model.selectedId}`)}` : ""}`
   const linkClass = "inline-flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
   return <div className="min-w-0 space-y-6 [&_button]:min-h-11 [&_button]:min-w-11" data-testid={`module-insights-${input.module}`}>
     <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "insights", "actions"].map((key) => <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>)}</nav>
@@ -107,39 +109,28 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
             ))}
           </SelectContent>{" "}
         </Select></label>}
-          <label className="space-y-1 text-xs font-medium"><span>{t("moduleInsights.period")}</span><Select
-            value={String(days ?? "")}
-            onValueChange={(nextValue) => setDays(Number(nextValue) as InsightPeriod)}
-          >
-            {" "}
-            <SelectTrigger
-              aria-label={t("moduleInsights.period")}
-              className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-            >
-              <SelectValue />
-            </SelectTrigger>{" "}
-            <SelectContent>
-              {[30, 90, 180].map((value) => (
-                <SelectItem key={value} value={String(value)}>
-                  {t("moduleInsights.lastDays", { count: value })}
-                </SelectItem>
-              ))}
-            </SelectContent>{" "}
-          </Select></label>
+          <HistoryPeriodSelect value={period} onChange={setPeriod} timeZone={model.timeZone} label={t("moduleInsights.period")} />
         </div>
       </div>
-      <p className="text-xs leading-5 text-muted-foreground">{date(model.startMs)} – {date(model.endMs - 1)} · {t("moduleInsights.comparedWith")} {date(model.previousStartMs)} – {date(model.startMs - 1)}. {t("moduleInsights.utc")}</p>
+      {invalidPeriod && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Choose a valid period to inspect records." })}</p><Button type="button" variant="outline" onClick={() => setPeriod("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}</Button></div>}
+      <p className="text-xs leading-5 text-muted-foreground">{model.bounds.startMs == null || model.bounds.endMs == null
+        ? t("common.historyPeriod.all", { defaultValue: "All history" })
+        : `${date(model.bounds.startMs)} – ${date(model.bounds.endMs - 1)}`}
+        {model.previousBounds?.startMs != null && model.previousBounds.endMs != null && <> · {t("moduleInsights.comparedWith")} {date(model.previousBounds.startMs)} – {date(model.previousBounds.endMs - 1)}</>}
+        {` · ${model.timeZone}`}
+      </p>
+      <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status." })} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link></p>
       <div className={`${workspaceStyles.surface} grid min-w-0 divide-y sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 [&>div]:sm:border-b [&>div]:xl:border-b-0 [&>div:nth-child(even)]:sm:border-l [&>div:nth-child(3)]:xl:border-l`}>
         {metric("currentValue", model.totals.state, model.totals.value?.amount, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>, true)}
         {metric("currentCount", model.counts.state, model.counts.value?.current, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>)}
-        {metric("periodValue", model.period.state, model.period.value?.current, model.period.value && <div className="space-y-1 text-xs leading-5 text-muted-foreground"><p>{model.period.value.percent === null ? t("moduleInsights.noBaseline") : `${model.period.value.percent > 0 ? "+" : ""}${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(model.period.value.percent)}% ${t("moduleInsights.vsPrevious")}`}</p><p>{t("moduleInsights.previous")}: {formatValue(model.period.value.previous)}</p></div>, true)}
+        {metric("periodValue", model.period.state, model.period.value?.current, model.period.value && model.period.value.previous != null && <div className="space-y-1 text-xs leading-5 text-muted-foreground"><p>{model.period.value.percent === null ? t("moduleInsights.noBaseline") : `${model.period.value.percent > 0 ? "+" : ""}${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(model.period.value.percent)}% ${t("moduleInsights.vsPrevious")}`}</p><p>{t("moduleInsights.previous")}: {formatValue(model.period.value.previous)}</p></div>, true)}
         {metric("periodCount", model.periodCounts.state, model.periodCounts.value?.current, previous(model.periodCounts.value?.previous))}
       </div>
       <p className="text-xs leading-5 text-muted-foreground">{label("basis")}</p>
     </section>
     <section aria-labelledby={sectionId("insights")} className="space-y-4"><h2 id={sectionId("insights")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.insights")}</h2>
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
-        {chart(trend, model.period.state, label("trendHint"), <>{tableHead(t("moduleInsights.month"), label("measure"))}<tbody>{model.period.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{month(point.startMs)}</th><td className="py-3 text-right">{formatValue(point.value)}</td></tr>)}</tbody></>)}
+        {chart(trend, model.period.state, label("trendHint"), <>{tableHead(t("common.historyPeriod.label", { defaultValue: "Date range" }), label("measure"))}<tbody>{model.period.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{point.label}</th><td className="py-3 text-right">{formatValue(point.value)}</td></tr>)}</tbody></>)}
         {chart(breakdown, model.counts.state, t("moduleInsights.distributionHint"), <>{tableHead(t("moduleInsights.state"), t("moduleInsights.records"))}<tbody>{model.counts.value?.states.map((point) => <tr key={point.status} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{status(point.status)}</th><td className="py-3 text-right">{point.count}</td></tr>)}</tbody></>, true)}
       </div>
     </section>

@@ -123,9 +123,6 @@ import {
   useCrmCsvImportMutations,
   useCreateForecastSnapshot,
   useCrmForecastSnapshots,
-  useClearOpportunityPresence,
-  useOpportunityPresence,
-  useUpdateOpportunityPresence,
   type Lead,
   type Opportunity,
   type Contact,
@@ -197,7 +194,6 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useModuleFilters } from "@/hooks/use-module-filters"
-import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
@@ -2027,7 +2023,7 @@ function CrmClientLoaded({
     const inCurrentRange = (row: Record<string, unknown>) =>
       isTimestampInRange(recordTimestampMs(row), startMs, endMs)
     const inPreviousRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
+      previousRange != null && isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
 
     const isActiveLead = (row: Record<string, unknown>) => {
       const s = leadStateRaw(row)
@@ -2100,13 +2096,13 @@ function CrmClientLoaded({
                 {
                   label: t("crm.dashboard.activeLeads"),
                   value: String(currentActiveLeads),
-                  change: percentChange(currentActiveLeads, previousActiveLeads),
+                  change: previousRange ? percentChange(currentActiveLeads, previousActiveLeads) : undefined,
                   icon: "Users",
                 },
                 {
                   label: t("crm.dashboard.pipelineValue"),
                   value: `$${currentPipelineValue.toLocaleString()}`,
-                  change: percentChange(currentPipelineValue, previousPipelineValue),
+                  change: previousRange ? percentChange(currentPipelineValue, previousPipelineValue) : undefined,
                   icon: "TrendingUp",
                 },
                 {
@@ -2125,7 +2121,7 @@ function CrmClientLoaded({
                 {
                   label: t("crm.dashboard.openOpportunities"),
                   value: String(openOpportunities.length),
-                  change: percentChange(currentOpenOpportunities.length, previousOpenOpportunities.length),
+                  change: previousRange ? percentChange(currentOpenOpportunities.length, previousOpenOpportunities.length) : undefined,
                   icon: "Users",
                 },
               ],
@@ -2147,6 +2143,10 @@ function CrmClientLoaded({
               const now = Date.now()
               const snapshotStart = insightPeriodRange?.startMs ?? startMs
               const snapshotEnd = insightPeriodRange?.endMs ?? endMs
+              if (!Number.isFinite(snapshotStart) || !Number.isFinite(snapshotEnd)) {
+                showWorkflowToast({ kind: "error", title: t("common.error.title"), description: t("moduleInsights.forecastFinitePeriod", { defaultValue: "Choose a custom date range or a calendar preset before creating a forecast snapshot." }) })
+                return
+              }
               const endMsSafe = snapshotEnd > snapshotStart ? snapshotEnd : now
               createForecastSnapshot
                 .mutateAsync({
