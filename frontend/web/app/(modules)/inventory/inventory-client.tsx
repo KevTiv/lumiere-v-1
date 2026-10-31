@@ -17,7 +17,7 @@ import {
 import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
 import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import dynamic from 'next/dynamic';
 import { useTranslation } from '@lumiere/i18n';
@@ -466,7 +466,8 @@ function InventoryClientLoaded({
   > | null>(null);
   const [renameCategoryRow, setRenameCategoryRow] = useState<Record<string, unknown> | null>(null);
   const renameCategory = useRenameProductCategory(orgId);
-  useEffect(() => { setRenameCategoryRow(null); }, [identity, sessionOrganizationId, organizationId, operatingCompanyId]);
+  const renameCategoryEpoch = useRef(0);
+  useEffect(() => { renameCategoryEpoch.current++; setRenameCategoryRow(null); }, [identity, sessionOrganizationId, organizationId, operatingCompanyId]);
   const [variantProductId, setVariantProductId] = useState<ScalarId | null>(
     null,
   );
@@ -3128,7 +3129,7 @@ function InventoryClientLoaded({
                   label: t('inventory.categoryActions.rename'),
                   permission: { resource: 'product_category', action: 'write' },
                   requiresSelection: true,
-                  onClick: (rows) => { if (permissionsReady !== false && checkPermission('product_category', 'write').allowed && rows.length === 1) setRenameCategoryRow(rows[0]!); },
+                  onClick: (rows) => { if (permissionsReady !== false && checkPermission('product_category', 'write').allowed && rows.length === 1) { renameCategoryEpoch.current++; setRenameCategoryRow(rows[0]!); } },
                 },
                 {
                   id: 'delete-category',
@@ -4059,7 +4060,7 @@ function InventoryClientLoaded({
       <FormModal
         key={`rename-category-${identity}-${sessionOrganizationId}-${operatingCompanyId}-${String(renameCategoryRow?.id ?? 'closed')}`}
         open={renameCategoryRow !== null && categoriesUsable}
-        onOpenChange={(open) => !open && setRenameCategoryRow(null)}
+        onOpenChange={(open) => { if (!open) { renameCategoryEpoch.current++; setRenameCategoryRow(null); } }}
         config={{
           ...newProductCategoryForm(t),
           id: 'rename-product-category', title: t('inventory.categoryActions.rename'),
@@ -4075,9 +4076,10 @@ function InventoryClientLoaded({
         submissionDisabled={permissionsReady === false || !checkPermission('product_category', 'write').allowed}
         onSubmit={async (fd) => {
           if (!renameCategoryRow || !categoriesUsable || permissionsReady === false || !checkPermission('product_category', 'write').allowed) throw new Error('Category unavailable.');
+          const epoch = renameCategoryEpoch.current;
           await renameCategory.mutateAsync({ categoryId: renameCategoryRow.id as ScalarId,
             previousName: String(renameCategoryRow.name ?? ''), name: String(fd.name ?? '') });
-          setRenameCategoryRow(null);
+          if (epoch === renameCategoryEpoch.current) setRenameCategoryRow(null);
         }}
       />
       <FormModal
