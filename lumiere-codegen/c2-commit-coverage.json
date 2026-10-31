@@ -309,6 +309,17 @@
     },
     {
       "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_document_creation",
+      "operation": "create_document",
+      "operation_id": "erp.create_document",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
       "function": "record_lead_creation",
       "operation": "create_lead",
       "operation_id": "erp.create_lead",

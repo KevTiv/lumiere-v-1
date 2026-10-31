@@ -55,7 +55,7 @@
   "packages/query-hooks/src/hooks/bff-company-rows.ts": 3,
   "packages/query-hooks/src/hooks/calendar.ts": 1,
   "packages/query-hooks/src/hooks/crm.ts": 2,
-  "packages/query-hooks/src/hooks/documents.ts": 15,
+  "packages/query-hooks/src/hooks/documents.ts": 14,
   "packages/query-hooks/src/hooks/exact-record-state.ts": 2,
   "packages/query-hooks/src/hooks/hr-allocations.ts": 1,
   "packages/query-hooks/src/hooks/import-mapping-templates.ts": 2,

@@ -222,6 +222,30 @@ pub struct CreateDocumentParams {
     pub metadata: Option<String>,
 }
 
+/// The upload key selects the canonical actor/company-scoped creation receipt.
+fn upload_submission_id(params: &CreateDocumentParams) -> Result<Option<String>, String> {
+    let Some(raw) = params.metadata.as_deref() else {
+        return Ok(None);
+    };
+    let Ok(metadata) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return Ok(None);
+    };
+    let Some(submission_id) = metadata
+        .get("uploadSubmissionId")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+    if submission_id.len() != 32
+        || !submission_id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err("invalid document submission ID".into());
+    }
+    Ok(Some(submission_id.to_owned()))
+}
+
 /// Params for adding a document version.
 /// Scope: `organization_id` + `document_id` are flat reducer params.
 #[derive(SpacetimeType, Clone, Debug)]
@@ -682,6 +706,20 @@ pub fn create_document(
         folder_residency = folder.residency_region.clone();
     }
 
+    let (creation_intent, replayed) = if let Some(submission_id) = upload_submission_id(&params)? {
+        crate::forms::record_creation::prepare_document_creation(
+            ctx,
+            organization_id,
+            company_id.ok_or("document submissions require a company")?,
+            &submission_id,
+            &params,
+        )?
+    } else {
+        (None, None)
+    };
+    if replayed.is_some() {
+        return Ok(());
+    }
     let checksum = params.checksum.trim().to_lowercase();
     let index_language = document_search_language_for_company(ctx, organization_id, company_id);
     let residency_region = params
@@ -787,6 +825,25 @@ pub fn create_document(
             metadata: None,
         },
     );
+
+    if let Some(company_id) = company_id {
+        if let Some(receipt_id) = crate::forms::record_creation::finish_creation(
+            ctx,
+            organization_id,
+            company_id,
+            "document",
+            doc_id,
+            creation_intent,
+        )? {
+            crate::forms::record_creation_persistence::record_document_creation(
+                ctx,
+                organization_id,
+                company_id,
+                doc_id,
+                &receipt_id,
+            )?;
+        }
+    }
 
     log::info!("Document created: id={}", doc_id);
     Ok(())

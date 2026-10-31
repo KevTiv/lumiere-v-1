@@ -1348,6 +1348,21 @@
         "note": "Note",
         "reconcile": "Allow reconciliation",
         "unchanged": "Nothing to change."
+      },
+      "create": {
+        "purpose": "Account purpose",
+        "reconciliationEnabled": "Reconciliation will be enabled for this account.",
+        "classificationSaved": "This purpose sets the account classification when it is created.",
+        "purposes": {
+          "receivable": "Customer balances (receivable)",
+          "payable": "Supplier balances (payable)",
+          "liquidity": "Bank or cash",
+          "asset": "Other asset",
+          "liability": "Other liability",
+          "equity": "Equity",
+          "income": "Income",
+          "expense": "Expense"
+        }
       }
     },
     "glDrilldown": {
@@ -9946,6 +9961,10 @@
           "description": "Description",
           "descriptionPlaceholder": "What did you work on?"
         }
+      },
+      "subcontractorCost": {
+        "currencyUnavailable": "Currencies are unavailable. Refresh currency data before linking this cost.",
+        "currencyRequired": "Choose an available currency before linking this cost. Your entries are retained."
       }
     },
     "page": {
@@ -10865,6 +10884,24 @@
       "delayed": "Scheduled in {{seconds}} seconds. This preview includes documents whose retention expires by that time. Eligibility and legal holds are checked again when the job runs; the final set can change.",
       "company": "Company",
       "finalCheck": "The scope is refreshed before requesting the purge. Purged documents cannot be restored."
+    },
+    "receipts": {
+      "title": "Upload receipts",
+      "help": "Files and registered documents remain saved if AI indexing fails. Receipts can be checked after refresh.",
+      "open": "Open document",
+      "fileSaved": "File saved",
+      "fileUnconfirmed": "File save not yet confirmed",
+      "registered": "Document registered",
+      "registrationPending": "Document registration pending",
+      "sourceSuperseded": "A newer document version exists; this receipt retains the original file",
+      "indexFailed": "AI indexing failed",
+      "indexQueued": "AI indexing pending · queued",
+      "indexPending": "AI indexing pending",
+      "id": "Receipt",
+      "checking": "Checking…",
+      "retryIndexing": "Retry indexing",
+      "resumeIndexing": "Continue indexing",
+      "checkSave": "Check save receipt"
     }
   },
   "helpdesk": {
@@ -14231,6 +14268,8 @@
       "stepPreview": "4. Preview",
       "stepImport": "5. Import",
       "analyze": "Analyze with AI",
+      "preparedProducts": "Preview prepared product CSV",
+      "preparedProductsHint": "Use exact CSV headers and explicit prices and units. No AI request is made. Uncertain rows can be saved for review.",
       "analyzing": "Analyzing…",
       "analyzed": "Column mapping suggested — review and continue.",
       "sourceColumns": "Source columns",
@@ -15217,9 +15256,63 @@
       "importRow": "Import row {{row}}",
       "sourceLine": "Source row {{row}}",
       "search": "Find an item or source file",
+      "category": "Product category",
+      "productUnit": "Product catalog unit",
+      "purchaseUnit": "Purchase unit",
+      "priceUnit": "Unit for corrected prices",
+      "referenceHint": "Choose from this organization. Enter quantities and prices for the chosen unit.",
+      "importSetup": "Advanced import settings",
+      "grouped": {
+        "unavailableValue": "{{value}} (unavailable)",
+        "editor": "Review {{name}}",
+        "independentFields": "Confirm each value you know. Unknown weight, original unit and cost can remain unresolved. Choosing a unit never changes quantities or prices.",
+        "field": "Field",
+        "original": "Original source",
+        "confirmValue": "Confirmed value",
+        "confirmField": "Confirm {{field}}",
+        "confirmRow": "Confirm all entered values and complete this row",
+        "uncertainSave": "The save result is unknown. Retry this same submission to check its durable receipt. Editing is paused to prevent conflicting submissions.",
+        "retrySave": "Retry same review submission",
+        "saveNext": "Save and next item",
+        "next": "Next item",
+        "bulk": "Bulk corrections",
+        "bulkSelected": "Correct {{count}} selected rows",
+        "bulkField": "Field to correct",
+        "chooseField": "Choose a field",
+        "newValue": "New value",
+        "bulkReason": "Bulk correction reason",
+        "confirmOnlyField": "Confirm this field only; keep other uncertainties unresolved",
+        "replaceConfirmed": "Replace values that were already confirmed",
+        "previewBulk": "Preview affected rows",
+        "clearSelection": "Clear selection",
+        "previewCount": "{{count}} rows will change; {{skipped}} exceptions stay unchanged.",
+        "previewBoundary": "Only the selected field changes. Every affected row keeps its original file and row. The entire correction stops if any reviewed row has changed since this preview.",
+        "before": "Before",
+        "after": "After",
+        "rowException": "Kept unchanged by reviewer",
+        "leaveUnchanged": "Leave unchanged",
+        "previousPage": "Previous page",
+        "nextPage": "Next page",
+        "page": "Page {{page}} of {{pages}}",
+        "exceptions": "{{count}} row exceptions",
+        "applyBulk": "Apply to {{count}} rows",
+        "editPreview": "Edit correction",
+        "summary": "{{rows}} source rows · {{unresolved}} unresolved · {{confirmed}} ready for import · {{excluded}} excluded. These are review decisions; draft and posted records are created separately.",
+        "issueGroup": "Group by issue",
+        "allIssues": "All issues",
+        "selectMatching": "Select all {{count}} matching rows",
+        "selectPage": "Select this page",
+        "selectItem": "Select {{name}}, source row {{row}}",
+        "fieldsConfirmed": "{{count}} fields confirmed",
+        "itemHistory": "This row’s decision history",
+        "undo": "Undo latest correction",
+        "olderHistory": "Load older decisions",
+        "historyAction": "History"
+      },
       "replaceDraftHint": "Your current file, mapping and preview will be replaced by the reviewed source.",
       "resolveCurrent": "Check the current import result before loading another source.",
-      "draftChanged": "The current import changed. Review it before loading another source."
+      "draftChanged": "The current import changed. Review it before loading another source.",
+      "recoveredSubmission": "Your previous submission is retained. Check its saved result or retry the same submission."
     }
   },
   "reports": {

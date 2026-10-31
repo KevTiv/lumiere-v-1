@@ -47,6 +47,11 @@ mod route_tests;
 
 const MAX_UPLOAD_BYTES: u64 = 50 * 1024 * 1024; // 50 MiB pilot cap
 
+#[path = "document_upload_receipts.rs"]
+mod upload_receipts;
+pub(crate) use upload_receipts::record_indexing_receipt;
+use upload_receipts::{receipt, submission_object_id, UploadRegistration};
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BlobMeta {
@@ -73,6 +78,10 @@ struct BlobMeta {
     completed: bool,
     actual_size: Option<u64>,
     actual_checksum: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    submission_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    registration: Option<UploadRegistration>,
 }
 
 impl BlobMeta {
@@ -100,6 +109,8 @@ struct PresignBody {
     residency: Option<String>,
     #[serde(default)]
     purpose: BlobPurpose,
+    submission_id: Option<String>,
+    registration: Option<UploadRegistration>,
 }
 
 #[derive(Debug, Serialize)]
@@ -109,6 +120,7 @@ struct PresignResponse {
     upload_url: String,
     public_url: String,
     headers: serde_json::Map<String, serde_json::Value>,
+    completed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,6 +156,7 @@ struct BlobDownloadQuery {
 pub fn blob_router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/documents/blobs/presign", post(presign))
+        .route("/documents/blobs/receipt", get(receipt))
         .route(
             "/documents/blobs/upload/:organization_id/:residency/:object_id",
             put(upload).layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES as usize)),
@@ -281,6 +294,8 @@ async fn import_network(
             completed: true,
             actual_size: Some(bytes.len() as u64),
             actual_checksum: Some(checksum.clone()),
+            submission_id: None,
+            registration: None,
         },
     )
     .await?;
@@ -455,6 +470,8 @@ pub(crate) async fn store_generated_pdf(
         completed: true,
         actual_size: Some(bytes.len() as u64),
         actual_checksum: Some(checksum.clone()),
+        submission_id: None,
+        registration: None,
     };
     create_meta(store, &meta_path, &meta).await?;
     Ok(GeneratedPdfBlob {
@@ -898,9 +915,34 @@ async fn presign(
     };
 
     let residency = residency_segment(body.residency.as_deref());
-    let mut id_bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut id_bytes);
-    let object_id = hex::encode(id_bytes);
+    let object_id = if let Some(submission_id) = body.submission_id.as_deref() {
+        if body.purpose != BlobPurpose::Document || expected_checksum.is_none() {
+            return Err(ApiError::Unprocessable(
+                "document submissions require a checksum".into(),
+            ));
+        }
+        body.registration
+            .as_ref()
+            .ok_or_else(|| {
+                ApiError::Unprocessable("document submission details are required".into())
+            })?
+            .validate()?;
+        submission_object_id(
+            org_id,
+            body.company_id,
+            &session.identity_hex,
+            submission_id,
+        )?
+    } else {
+        if body.registration.is_some() {
+            return Err(ApiError::Unprocessable(
+                "submissionId is required with document details".into(),
+            ));
+        }
+        let mut id_bytes = [0u8; 16];
+        rand::thread_rng().fill_bytes(&mut id_bytes);
+        hex::encode(id_bytes)
+    };
     let object_key = format!("org-{org_id}/{residency}/{object_id}");
     let file_name = sanitize_file_name(&body.file_name);
 
@@ -922,8 +964,13 @@ async fn presign(
         completed: false,
         actual_size: None,
         actual_checksum: None,
+        submission_id: body.submission_id.clone(),
+        registration: body.registration.clone(),
     };
-    create_meta(&state.config.document_blob_store, &meta_path, &meta).await?;
+    // A submission reserves one exact request. Retrying a lost reply must not
+    // replace completed metadata or allocate another object.
+    let meta =
+        upload_receipts::reserve(&state.config.document_blob_store, &meta_path, meta).await?;
 
     // Same-origin `/api/...` paths so Next BFF can forward cookies to api-server `/v1/...`.
     let upload_url = format!("/api/documents/blobs/upload/{org_id}/{residency}/{object_id}");
@@ -940,6 +987,7 @@ async fn presign(
         upload_url,
         public_url,
         headers: headers_map,
+        completed: meta.completed,
     }))
 }
 
@@ -1401,6 +1449,8 @@ mod tests {
                 completed,
                 actual_size: Some(bytes.len() as u64),
                 actual_checksum: Some(checksum.clone()),
+                submission_id: None,
+                registration: None,
             };
             write_fixture_meta(&meta_path, &meta).expect("fixture metadata");
             fs::write(&bin, bytes).expect("fixture PNG");

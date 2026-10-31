@@ -1,6 +1,7 @@
 "use client"
 
-import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useErpSession } from "@lumiere/erp-session"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
@@ -11,6 +12,10 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest } from "@lumiere/query-hooks/hooks/csv-import-request"
 import { guidedImportRequest, trackedImportEntity } from "./guided-import-request"
+import { clearImportRecovery, importRecoveryKey, readImportRecovery, retainImportRequest, type ImportRecoveryScope } from "./guided-import-recovery"
+import { previewPreparedProducts, type ProductImportReference } from "./prepared-product-preview"
+import { useProductCategories } from "@lumiere/query-hooks/hooks/inventory/products"
+import { useUoms } from "@lumiere/query-hooks/hooks/inventory/uom"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api-fetch"
 import { REVIEW_TARGETS, reviewDatasetFromCsv, type ReviewedImportSource } from "./import-review-model"
@@ -67,6 +72,7 @@ import {
 } from "@/lib/import-duplicate-detection"
 import {
   IMPORT_ENTITY_GROUPS,
+  WIZARD_IMPORT_ENTITIES,
   wizardEntitiesForGroup,
   wizardEntityByKey,
   type ImportEntityOption,
@@ -94,16 +100,37 @@ export type GuidedImportWizardProps = {
   onContinuationBlockChange?: (reason: GuidedImportContinuationBlock) => void
 }
 
+function PreparedProductPreviewButton({ organizationId, disabled, onPreview }: { organizationId: bigint; disabled: boolean; onPreview: (categories: readonly ProductImportReference[], uoms: readonly ProductImportReference[]) => void }) {
+  const { t } = useTranslation()
+  const categoriesQuery = useProductCategories(organizationId)
+  const uomsQuery = useUoms(organizationId)
+  return <div className="space-y-1">
+    <Button type="button" variant="outline" disabled={disabled || categoriesQuery.isFetching || uomsQuery.isFetching} onClick={() => onPreview(categoriesQuery.data ?? [], uomsQuery.data ?? [])}>{t("settings.import.preparedProducts", { defaultValue: "Preview prepared product CSV" })}</Button>
+    <p className="text-xs text-muted-foreground">{t("settings.import.preparedProductsHint", { defaultValue: "Use exact CSV headers and explicit prices and units. No AI request is made. Uncertain rows can be saved for review." })}</p>
+  </div>
+}
+
 export type GuidedImportContinuationBlock = "busy" | "unresolved" | null
 export interface GuidedImportWizardHandle {
   continueFromReview(source: ReviewedImportSource): Promise<boolean>
 }
 
-export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImportWizardProps>(function GuidedImportWizard({ organizationId, initialSource, onReviewSaved, onContinuationBlockChange }, ref) {
+export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImportWizardProps>(function GuidedImportWizard(props, ref) {
+  const { identity } = useErpSession()
+  const companyId = useOperatingCompanyId(props.organizationId)
+  const scope = useMemo(() => identity && companyId
+    ? { actor: identity.replace(/^0x/, "").toLowerCase(), organizationId: props.organizationId, companyId }
+    : null, [identity, props.organizationId, companyId])
+  const { t } = useTranslation()
+  if (!scope) return <p>{t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })}</p>
+  return <ScopedGuidedImportWizard key={importRecoveryKey(scope)} {...props} ref={ref} recoveryScope={scope} />
+})
+
+const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImportWizardProps & { recoveryScope: ImportRecoveryScope }>(function ScopedGuidedImportWizard({ organizationId, initialSource, onReviewSaved, onContinuationBlockChange, recoveryScope }, ref) {
   const { t } = useTranslation()
   const workspaceProfile = useWorkspaceProfile()
   const orgId = BigInt(organizationId)
-  const companyId = useOperatingCompanyId(organizationId)
+  const companyId = recoveryScope.companyId
   const companiesQuery = useCompanies(organizationId, organizationId > 0)
   const trackedImport = useTrackedCsvImport()
   const queryClient = useQueryClient()
@@ -129,6 +156,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
   const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
   const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
+  const [preparedPreview, setPreparedPreview] = useState(false)
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [previewResult, setPreviewResult] = useState<ImportPreviewResponse | null>(null)
   const [duplicateStates, setDuplicateStates] = useState<ImportDuplicateRowState[]>([])
@@ -146,10 +174,13 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
   const [importedJobId, setImportedJobId] = useState<string | null>(null)
   const [importRequest, setImportRequest] = useState<CsvImportRequest | null>(null)
   const importRequestRef = useRef<CsvImportRequest | null>(null)
+  const submitting = useRef(false)
+  const [recoveryReady, setRecoveryReady] = useState(false)
+  const [recoveryError, setRecoveryError] = useState<string | null>(null)
   const [rollbackConfirmId, setRollbackConfirmId] = useState<string | null>(null)
   const importErrorsQuery = useImportJobErrors(orgId, importedJobId != null)
   const { confirm, dialog: discardDialog } = useConfirmDialog()
-  const operationBusy = busy || readingFile || analyze.isPending || preview.isPending || saveTemplate.isPending
+  const operationBusy = !recoveryReady || !!recoveryError || busy || readingFile || analyze.isPending || preview.isPending || saveTemplate.isPending
     || deleteTemplate.isPending || finalizeImport.isPending || rollbackImport.isPending || trackedImport.isPending
   const continuationBlock: GuidedImportContinuationBlock = operationBusy ? "busy" : importRequest && !importedJobId ? "unresolved" : null
   const currentWork = useRef({ busy: operationBusy, dirty: false, importedJobId })
@@ -159,6 +190,29 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
   useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useLayoutEffect(() => { draftRevision.current += 1 }, [wizardKey, csvText, headers, rows, sourceFileName, sourceFormat, sourceSheetName, analysis, mapping, previewResult, duplicateStates, confirmImportWithErrors, selectedTemplateId, appliedTemplateId, importRequest, importedJobId, operationBusy])
   useLayoutEffect(() => { onContinuationBlockChange?.(continuationBlock) }, [continuationBlock, onContinuationBlockChange])
+
+  useEffect(() => {
+    try {
+      const retained = readImportRecovery(window.localStorage, recoveryScope)
+      if (retained) {
+        const parsed = parseCsvText(retained.request.csvData)
+        const entity = WIZARD_IMPORT_ENTITIES.find(option => trackedImportEntity(option.tableName) === retained.request.entity)
+        if (!entity) throw new Error("The retained import type is unavailable. Check its saved result before starting another import.")
+        importRequestRef.current = retained.request
+        setImportRequest(retained.request)
+        setWizardKey(entity.wizardKey)
+        setCsvText(retained.request.csvData)
+        setHeaders(parsed.headers)
+        setRows(parsed.rows)
+        setSourceFileName(retained.request.fileName)
+        setStep("import")
+        setStatus(t("settings.importReview.recoveredSubmission", { defaultValue: "Your previous submission is retained. Check its saved result or retry the same submission." }))
+      }
+      setRecoveryReady(true)
+    } catch (failure) {
+      setRecoveryError(failure instanceof Error ? failure.message : "Import recovery storage is unavailable. No new submission was sent.")
+    }
+  }, [recoveryScope, t])
 
   const entityOption = wizardEntityByKey(wizardKey) ?? wizardEntityByKey("contact")!
   const targetEntity = entityOption.tableName
@@ -240,8 +294,14 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
   )
 
   const resetFlow = useCallback(() => {
+    if (importRequestRef.current) {
+      if (!currentWork.current.importedJobId) return false
+      try { clearImportRecovery(window.localStorage, recoveryScope, importRequestRef.current.requestId) }
+      catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); return false }
+    }
     setStep("upload")
     setAnalysis(null)
+    setPreparedPreview(false)
     setMapping({})
     setPreviewResult(null)
     setDuplicateStates([])
@@ -256,7 +316,8 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
     setRollbackConfirmId(null)
     analyze.reset()
     preview.reset()
-  }, [analyze, preview])
+    return true
+  }, [analyze, preview, recoveryScope])
 
   useImperativeHandle(ref, () => ({
     async continueFromReview(source: ReviewedImportSource) {
@@ -284,7 +345,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
       }
       // Keep this owner mounted. Only an explicitly approved, idle draft can
       // be replaced; an unresolved tracked request never loses its identity.
-      resetFlow()
+      if (!resetFlow()) return false
       setWizardKey(source.targetEntity)
       setCsvText(source.csv); setHeaders(parsed.headers); setRows(parsed.rows)
       setSourceFileName(source.fileName); setSourceFormat("csv"); setSourceSheetName(undefined)
@@ -365,6 +426,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
     setError(null)
     setStatus(null)
     setPreviewResult(null)
+    setPreparedPreview(false)
     setDuplicateStates([])
     setStep("analyze")
     try {
@@ -398,6 +460,17 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
     }
   }, [analyze, csvText, headers, rows, selectedTemplate, selectedTemplateId, targetEntity, t])
 
+  const runPreparedPreview = (categories: readonly ProductImportReference[], uoms: readonly ProductImportReference[]) => {
+    setError(null); setStatus(null); setConfirmImportWithErrors(false)
+    try {
+      const result = previewPreparedProducts({ csv: csvText, organizationId, categories, uoms })
+      setAnalysis(result.analysis); setMapping(result.mapping); setPreviewResult(result.preview)
+      setAppliedTemplateId(null); setPreparedPreview(true)
+      setDuplicateStates(defaultDuplicateActions(detectImportDuplicates({ entity: entityOption, previewRows: result.preview.rows, mapping: result.mapping, products: productsQuery.data ?? [] })))
+      setStep("preview")
+    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
+  }
+
   const runPreview = useCallback(async () => {
     if (!csvText.trim() || Object.keys(mapping).length === 0) return
     setError(null)
@@ -429,27 +502,32 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
   )
   const previewWarnings = previewResult?.warnings.length ?? 0
   const saveForReview = async () => {
-    if (!companyId || !previewResult || busy) return
+    if (!companyId || !previewResult || currentWork.current.busy || submitting.current || !mounted.current) return
+    submitting.current = true
     setBusy(true); setError(null)
     try {
       const dataset = await reviewDatasetFromCsv({ title: sourceFileName || entityOption.label, targetEntity, fileName: sourceFileName || "source.csv", csv: csvText, headers, rows, mapping, requiredFields: analysis?.mappings.filter(item => item.required).map(item => item.target_field) ?? [], issues: previewResult.validation_errors })
+      if (!mounted.current) return
       const response = await apiFetch("/api/import-reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ companyId, dataset }) })
       const result = await response.json()
+      if (!mounted.current) return
       if (!response.ok || typeof result.id !== "string") throw new Error(result.error ?? "Source review could not be saved.")
       await queryClient.invalidateQueries({ queryKey: ["import-reviews", organizationId, companyId] })
+      if (!mounted.current) return
       onReviewSaved?.(result.id)
       resetFlow(); setCsvText(""); setHeaders([]); setRows([]); setSourceFileName("")
       setStatus(t("settings.importReview.saved", { defaultValue: "Saved as a source draft. Review the uncertain rows below." }))
-    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
-    finally { setBusy(false) }
+    } catch (failure) { if (mounted.current) setError(failure instanceof Error ? failure.message : String(failure)) }
+    finally { submitting.current = false; if (mounted.current) setBusy(false) }
   }
   const duplicateSkipCount = duplicateStates.filter((item) => item.action === "skip").length
   const mappedColumnCount = Object.values(mapping).filter((value) => value !== "__skip__").length
 
   const runImport = useCallback(async (lookupOnly = false) => {
+    if (submitting.current || currentWork.current.busy || !mounted.current) return
     if (!csvText.trim()) return
     if (!companyId) { setError(t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })); return }
-    if (!previewResult || previewResult.rows.length !== rows.length) {
+    if (!importRequestRef.current && (!previewResult || previewResult.rows.length !== rows.length)) {
       setError(
         t(
           "settings.import.fullPreviewRequired",
@@ -458,7 +536,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
       )
       return
     }
-    if (previewErrors.length > 0 && !confirmImportWithErrors) {
+    if (!importRequestRef.current && previewErrors.length > 0 && (preparedPreview || !confirmImportWithErrors)) {
       setError(
         t(
           "settings.import.confirmErrorsRequired",
@@ -471,18 +549,25 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
     setError(null)
     setStatus(null)
     setBusy(true)
+    submitting.current = true
     try {
       const skipRows = new Set(
         duplicateStates.filter((item) => item.action === "skip").map((item) => item.rowIndex),
       )
-      const importCsv = buildMappedImportCsv(headers, rows, mapping, skipRows)
+      const importCsv = importRequestRef.current?.csvData ?? buildMappedImportCsv(headers, rows, mapping, skipRows)
 
       const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", companies: companiesQuery.data ?? [] })
+      const retain = () => retainImportRequest(window.localStorage, recoveryScope, request)
+      if (navigator.locks) await navigator.locks.request(importRecoveryKey(recoveryScope), retain)
+      else retain()
+      if (!mounted.current) return
       importRequestRef.current = request
       setImportRequest(request)
       setStep("import")
       const importJson = lookupOnly ? await fetchCsvImportReceipt(request, apiFetch, true) : await trackedImport.mutateAsync(request)
+      if (!mounted.current) return
       await queryClient.invalidateQueries({ predicate: query => csvImportInvalidatesQuery(query.queryKey, request) })
+      if (!mounted.current) return
       if (importJson.status === "pending") {
         setStatus(t("settings.importReview.importPending", { defaultValue: "The import is running. Check its result before starting another submission." }))
         return
@@ -498,6 +583,9 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
 
       if (!["success", "partial"].includes(importJson.status)) { await importJobsQuery.refetch(); return }
       try {
+        // A recovered submission retains exact bytes and the native job/row
+        // evidence; do not replace reconciliation metadata with an empty preview.
+        if (previewResult) {
         await finalizeImport.mutateAsync({
           jobId: BigInt(jobId),
           templateId: appliedTemplateId ? BigInt(appliedTemplateId) : null,
@@ -513,7 +601,9 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
             mapping,
           },
         })
+        }
       } catch (finalizeError) {
+        if (!mounted.current) return
         setError(
           t(
             "settings.import.reconciliationMetadataFailed",
@@ -525,7 +615,9 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
           ),
         )
       }
+      if (!mounted.current) return
       await Promise.all([importJobsQuery.refetch(), importErrorsQuery.refetch()])
+      if (!mounted.current) return
 
       phCapture("ai_import_completed", {
         entity: targetEntity,
@@ -535,9 +627,10 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
         template_id: appliedTemplateId,
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (mounted.current) setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setBusy(false)
+      submitting.current = false
+      if (mounted.current) setBusy(false)
     }
   }, [
     appliedTemplateId,
@@ -553,8 +646,10 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
     mapping,
     orgId,
     queryClient,
+    recoveryScope,
     previewResult,
     previewErrors.length,
+    preparedPreview,
     rows,
     sourceFileName,
     sourceFormat,
@@ -836,7 +931,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
               </div>
             </div>
           ) : null}
-          {previewErrors.length > 0 ? (
+          {previewErrors.length > 0 && !preparedPreview ? (
             <label className="flex items-center gap-2 text-sm text-destructive">
               <input
                 type="checkbox"
@@ -854,6 +949,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        {step === "upload" && targetEntity === "product" && csvText.trim() ? <PreparedProductPreviewButton organizationId={orgId} disabled={busy || analyze.isPending} onPreview={runPreparedPreview} /> : null}
         {step === "import" && importRequest && !importedJobId ? <>
           <Button type="button" variant="outline" disabled={operationBusy} onClick={() => void runImport(true)}>{t("settings.importReview.checkResult", { defaultValue: "Check import result" })}</Button>
           <Button type="button" variant="outline" disabled={operationBusy} onClick={() => void runImport()}>{t("settings.importReview.retrySame", { defaultValue: "Retry same submission" })}</Button>
@@ -881,7 +977,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
           </Button>
         ) : null}
         {step === "preview" ? (
-          <Button type="button" disabled={operationBusy} onClick={() => void runImport()}>
+          <Button type="button" disabled={operationBusy || (preparedPreview && previewErrors.length > 0)} onClick={() => void runImport()}>
             {t("settings.import.run", "Import")}
           </Button>
         ) : null}
@@ -892,6 +988,7 @@ export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImp
         ) : null}
       </div>
 
+      {recoveryError ? <p role="alert" className="text-sm text-destructive">{recoveryError}</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 

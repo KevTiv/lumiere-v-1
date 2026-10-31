@@ -55,6 +55,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { useCurrencyFormat } from "../lib/currency-context"
 import { toast } from "sonner"
 import { TablePager, usePagedRows } from "../components/table-pager"
+import { ACCOUNT_PURPOSES, accountCreationValues, type AccountPurpose } from "./account-creation"
 
 type DisplayGroup = AccountTypeGroup
 
@@ -277,7 +278,7 @@ export function ChartOfAccountsView({
   const [isCreating, setIsCreating] = useState(false)
   const [newCode, setNewCode] = useState("")
   const [newName, setNewName] = useState("")
-  const [newGroup, setNewGroup] = useState<DisplayGroup>("asset")
+  const [newPurpose, setNewPurpose] = useState<AccountPurpose>("asset")
   const [newOpening, setNewOpening] = useState("")
 
   const filtered = accounts.filter((a) =>
@@ -382,19 +383,27 @@ export function ChartOfAccountsView({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="coa-create-group">{t("accounting.forms.newAccount.fields.internalGroup")}</Label>
-                <Select value={newGroup} onValueChange={(v) => setNewGroup(v as DisplayGroup)}>
-                  <SelectTrigger id="coa-create-group">
+                <Label htmlFor="coa-create-purpose">{t("accounting.accounts.create.purpose", { defaultValue: "Account purpose" })}</Label>
+                <Select value={newPurpose} onValueChange={(value) => {
+                  const purpose = ACCOUNT_PURPOSES.find((candidate) => candidate.value === value)
+                  if (purpose) setNewPurpose(purpose.value)
+                }}>
+                  <SelectTrigger id="coa-create-purpose">
                     <SelectValue placeholder={t("accounting.forms.newAccount.fields.accountTypePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(["asset", "liability", "equity", "income", "expense"] as DisplayGroup[]).map((g) => (
-                      <SelectItem key={g} value={g}>
-                        {t(groupConfig[g].labelKey as any)}
+                    {ACCOUNT_PURPOSES.map((purpose) => (
+                      <SelectItem key={purpose.value} value={purpose.value}>
+                        {t(`accounting.accounts.create.purposes.${purpose.value}`, { defaultValue: purpose.label })}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {newPurpose === "receivable" || newPurpose === "payable" || newPurpose === "liquidity"
+                    ? t("accounting.accounts.create.reconciliationEnabled", { defaultValue: "Reconciliation will be enabled for this account." })
+                    : t("accounting.accounts.create.classificationSaved", { defaultValue: "This purpose sets the account classification when it is created." })}
+                </p>
               </div>
             </div>
             <div className="space-y-2">
@@ -426,23 +435,14 @@ export function ChartOfAccountsView({
               {t("common.cancel")}
             </Button>
             <Button
-              disabled={isCreating}
+              disabled={isCreating || !onCreate || !newCode.trim() || !newName.trim()}
               onClick={async () => {
-                const bal = Number(newOpening) || 0
                 setIsCreating(true)
                 try {
-                  await onCreate?.({
-                    code: newCode.trim(),
-                    name: newName.trim(),
-                    internalGroup: newGroup,
-                    internalType: "other",
-                    reconcile: false,
-                    openingDebit: bal >= 0 ? bal : 0,
-                    openingCredit: bal < 0 ? -bal : 0,
-                  })
+                  await onCreate?.(accountCreationValues({ code: newCode, name: newName, purpose: newPurpose, openingBalance: newOpening }))
                   setNewCode("")
                   setNewName("")
-                  setNewGroup("asset")
+                  setNewPurpose("asset")
                   setNewOpening("")
                   setShowCreateModal(false)
                   toast.success(t("common.formSubmit.saved"))

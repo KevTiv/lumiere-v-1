@@ -77,6 +77,88 @@ pub(crate) struct CreationIntent {
     entries: Vec<RecordCustomFieldEntry>,
 }
 
+fn creation_receipt<T: spacetimedb_sats::ser::Serialize>(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    model: &str,
+    operation_key: &str,
+    params: &T,
+) -> Result<(String, String, Option<u64>), String> {
+    let payload = serde_json::to_vec(spacetimedb_sats::serde::SerdeWrapper::from_ref(params))
+        .map_err(|_| "creation input cannot be fingerprinted")?;
+    let payload_hash = format!("sha256:{:x}", Sha256::digest(payload));
+    let id = format!("{organization_id}:{company_id}:{model}:{operation_key}");
+    let receipt = ctx.db.record_creation_receipt().id().find(&id);
+    if let Some(receipt) = receipt.as_ref() {
+        if receipt.organization_id != organization_id
+            || receipt.company_id != company_id
+            || receipt.model != model
+            || receipt.created_by != ctx.sender()
+            || receipt.payload_hash != payload_hash
+        {
+            return Err(
+                "creation key was already used by another actor or with different input".into(),
+            );
+        }
+    }
+    Ok((id, payload_hash, receipt.map(|receipt| receipt.record_id)))
+}
+
+/// Documents keep their upload protocol and immutable version provenance while
+/// sharing the canonical creation receipt. A purged document never frees its key.
+pub(crate) fn prepare_document_creation<T: spacetimedb_sats::ser::Serialize>(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    operation_key: &str,
+    params: &T,
+) -> Result<(Option<CreationIntent>, Option<u64>), String> {
+    use crate::documents::documents::document;
+    if operation_key.len() != 32
+        || !operation_key
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err("invalid document submission ID".into());
+    }
+    crate::documents::knowledge_guides::require_company_membership(
+        ctx,
+        organization_id,
+        company_id,
+    )?;
+    let (id, payload_hash, record_id) = creation_receipt(
+        ctx,
+        organization_id,
+        company_id,
+        "document",
+        operation_key,
+        params,
+    )?;
+    if let Some(record_id) = record_id {
+        let record = ctx.db.document().id().find(&record_id).ok_or(
+            "this document submission was already saved; its record is no longer available",
+        )?;
+        if record.organization_id != organization_id
+            || record.company_id != Some(company_id)
+            || record.owner_id != ctx.sender()
+            || record.is_deleted
+        {
+            return Err("this document submission is no longer accessible".into());
+        }
+        return Ok((None, Some(record_id)));
+    }
+    Ok((
+        Some(CreationIntent {
+            id,
+            operation_key: operation_key.to_owned(),
+            payload_hash,
+            entries: Vec::new(),
+        }),
+        None,
+    ))
+}
+
 fn envelope(
     metadata: Option<&str>,
 ) -> Result<(Option<(String, u64)>, Vec<RecordCustomFieldEntry>), String> {
@@ -461,30 +543,23 @@ pub(crate) fn prepare_creation<T: spacetimedb_sats::ser::Serialize>(
         organization_id,
         company_id,
     )?;
-    let payload = serde_json::to_vec(spacetimedb_sats::serde::SerdeWrapper::from_ref(params))
-        .map_err(|_| "creation input cannot be fingerprinted")?;
-    let payload_hash = format!("sha256:{:x}", Sha256::digest(payload));
-    let id = format!("{organization_id}:{company_id}:{model}:{operation_key}");
-    if let Some(receipt) = ctx.db.record_creation_receipt().id().find(&id) {
-        if receipt.organization_id != organization_id
-            || receipt.company_id != company_id
-            || receipt.model != model
-            || receipt.created_by != ctx.sender()
-            || receipt.payload_hash != payload_hash
-        {
-            return Err(
-                "creation key was already used by another actor or with different input"
-                    .to_string(),
-            );
-        }
+    let (id, payload_hash, record_id) = creation_receipt(
+        ctx,
+        organization_id,
+        company_id,
+        model,
+        &operation_key,
+        params,
+    )?;
+    if let Some(record_id) = record_id {
         super::ensure_record_allows_custom_field_writes(
             ctx,
             organization_id,
             company_id,
             model,
-            receipt.record_id,
+            record_id,
         )?;
-        return Ok((None, Some(receipt.record_id)));
+        return Ok((None, Some(record_id)));
     }
     validate_entries(ctx, organization_id, model, &entries)?;
     Ok((

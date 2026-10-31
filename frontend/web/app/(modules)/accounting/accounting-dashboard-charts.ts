@@ -308,7 +308,8 @@ export function dominantCurrencyCode(
 }
 
 /** Aggregates need one known denomination; formatted bare numbers do not make mixed currencies additive. */
-export function singleCurrencyId(rows: readonly { currencyId?: unknown }[]): string | null {
+export function singleCurrencyId(rows: readonly { currencyId?: unknown }[], emptyCurrencyId?: unknown): string | null {
+  if (rows.length === 0) return emptyCurrencyId == null || String(emptyCurrencyId) === "0" ? null : String(emptyCurrencyId)
   const ids = new Set(rows.map((row) => row.currencyId == null ? "" : String(row.currencyId)))
   return ids.size === 1 && !ids.has("") ? [...ids][0]! : null
 }

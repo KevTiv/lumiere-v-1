@@ -87,3 +87,25 @@ test("a revoked upload is reported without completing or returning a document", 
     globalThis.fetch = previous
   }
 })
+
+test("a completed submission retry verifies its same blob without uploading bytes again", async () => {
+  const previous = globalThis.fetch
+  const calls: string[] = []
+  try {
+    let checksum = ""
+    globalThis.fetch = async (input, init) => {
+      calls.push(String(input))
+      const body = JSON.parse(String(init?.body))
+      if (calls.length === 1) {
+        assert.equal(body.submissionId, "a".repeat(32))
+        assert.deepEqual(body.registration, { name: "Farm" })
+        checksum = body.checksum
+        return Response.json({ objectKey: "same-blob", uploadUrl: "/do-not-upload", publicUrl: "/same-blob", completed: true })
+      }
+      assert.equal(String(input), "/api/documents/blobs/complete")
+      return Response.json({ url: "/same-blob", objectKey: "same-blob", fileSize: 4, checksum, mimetype: "text/plain", fileName: "farm.txt" })
+    }
+    await uploadDocumentBlob({ file: new File(["farm"], "farm.txt", { type: "text/plain" }), companyId: 3n, submissionId: "a".repeat(32), registration: { name: "Farm" } })
+    assert.equal(calls.length, 2)
+  } finally { globalThis.fetch = previous }
+})

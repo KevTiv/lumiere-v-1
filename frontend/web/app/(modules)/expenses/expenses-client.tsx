@@ -1,4 +1,6 @@
 "use client"
+
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
@@ -10,7 +12,7 @@ import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
 import { ExpenseSourcePreview } from "../../../components/finance-source-preview"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
-import { ModuleInsights } from "../../../components/module-insights"
+import { CompanyModuleInsights } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useRouter } from "next/navigation"
 import { ExpensesInboxPanel } from "./expenses-inbox-panel"
@@ -430,6 +432,7 @@ function ExpensesClientLoaded({
     analyticAccountOptions: allocationAccounts.map((row) => ({ value: String(row.id), label: [row.code, row.name].filter(Boolean).map(String).join(" · ") || String(row.id) })),
     projectsState: allocationProjectsState, analyticAccountsState: allocationAccountsState,
   }, setExpenseAllocations.isPending || !allocationReadback.ready, allocationReadback.rows)
+  const companyCurrencyRows = useCompanies(Number(orgId), orgId > 0n).data ?? []
   const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const pendingApproval = sheetsToApprove.length
@@ -450,6 +453,11 @@ function ExpensesClientLoaded({
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
     const chartExpenses = expensesRaw.filter((expense) => expense.companyId === operatingCompanyId)
     const expenseCurrencies = new Set(chartExpenses.map((expense) => currencyCodeById.get(String(expense.currencyId)) ?? ""))
+    if (chartExpenses.length === 0) {
+      const base = companyCurrencyRows.find(company => company.id === operatingCompanyId)?.currencyId
+      const code = base == null ? undefined : currencyCodeById.get(String(base))
+      if (code) expenseCurrencies.add(code)
+    }
     const money: ChartValueFormat =
       expenseCurrencies.size === 1 && [...expenseCurrencies][0]
         ? { kind: "currency", currency: [...expenseCurrencies][0]! }
@@ -544,6 +552,7 @@ function ExpensesClientLoaded({
         return w
           })
   }, [
+    companyCurrencyRows,
     locale,
     expenses,
     sheets,
@@ -1082,7 +1091,7 @@ function ExpensesClientLoaded({
       <ModuleWorkView
         organizationId={organizationId}
         config={config}
-        dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
+        dashboardContent={<CompanyModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataState={dataState}
         onOpenCreateForm={(tabId) => {

@@ -1,16 +1,18 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { useErpSession } from "@lumiere/erp-session"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useTranslation } from "@lumiere/i18n"
 import { GuidedImportWizard, type GuidedImportContinuationBlock, type GuidedImportWizardHandle } from "./guided-import-wizard"
 import { ImportReviewWorkspace } from "./import-review-workspace"
 
 export function DataImportWorkspace({ organizationId }: { organizationId: number }) {
+  const { identity } = useErpSession()
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
-  if (!companyId) return <p>{t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })}</p>
-  return <Workspace key={`${organizationId}:${companyId}`} organizationId={organizationId} />
+  if (!identity || !companyId) return <p>{t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })}</p>
+  return <Workspace key={`${identity}:${organizationId}:${companyId}`} organizationId={organizationId} />
 }
 function Workspace({ organizationId }: { organizationId: number }) {
   const wizard = useRef<GuidedImportWizardHandle>(null)
