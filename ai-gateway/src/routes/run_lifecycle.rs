@@ -224,6 +224,12 @@ pub async fn post_run_lifecycle(
         max_bytes: granted.max_bytes.min(MAX_LIFECYCLE_BYTES),
     };
 
+    // Fail before dispatch when the canonical reader is not configured.
+    // Never fall back to querying private tables with the runtime writer.
+    let reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Unavailable("lifecycle reader is not configured".into()))?;
     let comparison = apply_intent(state.stdb.as_ref(), &actor, req.run_id, req.intent).await?;
     let comparison = load_comparison_details(
         state.stdb.as_ref(),
@@ -233,7 +239,7 @@ pub async fn post_run_lifecycle(
     )
     .await?;
     let response = load_response(
-        state.stdb.as_ref(),
+        reader,
         actor.organization_id,
         actor.company_id,
         req.run_id,
@@ -670,10 +676,10 @@ async fn load_response(
     comparison: Option<LifecycleComparison>,
     row_limit: usize,
 ) -> AppResult<RunLifecycleResponse> {
-    let state = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_state WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
+    let state = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_state_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?.into_iter().next()
         .ok_or_else(|| AppError::NotFound("run lifecycle not found".into()))?;
-    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
+    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     let queued_inputs = stdb
         .query_sql(&queued_inputs_sql(
@@ -684,11 +690,11 @@ async fn load_response(
         ))
         .await
         .map_err(|error| AppError::Internal(error.to_string()))?;
-    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
+    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     // The park table exists only in modules that include the budget-park
     // reducers; a missing table or row simply means the run was never parked.
-    let park = stdb.query_sql(&format!("SELECT * FROM ai_run_budget_park WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
+    let park = stdb.query_sql(&format!("SELECT * FROM ai_run_budget_park_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.ok().and_then(|rows| rows.into_iter().next()).and_then(|row| park_from_row(&row));
     let checkpoint_hash = text(&state, "checkpointHash")?;
     Ok(RunLifecycleResponse {
@@ -766,7 +772,7 @@ fn queued_inputs_sql(
     run_id: u64,
     row_limit: usize,
 ) -> String {
-    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY queued_input_id ASC LIMIT {row_limit}")
+    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY queued_input_id ASC LIMIT {row_limit}")
 }
 
 fn queued_input_from_row(row: Value) -> AppResult<LifecycleQueuedInput> {
@@ -973,7 +979,7 @@ mod tests {
     #[test]
     fn follow_up_read_never_selects_payload_or_author() {
         let sql = queued_inputs_sql(7, 9, 42, 10);
-        assert!(sql.contains("FROM ai_run_queued_input"));
+        assert!(sql.contains("FROM ai_run_queued_input_read"));
         assert!(!sql.contains('*'));
         assert!(!sql.contains("payload"));
         assert!(!sql.contains("author"));

@@ -4,7 +4,7 @@ export interface RunObservationView {
   runId: number
   status: string
   stepCount: number
-  tokensUsed: number
+  tokensUsed: number | null
   transcript: Array<{
     id: number
     stepNo: number
@@ -101,6 +101,23 @@ export function mapRunEconomics(value: unknown): RunEconomicsView | null {
   }
 }
 
+/** Prefer complete, settled provider usage for a waiting run. A run-row
+ * counter is only final on a terminal run; zero on a wait state is not evidence
+ * that the provider consumed no tokens. Unknown/partial usage stays unknown. */
+function observedTokens(status: string, recorded: number, economics: RunEconomicsView | null): number | null {
+  if (economics) {
+    if (economics.truncated || economics.outcomeUnknown || economics.attemptCount === null ||
+        economics.attemptStatuses.length === 0 ||
+        economics.attemptStatuses.some((value) => value !== 'succeeded' && value !== 'failed') ||
+        economics.reservationStatuses.length === 0 ||
+        economics.reservationStatuses.some((value) => value !== 'settled' && value !== 'released') ||
+        economics.inputTokens === null || economics.outputTokens === null) return null
+    const total = economics.inputTokens + economics.outputTokens
+    return Number.isSafeInteger(total) ? total : null
+  }
+  return status === 'completed' || status === 'failed' ? recorded : null
+}
+
 /**
  * Maps the exact-run evidence response into a deliberately narrow operator view.
  * Answer text, error messages, claims, raw arguments, and raw results are never
@@ -146,12 +163,14 @@ export function mapRunObservation(payload: unknown): RunObservationView | null {
     })
     .sort((left, right) => left.stepNo - right.stepNo || left.id - right.id)
 
+  const status = boundedText(root.status, 64) || 'unknown'
+  const economics = root.economics == null ? null : mapRunEconomics(root.economics)
   return {
     runId,
-    status: boundedText(root.status, 64) || 'unknown',
+    status,
     stepCount,
-    tokensUsed,
+    tokensUsed: root.economics != null && !economics ? null : observedTokens(status, tokensUsed, economics),
     transcript,
-    economics: root.economics == null ? null : mapRunEconomics(root.economics),
+    economics,
   }
 }

@@ -76,7 +76,7 @@ export function RunObservation({ observation }: { observation: ObservationState 
             <Badge variant="outline">{t("aiHarness.runLifecycle.runNumber", { id: run.runId })}</Badge>
             <Badge variant="outline">{runStatusLabel(t, run.status)}</Badge>
             <Badge variant="outline">{t("aiHarness.runLifecycle.stepCount", { count: run.stepCount })}</Badge>
-            <Badge variant="outline">{t("aiHarness.runLifecycle.tokenCount", { count: run.tokensUsed })}</Badge>
+            {run.tokensUsed !== null ? <Badge variant="outline">{t("aiHarness.runLifecycle.tokenCount", { count: run.tokensUsed })}</Badge> : null}
           </div>
         </div>
       </CardHeader>
