@@ -3982,7 +3982,7 @@ function AccountingClientReady({
     const chartInvoices = invoices.filter((move) => move.companyId === operatingCompanyId)
     const chartBills = bills.filter((move) => move.companyId === operatingCompanyId)
     const chartPayments = accountPayments.filter((payment) => payment.companyId === operatingCompanyId)
-    const currencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments])
+    const currencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments], companies.find(company => company.id === operatingCompanyId)?.currencyId)
     const currencyCode = currencyId ? currencyCodeMap(currencies).get(currencyId) : undefined
     const money: ChartValueFormat = currencyCode ? { kind: "currency", currency: currencyCode } : { kind: "number" }
     const sourceState = mergeModuleStates([allMovesRead.state, accountPaymentsRead.state, currenciesRead.state])
@@ -4003,7 +4003,7 @@ function AccountingClientReady({
       }
       return w
     }).map((section) => ({ ...section, widgets: section.widgets.filter((widget) => ids.includes(widget.id)) })).filter((section) => section.widgets.length > 0)
-  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale])
+  }, [companies, invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale])
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}

@@ -171,3 +171,11 @@ test('timestamp objects keep their declared microsecond unit near the epoch', ()
   assert.equal(timestampMs({ microsSinceUnixEpoch: 86_400_000_000n }), 86_400_000);
   assert.equal(timestampMs({ microsSinceUnixEpoch: 0n }), 0);
 });
+
+
+test("empty aggregates use company currency without masking bad records", () => {
+  assert.equal(singleCurrencyId([], 4098n), "4098");
+  assert.equal(singleCurrencyId([], 0n), null);
+  assert.equal(singleCurrencyId([{}], 4098n), null);
+  assert.equal(singleCurrencyId([{currencyId:1n},{currencyId:2n}],4098n), null);
+});
