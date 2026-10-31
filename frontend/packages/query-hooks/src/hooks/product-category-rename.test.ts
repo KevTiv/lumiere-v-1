@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { renameCategory } from './product-category-rename.ts'
+import { renameCategory } from './product-category-rename'
 
 test('lost reply resolves one exact rename without redispatch on retry', async () => {
   let row = { id: '9007199254740993', name: 'Old' }; let writes = 0
