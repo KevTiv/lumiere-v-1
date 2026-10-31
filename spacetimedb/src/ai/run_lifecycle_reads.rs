@@ -93,10 +93,8 @@ pub struct AiRunQuestionRead {
     pub run_id: u64,
     pub question_key: String,
     pub revision: u64,
-    pub prompt: String,
     pub required: bool,
     pub status: String,
-    pub answer_json: Option<String>,
 }
 
 #[spacetimedb::view(accessor = ai_run_question_read, public, primary_key = id)]
@@ -115,10 +113,8 @@ pub fn ai_run_question_read(ctx: &ViewContext) -> Vec<AiRunQuestionRead> {
                     run_id: row.run_id,
                     question_key: row.question_key,
                     revision: row.revision,
-                    prompt: row.prompt,
                     required: row.required,
                     status: row.status,
-                    answer_json: row.answer_json,
                 })
                 .collect::<Vec<_>>()
         })

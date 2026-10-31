@@ -10,7 +10,7 @@ Files changed
 - `spacetimedb/src/ai/run_lifecycle_reads.rs` and `ai/mod.rs` add five narrow read views.
 - Gateway `routes/run_lifecycle.rs`, `orchestrator/skill_loader.rs`, `orchestrator/budget_park.rs` and `orchestrator/run.rs` separate the existing reader and writer paths.
 - Gateway `routes/evidence.rs` retains unknown/in-flight/malformed provider usage as unknown.
-- Web `run-observation.ts`, its test, and its panel show complete provider totals for waiting runs and omit an unknown counter.
+- Web `run-observation.ts`, its test, and its panel, plus lifecycle metadata display/tests show complete provider totals for waiting runs and omit an unknown counter.
 
 Before path
 
@@ -27,9 +27,9 @@ The saved run counter stays zero on nonterminal wait states; provider attempts a
 
 After path
 
-Current actor/company/capability checks run before a reader is required and any intent is dispatched. Writes still use existing generated reducers. Readback uses five sender-scoped views through `spend_read_stdb`, with exact organization/company/run filters. Resume and budget-park continuation reads use that same reader. No writer fallback is added.
+Current actor/company/capability checks and an exact bounded pre-read run before any intent is dispatched. A configured token alone is not treated as proof of readback availability. Writes still use existing generated reducers. Readback uses five sender-scoped views through `spend_read_stdb`, with exact organization/company/run filters. Resume and budget-park continuation reads use that same reader. No writer fallback is added.
 
-Private tables remain private. Each view uses the existing `authorized_organization_ids` filter, which requires an active `ai_spend_reader` service binding for the sender. Queue payloads/authors and event payloads are absent from the read types. Question prompts and answers remain subject to the existing gateway capability and byte/row grants.
+Private tables remain private. Each view uses the existing `authorized_organization_ids` filter, which requires an active `ai_spend_reader` service binding for the sender. Queue payloads/authors and event payloads are absent from the read types. Question prompts and answers are omitted as well. The UI marks question content unavailable and excludes metadata-only questions from reply selection; it preserves answered status without an answer body. Content-bearing question UX needs a separately authorized reader.
 
 The UI uses an exact run's complete provider usage when attempts and reservations are settled. Unknown outcomes, in-flight attempts, incomplete rows, overflow and truncated responses do not become zero or a partial total. Terminal legacy runs without a provider summary retain their recorded counter. The gateway stops defaulting missing usage fields to zero.
 
@@ -52,6 +52,7 @@ An absent configured reader fails before dispatch. Private view/read failures re
 Tests run (command + result)
 
 - `node --import <existing-web-node_modules>/tsx/dist/loader.mjs --test 'frontend/web/app/(modules)/ai-harness/run-observation.test.ts'`: 6 passed.
+- `node --import <existing-web-node_modules>/tsx/dist/loader.mjs --test 'frontend/web/app/(modules)/ai-harness/run-lifecycle.test.ts'`: 4 passed, including metadata-only question content and answered status.
 - `cargo test --manifest-path /private/tmp/lumiere-run-usage-owner-test/Cargo.toml --offline`: 4 passed in an isolated extraction of the exact owner structs, functions and four regression tests from `routes/evidence.rs`. This proves the pure economics owner only, not gateway integration or the full module build.
 - `rustfmt --check --edition 2021` on the five modified gateway/loader files and new view file: passed.
 - `git diff --check`: passed.
@@ -59,7 +60,7 @@ Tests run (command + result)
 
 Operator proof
 
-Pending deployment. No new browser or provider call was made by this packet.
+Pending deployment. No new browser or provider call was made by this packet. Metadata-only questions do not offer a reply control without a separately authorized content read.
 
 Compatibility/debt retired
 
