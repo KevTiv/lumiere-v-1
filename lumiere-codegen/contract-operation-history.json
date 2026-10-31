@@ -218,17 +218,37 @@
       "name": "ai_provider_attempt_read",
       "shape_fingerprint": "sha256:f9eae49a0f6b1c454fcd1438a834c27a801730b0fd43a249495c1d31baa6a6da"
     },
+    "erp.ai_run_budget_park_read": {
+      "name": "ai_run_budget_park_read",
+      "shape_fingerprint": "sha256:43bfb68629b4a0d7c73875f88ac09ec42c062dc3d55cf27e1c8f87ab7f0da8eb"
+    },
+    "erp.ai_run_lifecycle_event_read": {
+      "name": "ai_run_lifecycle_event_read",
+      "shape_fingerprint": "sha256:84a8f426c964e16e6149d76fed4e168c0916f92c7e6550d6c1fab8b7fd9e1f21"
+    },
+    "erp.ai_run_lifecycle_state_read": {
+      "name": "ai_run_lifecycle_state_read",
+      "shape_fingerprint": "sha256:0ab843e3fb059f25f999e78f1e154341125d35d16dd4f1ea24fa00530cb8c473"
+    },
+    "erp.ai_run_question_read": {
+      "name": "ai_run_question_read",
+      "shape_fingerprint": "sha256:aefadfe36db9d0f3ea483b57b486863d6bb304a4d0229e8fdf9fea1e36533555"
+    },
+    "erp.ai_run_queued_input_read": {
+      "name": "ai_run_queued_input_read",
+      "shape_fingerprint": "sha256:0e3730faebcea931946c4fda5bfbcbfdd70ffade107d87be00d54cdfd059aa34"
+    },
     "erp.ai_spend_budget_read": {
       "name": "ai_spend_budget_read",
-      "shape_fingerprint": "sha256:4bb97664c786654669aab4c63ffd6af0acb0f759bb1c3bc9d1592a09432a1dcc"
+      "shape_fingerprint": "sha256:b1c8acc89fd1738e31fd31f17cfc5372ffb673ebb449114db31080a4503d980e"
     },
     "erp.ai_spend_price_snapshot_read": {
       "name": "ai_spend_price_snapshot_read",
-      "shape_fingerprint": "sha256:ec3403d533a609d6449b4b6ef76af6876456e5cdd36072f2705fd824ed6260c2"
+      "shape_fingerprint": "sha256:4c33e2bee8082644a18ccb7ec71c516938e265b3cf931f302dd788e5fb6c7612"
     },
     "erp.ai_spend_reservation_read": {
       "name": "ai_spend_reservation_read",
-      "shape_fingerprint": "sha256:3e0acf2f0a5046b2e0842e4312eae11fe1e50ff6f3f4bfecc2986a8d887d5a09"
+      "shape_fingerprint": "sha256:b83b0ea681d9d586855c903134956e6348547787261399f6180f08fa107b55c7"
     },
     "erp.allocate_payment_transaction": {
       "name": "allocate_payment_transaction",
@@ -2540,7 +2560,7 @@
     },
     "erp.helpdesk_related_record_read": {
       "name": "helpdesk_related_record_read",
-      "shape_fingerprint": "sha256:005f55e62f108f6a69cf5fdb9da89f365b00e040c37235be035997c07a7a71a5"
+      "shape_fingerprint": "sha256:1147057f9cb522053e709721227686cfba03ba2c429239d864de8ec806082af1"
     },
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
@@ -2836,11 +2856,11 @@
     },
     "erp.knowledge_guide_actor_profile_read": {
       "name": "knowledge_guide_actor_profile_read",
-      "shape_fingerprint": "sha256:2e20780b8a2deac3bff2053746ede83843f9c15ed097135190c4ad4df8fcccf4"
+      "shape_fingerprint": "sha256:1911b1d28ec5f41039b944596adfb996f270ecc236b670e632117817e1a42d05"
     },
     "erp.knowledge_guide_authority_read": {
       "name": "knowledge_guide_authority_read",
-      "shape_fingerprint": "sha256:8c32dc68dec5a6544caa7c30a74c1325b46740da15d433e73957b339655ea84c"
+      "shape_fingerprint": "sha256:7ad3a7a7ff3a848fb813c84ee68cf729cea4ac46680c5e02e75790f7b3216c95"
     },
     "erp.link_device_to_location": {
       "name": "link_device_to_location",
@@ -6284,6 +6304,14 @@
       "current_operations_fingerprint": "sha256:ee061378b95578a2e99e978ba49c5180281d00f33decdecdb5fb4ead0e24fc5d",
       "operation_count": 1491,
       "reason": "release on top of v0.3.158: add knowledge_guide_actor_profile_read, knowledge_guide_authority_read, nominate_knowledge_guide, purge_reviewed_expired_documents, run_configured_record_creation_tests; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.159",
+      "previous_ir_sha256": "sha256:97b392185eb95efe3172f65d5d422af515d90a609bce1d18721f734767da7cd0",
+      "previous_operations_fingerprint": "sha256:ee061378b95578a2e99e978ba49c5180281d00f33decdecdb5fb4ead0e24fc5d",
+      "current_operations_fingerprint": "sha256:4fea8ce1f6b82792d6a45c76b630de7bfcb1bfda90ca5be915cf1a3e4cd8ab6b",
+      "operation_count": 1496,
+      "reason": "Add five metadata-only lifecycle read views. Six existing view allocation indexes shift after insertion; targets and named return types are unchanged."
     }
   ]
 }

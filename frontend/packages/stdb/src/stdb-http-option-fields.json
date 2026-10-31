@@ -636,6 +636,9 @@
     "resume_requested_at",
     "resolved_at"
   ],
+  "AiRunBudgetParkRead": [
+    "resume_trigger"
+  ],
   "AiRunEffect": [
     "provider_reference",
     "detail"
@@ -657,6 +660,9 @@
     "answered_by"
   ],
   "AiRunQueuedInput": [
+    "promoted_run_id"
+  ],
+  "AiRunQueuedInputRead": [
     "promoted_run_id"
   ],
   "AiRunReview": [
