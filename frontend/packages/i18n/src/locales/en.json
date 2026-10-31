@@ -14231,6 +14231,8 @@
       "stepPreview": "4. Preview",
       "stepImport": "5. Import",
       "analyze": "Analyze with AI",
+      "preparedProducts": "Preview prepared product CSV",
+      "preparedProductsHint": "Use exact CSV headers and explicit prices and units. No AI request is made. Uncertain rows can be saved for review.",
       "analyzing": "Analyzing…",
       "analyzed": "Column mapping suggested — review and continue.",
       "sourceColumns": "Source columns",
@@ -15219,7 +15221,13 @@
       "search": "Find an item or source file",
       "replaceDraftHint": "Your current file, mapping and preview will be replaced by the reviewed source.",
       "resolveCurrent": "Check the current import result before loading another source.",
-      "draftChanged": "The current import changed. Review it before loading another source."
+      "draftChanged": "The current import changed. Review it before loading another source.",
+      "category": "Product category",
+      "productUnit": "Product catalog unit",
+      "purchaseUnit": "Purchase unit",
+      "priceUnit": "Unit for corrected prices",
+      "referenceHint": "Choose from this organization. Enter quantities and prices for the chosen unit.",
+      "importSetup": "Advanced import settings"
     }
   },
   "reports": {

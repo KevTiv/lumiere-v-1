@@ -1,6 +1,6 @@
 "use client"
 import { buildManualInvoiceCatalog, manualInvoiceAccountChoices, manualInvoiceJournalChoices, manualInvoiceTaxChoices } from "./features/manual-invoice-catalog"
-import { journalImportReadinessAction } from "./journal-import-readiness"
+import { journalImportReadinessAction, journalLineImportReadinessAction } from "./journal-import-readiness"
 import { useTaxDeadlineAdministration } from "./features/use-tax-deadline-administration"
 import { useTaxGroupAdministration } from "./features/use-tax-group-administration"
 import { useTaxJurisdictionAdministration } from "./features/use-tax-jurisdiction-administration"
@@ -1307,7 +1307,7 @@ function AccountingClientReady({
     [requestAccountingAction],
   )
   const openAccountingMoveLineImport = useCallback(
-    () => requestAccountingAction("import", () => setCsvKind("accountMoveLine")),
+    () => requestAccountingAction("journal-import", () => setCsvKind("accountMoveLine")),
     [requestAccountingAction],
   )
   const openOutstandingDocumentImport = useCallback(
@@ -3974,7 +3974,7 @@ function AccountingClientReady({
     const chartInvoices = invoices.filter((move) => move.companyId === operatingCompanyId)
     const chartBills = bills.filter((move) => move.companyId === operatingCompanyId)
     const chartPayments = accountPayments.filter((payment) => payment.companyId === operatingCompanyId)
-    const currencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments])
+    const currencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments], companies.find(company => company.id === operatingCompanyId)?.currencyId)
     const currencyCode = currencyId ? currencyCodeMap(currencies).get(currencyId) : undefined
     const money: ChartValueFormat = currencyCode ? { kind: "currency", currency: currencyCode } : { kind: "number" }
     const sourceState = mergeModuleStates([allMovesRead.state, accountPaymentsRead.state, currenciesRead.state])
@@ -3995,7 +3995,7 @@ function AccountingClientReady({
       }
       return w
     }).map((section) => ({ ...section, widgets: section.widgets.filter((widget) => ids.includes(widget.id)) })).filter((section) => section.widgets.length > 0)
-  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale])
+  }, [companies, invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale])
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}
@@ -5940,7 +5940,17 @@ function AccountingClientReady({
               await importOutstandingDocuments(text, "cutover_open_residual")
             else if (csvKind === "historicalDocumentsForPaymentReplay")
               await importOutstandingDocuments(text, "reconstruct_original_total")
-            else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
+            else if (csvKind === "accountMoveLine") {
+              const parsed = parseCsvText(text)
+              const action = journalLineImportReadinessAction(
+                parsed.headers.map(header => header.trim().toLowerCase()), parsed.rows, allMoves, operatingCompanyId,
+              )
+              const readiness = evaluateAccountingSetupReadiness(accountingSetup, action)
+              if (accountingSetupDataState.status !== "ready" || allMovesRead.state.status !== "ready" || !readiness.isReady) {
+                throw new Error(readiness.blockingItems[0]?.reason ?? "Accounting setup and journal entries must be ready before importing lines.")
+              }
+              await csvImports.importAccountMoveLine.mutateAsync(text)
+            }
             else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
             else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
             else if (csvKind === "budgetLine") await csvImports.importBudgetLine.mutateAsync(text)

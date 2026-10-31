@@ -102,3 +102,18 @@ test("Queue previews use exact numeric ID ordering and preserve canonical record
   assert.deepEqual(model.queues.value?.[0]?.records.map((item) => item.id), ["2", "10", "9007199254740993"])
   assert.equal(insightRecordHref("expenses", "9007199254740993"), "/expenses/reports/9007199254740993")
 })
+
+
+test("Company currency is the dashboard default; explicit selection and currency boundaries remain intact", () => {
+  const currencies = read([{ id: 1, code: "USD", decimalPlaces: 2 }, { id: 2, code: "RWF", decimalPlaces: 0 }])
+  const empty = data("expenses", [], { companyCurrencyId: 2, currencies })
+  const model = buildModuleInsights(empty, 30, undefined, now)
+  assert.equal(model.selectedId, "2")
+  assert.equal(model.currency?.label, "RWF")
+  assert.equal(model.totals.value?.amount, 0)
+  const mixed = data("expenses", [row(1, { state: "Submitted", totalAmount: 10 }), row(2, { state: "Submitted", currencyId: 2, totalAmount: 900 })], { companyCurrencyId: 2, currencies })
+  assert.equal(buildModuleInsights(mixed, 30, undefined, now).totals.value?.amount, 900)
+  assert.equal(buildModuleInsights(mixed, 30, "1", now).totals.value?.amount, 10)
+  assert.equal(buildModuleInsights(data("expenses", [row(1, { currencyId: undefined })], { companyCurrencyId: 2, currencies }), 30, undefined, now).totals.value, null)
+  assert.equal(buildModuleInsights({ ...empty, companyCurrencyId: 99 }, 30, undefined, now).selectedId, "1")
+})
