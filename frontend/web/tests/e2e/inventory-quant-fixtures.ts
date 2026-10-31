@@ -20,6 +20,7 @@ import {
   selectEntityRowById,
   selectModuleTab,
   submitForm,
+  smokeName,
 } from "./helpers"
 
 export interface QuantSnapshot {
@@ -620,7 +621,17 @@ export async function runCycleCountToPostedViaWizardUi(
   await selectModuleTab(page, "inventory", "cycle-wizard")
 
   await chooseSelectOptionByTriggerValue(page, page.locator("#cc-loc"), params.locationId)
+  const planName = smokeName("cov06d-count")
+  await page.locator("#cc-name").fill(planName)
   await page.getByTestId("cycle-wizard-create-plan").click()
+
+  // Plans require an explicit choice; select the exact uniquely named plan we created.
+  await expect(page.locator("#cc-id")).toBeVisible()
+  await expect(page.getByTestId("cycle-wizard-start-session")).toBeDisabled()
+  await page.locator("#cc-id").click()
+  const plan = page.getByRole("option").filter({ hasText: planName })
+  await expect(plan).toHaveCount(1)
+  await plan.click()
 
   await expect(page.getByTestId("cycle-wizard-start-session")).toBeEnabled({
     timeout: 30_000,
