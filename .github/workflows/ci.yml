@@ -348,6 +348,11 @@ jobs:
       - name: CRM qualification replay and tenant isolation proof
         run: spacetime call lumiere-ci-contracts run_crm_relational_fk_test --server local -y --no-config
 
+      - name: Farm import source trace and document receipt replay
+        run: |
+          spacetime call lumiere-ci-contracts run_data_ops_commit_test --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_documents_wave_a_tests --server local -y --no-config
+
       - name: Alpha capability saved-effect regressions
         run: |
           spacetime call lumiere-ci-contracts run_configured_record_creation_tests --server local -y --no-config
