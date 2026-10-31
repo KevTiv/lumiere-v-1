@@ -31,14 +31,14 @@ function source(id = "11"): ReviewRow {
       fields: [
         {
           key: "quantity",
-          label: "Actual weight (kg)",
+          label: "Recorded quantity / proposed weight",
           kind: "decimal",
           sourceValue: "8",
           required: true,
         },
         {
           key: "unit_price",
-          label: "Price per kg (RWF)",
+          label: "Recorded price / proposed price (RWF)",
           kind: "decimal",
           sourceValue: "600",
           required: true,
@@ -339,7 +339,7 @@ test("confirming a proposed price preserves unknown weight, original unit and co
   await expect(
     panel
       .getByRole("row")
-      .filter({ hasText: "Actual weight (kg) *" })
+      .filter({ hasText: "Recorded quantity / proposed weight *" })
       .getByRole("cell")
       .nth(1),
   ).toHaveText("8")
@@ -348,17 +348,20 @@ test("confirming a proposed price preserves unknown weight, original unit and co
     .click()
   await page.getByRole("option", { name: "unit", exact: true }).click()
   await expect(
-    panel.getByLabel("Actual weight (kg)", { exact: true }),
+    panel.getByLabel("Recorded quantity / proposed weight", { exact: true }),
   ).toHaveValue("")
   await expect(
-    panel.getByLabel("Price per kg (RWF)", { exact: true }),
+    panel.getByLabel("Recorded price / proposed price (RWF)", { exact: true }),
   ).toHaveValue("4800")
   await panel
     .getByRole("combobox", { name: "Unit for corrected prices", exact: true })
     .click()
   await page.getByRole("option", { name: "kg", exact: true }).click()
   await panel
-    .getByRole("checkbox", { name: "Confirm Price per kg (RWF)", exact: true })
+    .getByRole("checkbox", {
+      name: "Confirm Recorded price / proposed price (RWF)",
+      exact: true,
+    })
     .check()
   await panel
     .getByLabel("Reason or supporting evidence")
@@ -381,12 +384,12 @@ test("confirming a proposed price preserves unknown weight, original unit and co
     .click()
   await expect(
     editor(page).getByRole("checkbox", {
-      name: "Confirm Price per kg (RWF)",
+      name: "Confirm Recorded price / proposed price (RWF)",
       exact: true,
     }),
   ).toBeChecked()
   for (const label of [
-    "Actual weight (kg)",
+    "Recorded quantity / proposed weight",
     "Original quantity unit",
     "Cost (RWF/kg)",
   ])
@@ -455,9 +458,11 @@ test("complete-row confirmation requires explicit values and named product refer
     .fill("Verified source with owner")
   await panel.getByRole("button", { name: "Save review", exact: true }).click()
   await expect(panel.getByRole("alert")).toHaveText(
-    "Actual weight (kg) is required before confirmation",
+    "Recorded quantity / proposed weight is required before confirmation",
   )
-  await panel.getByLabel("Actual weight (kg)", { exact: true }).fill("1")
+  await panel
+    .getByLabel("Recorded quantity / proposed weight", { exact: true })
+    .fill("1")
   await panel.getByLabel("Cost (RWF/kg)", { exact: true }).fill("3000")
   await panel.getByLabel("Original quantity unit", { exact: true }).fill("pack")
   await panel.getByRole("combobox", { name: "Status", exact: true }).click()
@@ -489,7 +494,9 @@ test("stale inline saves retain entered values and never report success", async 
     .getByRole("button", { name: "Review and correct", exact: true })
     .click()
   const panel = editor(page)
-  await panel.getByLabel("Actual weight (kg)", { exact: true }).fill("1")
+  await panel
+    .getByLabel("Recorded quantity / proposed weight", { exact: true })
+    .fill("1")
   await panel
     .getByRole("combobox", { name: "Product catalog unit", exact: true })
     .click()
@@ -505,7 +512,7 @@ test("stale inline saves retain entered values and never report success", async 
     "This item changed. Reload the saved review before applying your correction.",
   )
   await expect(
-    panel.getByLabel("Actual weight (kg)", { exact: true }),
+    panel.getByLabel("Recorded quantity / proposed weight", { exact: true }),
   ).toHaveValue("1")
   expect(server.writes()).toBe(0)
 })
@@ -529,7 +536,7 @@ test("838 rows support bulk preview exceptions, safe retry, refresh and per-row 
     .click()
   await expect(
     page.getByRole("option", {
-      name: "Unknown: Actual weight (kg) (838)",
+      name: "Unknown: Recorded quantity / proposed weight (838)",
       exact: true,
     }),
   ).toBeVisible()
@@ -545,7 +552,10 @@ test("838 rows support bulk preview exceptions, safe retry, refresh and per-row 
     .getByRole("combobox", { name: "Field to correct", exact: true })
     .click()
   await page
-    .getByRole("option", { name: "Price per kg (RWF)", exact: true })
+    .getByRole("option", {
+      name: "Recorded price / proposed price (RWF)",
+      exact: true,
+    })
     .click()
   await bulk.getByLabel("New value", { exact: true }).fill("4900")
   await bulk
