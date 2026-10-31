@@ -386,6 +386,9 @@ pub(super) async fn receipt(
             &object_key,
             document_id.as_deref().unwrap_or_default(),
             &checksum,
+            trusted.client(),
+            organization_id,
+            query.company_id,
         )
         .await?
     } else {
@@ -459,6 +462,9 @@ async fn indexing_status(
     object_key: &str,
     document_id: &str,
     checksum: &str,
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    company_id: u64,
 ) -> Result<&'static str, ApiError> {
     for status in ["queued", "failed"] {
         if storage::read(
@@ -469,8 +475,220 @@ async fn indexing_status(
         .await?
         .is_some()
         {
+            if status == "queued" {
+                return Ok(read_worker_status(
+                    store,
+                    object_key,
+                    document_id,
+                    checksum,
+                    client,
+                    organization_id,
+                    company_id,
+                )
+                .await
+                .unwrap_or("unavailable"));
+            }
             return Ok(status);
         }
     }
     Ok("pending")
+}
+
+/// A manifest records exact admitted effects, not worker success. It contains
+/// no source text and is private under the already-authorized upload receipt.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct IndexingJobRef {
+    pub job_id: u64,
+    pub passage_id: u64,
+    pub fingerprint: String,
+}
+
+pub(crate) async fn record_indexing_manifest(
+    store: &DocumentBlobStoreConfig,
+    object_key: &str,
+    document_id: u64,
+    checksum: &str,
+    jobs: &[IndexingJobRef],
+) -> Result<(), ApiError> {
+    validate_job_refs(jobs)?;
+    let key = indexing_key(object_key, &document_id.to_string(), checksum, "jobs-v1")?;
+    let bytes = serde_json::to_vec(jobs).map_err(ApiError::internal)?;
+    storage::put_immutable(store, &key, &bytes, "application/json").await
+}
+
+fn validate_job_refs(jobs: &[IndexingJobRef]) -> Result<(), ApiError> {
+    let mut ids = std::collections::HashSet::new();
+    let mut passages = std::collections::HashSet::new();
+    if jobs.is_empty()
+        || jobs.len() > 64
+        || jobs.iter().any(|job| {
+            job.job_id == 0
+                || job.passage_id == 0
+                || !ids.insert(job.job_id)
+                || !passages.insert(job.passage_id)
+                || job.fingerprint.len() != 64
+                || !job
+                    .fingerprint
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
+    {
+        return Err(ApiError::Conflict(
+            "document indexing manifest is invalid".into(),
+        ));
+    }
+    Ok(())
+}
+
+async fn read_worker_status(
+    store: &DocumentBlobStoreConfig,
+    object_key: &str,
+    document_id: &str,
+    checksum: &str,
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<&'static str, ApiError> {
+    let key = indexing_key(object_key, document_id, checksum, "jobs-v1")?;
+    let Some(bytes) = storage::read(store, &key, 32768).await? else {
+        // Legacy queue receipts have no exact expected-job set. They never
+        // become complete through newest-row or document-name discovery.
+        return Ok("queued");
+    };
+    let jobs: Vec<IndexingJobRef> = serde_json::from_slice(&bytes).map_err(ApiError::internal)?;
+    validate_job_refs(&jobs)?;
+    let mut statuses = Vec::with_capacity(jobs.len());
+    for job in jobs {
+        let rows = client.query_sql(&format!(
+            "SELECT id, status, semantic_key FROM queue_job WHERE organization_id = {organization_id} AND company_id = {company_id} AND id = {} AND queue_name = 'embedding' LIMIT 2", job.job_id
+        )).await.map_err(ApiError::internal)?;
+        let embeddings = client.query_sql(&format!(
+            "SELECT expected_fingerprint, index_generation, sync_status FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = 'ai_evidence_passage' AND content_id = {} LIMIT 2", job.passage_id
+        )).await.map_err(ApiError::internal)?;
+        statuses.push(worker_status(&job, &rows, &embeddings));
+    }
+    Ok(combine_worker_statuses(&statuses))
+}
+
+fn worker_status(job: &IndexingJobRef, rows: &[Value], embeddings: &[Value]) -> &'static str {
+    if rows.len() != 1 || embeddings.len() != 1 {
+        return "unavailable";
+    }
+    let text = |row: &Value, camel: &str, snake: &str| {
+        row.get(camel)
+            .or_else(|| row.get(snake))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    let semantic_key = format!(
+        "embedding:ai_evidence_passage:{}:{}:semantic-index-v1",
+        job.passage_id, job.fingerprint
+    );
+    if text(&rows[0], "semanticKey", "semantic_key").as_deref() != Some(&semantic_key)
+        || text(
+            &embeddings[0],
+            "expectedFingerprint",
+            "expected_fingerprint",
+        )
+        .as_deref()
+            != Some(&job.fingerprint)
+        || text(&embeddings[0], "indexGeneration", "index_generation").as_deref()
+            != Some("semantic-index-v1")
+    {
+        return "unavailable";
+    }
+    match (
+        text(&rows[0], "status", "status").as_deref(),
+        text(&embeddings[0], "syncStatus", "sync_status").as_deref(),
+    ) {
+        (Some("Completed"), Some("synced")) => "completed",
+        (Some("DeadLettered" | "Cancelled"), _) | (_, Some("failed")) => "failed",
+        (Some("Leased"), Some("pending")) => "running",
+        (Some("Pending"), Some("pending")) => "queued",
+        _ => "unavailable",
+    }
+}
+
+fn combine_worker_statuses(statuses: &[&str]) -> &'static str {
+    if statuses.is_empty() || statuses.contains(&"unavailable") {
+        "unavailable"
+    } else if statuses.contains(&"failed") {
+        "failed"
+    } else if statuses.contains(&"running") {
+        "running"
+    } else if statuses.iter().all(|status| *status == "completed") {
+        "completed"
+    } else {
+        "queued"
+    }
+}
+
+#[cfg(test)]
+mod worker_status_tests {
+    use super::*;
+    fn fixture() -> (IndexingJobRef, Vec<Value>, Vec<Value>) {
+        let job = IndexingJobRef {
+            job_id: 10,
+            passage_id: 20,
+            fingerprint: "a".repeat(64),
+        };
+        let rows = vec![
+            serde_json::json!({"id":10,"semanticKey":format!("embedding:ai_evidence_passage:20:{}:semantic-index-v1",job.fingerprint),"status":"Completed"}),
+        ];
+        let embeddings = vec![
+            serde_json::json!({"expectedFingerprint":job.fingerprint,"indexGeneration":"semantic-index-v1","syncStatus":"synced"}),
+        ];
+        (job, rows, embeddings)
+    }
+    #[test]
+    fn completed_requires_both_canonical_finalization_records() {
+        let (job, mut rows, mut embeddings) = fixture();
+        assert_eq!(worker_status(&job, &rows, &embeddings), "completed");
+        rows[0]["status"] = Value::String("Leased".into());
+        assert_eq!(worker_status(&job, &rows, &embeddings), "unavailable");
+        embeddings[0]["syncStatus"] = Value::String("pending".into());
+        assert_eq!(worker_status(&job, &rows, &embeddings), "running");
+        rows[0]["status"] = Value::String("Pending".into());
+        assert_eq!(worker_status(&job, &rows, &embeddings), "queued");
+        rows[0]["status"] = Value::String("DeadLettered".into());
+        assert_eq!(worker_status(&job, &rows, &embeddings), "failed");
+    }
+    #[test]
+    fn stale_fingerprints_and_ambiguous_or_missing_rows_never_complete() {
+        let (job, rows, mut embeddings) = fixture();
+        assert_eq!(worker_status(&job, &[], &embeddings), "unavailable");
+        assert_eq!(
+            worker_status(&job, &[rows[0].clone(), rows[0].clone()], &embeddings),
+            "unavailable"
+        );
+        embeddings[0]["expectedFingerprint"] = Value::String("b".repeat(64));
+        assert_eq!(worker_status(&job, &rows, &embeddings), "unavailable");
+    }
+    #[test]
+    fn partial_passage_sets_do_not_report_completed() {
+        assert_eq!(combine_worker_statuses(&[]), "unavailable");
+        assert_eq!(combine_worker_statuses(&["completed", "queued"]), "queued");
+        assert_eq!(combine_worker_statuses(&["completed", "failed"]), "failed");
+        assert_eq!(
+            combine_worker_statuses(&["completed", "unavailable"]),
+            "unavailable"
+        );
+        assert_eq!(
+            combine_worker_statuses(&["completed", "completed"]),
+            "completed"
+        );
+    }
+    #[test]
+    fn manifest_requires_unique_exact_job_and_passage_identity() {
+        let (job, _, _) = fixture();
+        assert!(validate_job_refs(&[job.clone()]).is_ok());
+        assert!(validate_job_refs(&[job.clone(), job.clone()]).is_err());
+        assert!(validate_job_refs(&[]).is_err());
+        assert!(validate_job_refs(&[IndexingJobRef {
+            fingerprint: "not-a-hash".into(),
+            ..job
+        }])
+        .is_err());
+    }
 }

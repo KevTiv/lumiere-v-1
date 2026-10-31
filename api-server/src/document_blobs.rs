@@ -48,7 +48,7 @@ mod route_tests;
 const MAX_UPLOAD_BYTES: u64 = 50 * 1024 * 1024; // 50 MiB pilot cap
 
 #[path = "document_upload_receipts.rs"]
-mod upload_receipts;
+pub(crate) mod upload_receipts;
 pub(crate) use upload_receipts::record_indexing_receipt;
 use upload_receipts::{receipt, submission_object_id, UploadRegistration};
 

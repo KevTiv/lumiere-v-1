@@ -28,6 +28,8 @@ struct Rows {
     receipts: Vec<Value>,
     versions: Vec<Value>,
     creation_receipts: Vec<Value>,
+    embedding_jobs: Vec<Value>,
+    embeddings: Vec<Value>,
     field_permissions: Vec<Value>,
     restrict_after_versions: bool,
 }
@@ -48,6 +50,8 @@ impl Default for Rows {
             receipts: Vec::new(),
             versions: Vec::new(),
             creation_receipts: Vec::new(),
+            embedding_jobs: Vec::new(),
+            embeddings: Vec::new(),
             field_permissions: Vec::new(),
             restrict_after_versions: false,
         }
@@ -144,6 +148,22 @@ async fn sql(State(rows): State<Arc<Mutex<Rows>>>, headers: HeaderMap, query: St
             versions
         } else if query.contains(" FROM document_template ") {
             rows.templates.clone()
+        } else if query.contains(" FROM queue_job ") {
+            assert!(
+                query.contains("company_id = 3")
+                    && query.contains("id = 51")
+                    && query.contains("queue_name = 'embedding'"),
+                "{query}"
+            );
+            rows.embedding_jobs.clone()
+        } else if query.contains(" FROM search_embedding ") {
+            assert!(
+                query.contains("company_id = 3")
+                    && query.contains("content_id = 61")
+                    && query.contains("content_type = 'ai_evidence_passage'"),
+                "{query}"
+            );
+            rows.embeddings.clone()
         } else if query.contains(" FROM hr_expense_receipt ") {
             rows.receipts.clone()
         } else {
@@ -789,6 +809,63 @@ async fn submission_receipt_recovers_same_blob_and_separates_failed_indexing() {
         .json();
     assert_eq!(queued["indexing"], "queued");
     assert_eq!(queued["objectKey"], reserve["objectKey"]);
+    // New admissions freeze exact job identities after all passages queue.
+    // An identical replay (including a lost manifest-write reply) is safe.
+    let jobs = [upload_receipts::IndexingJobRef {
+        job_id: 51,
+        passage_id: 61,
+        fingerprint: "a".repeat(64),
+    }];
+    for _ in 0..2 {
+        upload_receipts::record_indexing_manifest(
+            &fixture.state.config.document_blob_store,
+            &slot.object_key,
+            21,
+            &checksum,
+            &jobs,
+        )
+        .await
+        .unwrap();
+    }
+    let conflicting = [upload_receipts::IndexingJobRef {
+        job_id: 52,
+        ..jobs[0].clone()
+    }];
+    assert!(upload_receipts::record_indexing_manifest(
+        &fixture.state.config.document_blob_store,
+        &slot.object_key,
+        21,
+        &checksum,
+        &conflicting
+    )
+    .await
+    .is_err());
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.embedding_jobs = vec![
+            json!({"id":51,"status":"Completed","semantic_key":format!("embedding:ai_evidence_passage:61:{}:semantic-index-v1", "a".repeat(64))}),
+        ];
+        rows.embeddings = vec![
+            json!({"expected_fingerprint":"a".repeat(64),"index_generation":"semantic-index-v1","sync_status":"synced"}),
+        ];
+    }
+    let completed = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(completed["indexing"], "completed");
+    assert_eq!(completed["documentId"], "21");
+    // A stale index generation must not be presented as completed.
+    fixture.rows.lock().unwrap().embeddings[0]["index_generation"] = json!("different-generation");
+    let unavailable = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(unavailable["indexing"], "unavailable");
+    assert_eq!(unavailable["fileSaved"], true);
+    assert_eq!(unavailable["registrationState"], "registered");
     fixture
         .get("other-token", &receipt_url)
         .await
