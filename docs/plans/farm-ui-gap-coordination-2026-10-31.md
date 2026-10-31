@@ -228,10 +228,10 @@ and rerun exact-head checks after it merges. No source fix below is deployed.
 | Packet | Source commit(s) integrated | State and remaining gate |
 | --- | --- | --- |
 | F1 | External PR #340 | Separate CI/release lane; not part of this combined test result. |
-| N1 | `031ba9e13` | Category rename source ready for review. Five resolver and seven Products catalog tests pass. Review display-label operation remains a separate producer task. No live rename. |
-| A1 | `dcebd51ef` | Scope selector and canonical projection source ready for review. Four selector tests and 91 exact-source authorization tests pass. Code generation and full/deployed checks pending. |
-| A2 | `14840b9ab`, `b11d5ecef` | Five scoped read views and truthful provider usage candidate. Six observation and four lifecycle model tests pass. Module schema/contract generation, native reader authorization execution and gateway integration remain required. Persisted run counter is unchanged. |
-| D1 | `82fcd99a0` | Exact worker-result resolver and receipt UI candidate. Nine receipt tests pass. Full API/router execution and live indexing/failure recovery remain pending. Legacy receipts without a job manifest are not declared complete. |
+| N1 | [PR #342](https://github.com/KevTiv/lumiere-v-1/pull/342), `031ba9e13` | Category rename source ready for review. Five resolver and seven Products catalog tests pass. Review display-label operation remains a separate producer task. No live rename. |
+| A1 | [PR #341](https://github.com/KevTiv/lumiere-v-1/pull/341), `dcebd51ef` | Scope selector and canonical projection source ready for review. Four selector tests and 91 exact-source authorization tests pass. Code generation and full/deployed checks pending. |
+| A2 | [PR #344](https://github.com/KevTiv/lumiere-v-1/pull/344), `14840b9ab`, `b11d5ecef` | Five scoped read views and truthful provider usage candidate. Six observation and four lifecycle model tests pass. Module schema/contract generation, native reader authorization execution and gateway integration remain required. Persisted run counter is unchanged. |
+| D1 | [PR #343](https://github.com/KevTiv/lumiere-v-1/pull/343), `82fcd99a0` | Exact worker-result resolver and receipt UI candidate. Nine receipt tests pass. Full API/router execution and live indexing/failure recovery remain pending. Legacy receipts without a job manifest are not declared complete. |
 | A3 | `25415ccef` | Contract boundary documented in finance-skill-readiness-admission-contract.md. No session-owned no-cost Finance admission read exists. Positive readiness UI is blocked on that producer; no activation. |
 | V1/H1 | None | Deployed acceptance and Mugisha naming/data handover remain pending. |
 
