@@ -3,6 +3,7 @@
 import { useMutation } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
+import { decodeAiFormSuggestions } from "./ai-form-suggestions"
 
 import { responseErrorMessage as parseAiError } from "@lumiere/api-client/response-error"
 
@@ -48,6 +49,8 @@ export type AiFormValidateResponse = {
 
 export function useAiFormSuggest() {
   return useMutation({
+    // Generation can incur provider cost even if the response cannot be read.
+    retry: false,
     mutationFn: async (args: {
       companyId: number
       formId: string
@@ -69,7 +72,7 @@ export function useAiFormSuggest() {
         }),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as AiFormSuggestResponse
+      return decodeAiFormSuggestions(await r.json(), args.fields)
     },
   })
 }
