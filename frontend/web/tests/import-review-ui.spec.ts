@@ -20,7 +20,7 @@ function source(): ReviewRow {
 async function mockProductReferences(page: Page) {
   await page.route("**/api/query/**", route => {
     const path = new URL(route.request().url()).pathname
-    const data = path.endsWith("product-categories") ? [{id:12,organizationId:8001,name:"Historic products"}] : path.endsWith("uoms") ? [{id:13,organizationId:8001,name:"Kilogram",symbol:"kg",categoryId:1},{id:14,organizationId:8001,name:"Unit",symbol:"unit",categoryId:2},{id:15,organizationId:8002,name:"Foreign unit",symbol:"kg",categoryId:1}] : []
+    const data = path.endsWith("product-categories") ? [{id:12,organizationId:8001,name:"Historic products"}] : path.endsWith("uoms") ? [{id:13,organizationId:8001,name:"Kilogram",symbol:"kg",categoryId:1},{id:14,organizationId:8001,name:"Unit",symbol:"unit",categoryId:2},{id:15,organizationId:8002,name:"Foreign unit",symbol:"kg",categoryId:1}] : path.endsWith("companies") ? [{ id: 9001, organizationId: 8001, name: "Fixture company", currencyId: 9102 }] : []
     return route.fulfill({json:{data}})
   })
 }
@@ -112,7 +112,7 @@ test("a stale revision retains the user's entries and does not show false succes
 })
 
 async function importHandoffFixture(page: Page, options: { deferAnalysis?: boolean } = {}) {
-  const item: ReviewRow = { ...source(), values: { quantity: "1", unit_price: "4800", amount: "4800", sale_price: "4800", cost_price: "3000" }, state: "confirmed", revision: 2, reason: "Confirmed source values" }
+  const item: ReviewRow = { ...source(), values: { ...source().values, quantity: "1" }, state: "confirmed", revision: 2, reason: "Confirmed source values" }
   const detail: ReviewDetail = { id: "1", title: "Confirmed source", targetEntity: "product", sourceFile: "historic-shop.csv", items: [item], history: [] }
   const analyses: Array<{ targetEntity: string; headers: string[]; csvText: string }> = []
   const imports: Array<{ requestId: string; csvData: string; fileName: string; params: { companyId: string; currencyId: string } }> = []
@@ -123,7 +123,7 @@ async function importHandoffFixture(page: Page, options: { deferAnalysis?: boole
   const importGate = new Promise<void>(resolve => { releaseImport = resolve })
   if (!options.deferAnalysis) releaseAnalysis()
   const safety = { findings: [], blocked_cell_count: 0, is_safe_for_ai: true }
-  await page.route("**/api/query/**", route => route.fulfill({ json: { data: new URL(route.request().url()).pathname.endsWith("/companies") ? [{ id: 9001, organizationId: 8001, name: "Fixture company", currencyId: 9102 }] : [] } }))
+  await mockProductReferences(page)
   await page.route("**/api/import-reviews**", route => route.fulfill({ json: new URL(route.request().url()).pathname.endsWith("/1") ? detail : { data: [{ id: "1", title: detail.title, pending: 0, total: 1, confirmed: 1, excluded: 0, targetEntity: "product", sourceFile: detail.sourceFile }] } }))
   await page.route("**/api/ai/import/analyze", async route => {
     const body = route.request().postDataJSON() as typeof analyses[number]
