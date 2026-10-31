@@ -1,4 +1,6 @@
 "use client"
+
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Button } from "@lumiere/ui/components/button"
 import { useCurrencyFormat, useRBAC, DashboardGrid } from "@lumiere/ui"
 import { useRouter } from "next/navigation"
@@ -725,12 +727,18 @@ function SubscriptionsClientLoaded({
     return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
   }, [t, activatePlan, deactivatePlan, updatePlan, createBundle, askForm, plans])
 
+  const companyCurrencyRows = useCompanies(Number(orgId), orgId > 0n).data ?? []
   const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const now = new Date()
     const currencyCodeById = currencyCodeMap(currencies)
     const chartSubscriptions = subscriptions.filter((subscription) => subscription.companyId === operatingCompanyId)
     const subscriptionCurrencies = new Set(chartSubscriptions.map((row) => currencyCodeById.get(String(row.currencyId)) ?? ""))
+    if (chartSubscriptions.length === 0) {
+      const base = companyCurrencyRows.find(company => company.id === operatingCompanyId)?.currencyId
+      const code = base == null ? undefined : currencyCodeById.get(String(base))
+      if (code) subscriptionCurrencies.add(code)
+    }
     const [onlyCurrency] = [...subscriptionCurrencies]
     const money: ChartValueFormat =
       subscriptionCurrencies.size === 1 && onlyCurrency ? { kind: "currency", currency: onlyCurrency } : { kind: "number" }
@@ -747,7 +755,7 @@ function SubscriptionsClientLoaded({
         }
         return w
           })
-  }, [locale, subscriptions, plans, currencies, moduleConfig, operatingCompanyId])
+  }, [locale, companyCurrencyRows, subscriptions, plans, currencies, moduleConfig, operatingCompanyId])
 
   const config = useMemo(
     () =>
