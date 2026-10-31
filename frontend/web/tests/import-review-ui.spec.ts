@@ -52,14 +52,14 @@ function source(id = "11"): ReviewRow {
         },
         {
           key: "sale_price",
-          label: "Sale price (RWF/kg)",
+          label: "Product sale price (RWF)",
           kind: "decimal",
           sourceValue: "600",
           required: true,
         },
         {
           key: "cost_price",
-          label: "Cost (RWF/kg)",
+          label: "Cost (RWF)",
           kind: "decimal",
           sourceValue: null,
           required: true,
@@ -391,7 +391,7 @@ test("confirming a proposed price preserves unknown weight, original unit and co
   for (const label of [
     "Recorded quantity / proposed weight",
     "Original quantity unit",
-    "Cost (RWF/kg)",
+    "Cost (RWF)",
   ])
     await expect(editor(page).getByLabel(label, { exact: true })).toHaveValue(
       "",
@@ -463,7 +463,7 @@ test("complete-row confirmation requires explicit values and named product refer
   await panel
     .getByLabel("Recorded quantity / proposed weight", { exact: true })
     .fill("1")
-  await panel.getByLabel("Cost (RWF/kg)", { exact: true }).fill("3000")
+  await panel.getByLabel("Cost (RWF)", { exact: true }).fill("3000")
   await panel.getByLabel("Original quantity unit", { exact: true }).fill("pack")
   await panel.getByRole("combobox", { name: "Status", exact: true }).click()
   await page

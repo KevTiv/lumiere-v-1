@@ -18,7 +18,7 @@ export type ImportRecovery = {
   request: CsvImportRequest
 }
 
-const MAX_CSV_BYTES = 512_000
+const MAX_CSV_BYTES = 2_000_000
 
 export function importRecoveryKey(scope: ImportRecoveryScope): string {
   if (!/^[a-f0-9]{64}$/i.test(scope.actor)
@@ -45,11 +45,13 @@ function decodeRecovery(value: unknown, scope: ImportRecoveryScope): ImportRecov
     || stored.organizationId !== String(scope.organizationId) || stored.companyId !== String(scope.companyId)
     || typeof stored.entity !== "string" || typeof stored.requestId !== "string"
     || typeof stored.csvData !== "string" || !stored.csvData.trim()
-    || new TextEncoder().encode(stored.csvData).byteLength > MAX_CSV_BYTES
     || typeof stored.fileName !== "string" || !stored.fileName || stored.fileName.length > 1024
     || (stored.currencyId !== undefined && typeof stored.currencyId !== "string")
     || (stored.cacheCompanyId !== undefined && stored.cacheCompanyId !== stored.companyId)) {
     throw new Error("The retained import request does not match this company. No new submission was sent.")
+  }
+  if (new TextEncoder().encode(stored.csvData).byteLength > MAX_CSV_BYTES) {
+    throw new Error("This import exceeds the 2 MB refresh-recovery limit. Use a smaller source file. No submission was sent.")
   }
   const request = createCsvImportRequest(
     BigInt(scope.organizationId), stored.entity, stored.csvData, stored.fileName,

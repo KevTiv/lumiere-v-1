@@ -200,6 +200,7 @@ jobs:
 
       - name: Alpha saved-effect readback and retention authorization
         run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::record_creations::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::expense_allocations::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::documents::retention::tests

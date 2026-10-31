@@ -65,6 +65,9 @@ and reason. The native location importer now records the exact created identity
 and submitted CSV row as products and contacts already do. The guided import keeps
 the exact request bytes and request ID across refresh, scoped to actor/company,
 and checks the server result before allowing a new submission.
+Refresh recovery supports submitted CSVs up to 2 MB, including source provenance.
+If the source exceeds that bound or browser storage cannot retain it, the UI stops
+before dispatch and explains the problem; it never sends an unresumable request.
 
 ### Save receipts
 
