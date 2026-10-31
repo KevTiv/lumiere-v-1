@@ -65,6 +65,19 @@
     "search": "Tafuta moduli na rekodi"
   },
   "common": {
+    "name": "Jina",
+    "importSource": {
+      "title": "Chanzo cha uingizaji kilichorekodiwa",
+      "description": "Maelezo ya faili na ukaguzi yaliyohifadhiwa pamoja na rekodi hii.",
+      "file": "Faili ya asili",
+      "sourceLine": "Mstari wa faili chanzo",
+      "importRow": "Safu ya uingizaji",
+      "sha256": "SHA-256 iliyorekodiwa ya faili",
+      "batch": "Kundi la ukaguzi",
+      "item": "Kipengee cha ukaguzi",
+      "revision": "Toleo la ukaguzi",
+      "reason": "Sababu ya uamuzi wa ukaguzi"
+    },
     "select": {
       "search": "Tafuta chaguo…",
       "options": "Chaguo",

@@ -7,6 +7,12 @@
     }
   },
   "common": {
+    "importSource": {
+      "description": "Amakuru ya file n’ay’igenzura abitswe hamwe n’iyi nyandiko.",
+      "file": "File y’umwimerere",
+      "sourceLine": "Umurongo muri file y’inkomoko",
+      "sha256": "SHA-256 yabitswe ya file"
+    },
     "lookup": {
       "noSaleOrders": "Nta order z’abakiriya. Banza ukore order yemejwe.",
       "noAccounts": "Nta account z’ibaruramari rusange. Banza ushyireho urutonde rwa account.",

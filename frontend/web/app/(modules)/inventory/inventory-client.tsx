@@ -59,6 +59,7 @@ import {
   productStatusBadges,
   stockQuantsTableConfig,
   stockQuantDetailConfig,
+  stockLocationDetailConfig,
   transfersTableConfig,
   transferDetailConfig,
   transferStatusBadges,
@@ -71,6 +72,7 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from '@lumiere/ui';
+import { useErpSession } from '@lumiere/erp-session';
 import { formNumber, formText, recordOptions, useFormDialog } from '@lumiere/ui';
 import type {
   EntityTableConfig,
@@ -427,6 +429,7 @@ function InventoryClientLoaded({
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription();
   const { t } = useTranslation();
+  const { identity, organizationId: sessionOrganizationId } = useErpSession();
   const { askForm, cancelForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const selectedOperatingCompanyId =
@@ -1590,6 +1593,12 @@ function InventoryClientLoaded({
       auditTableName: 'stock_quant',
     };
   }, [t, productLabelById, locationLabelById]);
+
+  const locationRecordSheet = useMemo((): EntityRecordSheetConfig => ({
+    titleKey: 'name',
+    detailConfig: stockLocationDetailConfig(t),
+    auditTableName: 'stock_location',
+  }), [t]);
 
   const transferRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = transferStatusBadges(t);
@@ -3210,7 +3219,7 @@ function InventoryClientLoaded({
           if (tab.id === 'lots') return withTransferActions(tab);
           if (tab.id === 'serials') return withTransferActions(tab);
           if (tab.id === 'adjustments') return withTransferActions(tab);
-          if (tab.id === 'locations') return withTransferActions(tab);
+          if (tab.id === 'locations') return withTransferActions({ ...tab, recordSheet: locationRecordSheet });
           if (tab.id === 'cycle-counts') return withTransferActions(tab);
           if (tab.id === 'quality') return withTransferActions(tab);
           if (tab.id === 'replenishment') return withTransferActions(tab);
@@ -3264,6 +3273,7 @@ function InventoryClientLoaded({
     transfersEntityConfig,
     productRecordSheet,
     stockQuantRecordSheet,
+    locationRecordSheet,
     transferRecordSheet,
     t,
     pickingWorkflow,
@@ -3835,12 +3845,9 @@ function InventoryClientLoaded({
   return (
     <>
       {activeTabUsable && formDialog}
-      {/* key={operatingCompanyId} forces React to remount ModuleView when the operating company
-          changes, preventing stale inventory rows from a previous company leaking into the new view. */}
+      {/* A record selection must not outlive its actor, organization, or company. */}
       <ModuleView
-        key={
-          operatingCompanyId != null ? String(operatingCompanyId) : 'no-company'
-        }
+        key={`${identity ?? 'anonymous'}:${sessionOrganizationId ?? 'no-organization'}:${organizationId}:${operatingCompanyId}`}
         config={config}
         data={data}
         dataLoading={{

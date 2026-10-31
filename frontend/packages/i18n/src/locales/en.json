@@ -251,6 +251,19 @@
     "search": "Search modules and records"
   },
   "common": {
+    "name": "Name",
+    "importSource": {
+      "title": "Recorded import source",
+      "description": "File and review details retained with this record.",
+      "file": "Original file",
+      "sourceLine": "Source line",
+      "importRow": "Import row",
+      "sha256": "Recorded file SHA-256",
+      "batch": "Review batch",
+      "item": "Review item",
+      "revision": "Review revision",
+      "reason": "Review decision reason"
+    },
     "select": {
       "search": "Search options…",
       "options": "Options",

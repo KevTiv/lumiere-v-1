@@ -68,6 +68,11 @@ and checks the server result before allowing a new submission.
 Refresh recovery supports submitted CSVs up to 2 MB, including source provenance.
 If the source exceeds that bound or browser storage cannot retain it, the UI stops
 before dispatch and explains the problem; it never sends an unresumable request.
+Product and location record details display the recorded source file, row, hash,
+review batch/item/revision and decision reason from their authorized metadata.
+Location rows now open a detail sheet. Selection resets when the actor,
+organization or company changes, and malformed source metadata is not presented
+as provenance.
 
 ### Save receipts
 
@@ -120,6 +125,10 @@ Focused coverage lives beside each owner:
   `prepared-product-import-ui.spec.ts` and
   `document-upload-receipts-ui.spec.ts`: production components in a browser with
   synthetic HTTP/session boundaries, refresh and request-count assertions.
+- `record-import-source.test.ts`, `record-import-source.test.tsx` and
+  `import-source-detail-ui.spec.ts`: source evidence in product/location record
+  details, exact large IDs, malformed/redacted metadata, refresh and dismissal
+  across actor, organization and company changes.
 - Actual PostgreSQL review tests cover scope, idempotency, revision checks, partial
   confirmations, all-or-nothing bulk decisions and durable undo history. The
   migration test upgrades populated catalog 31 to 32 and checks restart safety.
@@ -151,7 +160,9 @@ acceptance record containing the served commit and created record identities.
 5. Resolve enough product/location rows to continue into the prepared import.
    Interrupt a response, refresh and check the saved result. Verify one submission
    identity and trace every created record through import job/record metadata to
-   the exact original file and row. Repeat for each supported source type.
+   the exact original file and row. Open each created product/location detail and
+   inspect its Recorded import source panel. Refresh and verify the same source
+   evidence is shown. Repeat for each supported source type.
 6. Upload a document while indexing is unavailable. Verify **File saved → Document
    registered → AI indexing failed**, refresh, retry indexing and verify that file
    upload and document registration each happened once. Repeat with a lost reply.
