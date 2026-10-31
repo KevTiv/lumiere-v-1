@@ -4072,6 +4072,8 @@ function InventoryClientLoaded({
           }] }],
         }}
         draft={false}
+        closeOnSubmit={false}
+        showSubmitSuccessToast={false}
         isPending={renameCategory.isPending}
         submissionDisabled={permissionsReady === false || !checkPermission('product_category', 'write').allowed}
         onSubmit={async (fd) => {
