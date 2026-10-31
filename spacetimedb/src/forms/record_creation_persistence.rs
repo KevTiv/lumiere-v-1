@@ -6,6 +6,7 @@ use crate::core::reference::document_sequence;
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::crm::opportunities::opportunity;
+use crate::documents::documents::{doc_folder, document, document_version};
 use crate::forms::record_custom_field_value;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use spacetimedb::{ReducerContext, Table};
@@ -115,6 +116,87 @@ fn append_sequence(
         serde_json::json!({"sequence_key":row.sequence_key}),
         &row,
     )?);
+    Ok(())
+}
+
+pub(crate) fn record_document_creation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    record_id: u64,
+    receipt_id: &str,
+) -> Result<(), String> {
+    let row = ctx
+        .db
+        .document()
+        .id()
+        .find(&record_id)
+        .ok_or("created document missing")?;
+    if row.organization_id != organization_id || row.company_id != Some(company_id) {
+        return Err("created document scope mismatch".into());
+    }
+    let version_id = row
+        .current_version_id
+        .ok_or("created document version missing")?;
+    let version = ctx
+        .db
+        .document_version()
+        .id()
+        .find(&version_id)
+        .ok_or("created document version missing")?;
+    if version.document_id != record_id
+        || version.organization_id != organization_id
+        || version.version_number != 1
+    {
+        return Err("created document initial version mismatch".into());
+    }
+    let mut changes = vec![
+        RowChange::upsert_stdb_row("document", serde_json::json!({"id":row.id}), &row)?,
+        RowChange::upsert_stdb_row(
+            "document_version",
+            serde_json::json!({"id":version.id}),
+            &version,
+        )?,
+    ];
+    if let Some(folder_id) = row.folder_id {
+        let folder = ctx
+            .db
+            .doc_folder()
+            .id()
+            .find(&folder_id)
+            .ok_or("created document folder missing")?;
+        changes.push(RowChange::upsert_stdb_row(
+            "doc_folder",
+            serde_json::json!({"id":folder.id}),
+            &folder,
+        )?);
+    }
+    append_custom_values_and_audits(
+        ctx,
+        organization_id,
+        company_id,
+        "document",
+        record_id,
+        &mut changes,
+    )?;
+    append_creation_receipt(
+        ctx,
+        organization_id,
+        company_id,
+        "document",
+        record_id,
+        receipt_id,
+        &mut changes,
+    )?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_document".into(),
+            correlation_id: receipt_id.into(),
+            changes,
+        },
+    )?;
     Ok(())
 }
 

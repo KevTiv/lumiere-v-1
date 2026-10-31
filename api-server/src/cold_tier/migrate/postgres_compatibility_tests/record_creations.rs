@@ -1,6 +1,7 @@
-//! Real PostgreSQL 29→30 import reviews→31 receipts and restart preservation.
+//! Real PostgreSQL 29→30 reviews→31 receipts→32 field decisions and restart preservation.
 
 use super::*;
+use serde_json::Value;
 
 #[tokio::test]
 async fn postgres_guides_29_via_import_reviews_30_to_receipts_31_preserves_data() -> Result<()> {
@@ -60,7 +61,22 @@ async fn exercise_record_creation_upgrade(config: &pg_pool::PgConfig) -> Result<
     ensure!(previous_release_rows(&pool).await? == previous_rows);
     ensure!(!relation_exists(&pool, "record_creation_receipt").await?);
     seed_import_review_rows(&pool).await?;
-    let import_rows = import_review_rows(&pool).await?;
+    let mut import_rows = import_review_rows(&pool).await?;
+    // Migration 32 adds the exact sorted backfill to these two confirmed rows.
+    // Keep every prior field in the expected snapshots, including the unchanged
+    // batch; equality below must reject any other added or modified data.
+    for snapshot in &mut import_rows[1..] {
+        ensure!(snapshot["state"] == "confirmed");
+        let fields = snapshot
+            .as_object_mut()
+            .context("source review snapshot is an object")?;
+        ensure!(fields
+            .insert(
+                "confirmed_fields".into(),
+                json!(["amount", "quantity", "unit_price"]),
+            )
+            .is_none());
+    }
 
     ensure_schema(&pool).await?;
     let upgraded_history = applied_migration_history(&pool).await?;
@@ -135,7 +151,7 @@ async fn seed_import_review_rows(pool: &Pool) -> Result<()> {
     Ok(())
 }
 
-async fn import_review_rows(pool: &Pool) -> Result<Vec<String>> {
+async fn import_review_rows(pool: &Pool) -> Result<Vec<Value>> {
     let client = pool.get().await?;
     let mut rows = Vec::new();
     for table in [
@@ -143,10 +159,17 @@ async fn import_review_rows(pool: &Pool) -> Result<Vec<String>> {
         "import_review_item",
         "import_review_decision",
     ] {
-        rows.push(client.query_one(
-            &format!("SELECT row_to_json(snapshot)::TEXT FROM lumiere_platform.{table} AS snapshot"),
-            &[],
-        ).await?.get(0));
+        rows.push(
+            client
+                .query_one(
+                    &format!(
+                        "SELECT row_to_json(snapshot) FROM lumiere_platform.{table} AS snapshot"
+                    ),
+                    &[],
+                )
+                .await?
+                .get(0),
+        );
     }
     Ok(rows)
 }

@@ -62,6 +62,8 @@ pub fn run_documents_wave_a_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("documents empty blob: {e}"))?;
     platform_smoke::test_documents_create_and_lock(ctx)
         .map_err(|e| format!("documents create/lock: {e}"))?;
+    platform_smoke::test_documents_submission_receipt_replay(ctx)
+        .map_err(|e| format!("documents submission receipt: {e}"))?;
     platform_smoke::test_documents_folder_acl_blocks_write(ctx)
         .map_err(|e| format!("documents ACL: {e}"))?;
     platform_smoke::test_documents_company_isolation(ctx)

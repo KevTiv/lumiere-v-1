@@ -231,7 +231,7 @@
   "web/app/(modules)/documents/[id]/document-page-client.tsx": 2,
   "web/app/(modules)/documents/document-folder-gates.ts": 1,
   "web/app/(modules)/documents/document-record.ts": 1,
-  "web/app/(modules)/documents/documents-client.tsx": 26,
+  "web/app/(modules)/documents/documents-client.tsx": 25,
   "web/app/(modules)/documents/knowledge-actions.ts": 3,
   "web/app/(modules)/documents/signature-request.ts": 1,
   "web/app/(modules)/expenses/expense-report-finance-dialogs.tsx": 1,

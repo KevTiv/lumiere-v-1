@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
     http::HeaderMap,
     routing::{get, post},
     Json, Router,
@@ -29,7 +29,10 @@ use stdb_auth::{
     FieldAccessContext,
 };
 
-const MAX_CSV_BYTES: usize = 512_000;
+const MAX_CSV_BYTES: usize = 2_000_000;
+// Bound the JSON envelope separately so CSV quoting and escaping can exceed
+// Axum's default 2 MiB body limit without changing the decoded CSV byte limit.
+const MAX_IMPORT_JSON_BYTES: usize = 5_000_000;
 
 /// CRM entities gated by [`crm_csv_import_enabled`] pending CRM-RI-001 relational
 /// integrity remediation (see docs/plans/crm-relational-integrity-remediation-plan.md).
@@ -987,11 +990,20 @@ pub fn router() -> Router<Arc<AppState>> {
             "/import/:entity/requests/:request_id",
             get(import_request_get),
         )
+        .layer(DefaultBodyLimit::max(MAX_IMPORT_JSON_BYTES))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use axum::{
+        body::{to_bytes, Body},
+        http::{Request, StatusCode},
+    };
+    use std::{fmt::Write, sync::Mutex};
+    use tower::ServiceExt;
+    use tower_cookies::CookieManagerLayer;
 
     #[test]
     fn entity_map_includes_core_entities() {
@@ -1006,6 +1018,282 @@ mod tests {
     }
     const TOKEN: &str = "0123456789abcdef0123456789abcdef";
     const ACTOR: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    fn traced_farm_csv() -> String {
+        let reason = "Confirmed product units and prices against the original paper register; reviewed figures retained for the July farm import.";
+        let mut csv = String::from("name,sale_price,cost_price,uom_id,uom_po_id,category_id,metadata,_source_file,_source_row,_source_sha256,_review_item_id,_review_revision,_review_reason\n");
+        for index in 0..838 {
+            let file = format!("farm-historical-2024-07-file-{}.csv", index % 15 + 1);
+            let row = index + 2;
+            let item = (index + 1).to_string();
+            let metadata = json!({"source_review": {
+                "version": 1, "batch_id": "77", "item_id": item, "revision": 2,
+                "source_file": file, "source_row": row, "source_sha256": ACTOR,
+                "row_basis": "source_line", "decision_reason": reason,
+            }})
+            .to_string();
+            let fields = [
+                format!("Farm product {}", index + 1),
+                "4800".into(),
+                "3000".into(),
+                "11".into(),
+                "11".into(),
+                "21".into(),
+                metadata,
+                file,
+                row.to_string(),
+                ACTOR.into(),
+                item,
+                "2".into(),
+                reason.into(),
+            ];
+            csv.push_str(
+                &fields
+                    .iter()
+                    .map(|field| format!("\"{}\"", field.replace('"', "\"\"")))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+            csv.push('\n');
+        }
+        csv
+    }
+
+    type CapturedImports = Arc<Mutex<Vec<Value>>>;
+
+    async fn import_fixture_sql(
+        State(captured): State<CapturedImports>,
+        headers: HeaderMap,
+        sql: String,
+    ) -> ([(&'static str, &'static str); 1], Json<Value>) {
+        let token = headers.get("authorization").unwrap().to_str().unwrap();
+        let rows = if sql == "SELECT id FROM organization LIMIT 1" {
+            assert_eq!(token, "Bearer actor-token");
+            vec![json!({"id":7})]
+        } else if sql.contains(" FROM user_profile ") {
+            assert_eq!(token, "Bearer authority-token");
+            vec![
+                json!({"identity":ACTOR, "organization_id":7, "is_active":true, "is_superuser":false}),
+            ]
+        } else if sql.contains(" FROM user_organization ") {
+            assert!(sql.contains(ACTOR), "{sql}");
+            vec![
+                json!({"id":1, "organization_id":7, "company_id":42, "user_identity":ACTOR,
+                "role_id":9, "is_active":true, "is_default":true}),
+            ]
+        } else if sql.contains(" FROM role ") {
+            vec![
+                json!({"id":9, "organization_id":7, "name":"Inventory", "is_active":true,
+                "permissions":["product:read", "product:create"]}),
+            ]
+        } else if sql.contains(" FROM field_permission ")
+            || sql.contains(" FROM user_role_assignment ")
+            || sql.contains(" FROM org_permission ")
+        {
+            vec![]
+        } else if sql.contains(" FROM import_job ") {
+            assert_eq!(token, "Bearer actor-token");
+            assert_eq!(sql, receipt_sql(7, ACTOR, "product").unwrap());
+            let imports = captured.lock().unwrap();
+            let submission = &imports.last().expect("receipt read follows dispatch")[2];
+            let csv = submission["csv_data"].as_str().unwrap();
+            vec![
+                json!({"id":41, "organization_id":7, "table_name":"product", "status":"success",
+                "create_uid":ACTOR, "total_rows":838, "imported_rows":838, "error_rows":0,
+                "metadata":json!({"correlation_version":1,
+                    "sha256":format!("{:x}", Sha256::digest(csv.as_bytes())),
+                    "request_id":submission["request_id"], "company_id":42, "currency_id":3}).to_string()}),
+            ]
+        } else if sql.contains(" FROM import_job_error ") {
+            assert_eq!(token, "Bearer actor-token");
+            assert_eq!(sql, errors_sql(7, 41));
+            vec![]
+        } else {
+            panic!("unexpected SQL: {sql}");
+        };
+        let selected = sql
+            .strip_prefix("SELECT ")
+            .unwrap()
+            .split_once(" FROM ")
+            .unwrap()
+            .0;
+        let columns: Vec<String> = if selected == "*" {
+            rows.first()
+                .and_then(Value::as_object)
+                .map(|row| row.keys().cloned().collect())
+                .unwrap_or_default()
+        } else {
+            selected.split(", ").map(str::to_owned).collect()
+        };
+        (
+            [("spacetime-identity", ACTOR)],
+            Json(json!([{
+                "schema":{"elements":columns.iter().map(|name| json!({"name":{"some":name}})).collect::<Vec<_>>()},
+                "rows":rows.iter().map(|row| columns.iter().map(|name| row[name].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()
+            }])),
+        )
+    }
+
+    async fn import_fixture_reducer(
+        State(captured): State<CapturedImports>,
+        headers: HeaderMap,
+        Json(args): Json<Value>,
+    ) -> StatusCode {
+        assert_eq!(headers.get("authorization").unwrap(), "Bearer actor-token");
+        captured.lock().unwrap().push(args);
+        StatusCode::OK
+    }
+
+    fn tracked_import_body(csv: &str, company: u64) -> Value {
+        json!({"csvData":csv, "requestId":TOKEN, "fileName":"reviewed-77.csv",
+            "params":{"companyId":company, "currencyId":3}})
+    }
+
+    fn import_http_request(body: String, authenticated: bool) -> Request<Body> {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/import/product")
+            .header("content-type", "application/json");
+        if authenticated {
+            request = request.header("authorization", "Bearer actor-token");
+        }
+        request.body(Body::from(body)).unwrap()
+    }
+
+    #[test]
+    fn csv_limit_counts_decoded_utf8_bytes_and_keeps_empty_input_invalid() {
+        assert!(validate_csv(&"x".repeat(MAX_CSV_BYTES)).is_ok());
+        assert!(validate_csv(&"é".repeat(MAX_CSV_BYTES / 2)).is_ok());
+        for csv in [
+            "x".repeat(MAX_CSV_BYTES + 1),
+            "é".repeat(MAX_CSV_BYTES / 2 + 1),
+        ] {
+            assert!(
+                matches!(validate_csv(&csv), Err(ApiError::BadRequest(message))
+                if message == "CSV exceeds maximum size of 2000000 bytes")
+            );
+        }
+        assert!(matches!(
+            validate_csv(" \r\n\t"),
+            Err(ApiError::BadRequest(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn tracked_import_router_admits_838_traced_rows_and_preserves_bounds_and_scope() {
+        let csv = traced_farm_csv();
+        assert_eq!(csv.lines().count(), 839);
+        assert!(csv.len() > 512_000 && csv.len() < MAX_CSV_BYTES);
+        assert!(csv.is_ascii());
+        // The same decoded CSV has a legal, larger JSON representation. This
+        // exercises the production router's envelope limit as well as its CSV cap.
+        let mut envelope = tracked_import_body("", 42);
+        envelope.as_object_mut().unwrap().remove("csvData");
+        let mut escaped = envelope.to_string();
+        escaped.pop();
+        escaped.push_str(",\"csvData\":\"");
+        for byte in csv.bytes() {
+            write!(escaped, "\\u{byte:04x}").unwrap();
+        }
+        escaped.push_str("\"}");
+        assert!(escaped.len() > 2 * 1024 * 1024 && escaped.len() < MAX_IMPORT_JSON_BYTES);
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let mock = Router::new()
+            .route("/v1/database/test-module/sql", post(import_fixture_sql))
+            .route(
+                "/v1/database/test-module/call/import_csv_tracked",
+                post(import_fixture_reducer),
+            )
+            .with_state(Arc::clone(&captured));
+        let server = tokio::spawn(async move { axum::serve(listener, mock).await.unwrap() });
+        struct StopServer(tokio::task::JoinHandle<()>);
+        impl Drop for StopServer {
+            fn drop(&mut self) {
+                self.0.abort();
+            }
+        }
+        let _server = StopServer(server);
+        let mut config = crate::session::test_support::test_config(Some("authority-token"));
+        config.stdb_host = format!("http://{address}");
+        let app = router()
+            .layer(CookieManagerLayer::new())
+            .with_state(Arc::new(AppState::new(config)));
+
+        let response = app
+            .clone()
+            .oneshot(import_http_request(escaped, true))
+            .await
+            .unwrap();
+        let status = response.status();
+        let response_body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&response_body)
+        );
+        assert_eq!(
+            serde_json::from_slice::<Value>(&response_body).unwrap(),
+            json!({
+                "ok":true, "entity":"product", "requestId":TOKEN, "jobId":"41", "status":"success",
+                "totalRows":838, "rowsImported":838, "errorRows":0, "errors":[], "errorsRedacted":true,
+            })
+        );
+        {
+            let imports = captured.lock().unwrap();
+            assert_eq!(imports.len(), 1);
+            assert_eq!(
+                imports[0],
+                json!([7, {"some":42}, {"request_id":TOKEN, "entity":"product",
+                "csv_data":csv, "currency_id":{"some":3}, "file_name":{"some":"reviewed-77.csv"}}])
+            );
+        }
+
+        for (body, authenticated, expected) in [
+            (
+                tracked_import_body(&csv, 42).to_string(),
+                false,
+                StatusCode::UNAUTHORIZED,
+            ),
+            (
+                tracked_import_body(&csv, 43).to_string(),
+                true,
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                tracked_import_body(&"x".repeat(MAX_CSV_BYTES + 1), 42).to_string(),
+                true,
+                StatusCode::BAD_REQUEST,
+            ),
+            (
+                " ".repeat(MAX_IMPORT_JSON_BYTES + 1),
+                true,
+                StatusCode::PAYLOAD_TOO_LARGE,
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(import_http_request(body, authenticated))
+                .await
+                .unwrap();
+            let status = response.status();
+            let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+            assert_eq!(status, expected, "{}", String::from_utf8_lossy(&body));
+            if expected == StatusCode::BAD_REQUEST {
+                assert_eq!(
+                    serde_json::from_slice::<Value>(&body).unwrap(),
+                    json!({"error":"CSV exceeds maximum size of 2000000 bytes"})
+                );
+            }
+            assert_eq!(
+                captured.lock().unwrap().len(),
+                1,
+                "rejected requests must not dispatch"
+            );
+        }
+    }
 
     fn receipt(id: u64, company_id: u64) -> Value {
         json!({"id":id,"organizationId":7,"tableName":"product","status":"success","createUid":{"__identity__":format!("0x{ACTOR}")},

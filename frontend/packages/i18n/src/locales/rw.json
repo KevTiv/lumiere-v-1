@@ -65,6 +65,19 @@
     "search": "Shakisha ibice n’inyandiko"
   },
   "common": {
+    "name": "Izina",
+    "importSource": {
+      "title": "Inkomoko y’ibyinjijwe yabitswe",
+      "description": "Amakuru ya dosiye n’ay’igenzura abitswe hamwe n’iyi nyandiko.",
+      "file": "Dosiye y’umwimerere",
+      "sourceLine": "Umurongo muri dosiye y’inkomoko",
+      "importRow": "Umurongo mu byinjijwe",
+      "sha256": "SHA-256 yabitswe ya dosiye",
+      "batch": "Itsinda ry’inyandiko zigenzurwa",
+      "item": "Inyandiko igenzurwa",
+      "revision": "Ivugurura ry’igenzura",
+      "reason": "Impamvu y’icyemezo cy’igenzura"
+    },
     "select": {
       "search": "Shakisha amahitamo…",
       "options": "Amahitamo",

@@ -33,7 +33,7 @@ import { dispatchNamedOperation } from "../operation-dispatch"
 import { resolveDocumentVersionEffect } from "./document-version-effect"
 import { resolveDocumentCreateEffect } from "./document-create-effect"
 import { documentCreateCommand, documentFolderCreateCommand, type DocumentFolderCreateInput } from "./document-create-command"
-import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
+import { resolveDocumentLockEffect } from "./document-lock-effect"
 import {
   executeOperationWithCanonicalReadback,
   requireResolvedOperationEffect,
@@ -202,11 +202,19 @@ export function useCreateDocumentWithRef(organizationId: bigint, companyId: bigi
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
       const after = await fetchQueryList("/api/query/documents", "Failed to read documents")
       const p = params as { url?: unknown; checksum?: unknown; resModel?: unknown; resId?: unknown }
+      let submissionId: string | undefined
+      if (params.metadata) {
+        try {
+          const metadata: unknown = JSON.parse(params.metadata)
+          if (metadata !== null && typeof metadata === "object" && "uploadSubmissionId" in metadata && typeof metadata.uploadSubmissionId === "string") submissionId = metadata.uploadSubmissionId
+        } catch { /* Unstructured legacy metadata is not a replay receipt. */ }
+      }
       const effect = resolveDocumentCreateEffect(before, after, organizationId, {
         url: typeof p.url === "string" ? p.url : "",
         checksum: typeof p.checksum === "string" ? p.checksum : "",
         resModel: typeof p.resModel === "string" ? p.resModel : undefined,
         resId: p.resId == null ? undefined : toScalarU64(p.resId as ScalarId),
+        submissionId,
       })
       if (!effect) throw new Error("Document did not read back")
       return effect
@@ -529,7 +537,7 @@ export function useReleaseDocumentLegalHold(organizationId: bigint) {
   })
 }
 
-export function useUpdateDocumentPresence(organizationId: bigint) {
+export function useUpdateDocumentPresence(_organizationId: bigint) {
   return useMutation({
     mutationFn: async ({
       documentId,

@@ -6,6 +6,7 @@ test("prepared products import with AI disabled and wait for the tracked receipt
   let aiRequests = 0
   let requestId = ""
   let complete = false
+  let submissions = 0
   await page.route("**/api/ai/import/**", route => { aiRequests++; return route.fulfill({ status: 503, json: { error: "AI disabled" } }) })
   await page.route("**/api/query/**", route => {
     const path = new URL(route.request().url()).pathname
@@ -15,6 +16,7 @@ test("prepared products import with AI disabled and wait for the tracked receipt
   await page.route("**/api/operations/**", route => route.fulfill({ json: { ok: true } }))
   await page.route("**/api/import/product**", route => {
     if (route.request().method() === "POST") {
+      submissions++
       const body = route.request().postDataJSON()
       requestId = body.requestId
       expect(body.params).toEqual({ companyId: "9001", currencyId: "646" })
@@ -32,9 +34,13 @@ test("prepared products import with AI disabled and wait for the tracked receipt
   await page.getByRole("button", { name: "Import", exact: true }).click()
   await expect(page.getByText("The import is running. Check its result before starting another submission.", { exact: true })).toBeVisible()
   await expect(page.getByText("Imported 1 rows. 0 rows need correction.", { exact: true })).not.toBeVisible()
+  await page.reload()
+  await expect(page.getByText("Your previous submission is retained. Check its saved result or retry the same submission.", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("CSV or Excel file", { exact: true })).toBeDisabled()
   await page.getByRole("button", { name: "Check import result", exact: true }).click()
   await expect(page.getByText("Imported 1 rows. 0 rows need correction.", { exact: true })).toBeVisible()
   expect(aiRequests).toBe(0)
+  expect(submissions).toBe(1)
 })
 
 test("unknown product cost can be saved for review but cannot be imported", async ({ page }) => {

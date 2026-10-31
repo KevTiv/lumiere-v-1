@@ -324,6 +324,13 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0030_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 32,
+        name: "source_import_field_decisions",
+        change_set: 21,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_review_fields_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

@@ -7,10 +7,9 @@ import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
-import { Plug, Upload, Wrench } from "lucide-react"
+import { Building2, Plug, Upload, Wrench } from "lucide-react"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig, type SettingsExtraSection } from "@lumiere/ui"
 import {
-  toCreateCompanyParams,
   toCreateWhatsAppBusinessAccountParams,
 } from "@lumiere/erp-shared/settings-create-params"
 import {
@@ -39,12 +38,11 @@ import {
   useUpdateWhatsappCredentials,
 } from "@lumiere/query-hooks/hooks/auth"
 import { DataImportWorkspace } from "@/lib/data-import-workspace"
+import { CompanySetupWorkspace } from "@/lib/company-setup-workspace"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
-import { useCompanies, useCreateCompany } from "@lumiere/query-hooks/hooks/organization-company"
-import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { uploadDocumentBlob } from "@/lib/document-blob-upload"
 
 async function uploadInvoiceLogo(file: File, companyId: string | null): Promise<string> {
@@ -535,69 +533,11 @@ function FinanceAlphaSetup({
   title: string
   description: string
 }) {
-  const [formOpen, setFormOpen] = useState(true)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const { data: currencyRows = [] } = useCurrencies()
-  const companiesQuery = useCompanies(organizationId, true)
-  const createCompany = useCreateCompany(organizationId)
-  const form = useMemo(
-    () =>
-      withLinkedPickers(settingsActionForms.createCompany, {
-        currencyId: currencyOptionsFromRows(currencyRows),
-      }),
-    [currencyRows],
-  )
-
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} description={description} />
-      <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="text-base font-semibold">Complete Finance setup</h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Create an operating company and choose its base currency before creating invoices,
-          bills, or historical accounting imports.
-        </p>
-        <button
-          type="button"
-          className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-          onClick={() => setFormOpen(true)}
-        >
-          Create operating company
-        </button>
-      </section>
+      <CompanySetupWorkspace organizationId={organizationId} />
       <SettingsModule firstOrgProfile />
-      <FormModal
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        config={form}
-        isPending={createCompany.isPending}
-        closeOnSubmit={false}
-        submitError={submitError}
-        onSubmit={async (formData) => {
-          setSubmitError(null)
-          try {
-            const currentCompanies = await companiesQuery.refetch()
-            const existingIds = new Set(
-              (currentCompanies.data ?? []).map((company) => String(company.id)),
-            )
-            const params = toCreateCompanyParams(formData)
-            if (!params) throw new Error(i18n.t("common.paramsMapper.invalidCompany"))
-            await createCompany.mutateAsync(params)
-            const refreshed = await companiesQuery.refetch()
-            const createdCompany = refreshed.data?.find(
-              (company) => !existingIds.has(String(company.id)),
-            )
-            const createdCompanyId = Number(createdCompany?.id)
-            window.location.assign(
-              Number.isSafeInteger(createdCompanyId) && createdCompanyId > 0
-                ? `/accounting?companyId=${createdCompanyId}`
-                : "/accounting",
-            )
-          } catch (error) {
-            setSubmitError(error instanceof Error ? error.message : String(error))
-          }
-        }}
-      />
     </div>
   )
 }
@@ -896,6 +836,14 @@ function SettingsLoaded({
   )
 
   const extraSections: SettingsExtraSection[] = [
+    {
+      id: "finance-setup",
+      groupId: "organization",
+      title: "Company setup",
+      description: "Review country, currency, units, VAT and historical-data choices together.",
+      icon: Building2,
+      content: <CompanySetupWorkspace organizationId={organizationId} />,
+    },
     {
       id: "imports",
       groupId: "data",

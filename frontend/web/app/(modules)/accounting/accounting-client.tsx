@@ -4848,7 +4848,7 @@ function AccountingClientReady({
                       checkPermission("account_account", "write").allowed ? toggleAccountDeprecated : undefined
                     }
                     onEdit={checkPermission("account_account", "write").allowed ? editAccount : undefined}
-                    onCreate={accountTypes.length > 0 ? async (data) => {
+                    onCreate={accountTypes.length > 0 && checkPermission("account_account", "create").allowed ? async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
                         accountTypes,
@@ -5677,6 +5677,7 @@ function AccountingClientReady({
     <CurrencyFormatProvider currencies={currencies} defaultCode={operatingCompanyCurrencyCode}>
     <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
       {activeTabUsable && formDialog}
+      {companyAvailable ? <a href="/settings?section=finance-setup" className="mb-3 inline-block text-sm font-medium text-primary underline">Guided company setup</a> : null}
       {companyAvailable ? <AccountingSetupReadinessPanel
         setup={accountingSetup}
         compact={readinessAction === undefined && !config.tabGroups?.find((group) => group.tabIds.includes("taxes"))?.tabIds.includes(accountingActiveTab)}

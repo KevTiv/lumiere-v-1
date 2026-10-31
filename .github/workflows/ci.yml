@@ -200,6 +200,7 @@ jobs:
 
       - name: Alpha saved-effect readback and retention authorization
         run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::record_creations::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::expense_allocations::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::documents::retention::tests
@@ -347,6 +348,11 @@ jobs:
 
       - name: CRM qualification replay and tenant isolation proof
         run: spacetime call lumiere-ci-contracts run_crm_relational_fk_test --server local -y --no-config
+
+      - name: Farm import source trace and document receipt replay
+        run: |
+          spacetime call lumiere-ci-contracts run_data_ops_commit_test --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_documents_wave_a_tests --server local -y --no-config
 
       - name: Alpha capability saved-effect regressions
         run: |

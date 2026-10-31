@@ -65,6 +65,19 @@
     "search": "Rechercher des modules et des enregistrements"
   },
   "common": {
+    "name": "Nom",
+    "importSource": {
+      "title": "Source d’importation enregistrée",
+      "description": "Informations sur le fichier et le contrôle conservées avec cet enregistrement.",
+      "file": "Fichier d’origine",
+      "sourceLine": "Ligne du fichier source",
+      "importRow": "Ligne d’importation",
+      "sha256": "SHA-256 enregistré du fichier",
+      "batch": "Lot de contrôle",
+      "item": "Élément de contrôle",
+      "revision": "Révision du contrôle",
+      "reason": "Motif de la décision de contrôle"
+    },
     "select": {
       "search": "Rechercher des options…",
       "options": "Options",

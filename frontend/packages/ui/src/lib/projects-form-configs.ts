@@ -965,7 +965,7 @@ export const newProjectChangeOrderForm = (_t: TFunction): FormConfig => ({
 })
 
 /** Wave E — link vendor PO / bill cost to project (subcontractor). */
-export const linkSubcontractorCostForm = (_t: TFunction): FormConfig => ({
+export const linkSubcontractorCostForm = (t: TFunction): FormConfig => ({
   id: "link-subcontractor-cost",
   title: "Link subcontractor cost",
   description: "Attribute a vendor PO or bill amount to a project for margin",
@@ -1010,10 +1010,13 @@ export const linkSubcontractorCostForm = (_t: TFunction): FormConfig => ({
         {
           id: "currencyId",
           name: "currencyId",
-          type: "text",
-          label: "Currency ID",
+          type: "select",
+          label: t("projects.forms.logTimesheet.fields.currencyId"),
+          placeholder: t("projects.forms.logTimesheet.fields.currencyIdPlaceholder"),
+          searchable: true,
           required: true,
           width: "1/2",
+          options: emptySelect,
         },
         {
           id: "name",

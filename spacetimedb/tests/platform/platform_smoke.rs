@@ -2759,3 +2759,108 @@ pub fn test_documents_upload_rejects_oversized_and_disallowed_mimetype(
     }
     Ok(())
 }
+
+/// Replay evidence must survive live metadata edits and removal of every document row.
+pub fn test_documents_submission_receipt_replay(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::persistence::{organization_commit, organization_row_change};
+    use crate::forms::record_creation::record_creation_receipt;
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let company = fixture.company_id;
+    let key = "a".repeat(32);
+    let params = CreateDocumentParams {
+        name: "Receipt source".into(),
+        description: None,
+        file_name: "farm.csv".into(),
+        file_size: 4,
+        mimetype: "text/csv".into(),
+        url: format!(
+            "/api/documents/blobs/object/{org}/default/{}",
+            "b".repeat(32)
+        ),
+        checksum: "c".repeat(64),
+        folder_id: None,
+        res_model: None,
+        res_id: None,
+        partner_id: None,
+        tag_ids: vec![],
+        is_favorite: false,
+        classification_id: None,
+        retention_days: None,
+        fiscal_kind: None,
+        residency_region: None,
+        metadata: Some(serde_json::json!({"uploadSubmissionId":key}).to_string()),
+    };
+    let before = ctx.db.document().document_by_org().filter(&org).count();
+    create_document(ctx, org, Some(company), params.clone())?;
+    let receipt_key = format!("{org}:{company}:document:{key}");
+    let receipt = ctx
+        .db
+        .record_creation_receipt()
+        .id()
+        .find(&receipt_key)
+        .ok_or("missing canonical document creation receipt")?;
+    if receipt.created_by != ctx.sender() || receipt.payload_hash.is_empty() {
+        return Err("invalid document receipt provenance".into());
+    }
+    create_document(ctx, org, Some(company), params.clone())?;
+    if ctx.db.document().document_by_org().filter(&org).count() != before + 1 {
+        return Err("document replay created another record".into());
+    }
+    let doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&receipt.record_id)
+        .ok_or("created document missing")?;
+    ctx.db.document().id().update(Document {
+        metadata: Some("{\"note\":\"later edit\"}".into()),
+        ..doc
+    });
+    create_document(ctx, org, Some(company), params.clone())?;
+    let mut changed = params.clone();
+    changed.name = "Changed request".into();
+    if create_document(ctx, org, Some(company), changed).is_ok() {
+        return Err("changed submission request was accepted".into());
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&org)
+        .filter(|row| row.correlation_id == receipt_key)
+        .collect();
+    if commits.len() != 1 {
+        return Err("document receipt replay changed durable commit count".into());
+    }
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&org)
+        .filter(|row| row.commit_sequence == commits[0].sequence)
+        .collect();
+    for table in ["document", "document_version", "record_creation_receipt"] {
+        if changes.iter().filter(|row| row.table_name == table).count() != 1 {
+            return Err(format!("document save omitted durable {table}"));
+        }
+    }
+    let versions: Vec<_> = ctx
+        .db
+        .document_version()
+        .version_by_document()
+        .filter(&receipt.record_id)
+        .collect();
+    for version in versions {
+        ctx.db.document_version().id().delete(&version.id);
+    }
+    ctx.db.document().id().delete(&receipt.record_id);
+    if create_document(ctx, org, Some(company), params).is_ok() {
+        return Err("purged document freed its submission key".into());
+    }
+    if ctx.db.document().document_by_org().filter(&org).count() != before {
+        return Err("purged submission was recreated".into());
+    }
+    Ok(())
+}

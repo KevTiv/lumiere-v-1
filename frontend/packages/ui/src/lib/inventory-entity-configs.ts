@@ -5,6 +5,7 @@ import {
   type PickingActionId,
 } from "@lumiere/erp-workflows"
 import type { EntityAction, EntityDetailConfig, EntityRow, EntityViewConfig } from "./entity-view-types"
+import { unwrapEntityValue } from "./entity-row-values"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const productTypeBadges = (t: TFunction) => ({
@@ -571,6 +572,20 @@ export const inventoryAdjustmentsTableConfig = (t: TFunction): EntityViewConfig 
 })
 
 // ── Stock Locations ───────────────────────────────────────────────────────────
+export const stockLocationDetailConfig = (t: TFunction): EntityDetailConfig => ({
+  mode: "detail",
+  sections: [{
+    id: "location",
+    fields: [
+      { key: "name", label: t("common.name") },
+      { key: "completeName", label: t("inventory.stockLocations.columns.completeName") },
+      { key: "usage", label: t("inventory.stockLocations.columns.usage"), type: "badge", ...locationTypeBadges(t) },
+      { key: "barcode", label: t("inventory.stockLocations.columns.barcode") },
+      { key: "active", label: t("inventory.stockLocations.columns.active"), type: "boolean" },
+    ],
+  }],
+})
+
 export const stockLocationsTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "stock-locations-table",
   title: t("inventory.stockLocations.title"),
@@ -596,7 +611,12 @@ export const stockLocationsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "completeName", label: t("inventory.stockLocations.columns.completeName"), width: "min-w-48" },
+      {
+        key: "completeName",
+        label: t("inventory.stockLocations.columns.completeName"),
+        width: "min-w-48",
+        render: (value, row) => String(unwrapEntityValue(value) || unwrapEntityValue(row.name) || "—"),
+      },
       { key: "usage", label: t("inventory.stockLocations.columns.usage"), type: "badge", ...locationTypeBadges(t) },
       { key: "barcode", label: t("inventory.stockLocations.columns.barcode"), width: "min-w-28" },
       { key: "active", label: t("inventory.stockLocations.columns.active"), type: "boolean" },

@@ -6,6 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { guideLibraryHref } from "@/lib/assistant-guides"
+import { DocumentUploadReceipts } from "../../../components/document-upload-receipts"
+import { useDocumentUploadReceipts } from "@/lib/use-document-upload-receipts"
+import { documentRegistrationFromParams } from "@/lib/document-upload-receipts"
 import { readRetentionPreview, type RetentionPreview } from "@lumiere/query-hooks/hooks/document-retention-preview"
 import { reviewRetentionPurgeScope, useRetentionPurgeAuthority } from "./retention-purge-review"
 import { useErpSession } from "@lumiere/erp-session"
@@ -153,71 +156,6 @@ type DocumentRowAction =
   | { action: "updateFolder"; row: Record<string, unknown>; form: FormConfig }
   | { action: "addArticleMember"; row: Record<string, unknown>; form: FormConfig }
   | null
-
-function editDocumentForm(row: Record<string, unknown>): FormConfig {
-  return {
-    id: "edit-document",
-    title: "Update Document",
-    submitLabel: "Update document",
-    sections: [
-      {
-        id: "document",
-        fields: [
-          {
-            id: "doc-name",
-            name: "name",
-            type: "text",
-            label: "Name",
-            required: true,
-            defaultValue: String(row.name ?? ""),
-            width: "full",
-          },
-          {
-            id: "doc-file-name",
-            name: "fileName",
-            type: "text",
-            label: "File name",
-            defaultValue: String(row.fileName ?? ""),
-            width: "1/2",
-          },
-          {
-            id: "doc-mimetype",
-            name: "mimetype",
-            type: "text",
-            label: "MIME type",
-            defaultValue: String(row.mimetype ?? ""),
-            width: "1/2",
-          },
-          {
-            id: "doc-description",
-            name: "description",
-            type: "textarea",
-            label: "Description",
-            defaultValue: String(row.description ?? ""),
-            rows: 3,
-            width: "full",
-          },
-          {
-            id: "doc-favorite",
-            name: "isFavorite",
-            type: "checkbox",
-            label: "Favorite",
-            defaultValue: Boolean(row.isFavorite),
-            width: "1/2",
-          },
-          {
-            id: "doc-shared",
-            name: "isShared",
-            type: "checkbox",
-            label: "Shared",
-            defaultValue: Boolean(row.isShared),
-            width: "1/2",
-          },
-        ],
-      },
-    ],
-  }
-}
 
 interface DocumentsClientProps {
   initialDocuments?: Document[]
@@ -388,6 +326,13 @@ function DocumentsClientLoaded({
   const recordDocumentView = useRecordDocumentView(orgId)
   const addDocumentVersion = useAddDocumentVersion(orgId)
   const ingestDocumentEvidence = useIngestDocumentEvidence(orgId)
+  const uploadReceipts = useDocumentUploadReceipts({
+    scope: { organizationId: orgId, companyId: operatingCompanyId, actorId: session.identity ?? "" },
+    allowed: canUploadDocument,
+    assertCurrent: () => assertBrowserAction("upload"),
+    create: (params) => createDocument.mutateAsync(params),
+    index: (documentId) => ingestDocumentEvidence.mutateAsync({ companyId: operatingCompanyId, documentId }),
+  })
   const setDocumentRetention = useSetDocumentRetention(orgId)
   const purgeExpiredDocuments = usePurgeExpiredDocuments(orgId, () => retentionAuthority.mayDispatch(0))
   const applyDocumentLegalHold = useApplyDocumentLegalHold(orgId)
@@ -417,7 +362,6 @@ function DocumentsClientLoaded({
   const approveProcessingJob = useApproveDocumentProcessingJob(orgId)
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
-  const versionFormConfig = useMemo(() => uploadDocumentVersionForm(t), [t])
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
   const articleMemberFormConfig = useMemo<FormConfig>(() => {
     const base = addArticleMemberForm(t)
@@ -1455,31 +1399,19 @@ function DocumentsClientLoaded({
       (typeof formData.residencyRegion === "string" && formData.residencyRegion.trim()) ||
       (typeof folderResidency === "string" ? folderResidency : undefined) ||
       undefined
-    const uploaded = await uploadDocumentBlob({
-      file,
-      companyId: operatingCompanyId,
-      residency: residency ? String(residency) : undefined,
-    })
-    assertBrowserAction("upload")
+    // Validate and freeze the user's registration choices before storing bytes.
     const params = toCreateDocumentParams({
       ...formData,
-      fileName: uploaded.fileName,
-      fileSize: uploaded.fileSize,
-      mimetype: uploaded.mimetype,
-      url: uploaded.url,
-      checksum: uploaded.checksum,
+      fileName: file.name,
+      fileSize: BigInt(file.size),
+      mimetype: file.type || "application/octet-stream",
+      url: "pending-upload",
+      checksum: "pending-upload",
       residencyRegion: formData.residencyRegion ?? residency,
     })
-    if (!params) {
-      throw new Error("Document registration params incomplete after upload")
-    }
-    const created = await createDocument.mutateAsync(params)
-    assertBrowserAction("upload")
-    await ingestDocumentEvidence.mutateAsync({
-      companyId: operatingCompanyId,
-      objectKey: uploaded.objectKey,
-    })
-    return created.id
+    if (!params) throw new Error("Enter a document name before uploading. Your entries are retained.")
+    const receipt = await uploadReceipts.submit(file, documentRegistrationFromParams(params), residency)
+    return receipt.documentId ?? undefined
   }
 
   const browserFiles = useMemo(
@@ -1563,6 +1495,7 @@ function DocumentsClientLoaded({
   return (
     <>
       {operatingCompanyId ? <div className="mb-3 flex justify-end"><Link href={guideLibraryHref(String(operatingCompanyId))} className="text-sm text-primary underline underline-offset-4">{t("aiChat.guide.savedGuides", { defaultValue: "Saved guides" })}</Link></div> : null}
+      <DocumentUploadReceipts rows={uploadReceipts.rows} error={uploadReceipts.error} onResume={uploadReceipts.resume} />
       {processingToolbarError ? (
         <p className="text-sm text-destructive mb-2" role="alert">
           {processingToolbarError}

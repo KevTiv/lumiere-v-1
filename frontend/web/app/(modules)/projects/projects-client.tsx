@@ -2,7 +2,7 @@
 import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
-import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
@@ -22,7 +22,6 @@ import {
   newProjectRateCardForm,
   newProjectRateCardLineForm,
   newResourceAllocationForm,
-  newProjectMilestoneForm,
   projectExpenseRebillForm,
   newProjectChangeOrderForm,
   linkSubcontractorCostForm,
@@ -418,7 +417,8 @@ function ProjectsClientLoaded({
   const taskAssignees = useTaskAssignees(orgId, operatingCompanyId, undefined, canAssignTask && lifecycleModal.type === "assignUsers", { actorIdentity: session.identity ?? "", authorizationKey: taskAuthorizationKey })
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
-  const { data: currencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const { data: currencies = [] } = currenciesQuery
 
   const createProject = useCreateProject(orgId, operatingCompanyId)
   const createTask = useCreateTask(orgId, operatingCompanyId)
@@ -574,14 +574,6 @@ function ProjectsClientLoaded({
     [employeeFieldOptions, hrResources, projectFieldOptions, taskFieldOptions, t],
   )
 
-  const milestoneFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(newProjectMilestoneForm(t), {
-        projectId: projectFieldOptions,
-      }),
-    [projectFieldOptions, t],
-  )
-
   const changeOrderFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newProjectChangeOrderForm(t), {
@@ -590,13 +582,17 @@ function ProjectsClientLoaded({
     [projectFieldOptions, t],
   )
 
-  const subcontractorFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(linkSubcontractorCostForm(t), {
-        projectId: projectFieldOptions,
-      }),
-    [projectFieldOptions, t],
-  )
+  const subcontractorFormConfig = useMemo(() => {
+    const available = currenciesQuery.isSuccess && currencyFieldOptions.length > 0
+    const unavailable = t("projects.forms.subcontractorCost.currencyUnavailable", {
+      defaultValue: "Currencies are unavailable. Refresh currency data before linking this cost.",
+    })
+    const form = mergeSelectOptionsForFields(linkSubcontractorCostForm(t), {
+      projectId: projectFieldOptions,
+      currencyId: available ? currencyFieldOptions : [{ value: "", label: unavailable, disabled: true }],
+    })
+    return available ? form : { ...form, description: unavailable }
+  }, [projectFieldOptions, currencyFieldOptions, currenciesQuery.isSuccess, t])
 
   const integrationIntentFormConfig = useMemo(
     () =>
@@ -1740,6 +1736,12 @@ function ProjectsClientLoaded({
                   metadata: null,
                 })
               } else if (lifecycleModal.type === "subcontractorCost") {
+                const currency = currenciesQuery.isSuccess
+                  ? currencyFieldOptions.find((option) => option.value === String(formData.currencyId ?? ""))
+                  : undefined
+                if (!currency) throw new Error(t("projects.forms.subcontractorCost.currencyRequired", {
+                  defaultValue: "Choose an available currency before linking this cost. Your entries are retained.",
+                }))
                 const poRaw = formData.purchaseOrderId
                 const poLineRaw = formData.purchaseOrderLineId
                 await linkSubcontractor.mutateAsync({
@@ -1756,7 +1758,7 @@ function ProjectsClientLoaded({
                   vendorBillLineId: null,
                   partnerId: null,
                   amount: Number(formData.amount ?? 0),
-                  currencyId: BigInt(String(formData.currencyId)),
+                  currencyId: BigInt(currency.value),
                   name:
                     formData.name != null && String(formData.name).trim() !== ""
                       ? String(formData.name)
