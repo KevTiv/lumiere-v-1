@@ -15025,7 +15025,13 @@
       "retrySame": "Retry same submission",
       "importRow": "Import row {{row}}",
       "sourceLine": "Source row {{row}}",
-      "search": "Find an item or source file"
+      "search": "Find an item or source file",
+      "category": "Product category",
+      "productUnit": "Product catalog unit",
+      "purchaseUnit": "Purchase unit",
+      "priceUnit": "Unit for corrected prices",
+      "referenceHint": "Choose from this organization. Enter quantities and prices for the chosen unit.",
+      "importSetup": "Advanced import settings"
     }
   },
   "reports": {
