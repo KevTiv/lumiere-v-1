@@ -144,7 +144,9 @@ pub struct LifecycleBudgetPark {
 pub struct LifecycleQuestion {
     pub id: u64,
     pub key: String,
-    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    pub answered: bool,
     pub status: String,
     pub required: bool,
     pub revision: u64,
@@ -224,6 +226,26 @@ pub async fn post_run_lifecycle(
         max_bytes: granted.max_bytes.min(MAX_LIFECYCLE_BYTES),
     };
 
+    // Fail before dispatch when the canonical reader is not configured.
+    // Never fall back to querying private tables with the runtime writer.
+    let reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Unavailable("lifecycle reader is not configured".into()))?;
+    // Pre-read the exact bounded result before a command. A configured token is
+    // not evidence that the deployed schema or sender binding permits readback.
+    let current = load_response(
+        reader,
+        actor.organization_id,
+        actor.company_id,
+        req.run_id,
+        None,
+        usize::try_from(bounds.max_rows).unwrap_or(usize::MAX),
+    )
+    .await?;
+    if matches!(&req.intent, RunLifecycleIntent::View) {
+        return Ok(Json(enforce_lifecycle_bounds(current, bounds)?));
+    }
     let comparison = apply_intent(state.stdb.as_ref(), &actor, req.run_id, req.intent).await?;
     let comparison = load_comparison_details(
         state.stdb.as_ref(),
@@ -233,7 +255,7 @@ pub async fn post_run_lifecycle(
     )
     .await?;
     let response = load_response(
-        state.stdb.as_ref(),
+        reader,
         actor.organization_id,
         actor.company_id,
         req.run_id,
@@ -670,10 +692,10 @@ async fn load_response(
     comparison: Option<LifecycleComparison>,
     row_limit: usize,
 ) -> AppResult<RunLifecycleResponse> {
-    let state = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_state WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
+    let state = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_state_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?.into_iter().next()
         .ok_or_else(|| AppError::NotFound("run lifecycle not found".into()))?;
-    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
+    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     let queued_inputs = stdb
         .query_sql(&queued_inputs_sql(
@@ -684,11 +706,11 @@ async fn load_response(
         ))
         .await
         .map_err(|error| AppError::Internal(error.to_string()))?;
-    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
+    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     // The park table exists only in modules that include the budget-park
     // reducers; a missing table or row simply means the run was never parked.
-    let park = stdb.query_sql(&format!("SELECT * FROM ai_run_budget_park WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
+    let park = stdb.query_sql(&format!("SELECT * FROM ai_run_budget_park_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.ok().and_then(|rows| rows.into_iter().next()).and_then(|row| park_from_row(&row));
     let checkpoint_hash = text(&state, "checkpointHash")?;
     Ok(RunLifecycleResponse {
@@ -744,17 +766,16 @@ fn question_from_row(row: Value) -> AppResult<LifecycleQuestion> {
     Ok(LifecycleQuestion {
         id: number(&row, "id")?,
         key: text(&row, "questionKey")?,
-        prompt: text(&row, "prompt")?,
+        // The lifecycle reader receives metadata only, not authored content.
+        prompt: None,
+        answered: text(&row, "status")? == "answered",
         status: text(&row, "status")?,
         required: row
             .get("required")
             .and_then(Value::as_bool)
             .unwrap_or(false),
         revision: number(&row, "revision")?,
-        answer: row
-            .get("answerJson")
-            .and_then(Value::as_str)
-            .and_then(|value| serde_json::from_str(value).ok()),
+        answer: None,
     })
 }
 
@@ -766,7 +787,7 @@ fn queued_inputs_sql(
     run_id: u64,
     row_limit: usize,
 ) -> String {
-    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY queued_input_id ASC LIMIT {row_limit}")
+    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY queued_input_id ASC LIMIT {row_limit}")
 }
 
 fn queued_input_from_row(row: Value) -> AppResult<LifecycleQueuedInput> {
@@ -840,6 +861,19 @@ fn lifecycle_error(message: String) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn question_metadata_does_not_release_authored_content() {
+        let row = json!({"id": 1, "questionKey": "q1", "status": "answered", "required": true,
+            "revision": 2, "prompt": "private prompt", "answerJson": "{\"secret\":true}"});
+        let question = question_from_row(row).expect("metadata");
+        assert!(question.answered);
+        assert!(question.prompt.is_none());
+        assert!(question.answer.is_none());
+        let encoded = serde_json::to_string(&question).expect("metadata JSON");
+        assert!(!encoded.contains("private prompt"));
+        assert!(!encoded.contains("secret"));
+    }
 
     #[test]
     fn actor_scope_rejects_body_company_mismatch() {
@@ -931,7 +965,8 @@ mod tests {
                 .map(|id| LifecycleQuestion {
                     id,
                     key: format!("q{id}"),
-                    prompt: "prompt".repeat(50),
+                    prompt: Some("prompt".repeat(50)),
+                    answered: false,
                     status: "open".into(),
                     required: true,
                     revision: 1,
@@ -973,7 +1008,7 @@ mod tests {
     #[test]
     fn follow_up_read_never_selects_payload_or_author() {
         let sql = queued_inputs_sql(7, 9, 42, 10);
-        assert!(sql.contains("FROM ai_run_queued_input"));
+        assert!(sql.contains("FROM ai_run_queued_input_read"));
         assert!(!sql.contains('*'));
         assert!(!sql.contains("payload"));
         assert!(!sql.contains("author"));

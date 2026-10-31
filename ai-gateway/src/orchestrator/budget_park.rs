@@ -436,6 +436,7 @@ impl ResumeAdmission for LedgerAdmission<'_> {
 
 pub(crate) struct StdbParkStore<'a> {
     pub writer: &'a StdbClient,
+    pub reader: &'a StdbClient,
 }
 
 async fn call(
@@ -450,14 +451,14 @@ async fn call(
 }
 
 async fn continuation(
-    writer: &StdbClient,
+    reader: &StdbClient,
     organization_id: u64,
     company_id: u64,
     run_id: u64,
 ) -> Result<Value> {
-    let row = writer
+    let row = reader
         .query_sql(&format!(
-            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state \
+            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state_read \
              WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"
         ))
         .await
@@ -501,7 +502,7 @@ fn row_time(row: &Value, key: &str) -> Result<DateTime<Utc>> {
 impl ParkStore for StdbParkStore<'_> {
     async fn park(&self, target: &ParkTarget, request: &ParkRequest) -> Result<()> {
         let continuation = continuation(
-            self.writer,
+            self.reader,
             target.organization_id,
             target.company_id,
             target.run_id,
@@ -538,9 +539,9 @@ impl ParkStore for StdbParkStore<'_> {
 
     async fn pending_intents(&self, limit: usize) -> Result<Vec<ParkIntent>> {
         let rows = self
-            .writer
+            .reader
             .query_sql(&format!(
-                "SELECT * FROM ai_run_budget_park WHERE status = 'resume_requested' LIMIT {limit}"
+                "SELECT * FROM ai_run_budget_park_read WHERE status = 'resume_requested' LIMIT {limit}"
             ))
             .await
             .context("read pending budget park intents")?;
@@ -566,7 +567,7 @@ impl ParkStore for StdbParkStore<'_> {
 
     async fn resolve(&self, intent: &ParkIntent, command: &ResolveCommand) -> Result<()> {
         let continuation = continuation(
-            self.writer,
+            self.reader,
             intent.organization_id,
             intent.company_id,
             intent.run_id,

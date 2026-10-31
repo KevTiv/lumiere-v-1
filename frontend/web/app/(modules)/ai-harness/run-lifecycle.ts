@@ -16,6 +16,7 @@ export interface RunLifecycleView {
     id: number
     questionKey: string
     prompt: string
+    contentAvailable: boolean
     status: string
     required: boolean
     revision: number
@@ -105,11 +106,12 @@ export function mapRunLifecycle(payload: unknown): RunLifecycleView | null {
       id,
       questionKey: text(item.key, 128),
       prompt: text(item.prompt),
+      contentAvailable: typeof item.prompt === 'string' && item.prompt.trim().length > 0,
       status: text(item.status, 64),
       required: item.required === true,
       revision,
       // The answer body may contain sensitive user input and is never rendered.
-      answered: item.answer !== undefined && item.answer !== null,
+      answered: item.answered === true || (item.answer !== undefined && item.answer !== null),
     }]
   }) : []
 
