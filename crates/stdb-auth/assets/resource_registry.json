@@ -385,6 +385,7 @@
       "ai_agent"
     ],
     "default_restricted": [
+      "company_id",
       "name",
       "model",
       "provider",

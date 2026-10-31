@@ -2907,6 +2907,29 @@ mod tests {
     }
 
     #[test]
+    fn ai_agent_projection_keeps_company_binding_in_default_and_selective_reads() {
+        let default = resolve_http_sql_columns("ai-agents", None).expect("agent projection");
+        assert!(default.iter().any(|column| column == "company_id"));
+        let mut access = field_access(&["ai-agents:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "ai-agents".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+        let restricted = resolve_http_sql_columns("ai-agents", Some(&access))
+            .expect("restricted agent projection");
+        for field in ["id", "organization_id", "company_id", "name"] {
+            assert!(restricted.iter().any(|column| column == field));
+        }
+        assert!(!restricted.iter().any(|column| column == "monthly_spend"));
+    }
+
+    #[test]
     fn selective_accounting_field_policies_keep_company_scope_metadata() {
         for resource in ["account-accounts", "account-journals", "account-taxes"] {
             let mut access = field_access(&[&format!("{resource}:read")]);
