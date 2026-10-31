@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { isAgentAvailableForCompany } from "./agent-company-scope.ts"
+import { isAgentAvailableForCompany } from "./agent-company-scope"
 
 const agent = { id: 2n, organizationId: 4097n, companyId: 4097n, isActive: true }
 const available = (candidate: Parameters<typeof isAgentAvailableForCompany>[0], company = "4097") =>
