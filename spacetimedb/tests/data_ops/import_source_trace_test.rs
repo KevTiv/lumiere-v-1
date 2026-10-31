@@ -4,7 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::import_tracker::{import_job, import_job_record};
 use crate::data_ops::inventory_imports::import_stock_location_csv;
-use crate::inventory::stock::stock_location;
+use crate::inventory::warehouse::stock_location;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 pub fn test_location_import_retains_source_row(ctx: &ReducerContext) -> Result<(), String> {

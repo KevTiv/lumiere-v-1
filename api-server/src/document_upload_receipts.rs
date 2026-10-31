@@ -142,14 +142,14 @@ pub(super) async fn reserve(
         create_meta(store, key, &proposed).await?;
         return Ok(proposed);
     }
-    // An identical create-only write can race completion. Read the winner's
-    // immutable request fields instead of rewriting the state with a stale copy.
-    if let Err(error) = create_meta(store, key, &proposed).await {
-        if !matches!(error, ApiError::Conflict(_)) {
-            return Err(error);
-        }
-    }
-    let saved = read_meta(store, key).await?;
+    // Completion can expand the winner's metadata beyond the proposed JSON's
+    // byte length, and the create-only reply itself can be lost. Resolve either
+    // case through the bounded metadata reader, then verify all immutable request
+    // fields. An unproven reservation retains the write/read failure.
+    let reservation_error = create_meta(store, key, &proposed).await.err();
+    let saved = read_meta(store, key)
+        .await
+        .map_err(|read_error| reservation_error.unwrap_or(read_error))?;
     if saved.submission_id != proposed.submission_id
         || saved.organization_id != proposed.organization_id
         || saved.company_id != proposed.company_id
