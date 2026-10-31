@@ -59,7 +59,7 @@ describe("Finance Alpha global discovery", () => {
   })
 
   it("keeps Finance reference imports while hiding operational and payroll targets", () => {
-    for (const key of ["product", "contact", "hr_employee", "hr_department", "account_move", "expense", "subscription"]) {
+    for (const key of ["product", "stock_location", "contact", "hr_employee", "hr_department", "account_move", "expense", "subscription"]) {
       expect(isWorkspaceImportTargetVisible("finance-alpha", key)).toBe(true)
     }
     for (const key of ["stock_quant", "warehouse", "task", "project", "timesheet", "hr_payslip", "hr_contract", "helpdesk_ticket", "manufacturing_order", "unknown"]) {

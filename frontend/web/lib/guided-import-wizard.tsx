@@ -14,6 +14,7 @@ import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest
 import { guidedImportRequest, trackedImportEntity } from "./guided-import-request"
 import { clearImportRecovery, importRecoveryKey, readImportRecovery, retainImportRequest, type ImportRecoveryScope } from "./guided-import-recovery"
 import { previewPreparedProducts, type ProductImportReference } from "./prepared-product-preview"
+import { previewPreparedLocations } from "./prepared-location-preview"
 import { useProductCategories } from "@lumiere/query-hooks/hooks/inventory/products"
 import { useUoms } from "@lumiere/query-hooks/hooks/inventory/uom"
 import { useQueryClient } from "@tanstack/react-query"
@@ -467,6 +468,16 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       setAnalysis(result.analysis); setMapping(result.mapping); setPreviewResult(result.preview)
       setAppliedTemplateId(null); setPreparedPreview(true)
       setDuplicateStates(defaultDuplicateActions(detectImportDuplicates({ entity: entityOption, previewRows: result.preview.rows, mapping: result.mapping, products: productsQuery.data ?? [] })))
+      setStep("preview")
+    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
+  }
+
+  const runPreparedLocationPreview = () => {
+    setError(null); setStatus(null); setConfirmImportWithErrors(false)
+    try {
+      const result = previewPreparedLocations(csvText)
+      setAnalysis(result.analysis); setMapping(result.mapping); setPreviewResult(result.preview)
+      setAppliedTemplateId(null); setPreparedPreview(true); setDuplicateStates([])
       setStep("preview")
     } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) }
   }
@@ -950,6 +961,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
 
       <div className="flex flex-wrap gap-2">
         {step === "upload" && targetEntity === "product" && csvText.trim() ? <PreparedProductPreviewButton organizationId={orgId} disabled={busy || analyze.isPending} onPreview={runPreparedPreview} /> : null}
+        {step === "upload" && targetEntity === "stock_location" && csvText.trim() ? <Button type="button" variant="outline" disabled={busy || analyze.isPending} onClick={runPreparedLocationPreview}>{t("settings.import.preparedLocations", { defaultValue: "Preview prepared location CSV" })}</Button> : null}
         {step === "import" && importRequest && !importedJobId ? <>
           <Button type="button" variant="outline" disabled={operationBusy} onClick={() => void runImport(true)}>{t("settings.importReview.checkResult", { defaultValue: "Check import result" })}</Button>
           <Button type="button" variant="outline" disabled={operationBusy} onClick={() => void runImport()}>{t("settings.importReview.retrySame", { defaultValue: "Retry same submission" })}</Button>

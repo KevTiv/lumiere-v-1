@@ -11,7 +11,7 @@ const FINANCE_SUPPORT = new Set([
   "ai-assistant",
 ])
 const FINANCE_IMPORT_TARGETS = new Set([
-  "contact", "vendor", "lead", "product", "sale_order", "purchase_order", "opportunity",
+  "contact", "vendor", "lead", "product", "stock_location", "sale_order", "purchase_order", "opportunity",
   "account", "sale_order_line", "purchase_order_line", "supplier_info", "account_move",
   "tax_rate", "budget", "hr_employee", "hr_department", "expense", "subscription",
 ])
