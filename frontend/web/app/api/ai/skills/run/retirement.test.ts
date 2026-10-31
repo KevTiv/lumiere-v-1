@@ -21,3 +21,30 @@ test("legacy BFF retirement blocks uncertified custom skills", () => {
   assert.equal("replacementPath" in result, false)
   assert.match(result.error, /register and certify/)
 })
+
+test("legacy BFF retirement names the existing finance review routes", () => {
+  for (const skill of [
+    "finance_report_review",
+    "bank_reconciliation_review",
+    "period_close_review",
+    "expense_evidence_review",
+    "finance_variance_review",
+  ]) {
+    const result = legacyRunRetirement(` ${skill} `)
+
+    assert.equal(result.code, "legacy_skill_run_retired")
+    assert.equal(result.skillKey, skill)
+    assert.equal(result.replacementPath, `/api/ai/skills/finance/${skill}`)
+  }
+})
+
+test("legacy BFF retirement rejects inherited object keys as unknown skills", () => {
+  for (const skill of ["constructor", "toString", "__proto__"]) {
+    const result = legacyRunRetirement(skill)
+
+    assert.equal(result.code, "legacy_skill_run_retired")
+    assert.equal(result.skillKey, skill)
+    assert.equal(Object.hasOwn(result, "replacementPath"), false)
+    assert.match(result.error, /register and certify/)
+  }
+})

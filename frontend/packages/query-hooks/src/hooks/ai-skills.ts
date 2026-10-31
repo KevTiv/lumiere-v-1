@@ -95,6 +95,11 @@ const GOVERNED_SKILL_BFF_ROUTES: Readonly<Record<string, string>> = {
   insights_scan: "/api/ai/skills/insights-scan",
   daily_briefing: "/api/ai/skills/daily-briefing",
   report_analysis: "/api/ai/skills/report-analysis",
+  finance_report_review: "/api/ai/skills/finance/finance_report_review",
+  bank_reconciliation_review: "/api/ai/skills/finance/bank_reconciliation_review",
+  period_close_review: "/api/ai/skills/finance/period_close_review",
+  expense_evidence_review: "/api/ai/skills/finance/expense_evidence_review",
+  finance_variance_review: "/api/ai/skills/finance/finance_variance_review",
   process_research: "/api/ai/skills/process-research",
   price_search: "/api/ai/skills/price-search",
   supplier_discovery: "/api/ai/skills/supplier-discovery",
@@ -105,7 +110,9 @@ const GOVERNED_SKILL_BFF_ROUTES: Readonly<Record<string, string>> = {
 
 export function legacyAiSkillRunRetirement(skillKey: string): LegacyAiSkillRunRetirement {
   const normalized = skillKey.trim()
-  const replacementPath = GOVERNED_SKILL_BFF_ROUTES[normalized]
+  const replacementPath = Object.hasOwn(GOVERNED_SKILL_BFF_ROUTES, normalized)
+    ? GOVERNED_SKILL_BFF_ROUTES[normalized]
+    : undefined
   return {
     code: "legacy_skill_run_retired",
     skill_key: normalized,
