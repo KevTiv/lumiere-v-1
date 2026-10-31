@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test"
 import { activeTabEntityTable, gotoModule, scalarQueryId } from "./helpers"
 
-const VISIBLE = ["overview", "tasks", "approvals", "accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar", "settings"]
-const HIDDEN = ["messages", "inventory", "distributor", "pos", "manufacturing", "map", "fleet", "helpdesk", "workflows", "hr", "projects", "proposals", "forensics", "trackers", "ai-skills", "ai-action-drafts", "iot"]
+const VISIBLE = ["overview", "tasks", "approvals", "accounting", "sales", "crm", "purchasing", "products", "warehouse", "fleet", "reports", "subscriptions", "expenses", "documents", "calendar", "settings"]
+const HIDDEN = ["messages", "inventory", "distributor", "pos", "manufacturing", "map", "helpdesk", "workflows", "hr", "projects", "proposals", "forensics", "trackers", "ai-skills", "ai-action-drafts", "iot"]
 const sidebar = (page: Page) => page.locator('[data-testid="dashboard-sidebar"]:visible')
 
 async function expectFinanceNavigation(page: Page) {
@@ -67,7 +67,7 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       await page.keyboard.press("Control+k")
       const palette = page.getByRole("dialog", { name: "Command Palette", exact: true })
       await expect(palette).toBeVisible()
-      for (const name of ["Accounting", "Sales", "Purchasing", "Reports", "Expenses", "Settings"]) {
+      for (const name of ["Accounting", "Sales", "Purchasing", "Products", "Warehouse", "Fleet", "Reports", "Expenses", "Settings"]) {
         await expect(palette.getByRole("option", { name, exact: true })).toBeVisible()
       }
       for (const name of ["Messages", "Journal", "Notebook", "Inventory", "Manufacturing", "Projects", "Human Resources", "AI Skills", "IoT"]) {

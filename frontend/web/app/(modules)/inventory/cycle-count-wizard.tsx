@@ -1,8 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
-import { Button, EntityView, cn } from '@lumiere/ui';
+import { Button, EntityView, cn, useRBAC } from '@lumiere/ui';
+import { parseStrictU64 } from '@lumiere/erp-shared/u64';
+import { getRowField } from '@lumiere/ui/lib/entity-row-values';
+import { CYCLE_COUNT_PERMISSIONS, assertCycleCountScope, cycleCountId as requireCountId, cycleCountQuantity, prepareCycleCountLine, type CycleCountAction } from './cycle-count-input';
 import { Input } from '@lumiere/ui';
 import { Label } from '@lumiere/ui';
 import {
@@ -31,11 +34,6 @@ import type { QueryRows } from '@/lib/query-fetch';
 import { ChevronRight, MapPin, Package } from 'lucide-react';
 
 type ScalarId = bigint | number | string;
-
-function num(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 function strId(v: unknown): string {
   return v == null ? '' : String(v);
@@ -72,7 +70,7 @@ export function CycleCountWizard({
   organizationId,
   operatingCompanyId,
   locations,
-  cycleCounts,
+  cycleCounts: allCycleCounts,
   products,
   uoms,
   initialCycleCountId,
@@ -86,7 +84,28 @@ export function CycleCountWizard({
   initialCycleCountId?: ScalarId | '';
 }) {
   const { t } = useTranslation();
+  const { checkPermission, permissionsReady, currentUser } = useRBAC();
   const orgId = BigInt(organizationId);
+  const scope = { organizationId: String(organizationId), companyId: String(operatingCompanyId ?? ''), actorId: currentUser?.id ?? '' };
+  const allowed = (action: CycleCountAction) => {
+    const permission = CYCLE_COUNT_PERMISSIONS[action];
+    return permissionsReady !== false && currentUser != null && operatingCompanyId != null && operatingCompanyId > 0n && checkPermission(permission.resource, permission.action).allowed;
+  };
+  const live = useRef({ scope, allowed, mounted: true });
+  live.current = { scope, allowed, mounted: live.current.mounted };
+  useEffect(() => {
+    live.current.mounted = true;
+    return () => { live.current.mounted = false; };
+  }, []);
+  const scopeMessage = t('inventory.warehouseWorkspace.scopeChanged', { defaultValue: 'Your company, account or permissions changed. Reopen this workspace before continuing.' });
+  const assertCurrent = (action: CycleCountAction) => assertCycleCountScope(scope, {
+    ...live.current.scope, mounted: live.current.mounted, allowed: live.current.allowed(action),
+  }, scopeMessage);
+  const inputMessage = t('inventory.warehouseWorkspace.countInputInvalid', { defaultValue: 'Choose available count, product, location and unit records, and enter a finite quantity of zero or more.' });
+  const cycleCounts = useMemo(() => allCycleCounts.filter((row) =>
+    parseStrictU64(getRowField(row, 'organizationId')) === orgId &&
+    operatingCompanyId != null && parseStrictU64(getRowField(row, 'companyId')) === operatingCompanyId,
+  ), [allCycleCounts, orgId, operatingCompanyId]);
   const createPlan = useCreateCycleCountPlan(orgId, operatingCompanyId);
   const startSession = useStartCycleCountSession(orgId, operatingCompanyId);
   const recordLine = useRecordCycleCountLine(orgId, operatingCompanyId);
@@ -112,31 +131,17 @@ export function CycleCountWizard({
   const [recLocId, setRecLocId] = useState('');
   const [recQty, setRecQty] = useState('');
   const [recUom, setRecUom] = useState('');
-  const [planCreatedAt, setPlanCreatedAt] = useState(0);
-  // Highest plan id at the chosen location before this wizard created one.
-  const [planBaselineId, setPlanBaselineId] = useState(0);
+  const [recordedLine, setRecordedLine] = useState<ReturnType<typeof prepareCycleCountLine> | null>(null);
 
   useEffect(() => {
-    if (initialCycleCountId != null && initialCycleCountId !== '') {
-      setCycleCountId(initialCycleCountId);
-      setStep(2);
-    }
-  }, [initialCycleCountId]);
-
-  useEffect(() => {
-    if (planCreatedAt === 0 || cycleCounts.length === 0) return;
-    const forLoc = locationId
-      ? cycleCounts.filter((c) => strId(c.locationId) === locationId)
-      : cycleCounts;
-    const sorted = [...forLoc].sort((a, b) => num(b.id) - num(a.id));
-    const newest = sorted[0];
-    if (newest?.id != null && num(newest.id) > planBaselineId) {
-      setCycleCountId(newest.id as ScalarId);
-      setStep(2);
-      // Select the new plan once; later refetches must not rewind the wizard.
-      setPlanCreatedAt(0);
-    }
-  }, [cycleCounts, locationId, planCreatedAt, planBaselineId]);
+    setCycleCountId(initialCycleCountId ?? '');
+    setRecordedLine(null);
+    setRecProductId('');
+    setRecLocId('');
+    setRecQty('');
+    setRecUom('');
+    setStep(initialCycleCountId != null && initialCycleCountId !== '' ? 2 : 1);
+  }, [initialCycleCountId, organizationId, operatingCompanyId, currentUser?.id]);
 
   const selectedCount = useMemo(
     () => cycleCounts.find((c) => strId(c.id) === strId(cycleCountId)),
@@ -170,7 +175,9 @@ export function CycleCountWizard({
     );
   });
 
-  const uomOpts = uoms.map((u) => {
+  const selectedProduct = products.find((row) => strId(row.id) === recProductId);
+  const stockUomId = selectedProduct ? parseStrictU64(getRowField(selectedProduct, 'uomId')) : undefined;
+  const uomOpts = uoms.filter((unit) => stockUomId != null && parseStrictU64(unit.id) === stockUomId).map((u) => {
     const id = strId(u.id);
     return (
       <SelectItem key={id} value={id}>
@@ -178,6 +185,18 @@ export function CycleCountWizard({
       </SelectItem>
     );
   });
+
+  let preparedLine: ReturnType<typeof prepareCycleCountLine> | null = null;
+  try {
+    if (selectedCount && selectedProduct && locations.some((row) => strId(row.id) === recLocId) && uoms.some((row) => strId(row.id) === recUom)) {
+      preparedLine = prepareCycleCountLine({ cycleCountId, productId: recProductId, locationId: recLocId, uomId: recUom, stockUomId, quantity: recQty }, inputMessage);
+    }
+  } catch { /* The form remains editable until all count values are valid. */ }
+
+  const selectedCountId = () => {
+    if (!selectedCount) throw new Error(inputMessage);
+    return requireCountId(cycleCountId, inputMessage);
+  };
 
   const stepLabels: Record<WizardStep, string> = {
     1: t('inventory.cycleCountWizard.stepPlan'),
@@ -297,6 +316,9 @@ export function CycleCountWizard({
               </Label>
               <Input
                 id="cc-tp"
+                type="number"
+                min={0}
+                step="any"
                 value={tolPct}
                 onChange={(e) => setTolPct(e.target.value)}
               />
@@ -307,6 +329,9 @@ export function CycleCountWizard({
               </Label>
               <Input
                 id="cc-tv"
+                type="number"
+                min={0}
+                step="any"
                 value={tolVal}
                 onChange={(e) => setTolVal(e.target.value)}
               />
@@ -315,27 +340,20 @@ export function CycleCountWizard({
           <Button
             type="button"
             data-testid="cycle-wizard-create-plan"
-            disabled={createPlan.isPending || !locationId}
+            disabled={createPlan.isPending || !locationId || !allowed('plan')}
             onClick={() => {
-              const lid = Number(locationId);
-              setPlanBaselineId(
-                Math.max(
-                  0,
-                  ...cycleCounts
-                    .filter((c) => strId(c.locationId) === locationId)
-                    .map((c) => num(c.id)),
-                ),
-              );
               void runStep(
-                () =>
-                  createPlan.mutateAsync({
-                    locationId: lid,
+                async () => {
+                  assertCurrent('plan');
+                  if (!locations.some((row) => strId(row.id) === locationId)) throw new Error(inputMessage);
+                  await createPlan.mutateAsync({
+                    locationId: requireCountId(locationId, inputMessage),
                     params: {
-                      name: planName.trim() ? planName.trim() : undefined,
+                      name: planName.trim() || undefined,
                       countBy,
                       frequency,
-                      tolerancePercentage: num(tolPct),
-                      toleranceValue: num(tolVal),
+                      tolerancePercentage: cycleCountQuantity(tolPct, inputMessage),
+                      toleranceValue: cycleCountQuantity(tolVal, inputMessage),
                       nextCountDate: undefined,
                       userId: undefined,
                       teamId: undefined,
@@ -345,9 +363,11 @@ export function CycleCountWizard({
                       notes: undefined,
                       metadata: undefined,
                     },
-                  }),
+                  });
+                  assertCurrent('plan');
+                },
                 t('inventory.cycleCountWizard.createPlan'),
-                () => setPlanCreatedAt(Date.now()),
+                () => { setCycleCountId(''); setRecordedLine(null); setStep(2); },
               );
             }}
           >
@@ -359,13 +379,14 @@ export function CycleCountWizard({
       {step === 2 ? (
         <section className="space-y-3 rounded-lg border border-border p-4">
           <h3 className="font-medium">{stepLabels[2]}</h3>
+          <p className="text-muted-foreground text-xs">{t('inventory.warehouseWorkspace.selectCount', { defaultValue: 'Choose the count plan to continue. New plans are never selected automatically.' })}</p>
           <div className="space-y-1">
             <Label htmlFor="cc-id">
               {t('inventory.cycleCountWizard.cycleCountId')}
             </Label>
             <Select
               value={cycleCountId === '' ? '' : strId(cycleCountId)}
-              onValueChange={setCycleCountId}
+              onValueChange={(value) => { setCycleCountId(value); setRecordedLine(null); }}
             >
               <SelectTrigger id="cc-id">
                 <SelectValue placeholder="—" />
@@ -376,10 +397,10 @@ export function CycleCountWizard({
           <Button
             type="button"
             data-testid="cycle-wizard-start-session"
-            disabled={startSession.isPending || cycleCountId === ''}
+            disabled={startSession.isPending || !selectedCount || !allowed('start')}
             onClick={() =>
               void runStep(
-                () => startSession.mutateAsync(cycleCountId),
+                async () => { assertCurrent('start'); await startSession.mutateAsync(selectedCountId()); assertCurrent('start'); },
                 t('inventory.cycleCountWizard.startSession'),
                 goNext,
               )
@@ -398,7 +419,7 @@ export function CycleCountWizard({
               <Label htmlFor="cc-prod">
                 {t('inventory.cycleCountWizard.productId')}
               </Label>
-              <Select value={recProductId} onValueChange={setRecProductId}>
+              <Select value={recProductId} onValueChange={(value) => { setRecProductId(value); setRecUom(''); }}>
                 <SelectTrigger id="cc-prod">
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
@@ -422,6 +443,9 @@ export function CycleCountWizard({
               </Label>
               <Input
                 id="cc-qty"
+                type="number"
+                min={0}
+                step="any"
                 value={recQty}
                 onChange={(e) => setRecQty(e.target.value)}
               />
@@ -436,27 +460,22 @@ export function CycleCountWizard({
                 </SelectTrigger>
                 <SelectContent>{uomOpts}</SelectContent>
               </Select>
+              <p className="text-muted-foreground text-xs">{t('inventory.warehouseWorkspace.countBaseUnit', { defaultValue: 'Count in the product’s stock unit. Unit conversion is not applied.' })}</p>
             </div>
           </div>
           <Button
             type="button"
             data-testid="cycle-wizard-record-line"
-            disabled={recordLine.isPending || cycleCountId === ''}
+            disabled={recordLine.isPending || preparedLine == null || !allowed('line')}
             onClick={() =>
               void runStep(
-                () =>
-                  recordLine.mutateAsync({
-                    cycleCountId,
-                    params: {
-                      productId: BigInt(num(recProductId)),
-                      locationId: BigInt(num(recLocId)),
-                      lotId: undefined,
-                      qtyCounted: num(recQty),
-                      uomId: BigInt(num(recUom)),
-                      notes: undefined,
-                      metadata: undefined,
-                    },
-                  }),
+                async () => {
+                  assertCurrent('line');
+                  if (!preparedLine) throw new Error(inputMessage);
+                  await recordLine.mutateAsync(preparedLine);
+                  assertCurrent('line');
+                  setRecordedLine(preparedLine);
+                },
                 t('inventory.cycleCountWizard.recordLine'),
                 goNext,
               )
@@ -477,10 +496,10 @@ export function CycleCountWizard({
             type="button"
             variant="secondary"
             data-testid="cycle-wizard-validate"
-            disabled={validate.isPending || cycleCountId === ''}
+            disabled={validate.isPending || !selectedCount || !allowed('validate')}
             onClick={() =>
               void runStep(
-                () => validate.mutateAsync(cycleCountId),
+                async () => { assertCurrent('validate'); await validate.mutateAsync(selectedCountId()); assertCurrent('validate'); },
                 t('inventory.cycleCountWizard.validate'),
                 goNext,
               )
@@ -497,27 +516,26 @@ export function CycleCountWizard({
           <p className="text-muted-foreground text-xs">
             {t('inventory.cycleCountWizard.postHint')}
           </p>
+          {!recordedLine ? <p className="text-muted-foreground text-xs">{t('inventory.warehouseWorkspace.recordBeforePost', { defaultValue: 'Posting applies the validated count plan. Record a line here before posting.' })}</p> : null}
           <Button
             type="button"
             data-testid="cycle-wizard-post"
-            disabled={
-              postAdj.isPending ||
-              cycleCountId === '' ||
-              !recProductId ||
-              !recLocId ||
-              operatingCompanyId == null
-            }
+            disabled={postAdj.isPending || !selectedCount || !recordedLine || recordedLine.cycleCountId !== parseStrictU64(cycleCountId) || !allowed('post')}
             onClick={() =>
-              void postAdj.post(
-                {
-                  cycleCountId: strId(cycleCountId),
-                  productId: recProductId,
-                  locationId: recLocId,
-                  companyId: strId(operatingCompanyId),
-                  countedQty: num(recQty),
-                },
-                { navigateToNext: true },
-              )
+              void runStep(async () => {
+                assertCurrent('post');
+                if (!recordedLine || recordedLine.cycleCountId !== selectedCountId()) throw new Error(inputMessage);
+                await postAdj.post(
+                  {
+                    cycleCountId: String(recordedLine.cycleCountId),
+                    productId: String(recordedLine.params.productId),
+                    locationId: String(recordedLine.params.locationId),
+                    companyId: String(requireCountId(operatingCompanyId, inputMessage)),
+                    countedQty: recordedLine.params.qtyCounted,
+                  },
+                  { navigateToNext: true, assertScope: () => assertCurrent('post') },
+                );
+              }, t('inventory.cycleCountWizard.post'))
             }
           >
             {t('inventory.cycleCountWizard.post')}

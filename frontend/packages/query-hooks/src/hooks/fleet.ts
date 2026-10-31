@@ -192,6 +192,8 @@ export function useUpdateFleetVehicleDriver(organizationId: bigint, companyId?: 
 }
 
 export interface RecordFleetServiceInput {
+  /** Revalidate the mounted actor/company before each read and dispatch. */
+  assertScope?: () => void
   vehicleId: bigint
   serviceTypeId: bigint
   servicedAt?: Date
@@ -571,6 +573,7 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
     RecordFleetServiceInput
   >({
     mutationFn: async (input) => {
+      input.assertScope?.()
       const scopedCompanyId = requireCompany(companyId, "record fleet service")
       input = { ...input }
       const clientRequestId = requireFleetRequestId(input.clientRequestId)
@@ -588,8 +591,9 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
         clientRequestId: optionalText(clientRequestId),
       }
       const outcome = await executeOperationWithCanonicalReadback({
-        resolveEffect: async () =>
-          resolveFleetHistoryEffect(
+        resolveEffect: async () => {
+          input.assertScope?.()
+          return resolveFleetHistoryEffect(
             await fetchQueryList(
               "/api/query/fleet-service-records",
               "Failed to read fleet service records",
@@ -622,8 +626,10 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
                   }
                 : {}),
             },
-          ),
+          )
+        },
         dispatch: async () => {
+          input.assertScope?.()
           const { urlPath, init } = stdbBffCommandPost("record_fleet_service", {
             companyId: scopedCompanyId,
             params: stdbParamsToJson(params),
@@ -645,6 +651,8 @@ export function useRecordFleetService(organizationId: bigint, companyId?: bigint
 export type FleetInspectionOutcome = "passed" | "failed" | "attention_required"
 
 export interface RecordFleetInspectionInput {
+  /** Revalidate the mounted actor/company before each read and dispatch. */
+  assertScope?: () => void
   vehicleId: bigint
   inspectorId?: bigint
   inspectedAt?: Date
@@ -662,6 +670,7 @@ export function useRecordFleetInspection(organizationId: bigint, companyId?: big
     RecordFleetInspectionInput
   >({
     mutationFn: async (input) => {
+      input.assertScope?.()
       const scopedCompanyId = requireCompany(companyId, "record a fleet inspection")
       input = { ...input }
       const clientRequestId = requireFleetRequestId(input.clientRequestId)
@@ -675,8 +684,9 @@ export function useRecordFleetInspection(organizationId: bigint, companyId?: big
         clientRequestId: optionalText(clientRequestId),
       }
       const outcome = await executeOperationWithCanonicalReadback({
-        resolveEffect: async () =>
-          resolveFleetHistoryEffect(
+        resolveEffect: async () => {
+          input.assertScope?.()
+          return resolveFleetHistoryEffect(
             await fetchQueryList(
               "/api/query/fleet-inspections",
               "Failed to read fleet inspections",
@@ -687,8 +697,10 @@ export function useRecordFleetInspection(organizationId: bigint, companyId?: big
             input.vehicleId,
             clientRequestId,
             params,
-          ),
+          )
+        },
         dispatch: async () => {
+          input.assertScope?.()
           const { urlPath, init } = stdbBffCommandPost("record_fleet_inspection", {
             companyId: scopedCompanyId,
             params: stdbParamsToJson(params),

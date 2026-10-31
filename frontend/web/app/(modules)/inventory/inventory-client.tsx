@@ -23,6 +23,7 @@ import dynamic from 'next/dynamic';
 import { useTranslation } from '@lumiere/i18n';
 import {
   ModuleView,
+  useRBAC,
   FormModal,
   CsvImportModal,
   newProductForm,
@@ -91,6 +92,22 @@ import {
   ProductVendorPricesTab,
 } from './product-record-read-tabs';
 import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
+import {
+  PRODUCT_CATALOG_TAB_IDS,
+  productCatalogCategoryRows,
+  productCatalogDetail,
+  productCatalogRows,
+  productCatalogTable,
+  productCatalogWorkspace,
+} from './product-catalog';
+import { prepareProductCreate } from './product-create';
+import {
+  WAREHOUSE_TAB_IDS,
+  warehouseDataStates,
+  warehouseRows,
+  warehouseStockDetail,
+  warehouseWorkspace,
+} from './warehouse-workspace';
 
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
@@ -295,7 +312,6 @@ import {
   toCreateAdjustmentReasonParamsFromForm,
   toCreateInventoryAdjustmentParamsFromForm,
   toCreateProductCategoryParamsFromForm,
-  toCreateProductParamsFromForm,
   toCreateStockLocationParamsFromForm,
   toCreateStockPickingParamsFromForm,
   toCreateStockQuantParamsFromForm,
@@ -357,6 +373,8 @@ const WarehouseViewer = dynamic(
 );
 
 interface InventoryClientProps {
+  /** Bounded workspaces reuse Inventory's existing commands, forms and dialogs. */
+  workspace?: 'inventory' | 'products' | 'warehouse';
   initialProducts?: Product[];
   initialStockQuants?: StockQuant[];
   initialTransfers?: StockPicking[];
@@ -410,6 +428,7 @@ function runPickingWorkflowActionForRows(
 }
 
 function InventoryClientLoaded({
+  workspace = 'inventory',
   initialProducts,
   initialStockQuants,
   initialTransfers,
@@ -429,6 +448,7 @@ function InventoryClientLoaded({
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription();
   const { t } = useTranslation();
+  const { checkPermission, permissionsReady, currentUser } = useRBAC();
   const { identity, organizationId: sessionOrganizationId } = useErpSession();
   const { askForm, cancelForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
@@ -472,17 +492,17 @@ function InventoryClientLoaded({
   // Sync the active tab with `?tab=` so record links (e.g. a receipt's
   // `/inventory?tab=transfers&filter=id:…`) land on the right tab.
   const inventoryTabIds = useMemo(
-    () => [
+    () => workspace === 'products' ? [...PRODUCT_CATALOG_TAB_IDS] : workspace === 'warehouse' ? [...WAREHOUSE_TAB_IDS] : [
       ...inventoryModuleConfig(t).tabs.map((tab) => tab.id),
       'cycle-wizard',
       'location-tree',
       'quality-alerts',
       '3d-view',
     ],
-    [t],
+    [t, workspace],
   );
   const { activeTab, setActiveTab } = useModuleTab(
-    'dashboard',
+    workspace === 'products' ? 'products' : workspace === 'warehouse' ? 'stock' : 'dashboard',
     inventoryTabIds,
   );
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | ''>(
@@ -507,7 +527,8 @@ function InventoryClientLoaded({
   const productsLoading = productsRead.state.status === 'loading';
   const productCategoriesRead = moduleCollection(useProductCategories(orgId, initialProductCategories));
   const productCategories = productCategoriesRead.rows;
-  const { data: uoms = [] } = useUoms(orgId, initialUoms);
+  const uomsRead = moduleCollection(useUoms(orgId, initialUoms));
+  const uoms = uomsRead.rows;
   const { data: stockInventories = [] } = useStockInventories(orgId);
   const { data: iotDevices = [] } = useIotDevices(orgId);
   const stockQuantsRead = moduleCollection(useStockQuants(orgId, initialStockQuants));
@@ -564,7 +585,8 @@ function InventoryClientLoaded({
   const openQcExceptionsRead = moduleCollection(useInventoryExceptionsOpenQc(orgId));
   const openQcExceptions = openQcExceptionsRead.rows;
   const { data: orgUsers = [] } = useOrgUsers();
-  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
+  const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists));
+  const pricelists = pricelistsRead.rows;
   const { data: contacts = [] } = useContacts(orgId);
   const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId);
   const { data: productPackagings = [] } = useProductPackagings(orgId);
@@ -1409,10 +1431,11 @@ function InventoryClientLoaded({
   }, [moveQuantRow, locations, t]);
 
   const productsEntityConfig = useMemo((): EntityViewConfig => {
-    const base = productsTableConfig(t, {
-      formatProductDisplayName: inventoryProductPrimaryLabel,
+    const table = productsTableConfig(t, {
+      formatProductDisplayName: workspace === 'products' ? undefined : inventoryProductPrimaryLabel,
       onEmptyAction: openCreateProduct,
     });
+    const base = workspace === 'products' ? productCatalogTable(table, productCategories, t) : table;
     const view = base.view as EntityTableConfig;
     return withInlineEdits(
       {
@@ -1428,6 +1451,7 @@ function InventoryClientLoaded({
       {
         name: {
           kind: 'text',
+          canEdit: workspace === 'products' ? () => permissionsReady !== false && checkPermission('product', 'write').allowed : undefined,
           save: async (row, value) => {
             const name = requiredInlineText(
               value,
@@ -1438,6 +1462,7 @@ function InventoryClientLoaded({
         },
         standardPrice: {
           kind: 'number',
+          canEdit: workspace === 'products' ? () => permissionsReady !== false && checkPermission('product', 'write').allowed : undefined,
           save: async (row, value) => {
             const standardPrice = inlineNumberAtLeast(
               value,
@@ -1449,7 +1474,7 @@ function InventoryClientLoaded({
         },
       },
     );
-  }, [t, openCreateProduct, updateProduct]);
+  }, [t, openCreateProduct, updateProduct, workspace, productCategories, checkPermission, permissionsReady]);
 
   const stockEntityConfig = useMemo((): EntityViewConfig => {
     const base = stockQuantsTableConfig(t, {
@@ -1516,7 +1541,7 @@ function InventoryClientLoaded({
       statusKey: 'type',
       statusBadgeVariants: status.badgeVariants,
       statusBadgeLabels: status.badgeLabels,
-      detailConfig: productDetailConfig(t),
+      detailConfig: workspace === 'products' ? productCatalogDetail(productDetailConfig(t), t) : productDetailConfig(t),
       auditTableName: 'product',
       discussion: {},
       customTabs: [
@@ -1539,10 +1564,10 @@ function InventoryClientLoaded({
         },
       ],
     };
-  }, [t, orgId, vendorNameById]);
+  }, [t, orgId, vendorNameById, workspace]);
 
   const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => {
-    const baseDetail = stockQuantDetailConfig(t);
+    const baseDetail = workspace === 'warehouse' ? warehouseStockDetail(stockQuantDetailConfig(t), t) : stockQuantDetailConfig(t);
     const detailConfig = {
       ...baseDetail,
       sections: baseDetail.sections.map((section) =>
@@ -1592,7 +1617,7 @@ function InventoryClientLoaded({
       detailConfig,
       auditTableName: 'stock_quant',
     };
-  }, [t, productLabelById, locationLabelById]);
+  }, [t, productLabelById, locationLabelById, workspace]);
 
   const locationRecordSheet = useMemo((): EntityRecordSheetConfig => ({
     titleKey: 'name',
@@ -2148,6 +2173,7 @@ function InventoryClientLoaded({
       type: 'custom' as const,
       customContent: (
         <CycleCountWizard
+          key={`${organizationId}:${selectedOperatingCompanyId ?? ''}:${currentUser?.id ?? ''}`}
           organizationId={organizationId}
           operatingCompanyId={selectedOperatingCompanyId}
           locations={locations}
@@ -2162,6 +2188,7 @@ function InventoryClientLoaded({
       t,
       organizationId,
       selectedOperatingCompanyId,
+      currentUser?.id,
       locations,
       cycleCounts,
       products,
@@ -3189,7 +3216,7 @@ function InventoryClientLoaded({
       return tab;
     };
 
-    return {
+    const configured: ModuleConfig = {
       ...moduleConfig,
       tabs: [
         ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
@@ -3244,8 +3271,12 @@ function InventoryClientLoaded({
         qualityAlertsTab,
         warehouse3DTab,
       ],
-    } as ModuleConfig;
+    };
+    if (workspace === 'products') return productCatalogWorkspace(configured, t);
+    if (workspace === 'warehouse') return warehouseWorkspace(configured, t, locations);
+    return configured;
   }, [
+    workspace,
     stockMoveTabActions,
     inventoryCountTabActions,
     productionLotTabActions,
@@ -3347,12 +3378,12 @@ function InventoryClientLoaded({
 
   const data = useMemo(
     () => ({
-      products: (products as Record<string, unknown>[]).map((row) => ({
+      products: (workspace === 'products' ? productCatalogRows(products, productCategories, uoms) : products).map((row) => ({
         ...row,
         sheetTitle:
           inventoryProductPrimaryLabel(row) || String(row.name ?? row.id ?? ''),
       })),
-      stock: filteredStockQuants.map((row) => {
+      stock: (workspace === 'warehouse' ? warehouseRows(filteredStockQuants, products, locations, uoms) : filteredStockQuants).map((row) => {
         const record = row as Record<string, unknown>;
         const productId = record.productId ?? record.product_id;
         const locationId = record.locationId ?? record.location_id;
@@ -3367,7 +3398,9 @@ function InventoryClientLoaded({
         return {
           ...record,
           sheetTitle:
-            [productLabel, locationLabel].filter(Boolean).join(' · ') ||
+            (workspace === 'warehouse'
+              ? [record.warehouseProductName, record.warehouseLocationName]
+              : [productLabel, locationLabel]).filter(Boolean).join(' · ') ||
             String(record.id ?? ''),
         };
       }) as unknown as Record<string, unknown>[],
@@ -3378,23 +3411,23 @@ function InventoryClientLoaded({
       warehouses: warehouses as unknown as Record<string, unknown>[],
       adjustments: adjustments as unknown as Record<string, unknown>[],
       locations: locations as unknown as Record<string, unknown>[],
-      lots: lots as unknown as Record<string, unknown>[],
-      serials: serials as unknown as Record<string, unknown>[],
+      lots: workspace === 'warehouse' ? warehouseRows(lots, products, []) : lots as unknown as Record<string, unknown>[],
+      serials: workspace === 'warehouse' ? warehouseRows(serials, products, locations) : serials as unknown as Record<string, unknown>[],
       quality: qualityChecks as unknown as Record<string, unknown>[],
-      'cycle-counts': cycleCounts as unknown as Record<string, unknown>[],
+      'cycle-counts': workspace === 'warehouse' ? warehouseRows(cycleCounts, [], locations) : cycleCounts as unknown as Record<string, unknown>[],
       'picking-waves': pickingWaves as unknown as Record<string, unknown>[],
       'stock-packages': stockPackages as unknown as Record<string, unknown>[],
       'warehouse-tasks': warehouseTasks as unknown as Record<string, unknown>[],
       routes: stockRoutes as unknown as Record<string, unknown>[],
       rules: stockRules as unknown as Record<string, unknown>[],
-      'stock-moves': stockMoves as unknown as Record<string, unknown>[],
+      'stock-moves': workspace === 'warehouse' ? warehouseRows(stockMoves, products, locations, uoms) : stockMoves as unknown as Record<string, unknown>[],
       valuations: inventoryValuations as unknown as Record<string, unknown>[],
       replenishment: replenishmentRulesList as unknown as Record<
         string,
         unknown
       >[],
       'barcode-rules': barcodeRules as unknown as Record<string, unknown>[],
-      'product-categories': productCategories as unknown as Record<
+      'product-categories': workspace === 'products' ? productCatalogCategoryRows(productCategories) : productCategories as unknown as Record<
         string,
         unknown
       >[],
@@ -3416,6 +3449,8 @@ function InventoryClientLoaded({
       >[],
     }),
     [
+      workspace,
+      uoms,
       products,
       productLabelById,
       locationLabelById,
@@ -3457,13 +3492,16 @@ function InventoryClientLoaded({
     [data.transfers, transfersLoading, t],
   );
 
-  const dataState = {
+  const sourceDataState = {
     dashboard: mergeModuleStates([
       productsRead.state, stockQuantsRead.state, transfersRead.state, adjustmentsRead.state, stockMovesRead.state,
       shortAtpExceptionsRead.state, expiredLotExceptionsRead.state, openQcExceptionsRead.state,
     ]),
-    products: productsRead.state,
+    products: workspace === 'products'
+      ? mergeModuleStates([productsRead.state, productCategoriesRead.state, uomsRead.state])
+      : productsRead.state,
     'product-categories': productCategoriesRead.state,
+    uoms: uomsRead.state,
     stock: stockQuantsRead.state,
     transfers: transfersRead.state,
     'stock-moves': stockMovesRead.state,
@@ -3490,12 +3528,14 @@ function InventoryClientLoaded({
     'location-tree': locationsRead.state,
     'quality-alerts': qualityChecksRead.state,
   };
+  const dataState = workspace === 'warehouse' ? warehouseDataStates(sourceDataState) : sourceDataState;
   type InventoryTab = keyof typeof dataState;
   const tabUsable = (tab: string | undefined) =>
     tab == null || !(tab in dataState) || canUseModuleData(dataState[tab as InventoryTab]);
   const actionTabs: Record<string, InventoryTab> = {
     createProduct: 'products', createTransfer: 'transfers', createStockPicking: 'transfers',
     createStockLocation: 'locations', createWarehouse: 'warehouses', createQualityCheck: 'quality',
+    createAdjustment: 'adjustments', createInventoryAdjustment: 'adjustments',
     createQualityAlert: 'quality-alerts', createReplenishmentRule: 'replenishment',
     createPickingWave: 'picking-waves', createProductCategory: 'product-categories',
     createBarcodeRule: 'barcode-rules', createAdjustmentReason: 'adjustment-reasons',
@@ -3556,29 +3596,20 @@ function InventoryClientLoaded({
   ) => {
     if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
     if (action === 'createProduct') {
-      const pricelistRaw = formData.pricelistId;
-      if (pricelistRaw === '' || pricelistRaw == null) return;
-      const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw));
-      if (pl == null || pl.currencyId === undefined || pl.currencyId === null)
-        return;
-      const currencyId = Number(pl.currencyId);
-      const productParams = toCreateProductParamsFromForm(formData, currencyId);
-      if (productParams)
-        await createProduct.mutateAsync(
-          productParams as unknown as CreateProductParams,
-        );
+      const productParams = prepareProductCreate(formData, pricelists, pricelistsRead.state, t);
+      await createProduct.mutateAsync(productParams as unknown as CreateProductParams);
     } else if (action === 'createTransfer' || action === 'createStockPicking') {
       const stockPickingParams = toCreateStockPickingParamsFromForm(formData);
-      if (stockPickingParams)
-        await createStockPicking.mutateAsync(
-          stockPickingParams as unknown as CreateStockPickingParams,
-        );
+      if (!stockPickingParams) throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
+      await createStockPicking.mutateAsync(
+        stockPickingParams as unknown as CreateStockPickingParams,
+      );
     } else if (
       action === 'createAdjustment' ||
       action === 'createInventoryAdjustment'
     ) {
       const productRaw = formData.productId;
-      if (productRaw === '' || productRaw == null) return;
+      if (productRaw === '' || productRaw == null) throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
       const productRow = products.find(
         (p) => String(p.id) === String(productRaw),
       );
@@ -3588,42 +3619,38 @@ function InventoryClientLoaded({
           : productRow?.uomPoId != null
             ? Number(productRow.uomPoId)
             : undefined;
-      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) return;
+      if (uomFromProduct == null || Number.isNaN(uomFromProduct)) throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
       const adjustmentParams = toCreateInventoryAdjustmentParamsFromForm(
         formData,
         uomFromProduct,
       );
-      if (adjustmentParams)
-        await createInventoryAdjustment.mutateAsync(
-          adjustmentParams as unknown as CreateInventoryAdjustmentParams,
-        );
+      if (!adjustmentParams) throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
+      await createInventoryAdjustment.mutateAsync(
+        adjustmentParams as unknown as CreateInventoryAdjustmentParams,
+      );
     } else if (action === 'createStockLocation') {
       const stockLocationParams = toCreateStockLocationParamsFromForm(formData);
-      if (stockLocationParams)
-        await createStockLocation.mutateAsync(
-          stockLocationParams as unknown as CreateStockLocationParams,
-        );
+      if (!stockLocationParams) throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
+      await createStockLocation.mutateAsync(
+        stockLocationParams as unknown as CreateStockLocationParams,
+      );
     } else if (action === 'createWarehouse') {
       const templateWarehouseId = formData.templateWarehouseId;
-      if (templateWarehouseId === '' || templateWarehouseId == null) return;
+      if (templateWarehouseId === '' || templateWarehouseId == null) throw new Error(t('inventory.warehouseWorkspace.setupRequired', { defaultValue: 'Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.' }));
       const template = warehouses.find(
         (w) => String(w.id) === String(templateWarehouseId),
       ) as Record<string, unknown> | undefined;
-      if (!template) return;
-      try {
-        await createWarehouse.mutateAsync(
-          buildCreateWarehouseParamsFromTemplate(template, {
-            name: String(formData.name ?? '').trim(),
-            code: String(formData.code ?? '').trim(),
-            active: formData.active == null ? true : Boolean(formData.active),
-            sequence: Number(formData.sequence ?? 0),
-            // Ensures template row lookup key is visible to static form–mutation tooling
-            templateWarehouseId: String(templateWarehouseId),
-          }) as unknown as CreateWarehouseParams,
-        );
-      } catch {
-        return;
-      }
+      if (!template) throw new Error(t('inventory.warehouseWorkspace.setupRequired', { defaultValue: 'Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.' }));
+      await createWarehouse.mutateAsync(
+        buildCreateWarehouseParamsFromTemplate(template, {
+          name: String(formData.name ?? '').trim(),
+          code: String(formData.code ?? '').trim(),
+          active: formData.active == null ? true : Boolean(formData.active),
+          sequence: Number(formData.sequence ?? 0),
+          // Ensures template row lookup key is visible to static form–mutation tooling
+          templateWarehouseId: String(templateWarehouseId),
+        }) as unknown as CreateWarehouseParams,
+      );
     } else if (action === 'createQualityCheck') {
       const productRaw = formData.productId;
       if (productRaw === '' || productRaw == null) return;
@@ -3686,7 +3713,7 @@ function InventoryClientLoaded({
         uomRaw === '' ||
         uomRaw == null
       ) {
-        return;
+        throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
       }
       const qtyMultipleRaw = Number(formData.qtyMultiple ?? 1);
       const leadDaysRaw = Math.floor(Number(formData.leadDays ?? 0));
@@ -3747,10 +3774,10 @@ function InventoryClientLoaded({
         );
     } else if (action === 'createStockQuant') {
       const stockQuantParams = toCreateStockQuantParamsFromForm(formData);
-      if (stockQuantParams)
-        await createStockQuant.mutateAsync(
-          stockQuantParams as unknown as CreateStockQuantParams,
-        );
+      if (!stockQuantParams) throw new Error(t('inventory.warehouseWorkspace.requiredValues', { defaultValue: 'Complete the required fields using available records. Your entries have been retained.' }));
+      await createStockQuant.mutateAsync(
+        stockQuantParams as unknown as CreateStockQuantParams,
+      );
     } else if (action === 'createWarehouse3dZone') {
       const wid = formData.warehouseId;
       const lid = formData.locationId;

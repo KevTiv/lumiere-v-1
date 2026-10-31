@@ -5815,6 +5815,20 @@
     }
   },
   "inventory": {
+    "warehouseWorkspace": {
+      "scopeChanged": "Your company, account or permissions changed. Reopen this workspace before continuing.",
+      "countInputInvalid": "Choose available count, product, location and unit records, and enter a finite quantity of zero or more.",
+      "countBaseUnit": "Count in the product’s stock unit. Unit conversion is not applied.",
+      "selectCount": "Choose the count plan to continue. New plans are never selected automatically.",
+      "recordBeforePost": "Posting applies the validated count plan. Record a line here before posting.",
+      "description": "Stock by location, movements, counts and restocking",
+      "counts": "Counts",
+      "searchStock": "Search products, SKU or locations…",
+      "referenceUnavailable": "Unavailable",
+      "setupRequired": "Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.",
+      "counted": "Counted",
+      "requiredValues": "Complete the required fields using available records. Your entries have been retained."
+    },
     "csvImport": {
       "uomCategoriesTitle": "Import UOM categories (CSV)",
       "toolbarUomCategories": "Import UOM categories (CSV)",
@@ -5858,6 +5872,14 @@
     "products": {
       "title": "Products",
       "description": "Product catalog",
+      "create": {
+        "pricelistsUnavailable": "Price lists could not be loaded. Retry before creating a product.",
+        "pricelistRequired": "Select a price list for this product.",
+        "pricelistUnavailable": "The selected price list is no longer available. Choose another price list.",
+        "currencyRequired": "The selected price list needs a valid currency before it can be used.",
+        "referencesRequired": "Select a valid category, unit of measure and price list.",
+        "valuesRequired": "Enter a product name and a cost of zero or more."
+      },
       "searchPlaceholder": "Search by name or internal reference…",
       "emptyMessage": "No products found.",
       "emptyState": {
@@ -13994,7 +14016,23 @@
     }
   },
   "fleet": {
-    "title": "Fleet",
+    "workspace": {
+      "driverChoicesUnavailable": "No employee choices are available. You can still unassign the current driver.",
+      "inspectorChoicesUnavailable": "No employee choices are available. You can record the inspection without an inspector.",
+      "savedRequest": "A fleet save is waiting for confirmation.",
+      "retryOriginal": "Retry uses the original values and request identity, including after a reload.",
+      "retrySavedRequest": "Retry saved request",
+      "companyRequired": "Select an operating company to view and manage its vehicles.",
+      "loadingSetup": "Loading service and accounting choices…",
+      "setupTitle": "Set up service cost recording",
+      "setupHint": "An administrator must configure an active service type, a company journal, and expense and offset accounts before you can record a garage intervention and its cost.",
+      "status": {
+        "active": "Active",
+        "idle": "Idle",
+        "maintenance": "Maintenance",
+        "offline": "Offline"
+      }
+    },    "title": "Fleet",
     "subtitle": "Vehicles",
     "empty": "No vehicles yet.",
     "create": "Add vehicle",
@@ -14058,6 +14096,7 @@
         "empty": "No service records yet."
       },
       "inspections": {
+        "noInspector": "No inspector",
         "title": "Inspection history",
         "description": "Record the result of a fleet vehicle inspection.",
         "action": "Record inspection",

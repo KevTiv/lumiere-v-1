@@ -6,6 +6,8 @@
 **Module/surface:** Fleet  
 **Operator surface:** `/fleet`
 
+**2026-10-31 alpha scope:** Fleet is selected for bounded alpha discovery and route admission in [Product and Fleet alpha scope](../plans/product-fleet-alpha-2026-10-31.md). That decision is separate from this accepted service-cost slice and the wider module's U2/`review` calibration. The new UI/recovery work needs its own current-head validation; the historical results below do not certify those changes.
+
 ## Bounded path
 
 COV-15 now certifies a real service-cost and inspection-history path:

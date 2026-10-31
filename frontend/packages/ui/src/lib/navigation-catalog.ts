@@ -35,11 +35,12 @@ import {
   Truck,
   UserCheck,
   Users,
+  Warehouse,
 } from "lucide-react"
 
 import { isWorkspaceSurfaceVisible, type WorkspaceProfile } from "./workspace-profile"
 import type { Resource } from "./rbac-types"
-import { isFirstOrgSurfaceAdmitted } from "./product-surface-catalog"
+import { isFirstOrgNavigationAdmitted } from "./product-surface-catalog"
 
 export interface NavLinkItem {
   surfaceId: string
@@ -101,6 +102,8 @@ export function buildNavGroups(
     {
       label: t("nav.groups.operations"),
       items: [
+        { surfaceId: "products", label: t("inventory.products.title"), href: "/products", icon: Package, resource: "module:inventory" },
+        { surfaceId: "warehouse", label: t("modules.tabGroups.warehouse"), href: "/warehouse", icon: Warehouse, resource: "module:inventory" },
         { surfaceId: "inventory", label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
         { surfaceId: "distributor", label: t("nav.distributor"), href: "/distributor", icon: Store, resource: "module:inventory" },
         { surfaceId: "pos", label: t("nav.pos"), href: "/pos", icon: ShoppingCart, resource: "module:pos" },
@@ -143,7 +146,7 @@ export function buildNavGroups(
       ...group,
       items: group.items.filter((item) =>
         isWorkspaceSurfaceVisible(options.workspaceProfile ?? "full", item.surfaceId) &&
-        (!options.firstOrgProfile || isFirstOrgSurfaceAdmitted(item.surfaceId, options.isAdmin ?? false)),
+        (!options.firstOrgProfile || isFirstOrgNavigationAdmitted(item.surfaceId, options.isAdmin ?? false)),
       ),
     }))
     .filter((group) => group.items.length > 0)

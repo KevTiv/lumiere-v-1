@@ -20,6 +20,7 @@ import {
 
 type PostRunInput = PostCycleCountAdjustmentsInput & {
   snapshot: CycleCountAdjustmentSnapshot
+  assertScope?: () => void
 }
 
 export function useCycleCountAdjustmentWorkflow(
@@ -33,8 +34,10 @@ export function useCycleCountAdjustmentWorkflow(
   const spec = useMemo<TransitionSpec<PostRunInput>>(
     () => ({
       id: "inventory.cycle-count.post",
-      command: (input) =>
-        postCycleCountAdjustmentsCommand(companyId, input.cycleCountId),
+      command: (input) => {
+        input.assertScope?.()
+        return postCycleCountAdjustmentsCommand(companyId, input.cycleCountId)
+      },
       affects: CYCLE_COUNT_POST_AFFECTS,
       observe: async (input) =>
         observeCycleCountAdjustment(
@@ -53,12 +56,14 @@ export function useCycleCountAdjustmentWorkflow(
     () =>
       async (
         input: PostCycleCountAdjustmentsInput,
-        context?: { navigateToNext?: boolean },
+        context?: { navigateToNext?: boolean; assertScope?: () => void },
       ) => {
+        context?.assertScope?.()
         const rows = (await qc.fetchQuery({
           ...stockQuantsQueryOptions(organizationId),
           staleTime: 0,
         })) as unknown as RowValueMap[]
+        context?.assertScope?.()
         const snapshot = captureCycleCountAdjustmentSnapshot(input, rows)
         if (!snapshot) {
           throw new WorkflowError(
@@ -67,7 +72,7 @@ export function useCycleCountAdjustmentWorkflow(
           )
         }
 
-        const runInput: PostRunInput = { ...input, snapshot }
+        const runInput: PostRunInput = { ...input, snapshot, assertScope: context?.assertScope }
         return runner.run(
           `${spec.id}:${input.cycleCountId}`,
           spec,

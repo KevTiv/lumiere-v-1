@@ -257,7 +257,7 @@
   "web/app/(modules)/hr/hr-recruitment-panel.tsx": 5,
   "web/app/(modules)/hr/hr-statutory-ids-panel.tsx": 1,
   "web/app/(modules)/inventory/cycle-count-wizard.tsx": 9,
-  "web/app/(modules)/inventory/inventory-client.tsx": 72,
+  "web/app/(modules)/inventory/inventory-client.tsx": 71,
   "web/app/(modules)/inventory/inventory-ops-panel.tsx": 1,
   "web/app/(modules)/inventory/picking-wave-actions.ts": 1,
   "web/app/(modules)/inventory/product-record-read-tabs.tsx": 1,

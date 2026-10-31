@@ -18,6 +18,11 @@ export type ProductSurfaceTarget =
 
 export type FirstOrgExposure = "enabled" | "admin-only" | "hidden" | "review"
 
+export interface BoundedAlphaAdmission {
+  scope: "product-catalog" | "warehouse-operations" | "fleet-register-and-history"
+  decisionRecord: `docs/plans/${string}`
+}
+
 export interface ProductSurfaceDefinition {
   id: string
   kind: "route" | "panel"
@@ -31,6 +36,8 @@ export interface ProductSurfaceDefinition {
   minimumEvidence: string
   hiddenReason: string | null
   canonicalFor?: string
+  /** Explicit alpha scope; does not promote the owning lifecycle's U5 evidence. */
+  boundedAlpha?: BoundedAlphaAdmission
 }
 
 const pendingU5 = (
@@ -40,6 +47,7 @@ const pendingU5 = (
   owner: string,
   requiredCapability: Resource,
   canonicalFor?: string,
+  boundedAlpha?: BoundedAlphaAdmission,
 ): ProductSurfaceDefinition => ({
   id,
   kind: "route",
@@ -53,6 +61,7 @@ const pendingU5 = (
   minimumEvidence: `${owner} U5 acceptance revision`,
   hiddenReason: `${owner} has not supplied accepted U5 first-organization evidence`,
   canonicalFor,
+  boundedAlpha,
 })
 
 const alphaFinanceSurface = (
@@ -80,7 +89,9 @@ const alphaFinanceSurface = (
  *
  * This is product admission metadata, not authorization. Server/Casbin policy
  * remains authoritative for reads and writes after a surface is admitted.
- * REVIEW entries are fail-closed for the configured first test organization.
+ * REVIEW entries remain fail-closed unless they carry an explicit bounded-alpha
+ * decision or are an existing Finance support route. Neither exception promotes
+ * the owning lifecycle's firstOrgExposure or its U5 evidence.
  */
 export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
   pendingU5(
@@ -123,6 +134,30 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     "module:expenses",
   ),
   pendingU5(
+    "products",
+    "/products",
+    "t0-business",
+    "COV-06",
+    "module:inventory",
+    "product-catalog",
+    {
+      scope: "product-catalog",
+      decisionRecord: "docs/plans/product-fleet-alpha-2026-10-31.md",
+    },
+  ),
+  pendingU5(
+    "warehouse",
+    "/warehouse",
+    "t0-business",
+    "COV-06",
+    "module:inventory",
+    "warehouse-operations",
+    {
+      scope: "warehouse-operations",
+      decisionRecord: "docs/plans/product-fleet-alpha-2026-10-31.md",
+    },
+  ),
+  pendingU5(
     "inventory",
     "/inventory",
     "t0-business",
@@ -151,6 +186,10 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     "COV-15",
     "module:fleet",
     "fleet",
+    {
+      scope: "fleet-register-and-history",
+      decisionRecord: "docs/plans/product-fleet-alpha-2026-10-31.md",
+    },
   ),
   pendingU5(
     "helpdesk",
@@ -395,6 +434,25 @@ export function isFirstOrgSurfaceAdmitted(
   return surface.firstOrgExposure === "admin-only" && isAdmin
 }
 
+/**
+ * Navigation admission includes the explicitly selected alpha workspaces while
+ * retaining the stricter lifecycle admission above for evidence consumers.
+ * This never grants a role, field permission, or server operation.
+ */
+export function isFirstOrgNavigationAdmitted(
+  surfaceId: string,
+  isAdmin: boolean,
+): boolean {
+  const surface = surfacesById.get(surfaceId)
+  if (!surface) return false
+  if (isFirstOrgSurfaceAdmitted(surfaceId, isAdmin)) return true
+  return (
+    surface.kind === "route" &&
+    surface.target === "t0-business" &&
+    surface.boundedAlpha !== undefined
+  )
+}
+
 const FIRST_ORG_FINANCE_SUPPORT_ROUTE_IDS = new Set([
   "tasks",
   "inventory",
@@ -414,8 +472,9 @@ export function isFirstOrgRouteAdmitted(
   surfaceId: string,
   isAdmin: boolean,
 ): boolean {
-  const surface = getProductSurface(surfaceId)
-  if (isFirstOrgSurfaceAdmitted(surfaceId, isAdmin)) return true
+  const surface = surfacesById.get(surfaceId)
+  if (!surface) return false
+  if (isFirstOrgNavigationAdmitted(surfaceId, isAdmin)) return true
   return FIRST_ORG_FINANCE_SUPPORT_ROUTE_IDS.has(surface.id)
 }
 
