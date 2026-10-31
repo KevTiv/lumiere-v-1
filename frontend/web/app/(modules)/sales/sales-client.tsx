@@ -7,7 +7,7 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
-import { ModuleInsights } from "../../../components/module-insights"
+import { CompanyModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -2671,7 +2671,7 @@ function SalesClientLoaded({
       <ModuleWorkView
         organizationId={organizationId}
         config={config}
-        dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
+        dashboardContent={<CompanyModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataLoading={{ orders: ordersLoading }}
         dataState={dataState}
