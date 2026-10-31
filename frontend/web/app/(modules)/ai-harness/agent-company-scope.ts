@@ -20,7 +20,11 @@ function idKey(value: unknown): string | null {
 export function isAgentAvailableForCompany(agent: ScopedAgent, organizationId: bigint, companyId: string): boolean {
   const organization = idKey(organizationId)
   const company = idKey(companyId)
-  if (!organization || !company || !idKey(agent.id) || agent.isActive !== true) return false
+  // The current submit contract sends Number IDs; discovery must not offer
+  // values that the form would round during dispatch.
+  const agentId = idKey(agent.id)
+  if (!organization || !company || !agentId || agent.isActive !== true) return false
+  if (BigInt(company) > BigInt(Number.MAX_SAFE_INTEGER) || BigInt(agentId) > BigInt(Number.MAX_SAFE_INTEGER)) return false
   if (idKey(agent.organizationId) !== organization) return false
   return agent.companyId === null || idKey(agent.companyId) === company
 }

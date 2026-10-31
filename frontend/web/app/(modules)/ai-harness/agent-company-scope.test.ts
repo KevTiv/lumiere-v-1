@@ -32,9 +32,15 @@ test("explicit organization-wide binding still requires matching organization an
 
 test("JSON number/string IDs and native bigint IDs match without precision loss", () => {
   assert.equal(available({ ...agent, id: 2, organizationId: "4097", companyId: 4097 }), true)
-  assert.equal(isAgentAvailableForCompany({ ...agent, organizationId: "9007199254740993", companyId: "9007199254740994" }, 9007199254740993n, "9007199254740994"), true)
+  assert.equal(isAgentAvailableForCompany({ ...agent, organizationId: "9007199254740993", companyId: "4097" }, 9007199254740993n, "4097"), true)
   assert.equal(available({ ...agent, organizationId: Number.MAX_SAFE_INTEGER + 1 }), false)
-  for (const id of [0, -1, NaN, 1.5, Number.MAX_SAFE_INTEGER + 1, "18446744073709551616"]) {
+  for (const id of [0, -1, NaN, 1.5, Number.MAX_SAFE_INTEGER + 1, "9007199254740993", 9007199254740993n, "18446744073709551616"]) {
     assert.equal(available({ ...agent, id }), false)
   }
+})
+
+test("company choices outside the Number request contract cannot enable dispatch", () => {
+  assert.equal(available({ ...agent, companyId: "9007199254740993" }, "9007199254740993"), false)
+  assert.equal(available({ ...agent, companyId: null }, "9007199254740993"), false)
+  assert.equal(available({ ...agent, companyId: BigInt(Number.MAX_SAFE_INTEGER) }, String(Number.MAX_SAFE_INTEGER)), true)
 })

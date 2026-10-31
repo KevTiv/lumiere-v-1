@@ -29,7 +29,7 @@ server rejection remains authoritative. No error-message parsing was introduced.
 
 Tests run (command + result):
 
-- `node --import <existing tsx loader> --test agent-company-scope.test.ts finance-review-model.test.ts`: seven passed.
+- `node --import <existing tsx loader> --test agent-company-scope.test.ts finance-review-model.test.ts`: eight passed after the dispatch-range correction.
 - `tsc --noEmit --strict --target es2020 --skipLibCheck agent-company-scope.ts`: passed.
 - Exact current `stdb-auth/src/lib.rs` compiled with `rustc --test` against matching cached dependency fingerprints; current dependency-free policy-core source rebuilt directly. `/private/tmp/lumiere-ai-scope-auth-tests`: all 91 passed, including default/selective AI binding and existing authorization tests. An initial arbitrary cached-dependency selection was incompatible; the coherent fingerprint build replaced it.
 - `git diff --check`: passed.
@@ -39,8 +39,10 @@ UI mutation or second actor was used. Current-head hosted checks, full web type
 checking and deployed operator acceptance remain required.
 
 Compatibility/debt retired: the two forms no longer treat omitted company scope
-as organization-wide. Existing positive IDs remain supported as JSON number,
-string or native bigint without numeric precision loss.
+as organization-wide. Organization IDs remain exact as JSON strings or native bigint. Agent IDs and
+selected company IDs must fit Number.MAX_SAFE_INTEGER because the current form
+request contract converts them to Number. Unsafe string/bigint IDs are rejected
+before they can be offered for dispatch; native u64 types are unchanged.
 
 Remaining blocker/deferral: the coordinator must run supported code generation
 for the canonical registry and integrate its shared outputs. The frontend registry
