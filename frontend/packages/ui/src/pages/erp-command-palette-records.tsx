@@ -42,6 +42,8 @@ interface RecordModelSpec {
   model: string
   /** Same resource the module's navigation entry is gated on. */
   resource: string
+  /** A bounded surface can share a capability with a larger, hidden module. */
+  surfaceId?: string
   headingKey: string
   heading: string
   icon: ComponentType<{ className?: string }>
@@ -61,8 +63,8 @@ export const RECORD_MODEL_SPECS: readonly RecordModelSpec[] = [
   { model: "purchase_order", resource: "module:purchasing", headingKey: "commandPalette.records.purchaseOrders", heading: "Purchase orders", icon: ShoppingCart, useRows: usePurchaseOrders, fields: ["name", "partnerRef", "origin"], titleFields: ["name", "partnerRef"], partnerField: "partnerId" },
   { model: "account_move", resource: "module:accounting", headingKey: "commandPalette.records.invoices", heading: "Invoices and bills", icon: BookOpen, useRows: useAccountMoves, fields: ["name", "ref", "invoiceOrigin", "paymentReference"], titleFields: ["name", "ref"], partnerField: "partnerId" },
   { model: "contact", resource: "module:crm", headingKey: "commandPalette.records.contacts", heading: "Contacts", icon: Users, useRows: useContacts, fields: ["displayName", "name", "email", "phone"], titleFields: ["displayName", "name", "email"], fallbackHref: (id) => `/crm?tab=contacts&filter=${encodeURIComponent(`id:${id}`)}` },
-  { model: "product", resource: "module:inventory", headingKey: "commandPalette.records.products", heading: "Products", icon: Package, useRows: useProducts, fields: ["displayName", "name", "defaultCode", "code", "barcode"], titleFields: ["displayName", "name", "defaultCode"], fallbackHref: (id) => `/inventory?tab=products&filter=${encodeURIComponent(`id:${id}`)}` },
-  { model: "stock_picking", resource: "module:inventory", headingKey: "commandPalette.records.transfers", heading: "Transfers", icon: Boxes, useRows: useStockPickings, fields: ["name", "origin"], titleFields: ["name"], partnerField: "partnerId" },
+  { model: "product", resource: "module:inventory", surfaceId: "products", headingKey: "commandPalette.records.products", heading: "Products", icon: Package, useRows: useProducts, fields: ["displayName", "name", "defaultCode", "code", "barcode"], titleFields: ["displayName", "name", "defaultCode"], fallbackHref: (id) => `/products?tab=products&filter=${encodeURIComponent(`id:${id}`)}` },
+  { model: "stock_picking", resource: "module:inventory", surfaceId: "warehouse", headingKey: "commandPalette.records.transfers", heading: "Transfers", icon: Boxes, useRows: useStockPickings, fields: ["name", "origin"], titleFields: ["name"], partnerField: "partnerId", fallbackHref: (id) => `/warehouse?tab=transfers&filter=${encodeURIComponent(`id:${id}`)}` },
   { model: "subscription", resource: "module:subscriptions", headingKey: "commandPalette.records.subscriptions", heading: "Subscriptions", icon: RefreshCw, useRows: useSubscriptions, fields: ["code", "name", "description"], titleFields: ["code", "name"], partnerField: "partnerId" },
   { model: "document", resource: "module:documents", headingKey: "commandPalette.records.documents", heading: "Documents", icon: FileText, useRows: useDocuments, fields: ["name", "description"], titleFields: ["name"], partnerField: "partnerId" },
   { model: "fleet_vehicle", resource: "module:fleet", headingKey: "commandPalette.records.vehicles", heading: "Vehicles", icon: Truck, useRows: useFleetVehicles, fields: ["name", "licensePlate"], titleFields: ["name", "licensePlate"] },
@@ -96,6 +98,8 @@ interface RecordSearchResultsProps {
   query: string
   /** Resources the user may read (module navigation entries already admitted). */
   allowedResources: ReadonlySet<string>
+  /** Admitted discovery surfaces; a shared module capability alone is insufficient. */
+  allowedSurfaceIds: ReadonlySet<string>
   /** Record page of a model, injected by the app (`recordPageHref`). */
   recordHref: (model: string, id: string) => string | undefined
   onNavigate: (href: string) => void
@@ -170,7 +174,6 @@ function RecordModelResults({
         RECORDS_PER_MODEL,
       ),
     // partnerOf closes over spec + partnerLabels only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, isError, query, spec, partnerLabels],
   )
   const loading = Boolean(isLoading)
@@ -221,14 +224,18 @@ export function RecordSearchResults({
   organizationId,
   query,
   allowedResources,
+  allowedSurfaceIds,
   recordHref,
   onNavigate,
   onSummary,
 }: RecordSearchResultsProps) {
   const { t } = useTranslation()
   const specs = useMemo(
-    () => RECORD_MODEL_SPECS.filter((spec) => allowedResources.has(spec.resource)),
-    [allowedResources],
+    () => RECORD_MODEL_SPECS.filter((spec) =>
+      allowedResources.has(spec.resource) &&
+      allowedSurfaceIds.has(spec.surfaceId ?? spec.resource.replace(/^module:/, "")),
+    ),
+    [allowedResources, allowedSurfaceIds],
   )
   const [statuses, setStatuses] = useState<Record<string, RecordSearchSummary>>({})
   const [onStatus] = useState(

@@ -1,6 +1,6 @@
 # COV first-organization exposure prototype
 
-**Status:** IMPLEMENTED COV-00B denominator; all unaccepted surfaces remain REVIEW/hidden
+**Status:** IMPLEMENTED COV-00B denominator; bounded alpha admission is recorded separately from broader lifecycle acceptance
 **Canonical product admission owner:** `frontend/packages/ui/src/lib/product-surface-catalog.ts`
 **Canonical presentation owner:** `frontend/packages/ui/src/lib/navigation-catalog.ts`
 
@@ -67,7 +67,7 @@ interface ProductSurfaceDefinition {
 }
 ```
 
-The first-org profile is activated only for the organization ID explicitly configured in server-side `LUMIERE_FIRST_TEST_ORGANIZATION_ID`. There is no "first row" or organization-ID heuristic. If the variable is absent, ordinary product navigation is unchanged; an invalid configured value is rejected. When it matches the current session organization, navigation is limited to Finance and administrator Settings. A small, explicit set of supporting ERP routes remains available for cross-module links launched from Finance; every other unadmitted route redirects to the containment page.
+The first-org profile is activated only for the organization ID explicitly configured in server-side `LUMIERE_FIRST_TEST_ORGANIZATION_ID`. There is no "first row" or organization-ID heuristic. If the variable is absent, ordinary product navigation is unchanged; an invalid configured value is rejected. When it matches the current session organization, navigation is limited to admitted Finance surfaces and the explicitly selected bounded Products/Warehouse/Fleet alpha workspaces. Settings retains its current review decision. A small, explicit set of supporting ERP routes remains available for cross-module links launched from Finance; every other unadmitted route redirects to the containment page.
 
 Do not create a second independent navigation hierarchy. The existing navigation catalog should reference the stable `surfaceId` and derive admission metadata from this authority.
 
@@ -124,7 +124,9 @@ The audit can classify obvious concern families without deciding every product e
 - `/fleet` is the canonical COV-15 Fleet workspace. It now owns the broader vehicle, driver, service and inspection lifecycle.
 - `/map` is a mixed geospatial showcase (Fleet position, warehouse and POS pins), is hidden from the first-org profile, and must receive a separate product owner before admission. It is not a second Fleet workspace authority.
 
-Finance routes are admitted to alpha navigation. Tasks, Inventory, Workflows, Approvals, Documents, Calendar, and Messages may support Finance deep links without appearing in alpha navigation. Every other `REVIEW`, AI, internal, and showcase route remains fail closed. `trackers` and `notebook` retain explicit `BLOCKED: product owner required` ownership rather than an invented policy.
+Finance routes are admitted to alpha navigation. Products, Warehouse and Fleet also have the explicit [2026-10-31 bounded alpha decision](../plans/product-fleet-alpha-2026-10-31.md), stored as `boundedAlpha` metadata in the same catalog. Their `firstOrgExposure` and broader lifecycle evidence remain `review`; `isFirstOrgSurfaceAdmitted` still returns false for them, while the navigation/route helper applies the bounded decision. This admits only the documented catalog, operational Warehouse and vehicle-history workspaces; it does not certify the broader Inventory/WMS or full Fleet lifecycle.
+
+Tasks, Inventory, Workflows, Approvals, Documents, Calendar, and Messages may support Finance deep links without appearing in first-org navigation. Every other `REVIEW`, AI, internal, and showcase route remains fail closed. `trackers` and `notebook` retain explicit `BLOCKED: product owner required` ownership rather than an invented policy. Unknown IDs and route prefixes are not admitted.
 
 Do not let an implementation worker make those product decisions implicitly by adding/removing a sidebar link.
 

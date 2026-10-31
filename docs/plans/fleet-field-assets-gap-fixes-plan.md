@@ -3,6 +3,10 @@
 Backlog derived from [FLEET_FIELD_ASSETS_INVESTIGATION.md](../FLEET_FIELD_ASSETS_INVESTIGATION.md) (2026-07-21).  
 NetSuite is a **quality bar**, not a feature-copy spec.
 
+**2026-10-31 reconciliation:** `/fleet` is now the canonical vehicle, driver, service and inspection workspace. The bounded monetary service-cost path is accepted in [COV-15](../plan/erp-cov15-fleet-service-cost-status.md); fuel/TCO, asset integration and the wider lifecycle remain separate. [Product/Fleet alpha scope](product-fleet-alpha-2026-10-31.md) records the selected alpha workspaces without promoting the full module to U4/U5.
+
+The alpha target is tenant-owned vehicles: registration/lifecycle, garage maintenance, monetary costs/history and manually entered mileage. Rental/booking flows are outside this product scope. Future installed IoT/GPS trackers may add automatic distance; that source must remain distinguishable from manual odometer observations, with units, timestamps, provenance and explicit reconciliation. No automatic mileage is claimed here.
+
 ## Wave A — Pilot integrity (company, contracts, map honesty)
 
 - [x] Require `company_id` on create; company guards on all fleet mutators; isolation domain tests
@@ -36,7 +40,7 @@ NetSuite is a **quality bar**, not a feature-copy spec.
 - [ ] Trip/dispatch headers + odometer start/end
 - [ ] Geofence + incident workflow
 - [ ] OEM / fuel-card / e-toll `fleet_integration_intent` workers
-- [ ] Dedicated `/fleet` module UI beyond map sidebar
+- [x] Dedicated `/fleet` module UI beyond map sidebar (canonical workspace; broader lifecycle acceptance remains open)
 
 ## Out of scope until waves A–C land
 

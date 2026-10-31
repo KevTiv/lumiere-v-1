@@ -456,6 +456,9 @@ jobs:
       - name: Productivity workspace browser regressions
         run: pnpm --dir web test:e2e:productivity-ui
 
+      - name: Product, Fleet and Warehouse browser regressions
+        run: pnpm --dir web test:e2e:product-fleet-warehouse
+
       - name: Accounting next-action and authoring browser regressions
         working-directory: frontend/web
         run: pnpm exec playwright test --config playwright.accounting-ui.config.ts accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts

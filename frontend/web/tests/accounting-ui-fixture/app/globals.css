@@ -6,3 +6,6 @@ body { margin: 0; }
 @source "../../../app/(modules)/subscriptions";
 
 @source "../../../app/(modules)/messages";
+
+@source "../../../app/(modules)/inventory";
+@source "../../../app/(modules)/fleet";

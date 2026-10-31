@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs"
+import { existsSync, readdirSync, statSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
@@ -9,6 +9,7 @@ import {
   PRODUCT_SURFACES,
   getProductSurface,
   getProductSurfaceForPathname,
+  isFirstOrgNavigationAdmitted,
   isFirstOrgRouteAdmitted,
   isFirstOrgSurfaceAdmitted,
 } from "./product-surface-catalog"
@@ -45,12 +46,15 @@ describe("first-org product surface census", () => {
     ).toEqual(currentModuleRouteHrefs())
   })
 
-  it("shows only finance navigation in the alpha profile while settings remains in REVIEW", () => {
+  it("shows Finance and bounded Product/Warehouse/Fleet alpha navigation while Settings stays in REVIEW", () => {
     const memberGroups = buildNavGroups((key) => key, {
       firstOrgProfile: true,
       isAdmin: false,
     })
-    expect(memberGroups.map((group) => group.label)).toEqual(["nav.groups.finance"])
+    expect(memberGroups.map((group) => group.label)).toEqual([
+      "nav.groups.finance",
+      "nav.groups.operations",
+    ])
     expect(memberGroups.flatMap((group) => group.items.map((item) => item.surfaceId))).toEqual([
       "accounting",
       "sales",
@@ -59,6 +63,9 @@ describe("first-org product surface census", () => {
       "reports",
       "subscriptions",
       "expenses",
+      "products",
+      "warehouse",
+      "fleet",
     ])
 
     const adminIds = buildNavGroups((key) => key, {
@@ -73,6 +80,9 @@ describe("first-org product surface census", () => {
       "reports",
       "subscriptions",
       "expenses",
+      "products",
+      "warehouse",
+      "fleet",
     ])
   })
 
@@ -100,7 +110,7 @@ describe("first-org product surface census", () => {
     }
   })
 
-  it("keeps first-org presentation fail-closed for REVIEW and hidden surfaces", () => {
+  it("keeps unselected REVIEW and hidden surfaces contained without promoting lifecycle evidence", () => {
     const visibleSurfaceIds = buildNavGroups((key) => key, {
       firstOrgProfile: true,
       isAdmin: true,
@@ -111,8 +121,12 @@ describe("first-org product surface census", () => {
         surface.firstOrgExposure === "review" ||
         surface.firstOrgExposure === "hidden"
       ) {
-        expect(visibleSurfaceIds).not.toContain(surface.id)
         expect(isFirstOrgSurfaceAdmitted(surface.id, true)).toBe(false)
+        if (surface.boundedAlpha) {
+          expect(visibleSurfaceIds).toContain(surface.id)
+        } else {
+          expect(visibleSurfaceIds).not.toContain(surface.id)
+        }
       }
       expect(surface.owner.trim()).not.toBe("")
       expect(surface.minimumEvidence.trim()).not.toBe("")
@@ -121,6 +135,7 @@ describe("first-org product surface census", () => {
       }
       if (["ai", "internal", "showcase"].includes(surface.classification)) {
         expect(surface.firstOrgExposure).toBe("hidden")
+        expect(surface.boundedAlpha).toBeUndefined()
       }
       if (surface.firstOrgExposure === "admin-only") {
         expect(surface.classification).toBe("admin")
@@ -130,6 +145,58 @@ describe("first-org product surface census", () => {
         expect(surface.owner).toMatch(/^(COV-|GOV\/CAP|INTRO\/admin)/)
       }
     }
+  })
+
+  it("admits only the documented bounded alpha workspaces without awarding U5", () => {
+    const alpha = PRODUCT_SURFACES.filter((surface) => surface.boundedAlpha)
+    expect(alpha.map((surface) => surface.id)).toEqual(["products", "warehouse", "fleet"])
+
+    for (const surface of alpha) {
+      expect(surface).toMatchObject({
+        kind: "route",
+        classification: "hidden",
+        target: "t0-business",
+        firstOrgExposure: "review",
+      })
+      expect(surface.boundedAlpha?.scope).not.toBe("")
+      expect(existsSync(resolve(
+        moduleRoutesDirectory,
+        "../../../..",
+        surface.boundedAlpha!.decisionRecord,
+      ))).toBe(true)
+      for (const isAdmin of [false, true]) {
+        expect(isFirstOrgSurfaceAdmitted(surface.id, isAdmin)).toBe(false)
+        expect(isFirstOrgNavigationAdmitted(surface.id, isAdmin)).toBe(true)
+        expect(isFirstOrgRouteAdmitted(surface.id, isAdmin)).toBe(true)
+      }
+    }
+
+    expect(getProductSurface("products")).toMatchObject({
+      href: "/products",
+      owner: "COV-06",
+      requiredCapability: "module:inventory",
+      canonicalFor: "product-catalog",
+    })
+    expect(getProductSurface("warehouse")).toMatchObject({
+      href: "/warehouse",
+      owner: "COV-06",
+      requiredCapability: "module:inventory",
+      canonicalFor: "warehouse-operations",
+    })
+    expect(getProductSurface("inventory").boundedAlpha).toBeUndefined()
+    expect(getProductSurfaceForPathname("/products/42")?.id).toBe("products")
+  })
+
+  it("rejects unknown and unrelated routes for members and administrators", () => {
+    for (const isAdmin of [false, true]) {
+      for (const surfaceId of ["unknown", "manufacturing", "hr", "map", "forensics", "ai-harness"]) {
+        expect(isFirstOrgNavigationAdmitted(surfaceId, isAdmin)).toBe(false)
+        expect(isFirstOrgRouteAdmitted(surfaceId, isAdmin)).toBe(false)
+      }
+    }
+    expect(getProductSurfaceForPathname("/products-extra")).toBeNull()
+    expect(getProductSurfaceForPathname("/fleets")).toBeNull()
+    expect(getProductSurfaceForPathname("/warehouses")).toBeNull()
   })
 
   it("classifies every sidebar and command-palette quick action", () => {

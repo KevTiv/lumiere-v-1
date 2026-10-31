@@ -229,7 +229,7 @@ export function useCreateCycleCountPlan(
   return useMutation<
     void,
     Error,
-    { locationId: number; params: CreateCycleCountPlanParams }
+    { locationId: ScalarId; params: CreateCycleCountPlanParams }
   >({
     mutationFn: async ({ locationId, params }) => {
       if (companyId == null || companyId <= 0n)

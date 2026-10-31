@@ -98,6 +98,11 @@ export function ErpCommandPalette({
     .sort()
     .join("\n")
   const allowedResources = useMemo(() => new Set(allowedResourceKey.split("\n")), [allowedResourceKey])
+  const allowedSurfaceKey = accessibleNavGroups
+    .flatMap((group) => group.items.map((item) => item.surfaceId))
+    .sort()
+    .join("\n")
+  const allowedSurfaceIds = useMemo(() => new Set(allowedSurfaceKey.split("\n")), [allowedSurfaceKey])
   useEffect(() => {
     if (!recordSearchActive) setRecordSummary(null)
   }, [recordSearchActive])
@@ -159,6 +164,7 @@ export function ErpCommandPalette({
               organizationId={BigInt(organizationId)}
               query={search}
               allowedResources={allowedResources}
+              allowedSurfaceIds={allowedSurfaceIds}
               recordHref={resolveRecordHref}
               onNavigate={navigate}
               onSummary={setRecordSummary}

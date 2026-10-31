@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useErpSession } from '@lumiere/erp-session';
 import Link from 'next/link';
 import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -34,23 +35,20 @@ import {
 import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
-import {
-  useFleetInspections,
-  useFleetServiceRecords,
-  useFleetServiceTypes,
-  useFleetVehicles,
-} from '@lumiere/query-hooks/hooks/fleet';
-import { useEmployees } from '@lumiere/query-hooks/hooks/hr/employees';
-import { useAccountAccounts, useAccountJournals } from '@lumiere/query-hooks/hooks/accounting';
-import { useOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
+import { canUseModuleData } from '@lumiere/ui/lib/module-data-state';
+import { useRBAC } from '@lumiere/ui/lib/rbac-context';
 import type { FleetVehicle } from '@lumiere/stdb/types';
 import { accountAccountRowsToSelectOptions, accountJournalRowsToSelectOptions } from '@/lib/form-lookup';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { useFleetModuleSubscription } from '@/lib/module-subscription-hooks';
-import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { hasValidOrganizationId } from '@/lib/org-scoped';
 import { VehicleLocationMap } from './vehicle-location-map';
 import { useFleetActions } from '../../fleet-actions';
 import { fleetEnumTag, rowsOfVehicle } from '../../fleet-record';
+import { useFleetWorkspace } from '../../use-fleet-workspace';
+import { FleetRecoveryNotice } from '../../fleet-recovery-notice';
+import { FleetServiceSetupNotice } from '../../fleet-service-setup-notice';
 
 interface VehiclePageClientProps {
   vehicleId: string;
@@ -65,10 +63,11 @@ const TAB_IDS = ['overview', 'service', 'inspections', 'discussion', 'audit'] as
 type TabId = (typeof TAB_IDS)[number];
 
 export function VehiclePageClient(props: VehiclePageClientProps) {
+  const { identity, activeCompanyId, activeCompanyReady } = useErpSession();
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />;
   }
-  return <VehiclePageLoaded {...props} organizationId={props.organizationId} />;
+  return <VehiclePageLoaded key={`${identity}:${props.organizationId}:${activeCompanyReady}:${activeCompanyId}:${props.vehicleId}`} {...props} organizationId={props.organizationId} />;
 }
 
 function VehiclePageLoaded({
@@ -81,17 +80,11 @@ function VehiclePageLoaded({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { orgId } = orgBigInts(organizationId);
-  const company = useOperatingCompanyBigInt();
-
-  const { data: vehicles = initialVehicles ?? [], isLoading } = useFleetVehicles(orgId, initialVehicles);
-  const { data: serviceRecords = [] } = useFleetServiceRecords(orgId);
-  const { data: inspections = [] } = useFleetInspections(orgId);
-  const { data: serviceTypes = [] } = useFleetServiceTypes(orgId);
-  const { data: employees = [] } = useEmployees(orgId);
-  const { data: journals = [] } = useAccountJournals(orgId);
-  const { data: accounts = [] } = useAccountAccounts(orgId);
-  const fleetActions = useFleetActions(orgId, company ?? undefined);
+  const workspace = useFleetWorkspace(organizationId, initialVehicles);
+  const { orgId, company, vehicles, serviceRecords, inspections, activeServiceTypes: serviceTypes, employeeChoices: employees, journals, accounts } = workspace;
+  const fleetActions = useFleetActions(orgId, company, employees.map((row) => String(row.id)));
+  const { checkPermission, permissionsReady } = useRBAC();
+  const canWrite = permissionsReady !== false && checkPermission('fleet_vehicle', 'write').allowed;
 
   const [form, setForm] = useState<FormKind | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -125,12 +118,18 @@ function VehiclePageLoaded({
     [pathname, router, searchParams],
   );
 
+  if (workspace.scopeState.status !== 'ready') return workspace.scopeState.status === 'loading'
+    ? <p role="status">{t('common.loading', { defaultValue: 'Loading…' })}</p>
+    : <ModuleDataNotice state={workspace.scopeState} />;
+  if (!canUseModuleData(workspace.states.vehicles)) return <ModuleDataNotice state={workspace.states.vehicles} />;
+
   if (!vehicle) {
-    if (isLoading) {
+    if (workspace.states.vehicles.status === 'partial') return <ModuleDataNotice state={workspace.states.vehicles} />;
+    if (workspace.states.vehicles.status === 'loading') {
       return (
         <div className="space-y-4" data-testid="vehicle-page-loading">
           <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-10 w-96" />
+          <Skeleton className="h-10 w-full max-w-96" />
           <Skeleton className="h-64 w-full" />
         </div>
       );
@@ -154,7 +153,7 @@ function VehiclePageLoaded({
 
   const id = BigInt(vehicleId);
   const label = String(vehicle.name || '').trim() || `#${vehicleId}`;
-  const status = fleetEnumTag(vehicle.status);
+  const status = fleetEnumTag(vehicle.status).toLowerCase();
   const subtitle = [vehicle.license_plate, vehicle.vehicle_type, vehicle.driver_name]
     .map((part) => String(part ?? '').trim())
     .filter(Boolean)
@@ -196,6 +195,9 @@ function VehiclePageLoaded({
 
   return (
     <>
+      <ModuleDataNotice state={workspace.states.vehicles} />
+      <FleetRecoveryNotice key={`${organizationId}:${company}`} actions={fleetActions} />
+      {activeTab === 'service' && canWrite ? <FleetServiceSetupNotice workspace={workspace} /> : null}
       <RecordPage
         testIdPrefix="vehicle"
         breadcrumbs={[
@@ -211,35 +213,35 @@ function VehiclePageLoaded({
           <SmartButtons
             testIdPrefix="vehicle"
             buttons={[
-              {
+              ...(workspace.states.service.status === 'ready' ? [{
                 id: 'service',
                 label: t('fleet.lifecycle.service.title'),
                 count: ownService.length,
                 icon: <Wrench className="h-4 w-4" />,
                 onClick: () => setActiveTab('service'),
-              },
-              {
+              }] : []),
+              ...(workspace.states.inspections.status === 'ready' ? [{
                 id: 'inspections',
                 label: t('fleet.lifecycle.inspections.title'),
                 count: ownInspections.length,
                 icon: <ClipboardCheck className="h-4 w-4" />,
                 onClick: () => setActiveTab('inspections'),
-              },
+              }] : []),
             ]}
           />
         }
         actions={
           <>
-            <RecordHeaderActions model="vehicle" record={vehicle} organizationId={orgId} companyId={company ?? undefined} />
-            <Button size="sm" data-testid="vehicle-action-service" onClick={() => setForm('service')}>
+            {workspace.states.vehicles.status === 'ready' ? <RecordHeaderActions key={`${company}:${vehicleId}`} model="vehicle" record={vehicle} organizationId={orgId} companyId={company} /> : null}
+            {canWrite ? <Button size="sm" disabled={!workspace.serviceReady || fleetActions.isPending} data-testid="vehicle-action-service" onClick={() => setForm('service')}>
               {t('fleet.lifecycle.service.action')}
-            </Button>
-            <Button variant="outline" size="sm" data-testid="vehicle-action-inspection" onClick={() => setForm('inspection')}>
+            </Button> : null}
+            {canWrite ? <Button variant="outline" size="sm" disabled={!workspace.inspectionReady || fleetActions.isPending} data-testid="vehicle-action-inspection" onClick={() => setForm('inspection')}>
               {t('fleet.lifecycle.inspections.action')}
-            </Button>
-            <Button variant="outline" size="sm" data-testid="vehicle-action-assign" onClick={() => setForm('assign')}>
+            </Button> : null}
+            {canWrite ? <Button variant="outline" size="sm" disabled={!workspace.assignmentReady || fleetActions.isPending} data-testid="vehicle-action-assign" onClick={() => setForm('assign')}>
               {t('fleet.lifecycle.assignments.action')}
-            </Button>
+            </Button> : null}
           </>
         }
         activeTab={activeTab}
@@ -259,14 +261,20 @@ function VehiclePageLoaded({
             id: 'service',
             label: t('fleet.lifecycle.service.title'),
             content: (
-              <EntityView config={{ ...fleetServiceRecordsTableConfig(t), title: '', description: undefined }} data={ownService} useCard={false} />
+              <>
+                <ModuleDataNotice state={workspace.states.service} />
+                {canUseModuleData(workspace.states.service) ? <EntityView config={{ ...fleetServiceRecordsTableConfig(t), title: '', description: undefined }} data={ownService} isLoading={workspace.states.service.status === 'loading'} useCard={false} /> : null}
+              </>
             ),
           },
           {
             id: 'inspections',
             label: t('fleet.lifecycle.inspections.title'),
             content: (
-              <EntityView config={{ ...fleetInspectionsTableConfig(t), title: '', description: undefined }} data={ownInspections} useCard={false} />
+              <>
+                <ModuleDataNotice state={workspace.states.inspections} />
+                {canUseModuleData(workspace.states.inspections) ? <EntityView config={{ ...fleetInspectionsTableConfig(t), title: '', description: undefined }} data={ownInspections} isLoading={workspace.states.inspections.status === 'loading'} useCard={false} /> : null}
+              </>
             ),
           },
           {
@@ -286,9 +294,9 @@ function VehiclePageLoaded({
         ]}
       />
 
-      {form ? (
+      {form && canWrite && workspace.states.vehicles.status === 'ready' && (form === 'service' ? workspace.serviceReady : form === 'inspection' ? workspace.inspectionReady : workspace.assignmentReady) ? (
         <FormModal
-          key={form}
+          key={`${company}:${vehicleId}:${form}`}
           open
           onOpenChange={(open) => {
             if (!open) {

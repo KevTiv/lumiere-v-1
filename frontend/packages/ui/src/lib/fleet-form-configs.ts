@@ -79,7 +79,7 @@ export const assignFleetDriverForm = (
     id: "assignment",
     fields: [
       { id: "vehicle_id", name: "vehicle_id", type: "select", label: t("fleet.lifecycle.vehicle"), required: true, options: vehicles, width: "1/2" },
-      { id: "driver_id", name: "driver_id", type: "select", label: t("fleet.lifecycle.driver"), required: true, options: [{ value: "unassigned", label: t("fleet.lifecycle.assignments.unassign") }, ...employees], width: "1/2" },
+      { id: "driver_id", name: "driver_id", type: "select", label: t("fleet.lifecycle.driver"), required: true, options: [{ value: "unassigned", label: t("fleet.lifecycle.assignments.unassign") }, ...employees], description: employees.length ? undefined : t("fleet.workspace.driverChoicesUnavailable", { defaultValue: "No employee choices are available. You can still unassign the current driver." }), width: "1/2" },
     ],
   }],
 })
@@ -123,7 +123,7 @@ export const recordFleetInspectionForm = (
     id: "inspection",
     fields: [
       { id: "vehicle_id", name: "vehicle_id", type: "select", label: t("fleet.lifecycle.vehicle"), required: true, options: vehicles, width: "1/2" },
-      { id: "inspector_id", name: "inspector_id", type: "select", label: t("fleet.lifecycle.inspector"), options: employees, width: "1/2" },
+      { id: "inspector_id", name: "inspector_id", type: "select", label: t("fleet.lifecycle.inspector"), defaultValue: "none", options: [{ value: "none", label: t("fleet.lifecycle.inspections.noInspector", { defaultValue: "No inspector" }) }, ...employees], description: employees.length ? undefined : t("fleet.workspace.inspectorChoicesUnavailable", { defaultValue: "No employee choices are available. You can record the inspection without an inspector." }), width: "1/2" },
       optionalDate("inspected_at", t("fleet.lifecycle.inspectedAt")),
       { id: "outcome", name: "outcome", type: "select", label: t("fleet.lifecycle.outcome"), required: true, defaultValue: "passed", options: [
         { value: "passed", label: t("fleet.lifecycle.outcomes.passed") },

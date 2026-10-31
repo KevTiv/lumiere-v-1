@@ -8,6 +8,7 @@ import { ErpCommandPalette } from "./erp-command-palette"
 const push = vi.fn()
 const hookCalls = vi.hoisted(() => ({ names: [] as string[] }))
 const rbac = vi.hoisted(() => ({ denied: new Set<string>() }))
+const navigation = vi.hoisted(() => ({ hidden: new Set<string>() }))
 const data = vi.hoisted(() => ({
   loading: false,
   failed: new Set<string>(),
@@ -41,12 +42,15 @@ vi.mock("../lib/navigation-catalog", () => ({
       items: [
         { surfaceId: "sales", label: "Sales", href: "/sales", icon: () => null, resource: "module:sales" },
         { surfaceId: "crm", label: "CRM", href: "/crm", icon: () => null, resource: "module:crm" },
+        { surfaceId: "products", label: "Products", href: "/products", icon: () => null, resource: "module:inventory" },
+        { surfaceId: "warehouse", label: "Warehouse", href: "/warehouse", icon: () => null, resource: "module:inventory" },
         { surfaceId: "inventory", label: "Inventory", href: "/inventory", icon: () => null, resource: "module:inventory" },
+        { surfaceId: "fleet", label: "Fleet", href: "/fleet", icon: () => null, resource: "module:fleet" },
         { surfaceId: "purchasing", label: "Purchasing", href: "/purchasing", icon: () => null, resource: "module:purchasing" },
         { surfaceId: "messages", label: "Messages", href: "/messages", icon: () => null, resource: "module:messages" },
       ],
     },
-  ].map((group) => ({ ...group, items: group.items.filter((item) => isWorkspaceSurfaceVisible(options?.workspaceProfile ?? "full", item.surfaceId)) })),
+  ].map((group) => ({ ...group, items: group.items.filter((item) => !navigation.hidden.has(item.surfaceId) && isWorkspaceSurfaceVisible(options?.workspaceProfile ?? "full", item.surfaceId)) })),
 }))
 vi.mock("@lumiere/query-hooks/hooks/crm", () => ({ useContacts: rowsHook("contact") }))
 vi.mock("@lumiere/query-hooks/hooks/sales", () => ({ useSaleOrders: rowsHook("sale_order") }))
@@ -81,6 +85,7 @@ beforeEach(() => {
   push.mockReset()
   hookCalls.names.length = 0
   rbac.denied.clear()
+  navigation.hidden.clear()
   data.loading = false
   data.failed.clear()
   data.rows = {
@@ -93,6 +98,8 @@ beforeEach(() => {
       { id: 11, displayName: "Bob" },
     ],
     product: [{ id: 5, name: "Acme Widget", defaultCode: "W-1" }],
+    stock_picking: [{ id: 8, name: "ACME-TRANSFER" }],
+    fleet_vehicle: [{ id: 71, name: "Acme delivery van", license_plate: "RAG 281 C" }],
     purchase_order: [{ id: 9, name: "PO-ACME" }],
   }
 })
@@ -136,10 +143,31 @@ describe("ErpCommandPalette records", () => {
     expect(screen.queryByRole("option", { name: "Inventory" })).toBeNull()
     type("acme")
     expect(hookCalls.names).toContain("sale_order")
-    expect(hookCalls.names).not.toContain("product")
-    expect(hookCalls.names).not.toContain("stock_picking")
-    expect(screen.queryByTestId("erp-command-palette-record-product-5")).toBeNull()
+    expect(hookCalls.names).toContain("product")
+    expect(hookCalls.names).toContain("fleet_vehicle")
+    expect(hookCalls.names).toContain("stock_picking")
+    expect(screen.getByTestId("erp-command-palette-record-product-5")).toBeTruthy()
+    expect(screen.getByTestId("erp-command-palette-record-fleet_vehicle-71")).toBeTruthy()
+    expect(screen.getByTestId("erp-command-palette-record-stock_picking-8")).toBeTruthy()
     expect(screen.getByTestId("erp-command-palette-record-sale_order-1")).toBeTruthy()
+    fireEvent.click(screen.getByTestId("erp-command-palette-record-product-5"))
+    expect(push).toHaveBeenCalledWith("/products?tab=products&filter=id%3A5")
+  })
+
+  it("does not discover warehouse records through Products' shared inventory permission", () => {
+    navigation.hidden.add("warehouse")
+    render(<WorkspaceProfileProvider value="finance-alpha"><ErpCommandPalette open recordHref={recordHref} /></WorkspaceProfileProvider>)
+    type("acme")
+    expect(hookCalls.names).toContain("product")
+    expect(hookCalls.names).not.toContain("stock_picking")
+    expect(screen.queryByTestId("erp-command-palette-record-stock_picking-8")).toBeNull()
+  })
+
+  it("uses Warehouse for transfer results without a canonical detail URL", () => {
+    render(<WorkspaceProfileProvider value="finance-alpha"><ErpCommandPalette open recordHref={recordHref} /></WorkspaceProfileProvider>)
+    type("transfer")
+    fireEvent.click(screen.getByTestId("erp-command-palette-record-stock_picking-8"))
+    expect(push).toHaveBeenCalledWith("/warehouse?tab=transfers&filter=id%3A8")
   })
 
   it("opens from the workspace search control and keeps shortcut and navigation state synchronized", () => {
