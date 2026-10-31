@@ -423,18 +423,29 @@ fn economics_from_rows(
     let mut input_tokens = 0_u64;
     let mut output_tokens = 0_u64;
     let mut attempt_count = 0_u64;
+    let mut usage_complete = true;
     let mut outcome_unknown = false;
     for row in attempts {
         attempt_count = attempt_count.saturating_add(1);
-        input_tokens = input_tokens
-            .saturating_add(row_u64(row, "inputTokens", "input_tokens").unwrap_or_default());
-        output_tokens = output_tokens
-            .saturating_add(row_u64(row, "outputTokens", "output_tokens").unwrap_or_default());
+        match (
+            row_u64(row, "inputTokens", "input_tokens").and_then(|n| input_tokens.checked_add(n)),
+            row_u64(row, "outputTokens", "output_tokens")
+                .and_then(|n| output_tokens.checked_add(n)),
+        ) {
+            (Some(input), Some(output)) => {
+                input_tokens = input;
+                output_tokens = output;
+            }
+            _ => usage_complete = false,
+        }
         if let Some(status) = bounded_row_text(row, "status", "status", 32)
             .filter(|status| allowed_attempt_status(status))
         {
             outcome_unknown |= status == "outcome_unknown";
+            usage_complete &= matches!(status.as_str(), "succeeded" | "failed");
             attempt_statuses.insert(status);
+        } else {
+            usage_complete = false;
         }
         if let (Some(provider), Some(model)) = (
             bounded_row_text(row, "provider", "provider", 128),
@@ -489,8 +500,8 @@ fn economics_from_rows(
         attempt_statuses: attempt_statuses.into_iter().collect(),
         reservation_statuses: reservation_statuses.into_iter().collect(),
         outcome_unknown,
-        input_tokens: (!truncated).then_some(input_tokens),
-        output_tokens: (!truncated).then_some(output_tokens),
+        input_tokens: (!truncated && usage_complete).then_some(input_tokens),
+        output_tokens: (!truncated && usage_complete).then_some(output_tokens),
         currency,
         reserved_units: (!truncated).then_some(reserved_units),
         settled_units: (!truncated).then_some(settled_units),
@@ -1337,8 +1348,8 @@ mod route_tests {
         ];
         let summary = economics_from_rows(7, 9, 42, &attempts, &reservations).expect("economics");
         assert_eq!(summary.attempt_count, Some(2));
-        assert_eq!(summary.input_tokens, Some(100));
-        assert_eq!(summary.output_tokens, Some(20));
+        assert_eq!(summary.input_tokens, None);
+        assert_eq!(summary.output_tokens, None);
         assert_eq!(summary.currency.as_deref(), Some("USD"));
         assert_eq!(summary.reserved_units, Some(90));
         assert_eq!(summary.settled_units, Some(30));
@@ -1354,6 +1365,33 @@ mod route_tests {
         assert!(!encoded.contains("secret"));
         assert!(!encoded.contains("private network detail"));
         assert!(!encoded.contains("foreign"));
+    }
+
+    #[test]
+    fn incomplete_provider_usage_never_becomes_zero_or_an_overflowed_total() {
+        let known = json!({"organizationId": 7, "companyId": 9, "runId": 42,
+            "status": "succeeded", "inputTokens": 6173, "outputTokens": 449});
+        let summary = economics_from_rows(7, 9, 42, &[known.clone()], &[]).expect("usage");
+        assert_eq!(summary.input_tokens, Some(6173));
+        assert_eq!(summary.output_tokens, Some(449));
+        for bad in [
+            json!({"inputTokens": null}),
+            json!({"inputTokens": -1}),
+            json!({"status": "dispatched"}),
+            json!({"status": "unrecognized"}),
+        ] {
+            let mut row = known.clone();
+            row.as_object_mut()
+                .expect("object")
+                .extend(bad.as_object().expect("patch").clone());
+            let summary = economics_from_rows(7, 9, 42, &[row], &[]).expect("usage");
+            assert_eq!(summary.input_tokens, None);
+            assert_eq!(summary.output_tokens, None);
+        }
+        let mut huge = known.clone();
+        huge["inputTokens"] = json!(u64::MAX);
+        let summary = economics_from_rows(7, 9, 42, &[known, huge], &[]).expect("usage");
+        assert_eq!(summary.input_tokens, None);
     }
 
     #[test]

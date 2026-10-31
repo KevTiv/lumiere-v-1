@@ -721,13 +721,14 @@ pub async fn complete_run(
 /// that state replays without change.
 pub async fn resume_run(
     stdb: &StdbClient,
+    reader: &StdbClient,
     org_id: u64,
     company_id: u64,
     run_id: u64,
 ) -> Result<()> {
-    let row = stdb
+    let row = reader
         .query_sql(&format!(
-            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state \
+            "SELECT checkpoint_hash, cursor, concurrency_version FROM ai_run_lifecycle_state_read \
              WHERE organization_id = {org_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"
         ))
         .await
