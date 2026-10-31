@@ -228,8 +228,8 @@ and rerun exact-head checks after it merges. No source fix below is deployed.
 | Packet | Source commit(s) integrated | State and remaining gate |
 | --- | --- | --- |
 | F1 | External PR #340 | Separate CI/release lane; not part of this combined test result. |
-| N1 | [PR #342](https://github.com/KevTiv/lumiere-v-1/pull/342), `031ba9e13` | Category rename source ready for review. Five resolver and seven Products catalog tests pass. Review display-label operation remains a separate producer task. No live rename. |
-| A1 | [PR #341](https://github.com/KevTiv/lumiere-v-1/pull/341), `dcebd51ef` | Scope selector and canonical projection source ready for review. Four selector tests and 91 exact-source authorization tests pass. Code generation and full/deployed checks pending. |
+| N1 | [PR #342](https://github.com/KevTiv/lumiere-v-1/pull/342), `031ba9e13`, `b91853979`, `e6cb3fc70` | Category rename source ready for review. Five resolver and seven Products catalog tests pass. Review display-label operation remains a separate producer task. No live rename. |
+| A1 | [PR #341](https://github.com/KevTiv/lumiere-v-1/pull/341), `dcebd51ef`, `d16f440a7` | Scope selector and canonical projection source ready for review. Five selector tests and 91 exact-source authorization tests pass. Code generation and full/deployed checks pending. |
 | A2 | [PR #344](https://github.com/KevTiv/lumiere-v-1/pull/344), `14840b9ab`, `b11d5ecef` | Five scoped read views and truthful provider usage candidate. Six observation and four lifecycle model tests pass. Module schema/contract generation, native reader authorization execution and gateway integration remain required. Persisted run counter is unchanged. |
 | D1 | [PR #343](https://github.com/KevTiv/lumiere-v-1/pull/343), `82fcd99a0` | Exact worker-result resolver and receipt UI candidate. Nine receipt tests pass. Full API/router execution and live indexing/failure recovery remain pending. Legacy receipts without a job manifest are not declared complete. |
 | A3 | `25415ccef` | Contract boundary documented in finance-skill-readiness-admission-contract.md. No session-owned no-cost Finance admission read exists. Positive readiness UI is blocked on that producer; no activation. |
@@ -248,7 +248,7 @@ node --import tsx --test \
   ../packages/query-hooks/src/hooks/product-category-rename.test.ts
 ```
 
-Result: **38 passed, zero failed**. The observation test is now registered in the
+Result: **39 passed, zero failed**. The observation test is now registered in the
 web unit command. The missing metadata-only question label is in the English
 locale; locale JSON has no duplicate keys. Syntax transpilation of the six
 changed TSX presentation files passes. These checks do not replace a full type
@@ -270,3 +270,11 @@ or another source dependency changes the candidate. The A2 module views require
 an immutable contract release and aligned generated outputs before deployment.
 Keep compatible runtime artifacts and block readiness when the required reader
 or released views are unavailable.
+
+Independent source review corrections are integrated: A1 now rejects agent IDs
+and company selections outside the Number dispatch range, including string and
+bigint inputs. Organization comparisons remain exact. N1 uses a form epoch so a
+late reply cannot close a newer form after close/reopen or a scope change. The
+rename modal disables its default auto-close and success toast; only exact saved
+readback in the current form epoch closes it. A mounted async modal regression
+remains required; resolver tests and syntax checks do not certify that UI race.
