@@ -6558,6 +6558,8 @@
       "confirmDelete": "Delete this picking wave?"
     },
     "categoryActions": {
+      "rename": "Rename category",
+      "renameDescription": "Change the shared category name. Product links and source records remain the same.",
       "confirmDelete": "Delete this product category?",
       "restoreById": "Restore category…",
       "categoryIdPrompt": "Category ID"
