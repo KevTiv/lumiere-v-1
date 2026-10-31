@@ -26,6 +26,7 @@ import {
   type CompanyLookupRow,
 } from "../../../lib/form-lookup"
 import { SavedRunObservation } from "./run-observation-panel"
+import { isAgentAvailableForCompany } from "./agent-company-scope"
 import {
   financeReviewInput,
   financeReviewSkills,
@@ -64,12 +65,7 @@ export function FinanceReviewPanel({
   const review = useAiFinanceReview(skill)
   const submitting = useRef(false)
   const available = (agents.data ?? []).filter(
-    (a) =>
-      a.isActive &&
-      Number.isSafeInteger(Number(a.id)) &&
-      Number(a.id) > 0 &&
-      Number(a.organizationId) === Number(organizationId) &&
-      (a.companyId == null || String(a.companyId) === company),
+    (a) => isAgentAvailableForCompany(a, organizationId, company),
   )
   const selectedAgent = available.find((a) => String(a.id) === agent)
   const inputs = financeReviewInput(skill, fields)
