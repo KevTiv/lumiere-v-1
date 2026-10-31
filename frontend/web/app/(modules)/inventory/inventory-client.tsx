@@ -1780,7 +1780,7 @@ function InventoryClientLoaded({
     const inCurrentRange = (row: Record<string, unknown>) =>
       isTimestampInRange(recordTimestampMs(row), startMs, endMs);
     const inPreviousRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(
+      previousRange != null && isTimestampInRange(
         recordTimestampMs(row),
         previousRange.startMs,
         previousRange.endMs,
@@ -1831,13 +1831,13 @@ function InventoryClientLoaded({
               {
                 label: t('inventory.dashboard.zeroStockAlerts'),
                 value: zeroStock.toString(),
-                change: percentChange(currentAdjustments, previousAdjustments),
+                change: previousRange ? percentChange(currentAdjustments, previousAdjustments) : undefined,
                 icon: 'AlertTriangle',
               },
               {
                 label: t('inventory.dashboard.pendingTransfers'),
                 value: pendingTransfers.toString(),
-                change: percentChange(currentTransfers, previousTransfers),
+                change: previousRange ? percentChange(currentTransfers, previousTransfers) : undefined,
                 icon: 'Truck',
               },
             ],
