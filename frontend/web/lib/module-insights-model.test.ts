@@ -92,7 +92,8 @@ test("UTC comparison windows are disjoint, include today in progress, reject mis
   assert.equal(model.startMs, Date.parse("2026-09-18T00:00:00Z"))
   assert.equal(model.period.value?.current, 200)
   assert.equal(model.period.value?.previous, 300)
-  assert.deepEqual(model.period.value?.months.map((item) => item.value), [150, 50])
+  assert.equal(model.period.value?.months.reduce((sum, item) => sum + item.value, 0), 200)
+  assert.equal(model.period.value?.months.reduce((sum, item) => sum + item.count, 0), 2)
   assert.equal(buildModuleInsights(data("sales", [row(1, { state: "Sale", dateOrder: undefined })]), 30, "1", now).period.value, null)
   assert.equal(buildModuleInsights(data("sales", []), 30, "1", now).period.value?.percent, null)
 })
@@ -116,4 +117,43 @@ test("Company currency is the dashboard default; explicit selection and currency
   assert.equal(buildModuleInsights(mixed, 30, "1", now).totals.value?.amount, 10)
   assert.equal(buildModuleInsights(data("expenses", [row(1, { currencyId: undefined })], { companyCurrencyId: 2, currencies }), 30, undefined, now).totals.value, null)
   assert.equal(buildModuleInsights({ ...empty, companyCurrencyId: 99 }, 30, undefined, now).selectedId, "1")
+})
+
+test("All history includes old onboarding years and has no invented comparison baseline", () => {
+  const model = buildModuleInsights(data("sales", [
+    row(1, { state: "Sale", dateOrder: "1940-02-02", amountTotal: 25 }),
+    row(2, { state: "Done", dateOrder: "2022-06-18", amountTotal: 50 }),
+    row(3, { state: "Sale", dateOrder: "2026-10-01", amountTotal: 75 }),
+    row(4, { state: "Sale", companyId: 8, dateOrder: "1900-01-01", amountTotal: 999 }),
+  ]), "all", "1", now)
+  assert.equal(model.period.value?.current, 150)
+  assert.equal(model.periodCounts.value?.current, 3)
+  assert.equal(model.period.value?.previous, null)
+  assert.equal(model.periodCounts.value?.previous, null)
+  assert.equal(model.previousBounds, null)
+  assert.deepEqual(model.bounds, { startMs: null, endMs: null })
+  assert.ok((model.period.value?.months.length ?? 0) <= 36)
+  assert.equal(model.period.value?.months.reduce((sum, bucket) => sum + bucket.value, 0), 150)
+})
+
+test("Custom multi-year periods include the whole final day and exclude the next period", () => {
+  const selection = { kind: "custom" as const, from: "1990-01-01", through: "2023-12-31" }
+  const model = buildModuleInsights(data("sales", [
+    row(1, { state: "Sale", dateOrder: "1989-12-31T23:59:59.999Z", amountTotal: 900 }),
+    row(2, { state: "Sale", dateOrder: "1990-01-01T00:00:00Z", amountTotal: 25 }),
+    row(3, { state: "Done", dateOrder: "2023-12-31T23:59:59.999Z", amountTotal: 50 }),
+    row(4, { state: "Sale", dateOrder: "2024-01-01T00:00:00Z", amountTotal: 999 }),
+  ]), selection, "1", now)
+  assert.equal(model.period.value?.current, 75)
+  assert.equal(model.periodCounts.value?.current, 2)
+  assert.equal(model.endMs, Date.parse("2024-01-01T00:00:00Z"))
+  assert.equal(model.period.value?.months.reduce((sum, bucket) => sum + bucket.count, 0), 2)
+  assert.ok((model.period.value?.months.length ?? 0) <= 36)
+})
+
+test("Historical activity selection does not turn current action queues into historical snapshots", () => {
+  const model = buildModuleInsights(data("crm", [row(1, { createdAt: "2022-06-18", dateDeadline: "2025-01-01" })]),
+    { kind: "custom", from: "2022-01-01", through: "2022-12-31" }, "1", now)
+  assert.equal(model.periodCounts.value?.current, 1)
+  assert.deepEqual(model.queues.value?.find((queue) => queue.key === "overdue")?.records.map((record) => record.id), ["1"])
 })

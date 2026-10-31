@@ -36,8 +36,23 @@ describe("report export provenance", () => {
   })
 
   it("produces the standard SHA-256 artifact digest", async () => {
-    expect(await sha256Hex(new TextEncoder().encode("abc").buffer)).toBe(
+    const bytes = new TextEncoder().encode("abc")
+    const buffer = new ArrayBuffer(bytes.byteLength)
+    new Uint8Array(buffer).set(bytes)
+    expect(await sha256Hex(buffer)).toBe(
       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
     )
+  })
+
+  it("preserves date basis, calendar zone and an open all-history selection without nonfinite JSON bounds", () => {
+    const source = reportExportSourceProvenance({
+      organizationId: 7, companyId: 11, dashboardId: "sales-overview", model: "sale_order",
+      timeZone: "Africa/Kigali", period: "all", dateField: "dateOrder", endExclusive: true,
+      startMs: -Infinity, endMs: Infinity,
+    })
+    expect(source).toMatchObject({ timeZone: "Africa/Kigali", period: "all", dateField: "dateOrder", endExclusive: true })
+    expect(source).not.toHaveProperty("startMs")
+    expect(source).not.toHaveProperty("endMs")
+    expect(JSON.parse(reportExportProvenanceJson(source))).toEqual(source)
   })
 })

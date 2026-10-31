@@ -227,7 +227,10 @@
         "basis": "Prepared outputs are currently generated or exported reports. Counts span currencies within the selected company; no financial amounts, different report periods, snapshots or ledger lines are added together. Exported is a recorded state, not proof of recipient delivery. Statements, trial balances, schedules and saved dashboards retain their existing workspaces.",
         "browse": "Browse financial reports"
       }
-    }
+    },
+    "historySource": "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status.",
+    "availableHistory": "Available history",
+    "forecastFinitePeriod": "Choose a custom date range or a calendar preset before creating a forecast snapshot."
   },
   "workspaceShell": {
     "preferences": "Workspace preferences",
@@ -585,6 +588,29 @@
         "unavailableChoices": "no stored selectable options are available",
         "ambiguousDefinition": "more than one field definition uses this key"
       }
+    },
+    "historyPeriod": {
+      "all": "All history",
+      "label": "Date range",
+      "invalidFrom": "Enter a valid start date.",
+      "invalidThrough": "Enter a valid end date.",
+      "reversed": "The end date must be on or after the start date.",
+      "custom": "Custom dates",
+      "customDates": "Custom date range",
+      "from": "From",
+      "through": "Through",
+      "apply": "Apply dates",
+      "invalidTimeZone": "This link has an invalid time zone. Clear it to view the records.",
+      "invalidLink": "This link has an invalid date range. Clear it to view the records.",
+      "filteredAll": "Table date range: all dated records ({{timeZone}}).",
+      "filteredRange": "Table date range: {{from}} through {{through}} ({{timeZone}}).",
+      "clear": "Clear date range",
+      "today": "Today",
+      "last7Days": "Last 7 days",
+      "last30Days": "Last 30 days",
+      "last90Days": "Last 90 days",
+      "last180Days": "Last 180 days",
+      "yearToDate": "Year to date"
     }
   },
   "navigation": {
@@ -14032,7 +14058,8 @@
         "maintenance": "Maintenance",
         "offline": "Offline"
       }
-    },    "title": "Fleet",
+    },
+    "title": "Fleet",
     "subtitle": "Vehicles",
     "empty": "No vehicles yet.",
     "create": "Add vehicle",
@@ -14300,7 +14327,9 @@
       "orders": "Confirmed orders",
       "incompleteSource": "Required financial fields unavailable",
       "meaning": "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today.",
-      "noOverdueBalance": "No known overdue balance"
+      "noOverdueBalance": "No known overdue balance",
+      "selectedOrderTrend": "Confirmed orders · selected period",
+      "historyLink": "Inspect imported dates and source records awaiting review."
     }
   },
   "settings": {
@@ -17677,5 +17706,59 @@
   "purchasing.dashboard.vendor": "Vendor",
   "purchasing.dashboard.currency": "Currency",
   "purchasing.dashboard.orderValue": "Order value",
-  "purchasing.dashboard.vendorUnavailable": "Vendor unavailable"
+  "purchasing.dashboard.vendorUnavailable": "Vendor unavailable",
+  "availableHistory": {
+    "loadingCompany": "Loading the current company…",
+    "companyRequired": "Select an operating company to inspect its history.",
+    "changed": "Source history changed while loading. Refresh to see the current rows.",
+    "needsReview": "Needs review",
+    "confirmed": "Confirmed source",
+    "excluded": "Excluded",
+    "noDate": "No known date",
+    "unavailable": "History could not be loaded",
+    "title": "Available source history",
+    "description": "Inspect dates, original rows and review decisions from your onboarding files. Confirmed source values still need their business import before they appear in sales, expenses or stock balances.",
+    "loadingCoverage": "Loading available dates…",
+    "savedRows": "Saved source rows",
+    "coverage": "Known business dates",
+    "dateCounts": "{{dated}} dated · {{undated}} undated · {{invalid}} invalid or ambiguous dates",
+    "calendarDates": "Source dates retain their calendar day. Upload dates do not replace unknown business dates. A gap means no dated source was found; it does not establish a zero balance.",
+    "bucketMeaning": "Year and month counts use each observation's starting date. Period observations are counted once. Coverage describes all saved source rows for this company.",
+    "empty": "No saved source history is available for this company yet. Load a review document or save an import preview below.",
+    "datasets": "Source datasets",
+    "dataset": "Dataset",
+    "rows": "Rows",
+    "undated": "Undated",
+    "inspect": "Inspect rows",
+    "moreDatasets": "Load more datasets",
+    "allDatasets": "All saved datasets",
+    "dateState": "Date quality",
+    "allDates": "All date states",
+    "dated": "Known dates",
+    "invalid": "Invalid or ambiguous dates",
+    "reviewState": "Review status",
+    "allReviews": "All review states",
+    "year": "Jump to year",
+    "chooseYear": "Choose an available year",
+    "month": "Jump to month",
+    "chooseMonth": "Choose a month",
+    "unknownRange": "Rows without a usable business date are shown across all source history.",
+    "rangeHint": "A selected date range includes dated rows that overlap it. Use Undated or Invalid dates to inspect rows without a usable date.",
+    "loadingRows": "Loading source rows…",
+    "loadedRows": "{{count}} source rows loaded",
+    "noMatches": "No saved source rows match these filters.",
+    "businessDate": "Business date",
+    "item": "Item",
+    "source": "Source",
+    "interpretation": "Interpretation",
+    "moreRows": "Load more rows",
+    "unknown": "Unknown",
+    "inspectValues": "Inspect source and values",
+    "field": "Field",
+    "original": "Original source",
+    "current": "Current interpretation",
+    "revision": "Review revision {{revision}}",
+    "importRow": "Import row {{row}}",
+    "sourceRow": "Source row {{row}}"
+  }
 }

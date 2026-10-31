@@ -1718,7 +1718,7 @@ function SalesClientLoaded({
     const inCurrentRange = (row: Record<string, unknown>) =>
       isTimestampInRange(recordTimestampMs(row), startMs, endMs);
     const inPreviousRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs);
+      previousRange != null && isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs);
 
     const currentConfirmed = confirmedOrders.filter((o) =>
       inCurrentRange(o as Record<string, unknown>),
@@ -1897,19 +1897,19 @@ function SalesClientLoaded({
                 {
                   label: 'Revenue MTD',
                   value: `$${revenue.toLocaleString()}`,
-                  change: percentChange(revenue, previousRevenue),
+                  change: previousRange ? percentChange(revenue, previousRevenue) : undefined,
                   icon: 'TrendingUp',
                 },
                 {
                   label: 'Orders Confirmed',
                   value: String(orderCount),
-                  change: percentChange(orderCount, previousOrderCount),
+                  change: previousRange ? percentChange(orderCount, previousOrderCount) : undefined,
                   icon: 'ShoppingCart',
                 },
                 {
                   label: 'Avg Deal Size',
                   value: `$${Math.round(avgDeal).toLocaleString()}`,
-                  change: percentChange(avgDeal, previousAvgDeal),
+                  change: previousRange ? percentChange(avgDeal, previousAvgDeal) : undefined,
                   icon: 'DollarSign',
                 },
                 {

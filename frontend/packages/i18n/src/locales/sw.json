@@ -399,6 +399,29 @@
         "unavailableChoices": "no stored selectable options are available",
         "ambiguousDefinition": "more than one field definition uses this key"
       }
+    },
+    "historyPeriod": {
+      "all": "Historia yote",
+      "label": "Kipindi cha tarehe",
+      "invalidFrom": "Weka tarehe sahihi ya kuanza.",
+      "invalidThrough": "Weka tarehe sahihi ya mwisho.",
+      "reversed": "Tarehe ya mwisho lazima iwe sawa na tarehe ya kuanza au iwe baada yake.",
+      "custom": "Tarehe maalumu",
+      "customDates": "Kipindi maalumu cha tarehe",
+      "from": "Kuanzia",
+      "through": "Hadi",
+      "apply": "Tumia tarehe",
+      "invalidTimeZone": "Kiungo hiki kina ukanda wa saa usio sahihi. Ondoa kichujio cha tarehe ili kuona rekodi.",
+      "invalidLink": "Kiungo hiki kina kipindi cha tarehe kisicho sahihi. Ondoa kichujio cha tarehe ili kuona rekodi.",
+      "filteredAll": "Kipindi cha tarehe kwenye jedwali: rekodi zote zenye tarehe ({{timeZone}}).",
+      "filteredRange": "Kipindi cha tarehe kwenye jedwali: kuanzia {{from}} hadi {{through}} ({{timeZone}}).",
+      "clear": "Ondoa kichujio cha tarehe",
+      "today": "Leo",
+      "last7Days": "Siku 7 zilizopita",
+      "last30Days": "Siku 30 zilizopita",
+      "last90Days": "Siku 90 zilizopita",
+      "last180Days": "Siku 180 zilizopita",
+      "yearToDate": "Kuanzia mwanzo wa mwaka hadi leo"
     }
   },
   "navigation": {

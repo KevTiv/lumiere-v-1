@@ -19,6 +19,7 @@ import { useUoms } from "@lumiere/query-hooks/hooks/inventory/uom"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api-fetch"
 import { REVIEW_TARGETS, reviewDatasetFromCsv, type ReviewedImportSource } from "./import-review-model"
+import { resetHistoryQueries } from "./history-data"
 import {
   useAnalyzeImportMapping,
   usePreviewImportMapping,
@@ -512,7 +513,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       const result = await response.json()
       if (!mounted.current) return
       if (!response.ok || typeof result.id !== "string") throw new Error(result.error ?? "Source review could not be saved.")
-      await queryClient.invalidateQueries({ queryKey: ["import-reviews", organizationId, companyId] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["import-reviews", organizationId, companyId] }),
+        resetHistoryQueries(queryClient, { organizationId, companyId, actorIdentity: recoveryScope.actor }),
+      ])
       if (!mounted.current) return
       onReviewSaved?.(result.id)
       resetFlow(); setCsvText(""); setHeaders([]); setRows([]); setSourceFileName("")

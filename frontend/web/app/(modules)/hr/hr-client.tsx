@@ -942,7 +942,7 @@ function HrClientLoaded({
     const inCurrentRange = (row: Record<string, unknown>) =>
       isTimestampInRange(recordTimestampMs(row), startMs, endMs)
     const inPreviousRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
+      previousRange != null && isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
 
     const activeEmployees = employees.filter((e) => e.isActive)
     const pendingLeaves = leavesToApprove.length
@@ -966,7 +966,7 @@ function HrClientLoaded({
                     {
                       label: t("hr.dashboard.pendingLeaveRequests"),
                       value: pendingLeaves.toString(),
-                      change: percentChange(currentLeaves, previousLeaves),
+                      change: previousRange ? percentChange(currentLeaves, previousLeaves) : undefined,
                       icon: "Calendar",
                     },
                     {
@@ -977,7 +977,7 @@ function HrClientLoaded({
                     {
                       label: t("hr.dashboard.runningContracts"),
                       value: runningContracts.toString(),
-                      change: percentChange(currentContracts, previousContracts),
+                      change: previousRange ? percentChange(currentContracts, previousContracts) : undefined,
                       icon: "FileText",
                     },
                   ],

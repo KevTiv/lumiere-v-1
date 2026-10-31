@@ -48,8 +48,31 @@ describe("overview financial meaning", () => {
       { state: "Draft", dateOrder: "2026-10-10" },
       { state: "Sale", dateOrder: "2026-11-01" },
     ], new Date("2026-10-29T15:00:00Z"), "en-US")
-    assert.equal(series.length, 6)
-    assert.equal(series.at(-1)?.value, 2)
+    assert.ok(series.length <= 36)
+    assert.equal(new Set(series.map((point) => point.label)).size, series.length)
     assert.equal(series.reduce((sum, point) => sum + point.value, 0), 2)
+  })
+
+  it("uses the selected historical range and its exact end boundary for the trend", () => {
+    const rows = [
+      { state: "Sale", dateOrder: "2022-06-01" },
+      { state: "Done", dateOrder: "2023-12-31T23:59:59.999Z" },
+      { state: "Sale", dateOrder: "2024-01-01" },
+      { state: "Sale", createDate: "2022-06-01" },
+    ]
+    const period = { kind: "custom" as const, from: "2022-01-01", through: "2023-12-31" }
+    const selected = confirmedOrderTrend(rows, new Date("2026-10-29"), "en-US", period)
+    assert.equal(selected.reduce((sum, point) => sum + point.value, 0), 2)
+    assert.ok(selected.length <= 36)
+    const all = confirmedOrderTrend(rows, new Date("2026-10-29"), "en-US", "all")
+    assert.equal(all.reduce((sum, point) => sum + point.value, 0), 3)
+  })
+
+  it("keeps a timestamp just before epoch on its historical business day", () => {
+    const rows = [{ state: "Sale", dateOrder: { microsSinceUnixEpoch: -1n } }]
+    const before = confirmedOrderTrend(rows, new Date("2026-10-29"), "en-US", { kind: "custom", from: "1969-12-31", through: "1969-12-31" })
+    const after = confirmedOrderTrend(rows, new Date("2026-10-29"), "en-US", { kind: "custom", from: "1970-01-01", through: "1970-01-01" })
+    assert.equal(before.reduce((sum, point) => sum + point.value, 0), 1)
+    assert.equal(after.reduce((sum, point) => sum + point.value, 0), 0)
   })
 })
