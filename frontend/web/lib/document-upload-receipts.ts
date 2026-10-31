@@ -45,7 +45,7 @@ export const documentUploadReceiptSchema = z.object({
   registration: documentRegistrationSchema,
   registrationState: z.enum(["registered", "unconfirmed"]),
   documentId: id.nullable(),
-  indexing: z.enum(["pending", "failed", "queued", "superseded"]),
+  indexing: z.enum(["pending", "failed", "queued", "running", "completed", "unavailable", "superseded"]),
 }).strict()
 export type DocumentUploadReceipt = z.infer<typeof documentUploadReceiptSchema>
 
