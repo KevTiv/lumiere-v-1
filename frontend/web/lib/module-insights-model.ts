@@ -22,7 +22,7 @@ export interface InsightRecord {
 export interface InsightSource { rows: readonly InsightRecord[]; state: ModuleDataState }
 export interface ModuleInsightInput {
   module: InsightModule; organizationId: string | number | bigint; companyId: string | number | bigint
-  records: InsightSource; currencies: InsightSource
+  records: InsightSource; currencies: InsightSource; companyCurrencyId?: unknown
 }
 export interface InsightValue<T> { state: ModuleDataState; value: T | null }
 export interface InsightCurrency { id: string; label: string; decimals: number | null }
@@ -105,7 +105,9 @@ export function buildModuleInsights(input: ModuleInsightInput, days: InsightPeri
     const decimals = row?.decimalPlaces ?? row?.decimal_places
     return { id, label: row ? String(row.code ?? row.name ?? `#${id}`) : `#${id}`, decimals: typeof decimals === "number" && Number.isInteger(decimals) && decimals >= 0 && decimals <= 6 ? decimals : null }
   })
-  const selectedId = requestedCurrency ?? source.rows.map(currencyId).filter(Boolean).sort()[0] ?? currencies[0]?.id ?? ""
+  const companyCurrencyId = insightId(input.companyCurrencyId)
+  const knownCompanyCurrencyId = catalog.some((row) => insightId(row.id) === companyCurrencyId) ? companyCurrencyId : undefined
+  const selectedId = requestedCurrency ?? knownCompanyCurrencyId ?? source.rows.map(currencyId).filter(Boolean).sort()[0] ?? currencies[0]?.id ?? ""
   const currency = currencies.find((item) => item.id === selectedId)
   let state = monetary ? mergeModuleStates([source.state, input.currencies.state]) : source.state
   if (state.status === "ready" && monetary && (!selectedId || source.rows.some((row) => !currencyId(row)))) state = unavailable

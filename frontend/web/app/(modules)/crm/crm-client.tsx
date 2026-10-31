@@ -8,7 +8,7 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
-import { ModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
+import { CompanyModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
 import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
@@ -2699,7 +2699,7 @@ function CrmClientLoaded({
         record={focusedLiveRecord} config={focusedRecord.kind === "lead" ? leadRecordSheet : focusedRecord.kind === "opportunity" ? opportunityRecordSheet : contactRecordSheet} />}
       <ModuleView
         config={config}
-        dashboardContent={<ModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
+        dashboardContent={<CompanyModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
         data={data}
         dataLoading={dataLoading}
         dataState={dataState}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { ArrowUpRight, ChartNoAxesCombined } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Button } from "@lumiere/ui/components/button"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
@@ -25,6 +26,14 @@ function SourceNotice({ state }: { state: ModuleDataState }) {
 /** One composition for module dashboards; figures are derived only from explicit read projections. */
 export interface InsightPeriodRange { startMs: number; endMs: number }
 interface ModuleInsightsProps { input: ModuleInsightInput; sections?: DashboardSection[]; now?: Date; onPeriodRangeChange?: (range: InsightPeriodRange) => void }
+
+export function CompanyModuleInsights(props: ModuleInsightsProps) {
+  const { input } = props
+  const organizationId = Number(input.organizationId)
+  const companies = useCompanies(organizationId, input.module !== "reports" && Number.isSafeInteger(organizationId) && organizationId > 0)
+  const companyCurrencyId = companies.data?.find((company) => String(company.id) === String(input.companyId))?.currencyId
+  return <ModuleInsights {...props} input={{ ...input, companyCurrencyId: input.companyCurrencyId ?? companyCurrencyId }} />
+}
 
 export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange }: ModuleInsightsProps) {
   // A company switch remounts controls instead of retaining an old company's currency or queue.
