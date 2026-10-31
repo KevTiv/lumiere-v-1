@@ -5,6 +5,9 @@ mod field_policy;
 mod resource_registry;
 
 pub use lumiere_policy_core::additional_tenant::AdditionalTenantApproval;
+pub use lumiere_policy_core::expense_allocations::{
+    allocation_snapshot_bytes, AllocationSnapshotRow,
+};
 
 pub use erp_subscriptions::{
     auth_subscriptions, create_client_subscriptions, erp_org_extra_where,

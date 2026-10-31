@@ -392,6 +392,11 @@ pub fn create_manual_account_invoice(
     check_permission(ctx, organization_id, "account_move", "create")?;
     check_permission(ctx, organization_id, "account_move_line", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
+    crate::documents::knowledge_guides::require_company_membership(
+        ctx,
+        organization_id,
+        params.company_id,
+    )?;
     validate_request_token(&params.idempotency_key)?;
 
     let payload_fingerprint = format!("{params:?}");
@@ -409,6 +414,17 @@ pub fn create_manual_account_invoice(
     }
 
     let expected_journal_type = expected_journal_type(&params.move_type)?;
+    let custom_fields = crate::forms::record_creation::prepare_owned_custom_fields(
+        ctx,
+        organization_id,
+        "accounting",
+        if params.move_type == MoveType::InInvoice {
+            "new-bill"
+        } else {
+            "new-invoice"
+        },
+        params.metadata.as_deref(),
+    )?;
     let journal = require_active_journal(
         ctx,
         organization_id,
@@ -668,15 +684,31 @@ pub fn create_manual_account_invoice(
         },
     );
 
+    crate::forms::record_creation::persist_new_record_fields(
+        ctx,
+        organization_id,
+        params.company_id,
+        "account_move",
+        move_record.id,
+        &custom_fields,
+    );
+
     record_result(
         ctx,
         organization_id,
         params.company_id,
         ACTION_KIND,
-        params.idempotency_key,
+        params.idempotency_key.clone(),
         payload_fingerprint,
         "account_move",
         move_record.id,
     );
+    crate::forms::record_creation_persistence::record_manual_invoice_creation(
+        ctx,
+        organization_id,
+        params.company_id,
+        move_record.id,
+        &params.idempotency_key,
+    )?;
     Ok(())
 }

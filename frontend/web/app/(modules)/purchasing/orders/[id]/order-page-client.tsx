@@ -55,7 +55,8 @@ import {
 import type { StockPicking } from '@lumiere/stdb/types';
 import { useAccountMoves } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
-import { purchaseOrderLinks } from '@lumiere/query-hooks/hooks/cross-record-links';
+import { moduleQueryState, mergeModuleStates } from '@lumiere/ui/lib/module-data-state';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
 import { useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
 import {
   useComputePurchaseOrderTotals,
@@ -93,6 +94,7 @@ import {
   linesOfOrder,
 } from '../../purchase-order-forms';
 import { purchaseOrderStatusBar } from '../../purchase-order-status';
+import { purchaseDiscrepancyHandoffs, scopedPurchaseReviewRows } from '../../purchase-discrepancies';
 
 interface PurchaseOrderPageClientProps {
   orderId: string;
@@ -141,19 +143,20 @@ function PurchaseOrderPageLoaded({
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
-  const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders);
-  const { data: orderLines = [] } = usePurchaseOrderLines(orgId, initialOrderLines);
-  const {
-    data: stockPickings = [],
-    isLoading: pickingsLoading,
-    isError: pickingsError,
-  } = useStockPickings(orgId, initialStockPickings);
-  const {
-    data: accountMoves = [],
-    isLoading: movesLoading,
-    isError: movesError,
-  } = useAccountMoves(orgId);
-  const { data: contacts = [] } = useContacts(orgId, initialContacts);
+  const ordersQuery = usePurchaseOrders(orgId, initialOrders);
+  const linesQuery = usePurchaseOrderLines(orgId, initialOrderLines);
+  const pickingsQuery = useStockPickings(orgId, initialStockPickings);
+  const movesQuery = useAccountMoves(orgId);
+  const ordersState = moduleQueryState(ordersQuery);
+  const linesState = moduleQueryState(linesQuery);
+  const handoffsState = mergeModuleStates([moduleQueryState(pickingsQuery), moduleQueryState(movesQuery)]);
+  const scope = useMemo(() => ({ organizationId: orgId, companyId: operatingCompanyId }), [orgId, operatingCompanyId]);
+  const orders = useMemo(() => ordersState.status === 'ready' ? scopedPurchaseReviewRows(ordersQuery.data ?? [], scope) : [], [ordersState.status, ordersQuery.data, scope]);
+  const orderLines = useMemo(() => linesState.status === 'ready' ? scopedPurchaseReviewRows(linesQuery.data ?? [], scope) : [], [linesState.status, linesQuery.data, scope]);
+  const stockPickings = handoffsState.status === 'ready' ? pickingsQuery.data ?? [] : [];
+  const accountMoves = handoffsState.status === 'ready' ? movesQuery.data ?? [] : [];
+  const contactsQuery = useContacts(orgId, initialContacts);
+  const contacts = moduleQueryState(contactsQuery).status === 'ready' ? contactsQuery.data ?? [] : [];
 
   const workflowSurface = useWorkflowSurface({ organizationId });
   const workflow = usePurchasingWorkflow(
@@ -206,7 +209,10 @@ function PurchaseOrderPageLoaded({
   const [pendingConfirm, setPendingConfirm] = useState<WorkflowAction | null>(null);
 
   const order = useMemo(
-    () => (orders as unknown as Row[]).find((row) => String(row.id) === orderId),
+    () => {
+      const matches = (orders as unknown as Row[]).filter((row) => String(row.id) === orderId);
+      return matches.length === 1 ? matches[0] : undefined;
+    },
     [orders, orderId],
   );
   const lines = useMemo(() => linesOfOrder(orderLines as unknown as Row[], orderId), [orderLines, orderId]);
@@ -263,7 +269,7 @@ function PurchaseOrderPageLoaded({
   );
 
   if (!order) {
-    if (ordersLoading) {
+    if (ordersState.status === 'loading') {
       return (
         <div className="space-y-4" data-testid="purchase-order-page-loading">
           <Skeleton className="h-6 w-64" />
@@ -272,6 +278,7 @@ function PurchaseOrderPageLoaded({
         </div>
       );
     }
+    if (ordersState.status !== 'ready') return <ModuleDataNotice state={ordersState} />;
     return (
       <Empty data-testid="purchase-order-page-not-found">
         <EmptyHeader>
@@ -299,7 +306,7 @@ function PurchaseOrderPageLoaded({
   const stateTag = variantTag(order.state);
   const badges = purchaseOrderStatusBadges(t);
 
-  const links = purchaseOrderLinks(
+  const links = purchaseDiscrepancyHandoffs(
     order as never,
     { organizationId: orgId, companyId: operatingCompanyId },
     stockPickings as never,
@@ -583,7 +590,7 @@ function PurchaseOrderPageLoaded({
           {
             id: 'lines',
             label: t('purchasing.orderLines.title'),
-            content: (
+            content: linesState.status === 'loading' ? <p role="status">{t('common.loading')}</p> : linesState.status !== 'ready' ? <ModuleDataNotice state={linesState} /> : (
               <EntityView
                 config={{ ...linesConfig, title: '', description: undefined }}
                 data={lines}
@@ -595,16 +602,14 @@ function PurchaseOrderPageLoaded({
             id: 'handoffs',
             label: t('purchasing.order.handoffs', { defaultValue: 'Receipts & vendor bills' }),
             content:
-              movesLoading || pickingsLoading ? (
+              handoffsState.status === 'loading' ? (
                 <p>{t('common.loading', { defaultValue: 'Loading…' })}</p>
+              ) : handoffsState.status !== 'ready' ? (
+                <ModuleDataNotice state={handoffsState} />
               ) : (
                 <CrossRecordLinks
                   testIdPrefix="purchase-order-handoff"
-                  result={
-                    movesError || pickingsError
-                      ? { status: 'unavailable', links: [], reason: 'Linked records are unavailable' }
-                      : links
-                  }
+                  result={links}
                 />
               ),
           },

@@ -6,6 +6,7 @@ import {
   accountIsEligibleManualInvoiceTaxPosting,
   accountMatchesManualInvoiceLineType,
 } from "@lumiere/erp-shared"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 // Preserve the existing legacy field aliases inside the catalog boundary.
 // Public inputs remain the canonical generated resource rows.
 type ManualInvoiceAccountLookup = {
@@ -19,6 +20,8 @@ type ManualInvoiceAccountLookup = {
   readonly internalType?: unknown
   readonly internalGroup?: unknown
   readonly allowedJournalIds?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
 }
 type ManualInvoicePartnerLookup = {
   readonly id?: unknown
@@ -44,6 +47,8 @@ type ManualInvoiceJournalLookup = {
   readonly type_?: unknown
   readonly currencyId?: unknown
   readonly currency_id?: unknown
+  readonly defaultAccountId?: unknown
+  readonly default_account_id?: unknown
 }
 type ManualInvoiceTaxGroupLookup = {
   readonly id?: unknown
@@ -131,7 +136,9 @@ export function buildManualInvoiceCatalog({
   const accountsFor = (kind: "invoice" | "bill", counterpart: boolean) =>
     (accounts as readonly ManualInvoiceAccountLookup[])
       .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey)
-      .filter((row) => row.deprecated !== true && row.isOffBalance !== true)
+      .filter((row) => row.deprecated === false && row.isOffBalance === false && Array.isArray(row.allowedJournalIds))
+      .filter((row) => Object.hasOwn(row, "currencyId") || Object.hasOwn(row, "currency_id"))
+      .filter((row) => row.currencyId == null && row.currency_id == null || Boolean(parseStrictU64(row.currencyId ?? row.currency_id)))
       .filter(
         (row) =>
           enumTag(counterpart ? row.internalType : row.internalGroup) ===
@@ -147,6 +154,7 @@ export function buildManualInvoiceCatalog({
         value: String(row.id),
         label: accountLabel(row),
         allowedJournalIds: allowedJournals(row),
+        currencyId: row.currencyId == null && row.currency_id == null ? undefined : String(row.currencyId ?? row.currency_id),
       }))
   const partnersFor = (kind: "invoice" | "bill") =>
     (contacts as readonly ManualInvoicePartnerLookup[])
@@ -168,15 +176,18 @@ export function buildManualInvoiceCatalog({
     (journals as readonly ManualInvoiceJournalLookup[])
       .filter(
         (row) =>
-          String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false,
+          String(row.companyId ?? row.company_id ?? "") === companyKey && row.active === true,
       )
       .filter(
         (row) => enumTag(row.type ?? row.type_) === (kind === "invoice" ? "Sale" : "Purchase"),
       )
+      .filter((row) => Object.hasOwn(row, "currencyId") || Object.hasOwn(row, "currency_id"))
+      .filter((row) => Boolean(parseStrictU64(row.currencyId ?? row.currency_id ?? defaultCurrencyId)))
       .map((row) => ({
         value: String(row.id),
         label: `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id)}`,
         currencyId: String(row.currencyId ?? row.currency_id ?? defaultCurrencyId),
+        defaultAccountId: row.defaultAccountId == null && row.default_account_id == null ? undefined : String(row.defaultAccountId ?? row.default_account_id),
       }))
   const taxGroupById = new Map(
     (taxGroups as readonly ManualInvoiceTaxGroupLookup[]).map((row) => [String(row.id), row]),

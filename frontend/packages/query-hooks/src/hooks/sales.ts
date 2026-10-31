@@ -46,7 +46,7 @@ import type {
 } from "@lumiere/stdb/types"
 
 import { finalizeUpdateSaleOrderParams } from "./sales-params-merge"
-import { createdSaleOrderId, withSaleOrderReceipt } from './sales-create-receipt'
+import { useRecordCreationTransport } from './record-creation-http'
 import { invalidateQueryResources } from "./workflow"
 import {
   ACCEPT_SALE_ORDER_QUOTATION_AFFECTS,
@@ -274,30 +274,17 @@ export function useSaleCommissionsPending(organizationId: bigint, initialData?: 
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export async function createSaleOrderDraftCommand(params: CreateSaleOrderParams, organizationId: bigint, companyId?: bigint): Promise<{ orderId?: string }> {
-  const receipt = crypto.randomUUID()
-  const json = stdbParamsToJson(
-    withCompanyScope({ ...params, metadata: withSaleOrderReceipt(params.metadata, receipt) }, companyId),
-    "CreateSaleOrderParams",
-  )
-  const { urlPath, init } = stdbBffCommandPost("create_sale_order", { params: json })
-  const r = await apiFetch(urlPath, init)
-  if (!r.ok) throw await salesReducerError(r, 'Failed to create quotation')
-  // A read failure after an acknowledged save must not invite another create.
-  try {
-    if (companyId == null || companyId === 0n) return {}
-    const rows = await fetchQueryList(`/api/sales/order-creations/${receipt}?companyId=${companyId}`, 'Failed to read saved quotation')
-    return { orderId: createdSaleOrderId(rows, receipt, organizationId, companyId) }
-  } catch {
-    return {}
-  }
-}
-
 export function useCreateSaleOrder(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
+  const create = useRecordCreationTransport(organizationId, companyId, "sale_order")
   return useMutation<{ orderId?: string }, Error, CreateSaleOrderParams>({
     retry: false,
-    mutationFn: (params) => createSaleOrderDraftCommand(params, organizationId, companyId),
+    mutationFn: async (params) => {
+      const scoped = withCompanyScope(params, companyId)
+      const orderId = await create(JSON.stringify(stdbParamsToJson(scoped, "CreateSaleOrderParams")), params.metadata,
+        (metadata) => stdbBffCommandPost("create_sale_order", { params: stdbParamsToJson({ ...scoped, metadata }, "CreateSaleOrderParams") }))
+      return { orderId }
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sale-orders', rqBigIntKey(organizationId)] }),
   })
 }

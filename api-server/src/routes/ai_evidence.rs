@@ -476,14 +476,16 @@ async fn capture_decision(
     })))
 }
 
-async fn review_evidence(
-    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
-    OrgSession {
-        session,
-        organization_id,
-    }: OrgSession,
-    Json(body): Json<ReviewEvidenceBody>,
-) -> Result<Json<Value>, ApiError> {
+// Composite reducer parameters keep their generated SATS representation;
+// stdb-client encodes only top-level optional scalars.
+fn sats_optional_string(value: Option<&str>) -> Value {
+    match value {
+        Some(value) => json!({ "some": value }),
+        None => json!({ "none": [] }),
+    }
+}
+
+fn review_evidence_payload(body: &ReviewEvidenceBody) -> Result<(&'static str, Value), ApiError> {
     if body.company_id == 0
         || body.id == 0
         || body
@@ -502,12 +504,12 @@ async fn review_evidence(
         {
             (
                 "review_ai_evidence_claim",
-                json!({ "verification_outcome": body.outcome, "verification_note": body.note }),
+                json!({ "verification_outcome": body.outcome, "verification_note": sats_optional_string(body.note.as_deref()) }),
             )
         }
         "decision" if matches!(body.outcome.as_str(), "accepted" | "rejected") => (
             "review_ai_evidence_decision",
-            json!({ "outcome": body.outcome, "note": body.note }),
+            json!({ "outcome": body.outcome, "note": sats_optional_string(body.note.as_deref()) }),
         ),
         "component" if matches!(body.outcome.as_str(), "confirmed" | "unresolved") => {
             if body.outcome == "confirmed"
@@ -524,8 +526,8 @@ async fn review_evidence(
                 "review_ai_artifact_component_links",
                 json!({
                     "outcome": body.outcome,
-                    "note": body.note,
-                    "expected_content_hash": body.expected_content_hash,
+                    "note": sats_optional_string(body.note.as_deref()),
+                    "expected_content_hash": sats_optional_string(body.expected_content_hash.as_deref()),
                 }),
             )
         }
@@ -543,6 +545,18 @@ async fn review_evidence(
             "expectedContentHash is only valid for a component".into(),
         ));
     }
+    Ok((reducer, params))
+}
+
+async fn review_evidence(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+    OrgSession {
+        session,
+        organization_id,
+    }: OrgSession,
+    Json(body): Json<ReviewEvidenceBody>,
+) -> Result<Json<Value>, ApiError> {
+    let (reducer, params) = review_evidence_payload(&body)?;
     let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let company_id = resolve_membership_company_id(
         context.client(),
@@ -748,5 +762,146 @@ mod tests {
             "reviewerUid": "forged",
         });
         assert!(serde_json::from_value::<ReviewEvidenceBody>(request).is_err());
+    }
+
+    #[tokio::test]
+    async fn review_payload_transport_preserves_optional_notes_and_component_hashes() {
+        use axum::{
+            extract::State,
+            http::{HeaderMap, StatusCode, Uri},
+        };
+        use std::sync::Mutex;
+        use stdb_client::{ReducerCall, StdbClient};
+
+        type Calls = Arc<Mutex<Vec<(String, String, Value)>>>;
+        async fn receive(
+            State(calls): State<Calls>,
+            headers: HeaderMap,
+            uri: Uri,
+            Json(args): Json<Value>,
+        ) -> StatusCode {
+            calls.lock().unwrap().push((
+                headers["authorization"].to_str().unwrap().to_owned(),
+                uri.path().to_owned(),
+                args,
+            ));
+            StatusCode::NO_CONTENT
+        }
+        let calls: Calls = Arc::new(Mutex::new(Vec::new()));
+        let router = Router::new()
+            .route(
+                "/v1/database/review-fixture/call/review_ai_evidence_claim",
+                post(receive),
+            )
+            .route(
+                "/v1/database/review-fixture/call/review_ai_evidence_decision",
+                post(receive),
+            )
+            .route(
+                "/v1/database/review-fixture/call/review_ai_artifact_component_links",
+                post(receive),
+            )
+            .with_state(calls.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let client = StdbClient::new(
+            format!("http://{}", listener.local_addr().unwrap()),
+            "review-fixture".into(),
+            "human-reviewer-token".into(),
+        );
+        let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        let hash = "ab12".repeat(16);
+        let cases = [
+            (
+                "claim",
+                "supported",
+                Some("Checked the source"),
+                None,
+                "review_ai_evidence_claim",
+                json!({"verification_outcome":"supported","verification_note":{"some":"Checked the source"}}),
+            ),
+            (
+                "claim",
+                "qualified",
+                None,
+                None,
+                "review_ai_evidence_claim",
+                json!({"verification_outcome":"qualified","verification_note":{"none":[]}}),
+            ),
+            (
+                "decision",
+                "accepted",
+                Some("Checked the claims"),
+                None,
+                "review_ai_evidence_decision",
+                json!({"outcome":"accepted","note":{"some":"Checked the claims"}}),
+            ),
+            (
+                "decision",
+                "rejected",
+                None,
+                None,
+                "review_ai_evidence_decision",
+                json!({"outcome":"rejected","note":{"none":[]}}),
+            ),
+            (
+                "component",
+                "confirmed",
+                Some("Checked this edit"),
+                Some(hash.as_str()),
+                "review_ai_artifact_component_links",
+                json!({"outcome":"confirmed","note":{"some":"Checked this edit"},"expected_content_hash":{"some":hash}}),
+            ),
+            (
+                "component",
+                "unresolved",
+                None,
+                None,
+                "review_ai_artifact_component_links",
+                json!({"outcome":"unresolved","note":{"none":[]},"expected_content_hash":{"none":[]}}),
+            ),
+        ];
+        for (kind, outcome, note, expected_hash, expected_reducer, expected_params) in cases {
+            let body: ReviewEvidenceBody = serde_json::from_value(json!({"companyId":9,"kind":kind,"id":11,"outcome":outcome,"note":note,"expectedContentHash":expected_hash})).unwrap();
+            let (reducer, params) = review_evidence_payload(&body).unwrap();
+            assert_eq!(reducer, expected_reducer);
+            client
+                .call_reducer(
+                    ReducerCall::from_name(reducer, json!([7, 9, body.id, params])).unwrap(),
+                )
+                .await
+                .unwrap();
+            let (authorization, path, wire) = calls.lock().unwrap().pop().expect("native request");
+            assert_eq!(authorization, "Bearer human-reviewer-token");
+            assert_eq!(
+                path,
+                format!("/v1/database/review-fixture/call/{expected_reducer}")
+            );
+            assert_eq!(wire, json!([7, 9, 11, expected_params]));
+        }
+        server.abort();
+    }
+
+    #[test]
+    fn review_payload_keeps_exact_component_hash_and_target_admission() {
+        let mut body = ReviewEvidenceBody {
+            company_id: 9,
+            kind: "component".into(),
+            id: 11,
+            outcome: "confirmed".into(),
+            note: None,
+            expected_content_hash: None,
+        };
+        assert!(review_evidence_payload(&body).is_err());
+        body.expected_content_hash = Some("not-a-hash".into());
+        assert!(review_evidence_payload(&body).is_err());
+        body.expected_content_hash = Some("ab12".repeat(16));
+        assert!(review_evidence_payload(&body).is_ok());
+        body.kind = "decision".into();
+        body.outcome = "accepted".into();
+        assert!(review_evidence_payload(&body).is_err());
+        body.expected_content_hash = None;
+        assert!(review_evidence_payload(&body).is_ok());
+        body.company_id = 0;
+        assert!(review_evidence_payload(&body).is_err());
     }
 }

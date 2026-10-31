@@ -625,6 +625,66 @@ mod tests {
             revision: u32::try_from(number("revision")).expect("live revision"),
         };
         let http = reqwest::Client::new();
+        if let Some(key) = fixture["verificationKey"].as_str() {
+            use crate::orchestrator::evidence_inspector::{
+                retrieve_reusable_knowledge, ActorIdentity, KnowledgeRetrieval, Viewer,
+            };
+            let host = std::env::var("STDB_HOST").expect("isolated STDB host");
+            assert_eq!(host, "http://127.0.0.1:3000");
+            let owner = stdb_client::StdbClient::new(
+                host,
+                std::env::var("STDB_MODULE").expect("isolated module"),
+                std::env::var("STDB_SERVER_TOKEN").expect("isolated owner token"),
+            );
+            owner.call_reducer(stdb_client::ReducerCall::from_name("register_cold_tier_service_identity",serde_json::json!([org,format!("guide-acceptance-reader-{org}"),"ai_spend_reader",{"__identity__":format!("0x{}",text("identity").trim_start_matches("0x"))}])).expect("reader registration contract")).await.expect("isolated service reader binding");
+            let client = owner.with_token(text("token"));
+            let profiles = client
+                .query_sql("SELECT * FROM knowledge_guide_actor_profile_read")
+                .await
+                .expect("bound minimal profile view");
+            assert!(
+                !profiles.is_empty(),
+                "bound reader must have current profile authority"
+            );
+            for profile in profiles {
+                assert!(
+                    !profile
+                        .as_object()
+                        .expect("profile row")
+                        .keys()
+                        .any(|key| matches!(
+                            key.as_str(),
+                            "name" | "email" | "phone" | "avatarUrl"
+                        )),
+                    "profile authority view must not expose directory PII"
+                );
+            }
+            assert!(
+                owner
+                    .with_token(text("deniedToken"))
+                    .query_sql("SELECT * FROM knowledge_guide_actor_profile_read")
+                    .await
+                    .expect("ordinary authority read")
+                    .is_empty(),
+                "ordinary user cannot read trusted source authority"
+            );
+            let viewer = Viewer {
+                organization_id: org,
+                company_id: company,
+                actor_identity: ActorIdentity::parse(text("identity")),
+            };
+            let result = retrieve_reusable_knowledge(&client, viewer, key)
+                .await
+                .expect("real guide knowledge authority");
+            assert_eq!(
+                matches!(result, KnowledgeRetrieval::Reusable(_)),
+                fixture["expectReusable"]
+                    .as_bool()
+                    .expect("expected authority result"),
+                "actual guide knowledge authority: {result:?}"
+            );
+            return;
+        }
         let discovered = retrieve_for_scope(
             &http,
             base,

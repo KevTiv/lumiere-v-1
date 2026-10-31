@@ -119,9 +119,11 @@ class DurableMigrationListTest(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
-    def _checkout(self, update=None):
+    def _checkout(self, update=None, durable_version=11, application_version=None):
         import hashlib
 
+        application_version = application_version or durable_version
+        follow_up_name = f"{durable_version:04d}_durable_projection_delta"
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         base = Path(temp.name)
@@ -130,7 +132,7 @@ class DurableMigrationListTest(unittest.TestCase):
         migrations.mkdir(parents=True)
         files = {
             "0001_durable_projection": self.BASELINE,
-            "0011_durable_projection_delta": self.FOLLOW_UP,
+            follow_up_name: self.FOLLOW_UP,
         }
         checks = {}
         for name, sql in files.items():
@@ -138,7 +140,25 @@ class DurableMigrationListTest(unittest.TestCase):
             checks[name] = "sha256:" + hashlib.sha256(sql.encode()).hexdigest()
         catalog = base / "root/api-server/src/cold_tier/migrate.rs"
         catalog.parent.mkdir(parents=True)
-        entries = "".join(f"    Migration {{\n        version: {n},\n    }},\n" for n in range(1, 12))
+        frozen = base / "root/lumiere-codegen/pg-migration-ledger"
+        frozen.mkdir(parents=True)
+        (frozen / f"{follow_up_name}.sql").write_text(self.FOLLOW_UP, encoding="utf-8")
+        crate = contracts / "crates/lumiere-contracts/src/lib.rs"
+        crate.parent.mkdir(parents=True)
+        crate.write_text(
+            'pub mod manifests {\n'
+            '    pub const PG_DDL_MIGRATIONS_0001_DURABLE_PROJECTION: &str = include_str!("../../../manifests/pg_ddl/migrations/0001_durable_projection.sql");\n'
+            '}\n',
+            encoding="utf-8",
+        )
+        entries = ""
+        for n in range(1, application_version + 1):
+            sql = ""
+            if n == 1:
+                sql = "        sql: lumiere_contracts::manifests::PG_DDL_MIGRATIONS_0001_DURABLE_PROJECTION,\n"
+            elif n == application_version:
+                sql = f'        sql: include_str!("../../../lumiere-codegen/pg-migration-ledger/{follow_up_name}.sql"),\n'
+            entries += f"    Migration {{\n        version: {n},\n{sql}    }},\n"
         catalog.write_text(
             "pub const MIGRATIONS: &[Migration] = &[\n" + entries + "];\n", encoding="utf-8"
         )
@@ -158,10 +178,10 @@ class DurableMigrationListTest(unittest.TestCase):
                     "state": "released",
                 },
                 {
-                    "version": 11,
-                    "name": "0011_durable_projection_delta",
-                    "sql_file": "manifests/pg_ddl/migrations/0011_durable_projection_delta.sql",
-                    "checksum": checks["0011_durable_projection_delta"],
+                    "version": durable_version,
+                    "name": follow_up_name,
+                    "sql_file": f"manifests/pg_ddl/migrations/{follow_up_name}.sql",
+                    "checksum": checks[follow_up_name],
                     "state": "released",
                 },
             ],
@@ -174,7 +194,7 @@ class DurableMigrationListTest(unittest.TestCase):
                 "manifest_path": "manifests/durable-pg-schema-manifest.json",
                 "checksum": checks["0001_durable_projection"],
                 "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-                "application_catalog_version": 11,
+                "application_catalog_version": application_version,
                 "application_catalog_checksum": "sha256:" + "a" * 64,
             }
         }
@@ -197,6 +217,48 @@ class DurableMigrationListTest(unittest.TestCase):
 
     def test_released_follow_up_is_accepted(self):
         self._verify()
+
+    def test_generated_30_sql_can_be_registered_at_application_31(self):
+        root, contracts, manifest = self._checkout(durable_version=30, application_version=31)
+        self._verifier().verify_pg(root, contracts, manifest)
+
+    def test_application_31_receipt_sql_does_not_register_unreferenced_generated_31(self):
+        root, contracts, manifest = self._checkout(durable_version=31, application_version=31)
+        # The same SQL bytes at a different artifact identity must not stand in
+        # for the future generated migration merely because app version 31 exists.
+        frozen = root / "lumiere-codegen/pg-migration-ledger/0030_durable_projection_delta.sql"
+        frozen.write_text(self.FOLLOW_UP, encoding="utf-8")
+        catalog = root / "api-server/src/cold_tier/migrate.rs"
+        catalog.write_text(
+            catalog.read_text(encoding="utf-8").replace(
+                "0031_durable_projection_delta.sql", "0030_durable_projection_delta.sql"
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaises(SystemExit) as raised:
+            self._verifier().verify_pg(root, contracts, manifest)
+        self.assertIn("migration 31 SQL is missing from the application migration catalog", str(raised.exception))
+
+    def test_registered_local_sql_must_match_the_released_artifact_bytes(self):
+        root, contracts, manifest = self._checkout()
+        frozen = root / "lumiere-codegen/pg-migration-ledger/0011_durable_projection_delta.sql"
+        frozen.write_text("-- edited application SQL\n", encoding="utf-8")
+        with self.assertRaises(SystemExit) as raised:
+            self._verifier().verify_pg(root, contracts, manifest)
+        self.assertIn("registered SQL checksum does not match", str(raised.exception))
+
+    def test_baseline_constant_must_actually_reference_the_verified_baseline(self):
+        root, contracts, manifest = self._checkout()
+        crate = contracts / "crates/lumiere-contracts/src/lib.rs"
+        crate.write_text(
+            crate.read_text(encoding="utf-8").replace(
+                "0001_durable_projection.sql", "0011_durable_projection_delta.sql"
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaises(SystemExit) as raised:
+            self._verifier().verify_pg(root, contracts, manifest)
+        self.assertIn("migration 1 SQL is missing from the application migration catalog", str(raised.exception))
 
     def test_pending_follow_up_is_rejected(self):
         message = self._failure(lambda schema, _m, _d: schema["migrations"][1].update({"state": "pending"}))

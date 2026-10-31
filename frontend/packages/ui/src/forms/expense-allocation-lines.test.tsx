@@ -28,6 +28,20 @@ beforeAll(() => {
 afterEach(cleanup)
 
 describe("dynamic expense allocation form", () => {
+  it("starts with all saved rows and retains metadata through an unchanged save", async () => {
+    const save = vi.fn()
+    const saved = [
+      { projectId: "9007199254740993", analyticAccountId: "", sharePercent: "33.333333333", billable: true, metadata: '{"ref":"A"}' },
+      { projectId: "", analyticAccountId: "3", sharePercent: "66.666666667", billable: false },
+    ]
+    render(<ModularForm config={setExpenseAllocationsForm(t, choices, false, saved)} draft={false} onSubmit={save} />)
+    expect(screen.getAllByLabelText("Share (%)")).toHaveLength(2)
+    expect((screen.getAllByLabelText("Share (%)")[0] as HTMLInputElement).value).toBe("33.333333333")
+    fireEvent.click(screen.getByRole("checkbox", { name: "I have reviewed these rows and want to replace this expense's allocations." }))
+    fireEvent.click(screen.getByRole("button", { name: "Save allocations" }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    expect(save.mock.calls[0][0].allocationLines).toEqual(saved)
+  })
   it("preserves edits while adding/removing rows and refreshing named choices", async () => {
     const onSubmit = vi.fn()
     const { rerender } = render(<ModularForm config={setExpenseAllocationsForm(t, choices)} draft={false} onSubmit={onSubmit} />)

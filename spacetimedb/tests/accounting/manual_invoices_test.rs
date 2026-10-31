@@ -14,6 +14,8 @@ use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
+use crate::core::persistence::{organization_commit, organization_row_change};
+use crate::forms::record_custom_field_value;
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountMoveState, JournalType, MoveType, TaxAmountType, TaxTypeUse};
 
@@ -147,6 +149,12 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
 ) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    crate::platform_tests::record_creation_test::configure_form(
+        ctx,
+        fixture.organization_id,
+        "accounting",
+        "new-invoice",
+    )?;
     let journal_id = seed_sales_journal(ctx, &fixture)?;
     let tax_id = seed_sales_tax(ctx, &fixture)?;
     let revenue_account_id = *fixture
@@ -172,7 +180,7 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
         invoice_payment_term_id: None,
         ref_: Some(format!("manual-invoice-{}", fixture.company_id)),
         payment_reference: Some(format!("manual-payment-{}", fixture.company_id)),
-        metadata: Some(r#"{"test":"manual_invoice","notes":"Operator notes","invoiceContent":{"schemaVersion":1,"notice":"Customer notice"},"invoiceDocument":{"seller":{"name":"Forged client seller"}}}"#.to_string()),
+        metadata: Some(r#"{"custom:reference":"Accepted","test":"manual_invoice","notes":"Operator notes","invoiceContent":{"schemaVersion":1,"notice":"Customer notice"},"invoiceDocument":{"seller":{"name":"Forged client seller"}}}"#.to_string()),
         lines: vec![ManualAccountInvoiceLineInput {
             account_id: revenue_account_id,
             name: "Consulting services".to_string(),
@@ -218,6 +226,23 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
         .find(&receipt.result_id)
         .ok_or("manual invoice receipt result move missing")?;
     let initial_metadata = move_record.metadata.clone();
+    let custom_count = || {
+        ctx.db
+            .record_custom_field_value()
+            .iter()
+            .filter(|row| {
+                row.organization_id == fixture.organization_id
+                    && row.company_id == fixture.company_id
+                    && row.model == "account_move"
+                    && row.record_id == move_record.id
+                    && row.field_key == "custom:reference"
+                    && row.value_json == r#""Accepted""#
+            })
+            .count()
+    };
+    if custom_count() != 1 {
+        return Err("manual invoice did not atomically commit its custom field".into());
+    }
     let metadata: serde_json::Value = serde_json::from_str(
         initial_metadata
             .as_deref()
@@ -313,6 +338,63 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
         return Err(format!(
             "same-key manual invoice replay created {replay_move_count} moves"
         ));
+    }
+
+    if custom_count() != 1 {
+        return Err("manual invoice replay duplicated custom EAV rows".into());
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&fixture.organization_id)
+        .filter(|commit| {
+            commit.operation_id == "erp.create_manual_account_invoice"
+                && commit.correlation_id == receipt.id
+        })
+        .collect();
+    if commits.len() != 1 {
+        return Err("manual invoice replay duplicated or lost durable source commit".into());
+    }
+    let rows: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&fixture.organization_id)
+        .filter(|row| row.commit_sequence == commits[0].sequence)
+        .collect();
+    for (table, expected) in [
+        ("account_move", 1),
+        ("account_move_line", 3),
+        ("record_custom_field_value", 1),
+        ("accounting_operation_receipt", 1),
+        ("audit_log", 2),
+    ] {
+        if rows.iter().filter(|row| row.table_name == table).count() != expected {
+            return Err(format!(
+                "manual invoice source commit has wrong {table} coverage"
+            ));
+        }
+    }
+    let before_invalid = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == fixture.organization_id)
+        .count();
+    let mut invalid_custom = params.clone();
+    invalid_custom.idempotency_key = format!("{:032x}", fixture.company_id + 10_000_000);
+    invalid_custom.metadata = Some(r#"{"custom:reference":123}"#.into());
+    if create_manual_account_invoice(ctx, fixture.organization_id, invalid_custom).is_ok()
+        || ctx
+            .db
+            .account_move()
+            .iter()
+            .filter(|row| row.organization_id == fixture.organization_id)
+            .count()
+            != before_invalid
+    {
+        return Err("invalid custom invoice left a partial accounting move".into());
     }
 
     let mut conflicting = params;

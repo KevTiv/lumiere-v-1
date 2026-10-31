@@ -13,6 +13,8 @@ export interface ExpenseAllocationDraft {
   analyticAccountId: string
   sharePercent: string
   billable: boolean
+  /** Opaque saved line metadata is retained when an allocation is edited. */
+  metadata?: string
 }
 
 export interface ExpenseAllocationChoices {

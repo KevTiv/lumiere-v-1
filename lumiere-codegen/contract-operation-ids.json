@@ -1486,6 +1486,11 @@
     "void_payment_transaction": "erp.void_payment_transaction",
     "waive_tax_deadline": "erp.waive_tax_deadline",
     "withdraw_ai_run_follow_up": "erp.withdraw_ai_run_follow_up",
-    "worker_heartbeat": "erp.worker_heartbeat"
+    "worker_heartbeat": "erp.worker_heartbeat",
+    "nominate_knowledge_guide": "erp.nominate_knowledge_guide",
+    "purge_reviewed_expired_documents": "erp.purge_reviewed_expired_documents",
+    "run_configured_record_creation_tests": "erp.run_configured_record_creation_tests",
+    "knowledge_guide_authority_read": "erp.knowledge_guide_authority_read",
+    "knowledge_guide_actor_profile_read": "erp.knowledge_guide_actor_profile_read"
   }
 }

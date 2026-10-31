@@ -23,7 +23,116 @@ use super::knowledge_entry::{
     AiKnowledgeEntry, AiKnowledgeEntryVersion, AiKnowledgeReview,
 };
 use super::spend_reads::authorized_organization_ids;
+use crate::core::users::user_profile__view;
+use crate::documents::knowledge::knowledge_article__view;
+use crate::documents::knowledge_guides::{knowledge_guide__view, knowledge_guide_revision__view};
 use spacetimedb::ViewContext;
+
+/// Minimal current actor authority for the existing bound gateway reader.
+/// Never expose profile names, contacts or ordinary metadata to this reader.
+#[derive(Clone, spacetimedb::SpacetimeType)]
+pub struct KnowledgeGuideActorProfileRead {
+    pub id: u64,
+    pub organization_id: u64,
+    pub identity: spacetimedb::Identity,
+    pub is_active: bool,
+    pub is_superuser: bool,
+    pub metadata: Option<String>,
+}
+
+#[spacetimedb::view(accessor = knowledge_guide_actor_profile_read, public, primary_key = id)]
+pub fn knowledge_guide_actor_profile_read(
+    ctx: &ViewContext,
+) -> Vec<KnowledgeGuideActorProfileRead> {
+    authorized_organization_ids(ctx)
+        .into_iter()
+        .flat_map(|org| {
+            ctx.db
+                .user_profile()
+                .user_profile_by_organization()
+                .filter(&org)
+                .map(|profile| {
+                    let metadata = profile.metadata.filter(|raw| {
+                        let raw = raw.trim();
+                        let normalized = raw
+                            .strip_prefix('"')
+                            .and_then(|value| value.strip_suffix('"'))
+                            .unwrap_or(raw)
+                            .trim();
+                        normalized.starts_with("lumiere-platform-bootstrap-")
+                    });
+                    KnowledgeGuideActorProfileRead {
+                        id: profile.id,
+                        organization_id: org,
+                        identity: profile.identity,
+                        is_active: profile.is_active,
+                        is_superuser: profile.is_superuser,
+                        metadata,
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Only the existing bound gateway reader can see this private-guide association.
+/// The gateway must additionally check the acting member, company and current revision.
+#[derive(Clone, spacetimedb::SpacetimeType)]
+pub struct KnowledgeGuideAuthorityRead {
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub revision: u32,
+    pub title: String,
+    pub content_hash: String,
+    pub revision_author: spacetimedb::Identity,
+    pub member_ids: Vec<spacetimedb::Identity>,
+    pub module: String,
+    pub language: String,
+}
+
+#[spacetimedb::view(accessor = knowledge_guide_authority_read, public, primary_key = id)]
+pub fn knowledge_guide_authority_read(ctx: &ViewContext) -> Vec<KnowledgeGuideAuthorityRead> {
+    let mut rows = Vec::new();
+    for org in authorized_organization_ids(ctx) {
+        for guide in ctx
+            .db
+            .knowledge_guide()
+            .knowledge_guide_by_org()
+            .filter(&org)
+        {
+            let Some(article) = ctx.db.knowledge_article().id().find(&guide.id) else {
+                continue;
+            };
+            let Some(revision) = ctx
+                .db
+                .knowledge_guide_revision()
+                .knowledge_guide_revision_by_guide()
+                .filter(&guide.id)
+                .find(|row| {
+                    row.organization_id == org
+                        && row.company_id == guide.company_id
+                        && row.revision == guide.latest_revision
+                })
+            else {
+                continue;
+            };
+            rows.push(KnowledgeGuideAuthorityRead {
+                id: guide.id,
+                organization_id: org,
+                company_id: guide.company_id,
+                revision: guide.latest_revision,
+                title: revision.title,
+                content_hash: revision.content_hash,
+                revision_author: revision.create_uid,
+                member_ids: article.member_ids,
+                module: guide.module,
+                language: revision.language,
+            });
+        }
+    }
+    rows
+}
 
 #[spacetimedb::view(accessor = ai_capability_execution_read, public, primary_key = id)]
 pub fn ai_capability_execution_read(ctx: &ViewContext) -> Vec<AiCapabilityExecution> {

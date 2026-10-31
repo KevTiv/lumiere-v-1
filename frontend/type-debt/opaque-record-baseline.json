@@ -300,7 +300,7 @@
   "web/app/(modules)/purchasing/purchase-requisition-line.ts": 1,
   "web/app/(modules)/purchasing/purchasing-action-gates.ts": 1,
   "web/app/(modules)/purchasing/purchasing-blanket-workspace.tsx": 3,
-  "web/app/(modules)/purchasing/purchasing-client.tsx": 71,
+  "web/app/(modules)/purchasing/purchasing-client.tsx": 54,
   "web/app/(modules)/purchasing/purchasing-ops-sod.tsx": 4,
   "web/app/(modules)/reports/pivot-explorer.tsx": 10,
   "web/app/(modules)/reports/query-builder-semantics.ts": 4,

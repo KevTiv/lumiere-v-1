@@ -62,7 +62,9 @@ pub fn test_accounting_line_history_is_native_exact_and_replay_safe(
         .business_change()
         .business_change_by_organization()
         .filter(&org)
-        .find(|row| row.subject_record_id == original.id)
+        .find(|row| {
+            row.subject_record_id == original.id && row.operation == "update_account_move_line"
+        })
         .ok_or("trusted line change missing")?;
     if evidence.company_id != company
         || evidence.resource != "account_move"
@@ -236,6 +238,104 @@ pub fn test_accounting_line_history_is_native_exact_and_replay_safe(
         || !current.debit.is_finite()
     {
         return Err("rejected history mutation changed source or evidence".into());
+    }
+    Ok(())
+}
+
+pub fn test_accounting_line_addition_history_is_native_and_scoped(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let move_id = create_balanced_customer_invoice(ctx, &fixture, 12.5, false)?;
+    let evidence: Vec<_> = ctx
+        .db
+        .business_change()
+        .business_change_by_organization()
+        .filter(&org)
+        .filter(|row| row.record_id == move_id && row.operation == "add_account_move_line")
+        .collect();
+    if evidence.len() != 2 {
+        return Err(
+            "explicit draft-line additions did not produce two exact native histories".into(),
+        );
+    }
+    for change in evidence {
+        let line = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&change.subject_record_id)
+            .ok_or("addition history has no current exact source line")?;
+        if change.company_id != fixture.company_id
+            || change.resource != "account_move"
+            || change.subject_resource != "account_move_line"
+            || change.actor_identity != ctx.sender()
+            || line.organization_id != org
+            || line.company_id != fixture.company_id
+            || line.move_id != move_id
+        {
+            return Err("addition history lost canonical ownership or actor".into());
+        }
+        let deltas: Vec<serde_json::Value> =
+            serde_json::from_str(&change.changes_json).map_err(|error| error.to_string())?;
+        if deltas.iter().any(|delta| !delta["before"].is_null()) {
+            return Err("addition history invented a previous line value".into());
+        }
+        for (field, value) in [
+            ("account_id", line.account_id.to_string()),
+            ("currency_id", line.currency_id.to_string()),
+            ("debit", line.debit.to_string()),
+            ("credit", line.credit.to_string()),
+            ("name", line.name.clone()),
+        ] {
+            if !deltas
+                .iter()
+                .any(|delta| delta["field"] == field && delta["after"] == value)
+            {
+                return Err(format!("addition history lost exact {field}"));
+            }
+        }
+        let audit = ctx
+            .db
+            .audit_log()
+            .id()
+            .find(&change.audit_log_id)
+            .ok_or("addition audit missing")?;
+        if audit.action != "CREATE"
+            || audit.record_id != line.id
+            || audit.old_values.is_some()
+            || audit.new_values.is_some()
+        {
+            return Err(
+                "addition audit lost lifecycle semantics or duplicated private values".into(),
+            );
+        }
+        let commit = ctx
+            .db
+            .organization_commit()
+            .organization_commit_by_organization()
+            .filter(&org)
+            .find(|row| row.correlation_id == format!("business-change:{}", change.id))
+            .ok_or("addition evidence has no durable exact commit")?;
+        let rows: Vec<_> = ctx
+            .db
+            .organization_row_change()
+            .organization_row_change_by_commit()
+            .filter(&org)
+            .filter(|row| row.commit_sequence == commit.sequence)
+            .collect();
+        for table in [
+            "account_move",
+            "account_move_line",
+            "audit_log",
+            "business_change",
+        ] {
+            if rows.iter().filter(|row| row.table_name == table).count() != 1 {
+                return Err(format!("addition durable commit lacks exact {table} row"));
+            }
+        }
     }
     Ok(())
 }

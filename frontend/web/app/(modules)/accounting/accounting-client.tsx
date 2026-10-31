@@ -22,6 +22,7 @@ import { AccountantOverview } from "./accountant-overview"
 import { BillDocumentIntake } from "./bill-document-intake"
 import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
+import { useExplainErpError } from "@/lib/erp-ai-context"
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { ReconciliationWorkbench, type ReconciliationOutcome, type ReconciliationStatusResult } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
@@ -468,7 +469,6 @@ import {
   ConsolidationCompanyRatesSection,
 } from "./read-sections"
 import { apiFetch, fetchQueryList } from "@lumiere/query-hooks/http"
-import { persistCustomFieldsToEav } from "@/lib/persist-record-custom-fields"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
@@ -714,6 +714,7 @@ function AccountingClientReady({
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false })
   }, [clearModuleFilter, pathname, router, searchParams])
   const { t } = useTranslation()
+  const explainError = useExplainErpError()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const { askForm: showForm, cancelForm, formDialog } = useFormDialog()
@@ -747,15 +748,6 @@ function AccountingClientReady({
   }, [showForm, accountingActiveTab])
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
-  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string, companyId: bigint) {
-    await persistCustomFieldsToEav({
-      organizationId,
-      companyId,
-      model: "account_move",
-      recordId: BigInt(recordId),
-      metadata,
-    })
-  }
 
   // Quick-action form modal (dashboard tab)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
@@ -1173,7 +1165,7 @@ function AccountingClientReady({
     () => invoiceCurrencyOptions.find((option) => option.value === String(manualInvoiceCurrencyId))?.code,
     [invoiceCurrencyOptions, manualInvoiceCurrencyId],
   )
-  const manualInvoiceOptions = useMemo(() => buildManualInvoiceCatalog({ accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes }), [accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes])
+  const manualInvoiceOptions = useMemo(() => buildManualInvoiceCatalog({ accounts, contacts, defaultCurrencyId: manualInvoiceCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes }), [accounts, contacts, manualInvoiceCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes])
 
 
   const companySelectOptions = useMemo(
@@ -6042,6 +6034,7 @@ function AccountingClientReady({
       {/* Create invoice */}
       <CreateInvoiceModal
         open={showCreateInvoice}
+        onExplainError={explainError}
         kind="invoice"
         companyId={operatingCompanyId}
         onClose={() => setShowCreateInvoice(false)}
@@ -6058,24 +6051,15 @@ function AccountingClientReady({
         taxOptions={manualInvoiceOptions.invoice.taxes}
         productOptions={manualInvoiceOptions.invoice.products}
         paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
-        onSave={async (params: CreateManualAccountInvoiceParams) => {
-          const outcome = await createManualInvoice.mutateAsync(params)
-          if (outcome.kind === "converged" || outcome.kind === "already-applied") {
-            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id, params.companyId)
-          }
-          return outcome
-        }}
-        onCheckStatus={async (params) => {
-          const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
-          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id, params.companyId)
-          return ref
-        }}
+        onSave={(params: CreateManualAccountInvoiceParams) => createManualInvoice.mutateAsync(params)}
+        onCheckStatus={(params) => readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)}
         onResolved={(ref) => ref.href && router.push(ref.href)}
       />
 
       {/* Create bill (same form, different move type) */}
       <CreateInvoiceModal
         open={showCreateBill}
+        onExplainError={explainError}
         kind="bill"
         companyId={operatingCompanyId}
         onClose={() => setShowCreateBill(false)}
@@ -6088,18 +6072,8 @@ function AccountingClientReady({
         taxOptions={manualInvoiceOptions.bill.taxes}
         productOptions={manualInvoiceOptions.bill.products}
         paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
-        onSave={async (params: CreateManualAccountInvoiceParams) => {
-          const outcome = await createManualInvoice.mutateAsync(params)
-          if (outcome.kind === "converged" || outcome.kind === "already-applied") {
-            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id, params.companyId)
-          }
-          return outcome
-        }}
-        onCheckStatus={async (params) => {
-          const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
-          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id, params.companyId)
-          return ref
-        }}
+        onSave={(params: CreateManualAccountInvoiceParams) => createManualInvoice.mutateAsync(params)}
+        onCheckStatus={(params) => readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)}
         onResolved={(ref) => ref.href && router.push(ref.href)}
       />
 

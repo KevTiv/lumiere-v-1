@@ -82,6 +82,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 600 
       await expect(recordPayment).toBeVisible();
       await expect(page.getByTestId('subscription-action-generate-invoice')).toBeHidden();
       await expect(page.getByTestId('subscription-next-step')).toContainText('outstanding balance');
+      const lifecycle = page.getByTestId('subscription-lifecycle');
+      await expect(lifecycle).toContainText('Sep 1, 2026');
+      await expect(lifecycle).toContainText('Version 2');
+      await expect(lifecycle).not.toContainText('2035');
+      await expect(lifecycle).toContainText('No contractual end date is stored');
       await recordPayment.click();
       const dialog = page.getByTestId('form-modal-pay-subscription-invoice');
       await expect(dialog.getByTestId('subscription-action-preview')).toContainText('$75.00');
@@ -97,6 +102,44 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 600 
       await expect(dialog.getByRole('alert')).toBeVisible();
       await expect(dialog.getByTestId('form-field-amount')).toHaveValue('25.00');
       await page.screenshot({ path: info.outputPath('subscription-payment-rejected.png') });
+    });
+    test('denied amendment evidence disappears from lifecycle and history', async ({ page }) => {
+      await ready(page, '/subscriptions/2');
+      await expect(page.getByTestId('subscription-lifecycle')).toContainText('Sep 1, 2026');
+      await page.getByRole('button', { name: 'Deny synthetic amendments' }).click();
+      await expect(page.getByTestId('subscription-lifecycle')).not.toContainText('Sep 1, 2026');
+      await expect(page.getByTestId('subscription-lifecycle')).toContainText('Renewal history unavailable');
+      await page.getByRole('tab', { name: 'Amendments', exact: true }).click();
+      await expect(page.getByRole('tabpanel')).toContainText('You do not have access');
+      await expect(page.getByRole('tabpanel')).not.toContainText('2035');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+    test('interrupted renewal survives reload and checks its exact saved receipt without another write', async ({ page }) => {
+      const actor = 'ab'.repeat(32);
+      const key = `lumiere.subscription-renewal.${actor}.1.1.2`;
+      const retained = { scope: { actor, organizationId: '1', companyId: '1', subscriptionId: '2' }, idempotencyKey: 'retained-renewal', intervals: 2, notes: 'Extend support', phase: 'submitting' };
+      await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key, value: JSON.stringify(retained) });
+      let posts = 0;
+      page.on('request', (request) => { if (request.method() === 'POST' && request.url().includes('/api/')) posts++; });
+      await ready(page, '/subscriptions/2');
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.getByTestId('subscription-review-renewal').click();
+      const dialog = page.getByTestId('form-modal-renew-subscription');
+      await expect(dialog.getByTestId('form-field-intervals')).toHaveValue('2');
+      await expect(dialog.getByTestId('form-field-intervals')).toBeDisabled();
+      await expect(dialog).toContainText('Checking status sends no renewal request');
+      await dialog.getByRole('button', { name: 'Check renewal status', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText('remains unknown');
+      expect(posts).toBe(0);
+      await page.route('**/api/query/subscription-amendments*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [{
+        id: '73', organizationId: '1', companyId: '1', subscriptionId: '2', createdBy: actor, amendmentType: 'renew', version: 3,
+        metadata: JSON.stringify({ idempotency_key: retained.idempotencyKey, request_fingerprint: 'cd'.repeat(32) }),
+        afterJson: JSON.stringify({ intervals: 2, recurring_next_date: 1_800_000_000 }), notes: retained.notes,
+      }] }) }));
+      await dialog.getByRole('button', { name: 'Check renewal status', exact: true }).click();
+      await expect(dialog).toBeHidden();
+      expect(posts).toBe(0);
+      expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBeNull();
     });
   });
 }

@@ -162,7 +162,7 @@ pub(super) fn seed_accounts(
                 name: "Expense Misc".into(),
                 code: journal_code.clone(),
                 type_: JournalType::General,
-                currency_id: Some(1),
+                currency_id: Some(fixture.currency_id),
                 default_account_id: Some(expense_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -307,7 +307,7 @@ fn create_line_with_receipt(
             date: ctx.timestamp,
             unit_amount: amount,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],
@@ -351,7 +351,7 @@ fn create_draft_sheet(
             company_id: Some(fixture.company_id),
             employee_id,
             name: name.to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             notes: None,
             accounting_date: None,
         },
@@ -388,6 +388,15 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
         .ok_or("sheet after submit")?;
     if sheet.state != ExpenseSheetState::Submitted {
         return Err(format!("expected Submitted, got {:?}", sheet.state));
+    }
+    if sheet.currency_id != fixture.currency_id
+        || sheet.company_currency_id != fixture.currency_id
+        || sheet.currency_rate != 1.0
+    {
+        return Err(
+            "same-currency lifecycle must use the canonical company currency and unit FX snapshot"
+                .into(),
+        );
     }
     if (sheet.total_amount - 120.0).abs() > 0.001 {
         return Err(format!("expected total 120, got {}", sheet.total_amount));
@@ -459,12 +468,7 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
         accounting_date: ctx.timestamp,
         client_request_id: Some("post-1".into()),
     };
-    post_expense_sheet(
-        ctx,
-        fixture.organization_id,
-        sheet_id,
-        post_params.clone(),
-    )?;
+    post_expense_sheet(ctx, fixture.organization_id, sheet_id, post_params.clone())?;
 
     let posted = ctx
         .db
@@ -485,6 +489,9 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     if mv.state != AccountMoveState::Posted {
         return Err("move not posted".into());
     }
+    if mv.currency_id != fixture.currency_id || mv.company_currency_id != fixture.currency_id {
+        return Err("expense posting changed the canonical transaction or company currency".into());
+    }
     if (mv.amount_total - 120.0).abs() > 0.001 {
         return Err(format!("move total {}, expected 120", mv.amount_total));
     }
@@ -494,12 +501,7 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
         .iter()
         .filter(|row| row.organization_id == fixture.organization_id)
         .count();
-    post_expense_sheet(
-        ctx,
-        fixture.organization_id,
-        sheet_id,
-        post_params.clone(),
-    )?;
+    post_expense_sheet(ctx, fixture.organization_id, sheet_id, post_params.clone())?;
     let after_post_retry = ctx
         .db
         .expense_sheet()
@@ -520,14 +522,7 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     }
     let mut changed_post_params = post_params;
     changed_post_params.client_request_id = Some("post-1-stale".into());
-    if post_expense_sheet(
-        ctx,
-        fixture.organization_id,
-        sheet_id,
-        changed_post_params,
-    )
-    .is_ok()
-    {
+    if post_expense_sheet(ctx, fixture.organization_id, sheet_id, changed_post_params).is_ok() {
         return Err("changed expense-post replay unexpectedly succeeded".to_string());
     }
 
@@ -562,6 +557,24 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
     let reimbursement_move_id = done
         .reimbursement_move_id
         .ok_or("reimbursement_move_id unset")?;
+    let reimbursement = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&reimbursement_move_id)
+        .ok_or("reimbursement move missing")?;
+    if reimbursement.organization_id != fixture.organization_id
+        || reimbursement.company_id != fixture.company_id
+        || reimbursement.currency_id != fixture.currency_id
+        || reimbursement.company_currency_id != fixture.currency_id
+        || reimbursement.state != AccountMoveState::Posted
+        || (reimbursement.amount_total - 120.0).abs() > 0.001
+    {
+        return Err(
+            "reimbursement must retain the canonical company/currency and exact 120 payment effect"
+                .into(),
+        );
+    }
     let move_count_after_reimburse = ctx
         .db
         .account_move()
@@ -580,9 +593,7 @@ pub fn test_expense_lifecycle_posts_move(ctx: &ReducerContext) -> Result<(), Str
                 "unexpected expense-reimbursement replay error: {error}"
             ))
         }
-        Ok(()) => {
-            return Err("expense-reimbursement replay unexpectedly succeeded".to_string())
-        }
+        Ok(()) => return Err("expense-reimbursement replay unexpectedly succeeded".to_string()),
     }
     let after_reimbursement_replay = ctx
         .db
@@ -744,7 +755,7 @@ pub fn test_submit_rejects_missing_receipt(ctx: &ReducerContext) -> Result<(), S
             date: ctx.timestamp,
             unit_amount: 10.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![],

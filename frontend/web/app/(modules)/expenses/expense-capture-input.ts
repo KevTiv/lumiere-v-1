@@ -18,6 +18,56 @@ export interface ExpenseLookupRow {
   typeTaxUse?: unknown
   type_tax_use?: unknown
   currencyId?: unknown
+  currency_id?: unknown
+  userId?: unknown
+  user_id?: unknown
+  isActive?: unknown
+  is_active?: unknown
+  deletedAt?: unknown
+  deleted_at?: unknown
+}
+
+function employeeIdentity(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const hex = value.replace(/^0x/i, "").toLowerCase()
+    return /^[a-f0-9]{64}$/.test(hex) ? hex : undefined
+  }
+  if (value && typeof value === "object") {
+    if ("__identity__" in value) return employeeIdentity(value.__identity__)
+    if ("hex" in value) return employeeIdentity(value.hex)
+  }
+  return undefined
+}
+
+/** Only a unique, active employee explicitly linked to this actor is a usable default. */
+export function expenseDefaultEmployee(rows: readonly ExpenseLookupRow[], organizationId: bigint, companyId: bigint, identity: string | null): string | undefined {
+  const actor = employeeIdentity(identity)
+  if (!actor) return undefined
+  const matches = expenseCompanyLookupRows(rows, organizationId, companyId).filter((row) =>
+    (row.isActive ?? row.is_active) === true
+    && (row.deletedAt === null || row.deleted_at === null)
+    && employeeIdentity(row.userId ?? row.user_id) === actor
+    && Boolean(optionalBigIntU64(row.id)),
+  )
+  return matches.length === 1 ? String(matches[0].id) : undefined
+}
+
+/** Apply a proven default only to the initial form; the form owner retains later user edits. */
+export function expenseEmployeeDefaultForm(config: FormConfig, employeeId: string | undefined, description: string): FormConfig {
+  if (!employeeId) return config
+  return { ...config, sections: config.sections.map((section) => ({ ...section, fields: section.fields.map((field) =>
+    field.name === "employeeId" && field.type === "select" ? { ...field, defaultValue: employeeId, description } : field,
+  ) })) }
+}
+
+/** Shared price lists have an explicit null company, never an omitted company projection. */
+export function expensePricelistLookupRows<T extends ExpenseLookupRow>(rows: readonly T[], organizationId: bigint, companyId: bigint): T[] {
+  if (organizationId <= 0n || companyId <= 0n) return []
+  return rows.filter((row) => String(row.organizationId ?? row.organization_id ?? "") === String(organizationId)
+    && ("companyId" in row || "company_id" in row)
+    && (row.companyId === null || row.company_id === null || String(row.companyId ?? row.company_id) === String(companyId))
+    && (row.isActive ?? row.is_active) === true
+    && Boolean(optionalBigIntU64(row.currencyId ?? row.currency_id)))
 }
 
 /** Validate required relations before uploading a receipt or dispatching a create command. */

@@ -258,6 +258,7 @@
     "runtime_form_modal_files": [
       "frontend/packages/ui/src/forms/form-style-propagation.test.tsx",
       "frontend/packages/ui/src/pages/module-view.tsx",
+      "frontend/packages/ui/src/forms/runtime-form-create-admission-retention.test.tsx",
       "frontend/packages/ui/src/forms/runtime-form-modal.test.tsx",
       "frontend/web/app/(modules)/accounting/accounting-client.tsx",
       "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx",

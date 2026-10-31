@@ -34,18 +34,18 @@ async function loadProductReferences(companyId: number): Promise<ProductReviewRe
   return { categories: categories.data, uoms: uoms.data }
 }
 
-export function ImportReviewWorkspace({ organizationId, selectedId, onContinue }: { organizationId: number; selectedId?: string; onContinue: (source: ReviewedImportSource) => void }) {
+export function ImportReviewWorkspace({ organizationId, selectedId, onContinue, continuationBlock }: { organizationId: number; selectedId?: string; onContinue: (source: ReviewedImportSource) => void; continuationBlock?: "busy" | "unresolved" | null }) {
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
   if (!companyId) return <p>{t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })}</p>
-  return <ImportReviewPanel organizationId={organizationId} companyId={companyId} initialId={selectedId} onContinue={onContinue} />
+  return <ImportReviewPanel organizationId={organizationId} companyId={companyId} initialId={selectedId} onContinue={onContinue} continuationBlock={continuationBlock} />
 }
 
-export function ImportReviewPanel(props: { organizationId: number; companyId: number; initialId?: string; onContinue: (source: ReviewedImportSource) => void }) {
+export function ImportReviewPanel(props: { organizationId: number; companyId: number; initialId?: string; onContinue: (source: ReviewedImportSource) => void; continuationBlock?: "busy" | "unresolved" | null }) {
   return <ReviewWorkspace key={`${props.organizationId}:${props.companyId}:${props.initialId ?? ""}`} {...props} />
 }
 
-function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: { organizationId: number; companyId: number; initialId?: string; onContinue: (source: ReviewedImportSource) => void }) {
+function ReviewWorkspace({ organizationId, companyId, initialId, onContinue, continuationBlock }: { organizationId: number; companyId: number; initialId?: string; onContinue: (source: ReviewedImportSource) => void; continuationBlock?: "busy" | "unresolved" | null }) {
   const { t } = useTranslation()
   const cache = useQueryClient()
   const identityLabels = useIdentityLabelMap(organizationId)
@@ -144,9 +144,10 @@ function ReviewWorkspace({ organizationId, companyId, initialId, onContinue }: {
     {list.data?.data.length === 0 ? <p className="text-sm text-muted-foreground">{t("settings.importReview.empty", { defaultValue: "No source drafts yet. Save a CSV preview for review or load a prepared review document." })}</p> : null}
     {detail.data ? <>
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-medium">{detail.data.title}</h3><div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!confirmed || busy || !["product", "stock_location"].includes(detail.data.targetEntity)} onClick={() => void continueImport()}>{t("settings.importReview.continue", { defaultValue: "Continue import ({{count}} confirmed)", count: confirmed })}</Button>
+        <Button variant="outline" disabled={!confirmed || busy || !!continuationBlock || !["product", "stock_location"].includes(detail.data.targetEntity)} onClick={() => void continueImport()}>{t("settings.importReview.continue", { defaultValue: "Continue import ({{count}} confirmed)", count: confirmed })}</Button>
         <Button variant="outline" onClick={() => { setError(null); void detail.refetch(); void list.refetch() }}>{t("common.refresh", { defaultValue: "Refresh" })}</Button>
       </div></div>
+      {continuationBlock ? <p role="status" data-testid="import-review-handoff-status">{continuationBlock === "busy" ? t("common.formSubmit.busy") : t("settings.importReview.resolveCurrent", { defaultValue: "Check the current import result before loading another source." })}</p> : null}
       {!["product", "stock_location"].includes(detail.data.targetEntity) ? <p className="text-sm text-muted-foreground">{t("settings.importReview.moduleSpecific", { defaultValue: "These source corrections are saved. Use Accounting or the relevant module to create complete business records." })}</p> : null}
       <div className="flex flex-wrap gap-2" aria-label={t("settings.importReview.filterLabel", { defaultValue: "Filter review status" })}>{(["needs_review", "confirmed", "excluded", "all"] as const).map(state => <Button key={state} size="sm" variant={filter === state ? "secondary" : "outline"} aria-pressed={filter === state} onClick={() => setFilter(state)}>{t(`settings.importReview.filter.${state}`, { defaultValue: ({ needs_review: "Needs review", confirmed: "Confirmed", excluded: "Excluded", all: "All" })[state] })}</Button>)}</div>
       <Field className="max-w-md"><FieldLabel htmlFor="review-search">{t("settings.importReview.search", { defaultValue: "Find an item or source file" })}</FieldLabel><Input id="review-search" type="search" value={search} onChange={event => setSearch(event.target.value)} /></Field>

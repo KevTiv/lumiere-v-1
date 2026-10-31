@@ -44,7 +44,7 @@
     "error": "Change history could not be loaded. Previously loaded changes are hidden.",
     "retry": "Try again",
     "refresh": "Refresh changes",
-    "partialCoverage": "This history records description, debit/credit, partner and analytic-account edits made after tracking was enabled. Price and quantity corrections, other operations and earlier changes are not included. Values follow your current field access.",
+    "partialCoverage": "This history includes captured additions made through the explicit draft journal-item action and ordinary description, debit/credit, partner and analytic-account edits after tracking was enabled. Automatically generated lines, price and quantity corrections, deleted lines, other operations and earlier changes are not included. Values follow your current field access.",
     "empty": "No recorded line edits are available for this record.",
     "emptyPage": "No visible line edits in this page. Continue to check the next page.",
     "lineUpdated": "Line {{id}} updated",
@@ -64,7 +64,9 @@
       "residual": "Outstanding balance",
       "residualCurrency": "Outstanding balance in transaction currency",
       "debitCurrency": "Debit in transaction currency",
-      "creditCurrency": "Credit in transaction currency"
+      "creditCurrency": "Credit in transaction currency",
+      "account": "Account",
+      "currency": "Currency"
     },
     "fieldsChanged": "{{fields}} changed",
     "lineReference": "Line {{id}}",
@@ -72,11 +74,12 @@
     "userIdentity": "User identity",
     "beforeThisSave": "Before this save",
     "afterThisSave": "After this save",
-    "coverageLead": "Partial history: recorded line edits only.",
+    "coverageLead": "Partial history: captured line additions and edits only.",
     "coverageDetails": "What this history includes",
     "refreshing": "Refreshing changes…",
     "loadingMore": "Loading more changes…",
-    "emptyText": "Empty text"
+    "emptyText": "Empty text",
+    "lineAdded": "Added journal item: {{fields}}"
   },
   "moduleInsights": {
     "overview": "Overview",
@@ -533,6 +536,42 @@
     "moduleNavigation": {
       "overview": "Overview",
       "area": "Task area"
+    },
+    "explainError": "Explain this error",
+    "creationRecovery": {
+      "title": "Review an earlier save",
+      "hint": "An earlier save is retained for this company. Check it before starting a replacement.",
+      "review": "Review entered values",
+      "reviewHint": "These are the entries retained for the earlier save. Your current form stays open. Checking status does not send another save.",
+      "check": "Check save status",
+      "openSaved": "Open saved record in a new tab",
+      "finish": "Finish review",
+      "emptyValue": "Empty",
+      "entriesUnavailable": "The retained entries could not be displayed. Check the save status before starting another record.",
+      "models": {
+        "crm_lead": "Lead",
+        "opportunity": "Opportunity",
+        "contact": "Contact",
+        "sale_order": "Quotation"
+      },
+      "status": {
+        "pending": "Save needs review",
+        "unknown": "No saved result was confirmed. Keep this request and check again.",
+        "saved": "The earlier record is saved. Open it to review, then finish this review. Your current form has not been saved by this check.",
+        "unavailable": "The save could not be checked. The retained request has been kept.",
+        "denied": "Access to this save is unavailable. Its entries are hidden."
+      }
+    },
+    "selectPrompt": "Select",
+    "customFieldCreateAdmission": {
+      "blocked": "This form cannot create a record with these configured fields yet: {{fields}}. Ask an administrator to review them. No record has been created. Your entries are retained.",
+      "reasons": {
+        "unsupportedType": "unsupported field type",
+        "conditionalVisibility": "conditional visibility is not supported during creation",
+        "validationPattern": "this validation pattern is not supported during creation",
+        "unavailableChoices": "no stored selectable options are available",
+        "ambiguousDefinition": "more than one field definition uses this key"
+      }
     }
   },
   "navigation": {
@@ -3680,7 +3719,34 @@
       "contentOverride": "Edited for this document",
       "contentInherited": "Company default",
       "contentEmpty": "No text",
-      "documentContentHint": "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text."
+      "documentContentHint": "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text.",
+      "choicesChanged": "Accounting choices changed. Your selections are retained. Review the journal and accounts before saving.",
+      "keepChoices": "Keep current accounting choices",
+      "unsupportedCustomFields": "This form contains a custom field that invoice entry cannot save yet. Ask your administrator to review its type, choices, validation and visibility. No document has been created.",
+      "journalAccountSource": "From the selected journal's configured default account. You can change it for this document.",
+      "productAccountSource": "From the selected product's configured account. You can change it for this document.",
+      "singleAccountSuggestion": "Selected because it was the only eligible account. This is a suggestion, not a configured business default.",
+      "unavailableLineAccount": "The selected item account is unavailable for this journal and currency. Choose an eligible account; the other item details are retained.",
+      "singleJournalSuggestion": "Selected because it was the only eligible journal. This is a suggestion, not a configured business default.",
+      "chooseJournal": "Several journals are available. Choose the journal for this document.",
+      "unavailableJournal": "The selected journal is no longer available. Choose an active journal; your entries are retained.",
+      "chooseCounterpart": "Several eligible accounts are available. Choose the receivable or payable account for this document.",
+      "unavailableCounterpart": "The selected receivable or payable account is unavailable for this journal and currency. Choose an eligible account; your entries are retained.",
+      "oneTagPerLine": "Enter one tag per line.",
+      "customValidation": {
+        "unsupported": "This configured field is not supported by invoice entry.",
+        "required": "Complete this required field.",
+        "finiteNumber": "Enter a finite number.",
+        "numberLimits": "Enter a number within the configured limits.",
+        "boolean": "Choose a yes or no value.",
+        "distinctText": "Choose distinct text values.",
+        "text": "Enter a text value.",
+        "option": "Choose an available configured option.",
+        "textLength": "Use the configured text length.",
+        "email": "Enter a valid email address.",
+        "format": "Use the configured format.",
+        "invalidPattern": "The configured validation pattern is invalid."
+      }
     },
     "assetSchedule": {
       "generateFailed": "The saved schedule could not be confirmed. Refresh before you try again.",
@@ -7116,7 +7182,15 @@
       "vendorLabel": "Vendor {{id}}",
       "onTimePct": "On-time %",
       "overBilled": "Over-billed lines",
-      "partialReceipt": "Partial receipt"
+      "partialReceipt": "Partial receipt",
+      "exactVendor": "Vendor #{{id}}",
+      "confirmedOrderValue": "Confirmed order value",
+      "receivedOrNotDue": "Received or not yet due",
+      "vendorValueByCurrency": "Confirmed order value by vendor and currency",
+      "vendor": "Vendor",
+      "currency": "Currency",
+      "orderValue": "Order value",
+      "vendorUnavailable": "Vendor unavailable"
     },
     "handoffs": {
       "title": "Receipts and vendor bills",
@@ -8121,6 +8195,22 @@
       },
       "saved": "{{kind}} saved",
       "title": "Purchasing configuration"
+    },
+    "discrepancies": {
+      "ordered": "Ordered",
+      "received": "Received",
+      "billed": "Billed",
+      "reviewBillHint": "Review the bill and actual goods received. A quantity discrepancy does not authorize an additional receipt.",
+      "partialHint": "Some ordered goods remain unreceived. Review the order lines and existing receipts before continuing.",
+      "reviewLines": "Review order lines",
+      "reviewHandoffs": "Review order receipts and vendor bills",
+      "orderRecords": "Related records for this order",
+      "empty": "No verified discrepancies in this queue.",
+      "scopeHint": "Current company only. Open the exact saved record to review or continue through its existing actions.",
+      "unresolved": "Some queued records could not be matched to a current authorized order or line. Refresh the source records before reviewing those cases.",
+      "overBilled": "Over-billed lines",
+      "partial": "Partially received orders",
+      "title": "Discrepancies"
     }
   },
   "erpWorkflow": {
@@ -10762,6 +10852,19 @@
         "quote": "Quote",
         "code": "Code"
       }
+    },
+    "retentionPreview": {
+      "scopeChanged": "Your company or document permissions changed. Reopen the purge preview.",
+      "hidden": "{{count}} affected documents cannot be reviewed with your current document access. The organization-wide purge is blocked.",
+      "empty": "No reviewable documents are currently eligible for this purge. No purge was requested.",
+      "title": "Review documents before permanent purge",
+      "purge": "Permanently purge",
+      "schedule": "Schedule purge",
+      "orgScope": "This action covers the entire organization, across companies. It permanently removes eligible recycle-bin documents and their versions.",
+      "held": "{{count}} documents are excluded by active legal holds.",
+      "delayed": "Scheduled in {{seconds}} seconds. This preview includes documents whose retention expires by that time. Eligibility and legal holds are checked again when the job runs; the final set can change.",
+      "company": "Company",
+      "finalCheck": "The scope is refreshed before requesting the purge. Purged documents cannot be restored."
     }
   },
   "helpdesk": {
@@ -11742,7 +11845,7 @@
         "generate-invoice": "Create a draft invoice for the next billing period. Usage, taxes and other adjustments are calculated when saved. This action does not collect payment.",
         "pay-invoice": "Record a payment already received. A draft invoice will be posted first. The payment reduces the invoice balance; this action does not charge the customer.",
         "amend": "Change the selected contract line immediately. Review the new price and quantity before confirming.",
-        "renew": "Extend the subscription term by the selected number of billing periods. Renewal does not collect payment.",
+        "renew": "Advance the next invoice date by the selected number of billing periods. Renewal does not collect payment.",
         "cancel": "Close this subscription immediately and revoke service access. You can also create a credit note for a selected posted invoice.",
         "ingest-usage": "Record a usage event for this subscription. Charges are calculated separately.",
         "rate-usage": "Calculate charges for up to 100 pending usage events. This action does not create an invoice.",
@@ -11775,6 +11878,33 @@
       "openCatalog": "Open sales catalog (new tab)",
       "planSetup": "A plan needs a product, a price list and an active invoice journal. Complete the missing setup in the catalog and accounting, then refresh. Your entries are retained.",
       "inheritedCustomer": "Inherited from the selected sales order"
+    },
+    "lifecycle": {
+      "title": "Dates & renewal",
+      "dateUnavailable": "Date unavailable",
+      "contractEnd": "Contractual end date",
+      "contractEndUnavailable": "No contractual end date is stored",
+      "closedAt": "Closed on",
+      "renewal": "Renewal availability",
+      "closure": {
+        "not-closed": "Not closed",
+        "unavailable": "Closure date unavailable"
+      },
+      "renewalState": {
+        "available": "Available for this subscription state",
+        "not-active": "Unavailable in this subscription state",
+        "unavailable": "Subscription state unavailable"
+      },
+      "lastRenewal": "Last recorded renewal",
+      "renewalRecorded": "{{date}} · Version {{version}}",
+      "history": {
+        "none-recorded": "No renewal is recorded in the available history",
+        "unavailable": "Renewal history unavailable"
+      },
+      "renewalEffect": "Renewal advances the next invoice date by the selected billing periods. It does not set a contractual end date or collect payment.",
+      "checkRenewal": "Check renewal status",
+      "renewalUnknown": "This renewal request is retained. Check its saved result before starting another renewal. Checking status sends no renewal request.",
+      "dateMeaning": "The next invoice date controls billing. It is not a contractual end date or a confirmed payment date."
     }
   },
   "expenses": {
@@ -12293,7 +12423,8 @@
         "singleUnitHint": "Quick capture records one unit. This amount is the expense amount before any server calculation.",
         "financeSourcesRequired": "Journals or accounts could not be loaded. Retry the lookup before continuing. Your entries are retained.",
         "financeSourcesDenied": "You do not have access to the journals or accounts needed for this action. Ask your administrator to check your access.",
-        "financeSourcesLoading": "Loading journals and accounts. Your entries are retained."
+        "financeSourcesLoading": "Loading journals and accounts. Your entries are retained.",
+        "employeeDefaultHint": "Selected from the active employee record linked to your signed-in account in this company. Change it if you are entering an expense for someone else."
       }
     },
     "operationsTab": "Operations",
@@ -12366,6 +12497,18 @@
         "denied": "Access restricted",
         "error": "Choices could not be verified",
         "partial": "Choices could not be verified"
+      },
+      "loadedHint": "These are the saved allocations for this expense. Review every row before saving your changes.",
+      "save": "Save allocations",
+      "readUnavailable": "Saved allocations could not be verified. Retry the read before editing or saving.",
+      "changed": "Saved allocations changed since this editor opened. Your edits are retained. Close and reopen this expense to review the current saved rows before replacing them.",
+      "loadBeforeEdit": "Load this expense's saved allocations before making changes.",
+      "read": {
+        "loading": "Loading saved allocations…",
+        "denied": "Access to this expense's allocations is restricted.",
+        "error": "Saved allocations could not be verified.",
+        "partial": "Saved allocations could not be verified.",
+        "ready": "Loading saved allocations…"
       }
     }
   },
@@ -12909,7 +13052,26 @@
       "templatesLoading": "Loading message templates…",
       "showEvidence": "Review saved recipients and content",
       "approve": "Approve",
-      "reject": "Reject"
+      "reject": "Reject",
+      "providerDelivered": "Provider confirmed delivery",
+      "providerAccepted": "Provider accepted; delivery is not confirmed",
+      "providerFailed": "Provider reported failure",
+      "providerUnavailable": "No verified provider delivery receipt is available.",
+      "providerReference": "Provider reference",
+      "exclusionsUnavailable": "The complete creation-time exclusion reasons are unavailable for this batch. Current contact preferences cannot establish why a recipient was excluded earlier.",
+      "excludedRecipients": "Excluded at batch creation",
+      "invoice": "Invoice",
+      "contact": "Contact",
+      "exclusionReasons": {
+        "contact_inactive": "The contact is deleted or merged.",
+        "channel_opted_out": "The contact opted out of this channel.",
+        "no_eligible_primary_identity": "No eligible primary contact identity is available.",
+        "invoice_unavailable": "The invoice is unavailable.",
+        "invoice_not_outstanding_posted_customer_invoice": "The invoice is outside the selected scope or is not an outstanding posted customer invoice.",
+        "invoice_has_no_contact": "The invoice has no customer contact.",
+        "contact_unavailable": "The customer contact is unavailable."
+      },
+      "failureUnavailable": "The provider failure reason is unavailable."
     }
   },
   "pos": {
@@ -13153,7 +13315,35 @@
       "unsavedChanges": "Unsaved changes",
       "unsavedDraft": "Unsaved draft",
       "verified": "Verified",
-      "retryAccess": "Retry access check"
+      "retryAccess": "Retry access check",
+      "verification": "Guide verification",
+      "independentReviews": "This revision has the required independent evidence, domain and implementation reviews. Business actions still require current ERP checks.",
+      "reviewBoundary": "Saving a guide does not verify it. Verification requires canonical evidence and independent reviews; changing the guide or its evidence invalidates prior approval.",
+      "reviewStatus": "Review status: {{state}}",
+      "compatibilityUnknown": "Product and workflow compatibility have not been established. Check applicability before following this guide.",
+      "reviewKinds": {
+        "source_fidelity": "Source fidelity",
+        "domain_interpretation": "Domain interpretation",
+        "implementation": "Implementation"
+      },
+      "reviewOutcomes": {
+        "accepted": "Accepted",
+        "rejected": "Rejected"
+      },
+      "reviewerUnavailable": "Reviewer details unavailable",
+      "currentReviewerName": "Name from the current authorized directory.",
+      "reviewFailed": "The review could not be saved. Check the current guide before retrying.",
+      "requestVerification": "Request verification",
+      "selectEvidence": "Choose reviewed evidence already linked to this revision. The request creates a private review candidate; it does not approve or execute this guide.",
+      "inspectEvidence": "Inspect this evidence",
+      "noReviewEvidence": "No current reviewed evidence is linked to this revision. Review its sources and justifying decision before requesting verification.",
+      "submitVerification": "Submit this revision for review",
+      "recordReview": "Record independent review",
+      "reviewKind": "Review kind",
+      "reviewOutcome": "Review outcome",
+      "chooseOutcome": "Choose a verdict",
+      "reviewNote": "Review note",
+      "saveReview": "Save review"
     },
     "title": "AI Assistant",
     "subtitle": "Type @ for commands",
@@ -13212,6 +13402,9 @@
         "failed": "The draft request was rejected. Check its required inputs before preparing a new request.",
         "outcome_unknown": "Draft preparation could not be confirmed. Check Approvals for the original draft before trying again; this request was not retried."
       }
+    },
+    "errorHelp": {
+      "explain": "Explain this error"
     }
   },
   "aiHarness": {
@@ -15026,6 +15219,9 @@
       "importRow": "Import row {{row}}",
       "sourceLine": "Source row {{row}}",
       "search": "Find an item or source file",
+      "replaceDraftHint": "Your current file, mapping and preview will be replaced by the reviewed source.",
+      "resolveCurrent": "Check the current import result before loading another source.",
+      "draftChanged": "The current import changed. Review it before loading another source.",
       "category": "Product category",
       "productUnit": "Product catalog unit",
       "purchaseUnit": "Purchase unit",
@@ -17322,5 +17518,27 @@
     "articleMembersUnavailable": "This article's current member list is empty, unavailable or restricted. Refresh the article or ask an administrator before removing a member.",
     "articleAccessChanged": "Your article access changed. Reopen the article before removing a member.",
     "articleMemberChanged": "The exact article membership could not be verified. Refresh the article and review its current members before retrying."
-  }
+  },
+  "purchasing.discrepancies.ordered": "Ordered",
+  "purchasing.discrepancies.received": "Received",
+  "purchasing.discrepancies.billed": "Billed",
+  "purchasing.discrepancies.reviewBillHint": "Review the bill and actual goods received. A quantity discrepancy does not authorize an additional receipt.",
+  "purchasing.discrepancies.partialHint": "Some ordered goods remain unreceived. Review the order lines and existing receipts before continuing.",
+  "purchasing.discrepancies.reviewLines": "Review order lines",
+  "purchasing.discrepancies.reviewHandoffs": "Review order receipts and vendor bills",
+  "purchasing.discrepancies.orderRecords": "Related records for this order",
+  "purchasing.discrepancies.empty": "No verified discrepancies in this queue.",
+  "purchasing.discrepancies.scopeHint": "Current company only. Open the exact saved record to review or continue through its existing actions.",
+  "purchasing.discrepancies.unresolved": "Some queued records could not be matched to a current authorized order or line. Refresh the source records before reviewing those cases.",
+  "purchasing.discrepancies.overBilled": "Over-billed lines",
+  "purchasing.discrepancies.partial": "Partially received orders",
+  "purchasing.discrepancies.title": "Discrepancies",
+  "purchasing.dashboard.exactVendor": "Vendor #{{id}}",
+  "purchasing.dashboard.confirmedOrderValue": "Confirmed order value",
+  "purchasing.dashboard.receivedOrNotDue": "Received or not yet due",
+  "purchasing.dashboard.vendorValueByCurrency": "Confirmed order value by vendor and currency",
+  "purchasing.dashboard.vendor": "Vendor",
+  "purchasing.dashboard.currency": "Currency",
+  "purchasing.dashboard.orderValue": "Order value",
+  "purchasing.dashboard.vendorUnavailable": "Vendor unavailable"
 }

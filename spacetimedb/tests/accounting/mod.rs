@@ -82,6 +82,8 @@ pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result
 
 #[spacetimedb::reducer]
 pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
+    business_changes_test::test_accounting_line_addition_history_is_native_and_scoped(ctx)
+        .map_err(|error| format!("trusted accounting line addition history: {error}"))?;
     business_changes_test::test_accounting_line_history_is_native_exact_and_replay_safe(ctx)
         .map_err(|error| format!("trusted accounting change history: {error}"))?;
     invoice_profile_test::test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(ctx)

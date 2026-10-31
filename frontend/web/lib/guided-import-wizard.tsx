@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState } from "react"
+import { forwardRef, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
@@ -93,6 +94,7 @@ export type GuidedImportWizardProps = {
   organizationId: number
   initialSource?: ReviewedImportSource
   onReviewSaved?: (id: string) => void
+  onContinuationBlockChange?: (reason: GuidedImportContinuationBlock) => void
 }
 
 function PreparedProductPreviewButton({ organizationId, disabled, onPreview }: { organizationId: bigint; disabled: boolean; onPreview: (categories: readonly ProductImportReference[], uoms: readonly ProductImportReference[]) => void }) {
@@ -105,7 +107,12 @@ function PreparedProductPreviewButton({ organizationId, disabled, onPreview }: {
   </div>
 }
 
-export function GuidedImportWizard({ organizationId, initialSource, onReviewSaved }: GuidedImportWizardProps) {
+export type GuidedImportContinuationBlock = "busy" | "unresolved" | null
+export interface GuidedImportWizardHandle {
+  continueFromReview(source: ReviewedImportSource): Promise<boolean>
+}
+
+export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImportWizardProps>(function GuidedImportWizard({ organizationId, initialSource, onReviewSaved, onContinuationBlockChange }, ref) {
   const { t } = useTranslation()
   const workspaceProfile = useWorkspaceProfile()
   const orgId = BigInt(organizationId)
@@ -143,6 +150,9 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [readingFile, setReadingFile] = useState(false)
+  const readingFileRef = useRef(false)
+  const fileInput = useRef<HTMLInputElement>(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
@@ -152,6 +162,17 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
   const importRequestRef = useRef<CsvImportRequest | null>(null)
   const [rollbackConfirmId, setRollbackConfirmId] = useState<string | null>(null)
   const importErrorsQuery = useImportJobErrors(orgId, importedJobId != null)
+  const { confirm, dialog: discardDialog } = useConfirmDialog()
+  const operationBusy = busy || readingFile || analyze.isPending || preview.isPending || saveTemplate.isPending
+    || deleteTemplate.isPending || finalizeImport.isPending || rollbackImport.isPending || trackedImport.isPending
+  const continuationBlock: GuidedImportContinuationBlock = operationBusy ? "busy" : importRequest && !importedJobId ? "unresolved" : null
+  const currentWork = useRef({ busy: operationBusy, dirty: false, importedJobId })
+  currentWork.current = { busy: operationBusy, dirty: !!csvText.trim() || headers.length > 0 || !!sourceFileName || Object.keys(mapping).length > 0, importedJobId }
+  const draftRevision = useRef(0)
+  const mounted = useRef(false)
+  useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useLayoutEffect(() => { draftRevision.current += 1 }, [wizardKey, csvText, headers, rows, sourceFileName, sourceFormat, sourceSheetName, analysis, mapping, previewResult, duplicateStates, confirmImportWithErrors, selectedTemplateId, appliedTemplateId, importRequest, importedJobId, operationBusy])
+  useLayoutEffect(() => { onContinuationBlockChange?.(continuationBlock) }, [continuationBlock, onContinuationBlockChange])
 
   const entityOption = wizardEntityByKey(wizardKey) ?? wizardEntityByKey("contact")!
   const targetEntity = entityOption.tableName
@@ -252,9 +273,44 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
     preview.reset()
   }, [analyze, preview])
 
+  useImperativeHandle(ref, () => ({
+    async continueFromReview(source: ReviewedImportSource) {
+      const blocked = (): GuidedImportContinuationBlock => currentWork.current.busy || readingFileRef.current
+        ? "busy" : importRequestRef.current && !currentWork.current.importedJobId ? "unresolved" : null
+      const explainBlock = (reason: Exclude<GuidedImportContinuationBlock, null>) => setError(reason === "busy"
+        ? t("common.formSubmit.busy")
+        : t("settings.importReview.resolveCurrent", { defaultValue: "Check the current import result before loading another source." }))
+      const initialBlock = blocked()
+      if (initialBlock) { explainBlock(initialBlock); return false }
+      let parsed: ReturnType<typeof parseCsvText>
+      try { parsed = parseCsvText(source.csv) } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); return false }
+      const revision = draftRevision.current
+      if (currentWork.current.dirty && !await confirm({
+        title: t("common.discardChanges.title"),
+        description: t("settings.importReview.replaceDraftHint", { defaultValue: "Your current file, mapping and preview will be replaced by the reviewed source." }),
+        confirmLabel: t("common.discardChanges.discard"), cancelLabel: t("common.discardChanges.keep"),
+      })) return false
+      if (!mounted.current) return false
+      const latestBlock = blocked()
+      if (latestBlock) { explainBlock(latestBlock); return false }
+      if (draftRevision.current !== revision) {
+        setError(t("settings.importReview.draftChanged", { defaultValue: "The current import changed. Review it before loading another source." }))
+        return false
+      }
+      // Keep this owner mounted. Only an explicitly approved, idle draft can
+      // be replaced; an unresolved tracked request never loses its identity.
+      resetFlow()
+      setWizardKey(source.targetEntity)
+      setCsvText(source.csv); setHeaders(parsed.headers); setRows(parsed.rows)
+      setSourceFileName(source.fileName); setSourceFormat("csv"); setSourceSheetName(undefined)
+      if (fileInput.current) fileInput.current.value = ""
+      return true
+    },
+  }), [confirm, resetFlow, t])
+
   const onEntityChange = useCallback(
     (nextKey: string) => {
-      if (importRequestRef.current) return
+      if (importRequestRef.current || currentWork.current.busy || readingFileRef.current) return
       if (!isWorkspaceImportTargetVisible(workspaceProfile, nextKey)) return
       setWizardKey(nextKey)
       resetFlow()
@@ -270,7 +326,9 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
 
   const onFile = useCallback(
     async (file: File | null) => {
-      if (!file || importRequestRef.current) return
+      if (!file || importRequestRef.current || currentWork.current.busy || readingFileRef.current) return
+      readingFileRef.current = true
+      setReadingFile(true)
       const templateId = selectedTemplateId
       setError(null)
       resetFlow()
@@ -294,7 +352,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
         setRows([])
         setSourceFileName("")
         setSourceSheetName(undefined)
-      }
+      } finally { readingFileRef.current = false; if (mounted.current) setReadingFile(false) }
     },
     [resetFlow, selectedTemplateId],
   )
@@ -593,7 +651,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
       <div className="flex flex-wrap gap-3 items-end">
         <label className="text-sm space-y-1">
           <span className="block text-muted-foreground">{t("settings.import.entity", "Entity")}</span>
-          <Select value={wizardKey} onValueChange={onEntityChange} disabled={busy || !!importRequest}>
+          <Select value={wizardKey} onValueChange={onEntityChange} disabled={operationBusy || !!importRequest}>
             <SelectTrigger className="min-w-[200px]" data-testid="guided-import-entity">
               <SelectValue />
             </SelectTrigger>
@@ -624,7 +682,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
           </span>
           <Select
             value={selectedTemplateId ?? NO_TEMPLATE}
-            disabled={busy || !!importRequest}
+            disabled={operationBusy || !!importRequest}
             onValueChange={(value) => {
               const next = value === NO_TEMPLATE ? null : value
               setSelectedTemplateId(next)
@@ -650,8 +708,9 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
             {t("settings.import.file", "CSV or Excel file")}
           </span>
           <input
+            ref={fileInput}
             type="file"
-            disabled={busy || !!importRequest}
+            disabled={operationBusy || !!importRequest}
             accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
             data-testid="guided-import-file"
@@ -684,7 +743,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
             variant="outline"
             size="sm"
             onClick={() => setDeleteConfirmOpen(true)}
-            disabled={deleteTemplate.isPending}
+            disabled={operationBusy}
           >
             {t("settings.import.deleteTemplate", "Delete template")}
           </Button>
@@ -722,7 +781,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
               variant="secondary"
               size="sm"
               onClick={() => setSaveTemplateOpen(true)}
-              disabled={Object.keys(mapping).length === 0}
+              disabled={operationBusy || Object.keys(mapping).length === 0}
             >
               {t("settings.import.saveTemplate", "Save template")}
             </Button>
@@ -825,14 +884,14 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
       <div className="flex flex-wrap gap-2">
         {step === "upload" && targetEntity === "product" && csvText.trim() ? <PreparedProductPreviewButton organizationId={orgId} disabled={busy || analyze.isPending} onPreview={runPreparedPreview} /> : null}
         {step === "import" && importRequest && !importedJobId ? <>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void runImport(true)}>{t("settings.importReview.checkResult", { defaultValue: "Check import result" })}</Button>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void runImport()}>{t("settings.importReview.retrySame", { defaultValue: "Retry same submission" })}</Button>
+          <Button type="button" variant="outline" disabled={operationBusy} onClick={() => void runImport(true)}>{t("settings.importReview.checkResult", { defaultValue: "Check import result" })}</Button>
+          <Button type="button" variant="outline" disabled={operationBusy} onClick={() => void runImport()}>{t("settings.importReview.retrySame", { defaultValue: "Retry same submission" })}</Button>
         </> : null}
         {(step === "upload" || step === "analyze") && csvText.trim() ? (
           <Button
             type="button"
             variant="secondary"
-            disabled={analyze.isPending || !csvText.trim()}
+            disabled={operationBusy || !csvText.trim()}
             onClick={() => void runAnalyze()}
           >
             {analyze.isPending
@@ -841,22 +900,22 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
           </Button>
         ) : null}
         {step === "map" ? (
-          <Button type="button" disabled={preview.isPending} onClick={() => void runPreview()}>
+          <Button type="button" disabled={operationBusy} onClick={() => void runPreview()}>
             {t("settings.import.preview", "Preview import")}
           </Button>
         ) : null}
         {step === "preview" ? (
-          <Button type="button" variant="outline" disabled={busy || !companyId || !REVIEW_TARGETS.has(targetEntity) || rows.length > 1000} onClick={() => void saveForReview()}>
+          <Button type="button" variant="outline" disabled={operationBusy || !companyId || !REVIEW_TARGETS.has(targetEntity) || rows.length > 1000} onClick={() => void saveForReview()}>
             {t("settings.importReview.saveForReview", { defaultValue: "Save for review" })}
           </Button>
         ) : null}
         {step === "preview" ? (
-          <Button type="button" disabled={busy || (preparedPreview && previewErrors.length > 0)} onClick={() => void runImport()}>
+          <Button type="button" disabled={operationBusy || (preparedPreview && previewErrors.length > 0)} onClick={() => void runImport()}>
             {t("settings.import.run", "Import")}
           </Button>
         ) : null}
         {step !== "upload" ? (
-          <Button type="button" variant="outline" disabled={busy || (!!importRequest && !importedJobId)} onClick={resetFlow}>
+          <Button type="button" variant="outline" disabled={operationBusy || (!!importRequest && !importedJobId)} onClick={resetFlow}>
             {t("settings.import.startOver", "Start over")}
           </Button>
         ) : null}
@@ -1019,6 +1078,7 @@ export function GuidedImportWizard({ organizationId, initialSource, onReviewSave
           </div>
         </div>
       ) : null}
+      {discardDialog}
     </div>
   )
-}
+})

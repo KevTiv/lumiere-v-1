@@ -1,13 +1,18 @@
 import { createContext, useContext, type ReactNode } from "react"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { CreateInvoiceModal } from "./create-invoice-modal"
 import { InvoiceDetailModal } from "./invoice-detail-modal"
 import { formatInvoiceMoney, InvoiceDocument, readInvoiceDocumentContent, resolveDraftInvoiceDocument } from "./invoice-document"
 import { resolveInvoiceProfile, type InvoiceDocumentSnapshot } from "@lumiere/erp-shared/invoice-personalization"
+import type { InvoiceCustomField } from "./invoice-custom-fields"
 
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
-const configuredFields = vi.hoisted(() => ({ fields: [] as { fieldId: string; label: string; isEnabled: boolean; validation: { required: boolean } }[] }))
+const configuredFields = vi.hoisted(() => ({
+  fields: [] as (InvoiceCustomField & { isEnabled: boolean })[],
+  sourceFields: [] as (InvoiceCustomField & { isEnabled: boolean })[],
+  customFields: [] as (InvoiceCustomField & { isEnabled: boolean })[],
+}))
 vi.mock("../forms/hooks/use-form-config", () => ({ useFormConfiguration: () => ({ config: configuredFields }) }))
 
 // Exercise the invoice workflow with deterministic native selection; the browser
@@ -25,7 +30,8 @@ vi.mock("@/components/ui/select", () => ({
 }))
 
 afterEach(cleanup)
-beforeEach(() => { configuredFields.fields = [] })
+beforeAll(() => { globalThis.PointerEvent ??= MouseEvent as typeof PointerEvent })
+beforeEach(() => { configuredFields.fields = []; configuredFields.sourceFields = []; configuredFields.customFields = [] })
 
 const options = {
   companyId: 1n,
@@ -47,8 +53,130 @@ const seller = { name: "Alpha Legal Company", address: ["123 Main Street", "Pari
 const snapshot: InvoiceDocumentSnapshot = { schemaVersion: 1, profileVersionIds: { organization: "1", company: "2" }, seller, profile, notes: "Saved invoice notes" }
 
 describe("invoice workspace", () => {
+  it("does not treat hydrated organization users as stored custom-field create options", () => {
+    const stored: InvoiceCustomField & { isEnabled: boolean } = { fieldId: "custom:reviewer", label: "Reviewer", type: "UserSelect", isEnabled: true, options: [], validation: { required: false } }
+    configuredFields.sourceFields = [stored]
+    configuredFields.fields = [{ ...stored, options: [{ value: "actor", label: "Authorized organization user" }] }]
+    const onSave = vi.fn()
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
+    fillInvoice()
+    expect(screen.getByText(/This form contains a custom field that invoice entry cannot save yet/)).toBeTruthy()
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it("sends numeric zero and an explicit No custom boolean with their JSON types", async () => {
+    configuredFields.fields = [
+      { fieldId: "custom:count", label: "Count", type: "Number", options: [], isEnabled: true, validation: { required: true, min: 0 } },
+      { fieldId: "custom:reviewed", label: "Reviewed", type: "Checkbox", options: [], isEnabled: true, validation: { required: true } },
+    ]
+    const onSave = vi.fn().mockResolvedValue({ kind: "rejected", error: { message: "Retained for review" } })
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
+    fillInvoice()
+    fireEvent.change(screen.getByTestId("create-invoice-custom-custom:count"), { target: { value: "0" } })
+    fireEvent.change(screen.getByTestId("create-invoice-custom-custom:reviewed"), { target: { value: "false" } })
+    fireEvent.click(screen.getByTestId("create-invoice-save-draft"))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    expect(JSON.parse(onSave.mock.calls[0]![0].metadata)).toMatchObject({ "custom:count": 0, "custom:reviewed": false })
+  })
+
+  it("blocks an unsupported configured custom field without creating a partial document", () => {
+    configuredFields.fields = [{ fieldId: "custom:attachment", label: "Attachment", type: "File", options: [], isEnabled: true, validation: { required: false } }]
+    const onSave = vi.fn()
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
+    fillInvoice()
+    expect(screen.getByText(/This form contains a custom field that invoice entry cannot save yet/)).toBeTruthy()
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it("opens error help without retrying or losing the rejected invoice draft", async () => {
+    const onExplainError = vi.fn()
+    const onSave = vi.fn().mockResolvedValue({ kind: "rejected", error: { message: "Period is closed" } })
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} onExplainError={onExplainError} />)
+    fillInvoice()
+    fireEvent.click(screen.getByTestId("create-invoice-save-draft"))
+    await screen.findByRole("alert")
+    fireEvent.click(screen.getByRole("button", { name: "Explain this error" }))
+    expect(onExplainError).toHaveBeenCalledWith("Period is closed")
+    expect(onSave).toHaveBeenCalledOnce()
+    expect((screen.getByTestId("create-invoice-line-description") as HTMLInputElement).value).toBe("Alpha services")
+  })
+
+  it("requires an explicit journal and accounts when several eligible choices exist", () => {
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={vi.fn()} onCheckStatus={vi.fn()}
+      journalOptions={[...options.journalOptions, { value: "11", label: "Other sales journal", currencyId: "7" }]}
+      counterpartAccountOptions={[...options.counterpartAccountOptions, { value: "31", label: "Other receivable" }]}
+      lineAccountOptions={[...options.lineAccountOptions, { value: "41", label: "Other sales account" }]} />)
+    fillInvoice()
+    expect((screen.getByLabelText("accounting.forms.newInvoice.fields.journal") as HTMLInputElement).value).toBe("")
+    expect(screen.getByText("Several journals are available. Choose the journal for this document.")).toBeTruthy()
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("accounting.forms.newInvoice.fields.journal"), { target: { value: "11" } })
+    expect((screen.getByLabelText("Receivable account") as HTMLInputElement).value).toBe("")
+    expect((screen.getByLabelText("Income account") as HTMLInputElement).value).toBe("")
+    fireEvent.change(screen.getByLabelText("Receivable account"), { target: { value: "31" } })
+    fireEvent.change(screen.getByLabelText("Income account"), { target: { value: "41" } })
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it("uses a journal's configured eligible account and distinguishes singleton suggestions", async () => {
+    const onSave = vi.fn().mockResolvedValue({ kind: "rejected", error: { message: "Retained for review" } })
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()}
+      journalOptions={[{ ...options.journalOptions[0]!, defaultAccountId: "41" }]}
+      lineAccountOptions={[...options.lineAccountOptions, { value: "41", label: "Configured sales account" }]} />)
+    fillInvoice()
+    expect((screen.getByLabelText("Income account") as HTMLInputElement).value).toBe("41")
+    expect(screen.getByText("From the selected journal's configured default account. You can change it for this document.")).toBeTruthy()
+    expect(screen.getByText("Selected because it was the only eligible journal. This is a suggestion, not a configured business default.")).toBeTruthy()
+    fireEvent.click(screen.getByTestId("create-invoice-save-draft"))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    expect(onSave.mock.calls[0]![0].lines[0].accountId).toBe(41n)
+  })
+
+  it("retains unavailable explicit selections instead of silently switching accounts on refresh", () => {
+    const props = { ...options, open: true, onClose: vi.fn(), onSave: vi.fn(), onCheckStatus: vi.fn() }
+    const { rerender } = render(<CreateInvoiceModal {...props} />)
+    fillInvoice()
+    fireEvent.change(screen.getByLabelText("Income account"), { target: { value: "40" } })
+    fireEvent.change(screen.getByLabelText("Receivable account"), { target: { value: "30" } })
+    rerender(<CreateInvoiceModal {...props}
+      lineAccountOptions={[{ value: "41", label: "New sales account" }]}
+      counterpartAccountOptions={[{ value: "31", label: "New receivable" }]} />)
+    expect((screen.getByLabelText("Income account") as HTMLInputElement).value).toBe("40")
+    expect((screen.getByLabelText("Receivable account") as HTMLInputElement).value).toBe("30")
+    expect((screen.getByTestId("create-invoice-line-description") as HTMLInputElement).value).toBe("Alpha services")
+    expect(screen.getByText(/The selected item account is unavailable/)).toBeTruthy()
+    expect(screen.getByText(/The selected receivable or payable account is unavailable/)).toBeTruthy()
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText("Income account"), { target: { value: "41" } })
+    fireEvent.change(screen.getByLabelText("Receivable account"), { target: { value: "31" } })
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it("requires review when a singleton suggestion becomes ambiguous and keeps the original draft", () => {
+    const props = { ...options, open: true, onClose: vi.fn(), onSave: vi.fn(), onCheckStatus: vi.fn() }
+    const { rerender } = render(<CreateInvoiceModal {...props} />)
+    fillInvoice()
+    rerender(<CreateInvoiceModal {...props} journalOptions={[...options.journalOptions, { value: "11", label: "Other sales journal", currencyId: "7" }]} />)
+    expect((screen.getByLabelText("accounting.forms.newInvoice.fields.journal") as HTMLInputElement).value).toBe("10")
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByText("Keep current accounting choices"))
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it("never uses an ineligible journal default or another currency's account", () => {
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={vi.fn()} onCheckStatus={vi.fn()}
+      journalOptions={[{ ...options.journalOptions[0]!, defaultAccountId: "41" }]}
+      lineAccountOptions={[{ value: "41", label: "USD sales", currencyId: "8" }, { value: "42", label: "Restricted sales", allowedJournalIds: ["11"] }]} />)
+    fillInvoice()
+    expect((screen.getByLabelText("Income account") as HTMLInputElement).value).toBe("")
+    expect(screen.queryByText(/From the selected journal's configured default account/)).toBeNull()
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it("keeps required custom fields enforced and contains a long rejected-save error without losing entries", async () => {
-    configuredFields.fields = [{ fieldId: "custom:approval_reference", label: "Approval reference", isEnabled: true, validation: { required: true } }]
+    configuredFields.fields = [{ fieldId: "custom:approval_reference", label: "Approval reference", type: "Text", options: [], isEnabled: true, validation: { required: true } }]
     const rejection = "Review the selected account.\n" + "LongServerExplanation".repeat(400)
     const onSave = vi.fn().mockResolvedValue({ kind: "rejected", error: { message: rejection } })
     render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
@@ -146,7 +274,7 @@ describe("invoice workspace", () => {
   })
 
   it("prefills defaults, stores explicit clears separately from notes, and leaves snapshots server-owned", async () => {
-    configuredFields.fields = [{ fieldId: "custom:purchase_reference", label: "Purchase reference", isEnabled: true, validation: { required: false } }]
+    configuredFields.fields = [{ fieldId: "custom:purchase_reference", label: "Purchase reference", type: "Text", options: [], isEnabled: true, validation: { required: false } }]
     const onSave = vi.fn().mockResolvedValue({ kind: "outcome-unknown" })
     render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} profile={profile} seller={seller} profileVersionIds={snapshot.profileVersionIds} personalizationState={{ status: "ready" }} />)
     fireEvent.click(screen.getByTestId("create-invoice-content-toggle"))

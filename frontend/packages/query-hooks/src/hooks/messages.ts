@@ -5,6 +5,7 @@ import { newCorrelationId } from "@lumiere/erp-workflows"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import type { CreateInvoiceReminderBatchParams, CreateMessageBatchParams, CreateMessageTemplateParams, MailFollower, MailMessage, ReviewMessageBatchParams } from "@lumiere/stdb/types"
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
@@ -52,10 +53,38 @@ export function useMessageBatches(organizationId: bigint) {
   return useStdbQuery("message-batches", organizationId)
 }
 
+export interface BatchExclusionSnapshot {
+  id: string; organizationId: string; companyId: string; exclusions: unknown
+}
+
+export function useMessageBatchExclusions(organizationId: bigint, companyId: bigint, actorScope: string) {
+  return useQuery({
+    queryKey: ["message-batch-exclusions", String(organizationId), String(companyId), actorScope],
+    enabled: organizationId > 0n && companyId > 0n && Boolean(actorScope),
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async (): Promise<BatchExclusionSnapshot[]> => {
+      const response = await apiFetch(`/api/messaging/batches/exclusions?companyId=${companyId}`, { cache: "no-store" })
+      if (!response.ok) throw new Error("Unable to read captured batch exclusion reasons")
+      const value: unknown = await response.json()
+      if (!value || typeof value !== "object" || !("data" in value) || !Array.isArray(value.data)) throw new Error("Incomplete batch exclusion evidence")
+      const result: BatchExclusionSnapshot[] = []
+      for (const row of value.data) {
+        if (!row || typeof row !== "object" || !("id" in row) || typeof row.id !== "string" || (parseStrictU64(row.id) ?? 0n) <= 0n
+          || row.organizationId !== String(organizationId) || row.companyId !== String(companyId) || !("exclusions" in row)) throw new Error("Batch exclusion evidence scope changed")
+        result.push({ id: row.id, organizationId: row.organizationId, companyId: row.companyId, exclusions: row.exclusions })
+      }
+      if (new Set(result.map((row) => row.id)).size !== result.length) throw new Error("Ambiguous batch exclusion evidence")
+      return result
+    },
+  })
+}
+
 function invalidateOperationalMessages(qc: ReturnType<typeof useQueryClient>, organizationId: bigint) {
   for (const resource of ["message-templates", "operational-messages", "message-batches", "contact-communication-preferences"]) {
     qc.invalidateQueries({ queryKey: ["stdb", resource, String(organizationId)] })
   }
+  void qc.invalidateQueries({ queryKey: ["message-batch-exclusions", String(organizationId)] })
 }
 
 export function useCreateMessageBatch(organizationId: bigint) {

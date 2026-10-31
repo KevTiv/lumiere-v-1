@@ -811,14 +811,16 @@ export function useSetExpenseAllocations(organizationId: bigint) {
       params,
     }: {
       expenseId: string | number | bigint
-      params: SetExpenseAllocationsParams
+      params: SetExpenseAllocationsParams & { expectedSnapshot?: string }
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("set_expense_allocations", { expenseId: expenseId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("set_expense_allocations", { expenseId: expenseId, params: stdbParamsToJson(params, "SetExpenseAllocationsParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorExpenses(r, 'Failed to set expense allocations'))
     },
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] })
+      void qc.invalidateQueries({ queryKey: ['expense-allocations', rqBigIntKey(organizationId)] })
+    },
   })
 }
 

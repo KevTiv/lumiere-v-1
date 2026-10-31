@@ -3,10 +3,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { ReactNode } from "react"
 
 const hooks = vi.hoisted(() => {
-  const read = () => ({ data: [] as object[], isLoading: false, isError: false, error: undefined as unknown, refetch: vi.fn() })
+  const read = () => ({ data: [] as object[], isLoading: false, isPending: false, isFetching: false, isError: false, error: undefined as unknown, refetch: vi.fn() })
   const mutation = () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false })
   return {
-    conversations: read(), messages: read(), phones: read(), templates: read(), batches: read(), evidence: read(), jobs: read(), errors: read(),
+    conversations: read(), messages: read(), phones: read(), templates: read(), batches: read(), evidence: read(), exclusions: read(), jobs: read(), errors: read(),
     open: mutation(), append: mutation(), update: mutation(), createBatch: mutation(), createReminder: mutation(), createTemplate: mutation(), review: mutation(), rollback: mutation(),
   }
 })
@@ -37,6 +37,7 @@ vi.mock("@lumiere/query-hooks/hooks/crm", () => ({
 }))
 vi.mock("@lumiere/query-hooks/hooks/messages", () => ({
   useMessageTemplates: () => hooks.templates, useMessageBatches: () => hooks.batches, useOperationalMessages: () => hooks.evidence,
+  useMessageBatchExclusions: () => hooks.exclusions,
   useCreateMessageBatch: () => hooks.createBatch, useCreateInvoiceReminderBatch: () => hooks.createReminder,
   useCreateMessageTemplate: () => hooks.createTemplate, useReviewMessageBatch: () => hooks.review,
 }))
@@ -54,8 +55,8 @@ beforeAll(() => {
 })
 beforeEach(() => {
   vi.clearAllMocks()
-  for (const query of [hooks.conversations, hooks.messages, hooks.phones, hooks.templates, hooks.batches, hooks.evidence, hooks.jobs, hooks.errors]) {
-    query.data = []; query.isLoading = false; query.isError = false; query.error = undefined
+  for (const query of [hooks.conversations, hooks.messages, hooks.phones, hooks.templates, hooks.batches, hooks.evidence, hooks.exclusions, hooks.jobs, hooks.errors]) {
+    query.data = []; query.isLoading = false; query.isPending = false; query.isFetching = false; query.isError = false; query.error = undefined
     query.refetch.mockResolvedValue({ data: [], isError: false })
   }
   for (const mutation of [hooks.open, hooks.append, hooks.update, hooks.createBatch, hooks.createReminder, hooks.createTemplate, hooks.review, hooks.rollback]) {
@@ -69,6 +70,10 @@ function savedBatch() {
   hooks.batches.data = [{ id: "9007199254740993", organizationId: "1", companyId: "2", templateId: "5", recipientCount: "1", excludedCount: "2", channel: "WhatsApp", status: "PendingApproval", subjectModel: "account_move" }]
   hooks.templates.data = [{ id: "5", name: "Reminder", reviewState: "approved", active: true, locale: "en" }]
   hooks.evidence.data = [{ id: "9", organizationId: "1", companyId: "2", messageBatchId: "9007199254740993", contactId: "7", renderedBody: "Saved invoice 42 is due", status: "PendingApproval" }]
+  hooks.exclusions.data = [{ id: "9007199254740993", organizationId: "1", companyId: "2", exclusions: [
+    { model: "contact", recordId: "8", contactId: "8", reason: "channel_opted_out" },
+    { model: "contact", recordId: "9", contactId: "9", reason: "no_eligible_primary_identity" },
+  ] }]
 }
 
 describe("Supporting workspace source and recovery states", () => {
@@ -100,6 +105,37 @@ describe("Supporting workspace source and recovery states", () => {
     expect(screen.queryByText("No message batches")).toBeNull()
     expect(screen.queryByText("Saved invoice 42 is due")).toBeNull()
     expect(screen.queryByRole("button", { name: "Review & approve" })).toBeNull()
+  })
+  it("shows the captured creation-time exclusion evidence", () => {
+    savedBatch()
+    render(batches())
+    expect(screen.getByText("Excluded at batch creation")).toBeTruthy()
+    expect(screen.getByText("The contact opted out of this channel.")).toBeTruthy()
+    expect(screen.getByText("No eligible primary contact identity is available.")).toBeTruthy()
+    expect(screen.queryByText(/The complete creation-time exclusion reasons are unavailable/)).toBeNull()
+  })
+  it("does not expose cached exclusion reasons when their evidence source is denied", () => {
+    savedBatch(); hooks.exclusions.isError = true; hooks.exclusions.error = { status: 403 }
+    render(batches())
+    expect(screen.getByText("You do not have access to these records.")).toBeTruthy()
+    expect(screen.getByText(/The complete creation-time exclusion reasons are unavailable/)).toBeTruthy()
+    expect(screen.queryByText("Excluded at batch creation")).toBeNull()
+    expect(screen.queryByText("The contact opted out of this channel.")).toBeNull()
+    expect(screen.queryByText("No eligible primary contact identity is available.")).toBeNull()
+    expect(screen.getByText("Saved invoice 42 is due")).toBeTruthy()
+    expect(hooks.review.mutateAsync).not.toHaveBeenCalled()
+  })
+  it("hides denied recipient evidence and blocks approval despite cached content", async () => {
+    savedBatch(); hooks.evidence.isError = true; hooks.evidence.error = { status: 403 }
+    render(batches())
+    fireEvent.click(screen.getByRole("button", { name: "Review & approve" }))
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText("You do not have access to these records.")).toBeTruthy()
+    expect(screen.queryByText("Saved invoice 42 is due")).toBeNull()
+    expect(within(dialog).getByRole("button", { name: "Approve" }).hasAttribute("disabled")).toBe(true)
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /I have reviewed the saved recipients/ }))
+    fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }))
+    expect(hooks.review.mutateAsync).not.toHaveBeenCalled()
   })
   it("reviews saved content and retains a deliberate rejection reason after failure", async () => {
     savedBatch(); hooks.review.mutateAsync.mockRejectedValue(new Error("Review was rejected"))

@@ -9,7 +9,46 @@ import {
   guideQuestionEdits,
   guideAccessRevoked,
   guideRequestInScope,
+  requestGuideVerification,
+  recordGuideReview,
+  guideVerificationChoices,
 } from "./assistant-guides"
+
+test("named guide evidence is bound to the exact company/revision and keeps IDs out of lossy numbers", async()=>{
+  const prior=globalThis.fetch
+  const document={guideId:"42",revision:2,companyId:"7",draftKey:"d",title:"Guide",markdown:"Checks",module:"accounting",sources:[],reviewState:"draft" as const}
+  const choice={decisionId:"9007199254740993",title:"Reviewed bill checks",summary:"Review policy before posting",sourceLabels:["Bill review policy"],sourcePassageIds:["9007199254740994"],claimIds:["9007199254740995"]}
+  try{
+    globalThis.fetch=async()=>Response.json({schemaVersion:1,guideId:"42",companyId:"7",revision:2,choices:[choice]})
+    assert.deepEqual(await guideVerificationChoices(document),[choice])
+    globalThis.fetch=async()=>Response.json({schemaVersion:1,guideId:"42",companyId:"8",revision:2,choices:[choice]})
+    await assert.rejects(guideVerificationChoices(document),/scope or revision/)
+    globalThis.fetch=async()=>Response.json({schemaVersion:1,guideId:"42",companyId:"7",revision:2,choices:[{...choice,sourcePassageIds:[Number(choice.sourcePassageIds[0])]}]})
+    await assert.rejects(guideVerificationChoices(document),/Invalid guide evidence choice/)
+  }finally{globalThis.fetch=prior}
+})
+
+test("guide review selectors preserve exact scope and refuse unsupported verification claims", async () => {
+  const prior = globalThis.fetch
+  const document = { guideId: "42", revision: 2, companyId: "7", draftKey: "d", title: "Guide", markdown: "Check the bill", module: "accounting", sources: [], reviewState: "draft" as const }
+  try {
+    const calls: { url: string; body: unknown }[] = []
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), body: JSON.parse(String(init?.body)) })
+      return Response.json({ schemaVersion: 1, guide: { ...document, reviewEvidence: { state: "candidate", verified: false, versionId: "9007199254740993" } } })
+    }
+    await requestGuideVerification(document, { sourcePassageIds: ["9007199254740993"], claimIds: [], decisionIds: ["8"] })
+    assert.deepEqual(calls[0], { url: "/api/knowledge/guides/42/verification", body: { companyId: "7", revision: 2, sourcePassageIds: ["9007199254740993"], claimIds: [], decisionIds: ["8"] } })
+    await recordGuideReview(document, { reviewKind: "source_fidelity", outcome: "accepted", note: "Checked actual evidence" })
+    assert.equal(calls[1]!.url, "/api/knowledge/guides/42/reviews")
+    globalThis.fetch = async () => Response.json({ schemaVersion: 1, guide: { ...document, reviewState: "verified" } })
+    await assert.rejects(readAssistantGuide(document, "7"), /missing current review evidence/)
+    globalThis.fetch = async () => Response.json({ schemaVersion: 1, guide: { ...document, reviewEvidence: { state: "approved", verified: false }, reviewState: "verified" } })
+    await assert.rejects(readAssistantGuide(document, "7"), /missing current review evidence/)
+    globalThis.fetch = async () => Response.json({ schemaVersion: 1, guide: { ...document, companyId: "8" } })
+    await assert.rejects(recordGuideReview(document, { reviewKind: "implementation", outcome: "rejected" }), /scope or revision/)
+  } finally { globalThis.fetch = prior }
+})
 
 test("unsaved guide requests are never carried into another actor's conversation", () => {
   const request = { messageId: "message-1", draft: { draftKey: "draft-1", title: "Private notes", markdown: "Private working draft", companyId: "7", module: "accounting", sources: [] } }

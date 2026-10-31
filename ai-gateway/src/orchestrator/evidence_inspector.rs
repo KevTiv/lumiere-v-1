@@ -34,6 +34,9 @@ use serde::Serialize;
 use serde_json::Value;
 use stdb_client::StdbClient;
 
+#[path = "guide_source_authority.rs"]
+mod guide_source_authority;
+
 /// Longest excerpt returned for a passage.
 const MAX_EXCERPT_CHARS: usize = 1_000;
 /// Longest revision chain followed for an edited/forked component.
@@ -45,6 +48,10 @@ const MAX_REVISION_DEPTH: usize = 64;
 /// use an in-memory fake.
 #[async_trait]
 pub trait EvidenceRows: Send + Sync {
+    /// Current source resource/body policy, not a capability or saved membership snapshot.
+    async fn guide_source_read_allowed(&self, _viewer: Viewer) -> Result<bool> {
+        Ok(false)
+    }
     async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>>;
     /// Edges whose dependent is `(dependent_kind, id)`.
     async fn dependencies_of(
@@ -122,6 +129,9 @@ pub trait EvidenceRows: Send + Sync {
 
 #[async_trait]
 impl EvidenceRows for StdbClient {
+    async fn guide_source_read_allowed(&self, viewer: Viewer) -> Result<bool> {
+        guide_source_authority::allowed(self, viewer).await
+    }
     async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>> {
         let table = evidence_read_view(table)?;
         let rows = self
@@ -315,6 +325,7 @@ fn evidence_read_view(table: &str) -> Result<&'static str> {
         "ai_knowledge_entry" => Ok("ai_knowledge_entry_read"),
         "ai_knowledge_entry_version" => Ok("ai_knowledge_entry_version_read"),
         "ai_knowledge_review" => Ok("ai_knowledge_review_read"),
+        "knowledge_guide" => Ok("knowledge_guide_authority_read"),
         _ => bail!("unsupported evidence table"),
     }
 }
@@ -1537,6 +1548,11 @@ pub async fn retrieve_reusable_knowledge(
         });
     }
     let version_id = required_id(approved)?;
+    if !guide_version_matches(rows, viewer, &entry, approved).await? {
+        return Ok(KnowledgeRetrieval::Denied {
+            reasons: vec!["guide revision is unavailable or changed".into()],
+        });
+    }
     let review_epoch = number(approved, "reviewEpoch");
     let owner = identity(&entry, "ownerUid");
     let proposer = identity(approved, "createUid");
@@ -1573,6 +1589,13 @@ pub async fn retrieve_reusable_knowledge(
     if !blocking.is_empty() {
         return Ok(KnowledgeRetrieval::Denied { reasons: blocking });
     }
+    if !guide_binding_access(rows, viewer, &entry).await?
+        || !guide_version_matches(rows, viewer, &entry, approved).await?
+    {
+        return Ok(KnowledgeRetrieval::Denied {
+            reasons: vec!["guide access or revision changed during retrieval".into()],
+        });
+    }
     Ok(KnowledgeRetrieval::Reusable(Box::new(KnowledgeReuse {
         entry_id,
         entry_key: required_text(&entry, "entryKey")?,
@@ -1592,17 +1615,24 @@ async fn knowledge_scope_allowed(
     viewer: Viewer,
     entry: &Value,
 ) -> Result<bool> {
+    if !guide_binding_access(rows, viewer, entry).await? {
+        return Ok(false);
+    }
+    let guide_bound = guide_binding(entry)?.is_some();
     let share_scope = text(entry, "shareScope").unwrap_or_default();
     let membership = match viewer.actor_identity {
-        Some(actor) => {
+        Some(actor) if !guide_bound => {
             rows.knowledge_membership(viewer.organization_id, viewer.company_id, actor)
                 .await?
         }
-        None => None,
+        _ => None,
     };
     Ok(match share_scope.as_str() {
         "organization" => true,
-        "personal" => membership.is_some() && identity(&entry, "ownerUid") == viewer.actor_identity,
+        "personal" => {
+            (guide_bound || membership.is_some())
+                && identity(&entry, "ownerUid") == viewer.actor_identity
+        }
         "team" => {
             membership.is_some()
                 && text(&entry, "teamRef")
@@ -1616,6 +1646,102 @@ async fn knowledge_scope_allowed(
         }
         _ => false,
     })
+}
+
+fn guide_binding(entry: &Value) -> Result<Option<(u64, u64)>> {
+    let key = text(entry, "entryKey").unwrap_or_default();
+    if !key.starts_with("guide:") {
+        return Ok(None);
+    }
+    let parts: Vec<_> = key.split(':').collect();
+    let ["guide", id, "revision", revision] = parts.as_slice() else {
+        bail!("invalid guide association");
+    };
+    let canonical = |value: &str| {
+        value
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0 && id.to_string() == value)
+    };
+    Ok(Some((
+        canonical(id).context("invalid guide identity")?,
+        canonical(revision).context("invalid guide revision")?,
+    )))
+}
+
+async fn guide_binding_access(
+    rows: &dyn EvidenceRows,
+    viewer: Viewer,
+    entry: &Value,
+) -> Result<bool> {
+    let Some((id, revision)) = guide_binding(entry)? else {
+        return Ok(true);
+    };
+    let Some(actor) = viewer.actor_identity else {
+        return Ok(false);
+    };
+    if !rows.guide_source_read_allowed(viewer).await? {
+        return Ok(false);
+    }
+    let Some(guide) = rows
+        .row("knowledge_guide", id)
+        .await?
+        .filter(|row| owned_by(row, viewer))
+    else {
+        return Ok(false);
+    };
+    let member = guide
+        .get("memberIds")
+        .and_then(Value::as_array)
+        .is_some_and(|members| {
+            members.iter().any(|member| {
+                let text = member.as_str().or_else(|| {
+                    member
+                        .as_array()
+                        .filter(|items| items.len() == 1)?
+                        .first()?
+                        .as_str()
+                });
+                text.and_then(parse_stored_identity) == Some(actor)
+            })
+        });
+    Ok(member
+        && number(&guide, "revision") == Some(revision)
+        && identity(&guide, "revisionAuthor") == identity(entry, "ownerUid"))
+}
+
+async fn guide_version_matches(
+    rows: &dyn EvidenceRows,
+    viewer: Viewer,
+    entry: &Value,
+    version: &Value,
+) -> Result<bool> {
+    let Some((id, _)) = guide_binding(entry)? else {
+        return Ok(true);
+    };
+    let Some(guide) = rows
+        .row("knowledge_guide", id)
+        .await?
+        .filter(|row| owned_by(row, viewer))
+    else {
+        return Ok(false);
+    };
+    use sha2::{Digest, Sha256};
+    let body = text(version, "body").unwrap_or_default();
+    let hash = format!("{:x}", Sha256::digest(body.as_bytes()));
+    Ok(
+        identity(version, "createUid") == identity(&guide, "revisionAuthor")
+            && text(version, "title") == text(&guide, "title")
+            && text(&guide, "contentHash").as_deref() == Some(hash.as_str())
+            && strings(version, "applicability").contains(&format!(
+                "language:{}",
+                text(&guide, "language").unwrap_or_default()
+            ))
+            && strings(version, "applicability").contains(&format!(
+                "module:{}",
+                text(&guide, "module").unwrap_or_default()
+            )),
+    )
 }
 
 fn reviews_establish_independent_approval(
@@ -1684,6 +1810,9 @@ mod tests {
 
     #[derive(Default)]
     struct FakeRows {
+        guide_source_allowed: bool,
+        guide_source_max_checks: Option<usize>,
+        guide_source_checks: std::sync::atomic::AtomicUsize,
         tables: HashMap<(&'static str, u64), Value>,
         dependencies: Vec<Value>,
         entries: Vec<Value>,
@@ -1699,6 +1828,15 @@ mod tests {
 
     #[async_trait]
     impl EvidenceRows for FakeRows {
+        async fn guide_source_read_allowed(&self, _viewer: Viewer) -> Result<bool> {
+            let check = self
+                .guide_source_checks
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(self.guide_source_allowed
+                && self
+                    .guide_source_max_checks
+                    .is_none_or(|limit| check < limit))
+        }
         async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>> {
             Ok(self.tables.get(&(table, id)).cloned())
         }
@@ -2316,6 +2454,149 @@ mod tests {
             edge("knowledge_version", 21, "decision", 2, "required", "valid"),
         ];
         rows
+    }
+
+    fn guide_knowledge_fixture() -> FakeRows {
+        use sha2::{Digest, Sha256};
+        let mut rows = knowledge_fixture("approved", "personal");
+        rows.guide_source_allowed = true;
+        rows.entries[0]["entryKey"] = json!("guide:71:revision:2");
+        rows.tables
+            .insert(("ai_knowledge_entry", 20), rows.entries[0].clone());
+        rows.versions[0]["createUid"] = json!("a".repeat(64));
+        rows.versions[0]["applicability"] = json!(["language:en", "module:accounting"]);
+        rows.tables
+            .insert(("ai_knowledge_entry_version", 21), rows.versions[0].clone());
+        rows.tables.insert(("knowledge_guide",71),json!({"id":71,"organizationId":1,"companyId":10,"revision":2,"title":"Straight line","contentHash":format!("{:x}",Sha256::digest(b"Spread cost evenly.")),"revisionAuthor":"a".repeat(64),"memberIds":[["a".repeat(64)]],"module":"accounting","language":"en"}));
+        rows
+    }
+
+    #[tokio::test]
+    async fn reviewed_guides_require_current_membership_exact_author_revision_and_content() {
+        let viewer = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let rows = guide_knowledge_fixture();
+        assert!(matches!(
+            retrieve_reusable_knowledge(&rows, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Reusable(_)
+        ));
+        for (field, value) in [
+            ("revision", json!(3)),
+            ("memberIds", json!([])),
+            ("revisionAuthor", json!("d".repeat(64))),
+            ("contentHash", json!("changed")),
+            ("companyId", json!(11)),
+        ] {
+            let mut changed = guide_knowledge_fixture();
+            changed.tables.get_mut(&("knowledge_guide", 71)).unwrap()[field] = value;
+            assert!(
+                matches!(
+                    retrieve_reusable_knowledge(&changed, viewer, "guide:71:revision:2")
+                        .await
+                        .unwrap(),
+                    KnowledgeRetrieval::Denied { .. }
+                ),
+                "{field}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn copied_guide_text_does_not_bypass_independent_reviews_or_source_changes() {
+        let viewer = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let mut rows = guide_knowledge_fixture();
+        rows.reviews[0]["reviewerUid"] = json!("a".repeat(64));
+        assert!(matches!(
+            retrieve_reusable_knowledge(&rows, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+        let mut rows = guide_knowledge_fixture();
+        rows.dependencies[0] = edge("knowledge_version", 21, "passage", 5, "required", "invalid");
+        assert!(matches!(
+            retrieve_reusable_knowledge(&rows, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+        let mut rows = guide_knowledge_fixture();
+        rows.tables.remove(&("knowledge_guide", 71));
+        assert!(matches!(
+            retrieve_reusable_knowledge(&rows, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn reusable_guide_body_is_denied_when_source_policy_is_revoked_before_or_after_inspection(
+    ) {
+        let viewer = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let mut denied = guide_knowledge_fixture();
+        denied.guide_source_allowed = false;
+        assert!(matches!(
+            retrieve_reusable_knowledge(&denied, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+        assert_eq!(
+            denied
+                .guide_source_checks
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        let mut revoked = guide_knowledge_fixture();
+        // Entry admission and the inspector both see current authority. Revoke
+        // it before the final guard, so inspected text still cannot be served.
+        revoked.guide_source_max_checks = Some(2);
+        assert!(matches!(
+            retrieve_reusable_knowledge(&revoked, viewer, "guide:71:revision:2")
+                .await
+                .unwrap(),
+            KnowledgeRetrieval::Denied { .. }
+        ));
+        assert_eq!(
+            revoked
+                .guide_source_checks
+                .load(std::sync::atomic::Ordering::SeqCst),
+            3
+        );
+    }
+
+    #[tokio::test]
+    async fn reusable_guide_inspection_fails_closed_when_source_policy_is_revoked_during_read() {
+        let viewer = Viewer {
+            actor_identity: ActorIdentity::parse(&"a".repeat(64)),
+            ..VIEWER
+        };
+        let mut revoked = guide_knowledge_fixture();
+        // Admission succeeds, but the inspector's independent source check
+        // fails. Preserve its concealed error rather than returning guide text
+        // or converting arbitrary lineage/read failures into ordinary denials.
+        revoked.guide_source_max_checks = Some(1);
+        let error = retrieve_reusable_knowledge(&revoked, viewer, "guide:71:revision:2")
+            .await
+            .expect_err("revoked source access must not return a reusable guide");
+        assert_eq!(error.to_string(), "knowledge version 21 not found");
+        assert_eq!(
+            revoked
+                .guide_source_checks
+                .load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
     }
 
     #[tokio::test]

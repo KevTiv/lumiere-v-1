@@ -184,6 +184,72 @@ pub fn purge_expired_documents(ctx: &ReducerContext, organization_id: u64) -> Re
     Ok(())
 }
 
+fn reviewed_scope_matches(expected: &[u64], actual: &[u64]) -> bool {
+    let expected_set: std::collections::BTreeSet<_> = expected.iter().copied().collect();
+    let actual_set: std::collections::BTreeSet<_> = actual.iter().copied().collect();
+    !expected.is_empty()
+        && !expected_set.contains(&0)
+        && expected_set.len() == expected.len()
+        && actual_set.len() == actual.len()
+        && expected_set == actual_set
+}
+
+/// Bind an immediate purge to the exact set the actor reviewed. Eligibility and
+/// legal holds are checked in this transaction before any irreversible write.
+#[reducer]
+pub fn purge_reviewed_expired_documents(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    document_ids: Vec<u64>,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "document", "delete")?;
+    let now = ctx.timestamp.to_micros_since_unix_epoch();
+    let victims: Vec<Document> = ctx
+        .db
+        .document()
+        .iter()
+        .filter(|doc| {
+            doc.organization_id == organization_id
+                && doc.is_deleted
+                && doc
+                    .purge_after
+                    .is_some_and(|expiry| expiry.to_micros_since_unix_epoch() <= now)
+                && !crate::documents::legal_hold::document_has_active_legal_hold(
+                    ctx,
+                    organization_id,
+                    doc.id,
+                )
+        })
+        .collect();
+    let actual = victims.iter().map(|doc| doc.id).collect::<Vec<_>>();
+    if !reviewed_scope_matches(&document_ids, &actual) {
+        return Err(
+            "Affected documents or legal holds changed; review a fresh purge preview".into(),
+        );
+    }
+    for doc in victims {
+        hard_purge_document(ctx, organization_id, doc);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod reviewed_purge_tests {
+    use super::reviewed_scope_matches;
+    #[test]
+    fn reviewed_scope_requires_exact_set_and_rejects_new_removed_duplicate_or_empty_ids() {
+        assert!(reviewed_scope_matches(
+            &[9_007_199_254_740_993, 2],
+            &[2, 9_007_199_254_740_993]
+        ));
+        assert!(!reviewed_scope_matches(&[1], &[1, 2]));
+        assert!(!reviewed_scope_matches(&[1, 2], &[1]));
+        assert!(!reviewed_scope_matches(&[1, 1], &[1]));
+        assert!(!reviewed_scope_matches(&[], &[]));
+        assert!(!reviewed_scope_matches(&[0], &[0]));
+    }
+}
+
 #[reducer]
 pub fn schedule_document_retention_purge(
     ctx: &ReducerContext,

@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
 import { expect, test, type Page } from "@playwright/test"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
@@ -79,7 +80,7 @@ async function history(page: Page, moveId: number, companyId: number): Promise<H
   expect(result.recordId).toBe(String(moveId))
   expect(result.companyId).toBe(String(companyId))
   expect(result.coverage.status).toBe("partial")
-  expect(result.coverage.operations).toEqual(["update_account_move_line"])
+  expect(result.coverage.operations).toEqual(["update_account_move_line", "add_account_move_line"])
   return result
 }
 
@@ -95,6 +96,7 @@ async function createDraftInvoice(page: Page, companyId: number, description: st
   await page.locator('[role="listbox"]:visible').getByRole("option", { disabled: false }).first().click()
   await modal.getByTestId("create-invoice-line-description").fill(description)
   await modal.getByTestId("create-invoice-line-unit-price").fill("90")
+  await reviewInvoiceAccountingChoices(page)
   const [dispatch] = await Promise.all([
     page.waitForResponse((response) => matchesOperationResponse(response, "create_manual_account_invoice"), { timeout: 30_000 }),
     modal.getByTestId("create-invoice-save-draft").click(),

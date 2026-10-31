@@ -48,7 +48,7 @@ fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, Strin
             name: format!("Sub Sale B {company_id}"),
             code: journal_code.clone(),
             type_: JournalType::Sale,
-            currency_id: Some(1),
+            currency_id: Some(fixture.currency_id),
             default_account_id: Some(revenue_id),
             suspense_account_id: None,
             loss_account_id: None,
@@ -169,7 +169,7 @@ fn seed_plan_and_sub_with_tax(
             name: "Wave B Monthly".into(),
             code: code.clone(),
             description: Some("test".into()),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
@@ -216,7 +216,7 @@ fn seed_plan_and_sub_with_tax(
         CreatePricelistParams {
             company_id: None,
             name: format!("PL-B-{org_id}"),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -237,7 +237,7 @@ fn seed_plan_and_sub_with_tax(
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -438,6 +438,11 @@ pub fn test_tax_and_auto_deferred_on_invoice(ctx: &ReducerContext) -> Result<(),
     let sub = ctx.db.subscription().id().find(&sub_id).ok_or("sub")?;
     let move_id = *sub.invoice_ids.first().ok_or("no invoice")?;
     let inv = ctx.db.account_move().id().find(&move_id).ok_or("move")?;
+    if sub.currency_id != fixture.currency_id || inv.currency_id != fixture.currency_id {
+        return Err(
+            "base-currency subscription and invoice must use the fixture company currency".into(),
+        );
+    }
     if (inv.amount_untaxed - 100.0).abs() > 0.01 {
         return Err(format!("expected untaxed 100, got {}", inv.amount_untaxed));
     }
@@ -495,7 +500,7 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
                 name: "Wave B Pay Plan".into(),
                 code: format!("PLAN-PAY-{org_id}"),
                 description: None,
-                currency_id: 1,
+                currency_id: fixture.currency_id,
                 journal_id,
                 product_id: fixture.product_id,
                 billing_period: "month".into(),
@@ -542,7 +547,7 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
         CreatePricelistParams {
             company_id: None,
             name: format!("PL-PAY-{org_id}"),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -563,7 +568,7 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -806,7 +811,7 @@ pub fn test_csv_import_draft_only(ctx: &ReducerContext) -> Result<(), String> {
             name: "CSV Plan".into(),
             code: format!("CSV-PLAN-{org_id}"),
             description: None,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
@@ -847,7 +852,7 @@ pub fn test_csv_import_draft_only(ctx: &ReducerContext) -> Result<(), String> {
         CreatePricelistParams {
             company_id: None,
             name: format!("CSV-PL-{org_id}"),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -860,8 +865,8 @@ pub fn test_csv_import_draft_only(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("pl")?;
 
     let csv = format!(
-        "code,plan_id,partner_id,currency_id,pricelist_id,recurring_rule_type\nCSV-SUB-1,{plan_id},{},1,{pricelist_id},monthly\n",
-        fixture.partner_id
+        "code,plan_id,partner_id,currency_id,pricelist_id,recurring_rule_type\nCSV-SUB-1,{plan_id},{},{},{pricelist_id},monthly\n",
+        fixture.partner_id, fixture.currency_id
     );
     import_subscription_csv(ctx, org_id, company_id, csv)?;
 
@@ -876,6 +881,9 @@ pub fn test_csv_import_draft_only(ctx: &ReducerContext) -> Result<(), String> {
             "CSV must import draft/inactive, got state={} is_active={}",
             sub.state, sub.is_active
         ));
+    }
+    if sub.currency_id != fixture.currency_id {
+        return Err("CSV subscription must retain the organization-owned currency".into());
     }
     if !sub.invoice_ids.is_empty() {
         return Err("CSV must not create invoices".into());

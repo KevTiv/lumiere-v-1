@@ -1,6 +1,7 @@
+import { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
 import { randomUUID } from "node:crypto"
 
-import { expect, test, type Page, type Response } from "@playwright/test"
+import { expect, type Page, type Response } from "@playwright/test"
 
 import {
   chooseFirstEnabledOption,
@@ -22,7 +23,6 @@ import {
   waitForPaymentPosted,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
-import { loseNextResponse } from "./pretenant-support"
 
 /** Operator-driven COV-08 steps shared by the invoice, payment and reconcile specs (no compatibility route). */
 export type Row = Record<string, unknown>
@@ -58,6 +58,7 @@ export async function createAndPostInvoice(page: Page, label: string): Promise<n
   await page.getByRole("option").first().click()
   await page.getByTestId("create-invoice-line-description").fill(smokeName(label))
   await page.getByTestId("create-invoice-line-unit-price").fill("90")
+  await reviewInvoiceAccountingChoices(page)
   await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
   const [dispatch] = await Promise.all([
     page.waitForResponse((r) => matchesOperationResponse(r, "create_manual_account_invoice") && r.ok(), {

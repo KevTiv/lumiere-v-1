@@ -604,6 +604,20 @@ pub fn create_opportunity(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "opportunity", "create")?;
 
+    require_single_company_crm_scope(ctx, organization_id, params.company_id)?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let (creation, replay) = crate::forms::record_creation::prepare_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "opportunity",
+        params.metadata.as_deref(),
+        &params,
+    )?;
+    if replay.is_some() {
+        return Ok(());
+    }
+
     if params.name.is_empty() {
         return Err("Opportunity name cannot be empty".to_string());
     }
@@ -657,8 +671,6 @@ pub fn create_opportunity(
         }
     };
 
-    let operating_company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
-
     let opp = ctx.db.opportunity().insert(Opportunity {
         id: 0,
         organization_id,
@@ -697,6 +709,15 @@ pub fn create_opportunity(
         metadata: params.metadata,
     });
 
+    let creation_receipt = crate::forms::record_creation::finish_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "opportunity",
+        opp.id,
+        creation,
+    )?;
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -715,6 +736,15 @@ pub fn create_opportunity(
         },
     );
 
+    if let Some(receipt) = creation_receipt {
+        crate::forms::record_creation_persistence::record_opportunity_creation(
+            ctx,
+            organization_id,
+            operating_company_id,
+            opp.id,
+            &receipt,
+        )?;
+    }
     Ok(())
 }
 

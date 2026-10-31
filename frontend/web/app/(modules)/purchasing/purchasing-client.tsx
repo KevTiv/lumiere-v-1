@@ -5,6 +5,7 @@ import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { CompanyModuleInsights } from "../../../components/module-insights"
+import { PurchaseDiscrepancyPanel } from "./purchase-discrepancy-panel"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
@@ -52,8 +53,6 @@ import {
   csvImportForm,
   RecordChatterDialog,
   type TimeRangeValue,
-  isTimestampInRange,
-  percentChange,
   previousPeriodMs,
   timeRangeToMs,
   formNumber,
@@ -87,7 +86,6 @@ import {
 } from "./purchasing-intake-reason-dialog"
 import { RecordDocumentAttachments } from "../../../components/record-document-attachments"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
-import { groupBy } from "@/lib/utils"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import { purchaseOrderRecordHref } from "./purchase-order-record"
 import {
@@ -175,11 +173,11 @@ import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import { purchaseOrderListFieldAliases } from "@lumiere/ui/lib/purchasing-entity-configs"
-import { orderNeedsCustomFieldSave } from "@/lib/commercial-order-form-params"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
 import { purchaseOrderKpis } from "./purchase-order-kpis"
+import { purchasingFinancialSummary, purchasingReviewCounts } from "./purchasing-financial-summary"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -227,14 +225,6 @@ function poState(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
   return String(v ?? "")
-}
-
-function recordTimestampMs(row: Record<string, unknown>): number {
-  const raw = row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date
-  if (raw == null) return 0
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return 0
-  return n > 1e15 ? n / 1000 : n
 }
 
 function landedCostState(row: Record<string, unknown>): string {
@@ -392,7 +382,8 @@ function PurchasingClientLoaded({
   operatingCompanyId,
 }: PurchasingClientLoadedProps) {
   usePurchasingModuleSubscription()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const financialLocale = i18n.resolvedLanguage ?? i18n.language ?? "en"
   const { identity } = useErpSession()
   const { currentUser } = useRBAC()
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
@@ -412,7 +403,7 @@ function PurchasingClientLoaded({
   const purchasingTabIds = useMemo(
     () => {
       const workTabId = moduleWorkBoardTabId(moduleConfig)
-      return [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", ...(workTabId ? [workTabId] : [])]
+      return [...moduleConfig.tabs.map((tab) => tab.id), "discrepancies", "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", ...(workTabId ? [workTabId] : [])]
     },
     [moduleConfig],
   )
@@ -2078,67 +2069,21 @@ function PurchasingClientLoaded({
   ])
 
   const liveSections = useMemo(() => {
-    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange)
-    const previousRange = previousPeriodMs(dashboardTimeRange)
-    const inCurrentRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), startMs, endMs)
-    const inPreviousRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), previousRange.startMs, previousRange.endMs)
-
-    const isOpenOrder = (o: Record<string, unknown>) =>
-      String(o.state) !== "Done" && String(o.state) !== "Cancelled"
-    const isConfirmedOrder = (o: Record<string, unknown>) =>
-      String(o.state) === "Purchase" || String(o.state) === "Done"
-
-    const openOrders = orders.filter((o) => isOpenOrder(o as Record<string, unknown>))
-    const currentOpenOrders = openOrders.filter((o) => inCurrentRange(o as Record<string, unknown>))
-    const previousOpenOrders = orders.filter(
-      (o) => isOpenOrder(o as Record<string, unknown>) && inPreviousRange(o as Record<string, unknown>),
-    )
-    const spendMtd = orders
-      .filter((o) => isConfirmedOrder(o as Record<string, unknown>) && inCurrentRange(o as Record<string, unknown>))
-      .reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)
-    const previousSpend = orders
-      .filter((o) => isConfirmedOrder(o as Record<string, unknown>) && inPreviousRange(o as Record<string, unknown>))
-      .reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)
-    const pendingReceipt = orders.filter((o) => o.receiptStatus === "pending").length
-    const toApprove =
-      ordersToApprove.length > 0
-        ? ordersToApprove.length
-        : orders.filter((o) => String(o.state) === "ToApprove").length
-    const partialReceipt =
-      ordersPartialReceipt.length > 0
-        ? ordersPartialReceipt.length
-        : orders.filter((o) => String(o.receiptStatus) === "partial")
-            .length
-    const overBilled =
-      linesOverBilled.length > 0
-        ? linesOverBilled.length
-        : lines.filter((l) => {
-            const state = String(
-              (l as Record<string, unknown>).matchState ??
-                (l as Record<string, unknown>).match_state ??
-                "",
-            )
-            return state === "over_billed"
-          }).length
-    // MVP on-time: confirmed POs with date_planned that are fully received by planned date (or still open past planned).
-    const confirmedWithPlan = orders.filter((o) => {
-      if (!isConfirmedOrder(o as Record<string, unknown>)) return false
-      const planned = Number(o.datePlanned ?? 0)
-      return planned > 0
-    })
-    const onTimeCount = confirmedWithPlan.filter((o) => {
-      const plannedMs = Number(o.datePlanned ?? 0) / 1000
-      const receipt = String(o.receiptStatus ?? "")
-      if (receipt === "full" || receipt === "received") return true
-      if (plannedMs > 0 && Date.now() <= plannedMs) return true
-      return false
-    }).length
-    const onTimePct =
-      confirmedWithPlan.length > 0
-        ? Math.round((onTimeCount / confirmedWithPlan.length) * 100)
-        : null
+    const now = new Date()
+    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange, now)
+    const previousRange = previousPeriodMs(dashboardTimeRange, now)
+    const scope = { organizationId: orgId, companyId: operatingCompanyId }
+    const review = purchasingReviewCounts({
+      orders: { rows: orders, state: ordersRead.state },
+      toApprove: { rows: ordersToApprove, state: ordersToApproveRead.state },
+      partialReceipt: { rows: ordersPartialReceipt, state: ordersPartialReceiptRead.state },
+      overBilled: { rows: linesOverBilled, state: linesOverBilledRead.state },
+    }, scope, { startMs, endMs }, previousRange, now.getTime())
+    const financial = purchasingFinancialSummary(orders, currencyCodeMap(currencies), scope, { startMs, endMs }, previousRange,
+      financialLocale, { orders: ordersRead.state, currencies: moduleQueryState(currenciesQuery) })
+    const vendorLabel = (id: string) => vendorLabelById.get(id) ?? (id
+      ? t("purchasing.dashboard.exactVendor", { defaultValue: "Vendor #{{id}}", id })
+      : t("purchasing.dashboard.vendorUnavailable", { defaultValue: "Vendor unavailable" }))
 
     return mapDashboardWidgets(moduleConfig, (w) => {
         if (w.type === "stat-cards") {
@@ -2148,37 +2093,37 @@ function PurchasingClientLoaded({
               stats: [
                 {
                   label: t("purchasing.dashboard.openPOs"),
-                  value: openOrders.length.toString(),
-                  change: percentChange(currentOpenOrders.length, previousOpenOrders.length),
+                  value: review.open?.toString() ?? "—",
+                  change: review.change,
                   icon: "FileText",
                 },
                 {
-                  label: t("purchasing.dashboard.spendMTD"),
-                  value: `$${spendMtd.toLocaleString()}`,
-                  change: percentChange(spendMtd, previousSpend),
+                  label: t("purchasing.dashboard.confirmedOrderValue", { defaultValue: "Confirmed order value" }),
+                  value: financial.value,
+                  change: financial.change,
                   icon: "DollarSign",
                 },
-                { label: t("purchasing.dashboard.pendingReceipt"), value: pendingReceipt.toString(), icon: "Truck" },
-                { label: t("purchasing.dashboard.awaitingApproval"), value: toApprove.toString(), icon: "Clock" },
+                { label: t("purchasing.dashboard.pendingReceipt"), value: review.pendingReceipt?.toString() ?? "—", icon: "Truck" },
+                { label: t("purchasing.dashboard.awaitingApproval"), value: review.toApprove?.toString() ?? "—", icon: "Clock" },
                 {
                   label: t("purchasing.dashboard.partialReceipt", {
                     defaultValue: "Partial receipt",
                   }),
-                  value: partialReceipt.toString(),
+                  value: review.partialReceipt?.toString() ?? "—",
                   icon: "Package",
                 },
                 {
                   label: t("purchasing.dashboard.overBilled", {
                     defaultValue: "Over-billed lines",
                   }),
-                  value: overBilled.toString(),
+                  value: review.overBilled?.toString() ?? "—",
                   icon: "AlertTriangle",
                 },
                 {
-                  label: t("purchasing.dashboard.onTimePct", {
-                    defaultValue: "On-time %",
+                  label: t("purchasing.dashboard.receivedOrNotDue", {
+                    defaultValue: "Received or not yet due",
                   }),
-                  value: onTimePct == null ? "—" : `${onTimePct}%`,
+                  value: review.receivedOrNotDue == null ? "—" : `${review.receivedOrNotDue}%`,
                   icon: "Gauge",
                 },
               ],
@@ -2215,35 +2160,19 @@ function PurchasingClientLoaded({
           }
         }
         if (w.id === "pur-by-vendor") {
-          const byVendor = groupBy(orders, (o) => String(o.partnerId ?? "Unknown"))
-          const vendorValues = Object.entries(byVendor)
-            .map(([partnerId, vendOrders]) => ({
-              vendor: t("purchasing.dashboard.vendorLabel", { id: partnerId.slice(-4) }),
-              Spend: Math.round(vendOrders.reduce((s, o) => s + Number(o.amountTotal ?? 0), 0)),
-            }))
-            .sort((a, b) => b.Spend - a.Spend)
-            .slice(0, 5)
-          return { ...w, data: { ...(w.data as Record<string, unknown>), values: vendorValues } }
+          return { ...w, type: "table" as const,
+            title: t("purchasing.dashboard.vendorValueByCurrency", { defaultValue: "Confirmed order value by vendor and currency" }),
+            data: { columns: [{ key: "vendor", label: t("purchasing.dashboard.vendor", { defaultValue: "Vendor" }) },
+              { key: "currency", label: t("purchasing.dashboard.currency", { defaultValue: "Currency" }) },
+              { key: "value", label: t("purchasing.dashboard.orderValue", { defaultValue: "Order value" }), align: "right" as const }],
+            rows: financial.status === "ready" && financial.vendorsStatus === "ready" ? financial.vendors.map((vendor) => ({ vendor: vendorLabel(vendor.vendorId), currency: vendor.currency, value: vendor.value }))
+              : [{ vendor: t("common.recordsUnavailable"), currency: "—", value: "—" }] } }
         }
         if (w.id === "pur-po-table") {
-          const openRows = orders
-            .filter((o) => {
-              const state = String(o.state ?? "")
-              return state === "Purchase" || state === "Draft" || state === "Sent"
-            })
-            .slice(0, 4)
-            .map((o) => {
-              const dateMs = Number(o.dateOrder ?? 0) / 1000
-              const dateStr = dateMs > 0 ? new Date(dateMs).toLocaleDateString("en", { month: "short", day: "numeric" }) : "—"
-              return {
-                po: String(o.name ?? `PO-${String(o.id).slice(-6)}`),
-                vendor: t("purchasing.dashboard.vendorLabel", { id: String(o.partnerId ?? "?").slice(-4) }),
-                amount: `$${Number(o.amountTotal ?? 0).toLocaleString()}`,
-                ordered: dateStr,
-                expected: "—",
-                status: String(o.state ?? "Draft"),
-              }
-            })
+          const dateLabel = (date: Date | null) => date ? new Intl.DateTimeFormat(financialLocale, { month: "short", day: "numeric", year: "numeric" }).format(date) : "—"
+          const openRows = financial.status === "ready" ? financial.openOrders.map((order) => ({ po: order.name, vendor: vendorLabel(order.vendorId),
+            amount: order.value, ordered: dateLabel(order.ordered), expected: dateLabel(order.expected), status: order.state }))
+            : [{ po: t("common.recordsUnavailable"), vendor: "—", amount: "—", ordered: "—", expected: "—", status: "—" }]
           return { ...w, data: { ...(w.data as Record<string, unknown>), rows: openRows } }
         }
         return w
@@ -2263,6 +2192,16 @@ function PurchasingClientLoaded({
     openBlanketOrderCreate,
     openPurchasingConfiguration,
     dashboardTimeRange,
+    orgId,
+    operatingCompanyId,
+    ordersRead.state,
+    ordersToApproveRead.state,
+    ordersPartialReceiptRead.state,
+    linesOverBilledRead.state,
+    currencies,
+    currenciesQuery,
+    financialLocale,
+    vendorLabelById,
   ])
 
   const config = useMemo(
@@ -2356,6 +2295,18 @@ function PurchasingClientLoaded({
             return tab
           }),
           {
+            id: "discrepancies",
+            label: t("purchasing.discrepancies.title", { defaultValue: "Discrepancies" }),
+            type: "custom" as const,
+            customContent: <PurchaseDiscrepancyPanel
+              scope={{ organizationId: orgId, companyId: operatingCompanyId }}
+              partialQueue={ordersPartialReceipt} overBilledQueue={linesOverBilled} orders={orders} lines={lines}
+              pickings={stockPickings} bills={accountMoves}
+              states={{ partial: ordersPartialReceiptRead.state, overBilled: linesOverBilledRead.state,
+                orders: ordersRead.state, lines: linesRead.state,
+                receipts: moduleQueryState(receiptQuery), bills: moduleQueryState(billQuery) }} />,
+          },
+          {
             id: "blanket-orders",
             label: t("purchasing.blanketOrders.tab", { defaultValue: "Blanket Orders" }),
             type: "custom" as const,
@@ -2433,6 +2384,20 @@ function PurchasingClientLoaded({
       products,
       uoms,
       currencies,
+      orgId,
+      operatingCompanyId,
+      ordersPartialReceipt,
+      linesOverBilled,
+      orders,
+      lines,
+      stockPickings,
+      accountMoves,
+      ordersPartialReceiptRead.state,
+      linesOverBilledRead.state,
+      ordersRead.state,
+      linesRead.state,
+      receiptQuery,
+      billQuery,
       createPurchaseBlanketOrder,
       editPartnerBankFormConfig,
       deletePartnerBank,
@@ -2513,7 +2478,7 @@ function PurchasingClientLoaded({
 
   const dataState = {
     dashboard: mergeModuleStates([
-      ordersRead.state, ordersToApproveRead.state, ordersPartialReceiptRead.state, linesOverBilledRead.state, linesRead.state,
+      ordersRead.state, ordersToApproveRead.state, ordersPartialReceiptRead.state, linesOverBilledRead.state, linesRead.state, moduleQueryState(currenciesQuery),
     ]),
     orders: ordersRead.state,
     lines: linesRead.state,
@@ -2580,9 +2545,6 @@ function PurchasingClientLoaded({
         pricelists as Array<{ id: unknown; currencyId?: unknown }>,
       )
       if (params == null) throw new Error(t("purchasing.forms.refinement.requiredOrderContext", { defaultValue: "Choose a vendor and an available price list with a currency, then check the expected delivery date. Your entries have been retained." }))
-      if (orderNeedsCustomFieldSave(params.metadata)) {
-        throw new Error(t("purchasing.forms.refinement.customFieldsBlocked", { defaultValue: "Custom fields cannot be saved together with this purchase order yet. No purchase order was created. Your entries have been retained." }))
-      }
       await createPurchaseOrder.mutateAsync(params)
     } else if (action === "createPurchaseRequisition") {
       const params = toCreatePurchaseRequisitionParams(formData)

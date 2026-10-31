@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
 import { randomUUID } from "node:crypto"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
@@ -86,6 +87,7 @@ async function openCreateInvoice(page: Page, requestUuid: string, description: s
   await page.getByRole("option").first().click()
   await page.getByTestId("create-invoice-line-description").fill(description)
   await page.getByTestId("create-invoice-line-unit-price").fill("90")
+  await reviewInvoiceAccountingChoices(page)
   await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
 }
 

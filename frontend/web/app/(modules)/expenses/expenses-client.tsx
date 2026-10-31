@@ -92,8 +92,10 @@ import { approvalBacklog, monthlySpend, spendByCategory } from "./expenses-dashb
 import { useProjects } from "@lumiere/query-hooks/hooks/projects"
 import { useAccountTaxes, useAccountAnalyticAccounts } from "@lumiere/query-hooks/hooks/accounting"
 import { allocationLookupRows, expenseAllocationLines } from "./expense-allocation-input"
+import { useExpenseAllocationReadback } from "./use-expense-allocation-readback"
 import { expenseVariantTag } from "@/lib/expense-state"
-import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
+import { useExplainErpError } from "@/lib/erp-ai-context"
+import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseDefaultEmployee, expenseEmployeeDefaultForm, expensePricelistLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
 import {
   expenseQuantity,
   newExpenseReceiptClientRequestId,
@@ -196,6 +198,7 @@ function ExpensesClientLoaded({
   const { t } = useTranslation()
   const router = useRouter()
   const { identity } = useErpSession()
+  const explainError = useExplainErpError()
   const { checkPermission, permissionsReady } = useRBAC()
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
@@ -226,7 +229,8 @@ function ExpensesClientLoaded({
   const currenciesQuery = useCurrencies()
   const sheetsState = sheetsRead.state
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const employeesQuery = useEmployees(orgId, initialEmployees)
+  const employees = employeesQuery.data ?? []
   const { data: products = [] } = useProducts(orgId)
   const { data: currencies = [] } = useCurrencies()
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
@@ -235,6 +239,12 @@ function ExpensesClientLoaded({
   const { data: projects = [] } = projectsQuery
   const allocationAccountsQuery = useAccountAnalyticAccounts(orgId, { enabled: workflowForm?.kind === "setAllocations" && operatingCompanyId > 0n })
   const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: operatingCompanyId > 0n })
+  const allocationReadback = useExpenseAllocationReadback({
+    organizationId: orgId, companyId: operatingCompanyId, identity,
+    expenseId: workflowForm?.kind === "setAllocations" ? optionalBigIntU64(workflowForm.row.id) : undefined,
+    enabled: workflowForm?.kind === "setAllocations" && expensesUsable && permissionsReady !== false && checkPermission("hr_expense", "write").allowed,
+  }, t("expenses.allocations.readUnavailable", { defaultValue: "Saved allocations could not be verified. Retry the read before editing or saving." }),
+  t("expenses.allocations.changed", { defaultValue: "Saved allocations changed since this editor opened. Your edits are retained. Close and reopen this expense to review the current saved rows before replacing them." }))
 
   const expenses = useMemo(
     () => expensesRaw.map((e) => mapExpenseRow(e as Record<string, unknown>)),
@@ -336,14 +346,14 @@ function ExpensesClientLoaded({
 
   const pricelistFieldOptions = useMemo(() => {
     const codes = currencyCodeMap(currencies)
-    const fromApi = pricelistRowsToSelectOptions(pricelists).map((option) => {
+    const fromApi = pricelistRowsToSelectOptions(expensePricelistLookupRows(pricelists, orgId, operatingCompanyId)).map((option) => {
       const row = pricelists.find((candidate) => String(candidate.id) === option.value)
       const code = codes.get(String(row?.currencyId))
       return { ...option, label: code ? `${option.label} · ${code}` : option.label }
     })
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
-  }, [pricelists, currencies, t])
+  }, [pricelists, currencies, orgId, operatingCompanyId, t])
 
   const employeeFieldOptions = useMemo(() => {
     const fromApi = employeeRowsToSelectOptions(expenseCompanyLookupRows(employees, orgId, operatingCompanyId))
@@ -377,7 +387,7 @@ function ExpensesClientLoaded({
 
   const expenseFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newExpenseForm(t), {
+      expenseEmployeeDefaultForm(mergeSelectOptionsForFields(newExpenseForm(t), {
         pricelistId: pricelistFieldOptions,
         employeeId: employeeFieldOptions,
         mileageRateId: mileageRateFieldOptions,
@@ -385,17 +395,19 @@ function ExpensesClientLoaded({
         projectId: projectFieldOptions,
         productId: productFieldOptions,
         taxIds: taxFieldOptions,
-      }),
-    [t, pricelistFieldOptions, employeeFieldOptions, mileageRateFieldOptions, perDiemRateFieldOptions, projectFieldOptions, productFieldOptions, taxFieldOptions],
+      }), moduleQueryState(employeesQuery).status === "ready" ? expenseDefaultEmployee(employees, orgId, operatingCompanyId, identity) : undefined,
+      t("expenses.forms.capture.employeeDefaultHint", { defaultValue: "Selected from the active employee record linked to your signed-in account in this company. Change it if you are entering an expense for someone else." })),
+    [t, pricelistFieldOptions, employeeFieldOptions, mileageRateFieldOptions, perDiemRateFieldOptions, projectFieldOptions, productFieldOptions, taxFieldOptions, employeesQuery, employees, orgId, operatingCompanyId, identity],
   )
 
   const expenseSheetFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newExpenseSheetForm(t), {
+      expenseEmployeeDefaultForm(mergeSelectOptionsForFields(newExpenseSheetForm(t), {
         pricelistId: pricelistFieldOptions,
         employeeId: employeeFieldOptions,
-      }),
-    [t, pricelistFieldOptions, employeeFieldOptions],
+      }), moduleQueryState(employeesQuery).status === "ready" ? expenseDefaultEmployee(employees, orgId, operatingCompanyId, identity) : undefined,
+      t("expenses.forms.capture.employeeDefaultHint", { defaultValue: "Selected from the active employee record linked to your signed-in account in this company. Change it if you are entering an expense for someone else." })),
+    [t, pricelistFieldOptions, employeeFieldOptions, employeesQuery, employees, orgId, operatingCompanyId, identity],
   )
 
   const editExpenseFormConfig = useMemo(
@@ -419,7 +431,7 @@ function ExpensesClientLoaded({
     projectOptions: allocationProjects.map((row) => ({ value: String(row.id), label: String(row.name ?? row.id) })),
     analyticAccountOptions: allocationAccounts.map((row) => ({ value: String(row.id), label: [row.code, row.name].filter(Boolean).map(String).join(" · ") || String(row.id) })),
     projectsState: allocationProjectsState, analyticAccountsState: allocationAccountsState,
-  }, setExpenseAllocations.isPending)
+  }, setExpenseAllocations.isPending || !allocationReadback.ready, allocationReadback.rows)
   const companyCurrencyRows = useCompanies(Number(orgId), orgId > 0n).data ?? []
   const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
@@ -804,12 +816,12 @@ function ExpensesClientLoaded({
     if (!actionUsable(action)) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
     if (action === "createExpense") {
       if (permissionsReady === false || !checkPermission("hr_expense", "create").allowed) throw new Error(t("common.recordsUnavailable"))
-      const context = expenseCreateContext(formData, employees, pricelists, orgId, operatingCompanyId, t)
+      const context = expenseCreateContext(formData, employees, expensePricelistLookupRows(pricelists, orgId, operatingCompanyId), orgId, operatingCompanyId, t)
       const params = toCreateExpenseParams(expenseInputsForLineKind(formData), context.currencyId)
       if (params === null) throw new Error(t("expenses.forms.capture.dateRequired", { defaultValue: "Enter a valid expense date before saving. Your entries have been retained." }))
       await expenseCreate.submit(params, formData)
     } else if (action === "createExpenseSheet" || action === "createSheet") {
-      const context = expenseCreateContext(formData, employees, pricelists, orgId, operatingCompanyId, t)
+      const context = expenseCreateContext(formData, employees, expensePricelistLookupRows(pricelists, orgId, operatingCompanyId), orgId, operatingCompanyId, t)
       const params = toCreateExpenseSheetParams(formData, context.currencyId)
       if (params === null) throw new Error(t("expenses.forms.capture.contextRequired", { defaultValue: "Check the employee and price list before saving this report. Your entries have been retained." }))
       if (reportContinuation && (String(context.currencyId) !== String(reportContinuation.row.currencyId) || String(context.employeeId) !== String(reportContinuation.row.employeeId))) {
@@ -975,9 +987,11 @@ function ExpensesClientLoaded({
         t("expenses.allocations.invalidRow", { defaultValue: "Each allocation needs a current company project or active analytic account, a share greater than 0 and at most 100, and a billable choice. Correct invalid or unavailable selections; your rows are retained." }),
         t("expenses.ops.shareTotalInvalid"),
       )
+      const expectedSnapshot = await allocationReadback.verifyBeforeSave()
+      allocationReadback.assertCurrentAdmission()
       await setExpenseAllocations.mutateAsync({
         expenseId: rowId(workflowForm.row),
-        params: { lines },
+        params: { lines, expectedSnapshot },
       })
     }
     setWorkflowForm(null)
@@ -1089,6 +1103,7 @@ function ExpensesClientLoaded({
         isPending={isFormMutationPending}
       />
       <FormModal
+        onExplainError={explainError}
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => {
           if (!open) {
@@ -1174,16 +1189,25 @@ function ExpensesClientLoaded({
 
       {decision.modal}
       {finance.modal}
-      {workflowFormConfig && workflowForm && expensesUsable && (
+      {workflowForm?.kind === "setAllocations" && expensesUsable && !allocationReadback.initialized ? <Dialog open onOpenChange={(open) => !open && setWorkflowForm(null)}>
+        <DialogContent><DialogHeader><DialogTitle>{t("expenses.forms.setAllocations.title")}</DialogTitle>
+          <DialogDescription>{t("expenses.allocations.loadBeforeEdit", { defaultValue: "Load this expense's saved allocations before making changes." })}</DialogDescription></DialogHeader>
+          <p role={allocationReadback.state.status === "loading" ? "status" : "alert"}>{allocationReadback.error ?? t(`expenses.allocations.read.${allocationReadback.state.status}`, { defaultValue: allocationReadback.state.status === "loading" ? "Loading saved allocations…" : allocationReadback.state.status === "denied" ? "Access to this expense's allocations is restricted." : "Saved allocations could not be verified." })}</p>
+          <DialogFooter><Button variant="outline" onClick={() => setWorkflowForm(null)}>{t("common.close")}</Button><Button variant="outline" onClick={allocationReadback.retry}>{t("common.retry")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog> : null}
+      {workflowFormConfig && workflowForm && expensesUsable && (workflowForm.kind !== "setAllocations" || allocationReadback.initialized) && (
         <FormModal
+          onExplainError={explainError}
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}
           open={quickActionForm === null}
           onOpenChange={(open) => !open && setWorkflowForm(null)}
           config={workflowFormConfig}
           isPending={isFormMutationPending}
-          draftKey={workflowForm.kind === "setAllocations" ? rowId(workflowForm.row) : undefined}
-          submissionDisabled={workflowForm.kind === "setAllocations" && (!allocationChoicesReady || permissionsReady === false || !checkPermission("hr_expense", "write").allowed)}
-          formLeadingActions={workflowForm.kind === "addToReport" ? <Button type="button" variant="outline"
+          draftKey={workflowForm.kind === "setAllocations" ? `${identity}:${orgId}:${operatingCompanyId}:${rowId(workflowForm.row)}` : undefined}
+          submissionDisabled={workflowForm.kind === "setAllocations" && (!allocationReadback.ready || !allocationChoicesReady || permissionsReady === false || !checkPermission("hr_expense", "write").allowed)}
+          submitError={workflowForm.kind === "setAllocations" && !allocationReadback.ready ? allocationReadback.error ?? t("expenses.allocations.readUnavailable", { defaultValue: "Saved allocations could not be verified. Retry the read before editing or saving." }) : undefined}
+          formLeadingActions={workflowForm.kind === "setAllocations" && !allocationReadback.ready ? <Button type="button" variant="outline" onClick={allocationReadback.retry}>{t("common.retry")}</Button> : workflowForm.kind === "addToReport" ? <Button type="button" variant="outline"
             data-testid="expense-create-report-continuation" disabled={!sheetsUsable || permissionsReady === false || !checkPermission("hr_expense_sheet", "create").allowed} onClick={() => {
               setReportContinuation(workflowForm); setQuickActionForm({ action: "createSheet" })
             }}>{t("expenses.workflowUi.createReport")}</Button> : undefined}

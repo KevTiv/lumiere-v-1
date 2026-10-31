@@ -198,6 +198,13 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib document_blob
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib config::tests::document_
 
+      - name: Alpha saved-effect readback and retention authorization
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::record_creations::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::expense_allocations::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::documents::retention::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::messaging::exclusions::tests
+
       - name: C3 PostgreSQL projection matrix
         env:
           C3_TEST_PG: "1"
@@ -219,6 +226,7 @@ jobs:
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
         run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture --test-threads=1
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import_reviews:: -- --nocapture --test-threads=1
           bash scripts/tests/test-ai-index-migration.sh
@@ -263,9 +271,10 @@ jobs:
       - name: Document evidence ingestion tests
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib evidence_ingestion::tests
 
-      - name: Assistant guide access and save transport
+      - name: Assistant guide access, evidence review and save transport
         run: |
-          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::knowledge_guides::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::ai_evidence::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::knowledge_guides::
           python3 scripts/run-required-cargo-tests.py --locked -p stdb-auth detail_field_access_honors
 
       - name: Deterministic graduation conformance
@@ -338,6 +347,16 @@ jobs:
 
       - name: CRM qualification replay and tenant isolation proof
         run: spacetime call lumiere-ci-contracts run_crm_relational_fk_test --server local -y --no-config
+
+      - name: Alpha capability saved-effect regressions
+        run: |
+          spacetime call lumiere-ci-contracts run_configured_record_creation_tests --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_accounting_post_invoice_test --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_all_expenses_tests --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_all_subscriptions_tests --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_documents_wave_c_tests --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_core_operational_messaging_test --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_knowledge_guide_tests --server local -y --no-config
 
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.

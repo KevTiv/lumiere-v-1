@@ -53,6 +53,7 @@ pub(crate) struct BusinessChangeInput {
     pub subject_resource: &'static str,
     pub subject_record_id: u64,
     pub operation: &'static str,
+    pub audit_action: &'static str,
     pub before: Value,
     pub after: Value,
     /// Fields changed by the domain owner but deliberately excluded from
@@ -78,6 +79,9 @@ pub(crate) fn capture_business_change(
     {
         return Err("business change requires positive canonical ownership".into());
     }
+    if !matches!(input.audit_action, "CREATE" | "UPDATE") {
+        return Err("business change requires an admitted audit action".into());
+    }
     let prepared = prepare_change(&input.before, &input.after)?;
     if prepared.is_none() && input.summary_only_changed_fields.is_empty() {
         return Ok(None);
@@ -98,7 +102,7 @@ pub(crate) fn capture_business_change(
             company_id: Some(input.company_id),
             table_name: input.subject_resource,
             record_id: input.subject_record_id,
-            action: "UPDATE",
+            action: input.audit_action,
             // Sensitive values live once in the private change evidence.
             old_values: None,
             new_values: None,

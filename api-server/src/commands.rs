@@ -523,6 +523,69 @@ pub(crate) async fn dispatch_historical_payment_allocations(
     Ok(context)
 }
 
+pub(crate) fn knowledge_guide_review_contract() -> Result<&'static ReducerContract, ApiError> {
+    const REDUCER: &str = "review_ai_knowledge_entry_version";
+    let contract = stdb_client::reducer_contract(REDUCER).ok_or_else(|| {
+        ApiError::Forbidden("guide review reducer is absent from the contract".into())
+    })?;
+    let expected = [
+        ("organization_id", ScalarKind::UnsignedInteger, None),
+        ("company_id", ScalarKind::UnsignedInteger, None),
+        ("version_id", ScalarKind::UnsignedInteger, None),
+        (
+            "params",
+            ScalarKind::Composite,
+            Some("ReviewAiKnowledgeEntryVersionParams"),
+        ),
+    ];
+    if contract.name != REDUCER
+        || contract.contract_operation_id != "erp.review_ai_knowledge_entry_version"
+        || contract.exposure != Exposure::Denied
+        || contract.organization_position != Some(0)
+        || contract.company_position != Some(1)
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind, target))| {
+                actual.name == name && actual.kind == kind && actual.ref_target == target
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "guide review reducer must retain its fixed denied contract".into(),
+        ));
+    }
+    Ok(contract)
+}
+
+/// Only the dedicated guide review route admits this fixed native operation.
+/// Keep the human session token so native membership and independent-review
+/// checks still derive their actor from ctx.sender(). Generic operations deny it.
+pub(crate) async fn dispatch_knowledge_guide_review(
+    state: &AppState,
+    session: &ApiSession,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let contract = knowledge_guide_review_contract()?;
+    let args = args
+        .as_array()
+        .cloned()
+        .ok_or_else(|| ApiError::Internal("guide review arguments must be an array".into()))?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        state.client_with_token(&session.stdb_token),
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let company_scope = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
 /// Fixed, deny-by-default evidence mutations admitted only by dedicated BFF
 /// routes. The browser never selects a reducer or operation id.
 pub(crate) async fn dispatch_ai_evidence_mutation(

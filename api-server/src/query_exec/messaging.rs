@@ -4,6 +4,21 @@ use stdb_client::StdbClient;
 
 use super::row_values::sort_rows_by_id_desc;
 
+/// Historical metadata was caller-authored. Only the source-authorized private
+/// evidence route may return a reducer-captured exclusion snapshot.
+pub(super) fn strip_untrusted_batch_exclusions(rows: &mut [Value]) {
+    for row in rows {
+        let Some(raw) = row.get("metadata").and_then(Value::as_str) else {
+            continue;
+        };
+        let Ok(Value::Object(mut metadata)) = serde_json::from_str(raw) else {
+            continue;
+        };
+        metadata.remove("batch_exclusions_v1");
+        row["metadata"] = Value::String(Value::Object(metadata).to_string());
+    }
+}
+
 pub(super) async fn read_queued_mail_messages(
     client: &StdbClient,
     organization_id: u64,

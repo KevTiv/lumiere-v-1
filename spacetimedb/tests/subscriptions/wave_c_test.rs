@@ -5,6 +5,8 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{account_move, post_invoice};
+use crate::core::audit::audit_log;
+use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::sales_core::{
@@ -29,6 +31,121 @@ use crate::subscriptions::tables::{
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, JournalType, MoveType};
 
+fn require_exact_renewal_capture(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    subscription_id: u64,
+    expected_date: Timestamp,
+) -> Result<(), String> {
+    let amendments: Vec<_> = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&subscription_id)
+        .filter(|row| row.amendment_type == "renew")
+        .collect();
+    let [amendment] = amendments.as_slice() else {
+        return Err("expected one immutable renewal amendment".into());
+    };
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&organization_id)
+        .filter(|row| row.operation_id == "erp.renew_subscription")
+        .collect();
+    let [commit] = commits.as_slice() else {
+        return Err("renewal must emit one source commit, including after replay".into());
+    };
+    if commit.actor_identity != ctx.sender()
+        || commit.correlation_id != format!("renewal:{subscription_id}:{}", amendment.id)
+        || commit.row_change_count != 3
+    {
+        return Err("renewal source commit lost its actor or exact amendment identity".into());
+    }
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&organization_id)
+        .filter(|row| row.commit_sequence == commit.sequence)
+        .collect();
+    for table in ["subscription", "subscription_amendment", "audit_log"] {
+        if changes.iter().filter(|row| row.table_name == table).count() != 1 {
+            return Err(format!("renewal source omitted exact {table}"));
+        }
+    }
+    for change in &changes {
+        let row: serde_json::Value = serde_json::from_str(
+            change
+                .row_json
+                .as_deref()
+                .ok_or("renewal source row is incomplete")?,
+        )
+        .map_err(|e| e.to_string())?;
+        if row["organization_id"].as_u64() != Some(organization_id) {
+            return Err("renewal source captured another organization".into());
+        }
+        if change.table_name == "subscription" {
+            let date = serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(
+                &expected_date,
+            ))
+            .map_err(|e| e.to_string())?;
+            if row["id"].as_u64() != Some(subscription_id)
+                || row["company_id"].as_u64() != Some(company_id)
+                || row["state"] != "active"
+                || row["recurring_next_date"] != date
+            {
+                return Err(
+                    "renewal source did not capture its exact resulting billing state".into(),
+                );
+            }
+        } else if change.table_name == "subscription_amendment" {
+            let metadata: serde_json::Value = serde_json::from_str(
+                row["metadata"]
+                    .as_str()
+                    .ok_or("renewal receipt metadata missing")?,
+            )
+            .map_err(|e| e.to_string())?;
+            if row["id"].as_u64() != Some(amendment.id)
+                || row["company_id"].as_u64() != Some(company_id)
+                || row["subscription_id"].as_u64() != Some(subscription_id)
+                || metadata["idempotency_key"] != format!("renew-once-{subscription_id}")
+                || metadata["request_fingerprint"]
+                    .as_str()
+                    .is_none_or(|value| value.len() != 64)
+            {
+                return Err(
+                    "renewal durable amendment lost its complete scoped request receipt".into(),
+                );
+            }
+        } else {
+            let audit = ctx
+                .db
+                .audit_log()
+                .id()
+                .find(&row["id"].as_u64().ok_or("renewal audit identity missing")?)
+                .ok_or("renewal audit missing")?;
+            let exact =
+                serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&audit))
+                    .map_err(|e| e.to_string())?;
+            if audit.organization_id != organization_id
+                || audit.company_id != Some(company_id)
+                || audit.user_identity != ctx.sender()
+                || audit.record_id != subscription_id
+                || audit.table_name != "subscription"
+                || row != exact
+            {
+                return Err(
+                    "renewal source audit does not match the canonical actor/company action".into(),
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
     let org_id = fixture.organization_id;
     let company_id = fixture.company_id;
@@ -45,7 +162,7 @@ fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, Strin
             name: format!("Sub C {company_id}"),
             code: code.clone(),
             type_: JournalType::Sale,
-            currency_id: Some(1),
+            currency_id: Some(fixture.currency_id),
             default_account_id: Some(revenue_id),
             suspense_account_id: None,
             loss_account_id: None,
@@ -100,7 +217,7 @@ fn seed_active_subscription(
             name: format!("Wave C {label}"),
             code: plan_code.clone(),
             description: None,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
@@ -147,7 +264,7 @@ fn seed_active_subscription(
         CreatePricelistParams {
             company_id: None,
             name: format!("PL-C-{label}-{org_id}"),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -168,7 +285,7 @@ fn seed_active_subscription(
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -544,6 +661,7 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
         RenewSubscriptionParams {
             intervals: 2,
             notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
         },
     )?;
     let after = ctx
@@ -563,6 +681,84 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
             .as_secs()
     {
         return Err("renew should push recurring_next_date forward".into());
+    }
+
+    let renewal_count = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .filter(|row| row.amendment_type == "renew")
+        .count();
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 2,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )?;
+    let replayed = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("sub after replay")?;
+    let replay_count = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .filter(|row| row.amendment_type == "renew")
+        .count();
+    if replayed.recurring_next_date != after || replay_count != renewal_count || renewal_count != 1
+    {
+        return Err("renewal replay advanced billing or created another amendment".into());
+    }
+    require_exact_renewal_capture(ctx, org_id, company_id, sub_id, after)?;
+    if renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 3,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )
+    .is_ok()
+    {
+        return Err("renewal key reuse with different intervals must reject".into());
+    }
+    if renew_subscription(
+        ctx,
+        org_id,
+        company_id + 1,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 2,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )
+    .is_ok()
+    {
+        return Err("renewal replay must enforce company ownership before resolving".into());
+    }
+    if ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("sub after rejected replay")?
+        .recurring_next_date
+        != after
+    {
+        return Err("rejected renewal replay changed the billing date".into());
     }
 
     generate_subscription_invoice(
@@ -604,6 +800,33 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
     if closed.state != "closed" || closed.is_active {
         return Err("expected closed after cancel".into());
     }
+    let closed_next_date = closed.recurring_next_date;
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 2,
+            notes: Some("extend".into()),
+            idempotency_key: Some(format!("renew-once-{sub_id}")),
+        },
+    )?;
+    let closed_after_replay = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("closed replay")?;
+    if closed_after_replay.state != "closed"
+        || closed_after_replay.recurring_next_date != closed_next_date
+    {
+        return Err(
+            "resolving a completed renewal must not reopen or advance a later-closed subscription"
+                .into(),
+        );
+    }
+    require_exact_renewal_capture(ctx, org_id, company_id, sub_id, after)?;
     if !closed.metadata.contains("entitlement_revoke_pending") {
         return Err("expected entitlement revoke hook in metadata".into());
     }
@@ -622,6 +845,93 @@ pub fn test_renew_and_cancel_with_credit(ctx: &ReducerContext) -> Result<(), Str
     Ok(())
 }
 
+/// Omitted and empty notes, like zero and one intervals, normalize to the same immutable request.
+pub fn test_renew_default_notes_receipt(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let journal_id = seed_journal(ctx, &fixture)?;
+    let (sub_id, _) = seed_active_subscription(ctx, &fixture, journal_id, "RENEW-DEFAULT", 60.0)?;
+    let before = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription before default renewal")?
+        .recurring_next_date;
+    let key = format!("renew-once-{sub_id}");
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 0,
+            notes: None,
+            idempotency_key: Some(key.clone()),
+        },
+    )?;
+    let after = ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after default renewal")?
+        .recurring_next_date;
+    if after <= before {
+        return Err("default renewal did not advance its billing interval".into());
+    }
+    let amendment = ctx
+        .db
+        .subscription_amendment()
+        .subscription_amendment_by_sub()
+        .filter(&sub_id)
+        .find(|row| row.amendment_type == "renew")
+        .ok_or("default renewal receipt")?;
+    if !amendment.notes.is_empty() {
+        return Err("omitted renewal notes must be stored as the canonical empty value".into());
+    }
+    renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 1,
+            notes: Some(String::new()),
+            idempotency_key: Some(key.clone()),
+        },
+    )?;
+    if renew_subscription(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        RenewSubscriptionParams {
+            intervals: 1,
+            notes: Some("changed notes".into()),
+            idempotency_key: Some(key),
+        },
+    )
+    .is_ok()
+    {
+        return Err("a default-note request key must reject later changed notes".into());
+    }
+    if ctx
+        .db
+        .subscription()
+        .id()
+        .find(&sub_id)
+        .ok_or("subscription after default replay")?
+        .recurring_next_date
+        != after
+    {
+        return Err("default-note renewal replay advanced the billing date".into());
+    }
+    require_exact_renewal_capture(ctx, org_id, company_id, sub_id, after)
+}
+
 pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
@@ -637,7 +947,7 @@ pub fn test_plan_update_and_deactivate(ctx: &ReducerContext) -> Result<(), Strin
             name: "To Update".into(),
             code: format!("PLAN-UPD-{org_id}"),
             description: None,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
