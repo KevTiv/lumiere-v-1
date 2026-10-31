@@ -464,7 +464,7 @@ function InventoryClientLoaded({
     string,
     unknown
   > | null>(null);
-  const [renameCategoryRow, setRenameCategoryRow] = useState<Record<string, unknown> | null>(null);
+  const [renameCategoryRow, setRenameCategoryRow] = useState<{ id: ScalarId; name: string } | null>(null);
   const renameCategory = useRenameProductCategory(orgId);
   const renameCategoryEpoch = useRef(0);
   useEffect(() => { renameCategoryEpoch.current++; setRenameCategoryRow(null); }, [identity, sessionOrganizationId, organizationId, operatingCompanyId]);
@@ -3129,7 +3129,7 @@ function InventoryClientLoaded({
                   label: t('inventory.categoryActions.rename'),
                   permission: { resource: 'product_category', action: 'write' },
                   requiresSelection: true,
-                  onClick: (rows) => { if (permissionsReady !== false && checkPermission('product_category', 'write').allowed && rows.length === 1) { renameCategoryEpoch.current++; setRenameCategoryRow(rows[0]!); } },
+                  onClick: (rows) => { if (permissionsReady !== false && checkPermission('product_category', 'write').allowed && rows.length === 1) { renameCategoryEpoch.current++; setRenameCategoryRow({ id: rows[0]!.id as ScalarId, name: String(rows[0]!.name ?? '') }); } },
                 },
                 {
                   id: 'delete-category',
