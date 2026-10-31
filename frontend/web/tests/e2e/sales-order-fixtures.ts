@@ -12,6 +12,7 @@ import {
   chooseSelectOptionByValue,
   clickEntityActionAndWaitForReducer,
   fetchSaleOrderSelectLabel,
+  fetchSessionOrganizationId,
   fillField,
   gotoModule,
   openEntityCreate,
@@ -34,6 +35,10 @@ type SaleOrderQueryRow = QueryRowFor<"sale-orders">
  */
 export async function createDraftSaleOrder(page: Page, clientRef: string): Promise<number> {
   await gotoModule(page, "/sales", "sales")
+  const organizationId = await fetchSessionOrganizationId(page)
+  expect(Number.isSafeInteger(organizationId) && organizationId > 0).toBe(true)
+  const actorHex = (await page.context().cookies()).find((cookie) => cookie.name === "stdb_identity")?.value.replace(/^0x/i, "").toLowerCase()
+  expect(actorHex).toMatch(/^[0-9a-f]{64}$/)
   await selectModuleTab(page, "sales", "orders")
   await waitForBffQueryMinRows(page, "/api/query/contacts")
   await waitForBffQueryMinRows(page, "/api/query/pricelists")
@@ -51,35 +56,59 @@ export async function createDraftSaleOrder(page: Page, clientRef: string): Promi
   await chooseFirstEnabledOption(page, "pricelistId")
   await chooseFirstEnabledOption(page, "warehouseId")
   await fillField(page, "clientOrderRef", clientRef)
-  const [, receiptResponse] = await Promise.all([
+  const [creationResponse] = await Promise.all([
     page.waitForResponse((res) => matchesOperationResponse(res, "create_sale_order") && res.ok(), {
-      timeout: 30_000,
-    }),
-    page.waitForResponse((res) => /^\/(?:api|v1)\/sales\/order-creations\//.test(new URL(res.url()).pathname), {
       timeout: 30_000,
     }),
     submitForm(page, "new-sale-order"),
   ])
+  // The create owner performs an empty capability probe before dispatch. Read
+  // the post-commit receipt for this exact submitted attempt, never that probe
+  // or a record inferred from its reference/name.
+  const input = creationResponse.request().postDataJSON() as {
+    params: { company_id: { some: string | number }; metadata: { some: string } }
+  }
+  expect(typeof input.params.metadata.some).toBe("string")
+  const envelope = JSON.parse(input.params.metadata.some).__lumiere_create_v1 as {
+    company_id: string; operation_key: string
+  }
+  expect(Object.keys(envelope).sort()).toEqual(["company_id", "operation_key"])
+  expect(envelope.company_id).toMatch(/^[1-9][0-9]*$/)
+  expect(envelope.operation_key).toMatch(/^[A-Za-z0-9_-]{1,128}$/)
+  expect(String(input.params.company_id.some)).toBe(envelope.company_id)
+  const query = new URLSearchParams({ companyId: envelope.company_id, operationKey: envelope.operation_key })
+  const receiptResponse = await page.request.get(`/api/query/quotation-creations?${query}`)
   expect(receiptResponse.ok()).toBe(true)
-  const receipt = await receiptResponse.json() as { data: Array<{ id: string }> }
+  const receipt = await receiptResponse.json() as { data: Array<{
+    id: string; organizationId: string; companyId: string; model: string;
+    operationKey: string; payloadHash: string; recordId: string; createdBy: string; createdAt: unknown
+  }> }
   expect(receipt.data).toHaveLength(1)
-  expect(Object.keys(receipt.data[0]!).sort()).toEqual(["companyId", "id", "organizationId", "receipt"])
+  const saved = receipt.data[0]!
+  expect(Object.keys(saved).sort()).toEqual([
+    "companyId", "createdAt", "createdBy", "id", "model", "operationKey", "organizationId", "payloadHash", "recordId",
+  ])
+  expect(saved).toMatchObject({
+    id: `${organizationId}:${envelope.company_id}:sale_order:${envelope.operation_key}`,
+    organizationId: String(organizationId), companyId: envelope.company_id, model: "sale_order", operationKey: envelope.operation_key,
+  })
+  expect(saved.payloadHash).toMatch(/^sha256:[0-9a-f]{64}$/)
+  expect(saved.createdBy.replace(/^0x/i, "").toLowerCase()).toBe(actorHex)
+  expect(saved.recordId).toMatch(/^[1-9][0-9]*$/)
+  const orderId = Number(saved.recordId)
+  expect(Number.isSafeInteger(orderId) && orderId > 0).toBe(true)
 
-  let orderId = 0
   await expect
     .poll(
       async () => {
         const res = await page.request.get("/api/query/sale-orders")
-        if (!res.ok()) return 0
+        if (!res.ok()) return []
         const json = (await res.json()) as { data?: SaleOrderQueryRow[] }
-        const row = (json.data ?? []).find((candidate) => candidate.clientOrderRef === clientRef)
-        orderId = Number(row?.id ?? 0)
-        return orderId
+        return (json.data ?? []).filter((candidate) => candidate.clientOrderRef === clientRef).map((row) => String(row.id))
       },
       { timeout: 30_000 },
     )
-    .toBeGreaterThan(0)
-  expect(receipt.data[0]!.id).toBe(String(orderId))
+    .toEqual([saved.recordId])
   await expect(page).toHaveURL((url) => url.pathname === `/sales/orders/${orderId}` && url.searchParams.get("tab") === "lines" && url.searchParams.get("created") === "1")
   await expect(page.getByTestId('sale-order-next-step')).toBeVisible()
   return orderId

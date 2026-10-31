@@ -18,6 +18,8 @@ export type DocumentBlobUploadOptions = {
   residency?: string
   /** Fixed by the API at reservation; selects the matching record access policy. */
   purpose?: "document" | "branding" | "expense_receipt"
+  submissionId?: string
+  registration?: object
 }
 
 async function sha256Hex(file: File): Promise<string> {
@@ -40,7 +42,7 @@ async function readError(res: Response): Promise<string> {
 export async function uploadDocumentBlob(
   options: DocumentBlobUploadOptions,
 ): Promise<DocumentBlobUploadResult> {
-  const { file, companyId, residency, purpose = "document" } = options
+  const { file, companyId, residency, purpose = "document", submissionId, registration } = options
   if (!file || file.size <= 0) {
     throw new Error("A non-empty file is required")
   }
@@ -64,6 +66,7 @@ export async function uploadDocumentBlob(
       checksum,
       residency,
       purpose,
+      ...(submissionId ? { submissionId, registration } : {}),
     }),
   })
   if (!presignRes.ok) {
@@ -74,6 +77,7 @@ export async function uploadDocumentBlob(
     uploadUrl: string
     publicUrl: string
     headers?: Record<string, string>
+    completed?: boolean
   }
 
   const putHeaders = new Headers()
@@ -86,12 +90,12 @@ export async function uploadDocumentBlob(
     putHeaders.set("Content-Type", contentType)
   }
 
-  const putRes = await fetch(presign.uploadUrl, {
+  const putRes = presign.completed ? null : await fetch(presign.uploadUrl, {
     method: "PUT",
     headers: putHeaders,
     body: file,
   })
-  if (!putRes.ok) {
+  if (putRes && !putRes.ok) {
     throw new Error(await readError(putRes))
   }
 

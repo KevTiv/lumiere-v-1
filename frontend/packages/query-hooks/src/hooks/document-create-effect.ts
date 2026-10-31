@@ -12,6 +12,7 @@ export type DocumentCreateProjection = {
   readonly res_model?: unknown
   readonly resId?: unknown
   readonly res_id?: unknown
+  readonly metadata?: unknown
 }
 
 function optional(value: unknown): unknown {
@@ -27,12 +28,18 @@ export function resolveDocumentCreateEffect(
   before: readonly DocumentCreateProjection[],
   after: readonly DocumentCreateProjection[],
   organizationId: bigint,
-  expected: { readonly url: string; readonly checksum: string; readonly resModel?: string; readonly resId?: bigint },
+  expected: { readonly url: string; readonly checksum: string; readonly resModel?: string; readonly resId?: bigint; readonly submissionId?: string },
 ): CanonicalRecordRef | null {
   const known = new Set(before.map((row) => parseStrictU64(row.id)?.toString()))
   const created = after.filter((row) => {
     const id = parseStrictU64(row.id)
-    if (id == null || known.has(id.toString())) return false
+    if (id == null || (!expected.submissionId && known.has(id.toString()))) return false
+    if (expected.submissionId) {
+      try {
+        const metadata: unknown = JSON.parse(String(optional(row.metadata) ?? ""))
+        if (metadata === null || typeof metadata !== "object" || !("uploadSubmissionId" in metadata) || metadata.uploadSubmissionId !== expected.submissionId) return false
+      } catch { return false }
+    }
     if (parseStrictU64(row.organizationId ?? row.organization_id) !== organizationId) return false
     if (optional(row.url) !== expected.url) return false
     if (String(optional(row.checksum) ?? "").toLowerCase() !== expected.checksum.trim().toLowerCase()) return false

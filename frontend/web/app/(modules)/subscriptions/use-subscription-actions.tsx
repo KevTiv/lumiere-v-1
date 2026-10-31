@@ -1,6 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useErpSession } from '@lumiere/erp-session'
+import { OperationRequestError } from '@lumiere/api-client'
 import { useTranslation } from "@lumiere/i18n"
 import {
   FormModal,
@@ -59,6 +61,8 @@ import { mergeModuleStates, moduleQueryState } from '@lumiere/ui/lib/module-data
 import { inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, workflowTag, subscriptionActionPermissions } from './subscription-workflow'
 import { subscriptionStateOf } from './subscription-status'
 import { SubscriptionActionPreview } from './subscription-action-preview'
+import { completeRenewalAttempt, readRenewalAttempt, retainRenewalAttempt, renewalScope, type RenewalAttempt } from './subscription-renewal-attempt'
+import { newIdempotencyKey } from './subscription-payment-intent'
 
 export type SubscriptionDialogAction = SubscriptionActionId;
 export function isSubscriptionDialogAction(id: string): id is SubscriptionDialogAction {
@@ -72,10 +76,20 @@ export function isSubscriptionDialogAction(id: string): id is SubscriptionDialog
 export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint, enabled = true) {
   const { t } = useTranslation()
   const router = useRouter()
+  const { identity } = useErpSession()
+  const actorScope = `${identity ?? ''}:${orgId}:${operatingCompanyId}`
+  const liveScope = useRef({ stamp: actorScope, mounted: false })
+  if (liveScope.current.stamp !== actorScope) liveScope.current = { stamp: actorScope, mounted: false }
+  const actorLifetime = liveScope.current
+  useEffect(() => { actorLifetime.mounted = true; return () => { actorLifetime.mounted = false } }, [actorLifetime])
   const { checkPermission, permissionsReady } = useRBAC()
-  const [target, setTarget] = useState<{ action: SubscriptionActionId; id: bigint } | null>(null)
+  const [target, setTarget] = useState<{ action: SubscriptionActionId; id: bigint; scope: string } | null>(null)
+  const [renewalAttempt, setRenewalAttempt] = useState<RenewalAttempt | null>(null)
+  const [renewalStorageError, setRenewalStorageError] = useState<string | null>(null)
+  const [recoveryReady, setRecoveryReady] = useState(false)
+  useEffect(() => { setRecoveryReady(true) }, [])
   const close = () => setTarget(null)
-  useEffect(() => { setTarget(null) }, [orgId, operatingCompanyId, enabled])
+  useEffect(() => { setTarget(null); setRenewalAttempt(null); setRenewalStorageError(null) }, [actorScope, enabled])
   const subscriptionsQuery = useSubscriptions(orgId)
   const runsQuery = useSubscriptionBillingRuns(orgId)
   const linesQuery = useSubscriptionLines(orgId)
@@ -101,11 +115,24 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
     ...(needsInvoices ? [moduleQueryState(runsQuery), moduleQueryState(movesQuery)] : []),
     ...(['activate', 'amend'].includes(action) ? [moduleQueryState(linesQuery)] : []),
   ])
-  const usable = enabled && permitted && subscription != null && sourceState.status === 'ready'
-    && isSubscriptionActionApplicableOnPage(action, subscriptionStateOf(subscription))
+  const renewalRecovery = action === 'renew' && (renewalAttempt?.phase === 'unknown' || renewalAttempt?.phase === 'submitting')
+  const usable = enabled && permitted && subscription != null && sourceState.status === 'ready' && target?.scope === actorScope
+    && (isSubscriptionActionApplicableOnPage(action, subscriptionStateOf(subscription)) || renewalRecovery)
+    && (action !== 'renew' || (identity != null && !renewalStorageError))
   const openDialog = useCallback((nextAction: SubscriptionDialogAction, subscriptionId: number | bigint) => {
-    if (enabled) setTarget({ action: nextAction, id: BigInt(subscriptionId) })
-  }, [enabled])
+    if (!enabled) return
+    setRenewalAttempt(null); setRenewalStorageError(null)
+    if (nextAction === 'renew') {
+      try { setRenewalAttempt(readRenewalAttempt(renewalScope(identity, orgId, operatingCompanyId, BigInt(subscriptionId)))) }
+      catch (error) { setRenewalStorageError(error instanceof Error ? error.message : 'Renewal recovery storage is unavailable') }
+    }
+    setTarget({ action: nextAction, id: BigInt(subscriptionId), scope: actorScope })
+  }, [enabled, identity, orgId, operatingCompanyId, actorScope])
+  const hasPendingRenewal = (subscriptionId: bigint) => {
+    if (!identity || !recoveryReady) return false
+    try { return readRenewalAttempt(renewalScope(identity, orgId, operatingCompanyId, subscriptionId)) != null }
+    catch { return true }
+  }
 
   const activate = useActivateSubscription(orgId, operatingCompanyId)
   const closeSubscription = useCloseSubscription(orgId, operatingCompanyId)
@@ -114,7 +141,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   const amend = useAmendSubscription(orgId, operatingCompanyId)
   const pause = usePauseSubscription(orgId, operatingCompanyId)
   const resume = useResumeSubscription(orgId, operatingCompanyId)
-  const renew = useRenewSubscription(orgId, operatingCompanyId)
+  const renew = useRenewSubscription(orgId, operatingCompanyId, identity, Boolean(enabled && permitted && sourceState.status === 'ready' && target?.scope === actorScope))
   const cancel = useCancelSubscription(orgId, operatingCompanyId)
   const ingestUsage = useIngestSubscriptionUsageEvent(orgId, operatingCompanyId)
   const rateUsage = useRateSubscriptionUsageEvents(orgId, operatingCompanyId)
@@ -155,8 +182,9 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   const selectedPlan = (moduleQueryState(plansQuery).status === 'ready' ? plansQuery.data ?? [] : []).find((plan) => String(plan.id) === String(subscription?.planId) && inSubscriptionScope(plan, scope))
   const configuredJournal = journals.find((journal) => String(journal.id) === String(selectedPlan?.journalId) && workflowTag(journal.type) === 'sale')
   const config = mergeSelectOptionsForFields({
-    ...base, title: t(`subscriptions.workflow.labels.${action}`), submitLabel: t(`subscriptions.workflow.labels.${action}`),
+    ...base, title: t(`subscriptions.workflow.labels.${action}`), submitLabel: t(renewalRecovery ? 'subscriptions.lifecycle.checkRenewal' : `subscriptions.workflow.labels.${action}`),
     sections: base.sections.map((section) => ({ ...section, fields: section.fields.filter((field) => action !== 'pay-invoice' || availableInvoices.some((invoice) => workflowTag(invoice.state) === 'draft') || !['cogsAccountId', 'inventoryAccountId'].includes(field.name)).map((field) => {
+      if (action === 'renew' && renewalAttempt && (field.name === 'intervals' || field.name === 'notes')) return { ...field, defaultValue: renewalAttempt[field.name], disabled: renewalAttempt.phase !== 'rejected' }
       if (field.name === 'invoiceMoveId') return { ...field, required: action === 'pay-invoice', defaultValue: availableInvoices.length === 1 ? String(availableInvoices[0]!.id) : '' }
       if (field.name === 'invoiceDate') return { ...field, defaultValue: new Date().toISOString().slice(0, 10) }
       if (field.name === 'journalId' && action === 'generate-invoice' && configuredJournal) return { ...field, defaultValue: String(configuredJournal.id) }
@@ -177,7 +205,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   ] }]
 
   const submit = async (values: FormValues) => {
-    if (!usable || !target || !subscription) throw new Error(t('subscriptions.workflow.selectionChanged'))
+    if (!usable || !target || !subscription || liveScope.current !== actorLifetime || !actorLifetime.mounted) throw new Error(t('subscriptions.workflow.selectionChanged'))
     const subscriptionId = target.id
     switch (action) {
       case 'activate':
@@ -197,7 +225,27 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
       case 'amend':
         if (!lines.some((line) => String(line.id) === String(values.lineId))) throw new Error(t('subscriptions.workflow.selectionChanged'))
         await amend.mutateAsync({ subscriptionId, params: buildAmendSubscriptionParams(values) }); break
-      case 'renew': await renew.mutateAsync({ subscriptionId, params: buildRenewSubscriptionParams(values) }); break
+      case 'renew': {
+        const retainedScope = renewalScope(identity, orgId, operatingCompanyId, subscriptionId)
+        const proposed = { intervals: Math.max(1, Number(values.intervals ?? 1)), notes: String(values.notes ?? '').trim() }
+        const replaceRejected = renewalAttempt?.phase === 'rejected' && (renewalAttempt.intervals !== proposed.intervals || renewalAttempt.notes !== proposed.notes)
+        const request = renewalAttempt && !replaceRejected ? renewalAttempt : { idempotencyKey: newIdempotencyKey(), ...proposed }
+        if (!Number.isSafeInteger(request.intervals) || request.intervals < 1 || request.intervals > 4294967295) throw new Error(t('subscriptions.workflow.wholeNumber'))
+        const reconcileOnly = renewalAttempt?.phase === 'unknown' || renewalAttempt?.phase === 'submitting'
+        setRenewalAttempt(retainRenewalAttempt(retainedScope, request, 'submitting', undefined, replaceRejected))
+        try {
+          await renew.mutateAsync({ subscriptionId, request, params: buildRenewSubscriptionParams({ ...request }), reconcileOnly })
+          completeRenewalAttempt(retainedScope, request.idempotencyKey)
+          if (liveScope.current !== actorLifetime || !actorLifetime.mounted) return
+          setRenewalAttempt(null)
+        } catch (error) {
+          const phase = error instanceof OperationRequestError && error.retry !== 'reconcile' ? 'rejected' : 'unknown'
+          const retained = retainRenewalAttempt(retainedScope, request, phase)
+          if (liveScope.current === actorLifetime && actorLifetime.mounted) setRenewalAttempt(retained)
+          throw error
+        }
+        break
+      }
       case 'cancel':
         if (values.createCreditNote === true && !availableInvoices.some((invoice) => String(invoice.id) === String(values.invoiceMoveId))) throw new Error(t('subscriptions.workflow.chooseCreditInvoice'))
         await cancel.mutateAsync({ subscriptionId, params: buildCancelSubscriptionParams(values) }); break
@@ -220,12 +268,12 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   const dialogs: ReactNode = target && <FormModal key={`${orgId}:${operatingCompanyId}:${target.id}:${action}`}
     open onOpenChange={(open) => { if (!open) close() }} config={config} isPending={pending} submissionDisabled={blocked}
     showSubmitSuccessToast={false} draft={false}
-    submitError={blocked ? t(missingAccounting ? 'subscriptions.workflow.accountingSetup' : !permitted ? 'subscriptions.workflow.source.denied' : sourceState.status !== 'ready' ? `subscriptions.workflow.source.${sourceState.status}` : action === 'activate' && !lines.length ? 'subscriptions.workflow.noLines' : action === 'pay-invoice' ? 'subscriptions.workflow.noUnpaidInvoices' : 'subscriptions.workflow.selectionChanged') : null}
+    submitError={renewalStorageError ?? (blocked ? t(missingAccounting ? 'subscriptions.workflow.accountingSetup' : !permitted ? 'subscriptions.workflow.source.denied' : sourceState.status !== 'ready' ? `subscriptions.workflow.source.${sourceState.status}` : action === 'activate' && !lines.length ? 'subscriptions.workflow.noLines' : action === 'pay-invoice' ? 'subscriptions.workflow.noUnpaidInvoices' : 'subscriptions.workflow.selectionChanged') : null)}
     formLeadingActions={missingAccounting ? <div className="flex flex-wrap gap-2">
       <Button type="button" variant="outline" render={<Link href="/accounting?tab=accounts" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t('subscriptions.workflow.openAccounting')}</Button>
       <Button type="button" variant="outline" onClick={retrySources}>{t('common.retry')}</Button>
     </div> : sourceState.status !== 'ready' ? <Button type="button" variant="outline" onClick={retrySources}>{t('common.retry')}</Button> : undefined}
-    renderPreview={(values) => usable && subscription ? <SubscriptionActionPreview action={action} subscription={subscription} values={values} invoices={availableInvoices} lines={lines} currencies={currencies} /> : null}
+    renderPreview={(values) => usable && subscription ? <>{renewalRecovery && <p role="status">{t('subscriptions.lifecycle.renewalUnknown')}</p>}<SubscriptionActionPreview action={action} subscription={subscription} values={values} invoices={availableInvoices} lines={lines} currencies={currencies} /></> : null}
     onSubmit={submit} />
-  return { dialogs, openDialog, pending }
+  return { dialogs, openDialog, pending, hasPendingRenewal }
 }

@@ -472,14 +472,20 @@
     },
     "configure_workcenter_cost_rate": {
       "client_facing": true,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/src/manufacturing/costing.rs configure_workcenter_cost_rate validates a scoped active workcenter and overwrites its keyed rate; audit and organization commits remain append-only. Typed frontend BFF cost configuration caller; session-exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
     "configure_manufacturing_valuation": {
       "client_facing": true,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/src/manufacturing/costing.rs configure_manufacturing_valuation validates same-company posting accounts and overwrites keyed valuation configuration; audit and organization commits remain append-only. Typed frontend BFF valuation configuration caller; session-exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
@@ -1566,7 +1572,10 @@
     },
     "finish_manufacturing_order_with_tracking": {
       "client_facing": true,
-      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: finish_manufacturing_order_with_tracking validates exact lot/serial attribution and shares the ToClose state guard with finish.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
@@ -2383,35 +2392,50 @@
     },
     "run_manufacturing_tracked_output_test": {
       "client_facing": false,
-      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/tests/manufacturing/tracked_output_test.rs: isolated persisted domain proof; test-only reducer denied to session callers.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
     "run_manufacturing_bom_to_close_domain_lifecycle_test": {
       "client_facing": false,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted full manufacturing lifecycle proof with isolated fixture writes; test-only reducer denied to session callers.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
     "run_manufacturing_bom_routing_lifecycle_test": {
       "client_facing": false,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted routing ownership and predecessor proof with isolated fixture writes; test-only reducer denied to session callers.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
     "run_manufacturing_actual_cost_valuation_test": {
       "client_facing": false,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted manufacturing cost and posted accounting valuation proof with isolated fixture writes; test-only reducer denied to session callers.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
     },
     "run_manufacturing_cost_configuration_scope_test": {
       "client_facing": false,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted cost configuration scope and closed-period rejection proof with isolated fixture writes; test-only reducer denied to session callers.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
@@ -2428,14 +2452,20 @@
     },
     "scrap_manufacturing_material": {
       "client_facing": true,
-      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: scrap_manufacturing_material requires exact available BOM material stock in Progress before consumption and rejects reused request references.",
       "idempotency": "request_guarded",
       "semantic_kind": "command"
     },
     "scrap_tracked_manufacturing_output": {
       "client_facing": true,
-      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: scrap_tracked_manufacturing_output bounds scrap by the exact owned output move and rejects reused request references.",
       "idempotency": "request_guarded",
       "semantic_kind": "command"
@@ -2462,7 +2492,10 @@
     },
     "set_bom_operations": {
       "client_facing": false,
-      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
       "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs set_bom_operations validates ordered scoped routing and rejects changes after any MO references the BOM; audit and organization commits remain append-only. No enumerated frontend BFF caller.",
       "idempotency": "non_idempotent",
       "semantic_kind": "operator"
@@ -3326,6 +3359,36 @@
       "evidence": "spacetimedb/src/projects/timesheets.rs:841 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
+    },
+    "nominate_knowledge_guide": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "Exact author/current-revision guide nomination; canonical complete evidence selection deduplicated through existing knowledge owner.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "purge_reviewed_expired_documents": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "Exact reviewed organization-wide eligible document set compared inside canonical purge transaction; stale scope rejects.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "run_configured_record_creation_tests": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "Development-only native configured creation regression; never session exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "test"
     }
   },
   "version": 1

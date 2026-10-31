@@ -403,7 +403,7 @@ pub fn import_stock_location_csv(
             .to_string()
         };
 
-        ctx.db.stock_location().insert(StockLocation {
+        let created = ctx.db.stock_location().insert(StockLocation {
             id: 0,
             organization_id,
             name: name.clone(),
@@ -434,6 +434,7 @@ pub fn import_stock_location_csv(
             updated_at: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
+        record_import_created_id(ctx, job.id, "stock_location", created.id, row_num);
         imported += 1;
     }
 

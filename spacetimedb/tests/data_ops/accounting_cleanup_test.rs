@@ -2,7 +2,9 @@
 
 use spacetimedb::{ReducerContext, Table};
 
-use crate::accounting::chart_of_accounts::{account_journal, AccountJournal};
+use crate::accounting::chart_of_accounts::{
+    account_journal, create_account_journal, CreateAccountJournalParams,
+};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, AccountMove, AddAccountMoveLineParams,
 };
@@ -16,24 +18,65 @@ use crate::data_ops::import_tracker::{
     begin_import_job, cleanup_abandoned_account_move_import, finish_import_job, import_job,
     import_job_record, record_import_created_id, stamp_account_move_bundle_job, ImportJob,
 };
-use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::{AccountMoveState, MoveType, PaymentState};
+use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
+use crate::types::{AccountMoveState, JournalType, MoveType, PaymentState};
 
-fn journal_for_company(ctx: &ReducerContext, company_id: u64) -> Result<AccountJournal, String> {
+fn seed_cleanup_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, String> {
+    // The minimal organization fixture has a chart of accounts, but no journal.
+    // Create this scenario's journal explicitly instead of depending on prior tests.
+    let code = format!("CLEANUP-{}", fixture.company_id);
+    create_account_journal(
+        ctx,
+        fixture.organization_id,
+        CreateAccountJournalParams {
+            company_id: Some(fixture.company_id),
+            name: "Abandoned Import Cleanup".to_string(),
+            code: code.clone(),
+            type_: JournalType::General,
+            currency_id: Some(fixture.currency_id),
+            default_account_id: fixture.chart_account_ids.get(chart_keys::REVENUE).copied(),
+            suspense_account_id: None,
+            loss_account_id: None,
+            profit_account_id: None,
+            bank_account_id: None,
+            payment_credit_account_id: None,
+            payment_debit_account_id: None,
+            invoice_reference_type: None,
+            invoice_reference_model: None,
+            sequence_id: None,
+            refund_sequence_id: None,
+            sequence_override_regex: None,
+            secure_sequence_id: None,
+            alias_name: None,
+            alias_domain: None,
+            sale_activity_type_id: None,
+            sale_activity_user_id: None,
+            sale_activity_note: None,
+            sale_activity_date_deadline: None,
+            restrict_mode_hash_table: false,
+            active: true,
+            at_least_one_inbound: false,
+            at_least_one_outbound: false,
+            dedicated_payment_method_ids: vec![],
+            sale_activity_done: false,
+            metadata: None,
+        },
+    )?;
     ctx.db
         .account_journal()
         .journal_by_company()
-        .filter(&company_id)
-        .next()
-        .ok_or_else(|| "cleanup test journal missing".to_string())
+        .filter(&fixture.company_id)
+        .find(|journal| journal.organization_id == fixture.organization_id && journal.code == code)
+        .map(|journal| journal.id)
+        .ok_or_else(|| "cleanup test journal missing after create".to_string())
 }
 
 fn seed_abandoned_parent(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
+    journal_id: u64,
     move_count: usize,
 ) -> Result<(ImportJob, Vec<u64>), String> {
-    let journal = journal_for_company(ctx, fixture.company_id)?;
     let mut job = begin_import_job(
         ctx,
         fixture.organization_id,
@@ -86,7 +129,7 @@ fn seed_abandoned_parent(
             source_id: None,
             medium_id: None,
             company_id: fixture.company_id,
-            journal_id: journal.id,
+            journal_id,
             currency_id: fixture.currency_id,
             company_currency_id: fixture.currency_id,
             amount_untaxed: 0.0,
@@ -170,8 +213,9 @@ pub fn test_abandoned_account_move_cleanup_is_safe_and_idempotent(
 ) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let journal_id = seed_cleanup_journal(ctx, &fixture)?;
 
-    let (parent, move_ids) = seed_abandoned_parent(ctx, &fixture, 1)?;
+    let (parent, move_ids) = seed_abandoned_parent(ctx, &fixture, journal_id, 1)?;
     let membership = ctx
         .db
         .user_organization()
@@ -320,7 +364,7 @@ pub fn test_abandoned_account_move_cleanup_is_safe_and_idempotent(
         return Err("cleanup replay was not idempotent or audit-once".to_string());
     }
 
-    let (completed_parent, completed_moves) = seed_abandoned_parent(ctx, &fixture, 1)?;
+    let (completed_parent, completed_moves) = seed_abandoned_parent(ctx, &fixture, journal_id, 1)?;
     let mut child = begin_import_job(ctx, fixture.organization_id, "account_move_line", None, 1);
     let parent_marker = crate::data_ops::import_tracker::account_move_bundle_job_metadata(
         completed_parent.metadata.as_deref(),
@@ -350,7 +394,7 @@ pub fn test_abandoned_account_move_cleanup_is_safe_and_idempotent(
         return Err("cleanup accepted a completed child bundle".to_string());
     }
 
-    let (atomic_parent, atomic_moves) = seed_abandoned_parent(ctx, &fixture, 2)?;
+    let (atomic_parent, atomic_moves) = seed_abandoned_parent(ctx, &fixture, journal_id, 2)?;
     let second = ctx
         .db
         .account_move()
@@ -376,7 +420,7 @@ pub fn test_abandoned_account_move_cleanup_is_safe_and_idempotent(
         return Err("cleanup did not atomically refuse an accounting-effective move".to_string());
     }
 
-    let (nonempty_parent, nonempty_moves) = seed_abandoned_parent(ctx, &fixture, 1)?;
+    let (nonempty_parent, nonempty_moves) = seed_abandoned_parent(ctx, &fixture, journal_id, 1)?;
     let account_id = *fixture
         .chart_account_ids
         .values()

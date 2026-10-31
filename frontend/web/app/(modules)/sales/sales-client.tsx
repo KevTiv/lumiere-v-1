@@ -17,6 +17,7 @@ import { nullableBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import { useTranslation } from '@lumiere/i18n';
 import { useErpSession } from '@lumiere/erp-session';
 import { QuotationDocumentDialog } from './quotation-document-dialog';
+import { RecordCreationRecovery } from '../../../components/record-creation-recovery';
 import {
   FormModal,
   CsvImportModal,
@@ -197,7 +198,6 @@ import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumi
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
-import { orderNeedsCustomFieldSave } from '@/lib/commercial-order-form-params';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
@@ -2560,9 +2560,6 @@ function SalesClientLoaded({
       if ([contactsRead.state, pricelistsRead.state, warehousesRead.state].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
       const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
       if (!p) throw new Error(t('sales.forms.refinement.requiredOrderContext', { defaultValue: 'Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.' }));
-      if (orderNeedsCustomFieldSave(p.metadata)) {
-        throw new Error(t('sales.forms.refinement.customFieldsBlocked', { defaultValue: 'Custom fields cannot be saved together with this quotation yet. No quotation was created. Your entries have been retained.' }));
-      }
       const saved = await createSaleOrder.mutateAsync(p);
       phCapture('sale_order_created', { organization_id: organizationId });
       if (saved.orderId) router.push(`/sales/orders/${saved.orderId}?tab=lines&created=1`);
@@ -2667,6 +2664,9 @@ function SalesClientLoaded({
 
   return (
     <EntityLabelsProvider value={entityLabels}>
+      <RecordCreationRecovery organizationId={orgId} companyId={operatingCompanyId} refreshKey={isFormMutationPending} models={[
+        { model: 'sale_order', canRead: permissionsReady === true && checkPermission('sale_order', 'read').allowed && ordersRead.state.status === 'ready' },
+      ]} />
       {savedQuotationNotice && <p role="status" className="mx-4 mb-3 rounded-lg border p-4 text-sm">{t('sales.workspace.savedOpenQuotation', { defaultValue: 'Quotation saved. Open it from Quotations & orders to add products.' })}</p>}
       <ModuleWorkView
         organizationId={organizationId}

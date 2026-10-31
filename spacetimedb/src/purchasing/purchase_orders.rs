@@ -862,7 +862,16 @@ pub(crate) fn create_purchase_order_record(
     organization_id: u64,
     params: CreatePurchaseOrderParams,
 ) -> Result<u64, String> {
-    create_purchase_order_record_impl(ctx, organization_id, params, true)
+    create_purchase_order_record_impl(ctx, organization_id, params, true, false)
+}
+
+/// Only the durable keyed owner may admit custom fields on a new purchase order.
+pub(crate) fn create_keyed_purchase_order_record(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreatePurchaseOrderParams,
+) -> Result<u64, String> {
+    create_purchase_order_record_impl(ctx, organization_id, params, true, true)
 }
 
 fn create_purchase_order_record_impl(
@@ -870,6 +879,7 @@ fn create_purchase_order_record_impl(
     organization_id: u64,
     params: CreatePurchaseOrderParams,
     enforce_user_permission: bool,
+    allow_custom_values: bool,
 ) -> Result<u64, String> {
     if enforce_user_permission {
         check_permission(ctx, organization_id, "purchase_order", "create")?;
@@ -880,6 +890,16 @@ fn create_purchase_order_record_impl(
     }
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let custom_fields = crate::forms::record_creation::prepare_owned_custom_fields(
+        ctx,
+        organization_id,
+        "purchasing",
+        "new-purchase-order",
+        params.metadata.as_deref(),
+    )?;
+    if !allow_custom_values && !custom_fields.is_empty() {
+        return Err("custom-field purchase order creation requires the durable keyed owner".into());
+    }
     require_purchase_order_header_relations(
         ctx,
         organization_id,
@@ -959,6 +979,15 @@ fn create_purchase_order_record_impl(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    crate::forms::record_creation::persist_new_record_fields(
+        ctx,
+        organization_id,
+        company_id,
+        "purchase_order",
+        order.id,
+        &custom_fields,
+    );
 
     write_audit_log_v2(
         ctx,
@@ -1909,6 +1938,7 @@ pub(crate) fn create_replenishment_purchase_demand(
             is_quantity_copy: None,
             metadata: service_metadata.clone(),
         },
+        false,
         false,
     )?;
 

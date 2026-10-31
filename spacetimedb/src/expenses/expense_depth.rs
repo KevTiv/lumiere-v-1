@@ -1,6 +1,7 @@
 //! Wave C — mileage/per diem rates, split allocations, project rebill.
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::accounting::analytic_accounting::account_analytic_account;
 use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
@@ -15,7 +16,8 @@ use crate::expenses::expenses::{
     expense_sheet, hr_expense, metadata_str_eq, HrExpense, HrExpenseSheet,
 };
 use crate::helpers::{
-    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2,
+    write_audit_log_v2_returning, AuditLogParams,
 };
 use crate::projects::project_accounting::{
     project_margin_snapshot, refresh_project_margin_for_projects,
@@ -142,6 +144,8 @@ pub struct SeedStatutoryExpenseMileageRatesParams {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct SetExpenseAllocationsParams {
     pub lines: Vec<ExpenseAllocationLineParams>,
+    /// Exact authorized read snapshot. Required when replacing or clearing saved rows.
+    pub expected_snapshot: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -229,6 +233,82 @@ pub(crate) fn clear_allocations_for_expense(ctx: &ReducerContext, expense_id: u6
     for id in ids {
         ctx.db.hr_expense_allocation().id().delete(&id);
     }
+}
+
+pub(crate) fn allocation_snapshot(
+    expense: &HrExpense,
+    rows: &[HrExpenseAllocation],
+) -> Result<String, String> {
+    use lumiere_policy_core::expense_allocations::{
+        allocation_snapshot_bytes, AllocationSnapshotRow,
+    };
+    use sha2::{Digest, Sha256};
+    let rows: Vec<_> = rows
+        .iter()
+        .map(|row| AllocationSnapshotRow {
+            id: row.id,
+            organization_id: row.organization_id,
+            company_id: row.company_id,
+            expense_id: row.expense_id,
+            analytic_account_id: row.analytic_account_id,
+            project_id: row.project_id,
+            share_percent: row.share_percent,
+            amount: row.amount,
+            billable: row.billable,
+            metadata: row.metadata.as_deref(),
+        })
+        .collect();
+    let bytes = allocation_snapshot_bytes(
+        expense.organization_id,
+        expense.company_id,
+        expense.id,
+        &rows,
+    )
+    .map_err(str::to_owned)?;
+    Ok(format!("v1:{:x}", Sha256::digest(bytes)))
+}
+
+/// The exact replacement outcome, including removed child identities, is reconstructable.
+fn record_expense_allocation_commit(
+    ctx: &ReducerContext,
+    expense: &HrExpense,
+    previous: &[HrExpenseAllocation],
+    inserted: &[HrExpenseAllocation],
+    audit: &crate::core::audit::AuditLog,
+) -> Result<(), String> {
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "hr_expense",
+        serde_json::json!({"id": expense.id}),
+        expense,
+    )?];
+    for row in previous {
+        changes.push(RowChange::delete(
+            "hr_expense_allocation",
+            serde_json::json!({"id": row.id}),
+        ));
+    }
+    for row in inserted {
+        changes.push(RowChange::upsert_stdb_row(
+            "hr_expense_allocation",
+            serde_json::json!({"id": row.id}),
+            row,
+        )?);
+    }
+    changes.push(RowChange::upsert_stdb_row(
+        "audit_log",
+        serde_json::json!({"id": audit.id}),
+        audit,
+    )?);
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id: expense.organization_id,
+            operation_id: "erp.set_expense_allocations".into(),
+            correlation_id: format!("expense:{}:allocations:audit:{}", expense.id, audit.id),
+            changes,
+        },
+    )?;
+    Ok(())
 }
 
 // ── Statutory mileage helpers (AU/NZ packs) ───────────────────────────────────
@@ -550,6 +630,7 @@ pub fn set_expense_allocations(
     expense_id: u64,
     params: SetExpenseAllocationsParams,
 ) -> Result<(), String> {
+    const MAX_ALLOCATION_ROWS: usize = 1_000;
     check_permission(ctx, organization_id, "hr_expense", "update")?;
     let expense = ctx
         .db
@@ -560,12 +641,43 @@ pub fn set_expense_allocations(
     if expense.organization_id != organization_id {
         return Err("Expense belongs to a different organization".to_string());
     }
+    crate::documents::knowledge_guides::require_company_membership(
+        ctx,
+        organization_id,
+        expense.company_id,
+    )?;
     if expense.state != ExpenseState::Draft {
         return Err("Only draft expenses can change allocations".to_string());
     }
+    if !expense.total_amount.is_finite() {
+        return Err("Expense amount must be finite before changing allocations".into());
+    }
+    if params.lines.len() > MAX_ALLOCATION_ROWS {
+        return Err("Expense allocations exceed the supported review size".into());
+    }
+    let existing: Vec<_> = ctx
+        .db
+        .hr_expense_allocation()
+        .allocation_by_expense()
+        .filter(&expense_id)
+        .take(MAX_ALLOCATION_ROWS + 1)
+        .collect();
+    if existing.len() > MAX_ALLOCATION_ROWS {
+        return Err("Expense allocations exceed the supported review size".into());
+    }
+    let current_snapshot = allocation_snapshot(&expense, &existing)?;
+    lumiere_policy_core::expense_allocations::require_reviewed_allocation_snapshot(
+        params.expected_snapshot.as_deref(),
+        &current_snapshot,
+        existing.len(),
+    )
+    .map_err(str::to_owned)?;
     if params.lines.is_empty() {
+        if existing.is_empty() {
+            return Ok(());
+        }
         clear_allocations_for_expense(ctx, expense_id);
-        write_audit_log_v2(
+        let audit = write_audit_log_v2_returning(
             ctx,
             organization_id,
             AuditLogParams {
@@ -579,19 +691,27 @@ pub fn set_expense_allocations(
                 metadata: Some(r#"{"cleared":true}"#.into()),
             },
         );
+        record_expense_allocation_commit(ctx, &expense, &existing, &[], &audit)?;
         return Ok(());
     }
 
     let share_sum: f64 = params.lines.iter().map(|l| l.share_percent).sum();
-    if (share_sum - 100.0).abs() > 0.01 {
+    if !share_sum.is_finite() || (share_sum - 100.0).abs() > 0.01 {
         return Err(format!(
             "Allocation shares must total 100% (got {:.2})",
             share_sum
         ));
     }
     for line in &params.lines {
-        if line.share_percent <= 0.0 {
-            return Err("Each allocation share_percent must be positive".to_string());
+        if !line.share_percent.is_finite()
+            || line.share_percent <= 0.0
+            || line.share_percent > 100.0
+            || !(expense.total_amount * (line.share_percent / 100.0)).is_finite()
+        {
+            return Err(
+                "Each allocation share_percent must be finite, positive and at most 100"
+                    .to_string(),
+            );
         }
         if line.analytic_account_id.is_none() && line.project_id.is_none() {
             return Err("Each allocation needs analytic_account_id or project_id".to_string());
@@ -609,12 +729,29 @@ pub fn set_expense_allocations(
                 return Err("Allocation project does not belong to this company".to_string());
             }
         }
+        if let Some(id) = line.analytic_account_id {
+            let account = ctx
+                .db
+                .account_analytic_account()
+                .id()
+                .find(&id)
+                .ok_or("Allocation analytic account not found")?;
+            if account.organization_id != organization_id
+                || account.company_id != expense.company_id
+                || !account.active
+            {
+                return Err(
+                    "Allocation analytic account must be active in this company".to_string()
+                );
+            }
+        }
     }
 
     clear_allocations_for_expense(ctx, expense_id);
+    let mut inserted = Vec::with_capacity(params.lines.len());
     for line in params.lines {
         let amount = expense.total_amount * (line.share_percent / 100.0);
-        ctx.db.hr_expense_allocation().insert(HrExpenseAllocation {
+        let row = ctx.db.hr_expense_allocation().insert(HrExpenseAllocation {
             id: 0,
             organization_id,
             company_id: expense.company_id,
@@ -626,8 +763,9 @@ pub fn set_expense_allocations(
             billable: line.billable,
             metadata: line.metadata,
         });
+        inserted.push(row);
     }
-    write_audit_log_v2(
+    let audit = write_audit_log_v2_returning(
         ctx,
         organization_id,
         AuditLogParams {
@@ -641,6 +779,7 @@ pub fn set_expense_allocations(
             metadata: None,
         },
     );
+    record_expense_allocation_commit(ctx, &expense, &existing, &inserted, &audit)?;
     Ok(())
 }
 

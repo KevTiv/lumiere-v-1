@@ -60,6 +60,7 @@ interface ModularFormProps {
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   /** Submission feedback stays in the same scroll area as the fields it concerns. */
   submitError?: string | null
+  onExplainError?: (message: string) => void
   onCancel?: () => void
   className?: string
   /** Renders at the start of the footer row (e.g. destructive actions beside Cancel / Submit). */
@@ -91,6 +92,7 @@ export function ModularForm({
   config,
   onSubmit,
   submitError,
+  onExplainError,
   onCancel,
   className,
   leadingActions,
@@ -632,9 +634,10 @@ export function ModularForm({
       >
         <div className="flex min-w-0 flex-col gap-6">
           {visibleSubmitError ? (
-            <p tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
-              {visibleSubmitError}
-            </p>
+            <div tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
+              <p>{visibleSubmitError}</p>
+              {onExplainError ? <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => onExplainError(visibleSubmitError)}>{t("aiChat.errorHelp.explain", { defaultValue: "Explain this error" })}</Button> : null}
+            </div>
           ) : null}
           {fieldsContent}
         </div>

@@ -12,6 +12,7 @@ import { Separator } from "../components/separator"
 import { MarkdownView } from "../components/markdown-view"
 import { TooltipProvider } from "../components/tooltip"
 import { InlineEditField } from "./inline-edit-field"
+import { RecordImportSource } from "./record-import-source"
 
 interface EntityDetailProps {
   config: EntityDetailConfig
@@ -132,6 +133,7 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
           </div>
         </div>
       ))}
+      <RecordImportSource metadata={data.metadata} />
     </div>
     </TooltipProvider>
   )

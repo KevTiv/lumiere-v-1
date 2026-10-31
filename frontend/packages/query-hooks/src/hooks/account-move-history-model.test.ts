@@ -47,6 +47,21 @@ test("history keeps exact u64 identities and decimal strings without numeric coe
     assert.equal(validHistoryId(value), false);
 });
 
+test("explicit line additions retain exact account/currency identity and require admitted creation semantics", () => {
+  const addition = { ...entry, operation: "add_account_move_line", changes: [
+    { field: "account_id", before: null, after: "18446744073709551615" },
+    { field: "currency_id", before: null, after: "9007199254740993" },
+    { field: "debit", before: null, after: "0" },
+  ] };
+  const value = { ...page(), data: [addition], coverage: { ...page().coverage, operations: ["update_account_move_line", "add_account_move_line"] } };
+  const result = parseAccountMoveHistoryPage(value, scope);
+  assert.equal(result.data[0]?.operation, "add_account_move_line");
+  assert.equal(result.data[0]?.changes[0]?.after, "18446744073709551615");
+  assert.throws(() => parseAccountMoveHistoryPage({ ...value, coverage: page().coverage }, scope));
+  assert.throws(() => parseAccountMoveHistoryPage({ ...value, data: [{ ...addition, changes: [{ field: "debit", before: "0", after: "1" }] }] }, scope));
+  assert.throws(() => parseAccountMoveHistoryPage({ ...value, coverage: { ...value.coverage, operations: ["add_account_move_line", "add_account_move_line"] } }, scope));
+});
+
 test("history reads and cache identities bind actor, organization, company, record and authorization", () => {
   const path = accountMoveHistoryQueryPath(scope, "opaque+/cursor");
   const url = new URL(path, "https://example.test");

@@ -5,7 +5,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::helpers::check_permission;
 use crate::purchasing::purchase_orders::{
-    create_purchase_order_record, purchase_order, CreatePurchaseOrderParams,
+    create_keyed_purchase_order_record, purchase_order, CreatePurchaseOrderParams,
 };
 
 /// Immutable mapping from one scoped creation key to the exact purchase order.
@@ -162,11 +162,10 @@ pub fn create_purchase_order_once(
     params: CreatePurchaseOrderOnceParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "create")?;
-    crate::workflow::authorization::require_workflow_company_access(
+    crate::documents::knowledge_guides::require_company_membership(
         ctx,
         organization_id,
         company_id,
-        ctx.sender(),
     )?;
 
     let id = scoped_creation_id(organization_id, company_id, &params.operation_key)?;
@@ -195,11 +194,11 @@ pub fn create_purchase_order_once(
     }
 
     let (operation_key, order_params) = into_order_params(company_id, params);
-    let purchase_order_id = create_purchase_order_record(ctx, organization_id, order_params)?;
+    let purchase_order_id = create_keyed_purchase_order_record(ctx, organization_id, order_params)?;
     ctx.db
         .purchase_order_creation_operation()
         .insert(PurchaseOrderCreationOperation {
-            id,
+            id: id.clone(),
             organization_id,
             company_id,
             operation_key,
@@ -208,5 +207,12 @@ pub fn create_purchase_order_once(
             created_by: ctx.sender(),
             created_at: ctx.timestamp,
         });
+    crate::forms::record_creation_persistence::record_purchase_order_creation(
+        ctx,
+        organization_id,
+        company_id,
+        purchase_order_id,
+        &id,
+    )?;
     Ok(())
 }

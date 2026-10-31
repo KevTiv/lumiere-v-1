@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "./invoice-accounting-choices"
 import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { test, expect, type Page } from "@playwright/test"
 // Exact fixture asset allowlist; all other /api/ requests fail the isolation assertion.
@@ -97,6 +98,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByRole("option", { name: "Synthetic customer", exact: true }).click()
       await page.getByTestId("create-invoice-line-description").fill("Synthetic retained line")
       await page.getByTestId("create-invoice-line-unit-price").fill("1250")
+      await reviewInvoiceAccountingChoices(page)
       await dialog.getByRole("textbox", { name: "Terms", exact: true }).fill("Retained invoice-specific terms")
       await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
       const publisher = await context.newPage()
@@ -150,6 +152,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByRole("option", { name: "Synthetic customer", exact: true }).click()
       await page.getByTestId("create-invoice-line-description").fill("Synthetic international support")
       await page.getByTestId("create-invoice-line-unit-price").fill("1250")
+      await reviewInvoiceAccountingChoices(page)
       await dialog.getByRole("textbox", { name: "Terms", exact: true }).fill("Explicit invoice-only terms")
       await dialog.getByRole("textbox", { name: "Footer", exact: true }).fill("")
       if (width < 1024) await page.getByTestId("create-invoice-preview-toggle").click()

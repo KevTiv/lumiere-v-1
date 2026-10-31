@@ -185,6 +185,44 @@ pub(super) fn validate_values(
     Ok(())
 }
 
+/// Confirming one value does not resolve unrelated missing facts or change units.
+pub(super) fn validate_confirmed_fields(
+    item: &ReviewItem,
+    values: &BTreeMap<String, Option<String>>,
+    confirmed_fields: &BTreeSet<String>,
+    state: &str,
+    reason: &str,
+) -> Result<(), String> {
+    if !confirmed_fields.is_empty() && reason.trim().len() < 3 {
+        return Err("enter supporting evidence for the confirmed values".into());
+    }
+    for key in confirmed_fields {
+        if !item.fields.iter().any(|field| &field.key == key)
+            || !values
+                .get(key)
+                .and_then(Option::as_deref)
+                .is_some_and(|value| !value.trim().is_empty())
+        {
+            return Err("only known, nonempty values can be confirmed".into());
+        }
+    }
+    if state == "confirmed" {
+        for field in &item.fields {
+            let populated = values
+                .get(&field.key)
+                .and_then(Option::as_deref)
+                .is_some_and(|value| !value.trim().is_empty());
+            if (field.required || populated) && !confirmed_fields.contains(&field.key) {
+                return Err(format!(
+                    "{} needs confirmation before the row can continue",
+                    field.label
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn validate_dataset(data: &Dataset) -> Result<(), String> {
     if data.format != "lumiere-import-review/v1"
         || data.title.trim().is_empty()
@@ -268,5 +306,73 @@ mod tests {
         let values = BTreeMap::from([("quantity".into(), Some("1".into()))]);
         assert!(validate_values(&item, &values, "confirmed", "Confirmed weight").is_ok());
         assert!(validate_values(&item, &values, "confirmed", "").is_err());
+    }
+
+    #[test]
+    fn price_confirmation_keeps_unknown_weight_and_cost_unresolved() {
+        let item: ReviewItem = serde_json::from_value(serde_json::json!({
+            "key":"sausage", "label":"Sausage", "source":{"file":"shop.csv","row":8,"sha256":"a".repeat(64)},
+            "issue":"Weight, original unit and cost unknown", "fields":[
+                {"key":"quantity","label":"Actual weight","kind":"decimal","sourceValue":"8","required":true},
+                {"key":"unit_price","label":"Price per kg","kind":"decimal","sourceValue":"600","required":true},
+                {"key":"cost_price","label":"Cost","kind":"decimal","sourceValue":null,"required":true},
+                {"key":"stored_unit","label":"Price unit","kind":"choice","options":["kg","unit"],"sourceValue":null,"required":true}
+            ], "proposed":{"quantity":null,"unit_price":"4800","cost_price":null,"stored_unit":"kg"}
+        })).unwrap();
+        let fields = BTreeSet::from(["unit_price".into(), "stored_unit".into()]);
+        assert!(validate_values(
+            &item,
+            &item.proposed,
+            "needs_review",
+            "Price confirmed; weight unknown"
+        )
+        .is_ok());
+        assert!(validate_confirmed_fields(
+            &item,
+            &item.proposed,
+            &fields,
+            "needs_review",
+            "Price confirmed; weight unknown"
+        )
+        .is_ok());
+        assert!(validate_values(&item, &item.proposed, "confirmed", "Price confirmed").is_err());
+        assert!(validate_confirmed_fields(
+            &item,
+            &item.proposed,
+            &BTreeSet::from(["quantity".into()]),
+            "needs_review",
+            "Unknown"
+        )
+        .is_err());
+        assert_eq!(item.proposed.get("quantity"), Some(&None));
+        assert_eq!(item.fields[0].source_value.as_deref(), Some("8"));
+    }
+
+    #[test]
+    fn a_complete_row_cannot_export_an_unconfirmed_optional_proposal() {
+        let item: ReviewItem = serde_json::from_value(serde_json::json!({
+            "key":"source", "label":"Source", "source":{"file":"shop.csv","row":2,"sha256":"a".repeat(64)},
+            "issue":"Optional location proposed", "fields":[
+                {"key":"name","label":"Name","kind":"text","sourceValue":"Shop","required":true},
+                {"key":"location","label":"Location","kind":"text","sourceValue":null,"required":false}
+            ], "proposed":{"name":"Shop","location":"North store"}
+        })).unwrap();
+        let only_name = BTreeSet::from(["name".into()]);
+        assert!(validate_confirmed_fields(
+            &item,
+            &item.proposed,
+            &only_name,
+            "confirmed",
+            "Name verified"
+        )
+        .is_err());
+        assert!(validate_confirmed_fields(
+            &item,
+            &item.proposed,
+            &only_name,
+            "needs_review",
+            "Name verified"
+        )
+        .is_ok());
     }
 }

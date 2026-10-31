@@ -2371,33 +2371,83 @@ pub fn add_account_move_line(
         return Err("Cannot add lines to a posted move".to_string());
     }
 
-    let line = insert_draft_account_move_line(ctx, &move_record, params.clone())?;
-
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(move_record.company_id),
-            table_name: "account_move_line",
-            record_id: line.id,
-            action: "CREATE",
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "name": params.name,
-                    "debit": params.debit,
-                    "credit": params.credit,
-                })
-                .to_string(),
-            ),
-            changed_fields: vec![
-                "name".to_string(),
-                "debit".to_string(),
-                "credit".to_string(),
-            ],
-            metadata: None,
-        },
+    let balance = params.debit - params.credit;
+    if [params.debit, params.credit, balance]
+        .iter()
+        .any(|value| !value.is_finite())
+    {
+        return Err("draft-line addition requires finite accounting amounts".into());
+    }
+    let line = insert_draft_account_move_line(ctx, &move_record, params)?;
+    let mut after = accounting_line_change_snapshot(&line)?;
+    let object = after
+        .as_object_mut()
+        .ok_or("invalid draft-line addition snapshot")?;
+    object.insert(
+        "account_id".into(),
+        serde_json::Value::String(line.account_id.to_string()),
     );
+    object.insert(
+        "currency_id".into(),
+        serde_json::Value::String(line.currency_id.to_string()),
+    );
+    let before = serde_json::Value::Object(
+        object
+            .keys()
+            .map(|field| (field.clone(), serde_json::Value::Null))
+            .collect(),
+    );
+    let captured = capture_business_change(
+        ctx,
+        BusinessChangeInput {
+            organization_id,
+            company_id: move_record.company_id,
+            resource: "account_move",
+            record_id: move_id,
+            subject_resource: "account_move_line",
+            subject_record_id: line.id,
+            operation: "add_account_move_line",
+            audit_action: "CREATE",
+            before,
+            after,
+            summary_only_changed_fields: vec![],
+        },
+    )?
+    .ok_or("draft-line addition did not produce evidence")?;
+    let change = captured
+        .change
+        .as_ref()
+        .ok_or("draft-line addition evidence is missing")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.add_account_move_line".into(),
+            correlation_id: format!("business-change:{}", change.id),
+            changes: vec![
+                RowChange::upsert_stdb_row(
+                    "account_move",
+                    serde_json::json!({"id": move_record.id}),
+                    &move_record,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "account_move_line",
+                    serde_json::json!({"id": line.id}),
+                    &line,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "audit_log",
+                    serde_json::json!({"id": captured.audit.id}),
+                    &captured.audit,
+                )?,
+                RowChange::upsert_stdb_row(
+                    "business_change",
+                    serde_json::json!({"id": change.id}),
+                    change,
+                )?,
+            ],
+        },
+    )?;
 
     Ok(())
 }
@@ -3424,6 +3474,7 @@ pub fn update_account_move_line(
             subject_resource: "account_move_line",
             subject_record_id: line_id,
             operation: "update_account_move_line",
+            audit_action: "UPDATE",
             before,
             after,
             summary_only_changed_fields: if metadata_changed {

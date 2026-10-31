@@ -44,6 +44,7 @@ export function SubscriptionActionPreview({ action, subscription, values, invoic
       </>}
       {action === 'renew' && item(t('subscriptions.workflow.renewalPeriods'), String(values.intervals || 1))}
     </dl>
+    {action === 'renew' && <p className="text-sm text-muted-foreground">{t('subscriptions.lifecycle.renewalEffect')}</p>}
     {(action === 'cancel' || action === 'close') && <p className="text-sm text-muted-foreground">{t('subscriptions.workflow.closeVsCancel')}</p>}
     {action === 'amend' && values.prorate === true && <p className="text-sm text-muted-foreground">{t('subscriptions.workflow.prorationCalculated')}</p>}
   </section>;

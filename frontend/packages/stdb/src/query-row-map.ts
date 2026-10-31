@@ -118,6 +118,7 @@ import type {
   HrEmployeeSkill,
   HrExpense,
   HrExpenseAdvance,
+  HrExpenseAllocation,
   HrExpenseMileageRate,
   HrExpensePerDiemRate,
   HrExpensePolicyException,
@@ -452,6 +453,7 @@ export interface QueryRowMap {
   "employee-documents": HrEmployeeDocument
   "employees": HrEmployee
   "expense-advances": HrExpenseAdvance
+  "expense-allocations": HrExpenseAllocation
   "expense-card-statement-unmatched": ExpenseCardStatementLine
   "expense-mileage-rates": HrExpenseMileageRate
   "expense-per-diem-rates": HrExpensePerDiemRate

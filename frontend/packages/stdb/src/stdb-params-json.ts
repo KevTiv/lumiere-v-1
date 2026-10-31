@@ -42,6 +42,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreateManualAccountInvoiceParams: {
     lines: "ManualAccountInvoiceLineInput",
   },
+  SetExpenseAllocationsParams: {
+    lines: "ExpenseAllocationLineParams",
+  },
   CreateBomParams: {
     lines: "BomLineInput",
   },

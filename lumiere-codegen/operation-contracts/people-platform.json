@@ -5900,6 +5900,26 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/core/queue.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "knowledge_guide_authority_read": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: trusted sender-scoped current guide authority view; no public row exposure.",
+      "idempotency": "not_applicable",
+      "semantic_kind": "internal"
+    },
+    "knowledge_guide_actor_profile_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: minimal current source-actor policy profile, available only to an organization-bound trusted reader."
     }
   }
 }

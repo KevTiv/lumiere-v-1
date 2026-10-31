@@ -13,7 +13,7 @@ vi.mock("@lumiere/i18n", () => ({
           ? (root as { [key: string]: unknown })[part] : undefined,
         en,
       );
-      return String(value ?? key).replace(/\{\{(\w+)\}\}/g, (_: string, name: string) => String(params?.[name] ?? ""));
+      return String(value ?? params?.defaultValue ?? key).replace(/\{\{(\w+)\}\}/g, (_: string, name: string) => String(params?.[name] ?? ""));
     },
   }),
 }));
@@ -35,6 +35,16 @@ const entry: AccountMoveHistoryEntry = {
 const values = (side: "before" | "after") => screen.getAllByTestId(`record-change-${side}`).map((node) => node.textContent);
 
 describe("record changes", () => {
+  it("identifies an explicit journal-line addition using only its projected values", () => {
+    render(<RecordChangeHistory state="ready" entries={[{ ...entry, operation: "add_account_move_line", changes: [
+      { field: "account_id", before: null, after: "18446744073709551615" },
+      { field: "currency_id", before: null, after: "9007199254740993" },
+    ] }]} />);
+    expect(screen.getByTestId("record-change-summary").textContent).toBe("Added journal item: Account and Currency");
+    expect(values("before")).toEqual(["No value", "No value"]);
+    expect(values("after")).toEqual(["18446744073709551615", "9007199254740993"]);
+    expect(screen.queryByText("Description")).toBeNull();
+  });
   it("leads with the authorized fields and keeps exact line and actor identities secondary", () => {
     render(<RecordChangeHistory state="ready" entries={[entry]} />);
     const item = screen.getByTestId("record-change-9");

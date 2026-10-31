@@ -2834,6 +2834,14 @@
       "name": "invoice_po_line",
       "shape_fingerprint": "sha256:969e2a6e670d59ad96e9823c37704bac647f86ecc0c0c49436c320f1cb2c96b2"
     },
+    "erp.knowledge_guide_actor_profile_read": {
+      "name": "knowledge_guide_actor_profile_read",
+      "shape_fingerprint": "sha256:2e20780b8a2deac3bff2053746ede83843f9c15ed097135190c4ad4df8fcccf4"
+    },
+    "erp.knowledge_guide_authority_read": {
+      "name": "knowledge_guide_authority_read",
+      "shape_fingerprint": "sha256:8c32dc68dec5a6544caa7c30a74c1325b46740da15d433e73957b339655ea84c"
+    },
     "erp.link_device_to_location": {
       "name": "link_device_to_location",
       "shape_fingerprint": "sha256:bef5c8725edd9de155f3347bd231f925fb6de3764e64fd0e361c9831fbd63048"
@@ -2957,6 +2965,10 @@
     "erp.nominate_ai_knowledge_entry_version": {
       "name": "nominate_ai_knowledge_entry_version",
       "shape_fingerprint": "sha256:adf0f65a42beff13170e95e91aea5e14272bc960de0f5f388398c8e7b677142b"
+    },
+    "erp.nominate_knowledge_guide": {
+      "name": "nominate_knowledge_guide",
+      "shape_fingerprint": "sha256:3b3260ae646fcd48d962cc1c6564838343ddb613b9cec65aa00f065430e80841"
     },
     "erp.open_account_period": {
       "name": "open_account_period",
@@ -3121,6 +3133,10 @@
     "erp.purge_expired_documents": {
       "name": "purge_expired_documents",
       "shape_fingerprint": "sha256:60a7e5a44e3590d7da456d1d34ba7c56fd948f351079bcea57b8fda49df420c6"
+    },
+    "erp.purge_reviewed_expired_documents": {
+      "name": "purge_reviewed_expired_documents",
+      "shape_fingerprint": "sha256:dbe963822d89b4243e6ed855f40ba5d6cb4a440ac7a14b1b3ef6badc5c639e6b"
     },
     "erp.queue_mail_from_template": {
       "name": "queue_mail_from_template",
@@ -3957,6 +3973,10 @@
     "erp.run_cartonization": {
       "name": "run_cartonization",
       "shape_fingerprint": "sha256:118286b58cb1d8ef0236a03ac8efd788ba15ed3634ba3f5153b40ff4d9765684"
+    },
+    "erp.run_configured_record_creation_tests": {
+      "name": "run_configured_record_creation_tests",
+      "shape_fingerprint": "sha256:298062f36635f3fe0886862db5b1a5470ae926eb0cc0c53bf578b9e84333ab07"
     },
     "erp.run_core_operational_messaging_test": {
       "name": "run_core_operational_messaging_test",
@@ -6256,6 +6276,14 @@
       "current_operations_fingerprint": "sha256:ac4b4c8fe7bb8f83a28e45c3dba118445a676fffa885292cab25749f0cf3d941",
       "operation_count": 1486,
       "reason": "release on top of v0.3.157: add run_knowledge_guide_tests, save_knowledge_guide; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.158",
+      "previous_ir_sha256": "sha256:ed7e2d17bc507b057f3afa631ffe5587b35fb67593a71e6fb6889bd8cfdf7d33",
+      "previous_operations_fingerprint": "sha256:ac4b4c8fe7bb8f83a28e45c3dba118445a676fffa885292cab25749f0cf3d941",
+      "current_operations_fingerprint": "sha256:ee061378b95578a2e99e978ba49c5180281d00f33decdecdb5fb4ead0e24fc5d",
+      "operation_count": 1491,
+      "reason": "release on top of v0.3.158: add knowledge_guide_actor_profile_read, knowledge_guide_authority_read, nominate_knowledge_guide, purge_reviewed_expired_documents, run_configured_record_creation_tests; change the shape of none"
     }
   ]
 }

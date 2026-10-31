@@ -9,6 +9,7 @@ import {
   expenseCompanyLookupRows, expenseInputsForLineKind, expenseProductLookupRows,
   expenseReceiptFromUpload, expenseTaxLookupRows, createExpenseReceiptAttemptCache, preserveExpenseEditSelections,
   expenseCreateContext,
+  expenseDefaultEmployee, expenseEmployeeDefaultForm, expensePricelistLookupRows,
 } from "./expense-capture-input"
 
 const t = ((_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key) as TFunction
@@ -16,6 +17,50 @@ const entered = {
   employeeId: "1", date: "2026-10-20", name: "Trip", totalAmount: 9999, quantity: 777,
   mileageDistance: 20, mileageRateId: "2", perDiemDays: 3, perDiemRateId: "4", taxIds: ["7"],
 }
+
+test("employee default requires one current company active link to the exact actor, with visible source", () => {
+  const actor = "ab".repeat(32)
+  const employee = { id: "9007199254740993", organizationId: 9n, companyId: 2n, userId: actor, isActive: true, deletedAt: null }
+  assert.equal(expenseDefaultEmployee([employee], 9n, 2n, actor), "9007199254740993")
+  assert.equal(expenseDefaultEmployee([employee], 9n, 2n, `0x${actor.toUpperCase()}`), "9007199254740993")
+  for (const rows of [[{ ...employee, userId: "cd".repeat(32) }], [{ ...employee, companyId: 3n }],
+    [{ ...employee, organizationId: 3n }], [{ ...employee, isActive: false }], [{ ...employee, deletedAt: "yesterday" }],
+    [{ ...employee, deletedAt: undefined }], [employee, { ...employee, id: "2" }]]) {
+    assert.equal(expenseDefaultEmployee(rows, 9n, 2n, actor), undefined)
+  }
+  const { deletedAt: _omitted, ...maskedEmployee } = employee
+  assert.equal(expenseDefaultEmployee([maskedEmployee], 9n, 2n, actor), undefined)
+  assert.equal(expenseDefaultEmployee([employee], 9n, 2n, null), undefined)
+  const config = expenseEmployeeDefaultForm(newExpenseForm(t), employee.id, "From your linked employee")
+  const field = config.sections.flatMap((section) => section.fields).find((field) => field.name === "employeeId")
+  assert.equal(field?.defaultValue, employee.id)
+  assert.equal(field?.description, "From your linked employee")
+})
+
+test("employee defaults preserve unsupported field shapes and unrelated selectors", () => {
+  const config: FormConfig = { ...newExpenseForm(t), sections: [{ id: "alternate-fields", fields: [
+    { id: "employee-number", name: "employeeId", type: "number", defaultValue: 7, description: "Existing numeric control" },
+    { id: "employee-checkbox", name: "employeeId", type: "checkbox", defaultValue: false },
+    { id: "project", name: "projectId", type: "select", defaultValue: "project-1", options: [{ value: "project-1", label: "Current project" }] },
+  ] }] }
+  const result = expenseEmployeeDefaultForm(config, "9007199254740993", "From your linked employee")
+  for (const [index, field] of config.sections[0].fields.entries()) {
+    assert.equal(result.sections[0].fields[index], field)
+  }
+  assert.equal(result.sections[0].fields[0].defaultValue, 7)
+  assert.equal(result.sections[0].fields[0].description, "Existing numeric control")
+  assert.equal(result.sections[0].fields[1].defaultValue, false)
+})
+
+test("price list currency choices require declared organization/company scope and active state", () => {
+  const row = { id: 4n, organizationId: 9n, companyId: null, currencyId: 5n, isActive: true }
+  assert.deepEqual(expensePricelistLookupRows([row, { ...row, id: 5n, companyId: 2n }], 9n, 2n).map((row) => row.id), [4n, 5n])
+  for (const patch of [{ organizationId: 8n }, { companyId: 3n }, { isActive: false }, { currencyId: 0n }]) {
+    assert.deepEqual(expensePricelistLookupRows([{ ...row, ...patch }], 9n, 2n), [])
+  }
+  const { companyId: _masked, ...masked } = row
+  assert.deepEqual(expensePricelistLookupRows([masked], 9n, 2n), [])
+})
 
 test("expense prerequisites reject unavailable employee, price list and currency before an upload or create", () => {
   const employees = [{ id: 1n, organizationId: 9n, companyId: 2n }]

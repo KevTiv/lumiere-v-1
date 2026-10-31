@@ -166,7 +166,7 @@ fn seed_accounts(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<ExpenseAc
                 name: "WB Misc".into(),
                 code: journal_code.clone(),
                 type_: JournalType::General,
-                currency_id: Some(1),
+                currency_id: Some(fixture.currency_id),
                 default_account_id: Some(expense_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -277,7 +277,7 @@ fn create_expensed_product(
             uom_po_id: template.uom_po_id,
             standard_price: 0.0,
             list_price: 0.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             default_code: Some(format!("EXP-{name}")),
             barcode: None,
             description: None,
@@ -347,7 +347,7 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
             date: ctx.timestamp,
             unit_amount: 10.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: Some(blocked),
             description: None,
             tax_ids: vec![],
@@ -385,7 +385,7 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
             date: ctx.timestamp,
             unit_amount: 80.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: Some(capped),
             description: None,
             tax_ids: vec![],
@@ -434,7 +434,7 @@ pub fn test_product_policy_and_line_cap(ctx: &ReducerContext) -> Result<(), Stri
             date: ctx.timestamp,
             unit_amount: 40.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: Some(capped),
             description: None,
             tax_ids: vec![],
@@ -561,7 +561,7 @@ pub fn test_tax_recovery_and_partner_on_post(ctx: &ReducerContext) -> Result<(),
             company_id: Some(fixture.company_id),
             employee_id,
             name: "Tax Sheet".into(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             notes: None,
             accounting_date: None,
         },
@@ -584,7 +584,7 @@ pub fn test_tax_recovery_and_partner_on_post(ctx: &ReducerContext) -> Result<(),
             date: ctx.timestamp,
             unit_amount: 100.0,
             quantity: 1.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             product_id: None,
             description: None,
             tax_ids: vec![tax_def_id],
@@ -692,7 +692,13 @@ pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
         })
         .ok_or("USD currency is not seeded")?
         .id;
-    let _ = create_currency_rate(
+    if usd_currency_id != fixture.currency_id || eur_currency_id == usd_currency_id {
+        return Err(
+            "FX scenario requires distinct organization-owned EUR and company-base USD currencies"
+                .into(),
+        );
+    }
+    create_currency_rate(
         ctx,
         fixture.organization_id,
         Some(fixture.company_id),
@@ -702,7 +708,7 @@ pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
             rate: 1.25,
             metadata: None,
         },
-    );
+    )?;
 
     let employee_id = seed_employee(ctx, &fixture, "FX Emp")?;
     create_expense_sheet(
@@ -777,6 +783,11 @@ pub fn test_fx_snapshot_on_submit(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("submitted fx sheet")?;
     if sheet.state != ExpenseSheetState::Submitted {
         return Err("sheet not submitted".into());
+    }
+    if sheet.currency_id != eur_currency_id || sheet.company_currency_id != fixture.currency_id {
+        return Err(
+            "FX snapshot changed the source EUR or company-base USD currency identity".into(),
+        );
     }
     if (sheet.currency_rate - 1.25).abs() > 0.0001 {
         return Err(format!(

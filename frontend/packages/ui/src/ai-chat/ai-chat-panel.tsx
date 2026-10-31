@@ -34,6 +34,7 @@ import {
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
+import { Dialog, DialogContent, DialogTitle } from "../components/dialog"
 import { AssistantGuideCard } from "./assistant-guide-viewer"
 import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guide-types"
 import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-types"
@@ -61,6 +62,10 @@ interface AIChatPanelProps {
   config?: Partial<AIChatConfig>
   context?: ChatContext
   initialMessages?: ChatMessage[]
+  /** A user-requested question is appended once without replacing unsent work or sending it. */
+  composerRequest?: { id: string; text: string } | null
+  /** Error help opens above an existing editor without closing or weakening that editor's modal. */
+  modal?: boolean
   /** History persistence is separate from obtaining an answer or executing an action. */
   historySaveFailed?: boolean
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
@@ -136,6 +141,8 @@ export function AIChatPanel({
   config,
   context,
   initialMessages,
+  composerRequest,
+  modal = false,
   historySaveFailed,
   onSendMessage,
   onStreamMessage,
@@ -158,6 +165,7 @@ export function AIChatPanel({
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const lastComposerRequest = useRef<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const commands = config?.commands || defaultAtCommands
@@ -168,6 +176,13 @@ export function AIChatPanel({
       setMessages(initialMessages)
     }
   }, [initialMessages])
+
+  useEffect(() => {
+    if (!composerRequest || composerRequest.id === lastComposerRequest.current) return
+    lastComposerRequest.current = composerRequest.id
+    setInput((current) => current.trim() ? `${current}\n\n${composerRequest.text}` : composerRequest.text)
+    inputRef.current?.focus()
+  }, [composerRequest])
 
   const filteredCommands = commands.filter(
     (cmd) =>
@@ -487,7 +502,7 @@ export function AIChatPanel({
 
   if (!open) return null
 
-  return (
+  const panel = (
     <section
       data-testid="erp-ai-chat-panel"
       data-mode={docked ? "side" : "full"}
@@ -888,4 +903,5 @@ export function AIChatPanel({
       </div>
     </section>
   )
+  return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
 }

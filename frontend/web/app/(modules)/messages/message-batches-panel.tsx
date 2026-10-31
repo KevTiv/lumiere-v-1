@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { CheckIcon, FileTextIcon, MessageSquareMoreIcon, PlusIcon, ScrollTextIcon, XIcon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import {
   mergeSelectOptionsForFields,
   newInvoiceReminderBatchForm,
@@ -19,11 +20,13 @@ import {
   useCreateMessageBatch,
   useCreateMessageTemplate,
   useMessageBatches,
+  useMessageBatchExclusions,
   useMessageTemplates,
   useReviewMessageBatch,
   useOperationalMessages,
 } from "@lumiere/query-hooks/hooks/messages"
 import { nullableBigIntU64 as asId } from "@lumiere/erp-shared/form-coercion"
+import { useCrmConversationMessages } from "@lumiere/query-hooks/hooks/crm"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,7 +36,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
-import { batchEvidenceComplete, batchInScope, filterBatchChoices, messagesForBatch, type BatchReviewEnvelope } from "./message-batch-review"
+import { batchEvidenceComplete, batchExclusions, batchExclusionReason, batchInScope, filterBatchChoices, messageFailureReason, messageProviderEvidence, messagesForBatch, type BatchReviewEnvelope } from "./message-batch-review"
 
 type Row = Record<string, unknown>
 type PickerOption = { value: string; label: string; description?: string }
@@ -112,13 +115,18 @@ function selectedChannels(data: Row): MessageChannel[] {
 
 export function MessageBatchesPanel({ organizationId, companyId, contacts, invoices }: { organizationId: number; companyId: bigint; contacts: Row[]; invoices: Row[] }) {
   const { t } = useTranslation()
+  const session = useErpSession()
   const organization = BigInt(organizationId)
   const templatesQuery = useMessageTemplates(organization)
   const batchesQuery = useMessageBatches(organization)
   const evidenceQuery = useOperationalMessages(organization)
+  const providerQuery = useCrmConversationMessages(organization)
+  const exclusionsQuery = useMessageBatchExclusions(organization, companyId, JSON.stringify([session.identity, session.organizationId, session.activeCompanyId]))
+  const exclusionsState = moduleQueryState({ ...exclusionsQuery, data: exclusionsQuery.isFetching ? undefined : exclusionsQuery.data, isLoading: exclusionsQuery.isFetching || exclusionsQuery.isPending })
   const templatesState = moduleQueryState(templatesQuery)
   const batchesState = moduleQueryState(batchesQuery)
   const evidenceState = moduleQueryState(evidenceQuery)
+  const providerState = moduleQueryState(providerQuery)
   const templates = templatesState.status === "ready" ? templatesQuery.data ?? [] : []
   const batches = batchesState.status === "ready" ? (batchesQuery.data ?? []).filter((row) => batchInScope(row, organization, companyId)) : []
   const evidence = evidenceState.status === "ready" ? evidenceQuery.data ?? [] : []
@@ -249,6 +257,7 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
 
   const renderEvidence = (batch: BatchReviewEnvelope) => {
     const messages = messagesForBatch(evidence, batch, organization, companyId)
+    const exclusions = batchExclusions(batch, exclusionsState.status === "ready" ? exclusionsQuery.data ?? [] : [])
     const count = batch.recipientCount ?? batch.recipient_count
     return <section className="space-y-3" aria-label={t("messages.batchReview.evidence", { defaultValue: "Saved batch evidence" })}>
       <p className="text-sm">{t("messages.batchReview.template", { defaultValue: "Template" })}: {templateOptions.find((option) => option.value === String(batch.templateId ?? batch.template_id))?.label ?? t("messages.batchReview.templateUnavailable", { defaultValue: "Template details unavailable" })}</p>
@@ -257,15 +266,30 @@ export function MessageBatchesPanel({ organizationId, companyId, contacts, invoi
       {evidenceState.status === "ready" ? <>
         {!batchEvidenceComplete(messages, count) ? <p role="status" className="text-sm text-muted-foreground">{t("messages.batchReview.incomplete", { defaultValue: "The complete saved recipient content could not be verified. Approval is unavailable; restore the source records before continuing." })}</p> : null}
         <ul className="max-h-72 space-y-3 overflow-y-auto">
-          {messages.map((message) => <li key={String(message.id)} className="space-y-1 rounded border p-3 text-sm">
+          {messages.map((message) => {
+            const provider = providerState.status === "ready" ? messageProviderEvidence(message, providerQuery.data ?? [], organization, companyId) : null
+            const providerLabel = provider?.status === "delivered"
+              ? t("messages.batchReview.providerDelivered", { defaultValue: "Provider confirmed delivery" })
+              : provider?.status === "accepted" ? t("messages.batchReview.providerAccepted", { defaultValue: "Provider accepted; delivery is not confirmed" })
+                : provider?.status === "failed" ? t("messages.batchReview.providerFailed", { defaultValue: "Provider reported failure" })
+                  : t("messages.batchReview.providerUnavailable", { defaultValue: "No verified provider delivery receipt is available." })
+            return <li key={String(message.id)} className="space-y-1 rounded border p-3 text-sm">
             <p className="font-medium">{contactOptions.find((option) => option.value === String(message.contactId ?? message.contact_id))?.label ?? t("messages.batchReview.recipientUnavailable", { defaultValue: "Recipient name unavailable" })}</p>
             {typeof (message.renderedSubject ?? message.rendered_subject) === "string" ? <p>{String(message.renderedSubject ?? message.rendered_subject)}</p> : null}
             <p className="whitespace-pre-wrap break-words">{typeof (message.renderedBody ?? message.rendered_body) === "string" ? String(message.renderedBody ?? message.rendered_body) : t("messages.batchReview.bodyUnavailable", { defaultValue: "Message content unavailable" })}</p>
             <Badge variant="outline">{enumName(message.status)}</Badge>
-          </li>)}
+            <p className="text-xs text-muted-foreground">{providerLabel}</p>
+            {provider ? <p className="break-all text-xs">{t("messages.batchReview.providerReference", { defaultValue: "Provider reference" })}: {provider.providerMessageId}</p> : null}
+            {provider?.status === "failed" ? <p className="text-xs">{messageFailureReason(message) ?? t("messages.batchReview.failureUnavailable", { defaultValue: "The provider failure reason is unavailable." })}</p> : null}
+          </li>})}
         </ul>
       </> : null}
-      <p className="text-xs text-muted-foreground">{t("messages.batchReview.exclusionNotice", { defaultValue: "Excluded recipients are counted above. Individual exclusion reasons are not available in this view. Check recipient consent and channel eligibility in the owning contact record." })}</p>
+      <ModuleDataNotice state={exclusionsState} />
+      {exclusions == null ? <p role="status" className="text-xs text-muted-foreground">{t("messages.batchReview.exclusionsUnavailable", { defaultValue: "The complete creation-time exclusion reasons are unavailable for this batch. Current contact preferences cannot establish why a recipient was excluded earlier." })}</p>
+        : exclusions.length > 0 ? <section className="space-y-2"><p className="text-sm font-medium">{t("messages.batchReview.excludedRecipients", { defaultValue: "Excluded at batch creation" })}</p><ul className="max-h-60 space-y-2 overflow-y-auto">{exclusions.map((excluded) => <li key={`${excluded.model}:${excluded.recordId}`} className="rounded border p-2 text-sm">
+          <p>{contactOptions.find((option) => option.value === excluded.contactId)?.label ?? t("messages.batchReview.recipientUnavailable", { defaultValue: "Recipient name unavailable" })} · {excluded.model === "account_move" ? t("messages.batchReview.invoice", { defaultValue: "Invoice" }) : t("messages.batchReview.contact", { defaultValue: "Contact" })} #{excluded.recordId}</p>
+          <p className="text-muted-foreground">{t(`messages.batchReview.exclusionReasons.${excluded.reason}`, { defaultValue: batchExclusionReason(excluded.reason) ?? "" })}</p>
+        </li>)}</ul></section> : null}
     </section>
   }
 

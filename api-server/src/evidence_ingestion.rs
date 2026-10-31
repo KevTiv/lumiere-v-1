@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 
 use crate::{
     commands::{dispatch_ai_evidence_mutation, dispatch_ai_evidence_search_mutation},
-    document_blobs::{managed_blob_url, read_authorized_document_blob},
+    document_blobs::{managed_blob_url, read_authorized_document_blob, record_indexing_receipt},
     error::ApiError,
     query_exec::resolve_membership_company_id,
     state::AppState,
@@ -359,23 +359,38 @@ async fn ingest_document(
             "document version does not match its server-owned blob".into(),
         ));
     }
-    let (content, processor) =
-        extract_with_ocr(&blob.content_type, &blob.bytes, body.language.as_deref()).await?;
-    let extracted_chars = content.chars().count();
-    persist_document_evidence(
-        &state,
-        &session,
-        &context,
-        organization_id,
-        requested_company,
-        document_id,
-        &document,
+    let indexed = async {
+        let (content, processor) =
+            extract_with_ocr(&blob.content_type, &blob.bytes, body.language.as_deref()).await?;
+        let extracted_chars = content.chars().count();
+        persist_document_evidence(
+            &state,
+            &session,
+            &context,
+            organization_id,
+            requested_company,
+            document_id,
+            &document,
+            &blob.object_key,
+            blob.source_url.as_deref(),
+            &content,
+            &processor,
+        )
+        .await?;
+        Ok::<_, ApiError>((extracted_chars, processor))
+    }
+    .await;
+    // Queue failures do not undo the blob or document. Keep a durable result
+    // so the user can recover after refresh without submitting those again.
+    record_indexing_receipt(
+        &state.config.document_blob_store,
         &blob.object_key,
-        blob.source_url.as_deref(),
-        &content,
-        &processor,
+        document_id,
+        &blob.checksum,
+        indexed.is_ok(),
     )
     .await?;
+    let (extracted_chars, processor) = indexed?;
     Ok(Json(IngestDocumentResponse {
         document_id,
         version_id: document.current_version_id,

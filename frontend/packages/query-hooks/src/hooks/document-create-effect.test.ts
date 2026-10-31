@@ -36,3 +36,9 @@ test("ignores other organizations, records and pre-existing rows; null when unre
 test("two new matches are ambiguous", () => {
   assert.throws(() => resolveDocumentCreateEffect([], [doc(2n), doc(3n)], 1n, expected), AmbiguousOperationEffectError)
 })
+
+test("a submission replay resolves only its exact existing document", () => {
+  const row = doc(4n, { metadata: JSON.stringify({ uploadSubmissionId: "a".repeat(32) }) })
+  assert.equal(resolveDocumentCreateEffect([row], [row], 1n, { ...expected, submissionId: "a".repeat(32) })?.id, "4")
+  assert.equal(resolveDocumentCreateEffect([row], [row], 1n, { ...expected, submissionId: "b".repeat(32) }), null)
+})

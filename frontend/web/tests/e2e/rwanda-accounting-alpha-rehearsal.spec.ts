@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "../invoice-accounting-choices"
 import {
   expect,
   test,
@@ -283,6 +284,7 @@ async function createManualDocument(
   await page.getByRole("option").first().click()
   await page.getByTestId("create-invoice-line-description").fill(description)
   await page.getByTestId("create-invoice-line-unit-price").fill("125000")
+  await reviewInvoiceAccountingChoices(page)
   await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
 
   const operation = page.waitForResponse(

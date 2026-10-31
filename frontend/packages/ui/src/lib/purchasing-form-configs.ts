@@ -5,7 +5,7 @@ const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> =
 
 export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
   id: "new-purchase-order",
-  customFieldCreateUnavailableMessage: t("purchasing.forms.refinement.customFieldsCreateReadiness", { defaultValue: "This form includes custom fields that cannot be saved with a new purchase order yet. Creation is disabled before any purchase order is created. Ask an administrator to use a form without custom fields. Your entries are retained." }),
+  customFieldCreateCapability: "atomic-configured-v1",
   title: t("purchasing.forms.newPurchaseOrder.title"),
   description: t("purchasing.forms.refinement.newOrderHelp", { defaultValue: "Choose the vendor and currency, save a draft, then add items and review quantities and costs before confirmation." }),
   submitLabel: t("purchasing.forms.refinement.saveDraft", { defaultValue: "Save draft" }),

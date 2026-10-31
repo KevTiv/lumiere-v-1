@@ -64,6 +64,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import type { CanonicalRecordRef } from "./operation-effect"
 import { resolveCompletedActivityEffect } from "./crm-activity-completion"
+import { useRecordCreationTransport } from "./record-creation-http"
 
 import {
   finalizeCreateActivityParams,
@@ -221,19 +222,16 @@ export function useUsers(
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
-export function useCreateLead(organizationId: bigint) {
+export function useCreateLead(organizationId: bigint, options?: { companyId?: bigint }) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Partial<CreateLeadParams>>({
+  const create = useRecordCreationTransport(organizationId, options?.companyId, "crm_lead")
+  return useMutation<string, Error, Partial<CreateLeadParams>>({
+    retry: false,
     mutationFn: async (params) => {
       const merged = finalizeCreateLeadParams(params)
-      const { urlPath, init } = stdbBffCommandPost("create_lead", {
-        params: stdbParamsToJson(merged, "CreateLeadParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) {
-        const json = (await r.json().catch(() => ({}))) as { error?: string }
-        throw new Error(json.error ?? "Failed to create lead")
-      }
+      return create(JSON.stringify(stdbParamsToJson(merged, "CreateLeadParams")), merged.metadata, (metadata) => stdbBffCommandPost("create_lead", {
+        params: stdbParamsToJson({ ...merged, metadata }, "CreateLeadParams"),
+      }))
     },
     onSuccess: () => invalidateResourceQueries(qc, organizationId, ['leads']),
   })
@@ -267,18 +265,18 @@ export function useCreateOpportunity(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Partial<CreateOpportunityParams>>({
+  const create = useRecordCreationTransport(organizationId, scopedCompanyId, "opportunity")
+  return useMutation<string, Error, Partial<CreateOpportunityParams>>({
+    retry: false,
     mutationFn: async (params) => {
       const finalized = finalizeCreateOpportunityParams(params)
       const scoped = withCompanyScope(
         finalized as unknown as Record<string, unknown>,
         scopedCompanyId,
       )
-      const { urlPath, init } = stdbBffCommandPost("create_opportunity", {
-        params: stdbParamsToJson(scoped as object, "CreateOpportunityParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create opportunity')
+      return create(JSON.stringify(stdbParamsToJson(scoped as object, "CreateOpportunityParams")), finalized.metadata, (metadata) => stdbBffCommandPost("create_opportunity", {
+        params: stdbParamsToJson({ ...scoped, metadata }, "CreateOpportunityParams"),
+      }))
     },
     onSuccess: () =>
       invalidateResourceQueries(qc, organizationId, ['opportunities']),
@@ -291,21 +289,18 @@ export function useCreateContact(
 ) {
   const qc = useQueryClient()
   const scopedCompanyId = options?.companyId
-  return useMutation<void, Error, Partial<CreateContactParams>>({
+  const create = useRecordCreationTransport(organizationId, scopedCompanyId, "contact")
+  return useMutation<string, Error, Partial<CreateContactParams>>({
+    retry: false,
     mutationFn: async (params) => {
       const finalized = finalizeCreateContactParams(params)
       const scoped = withCompanyScope(
         finalized as unknown as Record<string, unknown>,
         scopedCompanyId,
       )
-      const { urlPath, init } = stdbBffCommandPost("create_contact", {
-        params: stdbParamsToJson(scoped as object, "CreateContactParams"),
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) {
-        const json = (await r.json().catch(() => ({}))) as { error?: string }
-        throw new Error(json.error ?? "Failed to create contact")
-      }
+      return create(JSON.stringify(stdbParamsToJson(scoped as object, "CreateContactParams")), finalized.metadata, (metadata) => stdbBffCommandPost("create_contact", {
+        params: stdbParamsToJson({ ...scoped, metadata }, "CreateContactParams"),
+      }))
     },
     onSuccess: () => invalidateResourceQueries(qc, organizationId, ['contacts']),
   })

@@ -201,6 +201,45 @@ def read_text(path: Path, label: str) -> str:
         fail(f"cannot read {label}: {error}")
 
 
+def registered_migration_sql(
+    root: Path, contracts: Path, catalog_path: Path, catalog_source: str
+) -> dict[str, set[str]]:
+    """Resolve the literal SQL artifacts actually bound by catalog sql fields.
+
+    Application migrations include authored infrastructure entries, so their
+    sequence numbers need not equal the generated durable migration numbers.
+    Frozen includes and the published crate's SQL constants bind the artifacts.
+    """
+    registered: dict[str, set[str]] = {}
+
+    def register(owner: Path, source: Path, relative: str, label: str) -> None:
+        path = (source.parent / relative).resolve()
+        require(path.is_relative_to(owner.resolve()), f"{label} escapes its checkout")
+        require(path.is_file(), f"{label} is missing: {path}")
+        registered.setdefault(path.name, set()).add(f"sha256:{sha256(path)}")
+
+    for relative in re.findall(
+        r'(?m)^\s*sql:\s*include_str!\(\s*"([^\"]+)"\s*\)\s*,', catalog_source
+    ):
+        register(root, catalog_path, relative, "application migration SQL")
+
+    constants = re.findall(
+        r"(?m)^\s*sql:\s*lumiere_contracts::manifests::([A-Z][A-Z0-9_]*)\s*,",
+        catalog_source,
+    )
+    if constants:
+        crate_path = contracts / "crates/lumiere-contracts/src/lib.rs"
+        crate_source = read_text(crate_path, "published contract SQL constants")
+        for constant in constants:
+            include = re.search(
+                rf'(?m)^\s*pub const {re.escape(constant)}:\s*&str\s*=\s*include_str!\(\s*"([^\"]+)"\s*\)\s*;',
+                crate_source,
+            )
+            require(include is not None, f"contract SQL constant {constant} has no frozen SQL include")
+            register(contracts, crate_path, include.group(1), f"contract SQL constant {constant}")
+    return registered
+
+
 def verify_pg(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
     expected = object_field(manifest, "durable_postgres", dict)
     sql_path = relative_path(contracts, expected.get("sql_path"), "durable_postgres.sql_path")
@@ -249,6 +288,9 @@ def verify_pg(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
             isinstance(durable_migrations, list) and durable_migrations,
             "durable PG schema manifest migrations must be a non-empty list",
         )
+        registered_sql = registered_migration_sql(
+            root, contracts, catalog_path, catalog_match.group(1)
+        )
         first = durable_migrations[0]
         require(
             isinstance(first, dict)
@@ -277,6 +319,15 @@ def verify_pg(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
             require(
                 version in versions,
                 f"durable PG migration {version} is missing from the application migration catalog",
+            )
+            source_checksums = registered_sql.get(entry_path.name)
+            require(
+                source_checksums is not None,
+                f"durable PG migration {version} SQL is missing from the application migration catalog",
+            )
+            require(
+                entry.get("checksum") in source_checksums,
+                f"durable PG migration {version} registered SQL checksum does not match its released artifact",
             )
 
 

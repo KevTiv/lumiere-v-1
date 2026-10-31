@@ -14,11 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { cn } from "../lib/utils"
 import { extractGuideHtmlDerivative, isSavedGuide, safeGuideHref } from "../lib/assistant-guide-types"
 import type { GuideDocument, GuideDraft, GuideReference, GuideRevisionSummary } from "../lib/assistant-guide-types"
+import type { GuideReviewInput, GuideVerificationInput, GuideVerificationChoice } from "../lib/assistant-guide-types"
+import { GuideVerificationActions } from "./guide-verification-actions"
 
 export interface AssistantGuideViewerProps {
   document: GuideDraft | GuideDocument
   onSave?: (draft: GuideDraft, expectedRevision?: number) => Promise<GuideDocument | void>
   onAsk?: (question: string, draftOverride?: GuideDraft) => Promise<string | void>
+  onLoadVerificationChoices?: () => Promise<GuideVerificationChoice[]>
+  onRequestVerification?: (input: GuideVerificationInput) => Promise<void>
+  onRecordReview?: (input: GuideReviewInput) => Promise<void>
   onOpenFullPage?: (reference?: GuideReference) => void
   history?: GuideRevisionSummary[]
   onRevisionChange?: (revision: number) => void | Promise<void>
@@ -56,7 +61,7 @@ export function buildGuideHtmlPreview(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox"><meta name="referrer" content="no-referrer"><style>body{margin:0;padding:24px;font:15px/1.7 system-ui,sans-serif;color:#202529;background:#fff;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}pre{white-space:pre-wrap}h1,h2,h3{line-height:1.3}</style></head><body>${safe}</body></html>`
 }
 
-export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFullPage, history, onRevisionChange, onDirtyChange, moduleOptions, busy = false, verificationUnavailable = false, onRetryVerification, error, className }: AssistantGuideViewerProps) {
+export function AssistantGuideViewer({ document: guide, onSave, onAsk, onLoadVerificationChoices, onRequestVerification, onRecordReview, onOpenFullPage, history, onRevisionChange, onDirtyChange, moduleOptions, busy = false, verificationUnavailable = false, onRetryVerification, error, className }: AssistantGuideViewerProps) {
   const { t } = useTranslation()
   const id = useId()
   const [edit, setEdit] = useState(false)
@@ -64,6 +69,7 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
   const [module, setModule] = useState(guide.module)
   const [markdown, setMarkdown] = useState(guide.markdown)
   const [question, setQuestion] = useState("")
+  const [reviewInput, setReviewInput] = useState(false)
   const [followUp, setFollowUp] = useState<string | null>(null)
   const [pending, setPending] = useState<"save" | "ask" | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -77,7 +83,7 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
   const canSave = !invalidIdentity && Boolean(onSave) && (!saved || guide.canWrite === true)
   const disabled = busy || pending !== null
   const dirty = title !== guide.title || module !== guide.module || markdown !== guide.markdown
-  const hasPendingInput = dirty || question.trim().length > 0
+  const hasPendingInput = dirty || question.trim().length > 0 || reviewInput
   const moduleLabel = moduleOptions?.find((option) => option.value === guide.module)?.label ?? guideDisplayLabel(guide.module)
   const filingLabel = moduleOptions?.find((option) => option.value === module)?.label ?? guideDisplayLabel(module)
   useEffect(() => { onDirtyChange?.(hasPendingInput) }, [hasPendingInput, onDirtyChange])
@@ -202,6 +208,13 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onOpenFul
           return <li key={`${source.source_key ?? source.entity_id ?? index}:${source.source_version ?? ""}`} className="break-words">{href ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">{label}</a> : <span>{label}</span>}{source.source_version ? <span className="ml-2 text-xs text-muted-foreground">{source.source_version}</span> : null}{source.snapshot_at ? <time dateTime={source.snapshot_at} suppressHydrationWarning className="block text-xs text-muted-foreground">{t("aiChat.guide.sourceAsOf", { defaultValue: "Record as of {{time}}", time: guideDisplayTime(source.snapshot_at) })}</time> : null}</li>
         })}</ul>
       </aside> : <p className="mt-6 text-xs text-muted-foreground">{t("aiChat.guide.noSources", { defaultValue: "This draft has no linked ERP sources. Check its guidance before relying on it." })}</p>}
+      {saved && (guide.reviewEvidence || guide.compatibility === "unknown") ? <aside className="mt-6 space-y-2 rounded-lg border border-border p-4 text-xs text-muted-foreground" aria-label={t("aiChat.guide.verification", { defaultValue: "Guide verification" })}>
+        <p>{guide.reviewState === "verified" ? t("aiChat.guide.independentReviews", { defaultValue: "This revision has the required independent evidence, domain and implementation reviews. Business actions still require current ERP checks." }) : t("aiChat.guide.reviewBoundary", { defaultValue: "Saving a guide does not verify it. Verification requires canonical evidence and independent reviews; changing the guide or its evidence invalidates prior approval." })}</p>
+        {guide.reviewEvidence && guide.reviewEvidence.state !== "not_requested" ? <p>{t("aiChat.guide.reviewStatus", { defaultValue: "Review status: {{state}}", state: guide.reviewEvidence.state.replaceAll("_", " ") })}</p> : null}
+        {guide.reviewEvidence?.reviews?.length ? <ul className="space-y-1">{guide.reviewEvidence.reviews.map((review) => <li key={review.kind} className="break-words">{t(`aiChat.guide.reviewKinds.${review.kind}`, { defaultValue: review.kind.replaceAll("_", " ") })}: {t(`aiChat.guide.reviewOutcomes.${review.outcome}`, { defaultValue: review.outcome })}<details className="mt-1"><summary>{review.reviewerName ?? t("aiChat.guide.reviewerUnavailable", { defaultValue: "Reviewer details unavailable" })}</summary><p>{review.reviewerName ? t("aiChat.guide.currentReviewerName", { defaultValue: "Name from the current authorized directory." }) : null}</p><code className="break-all">{review.reviewer}</code></details></li>)}</ul> : null}
+        {guide.compatibility === "unknown" ? <p>{t("aiChat.guide.compatibilityUnknown", { defaultValue: "Product and workflow compatibility have not been established. Check applicability before following this guide." })}</p> : null}
+        <GuideVerificationActions key={identity} document={guide} disabled={disabled || verificationUnavailable || dirty || guide.reviewState === "superseded"} onLoad={onLoadVerificationChoices} onNominate={onRequestVerification} onReview={onRecordReview} onPendingInput={setReviewInput} />
+      </aside> : null}
     </div>
     <footer className="shrink-0 space-y-3 border-t border-border bg-muted/20 px-4 py-3 sm:px-6">
       {followUp ? <div role="status" className="max-h-40 overflow-y-auto rounded-lg border border-border bg-background p-3 text-sm"><MarkdownView value={guideMarkdownWithoutHtml(followUp)} /></div> : null}

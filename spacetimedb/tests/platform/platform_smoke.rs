@@ -39,7 +39,8 @@ use crate::documents::presence::{
     clear_document_presence, document_presence, update_document_presence,
 };
 use crate::documents::regional::{
-    purge_expired_documents, set_document_retention, SetDocumentRetentionParams,
+    purge_expired_documents, purge_reviewed_expired_documents, set_document_retention,
+    SetDocumentRetentionParams,
 };
 use crate::helpdesk::tickets::{
     create_helpdesk_stage, create_helpdesk_team, create_ticket, helpdesk_stage, helpdesk_team,
@@ -1462,6 +1463,153 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
         return Err("expected hard purge of expired document".to_string());
     }
 
+    test_reviewed_document_purge_boundaries(ctx, &fixture)?;
+
+    Ok(())
+}
+
+fn seed_reviewed_purge_document(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    name: &str,
+    held: bool,
+) -> Result<u64, String> {
+    create_document(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        CreateDocumentParams {
+            name: name.into(),
+            description: None,
+            file_name: format!("{name}.pdf"),
+            file_size: 48,
+            mimetype: "application/pdf".into(),
+            url: format!(
+                "/api/documents/blobs/object/{}/default/{name}",
+                fixture.organization_id
+            ),
+            checksum: "e".repeat(64),
+            folder_id: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            tag_ids: vec![],
+            is_favorite: false,
+            classification_id: None,
+            retention_days: Some(7),
+            fiscal_kind: None,
+            residency_region: None,
+            metadata: None,
+        },
+    )?;
+    let doc = ctx
+        .db
+        .document()
+        .iter()
+        .find(|doc| doc.organization_id == fixture.organization_id && doc.name == name)
+        .ok_or("reviewed purge fixture document missing")?;
+    if held {
+        apply_document_legal_hold(
+            ctx,
+            fixture.organization_id,
+            doc.id,
+            ApplyDocumentLegalHoldParams {
+                reason: "Reviewed purge hold regression".into(),
+                metadata: None,
+            },
+        )?;
+    } else {
+        delete_document(ctx, fixture.organization_id, doc.id)?;
+    }
+    let doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("reviewed purge document disappeared before eligibility")?;
+    let id = doc.id;
+    ctx.db.document().id().update(Document {
+        is_deleted: true,
+        deleted_at: Some(ctx.timestamp),
+        purge_after: Some(ctx.timestamp),
+        ..doc
+    });
+    Ok(id)
+}
+
+fn test_reviewed_document_purge_boundaries(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+) -> Result<(), String> {
+    let org = fixture.organization_id;
+    let first = seed_reviewed_purge_document(ctx, fixture, "Reviewed purge first", false)?;
+    let second =
+        seed_reviewed_purge_document(ctx, fixture, "Reviewed purge newly eligible", false)?;
+    let held = seed_reviewed_purge_document(ctx, fixture, "Reviewed purge legal hold", true)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    let foreign_doc = seed_reviewed_purge_document(ctx, &foreign, "Reviewed purge foreign", false)?;
+    let versions = |document_id: u64| {
+        ctx.db
+            .document_version()
+            .iter()
+            .filter(|version| version.document_id == document_id)
+            .map(|version| version.id)
+            .collect::<Vec<_>>()
+    };
+    let first_versions = versions(first);
+    let second_versions = versions(second);
+    let held_versions = versions(held);
+    let foreign_versions = versions(foreign_doc);
+    if first_versions.is_empty()
+        || second_versions.is_empty()
+        || held_versions.is_empty()
+        || foreign_versions.is_empty()
+    {
+        return Err("reviewed purge requires genuine saved document versions".into());
+    }
+    for (label, ids) in [
+        ("stale", vec![first]),
+        ("duplicate", vec![first, first, second]),
+        ("foreign", vec![first, second, foreign_doc]),
+        ("held", vec![first, second, held]),
+        ("wrong", vec![u64::MAX]),
+    ] {
+        if purge_reviewed_expired_documents(ctx, org, ids).is_ok() {
+            return Err(format!("{label} reviewed purge scope was accepted"));
+        }
+        for id in [first, second, held, foreign_doc] {
+            if ctx.db.document().id().find(id).is_none() {
+                return Err(format!(
+                    "rejected {label} reviewed purge deleted document {id}"
+                ));
+            }
+        }
+        if versions(first) != first_versions
+            || versions(second) != second_versions
+            || versions(held) != held_versions
+            || versions(foreign_doc) != foreign_versions
+        {
+            return Err(format!(
+                "rejected {label} reviewed purge changed saved versions"
+            ));
+        }
+    }
+    purge_reviewed_expired_documents(ctx, org, vec![second, first])?;
+    if [first, second]
+        .iter()
+        .any(|id| ctx.db.document().id().find(id).is_some())
+        || !versions(first).is_empty()
+        || !versions(second).is_empty()
+    {
+        return Err("exact reviewed purge did not delete its documents and versions".into());
+    }
+    if ctx.db.document().id().find(held).is_none()
+        || ctx.db.document().id().find(foreign_doc).is_none()
+        || versions(held) != held_versions
+        || versions(foreign_doc) != foreign_versions
+    {
+        return Err("reviewed purge changed a held or foreign document".into());
+    }
     Ok(())
 }
 
@@ -2608,6 +2756,111 @@ pub fn test_documents_upload_rejects_oversized_and_disallowed_mimetype(
         .any(|d| d.organization_id == fixture.organization_id && d.name == "DOC-008 Valid")
     {
         return Err("valid document was not persisted".to_string());
+    }
+    Ok(())
+}
+
+/// Replay evidence must survive live metadata edits and removal of every document row.
+pub fn test_documents_submission_receipt_replay(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::persistence::{organization_commit, organization_row_change};
+    use crate::forms::record_creation::record_creation_receipt;
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let company = fixture.company_id;
+    let key = "a".repeat(32);
+    let params = CreateDocumentParams {
+        name: "Receipt source".into(),
+        description: None,
+        file_name: "farm.csv".into(),
+        file_size: 4,
+        mimetype: "text/csv".into(),
+        url: format!(
+            "/api/documents/blobs/object/{org}/default/{}",
+            "b".repeat(32)
+        ),
+        checksum: "c".repeat(64),
+        folder_id: None,
+        res_model: None,
+        res_id: None,
+        partner_id: None,
+        tag_ids: vec![],
+        is_favorite: false,
+        classification_id: None,
+        retention_days: None,
+        fiscal_kind: None,
+        residency_region: None,
+        metadata: Some(serde_json::json!({"uploadSubmissionId":key}).to_string()),
+    };
+    let before = ctx.db.document().document_by_org().filter(&org).count();
+    create_document(ctx, org, Some(company), params.clone())?;
+    let receipt_key = format!("{org}:{company}:document:{key}");
+    let receipt = ctx
+        .db
+        .record_creation_receipt()
+        .id()
+        .find(&receipt_key)
+        .ok_or("missing canonical document creation receipt")?;
+    if receipt.created_by != ctx.sender() || receipt.payload_hash.is_empty() {
+        return Err("invalid document receipt provenance".into());
+    }
+    create_document(ctx, org, Some(company), params.clone())?;
+    if ctx.db.document().document_by_org().filter(&org).count() != before + 1 {
+        return Err("document replay created another record".into());
+    }
+    let doc = ctx
+        .db
+        .document()
+        .id()
+        .find(&receipt.record_id)
+        .ok_or("created document missing")?;
+    ctx.db.document().id().update(Document {
+        metadata: Some("{\"note\":\"later edit\"}".into()),
+        ..doc
+    });
+    create_document(ctx, org, Some(company), params.clone())?;
+    let mut changed = params.clone();
+    changed.name = "Changed request".into();
+    if create_document(ctx, org, Some(company), changed).is_ok() {
+        return Err("changed submission request was accepted".into());
+    }
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&org)
+        .filter(|row| row.correlation_id == receipt_key)
+        .collect();
+    if commits.len() != 1 {
+        return Err("document receipt replay changed durable commit count".into());
+    }
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&org)
+        .filter(|row| row.commit_sequence == commits[0].sequence)
+        .collect();
+    for table in ["document", "document_version", "record_creation_receipt"] {
+        if changes.iter().filter(|row| row.table_name == table).count() != 1 {
+            return Err(format!("document save omitted durable {table}"));
+        }
+    }
+    let versions: Vec<_> = ctx
+        .db
+        .document_version()
+        .version_by_document()
+        .filter(&receipt.record_id)
+        .collect();
+    for version in versions {
+        ctx.db.document_version().id().delete(&version.id);
+    }
+    ctx.db.document().id().delete(&receipt.record_id);
+    if create_document(ctx, org, Some(company), params).is_ok() {
+        return Err("purged document freed its submission key".into());
+    }
+    if ctx.db.document().document_by_org().filter(&org).count() != before {
+        return Err("purged submission was recreated".into());
     }
     Ok(())
 }

@@ -312,6 +312,25 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_review_expand.sql"),
     },
+    Migration {
+        version: 31,
+        name: "record_creation_receipts",
+        change_set: 20,
+        phase: MigrationPhase::Expand,
+        // Generated durable SQL and application migration versions have
+        // separate identities. Preserve the already deployed import-review
+        // migration 30 and the immutable contracts 0.3.159 SQL artifact.
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0030_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 32,
+        name: "source_import_field_decisions",
+        change_set: 21,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_review_fields_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1351,6 +1370,23 @@ mod tests {
         assert_eq!(
             manifest["durable_postgres"]["application_catalog_checksum"],
             migration_catalog_checksum(MIGRATIONS)
+        );
+    }
+
+    #[test]
+    fn receipt_expand_preserves_deployed_import_review_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..30]),
+            "sha256:fc641a339afc1d796936fad7d2c692d279ac6bbf245f1b7512e6beb07ad2d130"
+        );
+        let receipt = MIGRATIONS[30];
+        assert_eq!(receipt.version, 31);
+        assert_eq!(receipt.name, "record_creation_receipts");
+        assert_eq!(receipt.change_set, 20);
+        assert_eq!(receipt.phase, MigrationPhase::Expand);
+        assert_eq!(
+            migration_checksum(receipt.sql),
+            "sha256:c41a2d2cb7449cdc24f8b8162c6d6fa18c7162b1c939f9cacf4504672cb0499a"
         );
     }
 

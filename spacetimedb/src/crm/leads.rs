@@ -459,13 +459,28 @@ pub fn create_lead(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "lead", "create")?;
 
+    let requested_company =
+        crate::forms::record_creation::requested_creation_company(params.metadata.as_deref())?;
+    require_single_company_crm_scope(ctx, organization_id, requested_company)?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, requested_company)?;
+    let (creation, replay) = crate::forms::record_creation::prepare_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "crm_lead",
+        params.metadata.as_deref(),
+        &params,
+    )?;
+    if replay.is_some() {
+        return Ok(());
+    }
+
     if params.name.is_empty() {
         return Err("Lead name cannot be empty".to_string());
     }
 
-    // Leads do not yet support explicit company selection (`company_id` is always
-    // unscoped below); `None` always satisfies the Phase 0 CRM containment guard.
-    require_single_company_crm_scope(ctx, organization_id, None)?;
+    // The lead row remains organization-shared. The validated envelope scopes
+    // the create receipt/EAV values; legacy no-envelope callers keep the default.
 
     if let Some(source_id) = params.source_id {
         validate_lead_source(ctx, organization_id, source_id)?;
@@ -533,6 +548,15 @@ pub fn create_lead(
         metadata: params.metadata,
     });
 
+    let creation_receipt = crate::forms::record_creation::finish_creation(
+        ctx,
+        organization_id,
+        operating_company_id,
+        "crm_lead",
+        lead.id,
+        creation,
+    )?;
+
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -550,6 +574,15 @@ pub fn create_lead(
         },
     );
 
+    if let Some(receipt) = creation_receipt {
+        crate::forms::record_creation_persistence::record_lead_creation(
+            ctx,
+            organization_id,
+            operating_company_id,
+            lead.id,
+            &receipt,
+        )?;
+    }
     Ok(())
 }
 

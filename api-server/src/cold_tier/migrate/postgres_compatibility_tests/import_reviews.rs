@@ -63,3 +63,64 @@ async fn exercise(pool: &Pool) -> Result<()> {
     ensure!(applied_migration_history(pool).await? == after);
     Ok(())
 }
+
+#[tokio::test]
+async fn postgres_import_review_32_preserves_decisions_and_backfills_only_confirmed_values(
+) -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!("skipping field decision migration proof (set C4_TEST_PG=1 to run)");
+        return Ok(());
+    }
+    let base = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin = admin_pool(&base)?;
+    create_database(&admin, &database, &base.user).await?;
+    let mut config = base;
+    config.database.clone_from(&database);
+    let pool = pg_pool::build_pool(&config)?;
+    let result = exercise_field_decisions(&pool).await;
+    drop(pool);
+    let cleanup = drop_database(&admin, &database).await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
+async fn exercise_field_decisions(pool: &Pool) -> Result<()> {
+    apply_migration_prefix(pool, 31).await?;
+    let history = applied_migration_history(pool).await?;
+    let client = pool.get().await?;
+    let batch: i64 = client.query_one("INSERT INTO lumiere_platform.import_review_batch (organization_id,company_id,title,target_entity,source_file,source_sha256,created_by) VALUES (8001,9001,'Farm history','source_observation','farm.csv',repeat('b',64),'actor-one') RETURNING id", &[]).await?.get(0);
+    let source = json!({"quantity":"8","price":"600","total":"4800","weight":null});
+    let proposal = json!({"price":"4800","unit":"kg","weight":null,"note":""});
+    let confirmed: i64 = client.query_one("INSERT INTO lumiere_platform.import_review_item (organization_id,company_id,batch_id,source_key,source_json,proposed_json,state,revision) VALUES (8001,9001,$1,'confirmed',$2,$3,'confirmed',2) RETURNING id", &[&batch,&source,&proposal]).await?.get(0);
+    let pending: i64 = client.query_one("INSERT INTO lumiere_platform.import_review_item (organization_id,company_id,batch_id,source_key,source_json,proposed_json) VALUES (8001,9001,$1,'pending',$2,$3) RETURNING id", &[&batch,&source,&proposal]).await?.get(0);
+    client.execute("INSERT INTO lumiere_platform.import_review_decision (organization_id,company_id,item_id,revision,request_key,proposed_json,state,reason,actor_identity) VALUES (8001,9001,$1,2,'migration-32-confirmed',$2,'confirmed','Confirmed source values','actor-one')", &[&confirmed,&proposal]).await?;
+    drop(client);
+
+    ensure_schema(pool).await?;
+    let after = applied_migration_history(pool).await?;
+    ensure!(after[..history.len()] == history);
+    let client = pool.get().await?;
+    for (id, expected) in [(confirmed, json!(["price", "unit"])), (pending, json!([]))] {
+        let row = client.query_one("SELECT source_json,proposed_json,confirmed_fields FROM lumiere_platform.import_review_item WHERE id=$1", &[&id]).await?;
+        ensure!(row.get::<_, Value>("source_json") == source);
+        ensure!(row.get::<_, Value>("proposed_json") == proposal);
+        ensure!(row.get::<_, Value>("confirmed_fields") == expected);
+    }
+    let decision = client.query_one("SELECT proposed_json,confirmed_fields,reason FROM lumiere_platform.import_review_decision WHERE item_id=$1", &[&confirmed]).await?;
+    ensure!(decision.get::<_, Value>("proposed_json") == proposal);
+    ensure!(decision.get::<_, Value>("confirmed_fields") == json!(["price", "unit"]));
+    ensure!(decision.get::<_, String>("reason") == "Confirmed source values");
+    ensure!(client
+        .execute(
+            "UPDATE lumiere_platform.import_review_item SET confirmed_fields='{}' WHERE id=$1",
+            &[&pending]
+        )
+        .await
+        .is_err());
+    drop(client);
+    ensure_schema(pool).await?;
+    ensure!(applied_migration_history(pool).await? == after);
+    Ok(())
+}

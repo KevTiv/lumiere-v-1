@@ -229,6 +229,7 @@ export function buildRenewSubscriptionParams(
 ): RenewSubscriptionParams {
   return stdbParamsToJson({
     intervals: Math.max(1, Number(formData.intervals ?? 1)),
+    idempotencyKey: typeof formData.idempotencyKey === 'string' ? formData.idempotencyKey : undefined,
     notes:
       formData.notes != null && String(formData.notes).trim() !== ''
         ? String(formData.notes).trim()

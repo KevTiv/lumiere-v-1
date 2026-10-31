@@ -52,6 +52,22 @@ const edit = (value: string) =>
 const cancel = () => fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
 
 describe("FormModal unsaved-changes guard", () => {
+  it("opens help for a displayed error while preserving the failed form and unsaved-change protection", async () => {
+    const onExplainError = vi.fn()
+    const onSubmit = vi.fn(async () => { throw new Error("The period is closed") })
+    const onOpenChange = vi.fn()
+    render(<FormModal open onOpenChange={onOpenChange} config={config} onSubmit={onSubmit} onExplainError={onExplainError} showSubmitSuccessToast={false} />)
+    edit("My retained invoice reference")
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+    fireEvent.click(await screen.findByRole("button", { name: /explain/i }))
+    expect(onExplainError).toHaveBeenCalledWith("The period is closed")
+    expect(onSubmit).toHaveBeenCalledOnce()
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("My retained invoice reference")
+    cancel()
+    expect(await screen.findByTestId("discard-changes-dialog")).toBeTruthy()
+  })
+
   it("keeps edits protected when the form has no submit binding", async () => {
     const onOpenChange = vi.fn()
     render(<FormModal open onOpenChange={onOpenChange} config={config} showSubmitSuccessToast={false} />)

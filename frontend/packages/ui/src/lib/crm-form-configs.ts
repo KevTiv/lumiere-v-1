@@ -5,7 +5,7 @@ export type OpportunityStageOption = { value: string; label: string }
 
 export const newLeadForm = (t: TFunction): FormConfig => ({
   id: "new-lead",
-  customFieldCreateUnavailableMessage: t("crm.forms.customFieldsCreateReadiness", { defaultValue: "This form includes custom fields that cannot be saved during creation yet. Creation is disabled before any record is created. Ask an administrator to use a form without custom fields. Your entries are retained." }),
+  customFieldCreateCapability: "atomic-configured-v1",
   title: t("crm.forms.newLead.title"),
   description: t("crm.forms.newLead.description"),
   submitLabel: t("crm.forms.newLead.save", { defaultValue: "Save lead" }),
@@ -110,7 +110,7 @@ export const newOpportunityForm = (
   stageOptions: OpportunityStageOption[] = [],
 ): FormConfig => ({
   id: "new-opportunity",
-  customFieldCreateUnavailableMessage: t("crm.forms.customFieldsCreateReadiness", { defaultValue: "This form includes custom fields that cannot be saved during creation yet. Creation is disabled before any record is created. Ask an administrator to use a form without custom fields. Your entries are retained." }),
+  customFieldCreateCapability: "atomic-configured-v1",
   title: t("crm.forms.newOpportunity.title"),
   description: t("crm.forms.newOpportunity.description"),
   submitLabel: t("crm.forms.newOpportunity.save", { defaultValue: "Save opportunity" }),
@@ -354,7 +354,7 @@ export const editOpportunityForm = (t: TFunction): FormConfig => ({
 
 export const newContactForm = (t: TFunction): FormConfig => ({
   id: "new-contact",
-  customFieldCreateUnavailableMessage: t("crm.forms.customFieldsCreateReadiness", { defaultValue: "This form includes custom fields that cannot be saved during creation yet. Creation is disabled before any record is created. Ask an administrator to use a form without custom fields. Your entries are retained." }),
+  customFieldCreateCapability: "atomic-configured-v1",
   title: t("crm.forms.newContact.title"),
   description: t("crm.forms.newContact.description"),
   submitLabel: t("crm.forms.newContact.save", { defaultValue: "Save contact" }),

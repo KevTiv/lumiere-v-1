@@ -41,6 +41,8 @@ pub fn run_subscriptions_wave_c_test(ctx: &ReducerContext) -> Result<(), String>
         .map_err(|e| format!("pause_blocks_invoice_and_resume: {e}"))?;
     wave_c_test::test_renew_and_cancel_with_credit(ctx)
         .map_err(|e| format!("renew_and_cancel_with_credit: {e}"))?;
+    wave_c_test::test_renew_default_notes_receipt(ctx)
+        .map_err(|e| format!("renew_default_notes_receipt: {e}"))?;
     wave_c_test::test_plan_update_and_deactivate(ctx)
         .map_err(|e| format!("plan_update_and_deactivate: {e}"))?;
     wave_c_test::test_amend_parent_line_fk_and_cycle(ctx)

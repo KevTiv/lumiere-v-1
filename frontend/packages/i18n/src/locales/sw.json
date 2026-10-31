@@ -65,6 +65,19 @@
     "search": "Tafuta moduli na rekodi"
   },
   "common": {
+    "name": "Jina",
+    "importSource": {
+      "title": "Chanzo cha uingizaji kilichorekodiwa",
+      "description": "Maelezo ya faili na ukaguzi yaliyohifadhiwa pamoja na rekodi hii.",
+      "file": "Faili ya asili",
+      "sourceLine": "Mstari wa faili chanzo",
+      "importRow": "Safu ya uingizaji",
+      "sha256": "SHA-256 iliyorekodiwa ya faili",
+      "batch": "Kundi la ukaguzi",
+      "item": "Kipengee cha ukaguzi",
+      "revision": "Toleo la ukaguzi",
+      "reason": "Sababu ya uamuzi wa ukaguzi"
+    },
     "select": {
       "search": "Tafuta chaguo…",
       "options": "Chaguo",
@@ -350,6 +363,42 @@
     "moduleNavigation": {
       "overview": "Muhtasari",
       "area": "Eneo la kazi"
+    },
+    "explainError": "Eleza hitilafu hii",
+    "creationRecovery": {
+      "title": "Review an earlier save",
+      "hint": "An earlier save is retained for this company. Check it before starting a replacement.",
+      "review": "Review entered values",
+      "reviewHint": "These are the entries retained for the earlier save. Your current form stays open. Checking status does not send another save.",
+      "check": "Check save status",
+      "openSaved": "Open saved record in a new tab",
+      "finish": "Finish review",
+      "emptyValue": "Empty",
+      "entriesUnavailable": "The retained entries could not be displayed. Check the save status before starting another record.",
+      "models": {
+        "crm_lead": "Lead",
+        "opportunity": "Opportunity",
+        "contact": "Contact",
+        "sale_order": "Quotation"
+      },
+      "status": {
+        "pending": "Save needs review",
+        "unknown": "No saved result was confirmed. Keep this request and check again.",
+        "saved": "The earlier record is saved. Open it to review, then finish this review. Your current form has not been saved by this check.",
+        "unavailable": "The save could not be checked. The retained request has been kept.",
+        "denied": "Access to this save is unavailable. Its entries are hidden."
+      }
+    },
+    "selectPrompt": "Chagua",
+    "customFieldCreateAdmission": {
+      "blocked": "This form cannot create a record with these configured fields yet: {{fields}}. Ask an administrator to review them. No record has been created. Your entries are retained.",
+      "reasons": {
+        "unsupportedType": "unsupported field type",
+        "conditionalVisibility": "conditional visibility is not supported during creation",
+        "validationPattern": "this validation pattern is not supported during creation",
+        "unavailableChoices": "no stored selectable options are available",
+        "ambiguousDefinition": "more than one field definition uses this key"
+      }
     }
   },
   "navigation": {

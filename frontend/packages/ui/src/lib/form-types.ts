@@ -228,6 +228,8 @@ export interface FormConfig {
   hideTitle?: boolean
   /** An explicit create-owner limit: configured custom fields cannot be committed atomically. */
   customFieldCreateUnavailableMessage?: string
+  /** The native owner atomically validates the admitted configured field subset during creation. */
+  customFieldCreateCapability?: "atomic-configured-v1"
   /** When false, omits the footer (submit / cancel / reset). Default true. */
   showActions?: boolean
   sections: FormSection[]

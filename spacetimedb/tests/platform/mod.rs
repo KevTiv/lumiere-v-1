@@ -3,6 +3,7 @@ mod country_pack_test;
 mod document_templates_test;
 mod knowledge_guides_test;
 mod platform_smoke;
+pub(crate) mod record_creation_test;
 mod tenant_isolation_test;
 
 use spacetimedb::ReducerContext;
@@ -24,6 +25,7 @@ pub fn run_all_platform_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_forms_custom_field_test(ctx)?;
     run_forms_custom_field_record_existence_test(ctx)?;
     run_forms_custom_field_invalid_model_test(ctx)?;
+    run_configured_record_creation_tests(ctx)?;
     run_tenant_isolation_tests(ctx)?;
     run_country_pack_test(ctx)?;
     log::info!("✅ run_all_platform_tests complete");
@@ -60,6 +62,8 @@ pub fn run_documents_wave_a_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("documents empty blob: {e}"))?;
     platform_smoke::test_documents_create_and_lock(ctx)
         .map_err(|e| format!("documents create/lock: {e}"))?;
+    platform_smoke::test_documents_submission_receipt_replay(ctx)
+        .map_err(|e| format!("documents submission receipt: {e}"))?;
     platform_smoke::test_documents_folder_acl_blocks_write(ctx)
         .map_err(|e| format!("documents ACL: {e}"))?;
     platform_smoke::test_documents_company_isolation(ctx)
@@ -154,4 +158,12 @@ pub fn run_country_pack_test(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_knowledge_guide_tests(ctx: &ReducerContext) -> Result<(), String> {
     knowledge_guides_test::lifecycle(ctx)
+}
+
+#[spacetimedb::reducer]
+pub fn run_configured_record_creation_tests(ctx: &ReducerContext) -> Result<(), String> {
+    record_creation_test::selected_company_lead_lifecycle(ctx)?;
+    record_creation_test::contact_lifecycle(ctx)?;
+    record_creation_test::quotation_lifecycle(ctx)?;
+    record_creation_test::purchase_order_lifecycle(ctx)
 }

@@ -20,8 +20,9 @@ export const GOVERNED_SKILL_REPLACEMENTS = {
 
 export function legacyRunRetirement(skillKey: string) {
   const normalized = skillKey.trim()
-  const replacementPath =
-    GOVERNED_SKILL_REPLACEMENTS[normalized as keyof typeof GOVERNED_SKILL_REPLACEMENTS]
+  const replacementPath = Object.hasOwn(GOVERNED_SKILL_REPLACEMENTS, normalized)
+    ? GOVERNED_SKILL_REPLACEMENTS[normalized as keyof typeof GOVERNED_SKILL_REPLACEMENTS]
+    : undefined
   return {
     error: replacementPath
       ? `Skill '${normalized}' has migrated from the legacy skill runner; use ${replacementPath}.`

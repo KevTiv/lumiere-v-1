@@ -1,3 +1,4 @@
+import { reviewInvoiceAccountingChoices } from "./invoice-accounting-choices"
 import { test, expect, type Page } from "@playwright/test"
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -90,6 +91,7 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
       await page.getByRole("option", { name: "Acme Corporation", exact: true }).click()
       await page.getByTestId("create-invoice-line-description").fill("Alpha accounting support")
       await page.getByTestId("create-invoice-line-unit-price").fill("1250")
+      await reviewInvoiceAccountingChoices(page)
       if (viewport.width < 1024) await page.getByTestId("create-invoice-preview-toggle").click()
       const document = page.getByRole("article", { name: "Document preview" })
       await expect(document).toBeVisible()

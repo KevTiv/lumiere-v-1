@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { eligibleSubscriptionOrders, eligibleSubscriptionPlans, inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, nextSubscriptionAction } from './subscription-workflow';
+import { subscriptionLifecycle } from './subscription-lifecycle';
+import { completeRenewalAttempt, readRenewalAttempt, retainRenewalAttempt, renewalScope } from './subscription-renewal-attempt';
 
 const scope = { organizationId: 1n, companyId: 2n };
 const base = { organizationId: 1n, companyId: 2n };
@@ -53,4 +55,78 @@ test('activation requires verified own lines, while pause and close never recomm
   assert.equal(nextSubscriptionAction(draft, { ...input, lines: [{ subscriptionId: 'other' }] }), null);
   assert.equal(nextSubscriptionAction({ ...subscription, state: 'paused' }, input), 'resume');
   assert.equal(nextSubscriptionAction({ ...subscription, state: 'closed' }, input), null);
+});
+
+test('lifecycle distinguishes actual closure from billing dates and ignores untrusted metadata', () => {
+  const result = subscriptionLifecycle({ ...subscription, state: 'closed', closeDate: { some: '2026-10-28T18:30:00Z' }, metadata: '{"end_date":"2035-01-01"}' } as typeof subscription & { closeDate: unknown; metadata: string }, [], scope, true);
+  assert.equal(result.closedAt?.toISOString(), '2026-10-28T18:30:00.000Z');
+  assert.equal(result.nextInvoiceDate?.toISOString(), '2026-10-27T00:00:00.000Z');
+  assert.equal(result.closure, 'recorded');
+  assert.equal(result.renewal, 'not-active');
+  assert.equal(subscriptionLifecycle({ ...subscription, state: 'closed' }, [], scope, true).closure, 'unavailable');
+  assert.equal(subscriptionLifecycle(subscription, [], scope, true).closure, 'not-closed');
+});
+
+test('renewal history uses the latest immutable version of the exact subscription and scope', () => {
+  const renew = { ...base, id: '9007199254740995', subscriptionId: subscription.id, amendmentType: 'renew', version: 3, effectiveDate: '2026-10-20' };
+  const rows = [
+    { ...renew, id: '9007199254740994', version: 1, effectiveDate: '2026-08-20' }, renew,
+    { ...renew, id: '44', version: 4, amendmentType: 'pause' },
+    { ...renew, id: '55', version: 9, companyId: 9n },
+    { ...renew, id: '56', version: 10, organizationId: 9n },
+    { ...renew, id: '57', version: 11, subscriptionId: '9007199254740992' },
+  ];
+  const result = subscriptionLifecycle(subscription, rows, scope, true);
+  assert.equal(result.renewalHistory, 'recorded');
+  assert.equal(result.lastRenewal?.id, '9007199254740995');
+  assert.equal(result.lastRenewal?.version, 3);
+  assert.equal(result.lastRenewal?.effectiveDate.toISOString(), '2026-10-20T00:00:00.000Z');
+  assert.equal(result.renewal, 'available');
+});
+
+test('unavailable, masked or inconsistent amendment reads never claim no renewal or show old evidence', () => {
+  const renew = { ...base, id: '1', subscriptionId: subscription.id, amendmentType: 'renew', version: 3, effectiveDate: '2026-10-20' };
+  assert.equal(subscriptionLifecycle(subscription, [renew], scope, false).renewalHistory, 'unavailable');
+  for (const change of [{ effectiveDate: undefined }, { effectiveDate: 'bad' }, { version: null }, { amendmentType: undefined }, { id: '' }]) {
+    const result = subscriptionLifecycle(subscription, [{ ...renew, ...change }], scope, true);
+    assert.equal(result.renewalHistory, 'unavailable');
+    assert.equal(result.lastRenewal, null);
+  }
+  assert.equal(subscriptionLifecycle(subscription, [renew, { ...renew, id: '2' }], scope, true).renewalHistory, 'unavailable');
+  const switched = subscriptionLifecycle(subscription, [renew], { ...scope, companyId: 9n }, true);
+  assert.equal(switched.lastRenewal, null);
+  assert.equal(switched.nextInvoiceDate, null);
+  assert.equal(switched.renewal, 'unavailable');
+  assert.equal(subscriptionLifecycle(subscription, [], scope, true).renewalHistory, 'none-recorded');
+});
+
+test('renewal checkpoints retain the same payload and key across reload and isolate actor/company scope', () => {
+  const rows = new Map<string, string>();
+  const storage = { getItem: (key: string) => rows.get(key) ?? null, setItem: (key: string, value: string) => { rows.set(key, value); }, removeItem: (key: string) => { rows.delete(key); } };
+  const scope = renewalScope('ab'.repeat(32), 7n, 8n, 41n);
+  const request = { idempotencyKey: 'once-only', intervals: 2, notes: 'Extend' };
+  retainRenewalAttempt(scope, request, 'submitting', storage);
+  assert.deepEqual(readRenewalAttempt(scope, storage), { ...request, scope, phase: 'submitting' });
+  retainRenewalAttempt(scope, request, 'unknown', storage);
+  assert.equal(readRenewalAttempt(scope, storage)?.idempotencyKey, 'once-only');
+  assert.equal(readRenewalAttempt({ ...scope, actor: 'cd'.repeat(32) }, storage), null);
+  assert.equal(readRenewalAttempt({ ...scope, companyId: '9' }, storage), null);
+  assert.throws(() => retainRenewalAttempt(scope, { ...request, intervals: 3 }, 'submitting', storage), /retained renewal/);
+  assert.throws(() => retainRenewalAttempt(scope, { ...request, intervals: 3 }, 'submitting', storage, true), /retained renewal/);
+  completeRenewalAttempt(scope, 'different-key', storage);
+  assert.ok(readRenewalAttempt(scope, storage));
+  completeRenewalAttempt(scope, request.idempotencyKey, storage);
+  assert.equal(readRenewalAttempt(scope, storage), null);
+  retainRenewalAttempt(scope, request, 'rejected', storage);
+  retainRenewalAttempt(scope, { ...request, idempotencyKey: 'new-key', intervals: 3 }, 'submitting', storage, true);
+  assert.equal(readRenewalAttempt(scope, storage)?.intervals, 3);
+});
+
+test('corrupt or unavailable renewal checkpoints fail closed before a new attempt is stored', () => {
+  const scope = renewalScope('ab'.repeat(32), 7n, 8n, 41n);
+  let writes = 0;
+  const storage = { getItem: () => '{"scope":{},"phase":"unknown"}', setItem: () => { writes++; }, removeItem: () => {} };
+  assert.throws(() => retainRenewalAttempt(scope, { idempotencyKey: 'another', intervals: 2, notes: '' }, 'submitting', storage));
+  assert.equal(writes, 0);
+  assert.throws(() => readRenewalAttempt(scope, { ...storage, getItem: () => { throw new Error('Storage blocked'); } }), /Storage blocked/);
 });

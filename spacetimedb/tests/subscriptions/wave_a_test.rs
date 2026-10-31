@@ -42,7 +42,7 @@ fn seed_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, Strin
             name: format!("Sub Sale {company_id}"),
             code: journal_code.clone(),
             type_: JournalType::Sale,
-            currency_id: Some(1),
+            currency_id: Some(fixture.currency_id),
             default_account_id: Some(revenue_id),
             suspense_account_id: None,
             loss_account_id: None,
@@ -90,7 +90,7 @@ fn seed_plan(ctx: &ReducerContext, fixture: &OrgFixture, journal_id: u64) -> Res
             name: "Wave A Monthly".into(),
             code: code.clone(),
             description: Some("test".into()),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             journal_id,
             product_id: fixture.product_id,
             billing_period: "month".into(),
@@ -144,7 +144,7 @@ fn seed_confirmed_so(
         CreatePricelistParams {
             company_id: None,
             name: label.to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -165,7 +165,7 @@ fn seed_confirmed_so(
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,

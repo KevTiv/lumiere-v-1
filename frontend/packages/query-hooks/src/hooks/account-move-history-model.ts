@@ -15,12 +15,17 @@ export interface BusinessChangeField {
 
 export interface AccountMoveHistoryEntry {
   id: string;
-  operation: "update_account_move_line";
+  operation: AccountMoveHistoryOperation;
   actorIdentity: string;
   occurredAt: string;
   changedResource: "account-move-lines";
   changedRecordId: string;
   changes: BusinessChangeField[];
+}
+
+export type AccountMoveHistoryOperation = "update_account_move_line" | "add_account_move_line";
+function historyOperation(value: unknown): value is AccountMoveHistoryOperation {
+  return value === "update_account_move_line" || value === "add_account_move_line";
 }
 
 export interface AccountMoveHistoryPage {
@@ -31,7 +36,7 @@ export interface AccountMoveHistoryPage {
   nextCursor: string | null;
   coverage: {
     status: "partial";
-    operations: ["update_account_move_line"];
+    operations: AccountMoveHistoryOperation[];
     message: string;
   };
 }
@@ -50,6 +55,8 @@ const historyFields = new Set([
   "credit_currency",
   "partner_id",
   "analytic_account_id",
+  "account_id",
+  "currency_id",
 ]);
 
 export function validHistoryId(value: unknown): value is string {
@@ -111,7 +118,7 @@ function parseEntry(value: unknown): AccountMoveHistoryEntry {
   if (
     !object(value) ||
     !validHistoryId(value.id) ||
-    value.operation !== "update_account_move_line" ||
+    !historyOperation(value.operation) ||
     typeof value.actorIdentity !== "string" ||
     !identityPattern.test(value.actorIdentity) ||
     typeof value.occurredAt !== "string" ||
@@ -136,6 +143,7 @@ function parseEntry(value: unknown): AccountMoveHistoryEntry {
       !scalar(change.before) ||
       !scalar(change.after) ||
       change.before === change.after
+      || (value.operation === "add_account_move_line" && change.before !== null)
     ) {
       throw new Error("Invalid history field");
     }
@@ -173,14 +181,21 @@ export function parseAccountMoveHistoryPage(
     !object(value.coverage) ||
     value.coverage.status !== "partial" ||
     !Array.isArray(value.coverage.operations) ||
-    value.coverage.operations.length !== 1 ||
-    value.coverage.operations[0] !== "update_account_move_line" ||
+    value.coverage.operations.length < 1 ||
+    value.coverage.operations.length > 2 ||
+    value.coverage.operations.some((operation) => !historyOperation(operation)) ||
+    new Set(value.coverage.operations).size !== value.coverage.operations.length ||
     typeof value.coverage.message !== "string" ||
     value.coverage.message.length > 2048
   ) {
     throw new Error("Invalid or out-of-scope history response");
   }
   const data = value.data.map(parseEntry);
+  const operations = value.coverage.operations.map((operation): AccountMoveHistoryOperation => {
+    if (!historyOperation(operation)) throw new Error("Invalid history coverage operation");
+    return operation;
+  });
+  if (data.some((entry) => !operations.includes(entry.operation))) throw new Error("History entry is outside declared capture coverage");
   if (new Set(data.map((entry) => entry.id)).size !== data.length)
     throw new Error("Duplicate history identity");
   return {
@@ -191,7 +206,7 @@ export function parseAccountMoveHistoryPage(
     nextCursor: value.nextCursor,
     coverage: {
       status: "partial",
-      operations: ["update_account_move_line"],
+      operations,
       message: value.coverage.message,
     },
   };

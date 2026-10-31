@@ -139,7 +139,10 @@
       "function": "set_helpdesk_related_record",
       "operation": "set_helpdesk_related_record",
       "operation_id": "erp.set_helpdesk_related_record",
-      "change_constructors": ["upsert_stdb_row", "delete"]
+      "change_constructors": [
+        "upsert_stdb_row",
+        "delete"
+      ]
     },
     {
       "source": "spacetimedb/src/hr/payroll.rs",
@@ -181,7 +184,10 @@
       "function": "quarantine_quantity",
       "operation": "fail_quality_check",
       "operation_id": "erp.fail_quality_check",
-      "change_constructors": ["upsert_stdb_row", "delete"]
+      "change_constructors": [
+        "upsert_stdb_row",
+        "delete"
+      ]
     },
     {
       "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
@@ -238,7 +244,9 @@
       "operation": "create_pos_order",
       "operation_id": "erp.create_pos_order",
       "change_constructors": ["upsert_stdb_row"],
-      "change_helpers": ["pos_order_projection_changes"]
+      "change_helpers": [
+        "pos_order_projection_changes"
+      ]
     },
     {
       "source": "spacetimedb/src/sales/pos_transactions.rs",
@@ -246,7 +254,9 @@
       "operation": "create_pos_order",
       "operation_id": "erp.create_pos_order",
       "change_constructors": ["upsert_stdb_row"],
-      "change_helpers": ["pos_order_projection_changes"]
+      "change_helpers": [
+        "pos_order_projection_changes"
+      ]
     },
     {
       "source": "spacetimedb/src/sales/pos_transactions.rs",
@@ -281,26 +291,147 @@
       "function": "save_presentation_module",
       "operation": "save_presentation_module",
       "operation_id": "erp.save_presentation_module",
-      "change_constructors": [
-        "upsert_stdb_row"
-      ]
+      "change_constructors": ["upsert_stdb_row"]
     },
     {
       "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
       "function": "create_bom_byproduct",
       "operation": "create_bom_byproduct",
       "operation_id": "erp.create_bom_byproduct",
-      "change_constructors": [
-        "upsert_stdb_row"
-      ]
+      "change_constructors": ["upsert_stdb_row"]
     },
     {
       "source": "spacetimedb/src/manufacturing/effects.rs",
       "function": "record_created_order",
       "operation": "create_manufacturing_order",
       "operation_id": "erp.create_manufacturing_order",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_document_creation",
+      "operation": "create_document",
+      "operation_id": "erp.create_document",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_lead_creation",
+      "operation": "create_lead",
+      "operation_id": "erp.create_lead",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt",
+        "append_sequence"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_contact_creation",
+      "operation": "create_contact",
+      "operation_id": "erp.create_contact",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt",
+        "append_sequence"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_opportunity_creation",
+      "operation": "create_opportunity",
+      "operation_id": "erp.create_opportunity",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt",
+        "append_sequence"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_quotation_creation",
+      "operation": "create_sale_order",
+      "operation_id": "erp.create_sale_order",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt",
+        "append_sequence"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_purchase_order_creation",
+      "operation": "create_purchase_order_once",
+      "operation_id": "erp.create_purchase_order_once",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt",
+        "append_sequence"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/forms/record_creation_persistence.rs",
+      "function": "record_manual_invoice_creation",
+      "operation": "create_manual_account_invoice",
+      "operation_id": "erp.create_manual_account_invoice",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "append_custom_values_and_audits",
+        "append_creation_receipt",
+        "append_sequence"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/accounting/journal_entries.rs",
+      "function": "add_account_move_line",
+      "operation": "add_account_move_line",
+      "operation_id": "erp.add_account_move_line",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/core/operational_messaging.rs",
+      "function": "capture_message_batch_creation",
+      "operation": "create_message_batch",
+      "operation_id": "erp.create_message_batch",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "prepare_batch_creation_changes"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/core/operational_messaging.rs",
+      "function": "capture_invoice_reminder_batch_creation",
+      "operation": "create_invoice_reminder_batch",
+      "operation_id": "erp.create_invoice_reminder_batch",
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": [
+        "prepare_batch_creation_changes"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/subscriptions/subscription_wave_c.rs",
+      "function": "record_renewal_commit",
+      "operation": "renew_subscription",
+      "operation_id": "erp.renew_subscription",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/expenses/expense_depth.rs",
+      "function": "record_expense_allocation_commit",
+      "operation": "set_expense_allocations",
+      "operation_id": "erp.set_expense_allocations",
       "change_constructors": [
-        "upsert_stdb_row"
+        "upsert_stdb_row",
+        "delete"
       ]
     }
   ],
@@ -449,9 +580,7 @@
       "operation_id_parameter": "operation",
       "snapshot_type": "BankSettlementCommitSnapshot",
       "method": "record",
-      "change_constructors": [
-        "upsert_stdb_row"
-      ],
+      "change_constructors": ["upsert_stdb_row"],
       "change_helpers": [],
       "callers": [
         {
@@ -558,9 +687,7 @@
       "operation_id_parameter": "operation",
       "snapshot_type": "FinanceWorkflowCommitSnapshot",
       "method": "record",
-      "change_constructors": [
-        "upsert_stdb_row"
-      ],
+      "change_constructors": ["upsert_stdb_row"],
       "change_helpers": [
         "append_guarded_receipts"
       ],

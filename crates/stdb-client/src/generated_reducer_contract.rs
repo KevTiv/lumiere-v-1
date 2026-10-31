@@ -3401,6 +3401,15 @@ const PARAMS_NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION: &[ReducerParam] = &[
     ReducerParam { name: "version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "signal", kind: ScalarKind::String, ref_target: None },
 ];
+const PARAMS_NOMINATE_KNOWLEDGE_GUIDE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "guide_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "source_passage_ids", kind: ScalarKind::Composite, ref_target: None },
+    ReducerParam { name: "claim_ids", kind: ScalarKind::Composite, ref_target: None },
+    ReducerParam { name: "decision_ids", kind: ScalarKind::Composite, ref_target: None },
+];
 const PARAMS_OPEN_ACCOUNT_PERIOD: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -3611,6 +3620,10 @@ const PARAMS_PURCHASING_INTEGRITY_INVENTORY: &[ReducerParam] = &[
 ];
 const PARAMS_PURGE_EXPIRED_DOCUMENTS: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_PURGE_REVIEWED_EXPIRED_DOCUMENTS: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "document_ids", kind: ScalarKind::Composite, ref_target: None },
 ];
 const PARAMS_QUEUE_MAIL_FROM_TEMPLATE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4515,6 +4528,8 @@ const PARAMS_RUN_CARTONIZATION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RunCartonizationParams") },
+];
+const PARAMS_RUN_CONFIGURED_RECORD_CREATION_TESTS: &[ReducerParam] = &[
 ];
 const PARAMS_RUN_CORE_OPERATIONAL_MESSAGING_TEST: &[ReducerParam] = &[
 ];
@@ -7251,6 +7266,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "migrate_workflow_instance", contract_operation_id: "erp.migrate_workflow_instance", params: PARAMS_MIGRATE_WORKFLOW_INSTANCE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "move_stock_quant", contract_operation_id: "erp.move_stock_quant", params: PARAMS_MOVE_STOCK_QUANT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "nominate_ai_knowledge_entry_version", contract_operation_id: "erp.nominate_ai_knowledge_entry_version", params: PARAMS_NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "nominate_knowledge_guide", contract_operation_id: "erp.nominate_knowledge_guide", params: PARAMS_NOMINATE_KNOWLEDGE_GUIDE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "open_account_period", contract_operation_id: "erp.open_account_period", params: PARAMS_OPEN_ACCOUNT_PERIOD, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "open_contract", contract_operation_id: "erp.open_contract", params: PARAMS_OPEN_CONTRACT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "open_crm_conversation", contract_operation_id: "erp.open_crm_conversation", params: PARAMS_OPEN_CRM_CONVERSATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7292,6 +7308,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "publish_workflow_version", contract_operation_id: "erp.publish_workflow_version", params: PARAMS_PUBLISH_WORKFLOW_VERSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "purchasing_integrity_inventory", contract_operation_id: "erp.purchasing_integrity_inventory", params: PARAMS_PURCHASING_INTEGRITY_INVENTORY, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "purge_expired_documents", contract_operation_id: "erp.purge_expired_documents", params: PARAMS_PURGE_EXPIRED_DOCUMENTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "purge_reviewed_expired_documents", contract_operation_id: "erp.purge_reviewed_expired_documents", params: PARAMS_PURGE_REVIEWED_EXPIRED_DOCUMENTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "queue_mail_from_template", contract_operation_id: "erp.queue_mail_from_template", params: PARAMS_QUEUE_MAIL_FROM_TEMPLATE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "rate_subscription_usage_events", contract_operation_id: "erp.rate_subscription_usage_events", params: PARAMS_RATE_SUBSCRIPTION_USAGE_EVENTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "rebase_deferred_schedules_for_subscription", contract_operation_id: "erp.rebase_deferred_schedules_for_subscription", params: PARAMS_REBASE_DEFERRED_SCHEDULES_FOR_SUBSCRIPTION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7501,6 +7518,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "run_analytics_dashboard_widget_idempotency_test", contract_operation_id: "erp.run_analytics_dashboard_widget_idempotency_test", params: PARAMS_RUN_ANALYTICS_DASHBOARD_WIDGET_IDEMPOTENCY_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_c_0_organization_ownership_backfill", contract_operation_id: "erp.run_c0_organization_ownership_backfill", params: PARAMS_RUN_C_0_ORGANIZATION_OWNERSHIP_BACKFILL, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_cartonization", contract_operation_id: "erp.run_cartonization", params: PARAMS_RUN_CARTONIZATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "run_configured_record_creation_tests", contract_operation_id: "erp.run_configured_record_creation_tests", params: PARAMS_RUN_CONFIGURED_RECORD_CREATION_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_core_operational_messaging_test", contract_operation_id: "erp.run_core_operational_messaging_test", params: PARAMS_RUN_CORE_OPERATIONAL_MESSAGING_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_core_permissions_test", contract_operation_id: "erp.run_core_permissions_test", params: PARAMS_RUN_CORE_PERMISSIONS_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_core_sod_test", contract_operation_id: "erp.run_core_sod_test", params: PARAMS_RUN_CORE_SOD_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
@@ -8734,6 +8752,7 @@ pub mod reducer_names {
     pub const MIGRATE_WORKFLOW_INSTANCE: ReducerName = ReducerName::new("migrate_workflow_instance");
     pub const MOVE_STOCK_QUANT: ReducerName = ReducerName::new("move_stock_quant");
     pub const NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION: ReducerName = ReducerName::new("nominate_ai_knowledge_entry_version");
+    pub const NOMINATE_KNOWLEDGE_GUIDE: ReducerName = ReducerName::new("nominate_knowledge_guide");
     pub const OPEN_ACCOUNT_PERIOD: ReducerName = ReducerName::new("open_account_period");
     pub const OPEN_CONTRACT: ReducerName = ReducerName::new("open_contract");
     pub const OPEN_CRM_CONVERSATION: ReducerName = ReducerName::new("open_crm_conversation");
@@ -8775,6 +8794,7 @@ pub mod reducer_names {
     pub const PUBLISH_WORKFLOW_VERSION: ReducerName = ReducerName::new("publish_workflow_version");
     pub const PURCHASING_INTEGRITY_INVENTORY: ReducerName = ReducerName::new("purchasing_integrity_inventory");
     pub const PURGE_EXPIRED_DOCUMENTS: ReducerName = ReducerName::new("purge_expired_documents");
+    pub const PURGE_REVIEWED_EXPIRED_DOCUMENTS: ReducerName = ReducerName::new("purge_reviewed_expired_documents");
     pub const QUEUE_MAIL_FROM_TEMPLATE: ReducerName = ReducerName::new("queue_mail_from_template");
     pub const RATE_SUBSCRIPTION_USAGE_EVENTS: ReducerName = ReducerName::new("rate_subscription_usage_events");
     pub const REBASE_DEFERRED_SCHEDULES_FOR_SUBSCRIPTION: ReducerName = ReducerName::new("rebase_deferred_schedules_for_subscription");
@@ -8984,6 +9004,7 @@ pub mod reducer_names {
     pub const RUN_ANALYTICS_DASHBOARD_WIDGET_IDEMPOTENCY_TEST: ReducerName = ReducerName::new("run_analytics_dashboard_widget_idempotency_test");
     pub const RUN_C_0_ORGANIZATION_OWNERSHIP_BACKFILL: ReducerName = ReducerName::new("run_c_0_organization_ownership_backfill");
     pub const RUN_CARTONIZATION: ReducerName = ReducerName::new("run_cartonization");
+    pub const RUN_CONFIGURED_RECORD_CREATION_TESTS: ReducerName = ReducerName::new("run_configured_record_creation_tests");
     pub const RUN_CORE_OPERATIONAL_MESSAGING_TEST: ReducerName = ReducerName::new("run_core_operational_messaging_test");
     pub const RUN_CORE_PERMISSIONS_TEST: ReducerName = ReducerName::new("run_core_permissions_test");
     pub const RUN_CORE_SOD_TEST: ReducerName = ReducerName::new("run_core_sod_test");
@@ -10205,6 +10226,7 @@ macro_rules! reducer_call {
     ("migrate_workflow_instance", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MIGRATE_WORKFLOW_INSTANCE, $args) };
     ("move_stock_quant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MOVE_STOCK_QUANT, $args) };
     ("nominate_ai_knowledge_entry_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION, $args) };
+    ("nominate_knowledge_guide", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_KNOWLEDGE_GUIDE, $args) };
     ("open_account_period", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::OPEN_ACCOUNT_PERIOD, $args) };
     ("open_contract", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::OPEN_CONTRACT, $args) };
     ("open_crm_conversation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::OPEN_CRM_CONVERSATION, $args) };
@@ -10246,6 +10268,7 @@ macro_rules! reducer_call {
     ("publish_workflow_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PUBLISH_WORKFLOW_VERSION, $args) };
     ("purchasing_integrity_inventory", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PURCHASING_INTEGRITY_INVENTORY, $args) };
     ("purge_expired_documents", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PURGE_EXPIRED_DOCUMENTS, $args) };
+    ("purge_reviewed_expired_documents", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PURGE_REVIEWED_EXPIRED_DOCUMENTS, $args) };
     ("queue_mail_from_template", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::QUEUE_MAIL_FROM_TEMPLATE, $args) };
     ("rate_subscription_usage_events", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RATE_SUBSCRIPTION_USAGE_EVENTS, $args) };
     ("rebase_deferred_schedules_for_subscription", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REBASE_DEFERRED_SCHEDULES_FOR_SUBSCRIPTION, $args) };
@@ -10455,6 +10478,7 @@ macro_rules! reducer_call {
     ("run_analytics_dashboard_widget_idempotency_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_ANALYTICS_DASHBOARD_WIDGET_IDEMPOTENCY_TEST, $args) };
     ("run_c_0_organization_ownership_backfill", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_C_0_ORGANIZATION_OWNERSHIP_BACKFILL, $args) };
     ("run_cartonization", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_CARTONIZATION, $args) };
+    ("run_configured_record_creation_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_CONFIGURED_RECORD_CREATION_TESTS, $args) };
     ("run_core_operational_messaging_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_CORE_OPERATIONAL_MESSAGING_TEST, $args) };
     ("run_core_permissions_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_CORE_PERMISSIONS_TEST, $args) };
     ("run_core_sod_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_CORE_SOD_TEST, $args) };
