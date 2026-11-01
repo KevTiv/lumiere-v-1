@@ -43,7 +43,7 @@ class PrivateReleaseTests(unittest.TestCase):
             self.assertEqual(plugin['name'], 'request-termination')
             self.assertEqual(plugin['config']['status_code'], status)
 
-    def test_alpha_pilot_exposes_only_exact_report_inspection_and_status_routes(self):
+    def test_alpha_pilot_exposes_only_exact_report_inspection_status_and_run_routes(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
         service = next(item for item in config['services'] if item['name'] == 'web-ai-alpha-pilot')
         self.assertEqual(service['url'], 'http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__')
@@ -56,16 +56,26 @@ class PrivateReleaseTests(unittest.TestCase):
                        for route in routes for pattern in route['paths'])
         for method, path in [('POST', '/api/ai/skills/report-analysis'),
                              ('POST', '/api/ai/evidence/runs/inspect'),
+                             ('POST', '/api/ai/runs/lifecycle'),
                              ('GET', '/api/ai/skills/certifications'),
                              ('GET', '/api/ai/skills/certifications/42')]:
             self.assertTrue(allowed(method, path), (method, path))
         for method, path in [('GET', '/api/ai/skills/report-analysis'),
+                             ('GET', '/api/ai/runs/lifecycle'),
+                             ('PATCH', '/api/ai/runs/lifecycle'),
+                             ('POST', '/api/ai/runs/lifecycle/'),
+                             ('POST', '/api/ai/runs/lifecycle/extra'),
+                             ('POST', '/prefix/api/ai/runs/lifecycle'),
                              ('POST', '/api/ai/skills/certifications'),
                              ('POST', '/api/ai/skills/report-analysis/extra'),
                              ('GET', '/api/ai/skills/certifications/42/extra'),
                              ('POST', '/api/ai/evidence/runs/export'),
                              ('POST', '/api/ai/action-draft/bridge'),
                              ('POST', '/api/ai/rag'), ('POST', '/api/ai/skills/run'),
+                             ('POST', '/api/ai/evidence/ingestion/documents'),
+                             ('POST', '/api/ai/evidence/ingestion/documents/lifecycle'),
+                             ('POST', '/api/ai/vision/analyze'),
+                             ('POST', '/api/ai/skills/import-mapping'),
                              ('POST', '/prefix/api/ai/skills/report-analysis')]:
             self.assertFalse(allowed(method, path), (method, path))
 
