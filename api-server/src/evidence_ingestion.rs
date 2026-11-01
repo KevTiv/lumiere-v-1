@@ -74,9 +74,18 @@ fn value_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
 }
 
 fn value_text<'a>(row: &'a Value, camel: &str, snake: &str) -> Option<&'a str> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(Value::as_str)
+    let value = row.get(camel).or_else(|| row.get(snake))?;
+    match value {
+        Value::String(text) => Some(text),
+        // DocumentVersion.checksum is Option<String> in canonical SATS SQL.
+        // Keep the wrapper when reading the row, then decode its one payload.
+        Value::Object(option) if option.len() == 1 => match option.get("some")? {
+            Value::String(text) => Some(text),
+            Value::Array(payload) if payload.len() == 1 => payload[0].as_str(),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn value_bool(row: &Value, camel: &str, snake: &str) -> Option<bool> {
@@ -363,7 +372,7 @@ async fn ingest_document(
         let (content, processor) =
             extract_with_ocr(&blob.content_type, &blob.bytes, body.language.as_deref()).await?;
         let extracted_chars = content.chars().count();
-        persist_document_evidence(
+        let indexing_jobs = persist_document_evidence(
             &state,
             &session,
             &context,
@@ -375,6 +384,14 @@ async fn ingest_document(
             blob.source_url.as_deref(),
             &content,
             &processor,
+        )
+        .await?;
+        crate::document_blobs::upload_receipts::record_indexing_manifest(
+            &state.config.document_blob_store,
+            &blob.object_key,
+            document_id,
+            &blob.checksum,
+            &indexing_jobs,
         )
         .await?;
         Ok::<_, ApiError>((extracted_chars, processor))
@@ -452,7 +469,7 @@ async fn persist_document_evidence(
     source_url: Option<&str>,
     content: &str,
     processor: &str,
-) -> Result<(), ApiError> {
+) -> Result<Vec<crate::document_blobs::upload_receipts::IndexingJobRef>, ApiError> {
     let source_key = format!("document:{document_id}");
     dispatch_ai_evidence_mutation(
         state,
@@ -544,6 +561,7 @@ async fn persist_document_evidence(
     } else {
         "extraction"
     };
+    let mut indexing_jobs = Vec::new();
     for (passage_key, passage_text, start, end) in passage_chunks(content) {
         let source_version = document_version_key(document.version_number, &document.checksum);
         dispatch_ai_evidence_mutation(
@@ -620,8 +638,19 @@ async fn persist_document_evidence(
             ]),
         )
         .await?;
+        let semantic_key =
+            format!("embedding:ai_evidence_passage:{passage_id}:{content_hash}:semantic-index-v1");
+        let jobs = context.client().query_sql(&format!(
+            "SELECT id FROM queue_job WHERE organization_id = {organization_id} AND company_id = {company_id} AND queue_name = 'embedding' AND semantic_key = '{semantic_key}' LIMIT 2"
+        )).await.map_err(ApiError::internal)?;
+        let job_id = exact_row_id(jobs, "document embedding job").await?;
+        indexing_jobs.push(crate::document_blobs::upload_receipts::IndexingJobRef {
+            job_id,
+            passage_id,
+            fingerprint: content_hash.to_owned(),
+        });
     }
-    Ok(())
+    Ok(indexing_jobs)
 }
 
 async fn evidence_source_versions(
@@ -789,6 +818,32 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_version_checksum_decodes_nullable_sats_text() {
+        for checksum in [
+            serde_json::json!("source-checksum"),
+            serde_json::json!({"some": "source-checksum"}),
+            serde_json::json!({"some": ["source-checksum"]}),
+        ] {
+            let version = serde_json::json!({"checksum": checksum});
+            assert_eq!(
+                value_text(&version, "checksum", "checksum"),
+                Some("source-checksum")
+            );
+        }
+        for checksum in [
+            serde_json::json!({"none": []}),
+            serde_json::json!({"some": []}),
+            serde_json::json!({"some": ["one", "two"]}),
+            serde_json::json!({"some": "one", "none": []}),
+            serde_json::json!({"some": 7}),
+            Value::Null,
+        ] {
+            let version = serde_json::json!({"checksum": checksum});
+            assert_eq!(value_text(&version, "checksum", "checksum"), None);
+        }
+    }
 
     #[test]
     fn document_scope_and_current_version_decode_nullable_sats_ids() {

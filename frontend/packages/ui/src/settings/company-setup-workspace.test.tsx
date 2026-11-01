@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   refetch: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
+  refresh: vi.fn(),
   companies: [
     {
       id: 7,
@@ -45,6 +46,7 @@ const state = vi.hoisted(() => ({
   ],
 }))
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => state.session }))
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: state.refresh }) }))
 vi.mock("@lumiere/ui/lib/rbac-context", () => ({
   useRBAC: () => ({ checkPermission: () => ({ allowed: state.allowed }) }),
 }))
@@ -84,6 +86,7 @@ beforeEach(() => {
     activeCompanyReady: true,
   }
   state.allowed = true
+  state.refresh.mockReset()
   state.refetch.mockReset()
   state.create.mockReset().mockResolvedValue(undefined)
   state.update.mockReset().mockResolvedValue(undefined)
@@ -123,6 +126,20 @@ async function confirmSetup(create: boolean) {
 }
 
 describe("company setup operation lifetime", () => {
+  it.each([false, true])("refreshes company admission after a saved create, including a lost reply: %s", async (lostReply) => {
+    state.refetch.mockImplementation(async () => ({
+      data: state.create.mock.calls.length
+        ? [{ ...state.companies[0], ...state.create.mock.calls[0][0], id: 9 }]
+        : state.companies,
+    }))
+    if (lostReply) state.create.mockRejectedValueOnce(new Error("lost reply"))
+    render(workspace())
+    await confirmSetup(true)
+    if (lostReply) fireEvent.click(await screen.findByRole("button", { name: "Check saved company" }))
+    await waitFor(() => expect(state.refresh).toHaveBeenCalledOnce())
+    expect(state.create).toHaveBeenCalledOnce()
+  })
+
   it.each([
     "unmount",
     "actor roundtrip",

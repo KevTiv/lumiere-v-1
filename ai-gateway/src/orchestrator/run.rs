@@ -1167,7 +1167,7 @@ pub async fn run_skill_admitted(
             // This mutation happens only after the current actor, skill,
             // bounded inputs, graph and knowledge/source dependencies have
             // all been re-authorized and matched to the immutable checkpoint.
-            resume_run(&stdb, req.org_id, req.company_id, run_id).await?;
+            resume_run(&stdb, spend_reader, req.org_id, req.company_id, run_id).await?;
         }
         let program = match executor.run(&graph, &program_context).await {
             Ok(program) => program,
@@ -1179,6 +1179,7 @@ pub async fn run_skill_admitted(
                 if let Some(parked) = super::budget_park::try_park(
                     &super::budget_park::StdbParkStore {
                         writer: state.stdb.as_ref(),
+                        reader: spend_reader,
                     },
                     req.org_id,
                     req.company_id,

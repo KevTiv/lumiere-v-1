@@ -62,3 +62,14 @@ test('browser request contains company intent but no authority fields', () => {
   assert.equal('actorIdentity' in request, false)
   assert.equal('token' in request, false)
 })
+
+
+test('metadata-only questions cannot become reply choices or expose authored content', () => {
+  const view = mapRunLifecycle({ runId: 8, state: 'waiting_input', questions: [
+    { id: 1, key: 'q1', revision: 2, status: 'answered', answered: true },
+  ] })
+  assert.ok(view)
+  assert.equal(view.questions[0]?.contentAvailable, false)
+  assert.equal(view.questions[0]?.prompt, '')
+  assert.equal(view.questions[0]?.answered, true)
+})

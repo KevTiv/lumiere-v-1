@@ -261,6 +261,14 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "account-moves".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
+    // Setup receipts and imported reference details need their saved metadata.
+    // Field authorization selects columns before this compatibility filter.
+    for resource in ["companies", "products", "stock-locations"] {
+        m.insert(
+            resource.to_string(),
+            ["metadata"].into_iter().map(String::from).collect(),
+        );
+    }
     m.insert(
         "account-accounts".to_string(),
         ["allowed_journal_ids"]
@@ -2461,6 +2469,42 @@ mod tests {
     }
 
     #[test]
+    fn import_receipt_metadata_respects_explicit_field_selection() {
+        for (resource, permission) in [
+            ("companies", "company:read"),
+            ("products", "product:read"),
+            ("stock-locations", "stock_location:read"),
+        ] {
+            let mut access = field_access(&[permission]);
+            let columns = resolve_http_sql_columns(resource, Some(&access))
+                .expect("authorized reference columns");
+            assert!(
+                columns.iter().any(|column| column == "metadata"),
+                "{resource}"
+            );
+            if resource == "products" {
+                for field in ["standard_price", "sale_ok"] {
+                    assert!(columns.iter().any(|column| column == field), "{field}");
+                }
+            }
+
+            select_fields(&mut access, resource, &["name"]);
+            let selected = resolve_http_sql_columns(resource, Some(&access))
+                .expect("selected reference columns");
+            assert!(selected.iter().any(|column| column == "id"));
+            assert!(selected.iter().any(|column| column == "organization_id"));
+            assert!(
+                !selected.iter().any(|column| column == "metadata"),
+                "{resource}"
+            );
+            if resource == "products" {
+                assert!(!selected.iter().any(|column| column == "standard_price"));
+                assert!(!selected.iter().any(|column| column == "sale_ok"));
+            }
+        }
+    }
+
+    #[test]
     fn requisition_projection_preserves_operator_identity_and_exact_po_handoff() {
         let cols = resolve_http_sql_columns("purchase-requisitions", None).unwrap();
         for field in [
@@ -2904,6 +2948,29 @@ mod tests {
                 "manufacturing cost projection must expose {field}: {cols:?}"
             );
         }
+    }
+
+    #[test]
+    fn ai_agent_projection_keeps_company_binding_in_default_and_selective_reads() {
+        let default = resolve_http_sql_columns("ai-agents", None).expect("agent projection");
+        assert!(default.iter().any(|column| column == "company_id"));
+        let mut access = field_access(&["ai-agents:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "ai-agents".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+        let restricted = resolve_http_sql_columns("ai-agents", Some(&access))
+            .expect("restricted agent projection");
+        for field in ["id", "organization_id", "company_id", "name"] {
+            assert!(restricted.iter().any(|column| column == field));
+        }
+        assert!(!restricted.iter().any(|column| column == "monthly_spend"));
     }
 
     #[test]

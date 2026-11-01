@@ -14,6 +14,7 @@ import { Badge } from "@lumiere/ui/components/badge"
 import { companyRowsToSelectOptions, type CompanyLookupRow } from "../../../lib/form-lookup"
 import { runStatusLabel } from "./enum-labels"
 import { SavedRunObservation } from "./run-observation-panel"
+import { isAgentAvailableForCompany } from "./agent-company-scope"
 
 export function ReportAnalysisPanel({ organizationId, companies, savedRun }: {
   organizationId: bigint
@@ -31,8 +32,7 @@ export function ReportAnalysisPanel({ organizationId, companies, savedRun }: {
   const analysis = useAiReportAnalysis()
   const submitting = useRef(false)
   const availableAgents = (agents.data ?? []).filter((agent) =>
-    agent.isActive && Number(agent.organizationId) === Number(organizationId) &&
-    (agent.companyId == null || String(agent.companyId) === companyId),
+    isAgentAvailableForCompany(agent, organizationId, companyId),
   )
   const selectedAgent = availableAgents.find((agent) => String(agent.id) === agentId)
   const ready = !!companyId && !!selectedAgent && query.trim().length > 0 && !agents.isError && !agents.isPending

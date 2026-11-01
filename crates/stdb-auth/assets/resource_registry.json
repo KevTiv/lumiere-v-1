@@ -385,6 +385,7 @@
       "ai_agent"
     ],
     "default_restricted": [
+      "company_id",
       "name",
       "model",
       "provider",
@@ -1099,6 +1100,7 @@
       "address_city",
       "address_zip",
       "address_country_code",
+      "metadata",
       "deleted_at"
     ],
     "mandatory": [
@@ -4680,11 +4682,14 @@
       "categ_id",
       "list_price",
       "public_price",
+      "standard_price",
+      "sale_ok",
       "type",
       "barcode",
       "purchase_ok",
       "tracking",
-      "can_be_expensed"
+      "can_be_expensed",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -6498,7 +6503,8 @@
       "usage",
       "complete_name",
       "company_id",
-      "location_id"
+      "location_id",
+      "metadata"
     ],
     "mandatory": [
       "id",

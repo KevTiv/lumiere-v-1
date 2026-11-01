@@ -261,6 +261,56 @@
       },
       "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
     },
+    "ai_run_budget_park_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_lifecycle_reads.rs: sender-scoped metadata-only lifecycle read through the active ai_spend_reader organization binding; actor/company capability checked by gateway"
+    },
+    "ai_run_lifecycle_event_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_lifecycle_reads.rs: sender-scoped metadata-only lifecycle read through the active ai_spend_reader organization binding; actor/company capability checked by gateway"
+    },
+    "ai_run_lifecycle_state_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_lifecycle_reads.rs: sender-scoped metadata-only lifecycle read through the active ai_spend_reader organization binding; actor/company capability checked by gateway"
+    },
+    "ai_run_question_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_lifecycle_reads.rs: sender-scoped metadata-only lifecycle read through the active ai_spend_reader organization binding; actor/company capability checked by gateway"
+    },
+    "ai_run_queued_input_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/run_lifecycle_reads.rs: sender-scoped metadata-only lifecycle read through the active ai_spend_reader organization binding; actor/company capability checked by gateway"
+    },
     "ai_spend_budget_read": {
       "semantic_kind": "internal",
       "client_facing": false,
