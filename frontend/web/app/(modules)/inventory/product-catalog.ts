@@ -29,6 +29,7 @@ const CATALOG_ACTION_PERMISSIONS: Readonly<
   },
   "csv-product": { resource: "product", action: "create" },
   "csv-product-variant": { resource: "product_variant", action: "create" },
+  "rename-category": { resource: "product_category", action: "write" },
   "edit-product": { resource: "product", action: "write" },
   "delete-product": { resource: "product", action: "delete" },
   "add-variant": { resource: "product_variant", action: "create" },

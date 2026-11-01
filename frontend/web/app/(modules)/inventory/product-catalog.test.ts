@@ -260,6 +260,7 @@ test("catalogue create and row actions carry their native resource permissions w
             columns: [{ key: "parentId", label: "Parent ID" }],
             actions: [
               { id: "delete-category", label: "Delete", onClick: save },
+              { id: "rename-category", label: "Rename", onClick: save },
             ],
           },
         },
@@ -284,6 +285,7 @@ test("catalogue create and row actions carry their native resource permissions w
   assert.ok(products.actions?.every((action) => action.onClick === save));
   const categories = result.tabs[1]?.entityConfig?.view;
   if (categories?.mode !== "table") assert.fail("Expected the category table");
+  assert.deepEqual(categories.actions?.[1]?.permission, { resource: "product_category", action: "write" });
   assert.deepEqual(categories.actions?.[0]?.permission, {
     resource: "product_category",
     action: "delete",

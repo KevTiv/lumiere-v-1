@@ -12,6 +12,8 @@ import {
   toCreateProductPackagingParams,
 } from "@lumiere/erp-shared/inventory-create-params"
 
+import { renameCategory } from "../product-category-rename"
+
 // ── Shared helpers ───────────────────────────────────────────────────────────
 import {
   companyScopeParams,
@@ -320,6 +322,28 @@ export function useUpdateProductCategory(
         queryKey: ['product-categories', rqBigIntKey(organizationId)],
       }),
   });
+}
+
+/** Rename only the display name; exact readback resolves lost replies. */
+export function useRenameProductCategory(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { categoryId: ScalarId; previousName: string; name: string }) => {
+      const id = String(toScalarU64(args.categoryId))
+      return renameCategory(id, args.previousName, args.name, async () => {
+        const rows = await fetchQueryList('/api/query/product-categories', 'Category readback unavailable')
+        return rows.filter(row => String(row.organizationId) === String(organizationId))
+          .map(row => ({ id: String(row.id), name: row.name }))
+      }, async () => {
+        const { urlPath, init } = stdbBffCommandPost('update_product_category', {
+          categoryId: toScalarU64(args.categoryId), params: stdbParamsToJson({ name: args.name.trim() }),
+        })
+        const response = await apiFetch(urlPath, init)
+        if (!response.ok) throw new Error('The category rename request failed. Check the saved name before retrying.')
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories', rqBigIntKey(organizationId)] }),
+  })
 }
 
 export function useDeleteProductCategory(
