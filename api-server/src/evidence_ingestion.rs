@@ -74,9 +74,18 @@ fn value_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
 }
 
 fn value_text<'a>(row: &'a Value, camel: &str, snake: &str) -> Option<&'a str> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(Value::as_str)
+    let value = row.get(camel).or_else(|| row.get(snake))?;
+    match value {
+        Value::String(text) => Some(text),
+        // DocumentVersion.checksum is Option<String> in canonical SATS SQL.
+        // Keep the wrapper when reading the row, then decode its one payload.
+        Value::Object(option) if option.len() == 1 => match option.get("some")? {
+            Value::String(text) => Some(text),
+            Value::Array(payload) if payload.len() == 1 => payload[0].as_str(),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn value_bool(row: &Value, camel: &str, snake: &str) -> Option<bool> {
@@ -789,6 +798,32 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_version_checksum_decodes_nullable_sats_text() {
+        for checksum in [
+            serde_json::json!("source-checksum"),
+            serde_json::json!({"some": "source-checksum"}),
+            serde_json::json!({"some": ["source-checksum"]}),
+        ] {
+            let version = serde_json::json!({"checksum": checksum});
+            assert_eq!(
+                value_text(&version, "checksum", "checksum"),
+                Some("source-checksum")
+            );
+        }
+        for checksum in [
+            serde_json::json!({"none": []}),
+            serde_json::json!({"some": []}),
+            serde_json::json!({"some": ["one", "two"]}),
+            serde_json::json!({"some": "one", "none": []}),
+            serde_json::json!({"some": 7}),
+            Value::Null,
+        ] {
+            let version = serde_json::json!({"checksum": checksum});
+            assert_eq!(value_text(&version, "checksum", "checksum"), None);
+        }
+    }
 
     #[test]
     fn document_scope_and_current_version_decode_nullable_sats_ids() {

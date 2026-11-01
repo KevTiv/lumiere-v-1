@@ -1,6 +1,7 @@
 "use client"
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useErpSession } from "@lumiere/erp-session"
 import {
   useCompanies,
@@ -55,6 +56,7 @@ export function CompanySetupWorkspace({
 }: {
   organizationId: number
 }) {
+  const router = useRouter()
   const session = useErpSession()
   const { checkPermission } = useRBAC()
   const companiesQuery = useCompanies(organizationId, !!session.identity)
@@ -298,20 +300,23 @@ export function CompanySetupWorkspace({
                 },
               )
               assertCurrent()
+              if (reviewed.companyId === null) router.refresh()
               return saved
             }
             const saved = await save(reviewed, assertCurrent)
             assertCurrent()
+            if (reviewed.companyId === null) router.refresh()
             return saved
           }}
           onRecover={async (reviewed) => {
             const assertCurrent = captureLease()
             const current = await readCompanies(assertCurrent)
             assertCurrent()
-            if (reviewed.companyId === null)
-              return (
-                findSubmittedCompany(current, reviewed.submissionId)?.id ?? null
-              )
+            if (reviewed.companyId === null) {
+              const savedId = findSubmittedCompany(current, reviewed.submissionId)?.id ?? null
+              if (savedId !== null) router.refresh()
+              return savedId
+            }
             return savedCompanyMatches(
               current.find((row) => row.id === reviewed.companyId),
               reviewed,

@@ -1,6 +1,31 @@
 import { expect, test } from "@playwright/test"
 import { parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
 
+test("reviewed locations reach the correct tracked import without AI", async ({ page }) => {
+  let aiRequests = 0
+  let submissions = 0
+  await page.route("**/api/ai/import/**", route => { aiRequests++; return route.fulfill({ status: 503, json: { error: "AI disabled" } }) })
+  await page.route("**/api/query/**", route => route.fulfill({ json: { data: new URL(route.request().url()).pathname.endsWith("/companies") ? [{ id: 9001, organizationId: 8001, currencyId: 646 }] : [] } }))
+  await page.route("**/api/import/stock_location**", route => {
+    expect(route.request().method()).toBe("POST")
+    const body = route.request().postDataJSON()
+    expect(body.params).toEqual({ companyId: "9001" })
+    const parsed = parseCsvText(body.csvData)
+    expect(Object.fromEntries(parsed.headers.map((key, i) => [key, parsed.rows[0][i]]))).toEqual({ name: "Synthetic shop", usage: "internal", active: "false", is_scrap: "false", metadata: "{}", _source_file: "source.csv", _source_row: "3" })
+    submissions++
+    return route.fulfill({ json: { ok: true, entity: "stock_location", requestId: body.requestId, jobId: "502", status: "success", totalRows: 1, rowsImported: 1, errorRows: 0, errors: [], errorsRedacted: false } })
+  })
+  await page.goto("/prepared-product-import")
+  await page.getByRole("button", { name: "Use location reference fixture", exact: true }).click()
+  await expect(page.getByRole("combobox", { name: "Entity", exact: true })).toContainText("Stock locations")
+  await page.getByRole("button", { name: "Preview prepared location CSV", exact: true }).click()
+  await expect(page.getByTestId("guided-import-preview")).toBeVisible()
+  await page.getByRole("button", { name: "Import", exact: true }).click()
+  await expect(page.getByText("Imported 1 rows. 0 rows need correction.", { exact: true })).toBeVisible()
+  expect(aiRequests).toBe(0)
+  expect(submissions).toBe(1)
+})
+
 test("prepared products import with AI disabled and wait for the tracked receipt", async ({ page }) => {
   test.setTimeout(90_000)
   let aiRequests = 0
