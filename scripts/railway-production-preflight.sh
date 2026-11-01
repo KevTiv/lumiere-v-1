@@ -119,7 +119,7 @@ while IFS= read -r service; do
       die "$selection_variable must be true or false"
     fi
     configured=false
-    jq -e --argjson keys "$(jq '.configuredVariables' <<<"$feature")" '
+    jq -e --argjson keys "$(jq '.configuredVariables // []' <<<"$feature")" '
       . as $variables | any($keys[]; . as $key |
         $variables | has($key) and (.[$key] == null or .[$key] != ""))
     ' >/dev/null <<<"$variables_json" && configured=true
@@ -127,7 +127,13 @@ while IFS= read -r service; do
       echo "[railway-preflight] optional $name feature is unconfigured: $feature_name"
       continue
     fi
-    requirements="$(jq -c --argjson feature "$feature" '. + $feature.requiredVariables' <<<"$requirements")"
+    requirements="$(jq -c --argjson feature "$feature" '
+      reduce ($feature.requiredVariables | to_entries[]) as $entry (.;
+        .[$entry.key] = if .[$entry.key].kind == "tenant-service-identities"
+          and $entry.value.kind == "tenant-service-identities"
+          then $entry.value + {services: ((.[$entry.key].services + $entry.value.services) | unique)}
+          else $entry.value end)
+    ' <<<"$requirements")"
     while IFS= read -r pair; do
       first="$(jq -r '.[0]' <<<"$pair")"
       second="$(jq -r '.[1]' <<<"$pair")"
@@ -166,6 +172,31 @@ while IFS= read -r service; do
       positive-id-list)
         jq -e --arg key "$variable" '
           has($key) and (.[$key] | type == "string" and test("^[1-9][0-9]*(,[1-9][0-9]*)*$"))
+        ' >/dev/null <<<"$variables_json" && valid=true
+        ;;
+      optional-positive-id-list)
+        jq -e --arg key "$variable" '
+          (has($key) | not) or .[$key] == "" or
+          (.[$key] | type == "string" and test("^[1-9][0-9]*(,[1-9][0-9]*)*$"))
+        ' >/dev/null <<<"$variables_json" && valid=true
+        ;;
+      tenant-service-identities)
+        selected_services="$(jq -c '.value.services' <<<"$requirement")"
+        jq -e --arg key "$variable" --argjson services "$selected_services" '
+          (.[$key] | fromjson?) as $identities
+          | ($identities | type == "object") and
+            all($services[]; . as $service | $identities | has($service)) and
+            all($identities | to_entries[];
+              (.key | IN("projection_worker", "pos_order_hydrator", "workflow_worker",
+                "owner_report_worker", "expense_integration_worker", "hr_integration_worker",
+                "project_integration_worker")) and
+              (.value | type == "string" and test("^(0x)?[0-9a-fA-F]{64}$") and
+                (test("^(0x)?0{64}$") | not))) and
+            ([$identities | to_entries[] |
+              {key, value: (.value | sub("^0x"; "") | ascii_downcase)}]
+              | group_by(.value)
+              | all(.[]; length == 1 or
+                ([.[].key] | sort) == ["pos_order_hydrator", "projection_worker"]))
         ' >/dev/null <<<"$variables_json" && valid=true
         ;;
       positive-integer)

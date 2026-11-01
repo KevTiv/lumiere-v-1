@@ -34,6 +34,28 @@
       },
       "optionalFeatures": [
         {
+          "name": "tenant-integrations",
+          "selectionVariable": "RAILWAY_ENABLE_INTEGRATIONS",
+          "requiredVariables": {
+            "LUMIERE_TENANT_SERVICE_IDENTITIES": {
+              "kind": "tenant-service-identities",
+              "services": ["expense_integration_worker", "hr_integration_worker", "project_integration_worker"]
+            },
+            "STDB_SERVER_TOKEN": { "kind": "secret" }
+          }
+        },
+        {
+          "name": "tenant-owner-reports",
+          "selectionVariable": "RAILWAY_ENABLE_OWNER_REPORTS",
+          "requiredVariables": {
+            "LUMIERE_TENANT_SERVICE_IDENTITIES": {
+              "kind": "tenant-service-identities",
+              "services": ["owner_report_worker"]
+            },
+            "STDB_SERVER_TOKEN": { "kind": "secret" }
+          }
+        },
+        {
           "name": "reviewed-email",
           "selectionVariable": "RAILWAY_ENABLE_REVIEWED_MAIL",
           "configuredVariables": [
@@ -153,7 +175,7 @@
         "STDB_HOST": { "kind": "url" },
         "STDB_MODULE": { "kind": "non-placeholder" },
         "STDB_EXPENSE_WORKER_TOKEN": { "kind": "secret" },
-        "LUMIERE_EXPENSE_WORKER_ORG_IDS": { "kind": "positive-id-list" },
+        "LUMIERE_EXPENSE_WORKER_ORG_IDS": { "kind": "optional-positive-id-list" },
         "LUMIERE_EXPENSE_WORKER_PORT": { "kind": "exact", "value": "8092" },
         "LUMIERE_PLACEMENT_GENERATION": { "kind": "positive-integer" },
         "LUMIERE_CELL_ID": { "kind": "non-placeholder" },
@@ -174,7 +196,7 @@
         "STDB_HOST": { "kind": "url" },
         "STDB_MODULE": { "kind": "non-placeholder" },
         "STDB_HR_WORKER_TOKEN": { "kind": "secret" },
-        "LUMIERE_HR_WORKER_ORG_IDS": { "kind": "positive-id-list" },
+        "LUMIERE_HR_WORKER_ORG_IDS": { "kind": "optional-positive-id-list" },
         "LUMIERE_HR_WORKER_PORT": { "kind": "exact", "value": "8094" },
         "LUMIERE_PLACEMENT_GENERATION": { "kind": "positive-integer" },
         "LUMIERE_CELL_ID": { "kind": "non-placeholder" },
@@ -195,7 +217,7 @@
         "STDB_HOST": { "kind": "url" },
         "STDB_MODULE": { "kind": "non-placeholder" },
         "STDB_PROJECT_WORKER_TOKEN": { "kind": "secret" },
-        "LUMIERE_PROJECT_WORKER_ORG_IDS": { "kind": "positive-id-list" },
+        "LUMIERE_PROJECT_WORKER_ORG_IDS": { "kind": "optional-positive-id-list" },
         "LUMIERE_PROJECT_WORKER_PORT": { "kind": "exact", "value": "8093" },
         "LUMIERE_PLACEMENT_GENERATION": { "kind": "positive-integer" },
         "LUMIERE_CELL_ID": { "kind": "non-placeholder" },

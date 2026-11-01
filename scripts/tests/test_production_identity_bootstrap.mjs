@@ -63,6 +63,19 @@ test('partitions credentials by service without leaking unrelated worker tokens'
   assert.equal(result.get('projection-worker').STDB_WORKFLOW_WORKER_TOKEN, undefined)
 })
 
+test('tenant enrollment sends public worker identities only to the API', () => {
+  const targets = [{secretName:'STDB_EXPENSE_WORKER_TOKEN', services:['expense-integration-worker'],
+    bindings:['expense_integration_worker']}]
+  const result = buildServiceSecrets({targets,
+    issued:new Map([['STDB_EXPENSE_WORKER_TOKEN',{token:'private-worker-token',identity:identity('e')}]]),
+    adminToken:'owner-token',runtimeHash:`sha256:${identity('f')}`,bootstrapSecrets:{}})
+  assert.equal(result.get('expense-integration-worker').STDB_EXPENSE_WORKER_TOKEN, 'private-worker-token')
+  assert.deepEqual(JSON.parse(result.get('api-server').LUMIERE_TENANT_SERVICE_IDENTITIES),
+    {expense_integration_worker:identity('e')})
+  assert.equal(result.get('api-server').STDB_EXPENSE_WORKER_TOKEN, undefined)
+  assert.equal(result.get('expense-integration-worker').LUMIERE_TENANT_SERVICE_IDENTITIES, undefined)
+})
+
 const baseEnv = {
   STDB_HOST: 'http://spacetimedb.railway.internal:3000',
   STDB_MODULE: 'lumiere-v1',

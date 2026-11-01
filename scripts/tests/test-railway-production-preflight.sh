@@ -46,7 +46,11 @@ for domain in expense hr project; do
     }' >"$TMP/$domain-integration-worker.variables.json"
 done
 
-jq -n '{LUMIERE_DOCUMENT_BLOB_DIR: "/data/document-blobs"}' >"$TMP/api-server.variables.json"
+jq -n '{LUMIERE_DOCUMENT_BLOB_DIR: "/data/document-blobs",STDB_SERVER_TOKEN:null,
+  LUMIERE_TENANT_SERVICE_IDENTITIES: ({expense_integration_worker:("a"*64),
+    hr_integration_worker:("b"*64),project_integration_worker:("c"*64),
+    owner_report_worker:("d"*64)} | tojson)}' >"$TMP/api-server.variables.json"
+cp "$TMP/api-server.variables.json" "$TMP/api-server-base.variables.json"
 jq -n '{LUMIERE_ENV:"production",KONG_DATABASE:"postgres",KONG_PG_HOST:"kong-postgres.railway.internal",KONG_PG_DATABASE:"lumiere_kong",KONG_PG_USER:"lumiere_kong",KONG_PG_PASSWORD:null,LUMIERE_GATEWAY_RATE_LIMIT_SCOPE:"service"}' >"$TMP/api-gateway.variables.json"
 
 cat >"$TMP/railway" <<'SH'
@@ -92,6 +96,35 @@ common_env=(
 )
 
 env "${common_env[@]}" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
+
+# Dynamic discovery works before the first signup and never needs static IDs.
+for domain in expense hr project; do
+  upper="${domain^^}"
+  jq --arg key "LUMIERE_${upper}_WORKER_ORG_IDS" 'del(.[$key])' \
+    "$TMP/$domain-integration-worker.variables.json" >"$TMP/dynamic.json"
+  mv "$TMP/dynamic.json" "$TMP/$domain-integration-worker.variables.json"
+done
+env "${common_env[@]}" RAILWAY_ENABLE_OWNER_REPORTS=true bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
+
+# Enabling workers requires the API's enrollment map, including all selected
+# features when integration and owner-report gates are both enabled.
+jq '.LUMIERE_TENANT_SERVICE_IDENTITIES |= (fromjson | del(.hr_integration_worker) | tojson)' \
+  "$TMP/api-server-base.variables.json" >"$TMP/api-server.variables.json"
+if env "${common_env[@]}" RAILWAY_ENABLE_OWNER_REPORTS=true bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/enrollment.out" 2>&1; then
+  echo 'production preflight accepted workers without tenant enrollment' >&2; exit 1
+fi
+grep -Fq 'invalid LUMIERE_TENANT_SERVICE_IDENTITIES' "$TMP/enrollment.out"
+for bad in invalid shared zero; do
+  jq --arg bad "$bad" '.LUMIERE_TENANT_SERVICE_IDENTITIES |= (fromjson |
+    .hr_integration_worker = (if $bad == "shared" then .expense_integration_worker
+      elif $bad == "zero" then "0"*64 else "not-an-identity" end) | tojson)' \
+    "$TMP/api-server-base.variables.json" >"$TMP/api-server.variables.json"
+  if env "${common_env[@]}" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/enrollment-$bad.out" 2>&1; then
+    echo "production preflight accepted $bad worker identity" >&2; exit 1
+  fi
+  grep -Fq 'invalid LUMIERE_TENANT_SERVICE_IDENTITIES' "$TMP/enrollment-$bad.out"
+done
+cp "$TMP/api-server-base.variables.json" "$TMP/api-server.variables.json"
 
 # An empty production database has no tenant IDs to configure. The initial ERP
 # release may omit integration workers until onboarding and identity binding.
@@ -188,7 +221,7 @@ if env "${common_env[@]}" \
   exit 1
 fi
 grep -Fq 'api-server is missing or has invalid LUMIERE_DOCUMENT_BLOB_DIR' "$TMP/blob-path.out"
-jq -n '{LUMIERE_DOCUMENT_BLOB_DIR: "/data/document-blobs"}' >"$TMP/api-server.variables.json"
+cp "$TMP/api-server-base.variables.json" "$TMP/api-server.variables.json"
 
 # Explicit selection must gate even when no provider variables are configured.
 if env "${common_env[@]}" RAILWAY_ENABLE_REVIEWED_MAIL=true \
@@ -231,7 +264,7 @@ if grep -Fq 'synthetic-fixture-same-token' "$TMP/mail-same.out"; then
   echo "production preflight printed a credential value" >&2
   exit 1
 fi
-jq -n '{LUMIERE_DOCUMENT_BLOB_DIR: "/data/document-blobs"}' >"$TMP/api-server.variables.json"
+cp "$TMP/api-server-base.variables.json" "$TMP/api-server.variables.json"
 
 jq '.LUMIERE_PROJECT_WORKER_ORG_IDS = "0"' \
   "$TMP/project-integration-worker.variables.json" >"$TMP/project-invalid.json"

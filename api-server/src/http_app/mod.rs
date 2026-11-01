@@ -52,6 +52,7 @@ pub(crate) async fn serve() -> anyhow::Result<()> {
         state.config.stdb_module
     );
 
+    crate::tenant_services::start(state.clone())?;
     let app = router::app(state, cors);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

@@ -135,7 +135,7 @@ test('network and response decoding errors never expose provider or credential d
   }), verifyReviewedMail: true }), error => error.message === 'bootstrap response contained invalid JSON')
 })
 
-function provisioningDatabase({ reviewedMismatch = false } = {}) {
+function provisioningDatabase({ reviewedMismatch = false, reuseIntegrationTokens = false } = {}) {
   const calls = []
   const env = {
     ...base,
@@ -143,6 +143,11 @@ function provisioningDatabase({ reviewedMismatch = false } = {}) {
     STDB_FINALIZATION_TOKEN: 'synthetic-finalization',
     STDB_OWNER_REPORT_WORKER_TOKEN: 'synthetic-owner-report',
     STDB_WORKFLOW_WORKER_TOKEN: 'synthetic-workflow',
+    ...(reuseIntegrationTokens ? {
+      STDB_EXPENSE_WORKER_TOKEN: 'synthetic-expense',
+      STDB_HR_WORKER_TOKEN: 'synthetic-hr',
+      STDB_PROJECT_WORKER_TOKEN: 'synthetic-project',
+    } : {}),
   }
   const serviceTokens = new Map([
     ['projection_worker', env.STDB_FINALIZATION_TOKEN],
@@ -210,6 +215,24 @@ test('provisioning binds the supplied reviewed identity per real org and verifie
   assert.deepEqual(Object.keys(payload.tokens), ['STDB_EXPENSE_WORKER_TOKEN', 'STDB_HR_WORKER_TOKEN', 'STDB_PROJECT_WORKER_TOKEN'])
   assert.ok(output.every(line => !line.includes('credential') && !line.includes('synthetic-expense')))
   assert.equal(db.calls.filter(call => call.path === '/v1/identity').length, 3, 'reviewed credential is never minted')
+  const map = JSON.parse(payload.apiVariables.LUMIERE_TENANT_SERVICE_IDENTITIES)
+  assert.deepEqual(Object.keys(map), ['projection_worker', 'pos_order_hydrator', 'owner_report_worker',
+    'workflow_worker', 'expense_integration_worker', 'hr_integration_worker', 'project_integration_worker'])
+  assert.ok(Object.values(map).every(value => /^[0-9a-f]{64}$/.test(value)))
+  assert.equal(map.reviewed_mail_dispatcher, undefined, 'reviewed mail remains explicitly reviewed')
+})
+
+test('repeat setup reuses deployed integration credentials and emits the API public identity map', async () => {
+  const db = provisioningDatabase({ reuseIntegrationTokens: true })
+  let payload
+  await bootstrapServiceIdentities({ ...db, log: () => {}, sealEnvelope: value => {
+    payload = value
+    return { syntheticEnvelope: true }
+  } })
+  assert.equal(db.calls.filter(call => call.path === '/v1/identity').length, 0)
+  assert.equal(db.calls.filter(call => call.path.includes('/call/')).length, 2, 'only missing reviewed-mail bindings are added')
+  assert.deepEqual(payload.tokens, {})
+  assert.ok(!payload.apiVariables.LUMIERE_TENANT_SERVICE_IDENTITIES.includes('synthetic-'))
 })
 
 test('provisioning refuses to replace a different existing reviewed identity', async () => {

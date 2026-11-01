@@ -243,6 +243,18 @@ export function buildServiceSecrets({ issued, targets = IDENTITY_TARGETS, adminT
     if (!credential) throw new Error(`missing issued credential ${target.secretName}`)
     for (const service of target.services) assign(service, target.secretName, credential.token)
   }
+  const tenantServices = Object.fromEntries(targets.flatMap(target => target.bindings
+    .filter(binding => ['projection_worker', 'pos_order_hydrator', 'workflow_worker',
+      'owner_report_worker', 'expense_integration_worker', 'hr_integration_worker',
+      'project_integration_worker'].includes(binding))
+    .map(binding => {
+      const identity = normalizeIdentity(issued.get(target.secretName).identity)
+      if (!identity) throw new Error(`missing verified public identity for ${binding}`)
+      return [binding, identity]
+    })))
+  if (Object.keys(tenantServices).length) {
+    assign('api-server', 'LUMIERE_TENANT_SERVICE_IDENTITIES', JSON.stringify(tenantServices))
+  }
   for (const [service, names] of Object.entries(SHARED_SECRETS)) {
     for (const name of names) {
       const value = name === 'STDB_SERVER_TOKEN' ? adminToken : bootstrapSecrets[name]
