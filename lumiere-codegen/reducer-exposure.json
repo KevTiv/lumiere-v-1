@@ -2,6 +2,16 @@
   "version": 1,
   "reducers": [
     {
+      "name": "share_ai_owner_agent",
+      "exposure": "session",
+      "reason": "reviewed limit-only/shared-agent owner configuration; authenticated human organization administrator, exact revision, immutable actor-bound receipt and current-budget preconditions are enforced by the native owner; requires matching released generated contracts before API integration"
+    },
+    {
+      "name": "set_ai_owner_limit",
+      "exposure": "session",
+      "reason": "reviewed limit-only/shared-agent owner configuration; authenticated human organization administrator, exact revision, immutable actor-bound receipt and current-budget preconditions are enforced by the native owner; requires matching released generated contracts before API integration"
+    },
+    {
       "name": "run_knowledge_guide_tests",
       "exposure": "denied",
       "reason": "in-module development regression only; never session exposed"

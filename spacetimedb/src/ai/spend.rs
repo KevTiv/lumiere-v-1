@@ -256,6 +256,12 @@ pub fn configure_ai_spend(
     params: ConfigureAiSpendParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_agent", "write")?;
+    super::owner_configuration::require_single_pool(ctx, organization_id, agent_id)?;
+    if super::owner_configuration::managed_allowance(ctx, organization_id, agent_id)
+        .is_some_and(|(limit, currency)| limit != params.limit_units || currency != params.currency)
+    {
+        return Err("managed allowance changes require the owner limit-only command".into());
+    }
     validate_common(
         &params.billing_period,
         &params.currency,
@@ -392,6 +398,7 @@ pub fn reserve_ai_spend(
         }
         return Err("request key was already used with different bindings".into());
     }
+    super::owner_configuration::require_single_pool(ctx, organization_id, params.agent_id)?;
     if params.billing_period != current_period(ctx.timestamp)? {
         return Err("billing period must be the current period".into());
     }
@@ -461,13 +468,13 @@ pub fn reserve_ai_spend(
     if latest_version != Some(snapshot.version) {
         return Err("new reservations require the latest price snapshot".into());
     }
-    let budget = ctx
-        .db
-        .ai_spend_budget()
-        .ai_spend_budget_by_agent_period()
-        .filter((&params.agent_id, &params.billing_period))
-        .find(|row| row.organization_id == organization_id && row.currency == params.currency)
-        .ok_or_else(|| "budget not configured".to_string())?;
+    let budget = super::owner_configuration::budget_for_reservation(
+        ctx,
+        organization_id,
+        params.agent_id,
+        &params.billing_period,
+        &params.currency,
+    )?;
     let reserved_units = allowance_cost(
         &snapshot,
         params.input_token_allowance,

@@ -16,7 +16,7 @@ use crate::ai::skills::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
-fn seed_run(
+pub(super) fn seed_run(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,

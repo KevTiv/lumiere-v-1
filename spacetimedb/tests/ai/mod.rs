@@ -4,6 +4,7 @@ pub mod capability_grants_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
+pub mod owner_configuration_test;
 pub mod relational_integrity_test;
 pub mod runtime_reads_test;
 pub mod prepaid_test;
@@ -209,6 +210,8 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_spend_recovery_tests(ctx)?;
     run_ai_prepaid_tests(ctx)?;
+    owner_configuration_test::test_owner_configuration(ctx)?;
+    owner_configuration_test::test_legacy_missing_period_and_recovery(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
     adversarial_drafts_test::test_correlated_draft_replay(ctx)?;
