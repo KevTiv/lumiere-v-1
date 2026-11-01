@@ -62,3 +62,22 @@ sponsored grants, not fabricated customer payments.
 These are source foundations. They do not establish paid production readiness,
 owner UI acceptance, full platform certification or the requested live USD 10
 cap. The last verified live cap remains USD 5.
+
+## Contract generation repair
+
+Release 41306256015 built the native module, then stopped before publication:
+the storage census still expected 524 tables and the four new tables had no
+storage policies. The funding table also lacked an organization-leading index.
+
+The source repair adds all four always-hot policies, preserves every earlier
+policy and reviewed fixture, adds the funding organization index, and advances
+the strict storage and ownership censuses to 528 (523 application relations and
+five protocol relations). The pending durable migration is reserved as 33 so
+it does not reuse the existing application catalog 31/32 numbers. All released
+SQL remains unchanged. Exact generated SQL must still be promoted and added
+to catalog 33 before publication; the workflow gate remains intact.
+
+The full code-generator test suite passes 143 tests, with its existing ignored
+test unchanged. All 13 Python ownership tests pass. A failure-only release
+artifact now retains the exact generated manifest and migration SQL to support
+that review and promotion. No migration was applied to Railway.

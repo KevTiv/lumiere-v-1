@@ -1486,7 +1486,7 @@ mod tests {
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (31, "0031_durable_projection_delta")
+            (33, "0033_durable_projection_delta")
         );
     }
     #[test]

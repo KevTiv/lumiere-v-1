@@ -34,7 +34,9 @@ pub struct AiPrepaidAccount {
 }
 
 #[derive(Clone)]
-#[spacetimedb::table(accessor = ai_prepaid_funding_entry, index(accessor = ai_prepaid_funding_by_account, btree(columns = [account_id])))]
+#[spacetimedb::table(accessor = ai_prepaid_funding_entry,
+    index(accessor = ai_prepaid_funding_by_org, btree(columns = [organization_id])),
+    index(accessor = ai_prepaid_funding_by_account, btree(columns = [account_id])))]
 pub struct AiPrepaidFundingEntry {
     #[primary_key]
     #[auto_inc]
