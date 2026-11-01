@@ -1,7 +1,8 @@
 import { stdbParamsToJson } from '@lumiere/stdb/stdb-params-json'
+import type { UpdateProductCategoryParams } from '@lumiere/stdb/types'
 
 /** Use the native update schema so optional fields retain SATS encoding. */
-export function productCategoryUpdateParams(params: object): Record<string, unknown> {
+export function productCategoryUpdateParams(params: Partial<UpdateProductCategoryParams>) {
   return stdbParamsToJson(params, 'UpdateProductCategoryParams')
 }
 
