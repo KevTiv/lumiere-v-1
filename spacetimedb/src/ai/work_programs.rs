@@ -231,12 +231,10 @@ pub fn save_ai_work_program_draft(
             reviewed_skill_key: manifest.reviewed_skill_key,
             created_at: ctx.timestamp,
         });
-    commit(
+    let changes = audited_changes(
         ctx,
         organization_id,
         params.company_id,
-        "erp.save_ai_work_program_draft",
-        request_key,
         "ai_work_program_version",
         version.id,
         vec![
@@ -251,7 +249,17 @@ pub fn save_ai_work_program_draft(
                 &version,
             )?,
         ],
-    )
+    )?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.save_ai_work_program_draft".to_string(),
+            correlation_id: request_key,
+            changes,
+        },
+    )?;
+    Ok(())
 }
 
 /// Nominate an artifact already attached to the caller's completed run. The
@@ -353,12 +361,10 @@ pub fn nominate_ai_work_program_output(
             source_artifact_bytes: artifact_bytes,
             created_at: ctx.timestamp,
         });
-    commit(
+    let changes = audited_changes(
         ctx,
         organization_id,
         params.company_id,
-        "erp.nominate_ai_work_program_output",
-        key,
         "ai_work_program_output_nomination",
         row.id,
         vec![RowChange::upsert_stdb_row(
@@ -366,7 +372,17 @@ pub fn nominate_ai_work_program_output(
             serde_json::json!({"id": row.id}),
             &row,
         )?],
-    )
+    )?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.nominate_ai_work_program_output".to_string(),
+            correlation_id: key,
+            changes,
+        },
+    )?;
+    Ok(())
 }
 
 fn authorize(ctx: &ReducerContext, organization_id: u64, company_id: u64) -> Result<(), String> {
@@ -377,16 +393,14 @@ fn authorize(ctx: &ReducerContext, organization_id: u64, company_id: u64) -> Res
     Ok(())
 }
 
-fn commit(
+fn audited_changes(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
-    operation: &str,
-    correlation_id: String,
     table: &str,
     record_id: u64,
     mut changes: Vec<RowChange>,
-) -> Result<(), String> {
+) -> Result<Vec<RowChange>, String> {
     let audit = ctx.db.audit_log().insert(AuditLog {
         id: 0,
         organization_id,
@@ -411,16 +425,7 @@ fn commit(
         serde_json::json!({"id": audit.id}),
         &audit,
     )?);
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: operation.into(),
-            correlation_id,
-            changes,
-        },
-    )?;
-    Ok(())
+    Ok(changes)
 }
 
 fn prepare_manifest(raw: &str) -> Result<(DraftManifest, String), String> {

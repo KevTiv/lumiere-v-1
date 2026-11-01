@@ -135,12 +135,10 @@ pub fn register_ai_work_program_recipe(
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
     });
-    commit(
+    let changes = audited_changes(
         ctx,
         organization_id,
         company_id,
-        "register_ai_work_program_recipe",
-        request_key,
         "ai_work_program_recipe",
         row.id,
         RowChange::upsert_stdb_row(
@@ -148,7 +146,17 @@ pub fn register_ai_work_program_recipe(
             serde_json::json!({"id": row.id}),
             &row,
         )?,
-    )
+    )?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.register_ai_work_program_recipe".to_string(),
+            correlation_id: request_key,
+            changes,
+        },
+    )?;
+    Ok(())
 }
 
 #[reducer]
@@ -201,12 +209,10 @@ pub fn revoke_ai_work_program_recipe(
             revoked_by: ctx.sender(),
             revoked_at: ctx.timestamp,
         });
-    commit(
+    let changes = audited_changes(
         ctx,
         organization_id,
         company_id,
-        "revoke_ai_work_program_recipe",
-        format!("recipe:{recipe_id}"),
         "ai_work_program_recipe_revocation",
         recipe_id,
         RowChange::upsert_stdb_row(
@@ -214,7 +220,17 @@ pub fn revoke_ai_work_program_recipe(
             serde_json::json!({"recipe_id": recipe_id}),
             &row,
         )?,
-    )
+    )?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.revoke_ai_work_program_recipe".to_string(),
+            correlation_id: format!("recipe:{recipe_id}"),
+            changes,
+        },
+    )?;
+    Ok(())
 }
 
 /// Scoped current read for a future admitted adapter. A binding never carries
@@ -419,17 +435,14 @@ fn bounded(name: &str, value: &str, max: usize) -> Result<(), String> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn commit(
+fn audited_changes(
     ctx: &ReducerContext,
     org: u64,
     company: u64,
-    operation: &str,
-    correlation: String,
     table: &str,
     id: u64,
     change: RowChange,
-) -> Result<(), String> {
+) -> Result<Vec<RowChange>, String> {
     let audit = ctx.db.audit_log().insert(AuditLog {
         id: 0,
         organization_id: org,
@@ -447,23 +460,10 @@ fn commit(
         timestamp: ctx.timestamp,
         metadata: Some("non-executable procedural memory binding".into()),
     });
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id: org,
-            operation_id: format!("erp.{operation}"),
-            correlation_id: correlation,
-            changes: vec![
-                change,
-                RowChange::upsert_stdb_row(
-                    "audit_log",
-                    serde_json::json!({"id": audit.id}),
-                    &audit,
-                )?,
-            ],
-        },
-    )?;
-    Ok(())
+    Ok(vec![
+        change,
+        RowChange::upsert_stdb_row("audit_log", serde_json::json!({"id": audit.id}), &audit)?,
+    ])
 }
 
 #[cfg(test)]
