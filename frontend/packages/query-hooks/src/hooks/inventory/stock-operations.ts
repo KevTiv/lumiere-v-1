@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useErpSession } from '@lumiere/erp-session'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -203,17 +204,25 @@ export function useStockPickings(
 
 export function useStockLocations(
   organizationId: bigint,
-  initialData?: StockLocation[],
+  _initialData?: StockLocation[],
 ) {
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const companyId = activeCompanyReady ? activeCompanyId : null
   return useQuery<StockLocation[]>({
-    queryKey: ['stock-locations', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/stock-locations',
+    // Preserve the prefix used by import and mutation invalidation.
+    queryKey: ['stock-locations', rqBigIntKey(organizationId), 'company', companyId],
+    queryFn: () => {
+      if (companyId == null || companyId <= 0) {
+        throw new Error('An active company is required to query stock locations')
+      }
+      return fetchQueryList(
+        `/api/query/stock-locations?companyId=${encodeURIComponent(String(companyId))}`,
         'Failed to fetch stock locations',
-      ),
+      )
+    },
+    enabled: organizationId > 0n && companyId != null && companyId > 0,
     staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    // The server seed has no company scope. Fetch before exposing selected-company rows.
   });
 }
 
