@@ -607,6 +607,19 @@
     "output_cost_per_1k_microunits",
     "per_request_cost_ceiling_microunits"
   ],
+  "AiOwnerConfigurationReceipt": [
+    "company_id"
+  ],
+  "AiOwnerConfigurationReceiptRead": [
+    "company_id"
+  ],
+  "AiPrepaidAccount": [
+    "enabled_by",
+    "enabled_at"
+  ],
+  "AiPrepaidFundingEntry": [
+    "original_entry_id"
+  ],
   "AiProviderAttempt": [
     "failure_reason",
     "resolution",
@@ -4859,6 +4872,9 @@
     "content_hash",
     "snapshot_ref",
     "supersedes_version_id"
+  ],
+  "RecordAiPrepaidFundingParams": [
+    "original_entry_id"
   ],
   "RecordAiProviderAttemptResultParams": [
     "failure_reason"

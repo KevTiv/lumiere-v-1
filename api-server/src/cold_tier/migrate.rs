@@ -331,6 +331,15 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_review_fields_expand.sql"),
     },
+    Migration {
+        version: 33,
+        name: "owner_ai_prepaid_funding",
+        change_set: 22,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0033_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1387,6 +1396,23 @@ mod tests {
         assert_eq!(
             migration_checksum(receipt.sql),
             "sha256:c41a2d2cb7449cdc24f8b8162c6d6fa18c7162b1c939f9cacf4504672cb0499a"
+        );
+    }
+
+    #[test]
+    fn owner_prepaid_expand_preserves_deployed_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..32]),
+            "sha256:806eab58bc10fc980c8f31997a73fadfdf5683d65131fe293126f0e381dfdb4d"
+        );
+        let migration = MIGRATIONS[32];
+        assert_eq!(migration.version, 33);
+        assert_eq!(migration.name, "owner_ai_prepaid_funding");
+        assert_eq!(migration.change_set, 22);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert_eq!(
+            migration_checksum(migration.sql),
+            "sha256:d11af0da114e9bb496cd6a29c42e80034765e4dfbcdfee760d183e9ee7ea2f2f"
         );
     }
 

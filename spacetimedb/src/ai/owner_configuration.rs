@@ -625,7 +625,11 @@ mod tests {
         for reason in ["\0Approved", "Approved\0reason", "Approved\0"] {
             assert!(validate_request("owner-limit:null-byte", reason).is_err());
         }
-        assert!(validate_request("owner-limit:multiline", "Owner approved\nBudget for Mugisha").is_ok());
+        assert!(validate_request(
+            "owner-limit:multiline",
+            "Owner approved\nBudget for Mugisha"
+        )
+        .is_ok());
         assert!(validate_request("owner-limit:unicode", "Propriétaire approuvé").is_ok());
     }
 
