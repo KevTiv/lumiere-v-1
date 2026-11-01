@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { expectAuthenticatedShell } from "./e2e/helpers"
 
 test.setTimeout(90_000)
 
@@ -97,3 +98,20 @@ test("sidebar categories and account sign-out stay usable on mobile", async ({ p
   await expect(page.getByText("Sign out requested", { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 })
+
+for (const width of [390, 1440]) {
+  test(`authenticated shell helper checks the account menu and restores navigation at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 950 })
+    await page.goto("/")
+    await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
+    await expectAuthenticatedShell(page)
+    await expect(page.getByTestId("workspace-user")).toBeHidden()
+    if (width < 768) {
+      const toggle = page.getByTestId("workspace-navigation-toggle")
+      await expect(toggle).toHaveAttribute("aria-expanded", "false")
+      await toggle.click()
+      await expectAuthenticatedShell(page)
+      await expect(toggle).toHaveAttribute("aria-expanded", "true")
+    }
+  })
+}
