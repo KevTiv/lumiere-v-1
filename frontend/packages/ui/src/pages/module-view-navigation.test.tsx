@@ -35,8 +35,14 @@ vi.mock("@lumiere/query-hooks/erp-ai-selection-context", () => ({
 vi.mock("../lib/rbac-context", () => ({
   useRBAC: () => ({ checkPermission: () => ({ allowed: true }), permissionsReady: true }),
 }))
-vi.mock("../entity-views/entity-view", () => ({ EntityView: () => null }))
-vi.mock("../entity-views/entity-record-sheet", () => ({ EntityRecordSheet: () => null }))
+vi.mock("../entity-views/entity-view", () => ({
+  EntityView: ({ data, onRowClick }: { data: Record<string, unknown>[]; onRowClick?: (row: Record<string, unknown>) => void }) =>
+    <button onClick={() => onRowClick?.(data[0]!)}>Open test record</button>,
+}))
+vi.mock("../entity-views/entity-record-sheet", () => ({
+  EntityRecordSheet: ({ open, record }: { open: boolean; record: Record<string, unknown> | null }) =>
+    open ? <div role="dialog" data-testid="configured-record-sheet">Record {String(record?.id)}</div> : null,
+}))
 vi.mock("../forms/form-modal", () => ({ FormModal: () => null }))
 vi.mock("../forms/runtime-form-modal", () => ({ RuntimeFormModal: () => null }))
 vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => null }))
@@ -163,5 +169,34 @@ describe("module task-area navigation", () => {
     )
     act(() => hook.result.current.setActiveTab("dashboard"))
     expect(route.push).toHaveBeenCalledWith("/accounting", { scroll: false })
+  })
+})
+
+
+describe("record click presentation ownership", () => {
+  const row = { id: 42, name: "SO-42" }
+  const rowConfig = (sheet: boolean): ModuleConfig => ({
+    id: "sales", title: "Sales", defaultTab: "orders",
+    tabs: [{ id: "orders", label: "Orders", type: "entity",
+      entityConfig: { view: { mode: "table", rowKey: "id", columns: [] } } as never,
+      ...(sheet ? { recordSheet: { titleKey: "name", detailConfig: {} } as never } : {}),
+    }],
+  })
+
+  it("opens the configured sheet without also invoking a legacy dialog callback", () => {
+    const legacyDialog = vi.fn()
+    render(<ModuleView config={rowConfig(true)} activeTab="orders" data={{ orders: [row] }} onRowClick={legacyDialog} />)
+    fireEvent.click(screen.getByRole("button", { name: "Open test record" }))
+    expect(screen.getByTestId("configured-record-sheet").textContent).toBe("Record 42")
+    expect(legacyDialog).not.toHaveBeenCalled()
+    expect(screen.getAllByRole("dialog")).toHaveLength(1)
+  })
+
+  it("keeps the legacy row callback for tabs with no configured record sheet", () => {
+    const legacyDialog = vi.fn()
+    render(<ModuleView config={rowConfig(false)} activeTab="orders" data={{ orders: [row] }} onRowClick={legacyDialog} />)
+    fireEvent.click(screen.getByRole("button", { name: "Open test record" }))
+    expect(legacyDialog).toHaveBeenCalledExactlyOnceWith("orders", row)
+    expect(screen.queryByTestId("configured-record-sheet")).toBeNull()
   })
 })

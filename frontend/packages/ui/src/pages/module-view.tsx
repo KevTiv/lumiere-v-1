@@ -65,6 +65,7 @@ interface ModuleViewProps {
     config: FormConfig,
   ) => React.ReactNode
   /** Called when a table row is clicked: tabId, row record */
+  /** Fallback record opener for tabs without a configured record sheet. */
   onRowClick?: (tabId: string, row: Record<string, unknown>) => void
   /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
   activeTab?: string
@@ -462,8 +463,11 @@ export function ModuleView({
                     }
                     if (tab.recordSheet) {
                       setSelectedRecord(row)
+                    } else {
+                      // A row has one record presentation owner. Opening the
+                      // legacy dialog as well creates competing modal roots.
+                      onRowClick?.(tab.id, row)
                     }
-                    onRowClick?.(tab.id, row)
                   }}
                 />
 
