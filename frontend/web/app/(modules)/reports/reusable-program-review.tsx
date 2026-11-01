@@ -5,6 +5,7 @@ import { Button } from "@lumiere/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@lumiere/ui/components/card"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import { parseProgramInputSchema, programInputFromControl, validateProgramInputs, type ProgramInputValue } from "../../../lib/work-program-inputs"
 import { mapRunHistory, runHistoryRequest, type RunHistoryView } from "../ai-harness/run-history"
 
@@ -92,15 +93,17 @@ function ScopedProgramReview({ scope, candidate, onInspectRun }: ReusableProgram
       }} className="space-y-3">
         {schema.fields.map((field) => <div key={field.key} className="space-y-1">
           <Label htmlFor={`${id}-${field.key}`}>{field.label}{field.required ? " (required)" : ""}</Label>
-          {field.enum || field.type === "boolean" ? <select id={`${id}-${field.key}`} className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={inputs[field.key] === undefined ? "" : String((field.enum ?? [true, false]).indexOf(inputs[field.key]!))} onChange={(event) => {
-            const raw = event.target.value
-            const value = raw === "" ? undefined : (field.enum ?? [true, false])[Number(raw)]
+          {field.enum || field.type === "boolean" ? <Select value={inputs[field.key] === undefined ? "unset" : String((field.enum ?? [true, false]).indexOf(inputs[field.key]!))} onValueChange={(raw) => {
+            const value = raw === "unset" ? undefined : (field.enum ?? [true, false])[Number(raw)]
             setInputs((current) => { const next = { ...current }; if (value === undefined) delete next[field.key]; else next[field.key] = value; return next })
             setInputMessage(null)
           }}>
-            <option value="">Choose a value</option>
-            {(field.enum ?? [true, false]).map((option, index) => <option key={String(option)} value={String(index)}>{String(option)}</option>)}
-          </select> : <Input id={`${id}-${field.key}`} type={field.format === "date" ? "date" : "text"} inputMode={field.type === "integer" || field.type === "number" ? "decimal" : undefined} value={inputs[field.key] === undefined ? "" : String(inputs[field.key])} onChange={(event) => {
+            <SelectTrigger id={`${id}-${field.key}`}><SelectValue placeholder="Choose a value" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unset">Choose a value</SelectItem>
+              {(field.enum ?? [true, false]).map((option, index) => <SelectItem key={String(option)} value={String(index)}>{option === "" ? "Empty text" : String(option)}</SelectItem>)}
+            </SelectContent>
+          </Select> : <Input id={`${id}-${field.key}`} type={field.format === "date" ? "date" : "text"} inputMode={field.type === "integer" || field.type === "number" ? "decimal" : undefined} value={inputs[field.key] === undefined ? "" : String(inputs[field.key])} onChange={(event) => {
             const value = programInputFromControl(field, event.target.value)
             setInputs((current) => { const next = { ...current }; if (value === undefined) delete next[field.key]; else next[field.key] = value; return next })
             setInputMessage(null)

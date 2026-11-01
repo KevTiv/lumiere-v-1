@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ReusableProgramReview } from "../../../../web/app/(modules)/reports/reusable-program-review"
+import { chooseSelectValue } from "../components/select-test-utils"
 
 const candidate = { title: "Period review", programKey: "period-review", versionLabel: "1", applicationContract: "v0.3.163", graphHash: "a".repeat(64), inputSchema: {
   type: "object", additionalProperties: false, required: ["limit", "includeEmpty"], properties: { limit: { type: "integer", minimum: 0, maximum: 50 }, includeEmpty: { type: "boolean" } },
@@ -17,9 +18,30 @@ describe("internal reusable program candidate review", () => {
     expect(fetcher).not.toHaveBeenCalled()
     expect(screen.getByRole("button", { name: "Run program" }).hasAttribute("disabled")).toBe(true)
     fireEvent.change(screen.getByLabelText("limit (required)"), { target: { value: "0" } })
-    fireEvent.change(screen.getByLabelText("includeEmpty (required)"), { target: { value: "1" } })
+    chooseSelectValue(screen.getByLabelText("includeEmpty (required)"), "1")
     fireEvent.click(screen.getByRole("button", { name: "Check inputs" }))
     expect(screen.getByRole("status").textContent).toContain("Inputs match")
+    expect(screen.getByRole("combobox", { name: "includeEmpty (required)" }).textContent).toContain("false")
+    chooseSelectValue(screen.getByLabelText("includeEmpty (required)"), "unset")
+    fireEvent.click(screen.getByRole("button", { name: "Check inputs" }))
+    expect(screen.getByRole("status").textContent).toContain("includeEmpty is required")
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+  it("keeps empty text and numeric zero enum values distinct from the unset choice", () => {
+    render(<ReusableProgramReview candidate={{ ...candidate, inputSchema: {
+      type: "object", additionalProperties: false, required: ["text", "amount"], properties: {
+        text: { type: "string", enum: ["", "USD"] }, amount: { type: "integer", enum: [0, 5] },
+      },
+    } }} scope={scope} />)
+    chooseSelectValue(screen.getByRole("combobox", { name: "text (required)" }), "0")
+    chooseSelectValue(screen.getByRole("combobox", { name: "amount (required)" }), "0")
+    fireEvent.click(screen.getByRole("button", { name: "Check inputs" }))
+    expect(screen.getByRole("status").textContent).toContain("Inputs match")
+    expect(screen.getByRole("combobox", { name: "text (required)" }).textContent).toContain("Empty text")
+    expect(screen.getByRole("combobox", { name: "amount (required)" }).textContent).toContain("0")
+    chooseSelectValue(screen.getByRole("combobox", { name: "text (required)" }), "unset")
+    fireEvent.click(screen.getByRole("button", { name: "Check inputs" }))
+    expect(screen.getByRole("status").textContent).toContain("text is required")
     expect(fetcher).not.toHaveBeenCalled()
   })
   it("loads the existing session-owned history only on request and does not infer completed", async () => {
