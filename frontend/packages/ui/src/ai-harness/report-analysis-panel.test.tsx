@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ReportAnalysisPanel } from "../../../../web/app/(modules)/ai-harness/report-analysis-panel"
 import { chooseSelectValue } from "../components/select-test-utils"
@@ -17,10 +17,14 @@ vi.mock("@lumiere/query-hooks/hooks/ai-agents", () => ({ useAiAgents: () => ({
     { id: 10, organizationId: 1, companyId: 1, isActive: false, name: "Inactive agent" },
   ],
 }) }))
-vi.mock("@lumiere/query-hooks/hooks/ai-skills", () => ({ useAiReportAnalysis: () => ({
-  mutateAsync: state.mutateAsync, reset: state.reset, data: state.data,
-  isPending: state.pending, isError: state.failed,
-}) }))
+vi.mock("@lumiere/query-hooks/hooks/ai-skills", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@lumiere/query-hooks/hooks/ai-skills")>(),
+  useAiReportAnalysis: () => ({
+    mutateAsync: state.mutateAsync, reset: state.reset, data: state.data,
+    isPending: state.pending, isError: state.failed,
+  }),
+}))
+const readinessFetch = vi.fn()
 const key = (value: string) => `aiHarness.reportAnalysis.${value}`
 const props = { organizationId: 1n, companies: [{ id: 1, name: "Alpha" }, { id: 2, name: "Second" }] }
 function prepare() {
@@ -32,8 +36,13 @@ beforeEach(() => {
   state.reset.mockReset()
   state.data = undefined
   state.pending = state.failed = state.agentsUnavailable = state.agentsPending = false
+  readinessFetch.mockReset().mockImplementation(async (_url: string, options: RequestInit) => {
+    const { companyId, agentId } = JSON.parse(String(options.body))
+    return { ok: true, json: async () => ({ companyId, agentId, status: "ready", code: null, billableCalls: 0 }) }
+  })
+  vi.stubGlobal("fetch", readinessFetch)
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe("governed report analysis", () => {
   it("requires an explicit active scoped agent and suppresses repeated submission while the request is unresolved", async () => {
@@ -43,12 +52,33 @@ describe("governed report analysis", () => {
     const button = screen.getByRole("button", { name: key("run"), exact: true })
     expect(button.hasAttribute("disabled")).toBe(true)
     prepare()
-    expect(button.hasAttribute("disabled")).toBe(false)
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false))
+    expect(readinessFetch).toHaveBeenCalledWith("/api/ai/skills/report-analysis/readiness", expect.objectContaining({
+      method: "POST", body: JSON.stringify({ companyId: 1, agentId: 7 }),
+    }))
+    expect(state.mutateAsync).not.toHaveBeenCalled()
     fireEvent.click(button)
     fireEvent.click(button)
     expect(state.mutateAsync).toHaveBeenCalledTimes(1)
     expect(state.mutateAsync).toHaveBeenCalledWith({ companyId: 1, agentId: 7, inputs: { query: "Summarize the current report." }, maxSteps: 5 })
     await act(async () => finish())
+  })
+
+  it("keeps a blocked readiness result disabled until an explicit successful recheck", async () => {
+    readinessFetch.mockResolvedValueOnce({ ok: true, json: async () => ({
+      companyId: 1, agentId: 7, status: "blocked", code: "budget_exhausted", billableCalls: 0,
+    }) })
+    render(<ReportAnalysisPanel {...props} />)
+    prepare()
+    await screen.findByText("aiHarness.reportReadiness.budget_exhausted")
+    const button = screen.getByRole("button", { name: key("run"), exact: true })
+    expect(button.hasAttribute("disabled")).toBe(true)
+    expect(readinessFetch).toHaveBeenCalledTimes(1)
+    expect(state.mutateAsync).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "aiHarness.reportReadiness.check", exact: true }))
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false))
+    expect(readinessFetch).toHaveBeenCalledTimes(2)
+    expect(state.mutateAsync).not.toHaveBeenCalled()
   })
 
   it("clears agent selection when company changes and excludes foreign or inactive agents", () => {
