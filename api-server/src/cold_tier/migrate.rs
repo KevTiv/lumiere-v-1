@@ -347,6 +347,15 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_tasks_expand.sql"),
     },
+    Migration {
+        version: 35,
+        name: "alpha_reusable_work",
+        change_set: 24,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0035_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1418,6 +1427,35 @@ mod tests {
         assert_eq!(task_migration.change_set, 23);
         assert_eq!(task_migration.phase, MigrationPhase::Expand);
         assert_eq!(task_migration.sql, include_str!("import_tasks_expand.sql"));
+    }
+
+    #[test]
+    fn reusable_work_expand_preserves_released_chat_import_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..34]),
+            "sha256:7a056996c109c8453172d0f6d81bfe57eeb608a29569f013e71de3f57ccd1200"
+        );
+        let migration = MIGRATIONS[34];
+        assert_eq!(migration.version, 35);
+        assert_eq!(migration.name, "alpha_reusable_work");
+        assert_eq!(migration.change_set, 24);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert_eq!(
+            migration_checksum(migration.sql),
+            "sha256:24a6a12283d50415869f0ee83830297a43b9264b63fe389edf4835b5f2ed4e20"
+        );
+        for table in [
+            "ai_work_program",
+            "ai_work_program_version",
+            "ai_work_program_output_nomination",
+            "ai_work_program_recipe",
+            "ai_work_program_recipe_revocation",
+        ] {
+            assert!(migration
+                .sql
+                .contains(&format!("CREATE TABLE IF NOT EXISTS \"{table}\"")));
+        }
+        assert!(!migration.sql.to_ascii_lowercase().contains("drop table"));
     }
 
     #[test]

@@ -3410,6 +3410,10 @@ const PARAMS_NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION: &[ReducerParam] = &[
     ReducerParam { name: "version_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "signal", kind: ScalarKind::String, ref_target: None },
 ];
+const PARAMS_NOMINATE_AI_WORK_PROGRAM_OUTPUT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("NominateAiWorkProgramOutputParams") },
+];
 const PARAMS_NOMINATE_KNOWLEDGE_GUIDE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4054,6 +4058,11 @@ const PARAMS_REGISTER_AI_SKILL_CERTIFICATION_RUNTIME_PROFILE: &[ReducerParam] = 
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RegisterAiSkillCertificationRuntimeProfileParams") },
 ];
+const PARAMS_REGISTER_AI_WORK_PROGRAM_RECIPE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RegisterAiWorkProgramRecipeParams") },
+];
 const PARAMS_REGISTER_COLD_TIER_SERVICE_IDENTITY: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "platform_id", kind: ScalarKind::String, ref_target: None },
@@ -4405,6 +4414,12 @@ const PARAMS_REVISE_AI_ARTIFACT_COMPONENT: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "component_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ReviseAiArtifactComponentParams") },
+];
+const PARAMS_REVOKE_AI_WORK_PROGRAM_RECIPE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "recipe_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "reason", kind: ScalarKind::String, ref_target: None },
 ];
 const PARAMS_REVOKE_DELEGATED_ADMIN_SCOPE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4933,6 +4948,10 @@ const PARAMS_RUN_WORKFLOW_PROVENANCE_TESTS: &[ReducerParam] = &[
 const PARAMS_RUN_WORKFLOW_RUNTIME_TESTS: &[ReducerParam] = &[
 ];
 const PARAMS_RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS: &[ReducerParam] = &[
+];
+const PARAMS_SAVE_AI_WORK_PROGRAM_DRAFT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SaveAiWorkProgramDraftParams") },
 ];
 const PARAMS_SAVE_IMPORT_MAPPING_TEMPLATE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -7295,6 +7314,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "migrate_workflow_instance", contract_operation_id: "erp.migrate_workflow_instance", params: PARAMS_MIGRATE_WORKFLOW_INSTANCE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "move_stock_quant", contract_operation_id: "erp.move_stock_quant", params: PARAMS_MOVE_STOCK_QUANT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "nominate_ai_knowledge_entry_version", contract_operation_id: "erp.nominate_ai_knowledge_entry_version", params: PARAMS_NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "nominate_ai_work_program_output", contract_operation_id: "erp.nominate_ai_work_program_output", params: PARAMS_NOMINATE_AI_WORK_PROGRAM_OUTPUT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "nominate_knowledge_guide", contract_operation_id: "erp.nominate_knowledge_guide", params: PARAMS_NOMINATE_KNOWLEDGE_GUIDE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "open_account_period", contract_operation_id: "erp.open_account_period", params: PARAMS_OPEN_ACCOUNT_PERIOD, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "open_contract", contract_operation_id: "erp.open_contract", params: PARAMS_OPEN_CONTRACT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7422,6 +7442,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "register_ai_intelligence_policy", contract_operation_id: "erp.register_ai_intelligence_policy", params: PARAMS_REGISTER_AI_INTELLIGENCE_POLICY, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_ai_model_profile", contract_operation_id: "erp.register_ai_model_profile", params: PARAMS_REGISTER_AI_MODEL_PROFILE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_ai_skill_certification_runtime_profile", contract_operation_id: "erp.register_ai_skill_certification_runtime_profile", params: PARAMS_REGISTER_AI_SKILL_CERTIFICATION_RUNTIME_PROFILE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "register_ai_work_program_recipe", contract_operation_id: "erp.register_ai_work_program_recipe", params: PARAMS_REGISTER_AI_WORK_PROGRAM_RECIPE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "register_cold_tier_service_identity", contract_operation_id: "erp.register_cold_tier_service_identity", params: PARAMS_REGISTER_COLD_TIER_SERVICE_IDENTITY, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_crm_provider_principal", contract_operation_id: "erp.register_crm_provider_principal", params: PARAMS_REGISTER_CRM_PROVIDER_PRINCIPAL, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_iot_device", contract_operation_id: "erp.register_iot_device", params: PARAMS_REGISTER_IOT_DEVICE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7491,6 +7512,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "review_message_batch", contract_operation_id: "erp.review_message_batch", params: PARAMS_REVIEW_MESSAGE_BATCH, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "review_supplier_intake", contract_operation_id: "erp.review_supplier_intake", params: PARAMS_REVIEW_SUPPLIER_INTAKE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "revise_ai_artifact_component", contract_operation_id: "erp.revise_ai_artifact_component", params: PARAMS_REVISE_AI_ARTIFACT_COMPONENT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "revoke_ai_work_program_recipe", contract_operation_id: "erp.revoke_ai_work_program_recipe", params: PARAMS_REVOKE_AI_WORK_PROGRAM_RECIPE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "revoke_delegated_admin_scope", contract_operation_id: "erp.revoke_delegated_admin_scope", params: PARAMS_REVOKE_DELEGATED_ADMIN_SCOPE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "revoke_field_permission", contract_operation_id: "erp.revoke_field_permission", params: PARAMS_REVOKE_FIELD_PERMISSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "revoke_permission", contract_operation_id: "erp.revoke_permission", params: PARAMS_REVOKE_PERMISSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7734,6 +7756,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "run_workflow_provenance_tests", contract_operation_id: "erp.run_workflow_provenance_tests", params: PARAMS_RUN_WORKFLOW_PROVENANCE_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_workflow_runtime_tests", contract_operation_id: "erp.run_workflow_runtime_tests", params: PARAMS_RUN_WORKFLOW_RUNTIME_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_workflow_subject_snapshot_tests", contract_operation_id: "erp.run_workflow_subject_snapshot_tests", params: PARAMS_RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "save_ai_work_program_draft", contract_operation_id: "erp.save_ai_work_program_draft", params: PARAMS_SAVE_AI_WORK_PROGRAM_DRAFT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_import_mapping_template", contract_operation_id: "erp.save_import_mapping_template", params: PARAMS_SAVE_IMPORT_MAPPING_TEMPLATE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_knowledge_guide", contract_operation_id: "erp.save_knowledge_guide", params: PARAMS_SAVE_KNOWLEDGE_GUIDE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "save_presentation_module", contract_operation_id: "erp.save_presentation_module", params: PARAMS_SAVE_PRESENTATION_MODULE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -8061,6 +8084,8 @@ pub fn company_scope_paths(reducer_name: &str) -> &'static [CompanyScopePath] {
         "create_manual_account_invoice" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         "create_opportunity" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
         "create_whatsapp_business_account" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
+        "nominate_ai_work_program_output" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
+        "save_ai_work_program_draft" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         _ => &[],
     }
 }
@@ -8788,6 +8813,7 @@ pub mod reducer_names {
     pub const MIGRATE_WORKFLOW_INSTANCE: ReducerName = ReducerName::new("migrate_workflow_instance");
     pub const MOVE_STOCK_QUANT: ReducerName = ReducerName::new("move_stock_quant");
     pub const NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION: ReducerName = ReducerName::new("nominate_ai_knowledge_entry_version");
+    pub const NOMINATE_AI_WORK_PROGRAM_OUTPUT: ReducerName = ReducerName::new("nominate_ai_work_program_output");
     pub const NOMINATE_KNOWLEDGE_GUIDE: ReducerName = ReducerName::new("nominate_knowledge_guide");
     pub const OPEN_ACCOUNT_PERIOD: ReducerName = ReducerName::new("open_account_period");
     pub const OPEN_CONTRACT: ReducerName = ReducerName::new("open_contract");
@@ -8915,6 +8941,7 @@ pub mod reducer_names {
     pub const REGISTER_AI_INTELLIGENCE_POLICY: ReducerName = ReducerName::new("register_ai_intelligence_policy");
     pub const REGISTER_AI_MODEL_PROFILE: ReducerName = ReducerName::new("register_ai_model_profile");
     pub const REGISTER_AI_SKILL_CERTIFICATION_RUNTIME_PROFILE: ReducerName = ReducerName::new("register_ai_skill_certification_runtime_profile");
+    pub const REGISTER_AI_WORK_PROGRAM_RECIPE: ReducerName = ReducerName::new("register_ai_work_program_recipe");
     pub const REGISTER_COLD_TIER_SERVICE_IDENTITY: ReducerName = ReducerName::new("register_cold_tier_service_identity");
     pub const REGISTER_CRM_PROVIDER_PRINCIPAL: ReducerName = ReducerName::new("register_crm_provider_principal");
     pub const REGISTER_IOT_DEVICE: ReducerName = ReducerName::new("register_iot_device");
@@ -8984,6 +9011,7 @@ pub mod reducer_names {
     pub const REVIEW_MESSAGE_BATCH: ReducerName = ReducerName::new("review_message_batch");
     pub const REVIEW_SUPPLIER_INTAKE: ReducerName = ReducerName::new("review_supplier_intake");
     pub const REVISE_AI_ARTIFACT_COMPONENT: ReducerName = ReducerName::new("revise_ai_artifact_component");
+    pub const REVOKE_AI_WORK_PROGRAM_RECIPE: ReducerName = ReducerName::new("revoke_ai_work_program_recipe");
     pub const REVOKE_DELEGATED_ADMIN_SCOPE: ReducerName = ReducerName::new("revoke_delegated_admin_scope");
     pub const REVOKE_FIELD_PERMISSION: ReducerName = ReducerName::new("revoke_field_permission");
     pub const REVOKE_PERMISSION: ReducerName = ReducerName::new("revoke_permission");
@@ -9227,6 +9255,7 @@ pub mod reducer_names {
     pub const RUN_WORKFLOW_PROVENANCE_TESTS: ReducerName = ReducerName::new("run_workflow_provenance_tests");
     pub const RUN_WORKFLOW_RUNTIME_TESTS: ReducerName = ReducerName::new("run_workflow_runtime_tests");
     pub const RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS: ReducerName = ReducerName::new("run_workflow_subject_snapshot_tests");
+    pub const SAVE_AI_WORK_PROGRAM_DRAFT: ReducerName = ReducerName::new("save_ai_work_program_draft");
     pub const SAVE_IMPORT_MAPPING_TEMPLATE: ReducerName = ReducerName::new("save_import_mapping_template");
     pub const SAVE_KNOWLEDGE_GUIDE: ReducerName = ReducerName::new("save_knowledge_guide");
     pub const SAVE_PRESENTATION_MODULE: ReducerName = ReducerName::new("save_presentation_module");
@@ -10269,6 +10298,7 @@ macro_rules! reducer_call {
     ("migrate_workflow_instance", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MIGRATE_WORKFLOW_INSTANCE, $args) };
     ("move_stock_quant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MOVE_STOCK_QUANT, $args) };
     ("nominate_ai_knowledge_entry_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION, $args) };
+    ("nominate_ai_work_program_output", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_AI_WORK_PROGRAM_OUTPUT, $args) };
     ("nominate_knowledge_guide", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_KNOWLEDGE_GUIDE, $args) };
     ("open_account_period", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::OPEN_ACCOUNT_PERIOD, $args) };
     ("open_contract", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::OPEN_CONTRACT, $args) };
@@ -10396,6 +10426,7 @@ macro_rules! reducer_call {
     ("register_ai_intelligence_policy", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_INTELLIGENCE_POLICY, $args) };
     ("register_ai_model_profile", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_MODEL_PROFILE, $args) };
     ("register_ai_skill_certification_runtime_profile", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_SKILL_CERTIFICATION_RUNTIME_PROFILE, $args) };
+    ("register_ai_work_program_recipe", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_WORK_PROGRAM_RECIPE, $args) };
     ("register_cold_tier_service_identity", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_COLD_TIER_SERVICE_IDENTITY, $args) };
     ("register_crm_provider_principal", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_CRM_PROVIDER_PRINCIPAL, $args) };
     ("register_iot_device", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_IOT_DEVICE, $args) };
@@ -10465,6 +10496,7 @@ macro_rules! reducer_call {
     ("review_message_batch", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVIEW_MESSAGE_BATCH, $args) };
     ("review_supplier_intake", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVIEW_SUPPLIER_INTAKE, $args) };
     ("revise_ai_artifact_component", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVISE_AI_ARTIFACT_COMPONENT, $args) };
+    ("revoke_ai_work_program_recipe", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_AI_WORK_PROGRAM_RECIPE, $args) };
     ("revoke_delegated_admin_scope", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_DELEGATED_ADMIN_SCOPE, $args) };
     ("revoke_field_permission", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_FIELD_PERMISSION, $args) };
     ("revoke_permission", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_PERMISSION, $args) };
@@ -10708,6 +10740,7 @@ macro_rules! reducer_call {
     ("run_workflow_provenance_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_PROVENANCE_TESTS, $args) };
     ("run_workflow_runtime_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_RUNTIME_TESTS, $args) };
     ("run_workflow_subject_snapshot_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_WORKFLOW_SUBJECT_SNAPSHOT_TESTS, $args) };
+    ("save_ai_work_program_draft", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_AI_WORK_PROGRAM_DRAFT, $args) };
     ("save_import_mapping_template", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_IMPORT_MAPPING_TEMPLATE, $args) };
     ("save_knowledge_guide", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_KNOWLEDGE_GUIDE, $args) };
     ("save_presentation_module", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PRESENTATION_MODULE, $args) };

@@ -5273,6 +5273,9 @@
     "external_reference": "string",
     "metadata": "string"
   },
+  "SaveAiWorkProgramDraftParams": {
+    "expected_revision": "u64"
+  },
   "SavedReport": {
     "column_dimension": "string",
     "filter_json": "string",
