@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { renameCategory } from './product-category-rename'
+import { productCategoryUpdateParams, renameCategory } from './product-category-rename'
+
+test('category rename uses native optional fields without replacing hierarchy or metadata', () => {
+  assert.deepEqual(productCategoryUpdateParams({ name: 'Shop product references' }), {
+    name: { some: 'Shop product references' },
+    parent_id: { none: [] },
+    sequence: { none: [] },
+    metadata: { none: [] },
+  })
+})
 
 test('lost reply resolves one exact rename without redispatch on retry', async () => {
   let row = { id: '9007199254740993', name: 'Old' }; let writes = 0
