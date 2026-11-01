@@ -462,6 +462,9 @@ jobs:
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
+      - name: Chat file import and recovery browser regressions
+        run: pnpm --dir web test:e2e:chat-import
+
       - name: Sales workflow browser regressions
         id: sales_workflow_ui
         run: pnpm --dir web test:e2e:sales-workflow

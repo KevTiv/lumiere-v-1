@@ -7,17 +7,17 @@ import { useTranslation } from "@lumiere/i18n"
 import { GuidedImportWizard, type GuidedImportContinuationBlock, type GuidedImportWizardHandle } from "./guided-import-wizard"
 import { ImportReviewWorkspace } from "./import-review-workspace"
 
-export function DataImportWorkspace({ organizationId }: { organizationId: number }) {
+export function DataImportWorkspace({ organizationId, initialReviewId }: { organizationId: number; initialReviewId?: string }) {
   const { identity } = useErpSession()
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
   if (!identity || !companyId) return <p>{t("settings.importReview.companyRequired", { defaultValue: "Select an operating company to review source data." })}</p>
-  return <Workspace key={`${identity}:${organizationId}:${companyId}`} organizationId={organizationId} />
+  return <Workspace key={`${identity}:${organizationId}:${companyId}:${initialReviewId ?? ""}`} organizationId={organizationId} initialReviewId={initialReviewId} />
 }
-function Workspace({ organizationId }: { organizationId: number }) {
+function Workspace({ organizationId, initialReviewId }: { organizationId: number; initialReviewId?: string }) {
   const wizard = useRef<GuidedImportWizardHandle>(null)
   const [continuationBlock, setContinuationBlock] = useState<GuidedImportContinuationBlock>(null)
-  const [reviewId, setReviewId] = useState<string>()
+  const [reviewId, setReviewId] = useState<string | undefined>(initialReviewId)
   return <div className="flex flex-col gap-8">
     <GuidedImportWizard ref={wizard} organizationId={organizationId} onReviewSaved={setReviewId} onContinuationBlockChange={setContinuationBlock} />
     <ImportReviewWorkspace organizationId={organizationId} selectedId={reviewId} continuationBlock={continuationBlock} onContinue={source => { void wizard.current?.continueFromReview(source) }} />

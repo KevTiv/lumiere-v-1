@@ -331,6 +331,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_review_fields_expand.sql"),
     },
+    Migration {
+        version: 33,
+        name: "chat_import_tasks",
+        change_set: 22,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_tasks_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

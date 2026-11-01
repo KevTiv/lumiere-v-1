@@ -3,6 +3,7 @@
 mod history_data;
 mod history_period;
 mod model;
+mod tasks;
 #[cfg(test)]
 mod postgres_tests;
 
@@ -474,6 +475,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/import-reviews/:batch/decisions", post(decide_bulk))
         .route("/import-reviews/:batch/items/:item/history", get(history))
         .layer(DefaultBodyLimit::max(5_000_000))
+        .merge(tasks::router())
         .layer(axum::middleware::map_response(
             |mut response: axum::response::Response| async move {
                 response.headers_mut().insert(
