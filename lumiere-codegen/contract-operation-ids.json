@@ -54,6 +54,8 @@
     "ai_knowledge_entry_read": "erp.ai_knowledge_entry_read",
     "ai_knowledge_entry_version_read": "erp.ai_knowledge_entry_version_read",
     "ai_knowledge_review_read": "erp.ai_knowledge_review_read",
+    "ai_owner_configuration_read": "erp.ai_owner_configuration_read",
+    "ai_owner_configuration_receipt_read": "erp.ai_owner_configuration_receipt_read",
     "ai_provider_attempt_read": "erp.ai_provider_attempt_read",
     "ai_run_budget_park_read": "erp.ai_run_budget_park_read",
     "ai_run_lifecycle_event_read": "erp.ai_run_lifecycle_event_read",
