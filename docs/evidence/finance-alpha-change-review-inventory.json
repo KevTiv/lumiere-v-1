@@ -30,7 +30,7 @@
     },
     {
       "path": "lumiere-codegen/c2-commit-coverage.json",
-      "sha256": "650559aa5121d5a84ec313963f534c3f71df7f7039137470ae9c38896fca5576"
+      "sha256": "6780f81e96d727b0483c949fc9044b080aaeccfefd50c4f571e928f8513291c7"
     },
     {
       "path": "docs/evidence/cov-00a-operation-census.json",
