@@ -49,7 +49,7 @@ test.describe("Parity phase 5 — chatter mutations", { tag: ["@dev-fixture", "@
 
     // Tables list newest first; focus the seeded (oldest) order exactly.
     await gotoModule(page, saleOrderHref(saleOrderId), "sales")
-    await openRecordChatterByRowText(page, SEEDED_SALE_ORDER_REF)
+    const dialog = await openRecordChatterByRowText(page, SEEDED_SALE_ORDER_REF)
     await postChatterNote(page, noteBody)
 
     await expectMailMessageForRecord(page, {
@@ -58,7 +58,6 @@ test.describe("Parity phase 5 — chatter mutations", { tag: ["@dev-fixture", "@
       bodyContains: noteBody,
     })
 
-    const dialog = page.getByTestId("record-chatter-dialog")
     // The rich-text composer mirrors its draft in an aria-hidden textarea.
     // Posting is complete only after the composer clears and the persisted
     // message appears exactly once in the timeline, outside the editor.

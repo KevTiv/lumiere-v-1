@@ -2662,17 +2662,18 @@ export async function openRecordChatterByRowText(page: Page, text: string | RegE
   const row = activeTabEntityTable(page).locator("tbody tr").filter({ hasText: text }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
-  await expect(page.getByTestId("record-chatter-dialog")).toBeVisible({ timeout: 15_000 })
-
-  // Some entity tabs also open their record sheet from the same row action.
-  // Close only that top sheet so the independently requested chatter dialog
-  // remains interactive; never force-click through its modal overlay.
+  const dialog = page.getByTestId("record-chatter-dialog")
   const sheet = page.locator('[data-slot="sheet-content"]:visible')
-  if ((await sheet.count()) > 0) {
-    await sheet.locator('[data-slot="sheet-close"]').click()
-    await expect(sheet).toBeHidden()
-    await expect(page.getByTestId("record-chatter-dialog")).toBeVisible()
+  // A row has one presentation owner. Use its discussion rather than relying
+  // on the former duplicate legacy dialog behind the configured record sheet.
+  await expect(dialog.or(sheet)).toHaveCount(1, { timeout: 15_000 })
+  await expect(dialog.or(sheet)).toBeVisible({ timeout: 15_000 })
+  if (await sheet.count() === 1) {
+    await sheet.getByTestId("entity-record-sheet-tab-discussion").click()
+    await expect(sheet.getByTestId("record-chatter-note")).toBeVisible()
+    return sheet
   }
+  return dialog
 }
 
 export async function postChatterNote(page: Page, body: string) {
