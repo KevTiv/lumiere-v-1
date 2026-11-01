@@ -1,3 +1,10 @@
+import { stdbParamsToJson } from '@lumiere/stdb/stdb-params-json'
+
+/** Use the native update schema so optional fields retain SATS encoding. */
+export function productCategoryUpdateParams(params: object): Record<string, unknown> {
+  return stdbParamsToJson(params, 'UpdateProductCategoryParams')
+}
+
 /** Exact category identity is retained across an uncertain rename reply. */
 export interface CategoryName { id: string; name: string }
 export async function renameCategory(

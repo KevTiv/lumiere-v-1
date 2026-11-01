@@ -12,7 +12,7 @@ import {
   toCreateProductPackagingParams,
 } from "@lumiere/erp-shared/inventory-create-params"
 
-import { renameCategory } from "../product-category-rename"
+import { productCategoryUpdateParams, renameCategory } from "../product-category-rename"
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 import {
@@ -312,7 +312,7 @@ export function useUpdateProductCategory(
     mutationFn: async ({ categoryId, params }) => {
       const { urlPath, init } = stdbBffCommandPost('update_product_category', {
         categoryId: toScalarU64(categoryId),
-        params: stdbParamsToJson(params as object),
+        params: productCategoryUpdateParams(params),
       });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to update product category');
@@ -336,7 +336,7 @@ export function useRenameProductCategory(organizationId: bigint) {
           .map(row => ({ id: String(row.id), name: row.name }))
       }, async () => {
         const { urlPath, init } = stdbBffCommandPost('update_product_category', {
-          categoryId: toScalarU64(args.categoryId), params: stdbParamsToJson({ name: args.name.trim() }),
+          categoryId: toScalarU64(args.categoryId), params: productCategoryUpdateParams({ name: args.name.trim() }),
         })
         const response = await apiFetch(urlPath, init)
         if (!response.ok) throw new Error('The category rename request failed. Check the saved name before retrying.')
