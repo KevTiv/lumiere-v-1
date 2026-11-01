@@ -187,3 +187,19 @@ Before Gate C, decide the retail tariff, top-up amounts, fee/tax display, carryo
 
 See [Farm UI gap coordination](farm-ui-gap-coordination-2026-10-31.md) for the existing delivery record. Inspect the current release head before implementation. This plan extends the existing harness and certification owners; it does not replace their release gates.
 
+
+## First source implementation checkpoint
+
+The first runtime candidate adds session-owned no-cost readiness, exact harness
+route admission and truthful audit outcomes. The native owner and prepaid
+candidate remains separate because its schema and operation contracts need a
+new immutable release before API and UI integration.
+
+Review identified an additional paid-release prerequisite: the legacy native
+`configure_ai_spend` operation still relies on `ai_agent:write`, which can
+include broad organization-owner permissions. The new owner commands expose no
+price inputs, but this does not remove the legacy native pricing authority.
+Before paid cutover, restrict price and sponsored-funding configuration to its
+reviewed trusted operator boundary and prove that owners cannot create cheaper
+price snapshots or sponsor their own credits through that legacy operation.
+The prepaid foundation is not a claim of paid-production readiness.

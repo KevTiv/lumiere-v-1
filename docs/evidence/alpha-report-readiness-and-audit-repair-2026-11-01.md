@@ -81,3 +81,21 @@ prerequisite. No grant, budget, provider configuration, live farm record, paid
 call, certification or promotion was changed. The prior review-required run is
 not proof of fully settled positive completion; that live objective remains
 open. Test it only after the matching release and evidence are available.
+
+## Combined source checks
+
+The coordinator integrated exact lifecycle and readiness edge admission. The
+combined source passes 874 web unit tests, the query-hooks type check and the
+full web type check. Five edge configuration tests pass. The opaque-record
+ratchet remains 2240; browser operation transport, i18n keys, JSON duplicate
+keys and Finance inventory checks pass.
+
+The report proposal is 1.0.8 and the five Finance proposals are 1.0.2, with
+source hashes regenerated from this combined tree. The development seed follows
+the report proposal. None is a live certificate or promoted release.
+
+The mounted readiness fixture now supplies the production API provider. Both
+browser cases are wired into the frontend CI job. Their browser execution and
+the full gateway build remain pending hosted checks. Local checks are not live
+farm acceptance. Native owner configuration and prepaid funding are a separate
+contract-dependent source candidate.
