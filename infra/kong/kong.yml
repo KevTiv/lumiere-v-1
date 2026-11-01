@@ -316,8 +316,9 @@ services:
           fault_tolerant: false
           policy: cluster
 
-  # Approved Alpha report pilot only. Web still enforces its AI switch, session,
-  # company scope, certified release, capability grants and spend admission.
+  # Alpha report pilot and scoped run controls. Web and gateway still enforce
+  # the session, company scope, current capability grants and checked lifecycle
+  # transitions. Run controls do not admit paid skill or ingestion endpoints.
   # Exact paths and methods keep every other AI endpoint on the 503 route.
   - name: web-ai-alpha-pilot
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
@@ -332,6 +333,18 @@ services:
         paths:
           - '~/api/ai/skills/report-analysis$'
           - '~/api/ai/evidence/runs/inspect$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-run-lifecycle
+        paths:
+          - '~/api/ai/runs/lifecycle$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-report-readiness
+        paths:
+          - '~/api/ai/skills/report-analysis/readiness$'
         methods: [POST]
         regex_priority: 10
         strip_path: false

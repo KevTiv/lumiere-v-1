@@ -478,6 +478,9 @@ jobs:
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
 
+      - name: Report readiness browser regressions
+        run: pnpm --dir web test:e2e:report-readiness
+
       - name: Productivity workspace browser regressions
         run: pnpm --dir web test:e2e:productivity-ui
 

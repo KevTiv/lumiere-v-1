@@ -106,6 +106,90 @@ pub async fn post_governed_readiness(
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ReportReadinessRequest {
+    pub org_id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+}
+
+fn report_readiness_actor(
+    headers: &HeaderMap,
+    req: &ReportReadinessRequest,
+) -> AppResult<lumiere_auth_context::ActorContext> {
+    let actor = lumiere_auth_context::ActorContext::from_headers(headers)?;
+    actor.require_company(req.company_id)?;
+    if actor.organization_id != req.org_id {
+        return Err(AppError::Forbidden(
+            "readiness organization differs from actor scope".into(),
+        ));
+    }
+    Ok(actor)
+}
+
+/// Session BFF supplies scope; internal gateway middleware authenticates the hop.
+/// This handler only reads existing configuration. It never provisions or invokes AI.
+pub async fn post_report_readiness(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<ReportReadinessRequest>,
+) -> AppResult<Json<crate::orchestrator::governed_bootstrap::ReportReadiness>> {
+    use crate::orchestrator::governed_bootstrap::{
+        inspect_report_readiness, ReportReadiness, ReportReadinessBlocker,
+    };
+    if req.org_id == 0 || req.company_id == 0 || req.agent_id == 0 {
+        return Err(AppError::BadRequest(
+            "organization, company and agent are required".into(),
+        ));
+    }
+    let actor = report_readiness_actor(&headers, &req)?;
+    crate::routes::evidence::require_scoped_capability_grant(
+        &state,
+        &actor.identity,
+        &actor.token,
+        actor.organization_id,
+        actor.company_id,
+        crate::routes::harness_descriptor::DESCRIPTOR_CAPABILITY,
+    )
+    .await?;
+    let blocker = if state.config.kong_llm_url.is_some() {
+        Some(ReportReadinessBlocker::ModelPolicy)
+    } else if !state
+        .config
+        .mistral_api_key
+        .as_ref()
+        .is_some_and(|key| !key.trim().is_empty())
+    {
+        Some(ReportReadinessBlocker::ProviderUnavailable)
+    } else if state.spend_read_stdb.is_none() {
+        Some(ReportReadinessBlocker::ReadinessUnavailable)
+    } else {
+        None
+    };
+    if let Some(code) = blocker {
+        return Ok(Json(ReportReadiness::blocked(
+            req.company_id,
+            req.agent_id,
+            code,
+        )));
+    }
+    let reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Unavailable("readiness reader unavailable".into()))?;
+    Ok(Json(
+        inspect_report_readiness(
+            &state.stdb,
+            reader,
+            req.org_id,
+            req.company_id,
+            req.agent_id,
+        )
+        .await,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GatewayImportMappingRequest {
     pub org_id: u64,
@@ -504,5 +588,50 @@ mod tests {
                 "{field} must not be accepted in the request body"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod report_readiness_actor_tests {
+    use super::*;
+    #[test]
+    fn readiness_rejects_missing_actor_and_foreign_requested_scope() {
+        let req = ReportReadinessRequest {
+            org_id: 11,
+            company_id: 13,
+            agent_id: 7,
+        };
+        assert!(report_readiness_actor(&HeaderMap::new(), &req).is_err());
+        let actor = lumiere_auth_context::ActorContext::new(&"a".repeat(64), "actor-token", 11, 13)
+            .unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert("x-lumiere-organization-id", "11".parse().unwrap());
+        headers.insert("x-lumiere-company-id", "13".parse().unwrap());
+        headers.insert("x-lumiere-actor-identity", actor.identity.parse().unwrap());
+        headers.insert("x-lumiere-actor-token", "actor-token".parse().unwrap());
+        assert!(report_readiness_actor(&headers, &req).is_ok());
+        assert!(
+            report_readiness_actor(&headers, &ReportReadinessRequest { org_id: 99, ..req })
+                .is_err()
+        );
+        assert!(report_readiness_actor(
+            &headers,
+            &ReportReadinessRequest {
+                org_id: 11,
+                company_id: 14,
+                agent_id: 7
+            }
+        )
+        .is_err());
+        headers.remove("x-lumiere-actor-token");
+        assert!(report_readiness_actor(
+            &headers,
+            &ReportReadinessRequest {
+                org_id: 11,
+                company_id: 13,
+                agent_id: 7
+            }
+        )
+        .is_err());
     }
 }

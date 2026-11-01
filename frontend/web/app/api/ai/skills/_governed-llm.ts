@@ -11,6 +11,7 @@ import {
 } from "../_lib/route-helpers"
 import { resolveAiPrivacyPolicy } from "../_lib/ai-privacy-policy"
 import { buildTrustedGovernedLlmRequest } from "./_governed-llm-contract"
+import { readReportReadiness } from "@/lib/report-readiness-server"
 import { callReducer } from "@/lib/stdb-reducer"
 
 const GATEWAY_PATHS = {
@@ -64,6 +65,16 @@ async function postGovernedLlmSkill(
         { error: "Authenticated actor context required" },
         { status: 403 },
       )
+    }
+    if (!Number.isSafeInteger(agentId) || !agentId || agentId <= 0) {
+      return NextResponse.json({ error: "Select an approved agent before analysis", analysisStarted: false }, { status: 400 })
+    }
+    // Recheck configuration at submission. This producer does not write or invoke
+    // a model; a stale UI-ready snapshot cannot cause an ambiguous paid request.
+    const readiness = await readReportReadiness({ organizationId: orgId, companyId: companyId as number,
+      agentId, actorIdentity: session.identityHex, stdbToken: session.stdbToken })
+    if (readiness.status !== "ready") {
+      return NextResponse.json({ error: "Report analysis is blocked by current AI configuration", analysisStarted: false, readiness }, { status: 409 })
     }
     // Admission requires the caller's current server-owned policy generation.
     // Refresh only that caller's derived snapshot through the session transport.
