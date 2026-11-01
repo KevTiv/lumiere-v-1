@@ -34,6 +34,109 @@ pub(crate) struct GovernedReadiness {
     pub models: Vec<String>,
 }
 
+/// Typed no-cost blockers. Messages are selected by the UI, never parsed from
+/// database/provider errors. Readiness is advisory; dispatch rechecks admission.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ReportReadinessBlocker {
+    CompanyScope,
+    ReleaseNotReady,
+    SkillBinding,
+    AgentUnavailable,
+    ModelPolicy,
+    Calibration,
+    DecisionType,
+    BudgetUnavailable,
+    BudgetExhausted,
+    ModelPrice,
+    ProviderUnavailable,
+    ReadinessUnavailable,
+}
+impl std::fmt::Display for ReportReadinessBlocker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+impl std::error::Error for ReportReadinessBlocker {}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReportReadiness {
+    pub status: &'static str,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub code: Option<ReportReadinessBlocker>,
+    pub billable_calls: u32,
+}
+impl ReportReadiness {
+    pub(crate) fn blocked(company_id: u64, agent_id: u64, code: ReportReadinessBlocker) -> Self {
+        Self {
+            status: "blocked",
+            company_id,
+            agent_id,
+            code: Some(code),
+            billable_calls: 0,
+        }
+    }
+}
+
+pub(crate) async fn inspect_report_readiness(
+    writer: &StdbClient,
+    reader: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    agent_id: u64,
+) -> ReportReadiness {
+    let result = async {
+        let skill =
+            super::skill_loader::load_skill(writer, organization_id, company_id, "report_analysis")
+                .await
+                .context(ReportReadinessBlocker::SkillBinding)?;
+        let policy = super::skill_loader::intelligence_policy_ref(&skill.config_json)?
+            .context(ReportReadinessBlocker::SkillBinding)?;
+        inspect_governed_readiness(
+            writer,
+            reader,
+            organization_id,
+            company_id,
+            agent_id,
+            &policy,
+        )
+        .await
+    }
+    .await;
+    match result {
+        Ok(_) => ReportReadiness {
+            status: "ready",
+            company_id,
+            agent_id,
+            code: None,
+            billable_calls: 0,
+        },
+        Err(error) => ReportReadiness::blocked(
+            company_id,
+            agent_id,
+            error
+                .downcast_ref::<ReportReadinessBlocker>()
+                .copied()
+                .unwrap_or(ReportReadinessBlocker::ReadinessUnavailable),
+        ),
+    }
+}
+
+fn agent_company_matches(row: &serde_json::Value, company_id: u64) -> bool {
+    match row.get("companyId").or_else(|| row.get("company_id")) {
+        Some(serde_json::Value::Null) => true,
+        Some(value) => {
+            value
+                .as_u64()
+                .or_else(|| value.as_str().and_then(|v| v.parse::<u64>().ok()))
+                == Some(company_id)
+        }
+        None => false,
+    }
+}
+
 /// Non-generative, read-only resolution through the same owners used by the
 /// report-analysis runtime. Configuration existence alone is not admission.
 pub(crate) async fn inspect_governed_readiness(
@@ -45,19 +148,17 @@ pub(crate) async fn inspect_governed_readiness(
     policy_ref: &str,
 ) -> Result<GovernedReadiness> {
     use super::model_configuration::{IntelligenceRole, IntelligenceRouteResolver};
-    anyhow::ensure!(
-        organization_id > 0 && company_id > 0 && agent_id > 0,
-        "organization, company and agent must be nonzero"
-    );
+    if !(organization_id > 0 && company_id > 0 && agent_id > 0) {
+        return Err(ReportReadinessBlocker::CompanyScope.into());
+    }
     let company = writer
         .query_sql(&format!(
         "SELECT id FROM company WHERE id = {company_id} AND organization_id = {organization_id}"
     ))
         .await?;
-    anyhow::ensure!(
-        company.len() == 1,
-        "company is outside the selected organization"
-    );
+    if !(company.len() == 1) {
+        return Err(ReportReadinessBlocker::CompanyScope.into());
+    }
     crate::harness::release_registry::load_active_manifest(
         writer,
         organization_id,
@@ -65,65 +166,75 @@ pub(crate) async fn inspect_governed_readiness(
         1,
     )
     .await
-    .map_err(anyhow::Error::msg)?;
+    .map_err(anyhow::Error::msg)
+    .context(ReportReadinessBlocker::ReleaseNotReady)?;
     let skill =
         super::skill_loader::load_skill(writer, organization_id, company_id, "report_analysis")
-            .await?;
-    anyhow::ensure!(skill.enabled, "report-analysis skill is disabled");
-    anyhow::ensure!(
-        super::skill_loader::skill_agent_id(&skill.config_json, None, None)? == Some(agent_id),
-        "company skill agent binding differs"
-    );
-    anyhow::ensure!(
-        super::skill_loader::intelligence_policy_ref(&skill.config_json)?.as_deref()
-            == Some(policy_ref),
-        "company skill policy binding differs"
-    );
+            .await
+            .context(ReportReadinessBlocker::SkillBinding)?;
+    if !(skill.enabled) {
+        return Err(ReportReadinessBlocker::SkillBinding.into());
+    }
+    if !(super::skill_loader::skill_agent_id(&skill.config_json, None, None)? == Some(agent_id)) {
+        return Err(ReportReadinessBlocker::SkillBinding.into());
+    }
+    if !(super::skill_loader::intelligence_policy_ref(&skill.config_json)?.as_deref()
+        == Some(policy_ref))
+    {
+        return Err(ReportReadinessBlocker::SkillBinding.into());
+    }
+    let agent_scope = writer.query_sql(&format!("SELECT id, company_id FROM ai_agent WHERE organization_id = {organization_id} AND id = {agent_id} LIMIT 2"))
+        .await.context(ReportReadinessBlocker::AgentUnavailable)?;
+    if agent_scope.len() != 1 || !agent_company_matches(&agent_scope[0], company_id) {
+        return Err(ReportReadinessBlocker::AgentUnavailable.into());
+    }
     let agent =
         crate::ai_agent::resolve_agent(writer, organization_id, Some(agent_id), None, false)
-            .await?;
-    anyhow::ensure!(
-        crate::providers::llm::normalize_provider(&agent.provider) == "mistral",
-        "pilot agent must use Mistral"
-    );
-    crate::ai_agent::ensure_allowed_action(&agent, "skill_run")?;
+            .await
+            .context(ReportReadinessBlocker::AgentUnavailable)?;
+    if !(crate::providers::llm::normalize_provider(&agent.provider) == "mistral") {
+        return Err(ReportReadinessBlocker::AgentUnavailable.into());
+    }
+    crate::ai_agent::ensure_allowed_action(&agent, "skill_run")
+        .context(ReportReadinessBlocker::AgentUnavailable)?;
     let store = StdbModelConfigurationStore { reader: writer };
     let resolver =
-        IntelligenceRouteResolver::new_governed(&store, organization_id, &agent, Some(policy_ref))?;
+        IntelligenceRouteResolver::new_governed(&store, organization_id, &agent, Some(policy_ref))
+            .context(ReportReadinessBlocker::ModelPolicy)?;
     resolver
         .validate_review_independence("ReportAttentionNeed")
-        .await?;
+        .await
+        .context(ReportReadinessBlocker::ModelPolicy)?;
     let calibration = writer
         .query_sql(&format!(
             "SELECT id FROM ai_calibration_profile WHERE organization_id = {organization_id} \
          AND profile_name = 'report-attention' AND profile_version = 1 AND is_active = true"
         ))
         .await?;
-    anyhow::ensure!(
-        calibration.len() == 1,
-        "report-attention calibration is missing or inactive"
-    );
+    if !(calibration.len() == 1) {
+        return Err(ReportReadinessBlocker::Calibration.into());
+    }
     let definitions = writer.query_sql(&format!(
         "SELECT id FROM ai_decision_type_definition WHERE organization_id = {organization_id} \
          AND decision_type_name = 'ReportAttentionNeed' AND decision_type_version = 1 AND is_active = true"
     )).await?;
-    anyhow::ensure!(
-        definitions.len() == 1,
-        "ReportAttentionNeed decision type is missing or inactive"
-    );
+    if !(definitions.len() == 1) {
+        return Err(ReportReadinessBlocker::DecisionType.into());
+    }
     let spend = crate::ai_spend::SpendReader::new(spend_reader);
     let period = crate::ai_spend::billing_period(chrono::Utc::now());
     let budget = spend
         .budget(organization_id, agent_id, &period)
-        .await?
-        .context("current-period budget is missing or invisible to the gateway spend reader")?;
-    anyhow::ensure!(
-        budget
-            .settled_units
-            .checked_add(budget.outstanding_units)
-            .is_some_and(|committed| committed < budget.limit_units),
-        "pilot budget is exhausted"
-    );
+        .await
+        .context(ReportReadinessBlocker::BudgetUnavailable)?
+        .context(ReportReadinessBlocker::BudgetUnavailable)?;
+    if !(budget
+        .settled_units
+        .checked_add(budget.outstanding_units)
+        .is_some_and(|committed| committed < budget.limit_units))
+    {
+        return Err(ReportReadinessBlocker::BudgetExhausted.into());
+    }
     let mut models = Vec::new();
     for role in [
         IntelligenceRole::Decision,
@@ -131,27 +242,30 @@ pub(crate) async fn inspect_governed_readiness(
         IntelligenceRole::Generation,
         IntelligenceRole::Review,
     ] {
-        let route = resolver.resolve(role, Some("ReportAttentionNeed")).await?;
+        let route = resolver
+            .resolve(role, Some("ReportAttentionNeed"))
+            .await
+            .context(ReportReadinessBlocker::ModelPolicy)?;
         let profile = route.primary;
-        anyhow::ensure!(
-            profile.provider == "mistral"
-                && profile.max_retries == 0
-                && route.fallbacks.is_empty()
-                && route.shadows.is_empty(),
-            "pilot requires direct Mistral profiles without retry, fallback or shadow"
-        );
-        anyhow::ensure!(
-            profile.max_tokens <= agent.max_tokens
-                && profile.context_window <= agent.context_window,
-            "profile exceeds the agent token/context ceiling"
-        );
-        anyhow::ensure!(
-            agent
-                .allowed_models
-                .iter()
-                .any(|model| model == &profile.model),
-            "pilot model is outside agent allowlist"
-        );
+        if !(profile.provider == "mistral"
+            && profile.max_retries == 0
+            && route.fallbacks.is_empty()
+            && route.shadows.is_empty())
+        {
+            return Err(ReportReadinessBlocker::ModelPolicy.into());
+        }
+        if !(profile.max_tokens <= agent.max_tokens
+            && profile.context_window <= agent.context_window)
+        {
+            return Err(ReportReadinessBlocker::ModelPolicy.into());
+        }
+        if !(agent
+            .allowed_models
+            .iter()
+            .any(|model| model == &profile.model))
+        {
+            return Err(ReportReadinessBlocker::ModelPolicy.into());
+        }
         spend
             .latest_price_snapshot(
                 organization_id,
@@ -161,7 +275,7 @@ pub(crate) async fn inspect_governed_readiness(
                 &budget.currency,
             )
             .await?
-            .context("pilot model price snapshot is missing or invisible")?;
+            .context(ReportReadinessBlocker::ModelPrice)?;
         if !models.contains(&profile.model) {
             models.push(profile.model);
         }
@@ -300,7 +414,7 @@ mod tests {
                 ]
             } else if statement.contains("FROM ai_agent ") {
                 vec![
-                    json!({"id": 7, "provider": "mistral", "model": "primary", "is_active": true,
+                    json!({"id": 7, "company_id": if case == "agent-company" { 99 } else { 3 }, "provider": "mistral", "model": "primary", "is_active": true,
                     "max_tokens": 2048, "context_window": 32000, "allowed_actions": ["skill_run"],
                     "allowed_models": ["primary", "review"]}),
                 ]
@@ -350,6 +464,7 @@ mod tests {
         for case in [
             "ready",
             "company",
+            "agent-company",
             "release",
             "source",
             "disabled",
@@ -374,6 +489,25 @@ mod tests {
             let writer = StdbClient::new(base.clone(), "fixture".into(), "gateway".into());
             let reader = StdbClient::new(base, "fixture".into(), "spend-reader".into());
             let result = inspect_governed_readiness(&writer, &reader, 9, 3, 7, "pilot@1").await;
+            let typed = inspect_report_readiness(&writer, &reader, 9, 3, 7).await;
+            assert_eq!(typed.billable_calls, 0);
+            match case {
+                "ready" => {
+                    assert_eq!(typed.status, "ready");
+                    assert_eq!(typed.code, None);
+                }
+                "source" | "release" => {
+                    assert_eq!(typed.code, Some(ReportReadinessBlocker::ReleaseNotReady))
+                }
+                "disabled" => assert_eq!(typed.code, Some(ReportReadinessBlocker::SkillBinding)),
+                "company" => assert_eq!(typed.code, Some(ReportReadinessBlocker::CompanyScope)),
+                "agent-company" => {
+                    assert_eq!(typed.code, Some(ReportReadinessBlocker::AgentUnavailable))
+                }
+                "budget" => assert_eq!(typed.code, Some(ReportReadinessBlocker::BudgetExhausted)),
+                "price" => assert_eq!(typed.code, Some(ReportReadinessBlocker::ModelPrice)),
+                _ => assert_eq!(typed.status, "blocked"),
+            }
             server.abort();
             if case == "ready" {
                 let ready = result.unwrap_or_else(|error| panic!("ready fixture: {error:#}"));
@@ -382,6 +516,18 @@ mod tests {
                 assert!(result.is_err(), "unready fixture admitted: {case}");
             }
         }
+    }
+
+    #[test]
+    fn agent_scope_requires_explicit_current_company_or_orgwide_binding() {
+        assert!(agent_company_matches(&json!({"companyId": 3}), 3));
+        assert!(agent_company_matches(&json!({"companyId": null}), 3));
+        assert!(!agent_company_matches(&json!({"companyId": 4}), 3));
+        assert!(!agent_company_matches(&json!({}), 3));
+        assert!(!agent_company_matches(
+            &json!({"companyId": {"some": 3}}),
+            3
+        ));
     }
 
     #[test]
