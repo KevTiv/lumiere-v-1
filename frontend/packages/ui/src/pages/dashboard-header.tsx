@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react"
 import { Fragment, createContext, useContext } from "react"
+import type { HistoryBounds, HistoryDates, HistoryPeriod } from "@lumiere/erp-shared/history-period"
 import Link from "next/link"
 import { Button } from "../components/button"
 import {
@@ -12,13 +13,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../components/breadcrumb"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../components/dropdown-menu"
-import { RefreshCw, Download, ChevronDown, Calendar } from "lucide-react"
+import { HistoryPeriodSelect } from "../components/history-period-select"
+import { RefreshCw, Download } from "lucide-react"
 import { workspaceStyles } from "../lib/workspace-styles"
 
 interface ActionItem {
@@ -28,7 +24,7 @@ interface ActionItem {
   testId?: string
 }
 
-export type TimeRangeValue = "today" | "7d" | "30d" | "90d" | "ytd"
+export type TimeRangeValue = HistoryPeriod
 
 interface BreadcrumbItemConfig {
   label: string
@@ -45,15 +41,10 @@ interface DashboardHeaderProps {
   actions?: ActionItem[]
   timeRange?: TimeRangeValue
   onTimeRangeChange?: (value: TimeRangeValue) => void
+  timeZone?: string
+  historyCoverage?: HistoryBounds
+  historyCoverageDates?: HistoryDates
 }
-
-const timeRanges = [
-  { label: "Today", value: "today" },
-  { label: "Last 7 Days", value: "7d" },
-  { label: "Last 30 Days", value: "30d" },
-  { label: "Last 90 Days", value: "90d" },
-  { label: "Year to Date", value: "ytd" },
-]
 
 /** Content the app shell shows at the end of every DashboardHeader's actions (e.g. the notifications bell). */
 const HeaderTrailingContext = createContext<ReactNode>(null)
@@ -67,11 +58,13 @@ export function DashboardHeader({
   onRefresh,
   onExport,
   actions,
-  timeRange = "30d",
+  timeRange = "all",
   onTimeRangeChange,
+  timeZone,
+  historyCoverage,
+  historyCoverageDates,
 }: DashboardHeaderProps) {
   const trailing = useContext(HeaderTrailingContext)
-  const selectedTimeRange = timeRanges.find((range) => range.value === timeRange) ?? timeRanges[2]
   const hasPrimaryAction = primaryAction != null && primaryAction !== false
   const firstImplicitAction = hasPrimaryAction ? -1 : actions?.findIndex((action) => action.variant == null) ?? -1
 
@@ -119,25 +112,13 @@ export function DashboardHeader({
           </Button>
         ))}
         {onTimeRangeChange ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                {selectedTimeRange.label}
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {timeRanges.map((range) => (
-                <DropdownMenuItem
-                  key={range.value}
-                  onClick={() => onTimeRangeChange(range.value as TimeRangeValue)}
-                >
-                  {range.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <HistoryPeriodSelect
+            value={timeRange}
+            onChange={onTimeRangeChange}
+            timeZone={timeZone}
+            coverage={historyCoverage}
+            coverageDates={historyCoverageDates}
+          />
         ) : null}
         {onRefresh ? (
           <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh dashboard">

@@ -9,6 +9,10 @@ export interface ReportExportSourceProvenance {
   model: string
   domain: string | null
   groupBy: string | null
+  timeZone?: string
+  period?: string
+  dateField?: string
+  endExclusive?: boolean
   startMs?: number
   endMs?: number
 }
@@ -26,6 +30,10 @@ export function reportExportSourceProvenance(input: {
   model: unknown
   domain?: unknown
   groupBy?: unknown
+  timeZone?: string
+  period?: string
+  dateField?: string
+  endExclusive?: boolean
   startMs?: number
   endMs?: number
 }): ReportExportSourceProvenance {
@@ -38,8 +46,12 @@ export function reportExportSourceProvenance(input: {
     model: String(input.model ?? ""),
     domain: input.domain == null || String(input.domain).trim() === "" ? null : String(input.domain),
     groupBy: input.groupBy == null || String(input.groupBy).trim() === "" ? null : String(input.groupBy),
-    ...(input.startMs == null ? {} : { startMs: input.startMs }),
-    ...(input.endMs == null ? {} : { endMs: input.endMs }),
+    ...(input.timeZone == null ? {} : { timeZone: input.timeZone }),
+    ...(input.period == null ? {} : { period: input.period }),
+    ...(input.dateField == null ? {} : { dateField: input.dateField }),
+    ...(input.endExclusive == null ? {} : { endExclusive: input.endExclusive }),
+    ...(input.startMs == null || !Number.isFinite(input.startMs) ? {} : { startMs: input.startMs }),
+    ...(input.endMs == null || !Number.isFinite(input.endMs) ? {} : { endMs: input.endMs }),
   }
 }
 

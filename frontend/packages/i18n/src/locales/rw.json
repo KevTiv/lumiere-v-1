@@ -399,6 +399,29 @@
         "unavailableChoices": "no stored selectable options are available",
         "ambiguousDefinition": "more than one field definition uses this key"
       }
+    },
+    "historyPeriod": {
+      "all": "Amateka yose",
+      "label": "Intera y’amatariki",
+      "invalidFrom": "Andika itariki yo gutangira yemewe.",
+      "invalidThrough": "Andika itariki yo kurangiza yemewe.",
+      "reversed": "Itariki yo kurangiza igomba kuba imwe n’iyo gutangira cyangwa ikayikurikira.",
+      "custom": "Amatariki wihitiyemo",
+      "customDates": "Intera y’amatariki wihitiyemo",
+      "from": "Kuva",
+      "through": "Kugeza",
+      "apply": "Shyiraho amatariki",
+      "invalidTimeZone": "Iri huza ririmo akarere k’amasaha katemewe. Kuraho ikiyungurura cy’amatariki kugira ngo urebe inyandiko.",
+      "invalidLink": "Iri huza ririmo intera y’amatariki itemewe. Kuraho ikiyungurura cy’amatariki kugira ngo urebe inyandiko.",
+      "filteredAll": "Intera y’amatariki mu mbonerahamwe: inyandiko zose zifite itariki ({{timeZone}}).",
+      "filteredRange": "Intera y’amatariki mu mbonerahamwe: kuva {{from}} kugeza {{through}} ({{timeZone}}).",
+      "clear": "Kuraho ikiyungurura cy’amatariki",
+      "today": "Uyu munsi",
+      "last7Days": "Iminsi 7 iheruka",
+      "last30Days": "Iminsi 30 iheruka",
+      "last90Days": "Iminsi 90 iheruka",
+      "last180Days": "Iminsi 180 iheruka",
+      "yearToDate": "Kuva umwaka utangiye kugeza uyu munsi"
     }
   },
   "navigation": {

@@ -2,7 +2,7 @@ import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { normalizedTag } from "@lumiere/erp-workflows"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
-import { percentChange } from "@lumiere/ui/lib/dashboard-time-range"
+import { isTimestampInRange, percentChange } from "@lumiere/ui/lib/dashboard-time-range"
 import { overviewMoneySummary } from "../overview/financial-summary"
 import { completeScopedPurchaseReviewRows, type PurchaseDiscrepancyRow } from "./purchase-discrepancies"
 
@@ -37,7 +37,7 @@ function amount(row: PurchasingMoneyRow): number | undefined {
   const value = Number(raw)
   return Number.isFinite(value) ? value : undefined
 }
-function inPeriod(date: Date, period: Period) { return date.getTime() >= period.startMs && date.getTime() <= period.endMs }
+function inPeriod(date: Date, period: Period) { return isTimestampInRange(date.getTime(), period.startMs, period.endMs) }
 
 interface ReviewRead { rows: readonly PurchasingMoneyRow[]; state: ModuleDataState }
 const orderStates = ["draft", "sent", "toapprove", "purchase", "done", "cancelled", "cancel"]
@@ -50,13 +50,13 @@ function reviewedRows(read: ReviewRead, scope: { organizationId: bigint; company
 /** Operational counts depend on identity/status admission, independently of monetary fields. */
 export function purchasingReviewCounts(
   reads: { orders: ReviewRead; toApprove: ReviewRead; partialReceipt: ReviewRead; overBilled: ReviewRead },
-  scope: { organizationId: bigint; companyId: bigint }, period: Period, previous: Period, nowMs: number,
+  scope: { organizationId: bigint; companyId: bigint }, period: Period, previous: Period | undefined, nowMs: number,
 ) {
   const candidates = reviewedRows(reads.orders, scope)
   const orders = candidates?.every((row) => orderStates.includes(normalizedTag(row.state))) ? candidates : null
   const open = orders?.filter((row) => openStates.includes(normalizedTag(row.state))) ?? null
   const openDates = open?.map((row) => kpiDate(row.dateOrder ?? row.date_order))
-  const change = openDates?.every((date) => date !== null)
+  const change = previous != null && openDates?.every((date) => date !== null)
     ? percentChange(openDates.filter((date) => date && inPeriod(date, period)).length,
       openDates.filter((date) => date && date.getTime() < period.startMs && inPeriod(date, previous)).length) : undefined
   const confirmed = orders?.filter((row) => ["purchase", "done"].includes(normalizedTag(row.state))) ?? null
@@ -86,7 +86,7 @@ export function purchasingReviewCounts(
 /** Confirmed order value is not paid spend. Keep transaction currencies and comparisons separate. */
 export function purchasingFinancialSummary(
   rows: readonly PurchasingMoneyRow[], currencyCodes: ReadonlyMap<string, string>,
-  scope: { organizationId: bigint; companyId: bigint }, period: Period, previous: Period, locale: string,
+  scope: { organizationId: bigint; companyId: bigint }, period: Period, previous: Period | undefined, locale: string,
   states: { orders: ModuleDataState; currencies: ModuleDataState },
 ): PurchasingFinancialSummary {
   if (states.orders.status !== "ready" || states.currencies.status !== "ready" || scope.organizationId <= 0n || scope.companyId <= 0n) return unavailable()
@@ -102,7 +102,7 @@ export function purchasingFinancialSummary(
     if (!["purchase", "done"].includes(state)) continue
     const date = kpiDate(row.dateOrder ?? row.date_order)
     if (!date) return unavailable()
-    const inPrevious = date.getTime() < period.startMs && inPeriod(date, previous)
+    const inPrevious = previous != null && date.getTime() < period.startMs && inPeriod(date, previous)
     if (!inPeriod(date, period) && !inPrevious) continue
     const value = amount(row)
     const currencyId = parseStrictU64(row.currencyId ?? row.currency_id)
@@ -136,7 +136,7 @@ export function purchasingFinancialSummary(
   const currentCurrencies = new Set(confirmed.map((row) => currencyCodes.get(String(row.currencyId))))
   const priorCurrencies = new Set(prior.map((row) => currencyCodes.get(String(row.currencyId))))
   let change: number | undefined
-  if (currentCurrencies.size === 1 && priorCurrencies.size === 1 && [...currentCurrencies][0] === [...priorCurrencies][0]) {
+  if (previous != null && currentCurrencies.size === 1 && priorCurrencies.size === 1 && [...currentCurrencies][0] === [...priorCurrencies][0]) {
     const current = confirmed.reduce((total, row) => total + (amount(row) ?? 0), 0)
     const baseline = prior.reduce((total, row) => total + (amount(row) ?? 0), 0)
     if (Number.isFinite(current) && Number.isFinite(baseline) && baseline > 0) {

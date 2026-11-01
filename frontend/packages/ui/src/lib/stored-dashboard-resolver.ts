@@ -1,3 +1,4 @@
+import { moduleHistoryTimestampMs } from "./module-history-filter"
 import type { DashboardWidget, DiagnosticWidget, GridWidth } from "./dashboard-types"
 import {
   resolveStoredDashboardDrillTarget,
@@ -261,33 +262,14 @@ function sortRowsByField(
 }
 
 function timestampToMs(raw: unknown): number | null {
-  if (raw == null) return null
-  if (raw instanceof Date) {
-    const value = raw.getTime()
-    return Number.isFinite(value) ? value : null
+  if (raw !== null && typeof raw === "object" && "toDate" in raw && typeof raw.toDate === "function") {
+    return moduleHistoryTimestampMs(raw.toDate())
   }
-  if (typeof raw === "object") {
-    const obj = raw as Record<string, unknown>
-    if ("some" in obj) return timestampToMs(obj.some)
-    const toDate = (obj as { toDate?: () => Date }).toDate
-    if (typeof toDate === "function") {
-      const date = toDate.call(raw)
-      if (!(date instanceof Date)) return null
-      const value = date.getTime()
-      return Number.isFinite(value) ? value : null
-    }
-    if ("__timestamp_micros_since_unix_epoch__" in obj) {
-      return timestampToMs(obj.__timestamp_micros_since_unix_epoch__)
-    }
-    return null
-  }
-  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}(?:T|$)/.test(raw)) {
-    const parsed = Date.parse(raw)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  const value = Number(raw)
-  if (!Number.isFinite(value) || value <= 0) return null
-  return value > 1e15 ? value / 1000 : value
+  // Preserve the legacy bare-microsecond representation; typed STDB timestamps
+  // and date strings have explicit units and support pre-1970 dates without guessing.
+  const legacyNumeric = typeof raw === "number" || typeof raw === "bigint" ||
+    (typeof raw === "string" && /^-?\d+(?:\.\d+)?$/.test(raw))
+  return moduleHistoryTimestampMs(raw, "UTC", legacyNumeric && Math.abs(Number(raw)) > 1e15 ? "microseconds" : "milliseconds")
 }
 
 function applyTimeRange(
@@ -319,7 +301,7 @@ function applyTimeRange(
     value: rows.filter((_row, index) => {
       const timestamp = timestamps[index]!
       if (startMs != null && timestamp < startMs) return false
-      if (endMs != null && timestamp > endMs) return false
+      if (endMs != null && timestamp >= endMs) return false
       return true
     }),
   }

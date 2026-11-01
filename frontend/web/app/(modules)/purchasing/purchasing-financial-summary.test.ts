@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { previousPeriodMs, timeRangeToMs } from "@lumiere/ui/lib/dashboard-time-range"
 import { purchasingFinancialSummary, purchasingReviewCounts } from "./purchasing-financial-summary"
 
 const scope = { organizationId: 1n, companyId: 2n }
@@ -32,6 +33,43 @@ test("comparisons require the same single currency and never count the current-p
   assert.equal(summary([order({ amountTotal: 20 }), order({ id: "8", amountTotal: 10, dateOrder: "2026-09-20" })]).change, 100)
   assert.equal(summary([order({ amountTotal: 20 }), order({ id: "8", amountTotal: 10, dateOrder: "2026-09-20", currencyId: "2" })]).change, undefined)
   assert.equal(summary([order({ dateOrder: "2026-10-01" })]).change, undefined)
+})
+
+test("all-history purchasing summaries retain dated records and omit prior-period comparisons", () => {
+  const all = timeRangeToMs("all")
+  const noPrevious = previousPeriodMs("all")
+  const rows = [order({ dateOrder: "1940-01-01", amountTotal: 10 }), order({ id: "8", amountTotal: 20 })]
+  const financial = purchasingFinancialSummary(rows, currencies, scope, all, noPrevious, "en-US", states)
+  assert.equal(financial.status, "ready")
+  assert.equal(financial.value, "USD 30.00")
+  assert.equal(financial.change, undefined)
+  const counts = purchasingReviewCounts({
+    orders: { rows, state: states.orders },
+    toApprove: { rows: [], state: states.orders },
+    partialReceipt: { rows: [], state: states.orders },
+    overBilled: { rows: [], state: states.orders },
+  }, scope, all, noPrevious, Date.parse("2026-10-30"))
+  assert.equal(counts.open, 2)
+  assert.equal(counts.change, undefined)
+})
+
+test("purchasing comparisons exclude the exact current-period end and stay absent without a prior period", () => {
+  const selected = timeRangeToMs({ kind: "custom", from: "2026-10-01", through: "2026-10-31" })
+  const prior = previousPeriodMs({ kind: "custom", from: "2026-10-01", through: "2026-10-31" })
+  const rows = [order({ dateOrder: "2026-10-01", amountTotal: 20 }),
+    order({ id: "8", dateOrder: "2026-09-20", amountTotal: 10 }),
+    order({ id: "9", dateOrder: "2026-11-01", amountTotal: 999 })]
+  const financial = purchasingFinancialSummary(rows, currencies, scope, selected, prior, "en-US", states)
+  assert.equal(financial.value, "USD 20.00")
+  assert.equal(financial.change, 100)
+  assert.equal(purchasingFinancialSummary(rows, currencies, scope, selected, undefined, "en-US", states).change, undefined)
+  const counts = purchasingReviewCounts({
+    orders: { rows, state: states.orders },
+    toApprove: { rows: [], state: states.orders },
+    partialReceipt: { rows: [], state: states.orders },
+    overBilled: { rows: [], state: states.orders },
+  }, scope, selected, prior, Date.parse("2026-10-31"))
+  assert.equal(counts.change, 0)
 })
 
 test("missing amounts/currency/dates, duplicates and stale/denied reads never become reassuring zero totals", () => {

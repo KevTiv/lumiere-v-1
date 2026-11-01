@@ -399,6 +399,29 @@
         "unavailableChoices": "no stored selectable options are available",
         "ambiguousDefinition": "more than one field definition uses this key"
       }
+    },
+    "historyPeriod": {
+      "all": "Tout l’historique",
+      "label": "Plage de dates",
+      "invalidFrom": "Saisissez une date de début valide.",
+      "invalidThrough": "Saisissez une date de fin valide.",
+      "reversed": "La date de fin doit être égale ou postérieure à la date de début.",
+      "custom": "Dates personnalisées",
+      "customDates": "Plage de dates personnalisée",
+      "from": "Du",
+      "through": "Au",
+      "apply": "Appliquer les dates",
+      "invalidTimeZone": "Ce lien contient un fuseau horaire non valide. Effacez le filtre de dates pour afficher les enregistrements.",
+      "invalidLink": "Ce lien contient une période non valide. Effacez le filtre de dates pour afficher les enregistrements.",
+      "filteredAll": "Période du tableau : tous les enregistrements datés ({{timeZone}}).",
+      "filteredRange": "Période du tableau : du {{from}} au {{through}} ({{timeZone}}).",
+      "clear": "Effacer le filtre de dates",
+      "today": "Aujourd’hui",
+      "last7Days": "7 derniers jours",
+      "last30Days": "30 derniers jours",
+      "last90Days": "90 derniers jours",
+      "last180Days": "180 derniers jours",
+      "yearToDate": "Depuis le début de l’année"
     }
   },
   "navigation": {

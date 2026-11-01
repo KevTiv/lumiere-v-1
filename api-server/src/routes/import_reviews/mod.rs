@@ -1,5 +1,7 @@
 //! Durable, tenant-scoped source review documents. These routes never dispatch
 //! ERP reducers. Confirmed rows still enter the normal validated import path.
+mod history_data;
+mod history_period;
 mod model;
 #[cfg(test)]
 mod postgres_tests;
@@ -464,6 +466,8 @@ async fn history(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/history/source/coverage", get(history_data::coverage))
+        .route("/history/source/rows", get(history_data::rows))
         .route("/import-reviews", get(list).post(create))
         .route("/import-reviews/:id", get(read))
         .route("/import-reviews/:batch/items/:item", patch(decide))

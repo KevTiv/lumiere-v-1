@@ -3,7 +3,7 @@
 import { ModuleDataNotice } from "./module-data-notice"
 import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state"
 
-import { useEffect, useRef, useState, useCallback, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
 import {
@@ -36,6 +36,7 @@ import { KpiStrip } from "../components/kpi-strip"
 import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
 import { WorkspaceNav } from "./workspace-nav"
 import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
+import { filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -82,6 +83,8 @@ interface ModuleViewProps {
   /** Dashboard time range — shown in header only on the dashboard tab. */
   dashboardTimeRange?: TimeRangeValue
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
+  /** Prefer an authoritative company zone when supplied; otherwise a drill link carries its zone. */
+  historyTimeZone?: string
   /** Scoped overview composition owns its controls/exports; other module tabs are unchanged. */
   dashboardContent?: ReactNode
   /**
@@ -132,6 +135,7 @@ export function ModuleView({
   dataState,
   dashboardTimeRange,
   onDashboardTimeRangeChange,
+  historyTimeZone,
   dashboardContent,
   urlFilters: urlFiltersProp,
   runtimeForms,
@@ -163,6 +167,19 @@ export function ModuleView({
   }, [activeTabProp, routeTab, defaultTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
+  const rawHistoryPeriod = searchParams?.get("period") ?? null
+  const periodTimeZone = historyTimeZone ?? searchParams?.get("periodTimeZone") ?? "UTC"
+  const historyFilter = useMemo(
+    () => resolveModuleHistoryFilter(config.id, activeTab, rawHistoryPeriod, { timeZone: periodTimeZone }),
+    [config.id, activeTab, rawHistoryPeriod, periodTimeZone],
+  )
+  const activeRows = data[activeTab]
+  const historyRows = useMemo(() => filterModuleHistoryRows(activeRows ?? [], historyFilter), [activeRows, historyFilter])
+  const entityRows = (tabId: string) => tabId === activeTab ? historyRows : data[tabId] ?? []
+  const clearHistoryFilter = () => {
+    const query = removeModuleHistoryFilter(searchParams?.toString() ?? "")
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
   const navigationAreas = config.tabNavigation === "areas"
     ? buildModuleNavigationAreas(config.tabs, config.tabGroups, t("common.moduleNavigation.overview", { defaultValue: "Overview" })) : []
   const currentArea = navigationAreas.find((area) => area.tabIds.includes(activeTab)) ?? navigationAreas[0]
@@ -202,6 +219,7 @@ export function ModuleView({
   const showAltView = (tab: ModuleTab) =>
     tab.entityAltView != null &&
     altViewChoice[tab.id] !== "table" &&
+    !(activeTab === tab.id && historyFilter.status !== "inactive") &&
     !(activeTab === tab.id && Object.keys(urlFilters ?? {}).length > 0)
   const tabListRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -220,6 +238,7 @@ export function ModuleView({
   useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
+  useEffect(() => { setSelectedRecord(null) }, [rawHistoryPeriod, periodTimeZone])
   const dashboardGridRef = useRef<HTMLDivElement>(null)
 
   const handleDashboardExport = useCallback(async () => {
@@ -271,6 +290,7 @@ export function ModuleView({
         }
         timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
         onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
+        timeZone={historyTimeZone}
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
@@ -396,6 +416,29 @@ export function ModuleView({
                     }))}
                   />
                 ) : null}
+                {activeTab === tab.id && historyFilter.status !== "inactive" && (
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                    role={historyFilter.status === "invalid" ? "alert" : "status"}
+                    data-testid="module-history-filter"
+                  >
+                    <p>
+                      {historyFilter.status === "invalid"
+                        ? historyFilter.reason === "invalid-time-zone"
+                          ? t("common.historyPeriod.invalidTimeZone", { defaultValue: "This link has an invalid time zone. Clear it to view the records." })
+                          : t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Clear it to view the records." })
+                        : historyFilter.period === "all"
+                          ? t("common.historyPeriod.filteredAll", { defaultValue: "Table date range: all dated records ({{timeZone}}).", timeZone: historyFilter.timeZone })
+                          : t("common.historyPeriod.filteredRange", {
+                              defaultValue: "Table date range: {{from}} through {{through}} ({{timeZone}}).",
+                              from: historyFilter.dates.from, through: historyFilter.dates.through, timeZone: historyFilter.timeZone,
+                            })}
+                    </p>
+                    <Button type="button" variant="ghost" size="sm" onClick={clearHistoryFilter}>
+                      {t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}
+                    </Button>
+                  </div>
+                )}
                 <EntityView
                   useCard={false}
                   headerAction={
@@ -432,8 +475,8 @@ export function ModuleView({
                   }
                   data={
                     kpiStrips?.[tab.id]
-                      ? filterRowsByKpi(data[tab.id] ?? [], kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
-                      : (data[tab.id] ?? [])
+                      ? filterRowsByKpi(entityRows(tab.id), kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
+                      : entityRows(tab.id)
                   }
                   isLoading={dataState?.[tab.id]?.status === "loading" || dataLoading?.[tab.id]}
                   initialFilters={activeTab === tab.id ? urlFilters : undefined}

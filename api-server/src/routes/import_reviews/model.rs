@@ -55,6 +55,8 @@ pub(super) struct ReviewItem {
     pub issue: String,
     pub fields: Vec<ReviewField>,
     pub proposed: BTreeMap<String, Option<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub business_date: Option<super::history_period::BusinessDate>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -243,6 +245,9 @@ pub(super) fn validate_dataset(data: &Dataset) -> Result<(), String> {
     }
     let mut keys = BTreeSet::new();
     for item in &data.items {
+        if let Some(date) = &item.business_date {
+            date.validate()?;
+        }
         if !key(&item.key)
             || !keys.insert(&item.key)
             || item.label.trim().is_empty()

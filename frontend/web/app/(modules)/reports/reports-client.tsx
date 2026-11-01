@@ -1,4 +1,6 @@
 "use client"
+import { serializeHistoryPeriod, type HistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { HistoryPeriodSelect } from "@lumiere/ui/components/history-period-select"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { applyPeriodReportFormContext, periodReportContextState, periodReportFormDefaults, readPeriodReportContext, reportMatchesPeriodContext } from "@lumiere/ui/lib/period-report-context"
@@ -148,13 +150,6 @@ import {
 } from "lucide-react"
 import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
 import { useOpenErpAiChat } from "@/lib/erp-ai-context"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
@@ -245,7 +240,7 @@ function ReportsClientLoaded({
   const [updateLayoutOpen, setUpdateLayoutOpen] = useState(false)
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
-  const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
+  const [viewDashboardRange, setViewDashboardRange] = useState<HistoryPeriod>("all")
   const [queryBuilderStatus, setQueryBuilderStatus] = useState<QueryBuilderStatus | null>(null)
   const openErpAiChat = useOpenErpAiChat()
   const handleStoredDashboardDrill = useCallback(
@@ -414,11 +409,12 @@ function ReportsClientLoaded({
         (dashboardWidgets as unknown as Record<string, unknown>[])
           .filter((widget) => ((viewDashboard.widgetIds ?? viewDashboard.widget_ids) as Array<string | number | bigint> | undefined)
             ?.some((id) => String(id) === String(widget.id)))
-          .map((widget) => ({ id: String(widget.id ?? ""), domain: widget.domain ?? null })),
+          .map((widget) => ({ id: String(widget.id ?? ""), domain: widget.domain ?? null, configuration: widget.configuration ?? null })),
       ),
       ...(viewDashboardTimeRange ?? {}),
+      timeZone: "UTC", period: serializeHistoryPeriod(viewDashboardRange), endExclusive: true,
     })
-  }, [dashboardWidgets, operatingCompanyId, orgId, viewDashboard, viewDashboardModels, viewDashboardTimeRange])
+  }, [dashboardWidgets, operatingCompanyId, orgId, viewDashboard, viewDashboardModels, viewDashboardTimeRange, viewDashboardRange])
   const handleStoredDashboardExport = useCallback(async () => {
     if (!storedDashboardRef.current || !viewDashboard || !storedDashboardExport.allowed) return
     await exportDashboardToPng(
@@ -1576,27 +1572,9 @@ function ReportsClientLoaded({
               </div>
               {viewDashboard ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    value={viewDashboardRange}
-                    onValueChange={(value) =>
-                      setViewDashboardRange(value as "all" | "7d" | "30d" | "90d" | "ytd")
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label={t("reports.actions.dashboardTimeRange")}
-                      className="h-9 w-[150px]"
-                      data-testid="stored-dashboard-time-range"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All time</SelectItem>
-                      <SelectItem value="7d">Last 7 days</SelectItem>
-                      <SelectItem value="30d">Last 30 days</SelectItem>
-                      <SelectItem value="90d">Last 90 days</SelectItem>
-                      <SelectItem value="ytd">Year to date</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div data-testid="stored-dashboard-time-range">
+                    <HistoryPeriodSelect value={viewDashboardRange} onChange={setViewDashboardRange} timeZone="UTC" />
+                  </div>
                   <Button
                     type="button"
                     variant="outline"

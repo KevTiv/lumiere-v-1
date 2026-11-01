@@ -9,6 +9,11 @@ export type ReviewField = {
   options?: string[]
   export?: boolean
 }
+/** Source-calendar evidence, independent of upload time. Period ends are exclusive. */
+export type ReviewBusinessDate =
+  | { precision: "day" | "month" | "year" | "interval"; from: string; toExclusive: string; raw?: string }
+  | { precision: "undated" | "invalid"; from?: never; toExclusive?: never; raw?: string }
+
 export type ReviewSource = {
   key: string
   label: string
@@ -19,6 +24,7 @@ export type ReviewSource = {
     rowBasis?: "source_line" | "import_row"
   }
   issue: string
+  businessDate?: ReviewBusinessDate
   fields: ReviewField[]
   proposed: Record<string, string | null>
 }

@@ -1,3 +1,5 @@
+import { createHistoryBuckets, resolveHistoryPeriod, type HistoryPeriod, type HistoryPeriodOptions } from "@lumiere/erp-shared/history-period"
+import { moduleHistoryDateValue, moduleHistoryTimestampMs } from "@lumiere/ui/lib/module-history-filter"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
 import { variantTag } from "@lumiere/erp-workflows"
 
@@ -12,6 +14,7 @@ export interface OverviewFinancialRow {
   amountResidual?: unknown
   invoiceDateDue?: unknown
   dateOrder?: unknown
+  date_order?: unknown
   createDate?: unknown
   writeDate?: unknown
 }
@@ -20,8 +23,9 @@ export function confirmedOrder(row: OverviewFinancialRow): boolean {
   return ["sale", "done"].includes(variantTag(row.state).toLowerCase())
 }
 
-export function orderDate(row: OverviewFinancialRow): Date | null {
-  return kpiDate(row.dateOrder ?? row.createDate ?? row.writeDate)
+export function orderDate(row: OverviewFinancialRow, timeZone = "UTC"): Date | null {
+  const ms = moduleHistoryTimestampMs(moduleHistoryDateValue(row, "dateOrder"), timeZone)
+  return ms === null ? null : new Date(Math.floor(ms))
 }
 
 /** Required eligibility fields cannot be redacted into a reassuring zero-valued queue. */
@@ -72,20 +76,25 @@ export function overviewMoneySummary(
   ).join(" · ")
 }
 
-/** Year-aware UTC buckets exclude same-month orders from earlier years and unknown dates. */
-export function confirmedOrderTrend(rows: readonly OverviewFinancialRow[], now: Date, locale: string) {
-  const months = Array.from({ length: 6 }, (_, index) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + index, 1)))
-  const monthKey = (date: Date) => `${date.getUTCFullYear()}-${date.getUTCMonth()}`
-  const counts = new Map(months.map((date) => [monthKey(date), 0]))
-  for (const row of rows) {
-    if (!confirmedOrder(row)) continue
-    const date = orderDate(row)
-    if (!date || date.getTime() > now.getTime()) continue
-    const key = monthKey(date)
-    if (counts.has(key)) counts.set(key, counts.get(key)! + 1)
-  }
-  return months.map((date) => ({
-    label: new Intl.DateTimeFormat(locale, { month: "short", year: "2-digit", timeZone: "UTC" }).format(date),
-    value: counts.get(monthKey(date))!,
+/** The same selected calendar period drives both metrics and the adaptive trend. */
+export function confirmedOrderTrend(
+  rows: readonly OverviewFinancialRow[],
+  now: Date,
+  locale: string,
+  period: HistoryPeriod = "180d",
+  options: Omit<HistoryPeriodOptions, "now"> = {},
+) {
+  const bounds = resolveHistoryPeriod(period, { ...options, now })
+  const dates = rows.filter(confirmedOrder).map((row) => orderDate(row, options.timeZone)).filter((date): date is Date => date != null)
+    .map((date) => date.getTime())
+    .filter((time) => (bounds.startMs === null || time >= bounds.startMs) && (bounds.endMs === null || time < bounds.endMs))
+  // Drawing extents come from these records only; the source-history API owns coverage totals.
+  const extent = dates.reduce((result, time) => ({
+    startMs: result.startMs === null ? time : Math.min(result.startMs, time),
+    endMs: result.endMs === null ? time + 1 : Math.max(result.endMs, time + 1),
+  }), { ...bounds })
+  return createHistoryBuckets(extent, { timeZone: options.timeZone, locale, maxBuckets: 36 }).map((bucket) => ({
+    label: bucket.label,
+    value: dates.filter((time) => time >= bucket.startMs && time < bucket.endMs).length,
   }))
 }

@@ -3,14 +3,16 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
+import Link from "next/link"
+import { useHistoryPeriod } from "@/lib/use-history-period"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
+  Button,
   DashboardGrid,
   DashboardHeader,
   MissingOrganization,
   exportDashboardToPng,
-  type TimeRangeValue,
   isTimestampInRange,
   percentChange,
   previousPeriodMs,
@@ -66,7 +68,7 @@ function isOpenSaleOrder(row: Record<string, unknown>): boolean {
 }
 
 function orderTimestampMs(row: Record<string, unknown>): number {
-  return orderDate(row)?.getTime() ?? 0
+  return orderDate(row)?.getTime() ?? NaN
 }
 
 function OverviewDashboardSkeleton() {
@@ -111,6 +113,7 @@ function OverviewClientLoaded({
 }: OverviewClientProps & { organizationId: number }) {
   useOverviewModuleSubscription()
   const { t, i18n } = useTranslation()
+  const [timeRange, setTimeRange, invalidPeriod] = useHistoryPeriod()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
 
@@ -160,7 +163,7 @@ function OverviewClientLoaded({
   }
   const companyState = operatingCompanyId != null && operatingCompanyId > 0 ? undefined
     : t("overview.financial.selectCompany", { defaultValue: "Select an operating company" })
-  const salesState = companyState ?? resourceStatusLabel(resourceStates["sale-orders"])
+  const salesState = invalidPeriod ? t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Choose a valid period to inspect records." }) : companyState ?? resourceStatusLabel(resourceStates["sale-orders"])
   const tasksState = companyState ?? resourceStatusLabel(resourceStates.tasks)
   const contactsState = companyState ?? resourceStatusLabel(resourceStates.contacts)
   const movesState = companyState ?? resourceStatusLabel(resourceStates["account-moves"])
@@ -169,7 +172,6 @@ function OverviewClientLoaded({
   const paymentsState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"]))
   const stockState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products))
   const messagesState = companyState ?? resourceStatusLabel(resourceStates["message-batches"])
-  const [timeRange, setTimeRange] = useState<TimeRangeValue>("30d")
   const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
@@ -216,17 +218,17 @@ function OverviewClientLoaded({
     const previousOpenOrders = scopedOrders.filter((order) => {
       if (!isOpenSaleOrder(order as Record<string, unknown>)) return false
       const ms = orderTimestampMs(order as Record<string, unknown>)
-      return isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
+      return previousRange != null && isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
     }).length
 
     return {
       currentOrders,
       currentOpenOrders,
-      openOrdersChange: percentChange(currentOpenOrders, previousOpenOrders),
+      openOrdersChange: previousRange ? percentChange(currentOpenOrders, previousOpenOrders) : undefined,
     }
   }, [scopedOrders, startMs, endMs, previousRange])
 
-  const salesTrendValues = useMemo(() => confirmedOrderTrend(scopedOrders, new Date(), i18n.language), [scopedOrders, i18n.language])
+  const salesTrendValues = useMemo(() => confirmedOrderTrend(scopedOrders, new Date(), i18n.language, timeRange), [scopedOrders, i18n.language, timeRange])
 
   const liveSections = useMemo(() => {
     const openTasks = scopedTasks.filter((task) => !task.isClosed).length
@@ -286,7 +288,7 @@ function OverviewClientLoaded({
     return toDashboardSections(definition, data, (key) => key === "sales.dashboard.widgets.revenue"
       ? t("overview.financial.confirmedOrderValue", { defaultValue: "Confirmed order value · by currency" })
       : key === "overview.dashboard.widgets.salesTrend"
-        ? t("overview.financial.confirmedOrderTrend", { defaultValue: "Confirmed orders · last six months" }) : t(key), overviewDashboardWebOptions)
+        ? t("overview.financial.selectedOrderTrend", { defaultValue: "Confirmed orders · selected period" }) : t(key), overviewDashboardWebOptions)
   }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, currencyState, currencyCodes, i18n.language, ordersComplete, invoicesComplete, incompleteFinancialData, t])
 
   const ownerControlLoop = useMemo(() => {
@@ -342,6 +344,8 @@ function OverviewClientLoaded({
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}
       />
+      {invalidPeriod && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{salesState}</p><Button type="button" variant="outline" onClick={() => setTimeRange("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}</Button></div>}
+      <p className="text-sm text-muted-foreground"><Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link> · {t("overview.financial.historyLink", { defaultValue: "Inspect imported dates and source records awaiting review." })}</p>
       <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today." })}</p>
       {isHydrated ? (
         <div className="flex flex-col gap-6">

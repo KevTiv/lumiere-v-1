@@ -28,6 +28,21 @@ const baseWidget: Record<string, unknown> = {
 }
 
 describe("stored dashboard resolver", () => {
+  it("includes typed pre-epoch dates and excludes the exact final boundary", () => {
+    const result = resolveStoredDashboard(
+      [{ ...baseWidget, aggregation: "count", fields: [], configuration: strictBinding("date_order", null) }],
+      [1],
+      { sale_order: [
+        { id: 1, date_order: { microsSinceUnixEpoch: -1000n } },
+        { id: 2, date_order: { microsSinceUnixEpoch: 0n } },
+        { id: 3, date_order: { microsSinceUnixEpoch: 1000n } },
+      ] },
+      { startMs: -1, endMs: 1 },
+    )
+    expect(result.state).toBe("ready")
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: "2" } })
+  })
+
   it("emits a canonical allowlisted drill target and withholds callbacks for unadmitted fields", () => {
     const targets: unknown[] = []
     const chart = {

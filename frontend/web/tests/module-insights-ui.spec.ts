@@ -25,6 +25,7 @@ for (const width of [320, 390, 768, 1440]) {
       test("charts, currency/period scope, queues, exports, unavailable sources and retained workspaces", async ({ page }) => {
         const overview = page.getByTestId(`module-insights-${module}`)
         const trend = page.getByTestId(`${module}-insights-trend`)
+        await expect(page.getByTestId("module-insights-period-callback")).toContainText("All history")
         await expect(trend.locator(".recharts-area").first()).toBeVisible()
         await expect(page.getByTestId(`${module}-insights-states`).locator(".recharts-bar")).toHaveCount(1)
         await expect(page.getByText("LEGACY FIGURES MUST NOT RENDER")).toHaveCount(0)
@@ -36,6 +37,9 @@ for (const width of [320, 390, 768, 1440]) {
         const csv = await readFile((await (await csvEvent).path())!, "utf8")
         const provenance = JSON.parse(csv.split("\r\n")[0]!.slice("# lumiere-provenance:".length))
         expect(provenance.companyId).toBe("1")
+        expect(provenance.period).toBe("all")
+        expect(provenance).not.toHaveProperty("startMs")
+        expect(provenance).not.toHaveProperty("endMs")
         expect(JSON.parse(provenance.domain).currencyId).toBe(module === "reports" ? null : "1")
         expect(csv).not.toContain("999999")
         await trend.getByText("View chart data", { exact: true }).click()
@@ -44,7 +48,7 @@ for (const width of [320, 390, 768, 1440]) {
         await chooseSelectOptionByTriggerValue(
           page,
           page.getByLabel("Analysis period", { exact: true }),
-          "30",
+          "30d",
         )
         await expect(page.getByTestId("module-insights-period-callback")).toContainText("2026-09-18T00:00:00.000Z")
         await expect(page.getByTestId("module-insights-period-callback")).toContainText("2026-10-18T00:00:00.000Z")
@@ -103,7 +107,7 @@ for (const width of [320, 390, 768, 1440]) {
         await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
         if (module !== "reports") {
           await expect(page.getByLabel("Analysis currency", { exact: true })).toContainText("USD")
-          await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("90")
+          await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("30")
           await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("375.00 USD")
           await expect(overview).not.toContainText("Synthetic exact u64 record")
         } else await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("1")

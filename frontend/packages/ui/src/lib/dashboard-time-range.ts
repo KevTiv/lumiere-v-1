@@ -1,36 +1,35 @@
-import type { TimeRangeValue } from "../pages/dashboard-header"
+import {
+  previousHistoryPeriod,
+  resolveHistoryPeriod,
+  type HistoryPeriod,
+  type HistoryPeriodOptions,
+} from "@lumiere/erp-shared/history-period"
 
 export type { TimeRangeValue } from "../pages/dashboard-header"
 
-export function timeRangeToMs(
-  range: TimeRangeValue,
-  now: Date = new Date(),
-): { startMs: number; endMs: number } {
-  const endMs = now.getTime()
+type RangeOptions = Omit<HistoryPeriodOptions, "now"> | string
 
-  switch (range) {
-    case "today": {
-      const startMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-      return { startMs, endMs }
-    }
-    case "7d":
-      return { startMs: endMs - 7 * 24 * 60 * 60 * 1000, endMs }
-    case "30d":
-      return { startMs: endMs - 30 * 24 * 60 * 60 * 1000, endMs }
-    case "90d":
-      return { startMs: endMs - 90 * 24 * 60 * 60 * 1000, endMs }
-    case "ytd":
-      return { startMs: new Date(now.getFullYear(), 0, 1).getTime(), endMs }
-  }
+/** Numeric compatibility for local filters only. Use serializeHistoryBounds for API requests. */
+export function timeRangeToMs(
+  range: HistoryPeriod,
+  now: Date = new Date(),
+  options: RangeOptions = {},
+): { startMs: number; endMs: number } {
+  const bounds = resolveHistoryPeriod(range, { ...(typeof options === "string" ? { timeZone: options } : options), now })
+  return { startMs: bounds.startMs ?? -Infinity, endMs: bounds.endMs ?? Infinity }
 }
 
 export function previousPeriodMs(
-  range: TimeRangeValue,
+  range: HistoryPeriod,
   now?: Date,
-): { startMs: number; endMs: number } {
-  const { startMs, endMs } = timeRangeToMs(range, now)
-  const duration = endMs - startMs
-  return { startMs: startMs - duration, endMs: startMs }
+  options: RangeOptions = {},
+): { startMs: number; endMs: number } | undefined {
+  if (range === "all") return undefined
+  const settings = typeof options === "string" ? { timeZone: options } : options
+  const previous = previousHistoryPeriod(resolveHistoryPeriod(range, { ...settings, now }), settings.timeZone)
+  return previous?.startMs != null && previous.endMs != null
+    ? { startMs: previous.startMs, endMs: previous.endMs }
+    : undefined
 }
 
 export function percentChange(current: number, previous: number): number | undefined {
@@ -39,5 +38,5 @@ export function percentChange(current: number, previous: number): number | undef
 }
 
 export function isTimestampInRange(ms: number, startMs: number, endMs: number): boolean {
-  return ms >= startMs && ms <= endMs
+  return Number.isFinite(ms) && ms >= startMs && ms < endMs
 }

@@ -62,6 +62,7 @@ import {
 } from "./import-review-uncertainty"
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
+import { resetHistoryQueries } from "./history-data"
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(url, init)
@@ -290,6 +291,7 @@ function ReviewWorkspace({
   const refresh = () => {
     requireCurrentScope()
     return Promise.all([
+      resetHistoryQueries(cache, { organizationId, companyId, actorIdentity: actor }),
       cache.invalidateQueries({ queryKey: detailKey }),
       cache.invalidateQueries({ queryKey: listKey }),
       cache.invalidateQueries({
@@ -319,7 +321,10 @@ function ReviewWorkspace({
       })
       requireCurrentScope()
       chooseBatch(result.id)
-      await cache.invalidateQueries({ queryKey: listKey })
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: listKey }),
+        resetHistoryQueries(cache, { organizationId, companyId, actorIdentity: actor }),
+      ])
     } catch (failure) {
       if (mounted.current)
         setError(failure instanceof Error ? failure.message : String(failure))

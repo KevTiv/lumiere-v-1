@@ -520,6 +520,9 @@ test("stale inline saves retain entered values and never report success", async 
 test("838 rows support bulk preview exceptions, safe retry, refresh and per-row undo", async ({
   page,
 }) => {
+  // This case reloads the full fixture after saving 836 decisions. Request
+  // interception disables the browser cache, so budget for two cold page loads.
+  test.setTimeout(90_000)
   const rows = Array.from({ length: 838 }, (_, index) => {
     const item = source(String(index + 1))
     item.source.label = `Synthetic product ${index + 1}`

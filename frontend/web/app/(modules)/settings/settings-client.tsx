@@ -38,6 +38,7 @@ import {
   useUpdateWhatsappCredentials,
 } from "@lumiere/query-hooks/hooks/auth"
 import { DataImportWorkspace } from "@/lib/data-import-workspace"
+import { CompanyAvailableHistory } from "../../../components/available-history"
 import { CompanySetupWorkspace } from "@/lib/company-setup-workspace"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -851,7 +852,10 @@ function SettingsLoaded({
       description: "Bring existing records into the workspace from CSV files.",
       icon: Upload,
       content: (
-        <section className="rounded-xl border border-border bg-card p-4">
+        <section className="space-y-6 rounded-xl border border-border bg-card p-4">
+          <div id="available-history" className="scroll-mt-6">
+            <CompanyAvailableHistory organizationId={organizationId} />
+          </div>
           <DataImportWorkspace organizationId={organizationId} />
         </section>
       ),

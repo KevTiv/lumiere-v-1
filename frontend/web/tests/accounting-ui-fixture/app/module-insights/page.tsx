@@ -47,7 +47,7 @@ function Preview() {
       <Button variant="outline" onClick={() => setPalette("ocean")}>Synthetic Ocean palette</Button>
     </div>
     <p role="status" data-testid="module-insights-fixture-action">{message}</p>
-    <p className="text-xs text-muted-foreground" data-testid="module-insights-period-callback">{periodRange ? `${new Date(periodRange.startMs).toISOString()} – ${new Date(periodRange.endMs).toISOString()}` : "Pending period"}</p>
+    <p className="text-xs text-muted-foreground" data-testid="module-insights-period-callback">{periodRange ? Number.isFinite(periodRange.startMs) && Number.isFinite(periodRange.endMs) ? `${new Date(periodRange.startMs).toISOString()} – ${new Date(periodRange.endMs).toISOString()}` : "All history" : "Pending period"}</p>
     <ModuleView config={config} activeTab={tab} onActiveTabChange={setTab} dashboardTimeRange="30d" onDashboardTimeRangeChange={() => {}} dashboardContent={<ModuleInsights input={{ module, organizationId: 1, companyId, records: { rows: emptySources ? [] : moduleInsightRows(module).map((row) => longNames && row.id === "101" ? { ...row, name: `Synthetic international ${"LongReference".repeat(20)}` } : row), state: { status: emptySources ? "denied" : sourceState } }, currencies: { rows: emptySources || currencyDenied ? [] : [{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 2, code: "USD", decimalPlaces: 2 }], state: { status: emptySources || currencyDenied ? "denied" : "ready" } } }} sections={sections} now={moduleInsightNow} onPeriodRangeChange={setPeriodRange} />} />
   </main>
 }
