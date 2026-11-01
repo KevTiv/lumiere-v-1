@@ -37,3 +37,9 @@ Exact final command results are recorded in the PR. The completed local checks i
 This source tranche does not complete native publication/activation, released program API/catalog wiring, ten-module dataset adapters, sandbox compute nodes in the canonical executor, durable object-store artifact promotion, runtime trace emission/read adapters, effect-safe current-state replay, memory-lift evaluation, scheduled program dispatch or integrated module UI placement. Keep these packages partial in the execution plan.
 
 Certification, paid model/compute execution, Railway provisioning/deployment, customer-data sandbox enablement and production user acceptance are deferred. Neither an environment flag nor passing CI may turn this source candidate into an admitted runtime.
+
+## CI inventory correction and browser diagnostics
+
+At source head `57d929328`, CI stopped on stale Finance inventory source hashes, so the downstream Rust/frontend/contracts jobs did not run. Regenerated the inventory with its canonical generator and verified it, its fifteen focused tests, skill manifests/catalog and source lints.
+
+The P0 quarantine scenario timed out and its manual browser-context cleanup masked the original error. Its actor contexts now use a Playwright fixture with independent teardown; every original quantity, identity, replay and denied-actor assertion is retained. Named bounded test steps preserve the original 180-second scenario ceiling and expose the failing phase. Playwright test discovery passes. The underlying browser timeout is not claimed resolved until a new real-stack run passes; no timeout increase, test skip or product authorization change was introduced.
