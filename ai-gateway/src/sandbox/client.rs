@@ -7,8 +7,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::harness::ActorCredentials;
 
 use super::protocol::{
-    is_hash, DatasetEnvelope, DatasetHandle, DatasetIssueRequest, ExecutionEnvelope,
-    ExecutionRequest, ExecutionSnapshot, SandboxScope, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES,
+    is_hash, ArtifactEnvelope, ArtifactRecord, DatasetEnvelope, DatasetHandle, DatasetIssueRequest,
+    ExecutionEnvelope, ExecutionRequest, ExecutionSnapshot, SandboxScope, MAX_REQUEST_BYTES,
+    MAX_RESPONSE_BYTES,
 };
 
 const CONTROLLER_TIMEOUT: Duration = Duration::from_secs(30);
@@ -196,6 +197,62 @@ impl SandboxControllerClient {
             "sandbox inspection scope or identity mismatch"
         );
         Ok(envelope.execution)
+    }
+
+    /// Reopen one exact validated output; this never executes a program or
+    /// revives an expired dataset. Current controller authorization still applies.
+    pub(crate) async fn read_artifact(
+        &self,
+        execution: &ExecutionSnapshot,
+        artifact_hash: &str,
+    ) -> Result<ArtifactRecord> {
+        super::require_production_admission()?;
+        self.read_artifact_bound(execution, artifact_hash).await
+    }
+
+    async fn read_artifact_bound(
+        &self,
+        execution: &ExecutionSnapshot,
+        artifact_hash: &str,
+    ) -> Result<ArtifactRecord> {
+        execution.validate_metadata()?;
+        self.ensure_scope(&execution.scope)?;
+        ensure!(is_hash(artifact_hash), "sandbox artifact hash is invalid");
+        let expected = execution
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.sha256 == artifact_hash)
+            .context("sandbox artifact is not part of the validated execution")?;
+        let url = self
+            .base
+            .join(&format!(
+                "v1/executions/{}/artifacts/{artifact_hash}",
+                execution.request_key
+            ))
+            .context("construct sandbox artifact URL")?;
+        let response = self
+            .http
+            .get(url)
+            .header("x-lumiere-sandbox-secret", self.secret.clone())
+            .header(
+                reqwest::header::AUTHORIZATION,
+                self.actor_authorization.clone(),
+            )
+            .header("x-stdb-identity", self.actor_identity_header.clone())
+            .query(&execution.scope)
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("sandbox artifact transport failed"))?;
+        let envelope: ArtifactEnvelope = decode(response).await?;
+        ensure!(
+            envelope.scope == execution.scope && envelope.request_key == execution.request_key,
+            "sandbox artifact scope or execution substitution denied"
+        );
+        ensure!(
+            envelope.artifact == *expected,
+            "sandbox artifact substitution denied"
+        );
+        Ok(envelope.artifact)
     }
 
     pub(crate) async fn cancel(
@@ -568,5 +625,55 @@ mod tests {
             .await
             .unwrap();
         task.abort();
+    }
+
+    #[tokio::test]
+    async fn artifact_reopen_preserves_validated_execution_and_content_identity() {
+        let input = request();
+        let content = r#"{"kind":"aggregate","value":{"label":"total","value":60,"count":3}}"#;
+        let artifact_hash = format!("{:x}", sha2::Sha256::digest(content.as_bytes()));
+        let artifact = json!({"name":"summary.json", "mimeType":"application/json", "content":content,
+            "sourceDatasets":input.dataset_ids, "sha256":artifact_hash, "bytes":content.len()});
+        let execution: ExecutionSnapshot = serde_json::from_value(json!({
+            "requestKey":input.request_key,"status":"completed","scope":input.scope,"profileRef":input.profile_ref,
+            "programHash":format!("{:x}", sha2::Sha256::digest(input.program.as_bytes())),
+            "datasetIds":input.dataset_ids,"createdAt":"2026-10-28T12:00:00Z","updatedAt":"2026-10-28T12:00:01Z",
+            "artifacts":[artifact.clone()]
+        })).unwrap();
+        for field in ["valid", "scope", "requestKey", "artifact"] {
+            let mut envelope =
+                json!({"scope":input.scope,"requestKey":input.request_key,"artifact":artifact});
+            match field {
+                "scope" => envelope["scope"]["companyId"] = json!("999"),
+                "requestKey" => envelope["requestKey"] = json!("b".repeat(64)),
+                "artifact" => envelope["artifact"]["content"] = json!("PRIVATE-SUBSTITUTED-OUTPUT"),
+                _ => {}
+            }
+            let app = Router::new().route(
+                "/v1/executions/:key/artifacts/:hash",
+                get(move |headers: HeaderMap| {
+                    let envelope = envelope.clone();
+                    async move {
+                        assert_actor_headers(&headers);
+                        Json(envelope)
+                    }
+                }),
+            );
+            let (url, task) = server(app).await;
+            let client = SandboxControllerClient::connect(&url, &"s".repeat(32), &actor()).unwrap();
+            let response = client.read_artifact_bound(&execution, &artifact_hash).await;
+            if field == "valid" {
+                assert_eq!(response.unwrap(), execution.artifacts[0]);
+            } else {
+                let error = response.unwrap_err().to_string();
+                assert!(error.contains("substitution denied"));
+                assert!(!error.contains("PRIVATE-SUBSTITUTED-OUTPUT"));
+            }
+            assert!(client
+                .read_artifact_bound(&execution, &"f".repeat(64))
+                .await
+                .is_err());
+            task.abort();
+        }
     }
 }

@@ -6060,6 +6060,46 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/runtime_reads.rs: minimal current source-actor policy profile, available only to an organization-bound trusted reader."
+    },
+    "save_ai_work_program_draft": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/work_programs.rs: personal company-scoped immutable draft save with expected revision and actor/request receipt; never execution or publication authority.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "nominate_ai_work_program_output": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/work_programs.rs: exact server-hashed artifact nomination from the current caller completed source run; no verified evidence or storage claim.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "register_ai_work_program_recipe": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/work_program_learning.rs: version-pinned recipe bound to canonical independently reviewed procedure knowledge and completed source decision cases.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "revoke_ai_work_program_recipe": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/work_program_learning.rs: append-only scoped recipe revocation; grants no execution or publication authority.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     }
   }
 }

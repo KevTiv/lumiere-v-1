@@ -35,3 +35,5 @@ pub(crate) mod security_envelope;
 pub mod skill_loader;
 pub(crate) mod spend_admission;
 pub mod text_answer_gate;
+pub(crate) mod work_program;
+pub(crate) mod work_program_learning;

@@ -32,7 +32,8 @@ export function createControllerServer({ secret, maxBodyBytes = 1_310_720, creat
     } catch { return send(400, { error: 'invalid_request' }); }
     const url = new URL(request.url, 'http://controller.invalid');
     if (url.pathname === '/v1/datasets' || url.pathname === '/v1/executions'
-      || /^\/v1\/executions\/[a-f0-9]{64}(\/cancel)?$/.test(url.pathname)) {
+      || /^\/v1\/executions\/[a-f0-9]{64}(\/cancel)?$/.test(url.pathname)
+      || /^\/v1\/executions\/[a-f0-9]{64}\/artifacts\/[a-f0-9]{64}$/.test(url.pathname)) {
       if (!BUILD_ADMISSION.productionExecution) return send(503, { error: 'sandbox_production_uncertified' });
       if (typeof createRequestServices !== 'function') return send(503,{error:'sandbox_authority_unavailable'});
       try {

@@ -7,6 +7,17 @@ export class JournalError extends Error {
   constructor(code) { super(code); this.code = code; }
 }
 
+function validateArtifact(artifact) {
+  if (!artifact || typeof artifact.content !== 'string'
+    || artifact.mimeType !== 'application/json'
+    || !Number.isSafeInteger(artifact.bytes) || artifact.bytes < 1 || artifact.bytes > 65_536
+    || Buffer.byteLength(artifact.content) !== artifact.bytes
+    || !/^[a-f0-9]{64}$/.test(artifact.sha256)
+    || createHash('sha256').update(artifact.content).digest('hex') !== artifact.sha256) {
+    throw new JournalError('artifact_integrity');
+  }
+}
+
 export function scopeKey(scope) {
   return createHash('sha256').update(JSON.stringify([
     scope.actorIdentity, scope.organizationId, scope.companyId, scope.runId, scope.policyGeneration,
@@ -163,6 +174,7 @@ export class ExecutionJournal {
       .all().map((row) => JSON.parse(row.record));
   }
   putArtifact(scope, artifact) {
+    validateArtifact(artifact);
     const key = scopeKey(scope);
     // Names and dataset lineage belong to execution descriptors, not blob identity.
     const content = JSON.stringify({ sha256: artifact.sha256, mimeType: artifact.mimeType,
@@ -175,6 +187,10 @@ export class ExecutionJournal {
   getArtifact(scope, hash) {
     const row = this.#db.prepare('SELECT record FROM artifacts WHERE hash = ? AND scope_key = ?')
       .get(hash, scopeKey(scope));
-    return row ? JSON.parse(row.record) : undefined;
+    if (!row) return undefined;
+    const artifact = JSON.parse(row.record);
+    validateArtifact(artifact);
+    if (artifact.sha256 !== hash) throw new JournalError('artifact_integrity');
+    return artifact;
   }
 }

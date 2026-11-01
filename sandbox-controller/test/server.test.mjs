@@ -18,7 +18,7 @@ test('HTTP requires a dedicated secret and never admits executable or dataset tr
   assert.equal((await ready.json()).productionExecution,false);
   assert.equal((await fetch(`${base}/v1/datasets`,{method:'POST',body:'{}'})).status,401);
   const headers={'x-lumiere-sandbox-secret':secret};
-  for(const path of ['/v1/datasets','/v1/executions',`/v1/executions/${'a'.repeat(64)}/cancel`]){
+  for(const path of ['/v1/datasets','/v1/executions',`/v1/executions/${'a'.repeat(64)}/cancel`,`/v1/executions/${'a'.repeat(64)}/artifacts/${'b'.repeat(64)}`]){
     assert.equal((await fetch(base+path,{method:'POST',headers,body:'{"mode":"synthetic","enabled":true}'})).status,503);
   }
   assert.equal((await fetch(`${base}/v1/executions`,{method:'POST',headers,body:'x'.repeat(101)})).status,413);

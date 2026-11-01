@@ -1,4 +1,6 @@
-//! Actor-scoped discovery, preview and personal draft persistence; no activation.
+//! Actor-scoped discovery, preview and personal draft persistence.
+//! Publication and activation explicitly remain unavailable until their native
+//! contracts and trusted-catalogue admission are released together.
 
 use std::sync::Arc;
 
@@ -29,6 +31,7 @@ mod saved_drafts;
 
 pub(super) fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(publication_admission_routes())
         .route("/presentation/capabilities", get(capabilities))
         .route("/presentation/validate", post(validate))
         .route("/presentation/preview", get(preview_options).post(preview))
@@ -42,6 +45,25 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         )
         .layer(DefaultBodyLimit::max(96 * 1024))
 }
+
+fn publication_admission_routes<S: Clone + Send + Sync + 'static>() -> Router<S> {
+    Router::new()
+        .route("/presentation/publication", post(publication_unavailable))
+        .route("/presentation/activation", post(publication_unavailable))
+        .route("/presentation/revert", post(publication_unavailable))
+}
+
+async fn publication_unavailable() -> ApiError {
+    // This response has no tenant-dependent contents. Do not accept authority,
+    // write metadata, dispatch a reducer, or infer admission from a saved draft.
+    ApiError::Unavailable(
+        "presentation publication is unavailable pending released native contracts and trusted catalog admission".into(),
+    )
+}
+
+#[cfg(test)]
+#[path = "presentation/publication_admission_tests.rs"]
+mod publication_admission_tests;
 
 fn dictionary_error(error: DictionaryError) -> ApiError {
     match error {

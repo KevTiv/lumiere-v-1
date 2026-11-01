@@ -360,7 +360,7 @@ pub(crate) struct EvidenceRecord {
     pub source_datasets: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct ArtifactRecord {
     pub name: String,
@@ -369,6 +369,14 @@ pub(crate) struct ArtifactRecord {
     pub source_datasets: Vec<String>,
     pub sha256: String,
     pub bytes: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(super) struct ArtifactEnvelope {
+    pub scope: SandboxScope,
+    pub request_key: String,
+    pub artifact: ArtifactRecord,
 }
 
 fn validate_sources(sources: &[String], inputs: &[String]) -> Result<()> {

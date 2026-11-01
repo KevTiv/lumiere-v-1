@@ -4,6 +4,7 @@ The coordination program intentionally does not restate every architectural deta
 
 | Coordination area | Primary source plans |
 | --- | --- |
+| Alpha reusable work on Railway | `docs/plans/alpha-harness-reusable-work-railway-plan.md`: ten-module scope, WorkProgram/sandbox/publication, trace/replay/learning and bounded release gates; consumes the separately owned near-term AI workstreams |
 | Repository cohesion / duplicate-authority removal / error-outcome ownership | `docs/plan/repository-cohesion-outcome-ownership-plan.md`, current implementation evidence from `BASE-00` |
 | First-test-org module usability parity / T0 | `docs/plans/erp-module-usability-parity-program.md`, execution in `docs/plan/erp-module-usability-parity-ledger.md` |
 | Shared UI conventions / forms / charts / report cards / themes | `docs/plans/erp-ui-design-system-completion-plan.md`, execution in `docs/plan/erp-ui-completion-ledger.md`; module adoption stays with COV |

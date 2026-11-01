@@ -59,6 +59,28 @@ export class SandboxController {
     await this.#admit(scope, 'inspect', []);
     return executionSnapshot(this.#scoped(scope, requestKey));
   }
+  /** Reopen a validated output after dataset cleanup or VM destruction.
+   * The journal blob alone is never an export authority: require a completed
+   * execution's exact descriptor and fresh source-capability authorization.
+   */
+  async readArtifact({ scope, requestKey, artifactHash }) {
+    if (typeof artifactHash !== 'string' || !/^[a-f0-9]{64}$/.test(artifactHash)) fail('invalid_artifact_hash');
+    await this.#admit(scope, 'export', []);
+    const record = this.#scoped(scope, requestKey);
+    if (record.status !== 'completed') fail('artifact_not_available');
+    const descriptors = record.artifacts?.filter((item) => item.sha256 === artifactHash) ?? [];
+    if (!descriptors.length) fail('artifact_not_found');
+    const artifact = this.#journal.getArtifact(scope, artifactHash);
+    if (!artifact || descriptors.some((item) => item.content !== artifact.content
+      || item.bytes !== artifact.bytes || item.mimeType !== artifact.mimeType
+      || typeof item.name !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.json$/.test(item.name)
+      || !Array.isArray(item.sourceDatasets) || item.sourceDatasets.length !== record.datasetIds.length
+      || new Set(item.sourceDatasets).size !== item.sourceDatasets.length
+      || item.sourceDatasets.some((id) => !record.datasetIds.includes(id)))) fail('artifact_integrity');
+    // Names and source lineage belong to the admitted execution, not the blob.
+    return { scope: structuredClone(record.scope), requestKey,
+      artifact: structuredClone(descriptors[0]) };
+  }
   async execute({ scope, requestKey, program, datasetIds, profileRef }) {
     if (this.#mode === 'production') requireProductionAdmission();
     if (typeof requestKey !== 'string' || !/^[a-f0-9]{64}$/.test(requestKey)

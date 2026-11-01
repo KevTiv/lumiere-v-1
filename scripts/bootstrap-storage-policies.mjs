@@ -24,7 +24,7 @@ const schemaPath = path.join(
 const policyPath = path.join(repoRoot, "lumiere-codegen", "storage-policy-manifest.json");
 const resourceRegistryPath = path.join(repoRoot, "crates", "stdb-auth", "assets", "resource_registry.json");
 const checkOnly = process.argv.includes("--check");
-const EXPECTED_SCHEMA_TABLES = 528;
+const EXPECTED_SCHEMA_TABLES = 533;
 
 // C0 no longer permits application-level platform-global tables. Former
 // exceptions must be organization-owned in schema source before policy
@@ -168,6 +168,10 @@ const EXPLICIT_MODULES = {
 // semantics use append-history. Receipts, snapshots, jobs, and messages stay
 // upsert-current until their domain policy is reviewed.
 const APPEND_HISTORY_TABLES = new Set([
+  "ai_work_program_version",
+  "ai_work_program_output_nomination",
+  "ai_work_program_recipe",
+  "ai_work_program_recipe_revocation",
   "audit_log",
   "business_change",
   "hr_pii_access_log",
@@ -183,6 +187,10 @@ const APPEND_HISTORY_TABLES = new Set([
 // parent primary-key column are present in the current schema manifest. All
 // other tables remain explicit roots until a domain-owned FK graph exists.
 const PARENT_OVERRIDES = {
+  ai_work_program_version: ["ai_work_program", "program_id", "id"],
+  ai_work_program_output_nomination: ["ai_work_program_version", "program_version_id", "id"],
+  ai_work_program_recipe: ["ai_knowledge_entry_version", "knowledge_version_id", "id"],
+  ai_work_program_recipe_revocation: ["ai_work_program_recipe", "recipe_id", "id"],
   presentation_module_version: ["presentation_module", "module_id", "id"],
   account_period: ["account_fiscal_year", "fiscal_year_id", "id"],
   account_asset_depreciation_line: ["account_asset", "asset_id", "id"],
@@ -382,7 +390,7 @@ function versionStrategy(table) {
 function primaryKeyStrategy(table) {
   const { column_name: column, ty } = table.primary_key;
   if (ty === "Identity") return "identity";
-  if (table.sql_name === "organization_commit_cursor") return "natural";
+  if (["organization_commit_cursor", "ai_work_program_recipe_revocation"].includes(table.sql_name)) return "natural";
   if (["mrp_production_cost", "mrp_productivity_cost", "mrp_valuation_config", "mrp_workcenter_cost_rate"].includes(table.sql_name)) return "natural";
   if (ty === "U64") return "auto_increment";
   if (column.endsWith("_key") || column === "code" || column === "token" || column === "scope_key") {
