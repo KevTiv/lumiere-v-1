@@ -116,3 +116,12 @@ and no pending 34 delta exists.
 Final publication, consumer pins and native compilation from the completed
 branch are checked by the subsequent normal release run. No Railway migration
 or live funding/configuration change is part of this repair.
+
+
+Release 41310136783 was cancelled before module steps started. Its check
+annotation states that a higher-priority waiting request replaced it in the
+shared module concurrency group. The reusable build now uses `queue: max`
+with `cancel-in-progress: false`, so pending CI and release callers remain
+serialized instead of replacing a waiting release. This follows GitHub's
+supported concurrency queue option:
+https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency

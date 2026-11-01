@@ -34,10 +34,12 @@ jobs:
     # Release and pull-request validation can start for the same branch at the
     # same time. Serialize only this build job so the first caller fills the
     # exact-source cache and the second caller restores it instead of compiling
-    # the same WASM again.
+    # the same WASM again. Keep every pending caller: the default single-slot
+    # queue can replace a waiting release when another CI request arrives.
     concurrency:
       group: contracts-module-${{ github.head_ref || github.ref_name }}
       cancel-in-progress: false
+      queue: max
     steps:
       - uses: actions/checkout@v4
         with:
