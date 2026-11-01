@@ -1407,6 +1407,20 @@ mod tests {
     }
 
     #[test]
+    fn chat_import_tasks_preserve_released_owner_funding_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..33]),
+            "sha256:488b5e004dadaf81a5891c5e9c408053855ba884be62dd59bda2c1d62682b843"
+        );
+        let task_migration = MIGRATIONS[33];
+        assert_eq!(task_migration.version, 34);
+        assert_eq!(task_migration.name, "chat_import_tasks");
+        assert_eq!(task_migration.change_set, 23);
+        assert_eq!(task_migration.phase, MigrationPhase::Expand);
+        assert_eq!(task_migration.sql, include_str!("import_tasks_expand.sql"));
+    }
+
+    #[test]
     fn owner_prepaid_expand_preserves_deployed_catalog() {
         assert_eq!(
             migration_catalog_checksum(&MIGRATIONS[..32]),

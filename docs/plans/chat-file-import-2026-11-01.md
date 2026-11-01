@@ -102,8 +102,9 @@ suite. Executed results are reported separately from the existence of tests.
 
 Executed in this workspace:
 
-- 250 Python tests passed, including explicit processing-mode and inspection bounds.
-- 47 focused frontend tests passed. Mounted coverage passed for the chat controls
+- 257 Python tests passed after integrating current main, including explicit
+  processing-mode, inspection and source-scan bounds.
+- 59 focused frontend model tests passed against contracts 0.3.164. Mounted coverage passed for the chat controls
   (20 tests) and the decision card, host and inspection handoff (21 tests).
 - Ten browser scenarios passed, with the affected inspection scenario rerun after
   hiding its continuation controls. They cover the 15-file selection shape with
@@ -112,7 +113,8 @@ Executed in this workspace:
 - Seven Rust task tests passed with actual Python execution and PostgreSQL enabled
   (no skips), including preapproval blocking, decision replay/revision conflicts,
   concurrent approval, immutable original/question/answer evidence and inspection.
-- The final Rust migration-catalog checksum test passed. API library checking,
+- The final Rust migration-catalog checksum and immutable-prefix 1–33/new migration
+  34 regression tests passed against contracts 0.3.164. API library checking,
   full web TypeScript checking and UI TypeScript checking passed.
 
 The actual worker test caught and verified a fix for input-pipe EOF handling;
