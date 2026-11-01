@@ -34,7 +34,7 @@ function ListRefinement() {
   const [selected, setSelected] = useState("")
   const [showBills, setShowBills] = useState(false)
   useEffect(() => { setShowBills(new URLSearchParams(window.location.search).get("view") === "bills"); setHydrated(true) }, [])
-  return <DashboardWorkspace sidebar={<DashboardSidebar userProfile={{ name: "Synthetic Accountant" }} />} onOpenSearch={() => {}}>
+  return <DashboardWorkspace userProfile={{ name: "Synthetic Accountant" }} sidebar={<DashboardSidebar />} onOpenSearch={() => {}}>
     <p className="mb-4 text-xs text-muted-foreground" data-testid="list-refinement-disclosure" data-hydrated={hydrated}>Synthetic invoice list — no ERP backend operations</p>
     <h1 className="mb-4 text-2xl font-semibold">Accounting</h1>
     {showBills ? <BillsListView

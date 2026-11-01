@@ -563,6 +563,8 @@ function ModulesContent({
       <DashboardWorkspace
         forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onSignOut={performSignOut}
+        userProfile={currentUserProfile.data}
         notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
         sidebar={
           <DashboardSidebar
@@ -572,8 +574,6 @@ function ModulesContent({
             onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
             onOpenNotebook={notebookVisible ? () => setIsNotebookOpen(true) : undefined}
             onOpenAIChat={openAiChat}
-            onSignOut={() => void performSignOut()}
-            userProfile={currentUserProfile.data}
           />
         }
         overlays={

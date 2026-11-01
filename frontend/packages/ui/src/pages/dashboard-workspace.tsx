@@ -1,16 +1,17 @@
 "use client"
 
 import { createContext, useEffect, useState, type ReactNode } from "react"
-import { Monitor, Moon, Search, Settings2, Sun } from "lucide-react"
+import { LogOut, Monitor, Moon, Search, Sun, UserRound } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from "../components/popover"
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "../components/sidebar"
 import { useTheme, type Theme } from "../components/theme-provider"
-import { readPreference, writePreference } from "../lib/theme-storage"
+import { readPreference } from "../lib/theme-storage"
 import { cn } from "../lib/utils"
 import { HeaderTrailingProvider } from "./dashboard-header"
 import { CompanySwitcher } from "../settings/company-switcher"
+import { useRBAC } from "../lib/rbac-context"
 
 /** Allows the sidebar to remain usable outside the application shell (e.g. previews). */
 export const DashboardWorkspaceContext = createContext(false)
@@ -30,13 +31,28 @@ function MobileCompanySwitcher() {
   return isMobile && !openMobile ? <div className="max-w-32 min-w-0"><CompanySwitcher className="h-8 py-1" /></div> : null
 }
 
-function WorkspacePreferences({ width, onWidthChange }: {
-  width: ContentWidth
-  onWidthChange: (width: ContentWidth) => void
-}) {
-  const { theme, setTheme, density, setDensity } = useTheme()
+export interface DashboardAccountProps {
+  userProfile?: { name?: string | null; firstName?: string | null; lastName?: string | null; email?: string | null }
+  onSignOut?: () => void | Promise<void>
+}
+
+/** Best available human label: full name, then first/last, then email. */
+function accountUserLabel(profile: DashboardAccountProps["userProfile"]): string {
+  const name = profile?.name?.trim()
+  if (name) return name
+  const parts = [profile?.firstName, profile?.lastName].map((part) => part?.trim()).filter(Boolean)
+  return parts.length ? parts.join(" ") : profile?.email?.trim() ?? ""
+}
+
+function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps) {
+  const { theme, setTheme } = useTheme()
   const { t } = useTranslation()
   const { open, setOpen } = useSidebar()
+  const { currentUser, roles } = useRBAC()
+  const [signingOut, setSigningOut] = useState(false)
+  const userLabel = accountUserLabel(userProfile) || currentUser?.name?.trim() || t("nav.signedIn")
+  const roleId = currentUser?.roles[0]
+  const roleLabel = roleId ? roles.find((role) => role.id === roleId)?.name || roleId : t("nav.noRole")
   const modes: { value: Theme; label: string; icon: typeof Sun }[] = [
     { value: "light", label: t("workspaceShell.light", { defaultValue: "Light" }), icon: Sun },
     { value: "dark", label: t("workspaceShell.dark", { defaultValue: "Dark" }), icon: Moon },
@@ -45,13 +61,20 @@ function WorkspacePreferences({ width, onWidthChange }: {
 
   return (
     <Popover>
-      <PopoverTrigger render={<Button variant="ghost" size="icon" aria-label={t("workspaceShell.preferences", { defaultValue: "Workspace preferences" })} />}>
-        <Settings2 className="size-4" />
+      <PopoverTrigger render={<Button variant="ghost" size="icon" data-testid="workspace-account-menu" aria-label={t("workspaceShell.accountAndPreferences", { defaultValue: "Account and preferences" })} />}>
+        <UserRound className="size-4" />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-4 p-4">
         <div className="space-y-1">
-          <PopoverTitle>{t("workspaceShell.preferences", { defaultValue: "Workspace preferences" })}</PopoverTitle>
+          <PopoverTitle>{t("workspaceShell.accountAndPreferences", { defaultValue: "Account and preferences" })}</PopoverTitle>
           <PopoverDescription className="text-xs">{t("workspaceShell.preferencesDescription", { defaultValue: "Make this workspace comfortable for you." })}</PopoverDescription>
+        </div>
+        <div className="flex min-w-0 items-center gap-3 border-b pb-4" data-testid="workspace-user">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted"><UserRound className="size-4" /></div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{userLabel}</p>
+            <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
+          </div>
         </div>
         <fieldset className="space-y-2">
           <legend className="text-xs font-medium">{t("workspaceShell.appearance", { defaultValue: "Appearance" })}</legend>
@@ -64,30 +87,6 @@ function WorkspacePreferences({ width, onWidthChange }: {
             ))}
           </div>
         </fieldset>
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-medium">{t("workspaceShell.contentWidth", { defaultValue: "Content width" })}</legend>
-          <div className="grid grid-cols-2 gap-1">
-            {(["centered", "full"] as const).map((value) => (
-              <Button key={value} size="sm" variant={width === value ? "secondary" : "outline"}
-                aria-pressed={width === value} onClick={() => onWidthChange(value)}>
-                {value === "centered" ? t("workspaceShell.centered", { defaultValue: "Centered" }) : t("workspaceShell.fullWidth", { defaultValue: "Full width" })}
-              </Button>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-medium">{t("workspaceShell.density", { defaultValue: "Table density" })}</legend>
-          <div className="grid grid-cols-2 gap-1">
-            <Button size="sm" variant={density === "comfortable" ? "secondary" : "outline"}
-              aria-pressed={density === "comfortable"} onClick={() => setDensity("comfortable")}>
-              {t("workspaceShell.comfortable", { defaultValue: "Comfortable" })}
-            </Button>
-            <Button size="sm" variant={density === "compact" ? "secondary" : "outline"}
-              aria-pressed={density === "compact"} onClick={() => setDensity("compact")}>
-              {t("workspaceShell.compact", { defaultValue: "Compact" })}
-            </Button>
-          </div>
-        </fieldset>
         <fieldset className="hidden space-y-2 md:block">
           <legend className="text-xs font-medium">{t("workspaceShell.navigation", { defaultValue: "Navigation" })}</legend>
           <div className="grid grid-cols-2 gap-1">
@@ -97,20 +96,29 @@ function WorkspacePreferences({ width, onWidthChange }: {
               onClick={() => setOpen(false)}>{t("workspaceShell.compact", { defaultValue: "Compact" })}</Button>
           </div>
         </fieldset>
+        {onSignOut && <div className="border-t pt-3">
+          <Button variant="outline" size="sm" className="w-full justify-start" data-testid="workspace-sign-out"
+            disabled={signingOut} onClick={async () => {
+              setSigningOut(true)
+              try { await onSignOut() } finally { setSigningOut(false) }
+            }}>
+            <LogOut className="size-4" />{t("nav.signOut")}
+          </Button>
+        </div>}
       </PopoverContent>
     </Popover>
   )
 }
 
 /** Shared shell composition, inspired by Studio Admin's compact header and inset workspace. */
-export function DashboardWorkspace({ sidebar, children, overlays, notifications, onOpenSearch, forceCollapsed = false }: {
+export function DashboardWorkspace({ sidebar, children, overlays, notifications, onOpenSearch, forceCollapsed = false, userProfile, onSignOut }: {
   sidebar: ReactNode
   children: ReactNode
   overlays?: ReactNode
   notifications?: ReactNode
   onOpenSearch: () => void
   forceCollapsed?: boolean
-}) {
+} & DashboardAccountProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { t } = useTranslation()
   const [width, setWidth] = useState<ContentWidth>("centered")
@@ -123,14 +131,9 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
     if (persistedWidth === "centered" || persistedWidth === "full") setWidth(persistedWidth)
   }, [])
 
-  const changeWidth = (next: ContentWidth) => {
-    setWidth(next)
-    writePreference(CONTENT_WIDTH_KEY, next)
-  }
-
   return (
     <DashboardWorkspaceContext value={true}>
-      <SidebarProvider open={forceCollapsed ? false : sidebarOpen} onOpenChange={setSidebarOpen}
+      <SidebarProvider resizable open={forceCollapsed ? false : sidebarOpen} onOpenChange={setSidebarOpen}
         className="h-svh min-h-0 overflow-hidden bg-muted/30 text-foreground"
         style={{ "--sidebar-width-icon": "4rem" } as React.CSSProperties}>
         {sidebar}
@@ -148,7 +151,7 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
               </Button>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <WorkspacePreferences width={width} onWidthChange={changeWidth} />
+              <WorkspaceAccountMenu userProfile={userProfile} onSignOut={onSignOut} />
               {notifications}
             </div>
           </header>

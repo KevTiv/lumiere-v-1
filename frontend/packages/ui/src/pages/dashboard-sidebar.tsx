@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext, useEffect, useMemo } from "react"
+import { useContext, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -9,20 +9,21 @@ import { useRBAC } from "@/lib/rbac-context"
 import { useTranslation } from "@lumiere/i18n"
 import { CompanySwitcher } from "../settings/company-switcher"
 import {
+  ChevronDown,
   ChevronLeft,
   Menu,
   Lock,
   BookOpen,
   Sparkles,
   BookMarked,
-  LogOut,
 } from "lucide-react"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
-import { Sidebar, SidebarProvider, useSidebar } from "../components/sidebar"
+import { Sidebar, SidebarProvider, SidebarResizeHandle, useSidebar } from "../components/sidebar"
 import { DashboardWorkspaceContext } from "./dashboard-workspace"
+import { readPreference, writePreference } from "../lib/theme-storage"
 
 interface DashboardSidebarProps {
   forceCollapsed?: boolean
@@ -33,31 +34,12 @@ interface DashboardSidebarProps {
   firstOrgProfile?: boolean
   /** Optional nav badge counts keyed by href (e.g. pending AI approvals). */
   navBadges?: Record<string, number>
-  /** When set, shows a sidebar control that calls this handler (typically clears session + redirects). */
-  onSignOut?: () => void | Promise<void>
-  /** Signed-in user's profile; the RBAC user carries roles only. */
-  userProfile?: { name?: string | null; firstName?: string | null; lastName?: string | null; email?: string | null }
-}
-
-/** Best available human label: full name, then first/last, then email. */
-export function sidebarUserLabel(profile: DashboardSidebarProps["userProfile"]): string {
-  const name = profile?.name?.trim()
-  if (name) return name
-  const parts = [profile?.firstName, profile?.lastName].map((part) => part?.trim()).filter(Boolean)
-  if (parts.length > 0) return parts.join(" ")
-  return profile?.email?.trim() ?? ""
-}
-
-function sidebarUserInitials(label: string): string {
-  const base = label.includes("@") ? label.split("@")[0] : label
-  const words = base.split(/[\s._-]+/).filter(Boolean)
-  return words.slice(0, 2).map((word) => word[0]!.toUpperCase()).join("")
 }
 
 export function DashboardSidebar(props: DashboardSidebarProps) {
   const inWorkspace = useContext(DashboardWorkspaceContext)
   return inWorkspace ? <DashboardSidebarContent {...props} /> : (
-    <SidebarProvider><DashboardSidebarContent {...props} /></SidebarProvider>
+    <SidebarProvider resizable style={{ "--sidebar-width-icon": "4rem" } as React.CSSProperties}><DashboardSidebarContent {...props} /></SidebarProvider>
   )
 }
 
@@ -68,16 +50,27 @@ function DashboardSidebarContent({
   onOpenAIChat,
   firstOrgProfile = false,
   navBadges,
-  onSignOut,
-  userProfile,
 }: DashboardSidebarProps) {
   const { state, isMobile, toggleSidebar, setOpenMobile } = useSidebar()
-  const { checkPermission, currentUser, roles, isAdmin } = useRBAC()
+  const { checkPermission, isAdmin } = useRBAC()
   const pathname = usePathname()
   const router = useRouter()
   const { t } = useTranslation()
   const isCollapsed = !isMobile && (forceCollapsed || state === "collapsed")
-  const userLabel = sidebarUserLabel(userProfile) || currentUser?.name?.trim() || ""
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([])
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(readPreference("lumiere-sidebar-categories") ?? "[]")
+      if (Array.isArray(saved) && saved.every((value) => typeof value === "string")) setCollapsedGroups(saved)
+    } catch { /* Ignore invalid stored preferences. */ }
+  }, [])
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups((current) => {
+      const next = current.includes(key) ? current.filter((value) => value !== key) : [...current, key]
+      writePreference("lumiere-sidebar-categories", JSON.stringify(next))
+      return next
+    })
+  }
 
   const workspaceProfile = useWorkspaceProfile()
   useEffect(() => { setOpenMobile(false) }, [pathname, setOpenMobile])
@@ -97,12 +90,6 @@ function DashboardSidebarContent({
       (!firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin))
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
-
-  const getUserRoleName = () => {
-    if (!currentUser || currentUser.roles.length === 0) return t("nav.noRole")
-    const role = roles.find(r => r.id === currentUser.roles[0])
-    return role?.name || currentUser.roles[0]
-  }
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -127,14 +114,21 @@ function DashboardSidebarContent({
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3">
-        {navGroups.map((group, groupIndex) => (
-          <div key={`sidebar-option-${String(groupIndex)}`}>
+        {navGroups.map((group, groupIndex) => {
+          const groupKey = group.items[0]!.surfaceId
+          const expanded = !group.label || isCollapsed || !collapsedGroups.includes(groupKey)
+          const groupId = `sidebar-category-${groupIndex}`
+          return (
+          <div key={groupKey}>
             {!isCollapsed && group.label && (
-              <p className="px-2.5 py-1 text-[0.68rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                {group.label}
-              </p>
+              <button type="button" aria-expanded={expanded} aria-controls={groupId}
+                onClick={() => toggleGroup(groupKey)}
+                className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-[0.68rem] font-medium uppercase tracking-[0.08em] text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+                <span className="truncate">{group.label}</span>
+                <ChevronDown aria-hidden="true" className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
+              </button>
             )}
-            <div className="space-y-0.5">
+            <div id={groupId} hidden={!expanded} className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href)
@@ -200,7 +194,7 @@ function DashboardSidebarContent({
               })}
             </div>
           </div>
-        ))}
+        )})}
       </nav>
 
       <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
@@ -250,8 +244,8 @@ function DashboardSidebarContent({
             aria-label="Open AI Assistant"
             data-testid="sidebar-open-ai-chat"
             className={cn(
-              "flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-sidebar-accent px-2.5 py-2 text-sm transition-colors",
-              "text-sidebar-foreground hover:bg-sidebar-accent/70",
+              "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
+              "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
               isCollapsed && "justify-center"
             )}
           >
@@ -263,42 +257,7 @@ function DashboardSidebarContent({
         )}
       </div>
 
-      <div className="space-y-3 border-t border-sidebar-border p-3">
-        <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")} data-testid="sidebar-user">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-sm font-medium text-sidebar-foreground">
-            {sidebarUserInitials(userLabel) || "?"}
-          </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {userLabel || t("nav.signedIn")}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{getUserRoleName()}</p>
-            </div>
-          )}
-        </div>
-        {onSignOut ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={cn(
-              "w-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent",
-              !isCollapsed && "justify-start gap-2",
-              isCollapsed && "px-0 justify-center",
-            )}
-            title={isCollapsed ? t("nav.signOut") : undefined}
-            aria-label={t("nav.signOut")}
-            onClick={() => {
-              void onSignOut()
-            }}
-            data-testid="sidebar-sign-out"
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {!isCollapsed ? <span className="truncate">{t("nav.signOut")}</span> : null}
-          </Button>
-        ) : null}
-      </div>
+      {!forceCollapsed && <SidebarResizeHandle aria-label={t("workspaceShell.resizeNavigation", { defaultValue: "Resize navigation" })} />}
     </aside>
     </Sidebar>
   )

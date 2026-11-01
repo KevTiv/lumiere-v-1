@@ -68,7 +68,7 @@ function Templates() {
       { id: "form", label: "Static form", type: "custom", customContent: <ModularForm config={{ ...form, id: "template-inline", layout: "card" }} onSubmit={() => setSaved(true)} /> },
     ],
   }
-  return <DashboardWorkspace sidebar={<DashboardSidebar userProfile={{ name: "Synthetic Designer" }} />} onOpenSearch={() => {}}>
+  return <DashboardWorkspace userProfile={{ name: "Synthetic Designer" }} sidebar={<DashboardSidebar />} onOpenSearch={() => {}}>
     <p className="mb-4 text-xs text-muted-foreground" data-testid="style-fixture-disclosure" data-hydrated={hydrated}>Synthetic UI fixture — no backend operations</p>
     <div className="mb-5 flex flex-wrap gap-2" aria-label="Synthetic appearance controls">
       <Button variant="outline" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>Light theme</Button>

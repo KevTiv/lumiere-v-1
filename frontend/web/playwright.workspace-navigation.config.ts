@@ -4,7 +4,7 @@ import accountingUi from "./playwright.accounting-ui.config"
 /** Focused navigation/template checks without warming unrelated workflows. */
 export default defineConfig({
   ...accountingUi,
-  testMatch: ["workspace-navigation-ui.spec.ts", "style-templates-ui.spec.ts"],
+  testMatch: ["sidebar-workspace-ui.spec.ts", "workspace-navigation-ui.spec.ts", "style-templates-ui.spec.ts"],
   globalSetup: "./tests/workspace-navigation-warmup.ts",
   webServer: {
     command: "node node_modules/next/dist/bin/next dev tests/accounting-ui-fixture --webpack --hostname 127.0.0.1 --port 3111",
