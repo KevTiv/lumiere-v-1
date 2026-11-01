@@ -2,6 +2,11 @@
   "version": 1,
   "reducers": [
     {
+      "name": "run_ai_owner_configuration_tests",
+      "exposure": "denied",
+      "reason": "isolated native test runner; never an authenticated application operation"
+    },
+    {
       "name": "share_ai_owner_agent",
       "exposure": "session",
       "reason": "reviewed limit-only/shared-agent owner configuration; authenticated human organization administrator, exact revision, immutable actor-bound receipt and current-budget preconditions are enforced by the native owner; requires matching released generated contracts before API integration"
