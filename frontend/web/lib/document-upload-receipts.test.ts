@@ -119,3 +119,32 @@ test("missing file bytes cannot create a document or invoke AI", async () => {
   }), /Reselect the original file/)
   assert.equal(calls, 0)
 })
+
+
+test("worker states and unavailable reads never repeat upload, registration or indexing", async () => {
+  for (const indexing of ["running", "completed", "unavailable", "queued"] as const) {
+    let effects = 0
+    const receipt = saved({ documentId: "123", registrationState: "registered", indexing })
+    const recovered = await resumeDocumentSubmission({
+      assertCurrent: () => undefined, read: async () => receipt,
+      create: async () => { effects++; return { resource: "documents", id: "123" } },
+      index: async () => { effects++ }, changed: () => undefined,
+    }, { retryIndexing: true })
+    assert.equal(recovered.indexing, indexing)
+    assert.equal(effects, 0)
+  }
+})
+
+test("a lost indexing reply recovers a terminal worker receipt without another dispatch", async () => {
+  let server = saved({ documentId: "123", registrationState: "registered" })
+  let effects = 0
+  const ports = {
+    assertCurrent: () => undefined, read: async () => server,
+    create: async () => { throw new Error("registration must not repeat") },
+    index: async () => { effects++; server = { ...server, indexing: "completed" }; throw new Error("reply lost") },
+    changed: () => undefined,
+  }
+  assert.equal((await resumeDocumentSubmission(ports)).indexing, "completed")
+  assert.equal((await resumeDocumentSubmission(ports, { retryIndexing: true })).indexing, "completed")
+  assert.equal(effects, 1)
+})
