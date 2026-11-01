@@ -80,9 +80,11 @@ pub struct ColdTierServiceIdentity {
 /// Register (or replace) the organization binding for a cold-tier service,
 /// e.g. `"projection_worker"`. Retires any prior active identity for that
 /// `(organization_id, service_name)` — only one is active per organization.
+/// Platform ids prefixed `tenant-enrollment-` are reserved for automatic
+/// add-only enrollment and cannot replace any existing binding history.
 ///
 /// Not callable through the public API (see `reducer_allowlist.rs`) — this
-/// is a one-time-per-deploy ops action, run the same way
+/// is a trusted server/ops action, run the same way
 /// `register_ai_skill_certification_runtime_profile` is: directly against
 /// SpacetimeDB with the owner token, not from the app.
 #[spacetimedb::reducer]
@@ -104,6 +106,9 @@ pub fn register_cold_tier_service_identity(
 
     if let Some(organization) = ctx.db.organization().id().find(&organization_id) {
         require_superuser(ctx)?;
+        if platform_id.starts_with("tenant-enrollment-") && !organization.is_active {
+            return Err("automatic service enrollment requires an active organization".to_string());
+        }
         if organization.id == 0 || organization.organization_id != organization.id {
             return Err("Organization has invalid server-owned identity".to_string());
         }
@@ -141,8 +146,13 @@ pub fn register_cold_tier_service_identity(
         .cold_tier_service_identity()
         .cold_tier_service_identity_by_name()
         .filter((&organization_id, &service_name))
-        .filter(|row| row.is_active)
         .collect();
+    // Automatic tenant enrollment only fills an absent binding. Check the
+    // entire history atomically, so a concurrent retirement/rotation cannot be
+    // undone between the API's discovery query and this reducer transaction.
+    // Explicit operator registrations retain their existing rotation behavior.
+    require_new_automatic_binding(&platform_id, !active.is_empty())?;
+    let active = active.into_iter().filter(|row| row.is_active);
     for row in active {
         ctx.db
             .cold_tier_service_identity()
@@ -264,6 +274,13 @@ fn validate_platform_id(platform_id: &str) -> Result<String, String> {
     Ok(platform_id.to_string())
 }
 
+fn require_new_automatic_binding(platform_id: &str, has_history: bool) -> Result<(), String> {
+    if platform_id.starts_with("tenant-enrollment-") && has_history {
+        return Err("automatic enrollment cannot replace an existing service binding".to_string());
+    }
+    Ok(())
+}
+
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
     if !user.is_active || !user.is_superuser {
@@ -277,7 +294,19 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_platform_id, validate_reconstruction_bootstrap_identity};
+    use super::{
+        require_new_automatic_binding, validate_platform_id,
+        validate_reconstruction_bootstrap_identity,
+    };
+
+    #[test]
+    fn automatic_enrollment_cannot_undo_retirement_or_rotation() {
+        let automatic = "tenant-enrollment-expense_integration_worker-101";
+        assert!(require_new_automatic_binding(automatic, false).is_ok());
+        assert!(require_new_automatic_binding(automatic, true).is_err());
+        // Operator registration continues to permit explicit rotations.
+        assert!(require_new_automatic_binding("railway-expense-rotation-2026", true).is_ok());
+    }
 
     #[test]
     fn platform_binding_id_must_be_opaque_and_bounded() {

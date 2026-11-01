@@ -30,6 +30,7 @@ mod rwanda_vsdc;
 pub mod service_identity;
 pub mod session;
 pub mod state;
+mod tenant_services;
 pub(crate) mod trusted_context;
 pub mod web_session;
 pub mod workflow_reads;

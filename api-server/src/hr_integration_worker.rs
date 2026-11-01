@@ -4,7 +4,8 @@
 //! intents via `apply_pending_hr_integration_intents` (payload must contain worker-prepared results).
 //!
 //! Configure with:
-//! - `LUMIERE_HR_WORKER_ORG_IDS` — comma-separated organization ids (required)
+//! - `LUMIERE_HR_WORKER_ORG_IDS` — optional comma-separated tenant restriction;
+//!   unset/empty discovers active tenants bound to this worker on every poll
 //! - `LUMIERE_HR_WORKER_POLL_SECS` — poll interval (default 15)
 //! - `LUMIERE_HR_WORKER_PORT` — health port (default 8094)
 //! - `LUMIERE_HR_WORKER_BATCH` — max intents per org per tick (default 20)

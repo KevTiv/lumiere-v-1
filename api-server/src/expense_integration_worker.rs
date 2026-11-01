@@ -23,7 +23,8 @@
 //! This worker only flushes pending intents; it does not upload blobs.
 //!
 //! Configure with:
-//! - `LUMIERE_EXPENSE_WORKER_ORG_IDS` — comma-separated organization ids (required)
+//! - `LUMIERE_EXPENSE_WORKER_ORG_IDS` — optional comma-separated tenant restriction;
+//!   unset/empty discovers active tenants bound to this worker on every poll
 //! - `LUMIERE_EXPENSE_WORKER_POLL_SECS` — poll interval (default 15)
 //! - `LUMIERE_EXPENSE_WORKER_PORT` — health port (default 8092)
 //! - `LUMIERE_EXPENSE_WORKER_BATCH` — max intents per org per tick (default 20)
