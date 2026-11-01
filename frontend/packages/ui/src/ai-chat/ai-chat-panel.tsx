@@ -30,6 +30,7 @@ import {
   Command,
   PanelRight,
   PanelRightClose,
+  Paperclip,
 } from "lucide-react"
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
@@ -40,6 +41,7 @@ import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guid
 import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
+import { validateChatImportFiles } from "../lib/chat-import-files"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 
 interface ChatReply {
@@ -70,6 +72,13 @@ interface AIChatPanelProps {
   historySaveFailed?: boolean
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
   onSendMessage?: (userText: string) => Promise<ChatReply>
+  /** File-only intake attaches sources without sending or replacing the composer text. */
+  onImportFiles?: (files: File[]) => Promise<void>
+  /** Server-backed task cards are owned by the host, separately from text replies. */
+  importTaskContent?: React.ReactNode
+  importCompanyLabel?: string
+  /** The host can include actor and organization when the panel is not remounted on scope changes. */
+  importScopeKey?: string
   onStreamMessage?: (
     userText: string,
     handlers: {
@@ -145,6 +154,10 @@ export function AIChatPanel({
   modal = false,
   historySaveFailed,
   onSendMessage,
+  onImportFiles,
+  importTaskContent,
+  importCompanyLabel,
+  importScopeKey,
   onStreamMessage,
 }: AIChatPanelProps) {
   const { t } = useTranslation()
@@ -153,6 +166,23 @@ export function AIChatPanel({
   const [isLoading, setIsLoading] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [guideError, setGuideError] = useState<string | null>(null)
+  const fileImportEnabled = config?.enableFileUpload === true && onImportFiles != null
+  const fileScope = JSON.stringify([importScopeKey, context?.currentUser, context?.companyId, fileImportEnabled])
+  const currentFileScope = useRef(fileScope)
+  currentFileScope.current = fileScope
+  const [fileImport, setFileImport] = useState<{ scope: string; busy: boolean; error?: string }>({ scope: fileScope, busy: false })
+  const fileImportAttempt = useRef<{ scope: string; token: object } | null>(null)
+  const [draggingFiles, setDraggingFiles] = useState(false)
+  const fileDragDepth = useRef(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileImportBusy = fileImport.scope === fileScope && fileImport.busy
+  const fileImportError = fileImport.scope === fileScope ? fileImport.error : undefined
+  useEffect(() => {
+    fileDragDepth.current = 0
+    fileImportAttempt.current = null
+    setDraggingFiles(false)
+    setFileImport({ scope: fileScope, busy: false })
+  }, [fileScope])
   const active = useRef(true)
   useEffect(() => {
     active.current = true
@@ -170,6 +200,40 @@ export function AIChatPanel({
 
   const commands = config?.commands || defaultAtCommands
   const selectionSummary = selectionSummaryFromContext(context)
+
+  const handleImportFiles = async (files: File[]) => {
+    if (files.length === 0 || fileImportAttempt.current?.scope === fileScope) return
+    if (!fileImportEnabled || !onImportFiles) {
+      setFileImport({ scope: fileScope, busy: false, error: t("aiChat.import.unavailable", { defaultValue: "File import is unavailable in this workspace." }) })
+      return
+    }
+    const problem = validateChatImportFiles(files)
+    if (problem) {
+      const defaults = {
+        tooManyFiles: "Choose up to 20 files at a time.",
+        unsupportedFile: "{{fileName}} is not a CSV or XLSX file.",
+        emptyFile: "{{fileName}} is empty. Choose a file containing data.",
+        fileTooLarge: "{{fileName}} exceeds the 5 MB file limit.",
+        totalTooLarge: "The selected files exceed the 20 MB total limit.",
+      }
+      setFileImport({ scope: fileScope, busy: false, error: t(`aiChat.import.${problem.code}`, { defaultValue: defaults[problem.code], fileName: "fileName" in problem ? problem.fileName : undefined }) })
+      return
+    }
+    const attempt = { scope: fileScope, token: {} }
+    fileImportAttempt.current = attempt
+    setFileImport({ scope: fileScope, busy: true })
+    const isCurrent = () => active.current && currentFileScope.current === fileScope && fileImportAttempt.current === attempt
+    try {
+      await onImportFiles(files)
+      if (isCurrent()) setFileImport({ scope: fileScope, busy: false })
+    } catch (error) {
+      if (isCurrent()) setFileImport({ scope: fileScope, busy: false, error: error instanceof Error ? error.message : t("aiChat.import.failed", { defaultValue: "Import preparation could not be started. Check the saved task before trying again." }) })
+    } finally {
+      if (fileImportAttempt.current === attempt) fileImportAttempt.current = null
+    }
+  }
+
+  const isFileDrag = (event: React.DragEvent) => Array.from(event.dataTransfer.types).includes("Files") || event.dataTransfer.files.length > 0
 
   useEffect(() => {
     if (initialMessages) {
@@ -506,6 +570,30 @@ export function AIChatPanel({
     <section
       data-testid="erp-ai-chat-panel"
       data-mode={docked ? "side" : "full"}
+      onDragEnter={(event) => {
+        if (!isFileDrag(event)) return
+        event.preventDefault()
+        fileDragDepth.current += 1
+        if (fileImportEnabled && !fileImportBusy) setDraggingFiles(true)
+      }}
+      onDragOver={(event) => {
+        if (!isFileDrag(event)) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = fileImportEnabled && !fileImportBusy ? "copy" : "none"
+      }}
+      onDragLeave={(event) => {
+        if (!isFileDrag(event)) return
+        fileDragDepth.current = Math.max(0, fileDragDepth.current - 1)
+        if (fileDragDepth.current === 0) setDraggingFiles(false)
+      }}
+      onDrop={(event) => {
+        if (!isFileDrag(event)) return
+        event.preventDefault()
+        event.stopPropagation()
+        fileDragDepth.current = 0
+        setDraggingFiles(false)
+        void handleImportFiles(Array.from(event.dataTransfer.files))
+      }}
       aria-label={config?.title || t("aiChat.title")}
       className={cn(
         "relative z-50 flex min-h-0 flex-col overflow-hidden bg-background text-foreground",
@@ -514,6 +602,7 @@ export function AIChatPanel({
           : "fixed inset-0 h-dvh w-screen",
       )}
     >
+      {draggingFiles ? <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/95 p-6 text-center text-sm" role="status">{t("aiChat.import.dropFiles", { defaultValue: "Drop CSV or XLSX files to attach them" })}</div> : null}
       <header className="flex min-h-[64px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
@@ -575,6 +664,7 @@ export function AIChatPanel({
           {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
           {guideError ? <p role="alert" className="mb-4 break-words text-sm text-destructive">{guideError}</p> : null}
           {historySaveFailed ? <p role="alert" className="mb-4 break-words rounded-md border p-3 text-sm">{t("aiChat.historySaveFailed", { defaultValue: "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed." })}</p> : null}
+          {importTaskContent ? <div className="mb-6 space-y-3" data-testid="erp-ai-chat-import-tasks">{importTaskContent}</div> : null}
             {messages.length === 0 ? (
               <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -861,6 +951,9 @@ export function AIChatPanel({
             </div>
           )}
         <div className="shrink-0 border-t border-border/70 bg-background/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 sm:px-5">
+          {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
+          {fileImportBusy ? <p role="status" className="mx-auto mb-2 flex max-w-[790px] items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("aiChat.import.savingAttachments", { defaultValue: "Saving attachments…" })}</p> : null}
+          {config?.enableFileUpload && importCompanyLabel ? <p className="mx-auto mb-2 max-w-[790px] truncate text-xs text-muted-foreground" title={importCompanyLabel}>{t("aiChat.import.destination", { defaultValue: "Import into {{company}}", company: importCompanyLabel })}</p> : null}
           <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-ring">
             <Textarea
               variant="plain"
@@ -876,6 +969,10 @@ export function AIChatPanel({
             />
             <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 pl-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                {config?.enableFileUpload ? <>
+                  <input ref={fileInputRef} type="file" multiple accept=".csv,.xlsx" hidden data-testid="erp-ai-chat-file-input" disabled={!fileImportEnabled || fileImportBusy} aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void handleImportFiles(files) }} />
+                  <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" data-testid="erp-ai-chat-attach" disabled={!fileImportEnabled || fileImportBusy} onClick={() => fileInputRef.current?.click()} aria-label={t("aiChat.import.attachFiles", { defaultValue: "Attach CSV or XLSX files" })} title={t("aiChat.import.attachFiles", { defaultValue: "Attach CSV or XLSX files" })}><Paperclip className="size-4" aria-hidden="true" /></Button>
+                </> : null}
                 <span><kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}</span>
                 {selectionSummary ? (
                   <Badge variant="outline" className="max-w-[180px] truncate text-[10px]" title={t("aiChat.selectionContext")}>

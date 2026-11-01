@@ -62,6 +62,7 @@ import { performSignOut } from "@/lib/auth-sign-out"
 import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream, type TurnFailure } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
+import { useChatImportTasks } from "@/lib/chat-import-tasks"
 import { recordPageHref } from "@/lib/record-page-href"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
@@ -156,6 +157,8 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const citeSource = useRecordEvidenceContribution(orgId)
   const messagesQuery = useAiChatMessages(orgId, sessionKey, orgReady && operatingCompanyId != null)
   const companiesQuery = useCompanies(orgId, orgReady)
+  const importTasks = useChatImportTasks({ identity, organizationId: orgId, companyId: operatingCompanyId, conversationKey: sessionKey })
+  const importCompany = companiesQuery.data?.find(company => String(company.id) === String(operatingCompanyId))
 
   useEffect(() => {
     if (!actorHistoryScope) return
@@ -316,6 +319,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const chatConfig = useMemo(
     () => ({
       ...props.config,
+      enableFileUpload: true,
       guideLibraryHref: operatingCompanyId ? guideLibraryHref(String(operatingCompanyId), module ?? undefined) : undefined,
       onOpenGuide: (request: OpenGuideRequest) => {
         if (actorHistoryScope) setOpenGuide({ scope: actorHistoryScope, request })
@@ -493,6 +497,10 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       onContextChange={setSelectedScope}
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
+      onImportFiles={importTasks.onImportFiles}
+      importTaskContent={importTasks.content}
+      importCompanyLabel={importCompany?.name ?? (operatingCompanyId ? `Company ${operatingCompanyId}` : undefined)}
+      importScopeKey={JSON.stringify([identity, organizationId, operatingCompanyId, sessionKey])}
     />
     <AssistantGuideHost request={guideRequestInScope(openGuide, actorHistoryScope)} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
       onClose={() => setOpenGuide(null)} onSaved={onGuideSaved} onAsk={askAboutGuide} />

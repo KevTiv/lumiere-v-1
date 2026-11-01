@@ -77,6 +77,27 @@ services:
         config:
           allowed_payload_size: 20
 
+  # A 20 MB source selection expands to about 27 MB in the JSON upload.
+  # Keep this allowance on import preparation; ordinary web requests stay at 20 MB.
+  - name: api-import-tasks
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/import-tasks
+    routes:
+      - name: api-import-tasks
+        paths:
+          - /api/import-tasks
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          hour: 300
+          limit_by: ip
+          fault_tolerant: false
+          policy: cluster
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 28
+
   - name: api-query
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/query
     routes:
