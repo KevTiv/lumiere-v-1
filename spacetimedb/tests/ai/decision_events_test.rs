@@ -16,7 +16,7 @@ use crate::ai::skills::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
-fn seed_run(
+pub(super) fn seed_run(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -134,7 +134,10 @@ fn decision_params(step_no: u32, request_hash: &str) -> RecordAiDecisionEventPar
     }
 }
 
-fn shadow_success_params(request_hash: &str, shadow_profile_ref: &str) -> RecordAiDecisionShadowEventParams {
+fn shadow_success_params(
+    request_hash: &str,
+    shadow_profile_ref: &str,
+) -> RecordAiDecisionShadowEventParams {
     RecordAiDecisionShadowEventParams {
         shadow_profile_ref: shadow_profile_ref.to_string(),
         decision_type_name: "PaymentDisposition".to_string(),
@@ -152,7 +155,10 @@ fn shadow_success_params(request_hash: &str, shadow_profile_ref: &str) -> Record
     }
 }
 
-fn shadow_failure_params(request_hash: &str, shadow_profile_ref: &str) -> RecordAiDecisionShadowEventParams {
+fn shadow_failure_params(
+    request_hash: &str,
+    shadow_profile_ref: &str,
+) -> RecordAiDecisionShadowEventParams {
     RecordAiDecisionShadowEventParams {
         shadow_profile_ref: shadow_profile_ref.to_string(),
         decision_type_name: "PaymentDisposition".to_string(),
@@ -208,7 +214,9 @@ pub fn test_record_decision_shadow_event_persists(ctx: &ReducerContext) -> Resul
         || event.outcome_kind != "choice"
         || event.acceptance_status != "rejected"
     {
-        return Err(format!("AI-IE-010: unexpected persisted shadow event {event:?}"));
+        return Err(format!(
+            "AI-IE-010: unexpected persisted shadow event {event:?}"
+        ));
     }
     let production_count = ctx
         .db
@@ -264,7 +272,9 @@ pub fn test_record_decision_shadow_event_records_failure_and_is_idempotent(
     }
     let event = &matches[0];
     if event.shadow_error.as_deref() != Some("provider timeout") || event.outcome_kind != "failed" {
-        return Err(format!("AI-IE-011: unexpected failed shadow event {event:?}"));
+        return Err(format!(
+            "AI-IE-011: unexpected failed shadow event {event:?}"
+        ));
     }
     Ok(())
 }

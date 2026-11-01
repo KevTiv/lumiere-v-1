@@ -379,6 +379,14 @@ export function useCancelAiAgentRun(organizationId: number, companyId?: number) 
 
 // ── Harness skill runs (dedicated /api/ai/skills/* routes) ───────────────────
 
+/** Typed pre-dispatch rejection; unlike transport failure it proves no run started. */
+export class AiReportReadinessBlockedError extends Error {
+  constructor(public readonly readiness: unknown) {
+    super("Report analysis was blocked before dispatch")
+    this.name = "AiReportReadinessBlockedError"
+  }
+}
+
 async function postHarnessSkill<T>(
   path: string,
   body: Record<string, unknown>,
@@ -388,7 +396,15 @@ async function postHarnessSkill<T>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
-  if (!r.ok) throw new Error(await parseAiError(r))
+  if (!r.ok) {
+    if (path === "/api/ai/skills/report-analysis" && r.status === 409) {
+      const blocked: unknown = await r.clone().json().catch(() => null)
+      if (blocked && typeof blocked === "object" && "analysisStarted" in blocked && blocked.analysisStarted === false && "readiness" in blocked) {
+        throw new AiReportReadinessBlockedError(blocked.readiness)
+      }
+    }
+    throw new Error(await parseAiError(r))
+  }
   return (await r.json()) as T
 }
 

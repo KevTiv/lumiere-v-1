@@ -11,7 +11,7 @@ const compiled = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
 ).outputText
 
-function reportRoute(options: { refreshFails?: boolean; denied?: boolean; companyDenied?: boolean; actor?: string } = {}) {
+function reportRoute(options: { readinessBlocked?: boolean; refreshFails?: boolean; denied?: boolean; companyDenied?: boolean; actor?: string } = {}) {
   const calls: string[] = []
   const refreshes: { name: string; args: unknown[]; token: string }[] = []
   const forwarded: { body: unknown; headers: unknown }[] = []
@@ -35,6 +35,10 @@ function reportRoute(options: { refreshFails?: boolean; denied?: boolean; compan
     },
     "../_lib/ai-privacy-policy": { resolveAiPrivacyPolicy: () => ({ allowedFields: [], maskedFields: [], suppressedFields: [], maskPhoneFields: true, maskPaymentReferences: true, suppressSecrets: true }) },
     "./_governed-llm-contract": { buildTrustedGovernedLlmRequest },
+    "@/lib/report-readiness-server": { readReportReadiness: async () => {
+      calls.push("readiness")
+      return { companyId: 13, agentId: 7, billableCalls: 0, status: options.readinessBlocked ? "blocked" : "ready", code: options.readinessBlocked ? "release_not_ready" : null }
+    } },
     "@/lib/stdb-reducer": {
       callReducer: async (name: string, args: unknown[], opts: { token: string }) => {
         calls.push("refresh")
@@ -61,7 +65,7 @@ function reportRoute(options: { refreshFails?: boolean; denied?: boolean; compan
 test("report admission refreshes the current caller snapshot before contacting the gateway", async () => {
   const route = reportRoute()
   assert.equal((await route.submit()).status, 200)
-  assert.deepEqual(route.calls, ["refresh", "gateway"])
+  assert.deepEqual(route.calls, ["readiness", "refresh", "gateway"])
   assert.deepEqual(route.refreshes, [{ name: "refresh_policy_snapshot", args: [11], token: "actor-token" }])
   assert.deepEqual(route.forwarded[0].headers, {
     "x-lumiere-organization-id": "11", "x-lumiere-company-id": "13",
@@ -74,7 +78,7 @@ test("a failed snapshot refresh does not start a report or expose the upstream e
   const response = await route.submit()
   assert.equal(response.status, 503)
   assert.deepEqual(await response.json(), { error: "Report authorization refresh is unavailable. No analysis was started." })
-  assert.deepEqual(route.calls, ["refresh"])
+  assert.deepEqual(route.calls, ["readiness", "refresh"])
   assert.equal(route.forwarded.length, 0)
 })
 
@@ -84,4 +88,17 @@ test("unauthorized callers and wrong-company requests cannot refresh policy or s
     assert.ok((await route.submit()).status >= 400)
     assert.deepEqual(route.calls, [])
   }
+})
+
+
+test("a stale release blocks before policy writes and paid dispatch", async () => {
+  const route = reportRoute({ readinessBlocked: true })
+  const response = await route.submit()
+  assert.equal(response.status, 409)
+  const payload = await response.json()
+  assert.equal(payload.analysisStarted, false)
+  assert.equal(payload.readiness.code, "release_not_ready")
+  assert.deepEqual(route.calls, ["readiness"])
+  assert.equal(route.refreshes.length, 0)
+  assert.equal(route.forwarded.length, 0)
 })

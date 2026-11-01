@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const EXPECTED_SCHEMA_TABLES: usize = 524;
+const EXPECTED_SCHEMA_TABLES: usize = 528;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -1176,6 +1176,87 @@ mod tests {
             registry(),
             schema.tables.len(),
         )
+    }
+
+    #[test]
+    fn owner_and_prepaid_policies_preserve_hot_financial_authority() {
+        let config: StoragePolicyConfig =
+            serde_json::from_str(include_str!("../../storage-policy-manifest.json")).unwrap();
+        assert_eq!(config.policies.len(), EXPECTED_SCHEMA_TABLES);
+        for (name, parent, key, history) in [
+            ("ai_owner_configuration", "ai_agent", "agent_id", false),
+            (
+                "ai_owner_configuration_receipt",
+                "ai_owner_configuration",
+                "id",
+                true,
+            ),
+            ("ai_prepaid_account", "ai_agent", "id", false),
+            ("ai_prepaid_funding_entry", "ai_prepaid_account", "id", true),
+        ] {
+            let policy = config.policies.iter().find(|p| p.table == name).unwrap();
+            assert_eq!(policy.organization_ownership, OrganizationOwnership::Direct);
+            assert_eq!(
+                policy.organization_column.as_deref(),
+                Some("organization_id")
+            );
+            assert_eq!(policy.primary_key.column, key);
+            assert_eq!(policy.aggregate.parent.as_ref().unwrap().table, parent);
+            assert_eq!(policy.dependency_behavior, DependencyBehavior::FollowParent);
+            assert_eq!(policy.hot_retention, HotRetention::Always);
+            assert_eq!(policy.cooling_eligibility, CoolingEligibility::Never);
+            assert_eq!(policy.hydration_policy, HydrationPolicy::NotApplicable);
+            assert!(policy.archive.is_none());
+            if history {
+                assert_eq!(policy.durability_class, DurabilityClass::DurableHistory);
+                assert_eq!(policy.projection_mode, ProjectionMode::AppendHistory);
+                assert_eq!(policy.delete_behavior, DeleteBehavior::AppendOnly);
+            } else {
+                assert_eq!(
+                    policy.durability_class,
+                    DurabilityClass::DurableBusinessRecord
+                );
+                assert_eq!(policy.projection_mode, ProjectionMode::UpsertCurrent);
+            }
+            if name == "ai_owner_configuration_receipt" {
+                assert_eq!(policy.company_ownership, CompanyOwnership::Direct);
+                assert_eq!(policy.company_column_nullable, Some(true));
+            } else {
+                assert_eq!(policy.company_ownership, CompanyOwnership::None);
+            }
+        }
+        let owner = config
+            .policies
+            .iter()
+            .find(|p| p.table == "ai_owner_configuration")
+            .unwrap();
+        assert_eq!(owner.primary_key.strategy, PrimaryKeyStrategy::Natural);
+        assert_eq!(
+            owner.primary_key.version_strategy,
+            VersionStrategy::Revision
+        );
+    }
+
+    #[test]
+    fn new_organization_funding_rows_require_an_organization_leading_index() {
+        let mut funding = table("ai_prepaid_funding_entry", false);
+        funding.columns.retain(|c| c.sql_name != "company_id");
+        funding.indexes = vec![GeneratedIndex {
+            name: "by_account".into(),
+            columns: vec!["parent_id".into()],
+            unique: false,
+        }];
+        assert!(funding
+            .ownership()
+            .unwrap_err()
+            .to_string()
+            .contains("organization-leading"));
+        funding.indexes.push(GeneratedIndex {
+            name: "by_org".into(),
+            columns: vec!["organization_id".into()],
+            unique: false,
+        });
+        assert!(funding.ownership().is_ok());
     }
 
     #[test]

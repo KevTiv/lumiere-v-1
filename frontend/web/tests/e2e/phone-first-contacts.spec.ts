@@ -1,5 +1,6 @@
 import { bootstrapFixtureAccountSession } from './fixture-account'
 import { matchesOperationResponse } from "./operation-response"
+import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 import {
   expect,
   request as playwrightRequest,
@@ -17,6 +18,7 @@ import {
   fetchContactIdByName,
   fetchSessionOrganizationId,
   fillField,
+  gotoModule,
   openEntityCreate,
   scalarQueryId,
   smokeName,
@@ -448,7 +450,10 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
 
       await alpha.page.reload()
       await selectModuleTab(alpha.page, "crm", "contacts")
-      await expect(alpha.page.getByText(supplierName).first()).toBeVisible({ timeout: 30_000 })
+      // The customer create preserves its exact ID filter across refresh.
+      // Open the separately created supplier by its canonical ID explicitly.
+      await gotoModule(alpha.page, moduleTabHref("crm", "contacts", { id: String(supplierId) }), "crm")
+      await expect(alpha.page.getByTestId(`entity-row-${supplierId}`).getByText(supplierName, { exact: true })).toBeVisible({ timeout: 30_000 })
       await selectModuleTab(alpha.page, "crm", "duplicates")
       await expect(alpha.page.getByTestId("crm-duplicates-empty")).toBeVisible({ timeout: 30_000 })
 

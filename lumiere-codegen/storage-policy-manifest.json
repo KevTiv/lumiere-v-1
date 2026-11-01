@@ -2196,6 +2196,140 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_owner_configuration",
+      "module": "ai",
+      "rationale": "Organization-owned shared allowance policy; preserve revision and approved sponsored ceiling for current admission and later reconstruction.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent",
+          "child_column": "agent_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "agent_id",
+        "version_strategy": "revision"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:alpha-ai/shared-allowance-prepaid/canonical-admission-and-replay",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_owner_configuration_receipt",
+      "module": "ai",
+      "rationale": "Immutable actor-bound configuration receipt; retain exact request payload and resulting revision for idempotent replay.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": true,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_owner_configuration",
+          "child_column": "agent_id",
+          "parent_column": "agent_id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:alpha-ai/shared-allowance-prepaid/canonical-admission-and-replay",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_prepaid_account",
+      "module": "ai",
+      "rationale": "Canonical organization credit pool and one-way cutover baseline; losing this record could restore unfunded legacy admission.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_agent",
+          "child_column": "agent_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:alpha-ai/shared-allowance-prepaid/canonical-admission-and-replay",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_prepaid_funding_entry",
+      "module": "ai",
+      "rationale": "Immutable approved grant and linked reversal ledger; every entry is needed to derive funded headroom without minting credit during restore.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_prepaid_account",
+          "child_column": "account_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:alpha-ai/shared-allowance-prepaid/canonical-admission-and-replay",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_price_snapshot",
       "module": "ai",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",

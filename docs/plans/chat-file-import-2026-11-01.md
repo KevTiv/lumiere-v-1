@@ -78,9 +78,9 @@ set current stock or turn old debt snapshots into current obligations.
 
 ## Runtime and release
 
-The unreleased application migration 33 adds task, original-source, review-link
+The unreleased application migration 34 adds task, original-source, review-link
 and append-only decision storage, including the persisted question snapshot.
-Existing migrations 1–32 are unchanged. The checked-in release compatibility
+Existing migrations 1–33 are unchanged. The checked-in release compatibility
 manifest records the appended catalog checksum. No generated native contract
 change is required.
 
@@ -120,11 +120,10 @@ closing a write stream without dropping the pipe had left Python waiting for
 input. Mounted host tests also cover delayed replies after an A → B → A scope
 change and stale completions racing a newer operation or access denial.
 
-The route-boundary scan currently reports reducer calls in unchanged test fixtures
-in `api-server/src/routes/knowledge_guides.rs` and
-`api-server/src/routes/ai_evidence.rs`. This pre-existing repository failure is
-outside the new import routes; reducer-literal lint, release compatibility,
-ownership and Finance manifest checks pass.
+Main now includes the route-boundary fixture fixes from PR #352. Both source
+boundary scans pass on the integrated branch. Migration 33 remains exactly as
+shipped by main; chat import appends migration 34/change set 23. The current
+contract pin remains main’s published 0.3.164 release.
 
 The original 15 private farm files are not present in this workspace. Live
 acceptance still requires the served revision, those original hashes, a disposable

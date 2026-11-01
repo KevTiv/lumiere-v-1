@@ -510,3 +510,21 @@ jobs:
           done
           echo "::error::could not push the v$VERSION pin to ${GITHUB_REF_NAME}; pin it by hand."
           exit 1
+
+      # Preserve the exact generated candidate after a failed release gate.
+      # Operators can review/promote these bytes; the release gate above stays
+      # authoritative. Never archive the workspace, credentials or runtime logs.
+      - name: Upload generated durable migration diagnostics
+        if: ${{ failure() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: durable-migration-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .contracts-staging/manifests/durable-pg-schema-manifest.json
+            .contracts-staging/manifests/pg_ddl/migrations/*.sql
+          # The staging directory is hidden; only the two explicit generated
+          # artifact paths above are eligible for this upload.
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7

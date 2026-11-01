@@ -346,6 +346,11 @@ jobs:
       - name: Runtime reader tenant isolation and retirement proof
         run: spacetime call lumiere-ci-contracts run_ai_spend_recovery_tests --server local -y --no-config
 
+      - name: Owner allowance and prepaid native invariants
+        run: |
+          spacetime call lumiere-ci-contracts run_ai_owner_configuration_tests --server local -y --no-config
+          spacetime call lumiere-ci-contracts run_ai_prepaid_tests --server local -y --no-config
+
       - name: CRM qualification replay and tenant isolation proof
         run: spacetime call lumiere-ci-contracts run_crm_relational_fk_test --server local -y --no-config
 
@@ -480,6 +485,9 @@ jobs:
 
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
+
+      - name: Report readiness browser regressions
+        run: pnpm --dir web test:e2e:report-readiness
 
       - name: Productivity workspace browser regressions
         run: pnpm --dir web test:e2e:productivity-ui

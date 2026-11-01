@@ -306,8 +306,10 @@ pub async fn run_governed_llm_skill(
     .await
     .map_err(|error| error.to_string())?;
 
-    audit.record("artifact", format!("{skill_key} run completed"));
-    audit.record("completed", format!("{skill_key} succeeded"));
+    // Admission/transport success does not mean the reviewed run completed.
+    // Keep waiting, failed and unknown states distinct in durable audit output.
+    let (phase, message) = run_status_audit_event(&run.status);
+    audit.record(phase, format!("{skill_key} run #{} {message}", run.run_id));
 
     Ok(GovernedLlmSkillResult {
         decision: outcome.decision,
@@ -317,9 +319,43 @@ pub async fn run_governed_llm_skill(
     })
 }
 
+fn run_status_audit_event(status: &str) -> (&'static str, &'static str) {
+    match status {
+        "completed" => ("completed", "completed"),
+        "failed" => ("failed", "failed"),
+        "agent_settled" => ("review_required", "requires review or clarification"),
+        "awaiting_approval" => ("awaiting_approval", "awaits approval"),
+        "budget_parked" => ("budget_parked", "is parked for budget admission"),
+        _ => ("pending", "has not confirmed completion"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_canonical_completed_status_produces_completed_audit() {
+        assert_eq!(
+            run_status_audit_event("completed"),
+            ("completed", "completed")
+        );
+        for status in [
+            "agent_settled",
+            "awaiting_approval",
+            "budget_parked",
+            "failed",
+            "running",
+            "unknown",
+        ] {
+            let (phase, message) = run_status_audit_event(status);
+            assert_ne!(phase, "completed");
+            assert_ne!(phase, "artifact");
+            assert!(!message.contains("succeeded"));
+        }
+        assert_eq!(run_status_audit_event("agent_settled").0, "review_required");
+        assert_eq!(run_status_audit_event("failed").0, "failed");
+    }
 
     #[test]
     fn every_bundled_llm_skill_has_a_governed_program() {

@@ -13565,6 +13565,24 @@
     }
   },
   "aiHarness": {
+    "reportReadiness": {
+      "checking": "Checking AI configuration. This check does not call a model.",
+      "ready": "AI configuration is ready. Authorization and spend admission are checked again when analysis starts.",
+      "check": "Check AI readiness",
+      "company_scope": "This company is not available in the current organization. No analysis has started.",
+      "release_not_ready": "The report skill release is missing, invalid or stale. Its certified source must match this runtime before analysis can start.",
+      "skill_binding": "Report analysis is disabled or its agent and policy binding is missing for this company.",
+      "agent_unavailable": "The selected agent is inactive or unavailable for this company.",
+      "model_policy": "The model policy is missing or incompatible with the approved report workflow.",
+      "calibration": "The report calibration profile is missing or inactive.",
+      "decision_type": "The report decision definition is missing or inactive.",
+      "budget_unavailable": "The current monthly allowance cannot be read. No analysis has started.",
+      "budget_exhausted": "The monthly allowance is committed or exhausted. No analysis has started.",
+      "model_price": "An approved model price is missing or unavailable.",
+      "provider_unavailable": "The approved provider is not configured for this deployment.",
+      "readiness_unavailable": "AI readiness could not be verified. Check again before starting analysis.",
+      "authorization_denied": "Your current permissions do not allow this AI readiness check."
+    },
     "reportAnalysis": {
       "title": "Report analysis",
       "description": "Ask a question about company reports. The approved AI agent uses the governed report skill.",

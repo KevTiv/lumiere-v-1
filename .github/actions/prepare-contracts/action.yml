@@ -4,6 +4,24 @@ description: Materialize the checksum-verified contracts release used by applica
 runs:
   using: composite
   steps:
+    - name: Ensure source lint scanner is available
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v rg >/dev/null 2>&1; then
+          if [[ "${RUNNER_OS:-}" != "Linux" ]]; then
+            echo "ripgrep (rg) is required for source lints; install it before preparing contracts" >&2
+            exit 2
+          fi
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+        fi
+        rg --version
+
+    - name: Verify source lint scanner failure handling
+      shell: bash
+      run: python3 -B -m unittest discover -s scripts/tests -p test_source_lint_scanners.py
+
     - name: Prepare checksum-verified contracts release
       shell: bash
       run: bash scripts/prepare-vendored-contracts-rust.sh
