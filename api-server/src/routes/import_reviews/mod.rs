@@ -3,9 +3,9 @@
 mod history_data;
 mod history_period;
 mod model;
-mod tasks;
 #[cfg(test)]
 mod postgres_tests;
+mod tasks;
 
 use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
