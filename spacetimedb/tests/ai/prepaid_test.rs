@@ -498,3 +498,114 @@ pub fn test_old_month_holds_and_release(ctx: &ReducerContext) -> Result<(), Stri
     }
     Ok(())
 }
+
+/// Actual combined owner-limit + prepaid reservation reducers. Raising a cap
+/// never funds the pool or removes a hold, even when that cap exceeds sponsorship.
+pub fn test_prepaid_owner_limit_does_not_mint_credit(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::ai::owner_configuration::{
+        ai_owner_configuration, set_ai_owner_limit, SetAiOwnerLimitParams,
+    };
+    let f = seed(ctx)?;
+    let budget = ctx
+        .db
+        .ai_spend_budget()
+        .ai_spend_budget_by_agent_period()
+        .filter((f.agent, &f.period))
+        .next()
+        .ok_or("budget missing")?;
+    let prices_before = ctx
+        .db
+        .ai_price_snapshot()
+        .ai_price_snapshot_by_agent()
+        .filter(&f.agent)
+        .count();
+    let mut edit = SetAiOwnerLimitParams {
+        budget_id: budget.id,
+        expected_revision: 0,
+        expected_limit_units: 1000,
+        limit_units: 2000,
+        request_key: "prepaid-owner-cap".into(),
+        reason: "Raise the monthly cap without adding funds".into(),
+    };
+    if set_ai_owner_limit(ctx, f.org, f.agent, edit.clone()).is_ok() {
+        return Err("legacy owner increased the approved sponsored ceiling".into());
+    }
+    bind_funder(ctx, &f);
+    create_ai_prepaid_account(ctx, f.org, f.agent, "USD".into())?;
+    let account = account_id(ctx, &f)?;
+    funding(ctx, &f, account, "approved-owner-limit-grant", 50, None)?;
+    if set_ai_owner_limit(ctx, f.org, f.agent, edit.clone()).is_ok() {
+        return Err("funding a disabled account bypassed the sponsored ceiling".into());
+    }
+    enable_ai_prepaid_account(ctx, f.org, account)?;
+    set_ai_owner_limit(ctx, f.org, f.agent, edit.clone())?;
+    set_ai_owner_limit(ctx, f.org, f.agent, edit.clone())?;
+    let config = ctx
+        .db
+        .ai_owner_configuration()
+        .agent_id()
+        .find(f.agent)
+        .ok_or("configuration missing")?;
+    if config.monthly_limit_units != 2000
+        || config.sponsored_ceiling_units != 1000
+        || config.revision != 1
+    {
+        return Err("prepaid cap edit changed sponsorship or replay advanced revision".into());
+    }
+    if reserve(ctx, &f, "over-funded-credit", 51).is_ok() {
+        return Err("raised owner cap minted spendable credit".into());
+    }
+    let hold = reserve(ctx, &f, "prepaid-owner-hold", 40)?;
+    edit.expected_revision = 1;
+    edit.expected_limit_units = 2000;
+    edit.limit_units = 3000;
+    edit.request_key = "prepaid-owner-cap-with-hold".into();
+    set_ai_owner_limit(ctx, f.org, f.agent, edit)?;
+    if reserve(ctx, &f, "over-remaining-credit", 11).is_ok() {
+        return Err("cap edit erased an existing prepaid hold".into());
+    }
+    let committed = ctx
+        .db
+        .ai_spend_budget()
+        .id()
+        .find(budget.id)
+        .ok_or("budget missing")?;
+    if committed.limit_units != 3000
+        || committed.outstanding_units != 40
+        || committed.settled_units != 0
+    {
+        return Err("owner cap edit changed usage or holds".into());
+    }
+    settle_ai_spend(
+        ctx,
+        f.org,
+        SettleAiSpendParams {
+            reservation_id: hold,
+            input_tokens: 0,
+            output_tokens: 20,
+        },
+    )?;
+    if reserve(ctx, &f, "over-credit-after-settlement", 31).is_ok() {
+        return Err("settlement lost the prepaid debit".into());
+    }
+    reserve(ctx, &f, "exact-remaining-credit", 30)?;
+    let entries = ctx
+        .db
+        .ai_prepaid_funding_entry()
+        .ai_prepaid_funding_by_account()
+        .filter(&account)
+        .collect::<Vec<_>>();
+    if entries.len() != 1
+        || entries[0].units != 50
+        || ctx
+            .db
+            .ai_price_snapshot()
+            .ai_price_snapshot_by_agent()
+            .filter(&f.agent)
+            .count()
+            != prices_before
+    {
+        return Err("owner limit edit changed funding or provider prices".into());
+    }
+    Ok(())
+}

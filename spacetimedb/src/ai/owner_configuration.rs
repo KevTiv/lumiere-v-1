@@ -153,7 +153,11 @@ pub fn set_ai_owner_limit(
     if budget.limit_units != params.expected_limit_units {
         return Err("budget limit changed".into());
     }
-    validate_sponsored_limit(params.limit_units, config.sponsored_ceiling_units)?;
+    validate_owner_ceiling(
+        params.limit_units,
+        config.sponsored_ceiling_units,
+        super::prepaid::prepaid_enabled(ctx, organization_id, agent_id),
+    )?;
     validate_limit(
         params.limit_units,
         budget.settled_units,
@@ -470,6 +474,17 @@ fn next_revision(current: u64, expected: u64) -> Result<u64, String> {
         .checked_add(1)
         .ok_or_else(|| "configuration revision overflow".into())
 }
+/// An owner may choose a larger cap only after trusted prepaid cutover.
+/// This never adds credit: reserve_ai_spend still checks the exact funded pool
+/// atomically against all holds and usage before creating a reservation.
+fn validate_owner_ceiling(limit: u64, ceiling: u64, prepaid: bool) -> Result<(), String> {
+    if prepaid {
+        Ok(())
+    } else {
+        validate_sponsored_limit(limit, ceiling)
+    }
+}
+
 fn validate_sponsored_limit(limit: u64, ceiling: u64) -> Result<(), String> {
     if limit > ceiling {
         return Err(
@@ -569,6 +584,17 @@ pub fn ai_owner_configuration_receipt_read(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_trusted_prepaid_mode_separates_the_owner_cap_from_sponsorship() {
+        assert!(validate_owner_ceiling(10, 5, false).is_err());
+        assert!(validate_owner_ceiling(10, 5, true).is_ok());
+        assert!(validate_owner_ceiling(u64::MAX, 5, false).is_err());
+        // A high cap is not funding. The reservation owner independently checks
+        // actual prepaid credit and the existing committed-spend floor.
+        assert!(validate_owner_ceiling(u64::MAX, 5, true).is_ok());
+        assert!(validate_limit(9, 6, 4).is_err());
+    }
+
     #[test]
     fn limit_keeps_holds_and_settlement_committed() {
         assert!(validate_limit(9, 6, 4).is_err());
