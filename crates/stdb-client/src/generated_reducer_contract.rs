@@ -1186,6 +1186,11 @@ const PARAMS_CREATE_AI_KNOWLEDGE_ENTRY: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CreateAiKnowledgeEntryParams") },
 ];
+const PARAMS_CREATE_AI_PREPAID_ACCOUNT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "currency", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_CREATE_AI_REDUCER_ALLOWLIST: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CreateAiReducerAllowlistParams") },
@@ -2695,6 +2700,10 @@ const PARAMS_EDIT_AI_RUN_FOLLOW_UP: &[ReducerParam] = &[
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("EditAiRunFollowUpParams") },
 ];
+const PARAMS_ENABLE_AI_PREPAID_ACCOUNT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "account_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
 const PARAMS_END_CONTACT_RELATIONSHIP: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "relationship_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -3793,6 +3802,10 @@ const PARAMS_RECORD_AI_GRADUATION_AUTHORITY_ROLLBACK: &[ReducerParam] = &[
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RecordAiGraduationAuthorityRollbackParams") },
 ];
+const PARAMS_RECORD_AI_PREPAID_FUNDING: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RecordAiPrepaidFundingParams") },
+];
 const PARAMS_RECORD_AI_PROGRAM_CHECKPOINT: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4468,6 +4481,10 @@ const PARAMS_RUN_AI_INSIGHT_ORG_SCOPE_TEST: &[ReducerParam] = &[
 ];
 const PARAMS_RUN_AI_INTELLIGENCE_EVENTS_TESTS: &[ReducerParam] = &[
 ];
+const PARAMS_RUN_AI_OWNER_CONFIGURATION_TESTS: &[ReducerParam] = &[
+];
+const PARAMS_RUN_AI_PREPAID_TESTS: &[ReducerParam] = &[
+];
 const PARAMS_RUN_AI_SPEND_RECOVERY_TESTS: &[ReducerParam] = &[
 ];
 const PARAMS_RUN_ALL_ACCOUNTING_TESTS: &[ReducerParam] = &[
@@ -5115,6 +5132,11 @@ const PARAMS_SET_AI_MODEL_PROFILE_ACTIVE: &[ReducerParam] = &[
     ReducerParam { name: "profile_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
+const PARAMS_SET_AI_OWNER_LIMIT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetAiOwnerLimitParams") },
+];
 const PARAMS_SET_AI_REDUCER_ALLOWLIST_ENABLED: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "allowlist_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5296,6 +5318,11 @@ const PARAMS_SETUP_FISCAL_CALENDAR: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SetupFiscalCalendarParams") },
+];
+const PARAMS_SHARE_AI_OWNER_AGENT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ShareAiOwnerAgentParams") },
 ];
 const PARAMS_SHARE_DASHBOARD: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6788,6 +6815,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "create_ai_chat_session", contract_operation_id: "erp.create_ai_chat_session", params: PARAMS_CREATE_AI_CHAT_SESSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_ai_insight", contract_operation_id: "erp.create_ai_insight", params: PARAMS_CREATE_AI_INSIGHT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_ai_knowledge_entry", contract_operation_id: "erp.create_ai_knowledge_entry", params: PARAMS_CREATE_AI_KNOWLEDGE_ENTRY, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "create_ai_prepaid_account", contract_operation_id: "erp.create_ai_prepaid_account", params: PARAMS_CREATE_AI_PREPAID_ACCOUNT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "create_ai_reducer_allowlist", contract_operation_id: "erp.create_ai_reducer_allowlist", params: PARAMS_CREATE_AI_REDUCER_ALLOWLIST, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "create_ai_run_action_draft", contract_operation_id: "erp.create_ai_run_action_draft", params: PARAMS_CREATE_AI_RUN_ACTION_DRAFT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_ai_skill", contract_operation_id: "erp.create_ai_skill", params: PARAMS_CREATE_AI_SKILL, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7115,6 +7143,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "done_stock_move", contract_operation_id: "erp.done_stock_move", params: PARAMS_DONE_STOCK_MOVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "done_stock_package", contract_operation_id: "erp.done_stock_package", params: PARAMS_DONE_STOCK_PACKAGE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "edit_ai_run_follow_up", contract_operation_id: "erp.edit_ai_run_follow_up", params: PARAMS_EDIT_AI_RUN_FOLLOW_UP, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "enable_ai_prepaid_account", contract_operation_id: "erp.enable_ai_prepaid_account", params: PARAMS_ENABLE_AI_PREPAID_ACCOUNT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "end_contact_relationship", contract_operation_id: "erp.end_contact_relationship", params: PARAMS_END_CONTACT_RELATIONSHIP, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "end_contact_role", contract_operation_id: "erp.end_contact_role", params: PARAMS_END_CONTACT_ROLE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "end_user_session", contract_operation_id: "erp.end_user_session", params: PARAMS_END_USER_SESSION, lifecycle: "none", exposure: Exposure::Session, organization_position: None, company_position: None, unscoped_reason: Some("the reducer has no tenant-scope parameter; SpacetimeDB module authorization is authoritative") },
@@ -7341,6 +7370,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "record_ai_evidence_source_change", contract_operation_id: "erp.record_ai_evidence_source_change", params: PARAMS_RECORD_AI_EVIDENCE_SOURCE_CHANGE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "record_ai_evidence_source_version", contract_operation_id: "erp.record_ai_evidence_source_version", params: PARAMS_RECORD_AI_EVIDENCE_SOURCE_VERSION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "record_ai_graduation_authority_rollback", contract_operation_id: "erp.record_ai_graduation_authority_rollback", params: PARAMS_RECORD_AI_GRADUATION_AUTHORITY_ROLLBACK, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "record_ai_prepaid_funding", contract_operation_id: "erp.record_ai_prepaid_funding", params: PARAMS_RECORD_AI_PREPAID_FUNDING, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "record_ai_program_checkpoint", contract_operation_id: "erp.record_ai_program_checkpoint", params: PARAMS_RECORD_AI_PROGRAM_CHECKPOINT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "record_ai_provider_attempt_result", contract_operation_id: "erp.record_ai_provider_attempt_result", params: PARAMS_RECORD_AI_PROVIDER_ATTEMPT_RESULT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "record_ai_reasoning_event", contract_operation_id: "erp.record_ai_reasoning_event", params: PARAMS_RECORD_AI_REASONING_EVENT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7489,6 +7519,8 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "run_ai_evidence_provenance_tests", contract_operation_id: "erp.run_ai_evidence_provenance_tests", params: PARAMS_RUN_AI_EVIDENCE_PROVENANCE_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_ai_insight_org_scope_test", contract_operation_id: "erp.run_ai_insight_org_scope_test", params: PARAMS_RUN_AI_INSIGHT_ORG_SCOPE_TEST, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_ai_intelligence_events_tests", contract_operation_id: "erp.run_ai_intelligence_events_tests", params: PARAMS_RUN_AI_INTELLIGENCE_EVENTS_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_ai_owner_configuration_tests", contract_operation_id: "erp.run_ai_owner_configuration_tests", params: PARAMS_RUN_AI_OWNER_CONFIGURATION_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
+    ReducerContract { name: "run_ai_prepaid_tests", contract_operation_id: "erp.run_ai_prepaid_tests", params: PARAMS_RUN_AI_PREPAID_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_ai_spend_recovery_tests", contract_operation_id: "erp.run_ai_spend_recovery_tests", params: PARAMS_RUN_AI_SPEND_RECOVERY_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_all_accounting_tests", contract_operation_id: "erp.run_all_accounting_tests", params: PARAMS_RUN_ALL_ACCOUNTING_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "run_all_ai_tests", contract_operation_id: "erp.run_all_ai_tests", params: PARAMS_RUN_ALL_AI_TESTS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
@@ -7736,6 +7768,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "set_ai_intelligence_policy_active", contract_operation_id: "erp.set_ai_intelligence_policy_active", params: PARAMS_SET_AI_INTELLIGENCE_POLICY_ACTIVE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_knowledge_entry_version_state", contract_operation_id: "erp.set_ai_knowledge_entry_version_state", params: PARAMS_SET_AI_KNOWLEDGE_ENTRY_VERSION_STATE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "set_ai_model_profile_active", contract_operation_id: "erp.set_ai_model_profile_active", params: PARAMS_SET_AI_MODEL_PROFILE_ACTIVE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_owner_limit", contract_operation_id: "erp.set_ai_owner_limit", params: PARAMS_SET_AI_OWNER_LIMIT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_reducer_allowlist_enabled", contract_operation_id: "erp.set_ai_reducer_allowlist_enabled", params: PARAMS_SET_AI_REDUCER_ALLOWLIST_ENABLED, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_skill_active", contract_operation_id: "erp.set_ai_skill_active", params: PARAMS_SET_AI_SKILL_ACTIVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_analytic_account_active", contract_operation_id: "erp.set_analytic_account_active", params: PARAMS_SET_ANALYTIC_ACCOUNT_ACTIVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7771,6 +7804,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "settle_ai_spend", contract_operation_id: "erp.settle_ai_spend", params: PARAMS_SETTLE_AI_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "settle_sale_commissions", contract_operation_id: "erp.settle_sale_commissions", params: PARAMS_SETTLE_SALE_COMMISSIONS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "setup_fiscal_calendar", contract_operation_id: "erp.setup_fiscal_calendar", params: PARAMS_SETUP_FISCAL_CALENDAR, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "share_ai_owner_agent", contract_operation_id: "erp.share_ai_owner_agent", params: PARAMS_SHARE_AI_OWNER_AGENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "share_dashboard", contract_operation_id: "erp.share_dashboard", params: PARAMS_SHARE_DASHBOARD, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "signal_workflow", contract_operation_id: "erp.signal_workflow", params: PARAMS_SIGNAL_WORKFLOW, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "simulate_workflow", contract_operation_id: "erp.simulate_workflow", params: PARAMS_SIMULATE_WORKFLOW, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -8274,6 +8308,7 @@ pub mod reducer_names {
     pub const CREATE_AI_CHAT_SESSION: ReducerName = ReducerName::new("create_ai_chat_session");
     pub const CREATE_AI_INSIGHT: ReducerName = ReducerName::new("create_ai_insight");
     pub const CREATE_AI_KNOWLEDGE_ENTRY: ReducerName = ReducerName::new("create_ai_knowledge_entry");
+    pub const CREATE_AI_PREPAID_ACCOUNT: ReducerName = ReducerName::new("create_ai_prepaid_account");
     pub const CREATE_AI_REDUCER_ALLOWLIST: ReducerName = ReducerName::new("create_ai_reducer_allowlist");
     pub const CREATE_AI_RUN_ACTION_DRAFT: ReducerName = ReducerName::new("create_ai_run_action_draft");
     pub const CREATE_AI_SKILL: ReducerName = ReducerName::new("create_ai_skill");
@@ -8601,6 +8636,7 @@ pub mod reducer_names {
     pub const DONE_STOCK_MOVE: ReducerName = ReducerName::new("done_stock_move");
     pub const DONE_STOCK_PACKAGE: ReducerName = ReducerName::new("done_stock_package");
     pub const EDIT_AI_RUN_FOLLOW_UP: ReducerName = ReducerName::new("edit_ai_run_follow_up");
+    pub const ENABLE_AI_PREPAID_ACCOUNT: ReducerName = ReducerName::new("enable_ai_prepaid_account");
     pub const END_CONTACT_RELATIONSHIP: ReducerName = ReducerName::new("end_contact_relationship");
     pub const END_CONTACT_ROLE: ReducerName = ReducerName::new("end_contact_role");
     pub const END_USER_SESSION: ReducerName = ReducerName::new("end_user_session");
@@ -8827,6 +8863,7 @@ pub mod reducer_names {
     pub const RECORD_AI_EVIDENCE_SOURCE_CHANGE: ReducerName = ReducerName::new("record_ai_evidence_source_change");
     pub const RECORD_AI_EVIDENCE_SOURCE_VERSION: ReducerName = ReducerName::new("record_ai_evidence_source_version");
     pub const RECORD_AI_GRADUATION_AUTHORITY_ROLLBACK: ReducerName = ReducerName::new("record_ai_graduation_authority_rollback");
+    pub const RECORD_AI_PREPAID_FUNDING: ReducerName = ReducerName::new("record_ai_prepaid_funding");
     pub const RECORD_AI_PROGRAM_CHECKPOINT: ReducerName = ReducerName::new("record_ai_program_checkpoint");
     pub const RECORD_AI_PROVIDER_ATTEMPT_RESULT: ReducerName = ReducerName::new("record_ai_provider_attempt_result");
     pub const RECORD_AI_REASONING_EVENT: ReducerName = ReducerName::new("record_ai_reasoning_event");
@@ -8975,6 +9012,8 @@ pub mod reducer_names {
     pub const RUN_AI_EVIDENCE_PROVENANCE_TESTS: ReducerName = ReducerName::new("run_ai_evidence_provenance_tests");
     pub const RUN_AI_INSIGHT_ORG_SCOPE_TEST: ReducerName = ReducerName::new("run_ai_insight_org_scope_test");
     pub const RUN_AI_INTELLIGENCE_EVENTS_TESTS: ReducerName = ReducerName::new("run_ai_intelligence_events_tests");
+    pub const RUN_AI_OWNER_CONFIGURATION_TESTS: ReducerName = ReducerName::new("run_ai_owner_configuration_tests");
+    pub const RUN_AI_PREPAID_TESTS: ReducerName = ReducerName::new("run_ai_prepaid_tests");
     pub const RUN_AI_SPEND_RECOVERY_TESTS: ReducerName = ReducerName::new("run_ai_spend_recovery_tests");
     pub const RUN_ALL_ACCOUNTING_TESTS: ReducerName = ReducerName::new("run_all_accounting_tests");
     pub const RUN_ALL_AI_TESTS: ReducerName = ReducerName::new("run_all_ai_tests");
@@ -9222,6 +9261,7 @@ pub mod reducer_names {
     pub const SET_AI_INTELLIGENCE_POLICY_ACTIVE: ReducerName = ReducerName::new("set_ai_intelligence_policy_active");
     pub const SET_AI_KNOWLEDGE_ENTRY_VERSION_STATE: ReducerName = ReducerName::new("set_ai_knowledge_entry_version_state");
     pub const SET_AI_MODEL_PROFILE_ACTIVE: ReducerName = ReducerName::new("set_ai_model_profile_active");
+    pub const SET_AI_OWNER_LIMIT: ReducerName = ReducerName::new("set_ai_owner_limit");
     pub const SET_AI_REDUCER_ALLOWLIST_ENABLED: ReducerName = ReducerName::new("set_ai_reducer_allowlist_enabled");
     pub const SET_AI_SKILL_ACTIVE: ReducerName = ReducerName::new("set_ai_skill_active");
     pub const SET_ANALYTIC_ACCOUNT_ACTIVE: ReducerName = ReducerName::new("set_analytic_account_active");
@@ -9257,6 +9297,7 @@ pub mod reducer_names {
     pub const SETTLE_AI_SPEND: ReducerName = ReducerName::new("settle_ai_spend");
     pub const SETTLE_SALE_COMMISSIONS: ReducerName = ReducerName::new("settle_sale_commissions");
     pub const SETUP_FISCAL_CALENDAR: ReducerName = ReducerName::new("setup_fiscal_calendar");
+    pub const SHARE_AI_OWNER_AGENT: ReducerName = ReducerName::new("share_ai_owner_agent");
     pub const SHARE_DASHBOARD: ReducerName = ReducerName::new("share_dashboard");
     pub const SIGNAL_WORKFLOW: ReducerName = ReducerName::new("signal_workflow");
     pub const SIMULATE_WORKFLOW: ReducerName = ReducerName::new("simulate_workflow");
@@ -9748,6 +9789,7 @@ macro_rules! reducer_call {
     ("create_ai_chat_session", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_CHAT_SESSION, $args) };
     ("create_ai_insight", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_INSIGHT, $args) };
     ("create_ai_knowledge_entry", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_KNOWLEDGE_ENTRY, $args) };
+    ("create_ai_prepaid_account", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_PREPAID_ACCOUNT, $args) };
     ("create_ai_reducer_allowlist", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_REDUCER_ALLOWLIST, $args) };
     ("create_ai_run_action_draft", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_RUN_ACTION_DRAFT, $args) };
     ("create_ai_skill", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_AI_SKILL, $args) };
@@ -10075,6 +10117,7 @@ macro_rules! reducer_call {
     ("done_stock_move", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::DONE_STOCK_MOVE, $args) };
     ("done_stock_package", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::DONE_STOCK_PACKAGE, $args) };
     ("edit_ai_run_follow_up", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::EDIT_AI_RUN_FOLLOW_UP, $args) };
+    ("enable_ai_prepaid_account", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENABLE_AI_PREPAID_ACCOUNT, $args) };
     ("end_contact_relationship", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::END_CONTACT_RELATIONSHIP, $args) };
     ("end_contact_role", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::END_CONTACT_ROLE, $args) };
     ("end_user_session", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::END_USER_SESSION, $args) };
@@ -10301,6 +10344,7 @@ macro_rules! reducer_call {
     ("record_ai_evidence_source_change", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_EVIDENCE_SOURCE_CHANGE, $args) };
     ("record_ai_evidence_source_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_EVIDENCE_SOURCE_VERSION, $args) };
     ("record_ai_graduation_authority_rollback", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_GRADUATION_AUTHORITY_ROLLBACK, $args) };
+    ("record_ai_prepaid_funding", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_PREPAID_FUNDING, $args) };
     ("record_ai_program_checkpoint", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_PROGRAM_CHECKPOINT, $args) };
     ("record_ai_provider_attempt_result", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_PROVIDER_ATTEMPT_RESULT, $args) };
     ("record_ai_reasoning_event", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECORD_AI_REASONING_EVENT, $args) };
@@ -10449,6 +10493,8 @@ macro_rules! reducer_call {
     ("run_ai_evidence_provenance_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_AI_EVIDENCE_PROVENANCE_TESTS, $args) };
     ("run_ai_insight_org_scope_test", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_AI_INSIGHT_ORG_SCOPE_TEST, $args) };
     ("run_ai_intelligence_events_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_AI_INTELLIGENCE_EVENTS_TESTS, $args) };
+    ("run_ai_owner_configuration_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_AI_OWNER_CONFIGURATION_TESTS, $args) };
+    ("run_ai_prepaid_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_AI_PREPAID_TESTS, $args) };
     ("run_ai_spend_recovery_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_AI_SPEND_RECOVERY_TESTS, $args) };
     ("run_all_accounting_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_ALL_ACCOUNTING_TESTS, $args) };
     ("run_all_ai_tests", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RUN_ALL_AI_TESTS, $args) };
@@ -10696,6 +10742,7 @@ macro_rules! reducer_call {
     ("set_ai_intelligence_policy_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_INTELLIGENCE_POLICY_ACTIVE, $args) };
     ("set_ai_knowledge_entry_version_state", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_KNOWLEDGE_ENTRY_VERSION_STATE, $args) };
     ("set_ai_model_profile_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_MODEL_PROFILE_ACTIVE, $args) };
+    ("set_ai_owner_limit", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_OWNER_LIMIT, $args) };
     ("set_ai_reducer_allowlist_enabled", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_REDUCER_ALLOWLIST_ENABLED, $args) };
     ("set_ai_skill_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_SKILL_ACTIVE, $args) };
     ("set_analytic_account_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_ANALYTIC_ACCOUNT_ACTIVE, $args) };
@@ -10731,6 +10778,7 @@ macro_rules! reducer_call {
     ("settle_ai_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_AI_SPEND, $args) };
     ("settle_sale_commissions", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_SALE_COMMISSIONS, $args) };
     ("setup_fiscal_calendar", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETUP_FISCAL_CALENDAR, $args) };
+    ("share_ai_owner_agent", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SHARE_AI_OWNER_AGENT, $args) };
     ("share_dashboard", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SHARE_DASHBOARD, $args) };
     ("signal_workflow", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SIGNAL_WORKFLOW, $args) };
     ("simulate_workflow", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SIMULATE_WORKFLOW, $args) };

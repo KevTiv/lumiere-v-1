@@ -607,6 +607,19 @@
     "output_cost_per_1k_microunits": "u64",
     "per_request_cost_ceiling_microunits": "u64"
   },
+  "AiOwnerConfigurationReceipt": {
+    "company_id": "u64"
+  },
+  "AiOwnerConfigurationReceiptRead": {
+    "company_id": "u64"
+  },
+  "AiPrepaidAccount": {
+    "enabled_by": "identity",
+    "enabled_at": "timestamp"
+  },
+  "AiPrepaidFundingEntry": {
+    "original_entry_id": "u64"
+  },
   "AiProviderAttempt": {
     "failure_reason": "string",
     "resolution": "string",
@@ -4859,6 +4872,9 @@
     "content_hash": "string",
     "snapshot_ref": "string",
     "supersedes_version_id": "u64"
+  },
+  "RecordAiPrepaidFundingParams": {
+    "original_entry_id": "u64"
   },
   "RecordAiProviderAttemptResultParams": {
     "failure_reason": "string"

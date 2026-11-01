@@ -174,8 +174,13 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
     // Startup upgrades the frozen v13 prefix through the whole current catalog,
-    // including history partitions, guide tables and creation receipts.
+    // including history partitions, guide tables, creation receipts and the
+    // owner/prepaid tables added by migration 33.
     let expected_new_tables = [
+        "ai_owner_configuration",
+        "ai_owner_configuration_receipt",
+        "ai_prepaid_account",
+        "ai_prepaid_funding_entry",
         "ai_run_budget_park",
         "ai_run_budget_resume_job",
         "ai_run_queued_input",

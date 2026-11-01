@@ -2,6 +2,21 @@
   "version": 1,
   "reducers": [
     {
+      "name": "run_ai_owner_configuration_tests",
+      "exposure": "denied",
+      "reason": "isolated native test runner; never an authenticated application operation"
+    },
+    {
+      "name": "share_ai_owner_agent",
+      "exposure": "session",
+      "reason": "reviewed limit-only/shared-agent owner configuration; authenticated human organization administrator, exact revision, immutable actor-bound receipt and current-budget preconditions are enforced by the native owner; requires matching released generated contracts before API integration"
+    },
+    {
+      "name": "set_ai_owner_limit",
+      "exposure": "session",
+      "reason": "reviewed limit-only/shared-agent owner configuration; authenticated human organization administrator, exact revision, immutable actor-bound receipt and current-budget preconditions are enforced by the native owner; requires matching released generated contracts before API integration"
+    },
+    {
       "name": "run_knowledge_guide_tests",
       "exposure": "denied",
       "reason": "in-module development regression only; never session exposed"
@@ -5069,6 +5084,21 @@
       "name": "run_configured_record_creation_tests",
       "exposure": "denied",
       "reason": "Development-only native configured creation regression; never session exposed."
+    },
+    {
+      "name": "create_ai_prepaid_account",
+      "exposure": "denied",
+      "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
+    },
+    {
+      "name": "enable_ai_prepaid_account",
+      "exposure": "denied",
+      "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
+    },
+    {
+      "name": "record_ai_prepaid_funding",
+      "exposure": "denied",
+      "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
     }
   ]
 }

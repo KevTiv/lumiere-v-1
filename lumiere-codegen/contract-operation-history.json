@@ -214,41 +214,49 @@
       "name": "ai_knowledge_review_read",
       "shape_fingerprint": "sha256:d4a2365d00592762515fb1e75a8ef12329181bce0c53ed235a3ac7e486cc280b"
     },
+    "erp.ai_owner_configuration_read": {
+      "name": "ai_owner_configuration_read",
+      "shape_fingerprint": "sha256:a2a78be5740af688683f0c032aa3b0f5683f9250c40088057adf0fd4de8ef352"
+    },
+    "erp.ai_owner_configuration_receipt_read": {
+      "name": "ai_owner_configuration_receipt_read",
+      "shape_fingerprint": "sha256:0b9829f489d1fa838d4a4f5d6ce5811a7cdc6f1a682ea72ac6f3297d4bac7d34"
+    },
     "erp.ai_provider_attempt_read": {
       "name": "ai_provider_attempt_read",
-      "shape_fingerprint": "sha256:f9eae49a0f6b1c454fcd1438a834c27a801730b0fd43a249495c1d31baa6a6da"
+      "shape_fingerprint": "sha256:2c1f9f4e10cdfad63a23fecf8218858c6ce426d406527e9555f1236800ec83dc"
     },
     "erp.ai_run_budget_park_read": {
       "name": "ai_run_budget_park_read",
-      "shape_fingerprint": "sha256:43bfb68629b4a0d7c73875f88ac09ec42c062dc3d55cf27e1c8f87ab7f0da8eb"
+      "shape_fingerprint": "sha256:a93a2e463231d10b2cf82999141e1c0c628d02c5c373e2bb8790976dfce37211"
     },
     "erp.ai_run_lifecycle_event_read": {
       "name": "ai_run_lifecycle_event_read",
-      "shape_fingerprint": "sha256:84a8f426c964e16e6149d76fed4e168c0916f92c7e6550d6c1fab8b7fd9e1f21"
+      "shape_fingerprint": "sha256:456bc5063da3b5e0c05736cf78b334a48149c04b5d9e66b4fe3ed4964e5b9343"
     },
     "erp.ai_run_lifecycle_state_read": {
       "name": "ai_run_lifecycle_state_read",
-      "shape_fingerprint": "sha256:0ab843e3fb059f25f999e78f1e154341125d35d16dd4f1ea24fa00530cb8c473"
+      "shape_fingerprint": "sha256:1862cfded9ebbc07e11a4c101ce0de613661ba3b386b7e0d9563c55555a56fc0"
     },
     "erp.ai_run_question_read": {
       "name": "ai_run_question_read",
-      "shape_fingerprint": "sha256:aefadfe36db9d0f3ea483b57b486863d6bb304a4d0229e8fdf9fea1e36533555"
+      "shape_fingerprint": "sha256:012bd495a0c85f715639123caf201cebea36189ef0e953858a85b386ab63973f"
     },
     "erp.ai_run_queued_input_read": {
       "name": "ai_run_queued_input_read",
-      "shape_fingerprint": "sha256:0e3730faebcea931946c4fda5bfbcbfdd70ffade107d87be00d54cdfd059aa34"
+      "shape_fingerprint": "sha256:d03012f50151432dce48961839e573ecf75922fca6642c67036262acd7a08ca4"
     },
     "erp.ai_spend_budget_read": {
       "name": "ai_spend_budget_read",
-      "shape_fingerprint": "sha256:b1c8acc89fd1738e31fd31f17cfc5372ffb673ebb449114db31080a4503d980e"
+      "shape_fingerprint": "sha256:e68210954d919a77878b02c44acf0c7c9fd5c9751bce2f026f99889d03ed1589"
     },
     "erp.ai_spend_price_snapshot_read": {
       "name": "ai_spend_price_snapshot_read",
-      "shape_fingerprint": "sha256:4c33e2bee8082644a18ccb7ec71c516938e265b3cf931f302dd788e5fb6c7612"
+      "shape_fingerprint": "sha256:fbca309e823864d7ac76b272077ccaee940369b7dc8d966a32236a0f149783f0"
     },
     "erp.ai_spend_reservation_read": {
       "name": "ai_spend_reservation_read",
-      "shape_fingerprint": "sha256:b83b0ea681d9d586855c903134956e6348547787261399f6180f08fa107b55c7"
+      "shape_fingerprint": "sha256:4ce0e04915045ec50f6dc77076d12bfb5dc6f6948bcc77b4fc3e12dd9aa59265"
     },
     "erp.allocate_payment_transaction": {
       "name": "allocate_payment_transaction",
@@ -1061,6 +1069,10 @@
     "erp.create_ai_knowledge_entry": {
       "name": "create_ai_knowledge_entry",
       "shape_fingerprint": "sha256:782e9ec2ac4c3fe43c97cb7a1168aa41215af40389ac8b3c3bed4f4503e066f8"
+    },
+    "erp.create_ai_prepaid_account": {
+      "name": "create_ai_prepaid_account",
+      "shape_fingerprint": "sha256:7b037ebd80b49e5e0e406bf620593bfa5dcdb851e1d7a4415276c6512c3da13f"
     },
     "erp.create_ai_reducer_allowlist": {
       "name": "create_ai_reducer_allowlist",
@@ -2370,6 +2382,10 @@
       "name": "edit_ai_run_follow_up",
       "shape_fingerprint": "sha256:64eb14124505dc48c3e1c31775ee649134326cda04a8238d94e8e6155280f363"
     },
+    "erp.enable_ai_prepaid_account": {
+      "name": "enable_ai_prepaid_account",
+      "shape_fingerprint": "sha256:bd1175311ca2ab77f85694f2f1322c385725dd06b35c23d23db32a69b2e83042"
+    },
     "erp.end_contact_relationship": {
       "name": "end_contact_relationship",
       "shape_fingerprint": "sha256:4a66ee08ce016f3323c715c112f94d4e4f34918d9f3d4f10b618124f64020940"
@@ -2560,7 +2576,7 @@
     },
     "erp.helpdesk_related_record_read": {
       "name": "helpdesk_related_record_read",
-      "shape_fingerprint": "sha256:1147057f9cb522053e709721227686cfba03ba2c429239d864de8ec806082af1"
+      "shape_fingerprint": "sha256:f995de0416be2ed767d4a93d9f076453a9491de32bfb0284143387ddc9986641"
     },
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
@@ -2856,11 +2872,11 @@
     },
     "erp.knowledge_guide_actor_profile_read": {
       "name": "knowledge_guide_actor_profile_read",
-      "shape_fingerprint": "sha256:1911b1d28ec5f41039b944596adfb996f270ecc236b670e632117817e1a42d05"
+      "shape_fingerprint": "sha256:d2a83fc5b4ab5feca02e8676990f1a0ff89a0258e72ad22c8646d3bb669b93cc"
     },
     "erp.knowledge_guide_authority_read": {
       "name": "knowledge_guide_authority_read",
-      "shape_fingerprint": "sha256:7ad3a7a7ff3a848fb813c84ee68cf729cea4ac46680c5e02e75790f7b3216c95"
+      "shape_fingerprint": "sha256:f2fc3822d9c62a481f0c214b157ed1f55749dcebaa3f945dfb644440e4af64ea"
     },
     "erp.link_device_to_location": {
       "name": "link_device_to_location",
@@ -3285,6 +3301,10 @@
     "erp.record_ai_graduation_authority_rollback": {
       "name": "record_ai_graduation_authority_rollback",
       "shape_fingerprint": "sha256:c309b5644c73f7637e854986df72ffce36f45cab69f88e2f1af7797077b7e6e5"
+    },
+    "erp.record_ai_prepaid_funding": {
+      "name": "record_ai_prepaid_funding",
+      "shape_fingerprint": "sha256:f3360cf23e3786e46be92b51f3cddccc93358eb50a983d8da0c67f592941c5d5"
     },
     "erp.record_ai_program_checkpoint": {
       "name": "record_ai_program_checkpoint",
@@ -3877,6 +3897,14 @@
     "erp.run_ai_intelligence_events_tests": {
       "name": "run_ai_intelligence_events_tests",
       "shape_fingerprint": "sha256:2071b25e5137007b1b695f0c7974cd3d11b81b2d33bb373ff4a274c52f890a79"
+    },
+    "erp.run_ai_owner_configuration_tests": {
+      "name": "run_ai_owner_configuration_tests",
+      "shape_fingerprint": "sha256:41f9907136f9194c3b269cc65567d983c1e8e012cda87427e962e0831c321882"
+    },
+    "erp.run_ai_prepaid_tests": {
+      "name": "run_ai_prepaid_tests",
+      "shape_fingerprint": "sha256:86e52f0fb15ab23741e8d9204c543e2dd40d2be4d5ce38b8b9c6ac6780c4a1e9"
     },
     "erp.run_ai_spend_recovery_tests": {
       "name": "run_ai_spend_recovery_tests",
@@ -4866,6 +4894,10 @@
       "name": "set_ai_model_profile_active",
       "shape_fingerprint": "sha256:fb6226ca493c32c7bbff36fbdffe0ebd9562c44c1f257bc33ece4046e9071a18"
     },
+    "erp.set_ai_owner_limit": {
+      "name": "set_ai_owner_limit",
+      "shape_fingerprint": "sha256:c9b84d50d2e919fff3935ecb186d93e8f2aef095d0dc6e44ce23777ef047d3c2"
+    },
     "erp.set_ai_reducer_allowlist_enabled": {
       "name": "set_ai_reducer_allowlist_enabled",
       "shape_fingerprint": "sha256:8520c8ec8141779c6b78e90834a4d45fc394cb165819668d16385167a50788c4"
@@ -5005,6 +5037,10 @@
     "erp.setup_fiscal_calendar": {
       "name": "setup_fiscal_calendar",
       "shape_fingerprint": "sha256:7b03333b27961f723f7dcc14a8af7212f9d3b15cf1bf441a102d32eaceee18ef"
+    },
+    "erp.share_ai_owner_agent": {
+      "name": "share_ai_owner_agent",
+      "shape_fingerprint": "sha256:ff13610558b3cb804ab72fbd557fbf0939ef1e540d8f685cbc1274062d7fb37e"
     },
     "erp.share_dashboard": {
       "name": "share_dashboard",
@@ -6312,6 +6348,14 @@
       "current_operations_fingerprint": "sha256:4fea8ce1f6b82792d6a45c76b630de7bfcb1bfda90ca5be915cf1a3e4cd8ab6b",
       "operation_count": 1496,
       "reason": "Add five metadata-only lifecycle read views. Six existing view allocation indexes shift after insertion; targets and named return types are unchanged."
+    },
+    {
+      "previous_release": "v0.3.163",
+      "previous_ir_sha256": "sha256:f5c850dd0cfdbf3ad0c9ca9817ffaa5b181f953acb79a7a3588c59614e3c55d5",
+      "previous_operations_fingerprint": "sha256:4fea8ce1f6b82792d6a45c76b630de7bfcb1bfda90ca5be915cf1a3e4cd8ab6b",
+      "current_operations_fingerprint": "sha256:d7025e8126d9305937e9bf94b8d0bdf52c6ae7612892f882fd7ff25d9a0d67f1",
+      "operation_count": 1505,
+      "reason": "Publish owner allowance and prepaid contracts with promoted migration 33 and retained build queue"
     }
   ]
 }

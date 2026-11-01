@@ -251,6 +251,26 @@
       },
       "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
     },
+    "ai_owner_configuration_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/owner_configuration.rs: read-only view restricted to active ai_spend_reader organization bindings; no browser authorization or funding capability is conferred"
+    },
+    "ai_owner_configuration_receipt_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/owner_configuration.rs: read-only minimal immutable receipt view restricted to active ai_spend_reader organization bindings; actor authorization remains at the owning service boundary"
+    },
     "ai_provider_attempt_read": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -950,6 +970,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/knowledge_entry.rs: an entry key that already exists is rejected"
+    },
+    "create_ai_prepaid_account": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/prepaid.rs: trusted funding-service binding and permission required; exact pool key replay preserves the immutable account currency and creates no second account"
     },
     "create_ai_reducer_allowlist": {
       "semantic_kind": "command",
@@ -1820,6 +1850,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/run_followup_queue.rs: edit payload, expected revision and author are payload-bound and replay checked"
+    },
+    "enable_ai_prepaid_account": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/prepaid.rs: trusted funding-service binding and permission required; one-way cutover replays without resetting opening usage or releasing committed holds"
     },
     "end_user_session": {
       "semantic_kind": "command",
@@ -3181,6 +3221,16 @@
       },
       "evidence": "spacetimedb/src/ai/decision_events.rs: append-only rollback that must strictly reduce authority; replay of the same event is a no-op"
     },
+    "record_ai_prepaid_funding": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/prepaid.rs: immutable request and source keys bind account, actor, amount and original grant; exact replay returns before a second funding or reversal entry"
+    },
     "record_ai_program_checkpoint": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -3800,6 +3850,26 @@
         "version": 1
       },
       "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_ai_owner_configuration_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: isolated native owner configuration test runner; retry classification is not applicable"
+    },
+    "run_ai_prepaid_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: isolated native prepaid and combined owner-limit invariant runner; retry classification is not applicable"
     },
     "run_ai_spend_recovery_tests": {
       "semantic_kind": "test",
@@ -5161,6 +5231,16 @@
       },
       "evidence": "spacetimedb/src/ai/model_configuration.rs: governed-intelligence reducer validates scope/state and fails closed on conflicting replay or invalid lifecycle transition"
     },
+    "set_ai_owner_limit": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/owner_configuration.rs: current human organization administrator, expected revision and exact current budget; immutable actor-bound request receipt guards cap-only replay without funding or price changes"
+    },
     "set_ai_reducer_allowlist_enabled": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -5290,6 +5370,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/spend.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "share_ai_owner_agent": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/owner_configuration.rs: current human organization administrator, expected scope and revision; immutable actor-bound request receipt guards shared-agent replay without changing existing run attribution"
     },
     "share_dashboard": {
       "semantic_kind": "command",
