@@ -342,6 +342,12 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-report-readiness
+        paths:
+          - '~/api/ai/skills/report-analysis/readiness$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
     plugins: *domain_plugins
 
   - name: web-ai

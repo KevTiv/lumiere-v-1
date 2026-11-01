@@ -57,6 +57,7 @@ class PrivateReleaseTests(unittest.TestCase):
         for method, path in [('POST', '/api/ai/skills/report-analysis'),
                              ('POST', '/api/ai/evidence/runs/inspect'),
                              ('POST', '/api/ai/runs/lifecycle'),
+                             ('POST', '/api/ai/skills/report-analysis/readiness'),
                              ('GET', '/api/ai/skills/certifications'),
                              ('GET', '/api/ai/skills/certifications/42')]:
             self.assertTrue(allowed(method, path), (method, path))
@@ -66,6 +67,10 @@ class PrivateReleaseTests(unittest.TestCase):
                              ('POST', '/api/ai/runs/lifecycle/'),
                              ('POST', '/api/ai/runs/lifecycle/extra'),
                              ('POST', '/prefix/api/ai/runs/lifecycle'),
+                             ('GET', '/api/ai/skills/report-analysis/readiness'),
+                             ('POST', '/api/ai/skills/report-analysis/readiness/'),
+                             ('POST', '/api/ai/skills/report-analysis/readiness/extra'),
+                             ('POST', '/api/ai/skills/other/readiness'),
                              ('POST', '/api/ai/skills/certifications'),
                              ('POST', '/api/ai/skills/report-analysis/extra'),
                              ('GET', '/api/ai/skills/certifications/42/extra'),
