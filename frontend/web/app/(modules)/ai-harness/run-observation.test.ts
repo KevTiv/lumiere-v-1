@@ -63,3 +63,35 @@ test('deduplicates transcript ids before sorting', () => {
   assert.ok(view)
   assert.deepEqual(view.transcript.map((step) => step.toolName), ['first'])
 })
+
+const settledEconomics = {
+  attemptCount: 4, inputTokens: 6173, outputTokens: 449,
+  attemptStatuses: ['succeeded'], reservationStatuses: ['settled'],
+  outcomeUnknown: false, truncated: false,
+}
+const waitingRun = { runId: 8, status: 'agent_settled', stepCount: 5, tokensUsed: 0 }
+
+test('waiting run shows exact complete provider usage instead of the unset run counter', () => {
+  assert.equal(mapRunObservation({ ...waitingRun, economics: settledEconomics })?.tokensUsed, 6622)
+  assert.equal(mapRunObservation(waitingRun)?.tokensUsed, null)
+})
+
+test('unknown, in-flight, malformed or truncated provider usage is not a zero or partial total', () => {
+  for (const change of [
+    { outcomeUnknown: true },
+    { attemptStatuses: ['dispatched'] },
+    { attemptStatuses: [] },
+    { reservationStatuses: ['reserved'] },
+    { reservationStatuses: [] },
+    { inputTokens: null },
+    { inputTokens: -1 },
+    { inputTokens: Number.MAX_SAFE_INTEGER, outputTokens: 1 },
+    { truncated: true, attemptCount: null, inputTokens: null, outputTokens: null },
+  ]) {
+    assert.equal(mapRunObservation({ ...waitingRun, economics: { ...settledEconomics, ...change } })?.tokensUsed, null)
+  }
+})
+
+test('terminal legacy run retains its recorded counter when no provider summary is present', () => {
+  assert.equal(mapRunObservation({ ...waitingRun, status: 'completed', tokensUsed: 321 })?.tokensUsed, 321)
+})

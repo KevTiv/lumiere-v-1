@@ -636,6 +636,9 @@
     "resume_requested_at": "timestamp",
     "resolved_at": "timestamp"
   },
+  "AiRunBudgetParkRead": {
+    "resume_trigger": "string"
+  },
   "AiRunEffect": {
     "provider_reference": "string",
     "detail": "string"
@@ -657,6 +660,9 @@
     "answered_by": "identity"
   },
   "AiRunQueuedInput": {
+    "promoted_run_id": "u64"
+  },
+  "AiRunQueuedInputRead": {
     "promoted_run_id": "u64"
   },
   "AiRunReview": {
