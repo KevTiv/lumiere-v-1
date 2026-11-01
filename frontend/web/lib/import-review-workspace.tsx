@@ -96,11 +96,13 @@ export function ImportReviewWorkspace({
   selectedId,
   onContinue,
   continuationBlock,
+  allowImport = true,
 }: {
   organizationId: number
   selectedId?: string
   onContinue: (source: ReviewedImportSource) => void
   continuationBlock?: "busy" | "unresolved" | null
+  allowImport?: boolean
 }) {
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
@@ -112,6 +114,7 @@ export function ImportReviewWorkspace({
       initialId={selectedId}
       onContinue={onContinue}
       continuationBlock={continuationBlock}
+      allowImport={allowImport}
     />
   )
 }
@@ -122,6 +125,7 @@ export function ImportReviewPanel(props: {
   initialId?: string
   onContinue: (source: ReviewedImportSource) => void
   continuationBlock?: "busy" | "unresolved" | null
+  allowImport?: boolean
 }) {
   const { identity } = useErpSession()
   const { t } = useTranslation()
@@ -129,7 +133,7 @@ export function ImportReviewPanel(props: {
   const actor = identity.replace(/^0x/, "").toLowerCase()
   return (
     <ReviewWorkspace
-      key={`${actor}:${props.organizationId}:${props.companyId}:${props.initialId ?? ""}`}
+      key={`${actor}:${props.organizationId}:${props.companyId}:${props.initialId ?? ""}:${props.allowImport ?? true}`}
       actor={actor}
       {...props}
     />
@@ -143,6 +147,7 @@ function ReviewWorkspace({
   initialId,
   onContinue,
   continuationBlock,
+  allowImport = true,
 }: {
   actor: string
   organizationId: number
@@ -150,6 +155,7 @@ function ReviewWorkspace({
   initialId?: string
   onContinue: (source: ReviewedImportSource) => void
   continuationBlock?: "busy" | "unresolved" | null
+  allowImport?: boolean
 }) {
   const { t } = useTranslation()
   const mounted = useRef(true)
@@ -442,7 +448,7 @@ function ReviewWorkspace({
   const confirmed =
     detail.data?.items.filter((item) => item.state === "confirmed").length ?? 0
   const continueImport = async () => {
-    if (!detail.data || continuationBlock) return
+    if (!allowImport || !detail.data || continuationBlock) return
     setBusy(true)
     setError(null)
     try {
@@ -544,21 +550,21 @@ function ReviewWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-medium">{detail.data.title}</h3>
             <div className="flex flex-wrap gap-2">
-              <Button
+              {allowImport ? <Button
                 variant="outline"
                 disabled={
                   !confirmed ||
                   unavailable ||
                   !!selected ||
                   !!continuationBlock ||
-                  !["product", "stock_location"].includes(
+                  !["product", "stock_location", "contact"].includes(
                     detail.data.targetEntity,
                   )
                 }
                 onClick={() => void continueImport()}
               >
                 {t("settings.importReview.continue", { count: confirmed })}
-              </Button>
+              </Button> : null}
               <Button
                 variant="outline"
                 disabled={unavailable || !!selected}
@@ -571,7 +577,7 @@ function ReviewWorkspace({
               </Button>
             </div>
           </div>
-          {continuationBlock ? (
+          {allowImport && continuationBlock ? (
             <p role="status" data-testid="import-review-handoff-status">
               {continuationBlock === "busy"
                 ? t("common.formSubmit.busy")
@@ -581,7 +587,7 @@ function ReviewWorkspace({
                   })}
             </p>
           ) : null}
-          {!["product", "stock_location"].includes(detail.data.targetEntity) ? (
+          {allowImport && !["product", "stock_location", "contact"].includes(detail.data.targetEntity) ? (
             <p className="text-sm text-muted-foreground">
               {t("settings.importReview.moduleSpecific")}
             </p>

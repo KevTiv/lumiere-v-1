@@ -169,6 +169,8 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::workos::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::bootstrap::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib tenant_services::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib integration_worker::tests
 
       - name: Work board authorization and pagination tests
         run: |
@@ -466,6 +468,9 @@ jobs:
 
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
+
+      - name: Chat file import and recovery browser regressions
+        run: pnpm --dir web test:e2e:chat-import
 
       - name: Sales workflow browser regressions
         id: sales_workflow_ui

@@ -99,6 +99,9 @@ export async function bootstrapServiceIdentities({
   if (organizations.some(id => !Number.isSafeInteger(id) || id < 1)) throw new Error('invalid organization id')
   const minted = {}
   for (const prefix of verifyReviewedMail ? [] : ['EXPENSE', 'HR', 'PROJECT']) {
+    // Reuse the deployed credential on retries; onboarding must not rotate a
+    // worker identity and invalidate bindings for previously signed-up tenants.
+    if (env[`STDB_${prefix}_WORKER_TOKEN`]?.trim()) continue
     const response = await request('/v1/identity', null, undefined)
     const identity = await readJson(response)
     if (typeof identity.token !== 'string' || !identity.token) throw new Error('identity mint failed')
@@ -161,7 +164,14 @@ export async function bootstrapServiceIdentities({
     return
   }
 
-  const envelope = sealEnvelope({ tokens: minted, organizationIds: organizations }, publicKey)
+  const tenantServiceIdentities = Object.fromEntries(services
+    .filter(([, service]) => service !== 'reviewed_mail_dispatcher')
+    .map(([key, service]) => [service, identities.get(key)]))
+  const envelope = sealEnvelope({
+    tokens: minted,
+    organizationIds: organizations,
+    apiVariables: { LUMIERE_TENANT_SERVICE_IDENTITIES: JSON.stringify(tenantServiceIdentities) },
+  }, publicKey)
   log(`BOOTSTRAP_ENVELOPE ${JSON.stringify(envelope)}`)
   log(`BOOTSTRAP_VERIFIED organizations=${organizations.length} distinctIdentities=${identities.size}`)
 }

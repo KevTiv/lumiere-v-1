@@ -170,7 +170,7 @@ printf '[{"id":"service-test","name":"api-server"}]\\n'
         self.assertEqual(qdrant["featureGate"], "RAILWAY_ENABLE_AI")
         self.assertFalse(qdrant["required"])
 
-    def test_integration_activation_requires_real_tenants(self):
+    def test_integration_activation_remains_an_explicit_release_gate(self):
         workflow = (ROOT / ".github/workflows/release-railway-stack.yml").read_text()
         self.assertIn("enable_integrations:", workflow)
         self.assertIn("RAILWAY_ENABLE_INTEGRATIONS: ${{ inputs.enable_integrations }}", workflow)
@@ -194,8 +194,13 @@ printf '[{"id":"service-test","name":"api-server"}]\\n'
             self.assertEqual(variables[f"STDB_{domain.upper()}_WORKER_TOKEN"]["kind"], "secret")
             self.assertEqual(
                 variables[f"LUMIERE_{domain.upper()}_WORKER_ORG_IDS"]["kind"],
-                "positive-id-list",
+                "optional-positive-id-list",
             )
+        enrollment = next(feature for feature in services["api-server"]["optionalFeatures"]
+                          if feature["name"] == "tenant-integrations")
+        self.assertEqual(enrollment["selectionVariable"], "RAILWAY_ENABLE_INTEGRATIONS")
+        self.assertEqual(set(enrollment["requiredVariables"]["LUMIERE_TENANT_SERVICE_IDENTITIES"]["services"]),
+                         {"expense_integration_worker", "hr_integration_worker", "project_integration_worker"})
 
     def test_document_blobs_use_persistent_single_replica_api_storage(self):
         manifest = json.loads(

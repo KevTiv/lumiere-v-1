@@ -38,6 +38,8 @@ const nextConfig = {
   // server bundle. The release workflow copies this traced tree verbatim.
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
   experimental: {
+    // Preserve the base64 JSON body of a bounded 20 MB chat import through AuthKit proxying.
+    proxyClientMaxBodySize: '28mb',
     // Next 16.1 requires opt-in to write the compiler cache restored by Actions.
     turbopackFileSystemCacheForBuild: process.env.GITHUB_ACTIONS === 'true',
   },

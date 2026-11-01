@@ -1,7 +1,8 @@
 //! Polls pending project integration intents (payroll / calendar / e-invoice) and applies them.
 //!
 //! Configure with:
-//! - `LUMIERE_PROJECT_WORKER_ORG_IDS` — comma-separated organization ids (required)
+//! - `LUMIERE_PROJECT_WORKER_ORG_IDS` — optional comma-separated tenant restriction;
+//!   unset/empty discovers active tenants bound to this worker on every poll
 //! - `LUMIERE_PROJECT_WORKER_POLL_SECS` — poll interval (default 15)
 //! - `LUMIERE_PROJECT_WORKER_PORT` — health port (default 8093)
 //! - `LUMIERE_PROJECT_WORKER_BATCH` — max intents per org per tick (default 20)

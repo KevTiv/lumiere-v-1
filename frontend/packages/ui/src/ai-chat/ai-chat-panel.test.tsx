@@ -26,6 +26,99 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("starts a file-only drop without sending or replacing an unsent question", async () => {
+    const onImportFiles = vi.fn(async () => {})
+    const onSendMessage = vi.fn()
+    const file = new File(["name\nEggs"], "products.csv", { type: "text/csv" })
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} onSendMessage={onSendMessage} importCompanyLabel="Mugisha Farm" importTaskContent={<div>Saved farm task</div>} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Keep this question" } })
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files: [file] } })
+    await waitFor(() => expect(onImportFiles).toHaveBeenCalledExactlyOnceWith([file]))
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Keep this question")
+    expect(screen.getByTestId("erp-ai-chat-import-tasks").textContent).toContain("Saved farm task")
+    expect(screen.getByTitle("Mugisha Farm")).toBeTruthy()
+  })
+
+  it("accepts multiple files from the picker and clears it for future selection", async () => {
+    const onImportFiles = vi.fn(async () => {})
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} />)
+    const files = [new File(["name\nEggs"], "products.csv"), new File(["workbook"], "counts.XLSX")]
+    const input = screen.getByTestId("erp-ai-chat-file-input") as HTMLInputElement
+    const click = vi.spyOn(input, "click")
+    fireEvent.click(screen.getByTestId("erp-ai-chat-attach"))
+    expect(click).toHaveBeenCalledOnce()
+    fireEvent.change(input, { target: { files } })
+    await waitFor(() => expect(onImportFiles).toHaveBeenCalledExactlyOnceWith(files))
+    expect(input.value).toBe("")
+  })
+
+  it("respects upload configuration and unavailable intake without dispatching", async () => {
+    const onImportFiles = vi.fn(async () => {})
+    const file = new File(["name\nEggs"], "products.csv")
+    const { rerender } = render(<AIChatPanel open onClose={vi.fn()} onImportFiles={onImportFiles} />)
+    expect(screen.queryByTestId("erp-ai-chat-attach")).toBeNull()
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files: [file] } })
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.import.unavailable")
+    rerender(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} />)
+    expect((screen.getByTestId("erp-ai-chat-attach") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files: [file] } })
+    expect(onImportFiles).not.toHaveBeenCalled()
+  })
+
+  it("leaves ordinary text drags alone", () => {
+    const onImportFiles = vi.fn(async () => {})
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} />)
+    const completed = fireEvent.drop(screen.getByTestId("erp-ai-chat-input"), { dataTransfer: { types: ["text/plain"], files: [] } })
+    expect(completed).toBe(true)
+    expect(onImportFiles).not.toHaveBeenCalled()
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  it("rejects unsupported, oversized, empty, and excessive file selections before dispatch", () => {
+    const onImportFiles = vi.fn(async () => {})
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} />)
+    const drop = (files: File[]) => fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files } })
+    drop([new File(["text"], "instructions.pdf")])
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.import.unsupportedFile")
+    drop([new File([], "empty.csv")])
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.import.emptyFile")
+    drop([new File([new Uint8Array(5_000_001)], "large.csv")])
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.import.fileTooLarge")
+    drop(Array.from({ length: 21 }, (_, index) => new File(["row"], `${index}.csv`)))
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.import.tooManyFiles")
+    drop(Array.from({ length: 5 }, (_, index) => new File([new Uint8Array(4_000_001)], `${index}.csv`)))
+    expect(screen.getByRole("alert").textContent).toBe("aiChat.import.totalTooLarge")
+    expect(onImportFiles).not.toHaveBeenCalled()
+  })
+
+  it("prevents duplicate intake while preparing and shows a recoverable failure", async () => {
+    let reject!: (error: Error) => void
+    const onImportFiles = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail }))
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} />)
+    const transfer = { dataTransfer: { types: ["Files"], files: [new File(["name\nEggs"], "products.csv")] } }
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), transfer)
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), transfer)
+    expect(onImportFiles).toHaveBeenCalledOnce()
+    expect(screen.getByRole("status").textContent).toBe("aiChat.import.savingAttachments")
+    expect((screen.getByTestId("erp-ai-chat-attach") as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => reject(new Error("Check the saved task before retrying.")))
+    expect(screen.getByRole("alert").textContent).toBe("Check the saved task before retrying.")
+    expect((screen.getByTestId("erp-ai-chat-attach") as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it("hides late intake failures after changing the actor or company scope", async () => {
+    let reject!: (error: Error) => void
+    const onImportFiles = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail }))
+    const { rerender } = render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} context={{ companyId: 7 }} importScopeKey="actor-one:org-one:7" onImportFiles={onImportFiles} />)
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files: [new File(["private"], "products.csv")] } })
+    rerender(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} context={{ companyId: 8 }} importScopeKey="actor-two:org-one:8" onImportFiles={onImportFiles} />)
+    await act(async () => reject(new Error("Private old company failure")))
+    expect(screen.queryByText("Private old company failure")).toBeNull()
+    expect(screen.queryByRole("status")).toBeNull()
+    expect((screen.getByTestId("erp-ai-chat-attach") as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it("prepares an error question once without replacing an unsent draft or dispatching it", () => {
     const onSendMessage = vi.fn()
     const request = { id: "error-1", text: "Explain this ERP error using current authorized evidence.\nDisplayed error: Cannot post" }

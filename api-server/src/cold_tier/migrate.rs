@@ -340,6 +340,13 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0033_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 34,
+        name: "chat_import_tasks",
+        change_set: 23,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_tasks_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1397,6 +1404,20 @@ mod tests {
             migration_checksum(receipt.sql),
             "sha256:c41a2d2cb7449cdc24f8b8162c6d6fa18c7162b1c939f9cacf4504672cb0499a"
         );
+    }
+
+    #[test]
+    fn chat_import_tasks_preserve_released_owner_funding_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..33]),
+            "sha256:488b5e004dadaf81a5891c5e9c408053855ba884be62dd59bda2c1d62682b843"
+        );
+        let task_migration = MIGRATIONS[33];
+        assert_eq!(task_migration.version, 34);
+        assert_eq!(task_migration.name, "chat_import_tasks");
+        assert_eq!(task_migration.change_set, 23);
+        assert_eq!(task_migration.phase, MigrationPhase::Expand);
+        assert_eq!(task_migration.sql, include_str!("import_tasks_expand.sql"));
     }
 
     #[test]

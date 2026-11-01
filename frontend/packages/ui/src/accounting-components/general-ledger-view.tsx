@@ -34,20 +34,13 @@ import {
   X,
 } from "lucide-react"
 import type { AccountMove } from "../lib/accounting-types"
-import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
+import { moveStateIsDraft, moveTypeIsInvoiceOrRefund, stbEnumTag } from "../lib/accounting-move-utils"
 import { getRowField } from "../lib/entity-row-utils"
 import { useCurrencyFormat } from "../lib/currency-context"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { useTranslation } from "@lumiere/i18n"
 import type { RowValueMap } from "@lumiere/erp-shared/row-values"
 import { TablePager, usePagedRows } from "../components/table-pager"
-
-function moveStateStr(state: unknown): string {
-  if (state != null && typeof state === 'object' && 'tag' in state) {
-    return String((state as { tag: string }).tag)
-  }
-  return String(state ?? '')
-}
 
 function routeFilterValue(value: unknown): string {
   if (value == null) return ""
@@ -118,8 +111,8 @@ export function GeneralLedgerView({
 
   const stats = {
     total: moves.length,
-    posted: moves.filter((m) => String(m.state) === "Posted").length,
-    pending: moves.filter((m) => String(m.state) === "Draft").length,
+    posted: moves.filter((m) => stbEnumTag(m.state) === "Posted").length,
+    pending: moves.filter((m) => stbEnumTag(m.state) === "Draft").length,
     totalMovement: moves.reduce((s, m) => s + (m.amountTotal ?? 0), 0),
   }
 
@@ -240,7 +233,7 @@ export function GeneralLedgerView({
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("accounting.journalEntries.noResults")}</TableCell></TableRow>
               ) : movesPager.pageRows.map((move) => {
-                const isPosted = String(move.state) === "Posted"
+                const isPosted = stbEnumTag(move.state) === "Posted"
                 return (
                   <TableRow key={String(move.id)} data-testid={`entity-row-${move.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedMove(move)}>
                     <TableCell className="font-mono font-medium">{move.name}</TableCell>
@@ -248,7 +241,7 @@ export function GeneralLedgerView({
                     <TableCell>
                       {move.ref && <Badge variant="outline" className="text-xs">{move.ref}</Badge>}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{String(move.moveType)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{stbEnumTag(move.moveType)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(move.amountTotal ?? 0, move.currencyId)}</TableCell>
                     <TableCell>
                       <Badge variant={isPosted ? "default" : "secondary"} className="gap-1">
@@ -279,8 +272,8 @@ export function GeneralLedgerView({
               <DialogHeader>
                 <div className="flex items-center justify-between">
                   <DialogTitle>Entry: {selectedMove.name}</DialogTitle>
-                  <Badge variant={String(selectedMove.state) === "Posted" ? "default" : "secondary"}>
-                    {String(selectedMove.state) === "Posted" ? t("accounting.states.posted") : t("accounting.states.draft")}
+                  <Badge variant={stbEnumTag(selectedMove.state) === "Posted" ? "default" : "secondary"}>
+                    {stbEnumTag(selectedMove.state) === "Posted" ? t("accounting.states.posted") : t("accounting.states.draft")}
                   </Badge>
                 </div>
               </DialogHeader>
@@ -288,7 +281,7 @@ export function GeneralLedgerView({
                 <div className="grid grid-cols-3 gap-4">
                   <div><Label className="text-muted-foreground">{t("accounting.journalEntries.date")}</Label><p className="font-medium">{formatTimestamp(selectedMove.date)}</p></div>
                   <div><Label className="text-muted-foreground">{t("accounting.journalEntries.ref")}</Label><p className="font-medium">{selectedMove.ref ?? "—"}</p></div>
-                  <div><Label className="text-muted-foreground">{t("accounting.journalEntries.type")}</Label><p className="font-medium">{String(selectedMove.moveType)}</p></div>
+                  <div><Label className="text-muted-foreground">{t("accounting.journalEntries.type")}</Label><p className="font-medium">{stbEnumTag(selectedMove.moveType)}</p></div>
                 </div>
                 <div className="border rounded-lg">
                   <Table>
@@ -337,7 +330,7 @@ export function GeneralLedgerView({
                           {t("accounting.journalEntries.recalculateInvoiceTotals")}
                         </Button>
                       )}
-                    {moveStateStr(selectedMove.state) === 'Draft' && onPostMove && (
+                    {stbEnumTag(selectedMove.state) === 'Draft' && onPostMove && (
                       <Button
                         type="button"
                         data-testid="general-ledger-post-move"
@@ -347,8 +340,8 @@ export function GeneralLedgerView({
                         {t("accounting.journalEntries.postEntry")}
                       </Button>
                     )}
-                    {(moveStateStr(selectedMove.state) === 'Draft' ||
-                      moveStateStr(selectedMove.state) === 'Posted') &&
+                    {(stbEnumTag(selectedMove.state) === 'Draft' ||
+                      stbEnumTag(selectedMove.state) === 'Posted') &&
                       onCancelMove && (
                         <Button
                           type="button"

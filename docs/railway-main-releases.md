@@ -38,9 +38,56 @@ Railway's service healthchecks and one-shot completion markers remain gates.
 The public edge readiness URL is specified in the main release workflow.
 
 AI is included because it is already active in production. Owner-report and
-integration workers remain off until their credentials, organization bindings,
-and readiness endpoints are provisioned. Enable them using repository variables
-`RAILWAY_ENABLE_OWNER_REPORTS=true` and `RAILWAY_ENABLE_INTEGRATIONS=true`.
+integration workers remain off until their credentials, automatic tenant
+enrollment, and readiness endpoints are provisioned. Enable them using repository
+variables `RAILWAY_ENABLE_OWNER_REPORTS=true` and `RAILWAY_ENABLE_INTEGRATIONS=true`.
+
+### Automatic enrollment for signed-up tenants
+
+The API reconciles active tenants against `LUMIERE_TENANT_SERVICE_IDENTITIES`
+every 15 seconds. This deployment-owned JSON object maps canonical service names
+to their database-verified **public identities**, for example:
+
+```json
+{
+  "expense_integration_worker": "<64-character public identity>",
+  "hr_integration_worker": "<64-character public identity>",
+  "project_integration_worker": "<64-character public identity>",
+  "owner_report_worker": "<64-character public identity>"
+}
+```
+
+Use the identity bootstrap tooling to obtain the actual identities; tokens and
+tenant-supplied values never belong in this map. The Railway private bootstrap
+script now returns `apiVariables.LUMIERE_TENANT_SERVICE_IDENTITIES` inside its
+encrypted envelope. Apply those variables to `api-server`, and keep each worker
+token on its own service. Re-running bootstrap with the existing integration
+tokens reuses those identities. The Doppler bootstrap also writes this map when
+`api-server` is included in `DOPPLER_CONFIG_MAP_JSON`; include the complete set of
+desired identity targets when generating its API configuration. Retain all
+desired entries when updating the map or rotating only part of the services.
+
+New and existing active tenants receive separate organization-scoped bindings
+without editing Railway variables per signup. Enrollment retries failures and
+respects placement fencing. Existing different identities require explicit
+operator rotation; retired bindings stay retired. The registry checks this
+atomically, including during concurrent API replicas or operator changes.
+Reviewed-mail activation remains a separate reviewed operation.
+
+Expense, HR and project workers discover their active bindings on every poll.
+Remove or empty `LUMIERE_EXPENSE_WORKER_ORG_IDS`, `LUMIERE_HR_WORKER_ORG_IDS` and
+`LUMIERE_PROJECT_WORKER_ORG_IDS` to include future signups automatically. These
+variables remain optional restrictions for a shard; invalid or unauthorized IDs
+fail readiness. An empty deployment can be ready before its first signup after
+successfully authenticating and reading its binding discovery query. No external
+provider connection or credentials are created by tenant enrollment.
+
+Roll out the registry module and shared runtime together through the ordered
+release. Configure the API identity map and worker credentials before enabling
+the repository gates. Release preflight requires the map to contain every
+selected integration/owner-report service and no longer requires a static tenant
+list. Verify terminal deployment success, each worker's readiness and the
+per-tenant `cold_tier_service_identity` bindings after rollout.
 
 Make the new `lumiere-v-1-chromium-worker` GHCR package public before its first
 production pull. All release packages must be anonymously readable. The

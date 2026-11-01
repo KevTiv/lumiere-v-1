@@ -227,33 +227,44 @@ pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(20u32);
-    let org_ids = std::env::var(format!("LUMIERE_{}_WORKER_ORG_IDS", spec.env_prefix))
-        .unwrap_or_default()
-        .split(',')
-        .filter_map(|s| s.trim().parse::<u64>().ok())
-        .collect::<Vec<_>>();
+    let selection = crate::service_identity::parse_organization_selection(
+        std::env::var(format!("LUMIERE_{}_WORKER_ORG_IDS", spec.env_prefix))
+            .ok()
+            .as_deref(),
+    )?;
 
     let mut app_state = AppState::new(config);
     app_state.stdb = app_state.stdb.with_token(worker_token);
     let state = Arc::new(app_state);
-    // Configuration alone does not prove that the SpacetimeDB dependency and
-    // reducer are reachable. Readiness becomes true only after one successful
-    // batch, matching the other API-server workers.
+    // Readiness requires authenticated discovery and a successful batch for
+    // each discovered tenant. A deployment with no enrolled tenants may idle
+    // ready after its discovery query succeeds.
     let ready = Arc::new(AtomicBool::new(false));
     let worker_state = state.clone();
     let worker_ready = ready.clone();
-    let orgs = org_ids.clone();
     let reducer_name = spec.reducer_name;
     let service_name = spec.service_name;
     let log_label = spec.log_label;
-    let env_prefix = spec.env_prefix;
     tokio::spawn(async move {
-        if orgs.is_empty() {
-            tracing::warn!("{log_label} idle: set LUMIERE_{env_prefix}_WORKER_ORG_IDS");
-            return;
-        }
         loop {
-            match process_batch(&worker_state, &orgs, batch, reducer_name, service_name).await {
+            let result = async {
+                let organizations = crate::service_identity::discover_service_organizations(
+                    &worker_state.stdb,
+                    service_name,
+                    selection.as_ref(),
+                )
+                .await?;
+                process_batch(
+                    &worker_state,
+                    &organizations,
+                    batch,
+                    reducer_name,
+                    service_name,
+                )
+                .await
+            }
+            .await;
+            match result {
                 Ok(_) => worker_ready.store(true, Ordering::Relaxed),
                 Err(error) => {
                     worker_ready.store(false, Ordering::Relaxed);
@@ -294,12 +305,25 @@ async fn process_batch(
     reducer_name: &str,
     service_name: &'static str,
 ) -> anyhow::Result<()> {
+    let mut failures = 0;
     for organization_id in org_ids {
-        let service = ScheduledService::authorize(state, *organization_id, service_name).await?;
-        service
-            .call(reducer_name, json!([organization_id, batch]))
-            .await?;
+        let result = async {
+            let service =
+                ScheduledService::authorize(state, *organization_id, service_name).await?;
+            service
+                .call(reducer_name, json!([organization_id, batch]))
+                .await
+        }
+        .await;
+        if let Err(error) = result {
+            failures += 1;
+            tracing::error!(organization_id, service_name, %error, "tenant integration batch failed");
+        }
     }
+    anyhow::ensure!(
+        failures == 0,
+        "{failures} tenant integration batches failed"
+    );
     Ok(())
 }
 
