@@ -1,6 +1,6 @@
 # Owner allowance and prepaid source candidate
 
-Status: REVIEW, contract-dependent native foundation. Base `04d8541e4`.
+Status: REVIEW, native foundation pinned to contracts `0.3.164`. Base `04d8541e4`.
 No live cap, credit, price, grant, provider or farm record was changed.
 
 The combined native candidate preserves one managed organization pool, the
@@ -31,9 +31,9 @@ credit, held funds, settlement and unchanged funding and price entries.
 - The first prepaid module `cargo check --locked --offline --tests` passed
   before the final pool and combined edits. A later owner candidate check
   found two fixture clone errors, which were corrected.
-- Final combined module compilation and native reducer execution remain
-  pending. The local disk constraint stopped further builds; prior checks do
-  not certify the final combined tree.
+- The final hosted release compiled the native/WASM source and the api-server
+  library through its catalog checksum example. Native reducer execution and
+  full runtime/integration tests remain separate CI gates.
 - Formatting, diff checks, source-bound manifest checks and the generated
   Finance change-review inventory pass.
 - The isolated module CI lane now explicitly calls the owner configuration and
@@ -42,10 +42,9 @@ credit, held funds, settlement and unchanged funding and price entries.
 
 ## Required follow up
 
-Publish new generated contracts through the normal reviewed release, align pins
-and generated consumers, then wire authenticated API/UI reads and writes. The
-branch name suppresses automatic immutable publication. Contract drift cannot
-pass against the old pin until that release is approved and applied.
+Contracts `0.3.164` are published and pinned through the normal reviewed release.
+Wire authenticated API/UI reads and writes next. The branch prefix continues to
+suppress automatic immutable publication on ordinary pushes.
 
 Automatic funded month rollover remains deferred. The current native path
 requires an existing provisioned month even after prepaid activation. Add
@@ -113,9 +112,7 @@ PostgreSQL execution result. Application catalog 33 checksum is
 Canonical regeneration after promotion passed: all 16 migrations are released
 and no pending 34 delta exists.
 
-Final publication, consumer pins and native compilation from the completed
-branch are checked by the subsequent normal release run. No Railway migration
-or live funding/configuration change is part of this repair.
+No Railway migration or live funding/configuration change is part of this repair.
 
 
 Release 41310136783 was cancelled before module steps started. Its check
@@ -125,3 +122,24 @@ with `cancel-in-progress: false`, so pending CI and release callers remain
 serialized instead of replacing a waiting release. This follows GitHub's
 supported concurrency queue option:
 https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
+
+
+## Published result
+
+Release [41310497946](https://github.com/KevTiv/lumiere-v-1/actions/runs/41310497946)
+passed native compilation, both generation passes, the promoted-migration gate,
+candidate preparation, publication, pinning and final contract drift verification.
+Contracts tag `v0.3.164` resolves to
+`60a97ef7cf75c310480a12ca3aab7960b103835d`, with application source
+`12d0fd1cccf3e00ded6e8c5e0fc51c63519536e4`. Pin commit is
+`2a842294a` on PR #352. The published migration 33 matches the promoted SQL
+byte for byte. Cargo and frontend consumer pins were updated by the workflow.
+
+After pulling the pin, local archive verification, release-manifest validation,
+operation history (1,505 operations), Finance inventory and source-bound skill
+checks pass. Five isolated actual catalog tests also pass against the new pin.
+The native module artifact is CI artifact `13085262673` with ZIP digest
+`sha256:27938c9a964888308fae3614ebe091062f3f8b5642e21e33c8c3370fe0a05535`.
+This publication is source/contract evidence. Railway deployment, live USD 10
+activation, PostgreSQL execution and live tenant acceptance are not established
+by it. No paid calls, live grants or farm record writes were made for this repair.
