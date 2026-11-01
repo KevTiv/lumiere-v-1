@@ -461,6 +461,9 @@ fn validate_request(key: &str, reason: &str) -> Result<(), String> {
     {
         return Err("request key is invalid".into());
     }
+    if reason.contains('\0') {
+        return Err("configuration reason contains a null byte".into());
+    }
     if reason.trim().is_empty() || reason.len() > 1024 {
         return Err("configuration reason is required and bounded".into());
     }
@@ -615,6 +618,17 @@ mod tests {
         assert!(validate_sponsored_limit(10, 5).is_err());
         assert!(validate_sponsored_limit(u64::MAX, 5).is_err());
     }
+    #[test]
+    fn reason_rejects_null_bytes_but_allows_multiline_and_unicode_text() {
+        // PostgreSQL TEXT cannot persist a null byte. Both the receipt and the
+        // audit projection must remain writable after a native owner command.
+        for reason in ["\0Approved", "Approved\0reason", "Approved\0"] {
+            assert!(validate_request("owner-limit:null-byte", reason).is_err());
+        }
+        assert!(validate_request("owner-limit:multiline", "Owner approved\nBudget for Mugisha").is_ok());
+        assert!(validate_request("owner-limit:unicode", "Propriétaire approuvé").is_ok());
+    }
+
     #[test]
     fn request_is_bounded() {
         assert!(validate_request("owner-limit:one", "Owner approved").is_ok());
