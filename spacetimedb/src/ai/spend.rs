@@ -479,6 +479,9 @@ pub fn reserve_ai_spend(
         budget.outstanding_units,
         reserved_units,
     )?;
+    crate::ai::prepaid::require_prepaid_credit(
+        ctx, organization_id, params.agent_id, &params.currency, reserved_units,
+    )?;
     ctx.db.ai_spend_budget().id().update(AiSpendBudget {
         outstanding_units,
         write_uid: ctx.sender(),

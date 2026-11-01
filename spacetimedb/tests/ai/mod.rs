@@ -6,6 +6,7 @@ pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod relational_integrity_test;
 pub mod runtime_reads_test;
+pub mod prepaid_test;
 pub mod spend_recovery_test;
 pub mod workflow_provenance_test;
 
@@ -207,6 +208,7 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_spend_recovery_tests(ctx)?;
+    run_ai_prepaid_tests(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
     adversarial_drafts_test::test_correlated_draft_replay(ctx)?;
@@ -215,5 +217,14 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     adversarial_drafts_test::test_payment_reversal_draft_preserves_finance_workflow(ctx)?;
     adversarial_drafts_test::test_execution_claim_is_exclusive(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_ai_prepaid_tests(ctx: &ReducerContext) -> Result<(), String> {
+    prepaid_test::test_owner_wildcard_cannot_fund(ctx)?;
+    prepaid_test::test_prepaid_cutover_and_settlement(ctx)?;
+    prepaid_test::test_funding_identity_and_reversal_bounds(ctx)?;
+    prepaid_test::test_old_month_holds_and_release(ctx)?;
     Ok(())
 }

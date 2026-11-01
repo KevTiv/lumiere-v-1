@@ -5069,6 +5069,21 @@
       "name": "run_configured_record_creation_tests",
       "exposure": "denied",
       "reason": "Development-only native configured creation regression; never session exposed."
+    },
+    {
+      "name": "create_ai_prepaid_account",
+      "exposure": "denied",
+      "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
+    },
+    {
+      "name": "enable_ai_prepaid_account",
+      "exposure": "denied",
+      "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
+    },
+    {
+      "name": "record_ai_prepaid_funding",
+      "exposure": "denied",
+      "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
     }
   ]
 }
