@@ -53,6 +53,7 @@ import {
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 import { useCurrencyFormat } from "../lib/currency-context"
+import { unwrapEntityValue } from "../lib/entity-row-values"
 import { toast } from "sonner"
 import { TablePager, usePagedRows } from "../components/table-pager"
 import { ACCOUNT_PURPOSES, accountCreationValues, type AccountPurpose } from "./account-creation"
@@ -102,7 +103,7 @@ const groupConfig: Record<
 }
 
 function getDisplayGroup(account: AccountAccount): DisplayGroup {
-  const group = String(account.internalGroup ?? "")
+  const group = String(unwrapEntityValue(account.internalGroup) ?? "")
   if (group === "Asset") return "asset"
   if (group === "Liability") return "liability"
   if (group === "Equity") return "equity"
