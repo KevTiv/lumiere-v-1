@@ -30,3 +30,21 @@ test("enum constraints, string bounds, and missing/blank number retain exact sem
 test("invalid schema bounds and oversized descriptors reject before rendering", () => {
   for (const properties of [{ name: { type: "string", minLength: 5, maxLength: 4 } }, { name: { type: "string", maxLength: 2001 } }, { count: { type: "integer", minimum: 5, maximum: 4 } }, { enabled: { type: "boolean", minimum: 0 } }, { count: { type: "integer", enum: [1, 1] } }]) assert.equal(parseProgramInputSchema({ type: "object", additionalProperties: false, properties }), null)
 })
+test("root, properties, fields and inputs require plain objects with exact structural keys", () => {
+  const schema = parseProgramInputSchema(wire)!
+  for (const value of [null, [], "object", 0, true, new Date()]) {
+    assert.equal(parseProgramInputSchema(value), null)
+    assert.equal(validateProgramInputs(schema, value).valid, false)
+    assert.equal(parseProgramInputSchema({ ...wire, properties: value }), null)
+    assert.equal(parseProgramInputSchema({ ...wire, required: [], properties: { query: value } }), null)
+  }
+  assert.equal(parseProgramInputSchema({ ...wire, required: null }), null)
+  assert.equal(parseProgramInputSchema({ ...wire, required: [], properties: { query: { type: { toString: null } } } }), null)
+  assert.equal(parseProgramInputSchema({ ...wire, required: [], properties: { query: { type: "string", unknownConstraint: true } } }), null)
+  const inherited = Object.create({ period: "2026-11-01" }) as object
+  assert.equal(validateProgramInputs(schema, inherited).valid, false)
+  let accessorCalls = 0
+  const accessor = Object.defineProperty({ type: "string" }, "maxLength", { enumerable: true, get() { accessorCalls += 1; return 1 } })
+  assert.equal(parseProgramInputSchema({ ...wire, required: [], properties: { query: accessor } }), null)
+  assert.equal(accessorCalls, 0)
+})

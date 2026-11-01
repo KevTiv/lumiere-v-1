@@ -40,9 +40,9 @@ pub mod skill_registry;
 pub mod skills;
 pub mod spend;
 pub mod spend_reads;
-pub mod workflow_provenance;
-pub mod work_programs;
 pub mod work_program_learning;
+pub mod work_programs;
+pub mod workflow_provenance;
 
 pub use action_drafts::*;
 pub use agents::*;

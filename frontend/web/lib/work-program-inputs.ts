@@ -19,26 +19,44 @@ export interface ProgramInputSchema { fields: ProgramInputField[] }
 
 const RESERVED = /^(?:organization_?id|org_?id|company_?id|actor.*|identity.*|.*token|.*secret|.*credential|permissions?|capabilities|policy.*|__proto__|prototype|constructor)$/i
 const FIELD_KEY = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/
-function record(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null
+function isPlainObject(value: unknown): value is object {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false
+  const prototype: unknown = Object.getPrototypeOf(value)
+  return prototype === null || prototype === Object.prototype
 }
-function exact(value: Record<string, unknown>, keys: string[]) { return Object.keys(value).every((key) => keys.includes(key)) }
+function exact(value: object, keys: readonly string[]) {
+  return Object.getOwnPropertySymbols(value).length === 0 && Object.getOwnPropertyNames(value).every((key) => {
+    const property = Object.getOwnPropertyDescriptor(value, key)
+    return keys.includes(key) && property !== undefined && Object.hasOwn(property, "value")
+  })
+}
+/** Dynamic input names come from the validated schema. Never read inherited values or invoke accessors. */
+function ownValue(value: object, key: string): unknown { return Object.getOwnPropertyDescriptor(value, key)?.value }
 function bound(value: unknown): value is number { return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 }
 
 export function parseProgramInputSchema(value: unknown): ProgramInputSchema | null {
-  const root = record(value)
-  if (!root || !exact(root, ["type", "properties", "required", "additionalProperties"]) || root.type !== "object" || root.additionalProperties !== false) return null
-  const properties = record(root.properties)
-  if (!properties || Object.keys(properties).length > 16) return null
-  const required = root.required ?? []
+  if (!isPlainObject(value) || !exact(value, ["type", "properties", "required", "additionalProperties"])) return null
+  const root = {
+    type: ownValue(value, "type"), properties: ownValue(value, "properties"),
+    required: ownValue(value, "required"), additionalProperties: ownValue(value, "additionalProperties"),
+  }
+  if (root.type !== "object" || root.additionalProperties !== false) return null
+  const properties = root.properties
+  if (!isPlainObject(properties) || Object.keys(properties).length > 16) return null
+  const required = root.required === undefined ? [] : root.required
   if (!Array.isArray(required) || required.some((key) => typeof key !== "string" || !Object.hasOwn(properties, key)) || new Set(required).size !== required.length) return null
   const fields: ProgramInputField[] = []
-  for (const [key, raw] of Object.entries(properties)) {
-    const item = record(raw)
-    if (!FIELD_KEY.test(key) || RESERVED.test(key) || !item || !exact(item, ["type", "title", "enum", "minLength", "maxLength", "minimum", "maximum", "format"])) return null
-    if (!["string", "integer", "number", "boolean"].includes(String(item.type))) return null
+  for (const key of Object.keys(properties)) {
+    const raw = ownValue(properties, key)
+    if (!FIELD_KEY.test(key) || RESERVED.test(key) || !isPlainObject(raw) || !exact(raw, ["type", "title", "enum", "minLength", "maxLength", "minimum", "maximum", "format"])) return null
+    const item = {
+      type: ownValue(raw, "type"), title: ownValue(raw, "title"), enum: ownValue(raw, "enum"),
+      minLength: ownValue(raw, "minLength"), maxLength: ownValue(raw, "maxLength"),
+      minimum: ownValue(raw, "minimum"), maximum: ownValue(raw, "maximum"), format: ownValue(raw, "format"),
+    }
+    if (item.type !== "string" && item.type !== "integer" && item.type !== "number" && item.type !== "boolean") return null
     if (item.title !== undefined && (typeof item.title !== "string" || item.title.length > 120 || !item.title.trim())) return null
-    const field: ProgramInputField = { key, label: typeof item.title === "string" ? item.title : key, type: item.type as ProgramInputField["type"], required: required.includes(key) }
+    const field: ProgramInputField = { key, label: typeof item.title === "string" ? item.title : key, type: item.type, required: required.includes(key) }
     if (item.type === "string") {
       if (item.minimum !== undefined || item.maximum !== undefined) return null
       if (item.format !== undefined && item.format !== "date") return null
@@ -80,8 +98,8 @@ function validValue(field: ProgramInputField, value: unknown): value is ProgramI
 }
 
 export function validateProgramInputs(schema: ProgramInputSchema, value: unknown): { valid: true; values: Record<string, ProgramInputValue> } | { valid: false; errors: string[] } {
-  const inputs = record(value)
-  if (!inputs) return { valid: false, errors: ["Inputs must be an object."] }
+  if (!isPlainObject(value)) return { valid: false, errors: ["Inputs must be an object."] }
+  const inputs = value
   const errors: string[] = []
   const result: Record<string, ProgramInputValue> = {}
   for (const key of Object.keys(inputs)) if (!schema.fields.some((field) => field.key === key)) errors.push(`Unsupported input: ${key}`)
@@ -90,7 +108,7 @@ export function validateProgramInputs(schema: ProgramInputSchema, value: unknown
       if (field.required) errors.push(`${field.label} is required.`)
       continue
     }
-    const item = inputs[field.key]
+    const item = ownValue(inputs, field.key)
     if (!validValue(field, item) || (field.enum !== undefined && !field.enum.includes(item))) errors.push(`${field.label} is invalid.`)
     else result[field.key] = item
   }
