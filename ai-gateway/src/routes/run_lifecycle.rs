@@ -548,7 +548,7 @@ async fn load_comparison_details(
     let right = load_run(comparison.right_run_id).await?;
     let load_tools = |run_id: u64| async move {
         stdb.query_sql(&format!(
-            "SELECT tool_name FROM ai_agent_run_step WHERE organization_id = {organization_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {}",
+            "SELECT tool_name FROM ai_agent_run_step WHERE organization_id = {organization_id} AND run_id = {run_id} LIMIT {}",
             MAX_TOOLS + 1
         ))
         .await
@@ -597,6 +597,10 @@ fn enforce_lifecycle_bounds(
             "run lifecycle row grant is empty".into(),
         ));
     }
+    // SpacetimeDB SQL does not support ORDER BY. Order the bounded metadata
+    // returned by the reader before the aggregate row/byte limits are applied.
+    response.questions.sort_by_key(|question| question.id);
+    response.events.sort_by_key(|event| event.id);
     let mut remaining = usize::try_from(bounds.max_rows.saturating_sub(1)).unwrap_or(usize::MAX);
     if response.questions.len() > remaining {
         response.questions.truncate(remaining);
@@ -695,7 +699,7 @@ async fn load_response(
     let state = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_state_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?.into_iter().next()
         .ok_or_else(|| AppError::NotFound("run lifecycle not found".into()))?;
-    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
+    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     let queued_inputs = stdb
         .query_sql(&queued_inputs_sql(
@@ -706,12 +710,16 @@ async fn load_response(
         ))
         .await
         .map_err(|error| AppError::Internal(error.to_string()))?;
-    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
+    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     // The park table exists only in modules that include the budget-park
     // reducers; a missing table or row simply means the run was never parked.
     let park = stdb.query_sql(&format!("SELECT * FROM ai_run_budget_park_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.ok().and_then(|rows| rows.into_iter().next()).and_then(|row| park_from_row(&row));
+    // A full SQL page can hide more rows. Never call a bounded subset complete.
+    let truncated = questions.len() >= row_limit
+        || queued_inputs.len() >= row_limit
+        || events.len() >= row_limit;
     let checkpoint_hash = text(&state, "checkpointHash")?;
     Ok(RunLifecycleResponse {
         run_id,
@@ -738,7 +746,7 @@ async fn load_response(
             .collect::<AppResult<_>>()?,
         comparison,
         park,
-        truncated: false,
+        truncated,
     })
 }
 
@@ -787,7 +795,7 @@ fn queued_inputs_sql(
     run_id: u64,
     row_limit: usize,
 ) -> String {
-    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY queued_input_id ASC LIMIT {row_limit}")
+    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}")
 }
 
 fn queued_input_from_row(row: Value) -> AppResult<LifecycleQueuedInput> {
@@ -1003,6 +1011,72 @@ mod tests {
         assert_eq!(bounded.questions.len(), 2);
         assert!(bounded.events.is_empty());
         assert!(bounded.truncated);
+    }
+
+    #[test]
+    fn unordered_metadata_is_sorted_before_grant_truncation() {
+        let mut response = lifecycle_response();
+        response.questions.reverse();
+        response.events.reverse();
+        let bounded = enforce_lifecycle_bounds(
+            response,
+            CapabilityGrantBounds {
+                max_rows: 6,
+                max_bytes: 1_000_000,
+            },
+        )
+        .expect("bounded metadata");
+        assert_eq!(
+            bounded
+                .questions
+                .iter()
+                .map(|row| row.id)
+                .collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
+        assert_eq!(
+            bounded.events.iter().map(|row| row.id).collect::<Vec<_>>(),
+            [1, 2]
+        );
+        assert!(bounded.truncated);
+    }
+
+    #[tokio::test]
+    async fn lifecycle_reader_uses_supported_scoped_bounded_sql() {
+        use axum::{routing::post, Router};
+
+        let app = Router::new().route("/v1/database/test/sql", post(|sql: String| async move {
+            assert!(!sql.contains("ORDER BY"), "unsupported SQL: {sql}");
+            assert!(sql.contains("organization_id = 7 AND company_id = 9 AND run_id = 42"));
+            assert!(sql.ends_with("LIMIT 1") || sql.ends_with("LIMIT 10"));
+            let (names, rows) = if sql.contains("FROM ai_run_lifecycle_state_read") {
+                (vec!["run_id", "state", "checkpoint_hash", "cursor", "concurrency_version"],
+                 vec![vec![json!(42), json!("agent_settled"), json!("a".repeat(64)), json!(1), json!(2)]])
+            } else {
+                if sql.contains("FROM ai_run_queued_input_read") {
+                    assert!(!sql.contains("payload"));
+                    assert!(!sql.contains("author"));
+                }
+                (vec!["id"], vec![])
+            };
+            Json(json!([{"schema":{"elements": names.into_iter().map(|name| json!({"name":{"some":name}})).collect::<Vec<_>>()}, "rows":rows}]))
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let client = StdbClient::new(
+            format!("http://{}", listener.local_addr().expect("address")),
+            "test".into(),
+            "test-token".into(),
+        );
+        let task =
+            tokio::spawn(async move { axum::serve(listener, app).await.expect("test server") });
+        let result = load_response(&client, 7, 9, 42, None, 10).await;
+        task.abort();
+        let response = result.expect("supported lifecycle query");
+        assert_eq!(response.run_id, 42);
+        assert_eq!(response.state, "agent_settled");
+        assert!(!response.truncated);
     }
 
     #[test]
