@@ -189,10 +189,10 @@ pub(crate) struct WorkProgramReleaseBinding<'a> {
 /// canonical executor. Compilation alone authorizes no call.
 #[derive(Debug)]
 pub(crate) struct CompiledWorkProgram {
-    pub(super) graph: DecisionGraph,
-    pub(crate) manifest_sha256: String,
-    pub(crate) program_ref: String,
-    pub(crate) reviewed_skill_key: String,
+    graph: DecisionGraph,
+    manifest_sha256: String,
+    program_ref: String,
+    reviewed_skill_key: String,
 }
 
 fn admits_read_only_skill(module: AlphaModule, skill: &str) -> bool {
@@ -266,6 +266,18 @@ pub(crate) fn compile_work_program(
 }
 
 impl CompiledWorkProgram {
+    pub(crate) fn manifest_sha256(&self) -> &str {
+        &self.manifest_sha256
+    }
+
+    pub(crate) fn program_ref(&self) -> &str {
+        &self.program_ref
+    }
+
+    pub(crate) fn reviewed_skill_key(&self) -> &str {
+        &self.reviewed_skill_key
+    }
+
     /// Delegates to the canonical executor only after source admission. The
     /// current build deliberately has no production WorkProgram dispatcher.
     /// `run_manifest_sha256` must come from the durable run/version owner, not
