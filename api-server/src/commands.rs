@@ -1331,7 +1331,7 @@ mod tests {
         }
     }
 
-#[tokio::test]
+    #[tokio::test]
     async fn certification_enqueue_rechecks_company_and_uses_only_the_actor_credential() {
         use axum::{http::HeaderMap, routing::post, Router};
         use std::sync::{
