@@ -1,3 +1,4 @@
+import { DOCUMENT_FILE_ACCEPT } from "@lumiere/erp-shared/document-file-profile"
 import type { TFunction } from "i18next"
 import type { FormConfig } from "./form-types"
 
@@ -29,7 +30,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           description: t("documents.forms.newDocument.fields.fileHint"),
           required: true,
           width: "full",
-          accept: ".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx,.xls,.xlsx,application/pdf,image/*,text/plain",
+          accept: DOCUMENT_FILE_ACCEPT,
         },
         {
           id: "description",
@@ -531,7 +532,7 @@ export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
           label: "File",
           required: true,
           width: "full",
-          accept: ".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx,.xls,.xlsx,application/pdf,image/*,text/plain",
+          accept: DOCUMENT_FILE_ACCEPT,
         },
         {
           id: "changesDescription",

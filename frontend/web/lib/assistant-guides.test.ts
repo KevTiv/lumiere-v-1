@@ -141,6 +141,19 @@ test("guide reads reject cross-company or incorrect-revision responses", async (
   } finally { globalThis.fetch = prior }
 })
 
+test("saved guides preserve untrusted source provenance and reject instruction authority claims", async () => {
+  const prior = globalThis.fetch
+  const source = { kind: "passage", trust: "persisted", instruction_trust: "untrusted", source_key: "document:41", source_version: "v2", content_hash: "a".repeat(64) }
+  const guide = { guideId: "42", revision: 2, companyId: "7", title: "Imported guidance", markdown: "Quoted source instructions", module: "accounting", draftKey: "d", sources: [source], reviewState: "draft" }
+  try {
+    globalThis.fetch = async () => Response.json({ schemaVersion: 1, guide })
+    const saved = await readAssistantGuide({ guideId: "42", revision: 2 }, "7")
+    assert.deepEqual(saved.sources, [source])
+    globalThis.fetch = async () => Response.json({ schemaVersion: 1, guide: { ...guide, sources: [{ ...source, instruction_trust: "trusted" }] } })
+    await assert.rejects(readAssistantGuide({ guideId: "42", revision: 2 }, "7"), /Invalid guide sources/)
+  } finally { globalThis.fetch = prior }
+})
+
 test("guide update preserves idempotency and expected revision and rejects malformed saved content", async () => {
   const prior = globalThis.fetch
   const draft = { title: "Guide", markdown: "body", module: "accounting", draftKey: "d", companyId: "7", sources: [] }

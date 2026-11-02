@@ -1,3 +1,4 @@
+import { splitCsvRow } from "@lumiere/erp-shared/csv-import-safety"
 import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { expect, test, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
@@ -65,7 +66,7 @@ for (const width of [320, 390, 768, 1440]) {
       await trend.getByRole("button", { name: /as CSV/ }).click()
       const download = await downloadEvent
       const csv = await readFile((await download.path())!, "utf8")
-      const provenance = JSON.parse(csv.split("\r\n")[0]!.slice("# lumiere-provenance:".length))
+      const provenance = JSON.parse(splitCsvRow(csv.split("\r\n")[0]!)[0]!.slice("# lumiere-provenance:".length))
       expect(JSON.parse(provenance.domain).currencyId).toBe("1")
       expect(provenance.companyId).toBe("1")
       expect(csv).toContain("2400")

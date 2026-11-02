@@ -1,8 +1,9 @@
+import { neutralizeCsvCell } from "@lumiere/erp-shared/csv-import-safety"
 import type { DashboardWidget } from "./dashboard-types"
 import { reportExportProvenanceJson, type ReportExportSourceProvenance } from "./report-export-provenance"
 
 function escapeCsvCell(value: string | number): string {
-  const str = String(value)
+  const str = typeof value === "number" ? String(value) : neutralizeCsvCell(value)
   if (/[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`
   }
@@ -121,5 +122,6 @@ export function widgetDataToCsv(widget: DashboardWidget, provenance?: ReportExpo
     default:
       return null
   }
-  return provenance ? `# lumiere-provenance:${reportExportProvenanceJson(provenance)}\r\n${csv}` : csv
+  // Provenance is one CSV field; readers decode that field before parsing its JSON.
+  return provenance ? `${escapeCsvCell(`# lumiere-provenance:${reportExportProvenanceJson(provenance)}`)}\r\n${csv}` : csv
 }

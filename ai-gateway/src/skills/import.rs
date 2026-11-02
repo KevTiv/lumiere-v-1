@@ -8,7 +8,6 @@ use serde_json::{Map, Value};
 const MAX_ANALYZE_HEADERS: usize = 200;
 const MAX_SAMPLE_ROWS: usize = 50;
 const MAX_PREVIEW_ROWS: usize = 100;
-const MAX_CSV_TEXT_BYTES: usize = 512_000;
 
 #[derive(Debug, Deserialize)]
 pub struct ImportAnalyzeRequest {
@@ -61,7 +60,9 @@ pub struct CsvSafetyFinding {
 pub struct CsvSafetyReport {
     pub findings: Vec<CsvSafetyFinding>,
     pub blocked_cell_count: usize,
+    /// Compatibility shorthand for eligibility of the supplied input only.
     pub is_safe_for_ai: bool,
+    pub inspection: lumiere_file_inspection::InspectionReport,
 }
 
 #[derive(Debug, Serialize)]
@@ -463,49 +464,9 @@ fn infer_mapping_for_header<'a>(
     None
 }
 
-/// Parse a CSV string into headers and rows (preserves header casing).
+/// Parse the same bounded CSV representation used by native import reducers.
 pub fn parse_csv_text(csv: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
-    if csv.len() > MAX_CSV_TEXT_BYTES {
-        return Err(format!(
-            "csv exceeds maximum size of {MAX_CSV_TEXT_BYTES} bytes"
-        ));
-    }
-    let mut lines = csv.lines();
-    let header_line = lines.next().ok_or("csv is empty")?;
-    let headers = split_csv_row(header_line);
-    if headers.is_empty() {
-        return Err("csv header row is empty".to_string());
-    }
-    let rows = lines.map(split_csv_row).collect();
-    Ok((headers, rows))
-}
-
-fn split_csv_row(line: &str) -> Vec<String> {
-    let mut fields = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    let mut chars = line.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        match ch {
-            '"' if !in_quotes => in_quotes = true,
-            '"' if in_quotes => {
-                if chars.peek() == Some(&'"') {
-                    chars.next();
-                    current.push('"');
-                } else {
-                    in_quotes = false;
-                }
-            }
-            ',' if !in_quotes => {
-                fields.push(current.trim().to_string());
-                current = String::new();
-            }
-            _ => current.push(ch),
-        }
-    }
-    fields.push(current.trim().to_string());
-    fields
+    lumiere_file_inspection::parse_csv(csv).map_err(|error| error.to_string())
 }
 
 fn summarize_structure(headers: &[String], sample_rows: &[Vec<String>]) -> CsvStructureSummary {
@@ -562,91 +523,64 @@ fn metadata_suggestions(unmapped_source_columns: &[String]) -> Vec<MetadataMappi
         .collect()
 }
 
-fn is_formula_injection(value: &str) -> bool {
-    let trimmed = value.trim_start();
-    trimmed.starts_with('=')
-        || trimmed.starts_with('+')
-        || trimmed.starts_with('-')
-        || trimmed.starts_with('@')
-        || trimmed.starts_with('\t')
-        || trimmed.starts_with('\r')
-        || trimmed.starts_with('|')
+/// Inspect every supplied row. A supplied sample does not certify an unseen file.
+pub fn scan_csv_content(
+    headers: &[String],
+    rows: &[Vec<String>],
+) -> Result<CsvSafetyReport, String> {
+    let inspection = lumiere_file_inspection::inspect_matrix(headers, rows)
+        .map_err(|error| error.to_string())?;
+    let findings = inspection
+        .findings
+        .iter()
+        .map(|finding| CsvSafetyFinding {
+            location: finding.location.clone(),
+            kind: match finding.kind {
+                lumiere_file_inspection::FindingKind::FormulaInjection => "formula_injection",
+                lumiere_file_inspection::FindingKind::PromptInjection => "prompt_injection",
+            }
+            .into(),
+            message: finding.message.clone(),
+            severity: "error".into(),
+        })
+        .collect();
+    Ok(CsvSafetyReport {
+        findings,
+        blocked_cell_count: inspection.blocked_cell_count,
+        is_safe_for_ai: inspection.ai_allowed,
+        inspection,
+    })
 }
 
-fn is_prompt_injection(value: &str) -> bool {
-    let lower = value.to_ascii_lowercase();
-    [
-        "ignore previous instructions",
-        "ignore all previous",
-        "system:",
-        "assistant:",
-        "you are now",
-        "disregard prior",
-        "<|im_start|>",
-        "developer mode",
-    ]
-    .iter()
-    .any(|needle| lower.contains(needle))
-}
-
-fn scan_cell(location: &str, value: &str) -> Vec<CsvSafetyFinding> {
-    let mut findings = Vec::new();
-    if is_formula_injection(value) {
-        findings.push(CsvSafetyFinding {
-            location: location.to_string(),
-            kind: "formula_injection".to_string(),
-            message: "Cell begins with a spreadsheet formula prefix (=, +, -, @)".to_string(),
-            severity: "error".to_string(),
-        });
+fn validate_mapping_values(mapping: &Map<String, Value>) -> Result<(), String> {
+    if mapping.len() > lumiere_file_inspection::MAX_COLUMNS {
+        return Err("mapping exceeds 200 columns".into());
     }
-    if is_prompt_injection(value) {
-        findings.push(CsvSafetyFinding {
-            location: location.to_string(),
-            kind: "prompt_injection".to_string(),
-            message: "Cell contains instruction-like text unsafe for AI import analysis"
-                .to_string(),
-            severity: "error".to_string(),
-        });
-    }
-    if value.len() > 4_000 {
-        findings.push(CsvSafetyFinding {
-            location: location.to_string(),
-            kind: "oversized_cell".to_string(),
-            message: "Cell exceeds 4000 characters".to_string(),
-            severity: "warning".to_string(),
-        });
-    }
-    findings
-}
-
-/// Scan CSV headers and sample rows for formula/prompt injection patterns.
-pub fn scan_csv_content(headers: &[String], rows: &[Vec<String>]) -> CsvSafetyReport {
-    let mut findings = Vec::new();
-
-    for (idx, header) in headers.iter().enumerate() {
-        findings.extend(scan_cell(&format!("header[{idx}]"), header));
-    }
-
-    for (row_idx, row) in rows.iter().take(MAX_SAMPLE_ROWS).enumerate() {
-        for (col_idx, value) in row.iter().enumerate() {
-            findings.extend(scan_cell(&format!("row[{row_idx}].col[{col_idx}]"), value));
+    for (source, target) in mapping {
+        let Some(target) = target.as_str() else {
+            return Err("mapping targets must be strings".into());
+        };
+        if source.chars().count() > lumiere_file_inspection::MAX_CELL_CHARS || target.len() > 200 {
+            return Err("mapping entry exceeds its size limit".into());
         }
     }
+    Ok(())
+}
 
-    let blocked_cell_count = findings
-        .iter()
-        .filter(|finding| finding.severity == "error")
-        .count();
-    let is_safe_for_ai = blocked_cell_count == 0;
-
-    CsvSafetyReport {
-        findings,
-        blocked_cell_count,
-        is_safe_for_ai,
+fn validate_entity_name(entity: &str) -> Result<(), String> {
+    if entity.is_empty() || entity.len() > 100 {
+        return Err("target_entity must contain 1 to 100 bytes".into());
     }
+    Ok(())
 }
 
 fn analyze_mapping(req: &ImportAnalyzeRequest) -> Result<ImportAnalyzeResponse, String> {
+    validate_entity_name(&req.target_entity)?;
+    if req.bundle_key.as_ref().is_some_and(|key| key.len() > 100) {
+        return Err("bundle_key exceeds 100 bytes".into());
+    }
+    let safety = scan_csv_content(&req.headers, &req.sample_rows)?;
+    validate_mapping_values(&req.prior_mappings)?;
     let specs = manifest(&req.target_entity)
         .ok_or_else(|| format!("unsupported target_entity: {}", req.target_entity))?;
 
@@ -704,7 +638,6 @@ fn analyze_mapping(req: &ImportAnalyzeRequest) -> Result<ImportAnalyzeResponse, 
         .take(MAX_SAMPLE_ROWS)
         .cloned()
         .collect::<Vec<_>>();
-    let safety = scan_csv_content(&req.headers, &sample_rows);
     if !safety.is_safe_for_ai {
         warnings.push(format!(
             "{} cell(s) blocked due to CSV injection or prompt-injection patterns",
@@ -873,6 +806,9 @@ fn coerce_value(raw: &str, spec: &FieldSpec) -> Result<Value, String> {
 }
 
 fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, String> {
+    validate_entity_name(&req.target_entity)?;
+    let safety = scan_csv_content(&req.headers, &req.rows)?;
+    validate_mapping_values(&req.mapping)?;
     let specs = manifest(&req.target_entity)
         .ok_or_else(|| format!("unsupported target_entity: {}", req.target_entity))?;
     let spec_by_name = specs
@@ -953,8 +889,6 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
         Vec::new()
     };
 
-    let safety = scan_csv_content(&req.headers, &req.rows);
-
     Ok(ImportPreviewResponse {
         target_entity: req.target_entity.clone(),
         rows: normalized_rows,
@@ -1024,7 +958,7 @@ mod tests {
     fn scan_csv_content_flags_formula_injection() {
         let headers = vec!["Name".to_string()];
         let rows = vec![vec!["=cmd|'/c calc'!A0".to_string()]];
-        let report = scan_csv_content(&headers, &rows);
+        let report = scan_csv_content(&headers, &rows).expect("bounded matrix");
         assert!(!report.is_safe_for_ai);
         assert!(report.blocked_cell_count >= 1);
     }

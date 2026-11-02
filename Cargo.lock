@@ -68,6 +68,7 @@ dependencies = [
 name = "ai-gateway"
 version = "0.1.0"
 dependencies = [
+ "lumiere-file-inspection",
  "anyhow",
  "async-trait",
  "axum",
@@ -148,6 +149,7 @@ checksum = "fb5dfbc6d8d2675589ccbe4d0fd61df2419075625f8c1a62325e718e2b0049f9"
 name = "api-server"
 version = "0.1.0"
 dependencies = [
+ "lumiere-file-inspection",
  "aes-gcm",
  "ammonia",
  "anyhow",
@@ -2159,6 +2161,15 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "spacetimedb-sdk",
+]
+
+[[package]]
+name = "lumiere-file-inspection"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

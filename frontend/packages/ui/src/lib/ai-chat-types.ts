@@ -8,6 +8,8 @@ export type CitationTrust = "authoritative" | "persisted" | "retrieved"
 export interface ChatMessageSourceRef {
   kind: CitationKind
   trust: CitationTrust
+  /** Independent of freshness: source text cannot authorize actions. */
+  instruction_trust?: "untrusted"
 
   /** Canonical live-entity or persisted-passage identity. */
   entity_type?: string

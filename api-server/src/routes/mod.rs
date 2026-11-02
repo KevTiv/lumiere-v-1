@@ -16,6 +16,7 @@ mod finance_reviews;
 pub(crate) mod health;
 mod history;
 mod import;
+mod import_inspection;
 mod import_reviews;
 mod inventory;
 mod knowledge_guides;
@@ -64,6 +65,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(statement_imports::router())
         .merge(bootstrap::router())
         .merge(import::router())
+        .merge(import_inspection::router())
         .merge(import_reviews::router())
         .merge(billing::router())
         .merge(admin::router())

@@ -78,3 +78,14 @@ test("invalid scopes fail before issuing any request", () => {
   assert.throws(() => createCsvImportRequest(1n, "product", "x", "x.csv", { currencyId: 9007199254740992 }, "a".repeat(32)))
   assert.throws(() => createCsvImportRequest(1n, "product", "x", "x.csv", { companyId: 0n }, "a".repeat(32)))
 })
+
+
+test("workbook imports bind the server source admission to the exact request body", () => {
+  const id = "c".repeat(32)
+  const workbook = createCsvImportRequest(1n, "product", "name\nReviewed", "source.XLSX", { companyId: 2n, currencyId: 3n, sourceAdmissionId: id }, "b".repeat(32))
+  assert.equal(workbook.sourceAdmissionId, id)
+  assert.equal(JSON.parse(csvImportRequestBody(workbook)).sourceAdmissionId, id)
+  assert.throws(() => createCsvImportRequest(1n, "product", "name\nReviewed", "source.xlsx", { companyId: 2n, currencyId: 3n }), /inspect its original source/)
+  assert.throws(() => createCsvImportRequest(1n, "product", "name\nReviewed", "source.csv", { companyId: 2n, currencyId: 3n, sourceAdmissionId: "client-clean" }), /admission identity/)
+  assert.equal(Object.hasOwn(JSON.parse(csvImportRequestBody(request)), "sourceAdmissionId"), false)
+})

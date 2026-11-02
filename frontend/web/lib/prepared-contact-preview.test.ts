@@ -48,7 +48,7 @@ test("optional contact numbers and metadata preserve unknowns but reject malform
   assert.equal(result.preview.rows[0].employees_count, "")
   assert.equal(result.preview.rows[0].annual_revenue, "")
   assert.equal(result.preview.rows[3].annual_revenue, "0")
-  assert.ok(previewPreparedContacts({ csv: `${header}\n${contact},extra`, companyId: 22 }).preview.validation_errors.some(error => error.field === "row"))
+  assert.throws(() => previewPreparedContacts({ csv: `${header}\n${contact},extra`, companyId: 22 }), /more fields than the header/)
 })
 
 test("confirmed contact source reaches a tracked request with original provenance and scope", () => {

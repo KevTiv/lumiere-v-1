@@ -1,3 +1,5 @@
+import { documentFileContentType } from "@lumiere/erp-shared/document-file-profile"
+
 /**
  * DMS object-storage upload: presign → PUT bytes → complete (sha-256 verify).
  * Returns fields ready for `create_document` / `add_document_version`.
@@ -52,8 +54,8 @@ export async function uploadDocumentBlob(
     throw new Error("The company ID cannot be represented safely by the upload service")
   }
 
+  const contentType = documentFileContentType(file, purpose)
   const checksum = await sha256Hex(file)
-  const contentType = file.type || "application/octet-stream"
 
   const presignRes = await fetch("/api/documents/blobs/presign", {
     method: "POST",

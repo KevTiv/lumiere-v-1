@@ -1,3 +1,4 @@
+import { splitCsvRow } from "@lumiere/erp-shared/csv-import-safety"
 import { expect, test, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import { toCreateDashboardWidgetParams } from "@lumiere/erp-shared/reports-dashboard-params"
@@ -239,8 +240,8 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     const csvPath = await downloadedCsv.path()
     if (!csvPath) throw new Error("CSV download path is required")
     const firstLine = (await readFile(csvPath, "utf8")).split("\r\n")[0] ?? ""
-    expect(firstLine).toMatch(/^# lumiere-provenance:/)
-    expect(JSON.parse(firstLine.replace("# lumiere-provenance:", ""))).toMatchObject({
+    expect(splitCsvRow(firstLine)[0]).toMatch(/^# lumiere-provenance:/)
+    expect(JSON.parse(splitCsvRow(firstLine)[0]!.replace("# lumiere-provenance:", ""))).toMatchObject({
       schema: "lumiere.report-export-provenance/v1",
       organizationId: String(organizationId),
       dashboardId: String(dashboardId),

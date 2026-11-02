@@ -12,7 +12,7 @@ const JOB_TABLES: Record<string, string> = {
 export function trackedImportEntity(entity: string): string { return JOB_TABLES[entity] ?? entity }
 export function isExplicitProductPrice(value: string): boolean { return /^\d{1,12}(?:\.\d{1,6})?$/.test(value.trim()) }
 
-export function guidedImportRequest(args: { organizationId: bigint; companyId: number; entity: string; csv: string; fileName: string; companies: readonly { id: unknown; currencyId?: unknown }[] }) {
+export function guidedImportRequest(args: { organizationId: bigint; companyId: number; entity: string; csv: string; fileName: string; sourceAdmissionId?: string; companies: readonly { id: unknown; currencyId?: unknown }[] }) {
   const entity = trackedImportEntity(args.entity)
   if (entity === "account_move" || entity === "account_move_line") throw new Error("Use Accounting to import complete journal entries with their lines.")
   if (!supportsTrackedCsvImport(entity)) throw new Error("This import type cannot be submitted from this workspace yet.")
@@ -27,5 +27,5 @@ export function guidedImportRequest(args: { organizationId: bigint; companyId: n
       throw new Error("Enter an explicit sale price and cost price for every product. Save unknown prices for review.")
     }
   }
-  return createCsvImportRequest(args.organizationId, entity, args.csv, args.fileName, { companyId: args.companyId, ...(currencyId === undefined ? {} : { currencyId }) })
+  return createCsvImportRequest(args.organizationId, entity, args.csv, args.fileName, { companyId: args.companyId, sourceAdmissionId: args.sourceAdmissionId, ...(currencyId === undefined ? {} : { currencyId }) })
 }

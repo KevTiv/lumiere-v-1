@@ -23,6 +23,7 @@ const PASSTHROUGH_HEADERS = [
   "authorization",
   "x-stdb-identity",
   "content-type",
+  "x-file-name",
   "accept",
   "accept-language",
 ] as const

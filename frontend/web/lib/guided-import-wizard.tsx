@@ -1,6 +1,6 @@
 "use client"
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useReducer, useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
@@ -11,6 +11,7 @@ import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { reduceImportSourceAdmission, sourceAdmissionForScope } from "./import-source-admission"
 import { guidedImportRequest, trackedImportEntity } from "./guided-import-request"
 import { clearImportRecovery, importRecoveryKey, readImportRecovery, retainImportRequest, type ImportRecoveryScope } from "./guided-import-recovery"
 import { previewPreparedProducts, type ProductImportReference } from "./prepared-product-preview"
@@ -158,6 +159,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const [sourceFileName, setSourceFileName] = useState(initialSource?.fileName ?? "")
   const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
   const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
+  const [sourceAdmission, dispatchSourceAdmission] = useReducer(reduceImportSourceAdmission, null)
+  const sourceScopeKey = importRecoveryKey(recoveryScope)
+  const sourceAdmissionId = sourceAdmissionForScope(sourceAdmission, sourceScopeKey)
+  useEffect(() => { dispatchSourceAdmission({ type: "scope", scopeKey: sourceScopeKey }) }, [sourceScopeKey])
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
   const [preparedPreview, setPreparedPreview] = useState(false)
   const [mapping, setMapping] = useState<Record<string, string>>({})
@@ -191,7 +196,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const draftRevision = useRef(0)
   const mounted = useRef(false)
   useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-  useLayoutEffect(() => { draftRevision.current += 1 }, [wizardKey, csvText, headers, rows, sourceFileName, sourceFormat, sourceSheetName, analysis, mapping, previewResult, duplicateStates, confirmImportWithErrors, selectedTemplateId, appliedTemplateId, importRequest, importedJobId, operationBusy])
+  useLayoutEffect(() => { draftRevision.current += 1 }, [wizardKey, csvText, headers, rows, sourceFileName, sourceFormat, sourceSheetName, sourceAdmissionId, analysis, mapping, previewResult, duplicateStates, confirmImportWithErrors, selectedTemplateId, appliedTemplateId, importRequest, importedJobId, operationBusy])
   useLayoutEffect(() => { onContinuationBlockChange?.(continuationBlock) }, [continuationBlock, onContinuationBlockChange])
 
   useEffect(() => {
@@ -208,6 +213,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         setHeaders(parsed.headers)
         setRows(parsed.rows)
         setSourceFileName(retained.request.fileName)
+        dispatchSourceAdmission({ type: "source", scopeKey: importRecoveryKey(recoveryScope), id: retained.request.sourceAdmissionId })
         setStep("import")
         setStatus(t("settings.importReview.recoveredSubmission", { defaultValue: "Your previous submission is retained. Check its saved result or retry the same submission." }))
       }
@@ -302,6 +308,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       try { clearImportRecovery(window.localStorage, recoveryScope, importRequestRef.current.requestId) }
       catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); return false }
     }
+    dispatchSourceAdmission({ type: "reset" })
     setStep("upload")
     setAnalysis(null)
     setPreparedPreview(false)
@@ -383,15 +390,16 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       resetFlow()
       setSelectedTemplateId(templateId)
       try {
-        const parsed = await readImportFile(file)
+        const parsed = await readImportFile(file, { companyId })
         if (importRequestRef.current) return
-        assertCsvSafeForAi(parsed.headers, parsed.rows.slice(0, 50))
+        assertCsvSafeForAi(parsed.headers, parsed.rows)
         setCsvText(parsed.csvText)
         setHeaders(parsed.headers)
         setRows(parsed.rows)
         setSourceFileName(file.name)
         setSourceFormat(parsed.format)
         setSourceSheetName(parsed.sheetName)
+        dispatchSourceAdmission({ type: "source", scopeKey: sourceScopeKey, id: parsed.sourceAdmissionId })
         setStep("upload")
       } catch (e) {
         if (importRequestRef.current) return
@@ -403,7 +411,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         setSourceSheetName(undefined)
       } finally { readingFileRef.current = false; if (mounted.current) setReadingFile(false) }
     },
-    [resetFlow, selectedTemplateId],
+    [resetFlow, selectedTemplateId, sourceScopeKey, companyId],
   )
 
   const applyTemplateMapping = useCallback(
@@ -585,7 +593,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       )
       const importCsv = importRequestRef.current?.csvData ?? buildMappedImportCsv(headers, rows, mapping, skipRows)
 
-      const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", companies: companiesQuery.data ?? [] })
+      const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", sourceAdmissionId, companies: companiesQuery.data ?? [] })
       const retain = () => retainImportRequest(window.localStorage, recoveryScope, request)
       if (navigator.locks) await navigator.locks.request(importRecoveryKey(recoveryScope), retain)
       else retain()
@@ -622,6 +630,8 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
             source_file_name: sourceFileName,
             source_format: sourceFormat,
             source_sheet_name: sourceSheetName ?? null,
+            source_admission_id: request.sourceAdmissionId ?? null,
+            source_relation: request.sourceAdmissionId ? "user_prepared_derivative" : "direct_csv",
             source_rows: rows.length,
             previewed_rows: previewResult?.rows.length ?? 0,
             preview_errors: previewErrors.length,
@@ -683,6 +693,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     sourceFileName,
     sourceFormat,
     sourceSheetName,
+    sourceAdmissionId,
     targetEntity,
     trackedImport,
     t,
@@ -807,7 +818,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
             ref={fileInput}
             type="file"
             disabled={operationBusy || !!importRequest}
-            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
             data-testid="guided-import-file"
           />

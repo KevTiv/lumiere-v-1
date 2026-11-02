@@ -97,14 +97,16 @@ FROM debian:bookworm-slim AS runtime
 ENV RUST_LOG=info
 ENV ERP_SKILLS_DIR=/app/erp-skills
 ENV LUMIERE_IMPORT_PREPARE_SCRIPT=/app/scripts/import-task-prepare.py
+ENV LUMIERE_WORKBOOK_EXTRACT_SCRIPT=/app/scripts/workbook-extract.py
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates python3 \
+    && apt-get install -y --no-install-recommends ca-certificates python3 libseccomp2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/ /usr/local/bin/
 COPY --from=builder /app/erp-skills/ /app/erp-skills/
-COPY scripts/import-task-prepare.py scripts/farm-history-preflight.py /app/scripts/
+COPY scripts/import-task-prepare.py scripts/farm-history-preflight.py scripts/workbook-extract.py /app/scripts/
+RUN /usr/bin/python3 -I -S /app/scripts/workbook-extract.py --probe
 COPY --chmod=0755 scripts/lumiere-runtime-entrypoint.sh /usr/local/bin/lumiere-runtime-entrypoint
 
 EXPOSE 8080

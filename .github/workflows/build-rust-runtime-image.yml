@@ -15,6 +15,8 @@ on:
       - scripts/prepare-vendored-contracts-rust.sh
       - scripts/sync-directory.py
       - scripts/lumiere-runtime-entrypoint.sh
+      - scripts/workbook-extract.py
+      - scripts/tests/test_workbook_extract.py
       - scripts/tests/lumiere-runtime-entrypoint.test.sh
       - scripts/tests/rust-runtime-image-contract.test.sh
       - scripts/measure-ci-builds.py
@@ -37,6 +39,8 @@ on:
       - scripts/prepare-vendored-contracts-rust.sh
       - scripts/sync-directory.py
       - scripts/lumiere-runtime-entrypoint.sh
+      - scripts/workbook-extract.py
+      - scripts/tests/test_workbook_extract.py
       - scripts/tests/lumiere-runtime-entrypoint.test.sh
       - scripts/tests/rust-runtime-image-contract.test.sh
       - scripts/measure-ci-builds.py

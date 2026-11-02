@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { billDocumentContentType, BILL_DOCUMENT_FILE_HINT, BILL_DOCUMENT_IMAGE_HINT } from "@lumiere/erp-shared/document-file-profile"
 import { useTranslation } from "@lumiere/i18n"
 import type { ModuleDataState } from "../lib/module-data-state"
 import { ModuleDataNotice } from "../pages/module-data-notice"
@@ -37,11 +38,12 @@ function ScopedBillSourceDocuments(props: BillSourceDocumentsProps) {
     {props.sourceState.status !== "ready" ? props.sourceState.status === "loading" ? <p role="status" className="text-sm">{t("common.loading", { defaultValue: "Loading…" })}</p> : <ModuleDataNotice state={props.sourceState} /> : linked == null ? <p role="alert" className="text-sm text-destructive">{t("accounting.billDocuments.scopeUnavailable", { defaultValue: "Document links or ownership could not be verified. Refresh before attaching a file." })}</p> : <>
       {linked.length ? <ul className="space-y-1 text-sm">{linked.map((document) => <li key={String(document.id)}><a className="text-primary underline" href={`/documents/${id(document.id)}`}>{String(optional(document.name) ?? optional(document.fileName ?? document.file_name) ?? `#${String(document.id)}`)}</a></li>)}</ul> : <p className="text-sm text-muted-foreground">{t("accounting.billDocuments.empty", { defaultValue: "No supplier documents linked to this bill." })}</p>}
       {props.onUpload ? <div className="space-y-2">
-        <Label htmlFor={`bill-source-file-${String(props.billId)}`}>{t("accounting.billDocuments.file", { defaultValue: "Receipt or supplier document (PDF or image, up to 20 MB)" })}</Label>
+        <Label htmlFor={`bill-source-file-${String(props.billId)}`}>{t("accounting.billDocuments.file", { defaultValue: BILL_DOCUMENT_FILE_HINT })}</Label>
+        <p className="text-xs text-muted-foreground">{t("accounting.billDocuments.imageLimits", { defaultValue: BILL_DOCUMENT_IMAGE_HINT })}</p>
         <Input id={`bill-source-file-${String(props.billId)}`} type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp" disabled={blocked} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setLocalError(null) }} />
         <Button type="button" variant="outline" size="sm" disabled={blocked || !file} onClick={async () => {
           if (!file || !props.onUpload || blocked) return
-          if (file.size <= 0 || file.size > 20 * 1024 * 1024 || !["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) { setLocalError(t("accounting.billDocuments.invalidFile", { defaultValue: "Choose a non-empty PDF, PNG, JPEG or WebP file up to 20 MB." })); return }
+          try { billDocumentContentType(file) } catch (cause) { setLocalError(cause instanceof Error ? cause.message : String(cause)); return }
           setSubmitting(true); setLocalError(null)
           try { await props.onUpload(file); setFile(null) } catch (cause) { setLocalError(cause instanceof Error ? cause.message : String(cause)) } finally { setSubmitting(false) }
         }}>{busy ? t("accounting.billDocuments.uploading", { defaultValue: "Attaching…" }) : t("accounting.billDocuments.attach", { defaultValue: "Attach to this bill" })}</Button>

@@ -193,6 +193,7 @@ pub(super) struct UploadReceipt {
     registration_state: &'static str,
     document_id: Option<String>,
     indexing: &'static str,
+    inspection: Option<BlobInspectionReceipt>,
 }
 
 pub(super) async fn receipt(
@@ -213,7 +214,7 @@ pub(super) async fn receipt(
     let object_key = format!("org-{organization_id}/{residency}/{object_id}");
     let (bin_key, meta_key) = object_keys(organization_id, &object_id, &residency);
     let store = &state.config.document_blob_store;
-    let meta = read_meta(store, &meta_key).await?;
+    let mut meta = read_meta(store, &meta_key).await?;
     require_blob_upload(&state, &session, &meta, &object_key).await?;
     if meta.submission_id.as_deref() != Some(&query.submission_id)
         || meta.company_id != Some(query.company_id)
@@ -410,6 +411,13 @@ pub(super) async fn receipt(
     };
     require_blob_upload(&state, &current_session, &meta, &object_key).await?;
     trusted.require_current_placement(&state.organization_placements)?;
+    if meta.completed {
+        let bytes = storage::read(store, &bin_key, MAX_UPLOAD_BYTES)
+            .await?
+            .ok_or_else(|| ApiError::Conflict("completed document bytes are unavailable".into()))?;
+        verify_pinned_download(&meta, &bytes, organization_id, &checksum)?;
+        ensure_inspected_blob(store, &meta_key, &mut meta, &bytes).await?;
+    }
     Ok(Json(UploadReceipt {
         submission_id: query.submission_id,
         object_key,
@@ -424,6 +432,7 @@ pub(super) async fn receipt(
         registration_state,
         document_id,
         indexing,
+        inspection: meta.inspection,
     }))
 }
 

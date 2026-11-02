@@ -208,7 +208,7 @@
       "stepPreview": "Hakiki",
       "uploadHint": "Chagua faili ya CSV ya UTF-8 ili kuanza.",
       "structureSummary": "Safu wima {{columns}} · safu za data {{rows}} zimepatikana",
-      "safetyPassed": "CSV imepita ukaguzi wa usalama wa kivinjari",
+      "safetyPassed": "Faili limekaguliwa. Kagua ulinganishaji wa safu kabla ya kuingiza.",
       "analyze": "Changanua safu wima",
       "analyzing": "Inachanganua…",
       "preview": "Hakiki uingizaji",

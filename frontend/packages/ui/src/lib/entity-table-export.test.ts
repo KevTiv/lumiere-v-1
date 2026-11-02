@@ -22,7 +22,7 @@ describe("escaping", () => {
 })
 
 describe("CSV injection guard", () => {
-  it.each(["=SUM(A1)", "+1", "-1", "@cmd", "\tx", "\rx"])("prefixes %j", (text) => {
+  it.each(["=SUM(A1)", "+1", "-1", "@cmd", "\tx", "\rx", " =SUM(A1)", "\n@cmd", "＝1+1", " ＋cmd", "\u200b=cmd"])("prefixes %j", (text) => {
     expect(guardCsvInjection(text)).toBe(`'${text}`)
   })
   it("leaves safe text alone", () => {

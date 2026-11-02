@@ -98,6 +98,9 @@ export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[
     if (!["live", "passage", "activity", "web"].includes(source.kind)
       || !["authoritative", "persisted", "retrieved"].includes(source.trust)
       || typeof source.text_snippet !== "string") throw new Error("Invalid assistant source")
+    if (source.instruction_trust != null && source.instruction_trust !== "untrusted") {
+      throw new Error("Invalid assistant source instruction trust")
+    }
     for (const key of ["entity_type", "entity_id", "source_kind", "source_key", "source_version", "passage_key", "content_hash", "label", "field", "snapshot_at", "url", "fetched_at"] as const) {
       if (source[key] != null && typeof source[key] !== "string") throw new Error("Invalid assistant source field")
     }

@@ -6,49 +6,17 @@ use spacetimedb::Timestamp;
 
 // ── CSV Parsing ────────────────────────────────────────────────────────────────
 
-/// Split a raw CSV string into (headers, rows).
-/// Each row is a Vec<String> with one entry per column.
-/// Headers are lowercased for case-insensitive lookup by reducers.
-/// Blank lines are NOT filtered — callers that need to skip empty rows
-/// must do so explicitly. Row numbers correspond 1:1 to input lines.
+/// Parse exactly the bounded representation inspected by the API/gateway.
+/// Header casing is normalized for native reducer lookup; blank records are
+/// preserved and quoted line breaks remain inside one field.
 pub fn parse_csv(csv: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
-    let mut lines = csv.lines();
-    let header_line = lines.next().ok_or("CSV is empty")?;
-    let headers: Vec<String> = split_csv_row(header_line)
+    let (headers, rows) =
+        lumiere_file_inspection::parse_csv(csv).map_err(|error| error.to_string())?;
+    let headers = headers
         .into_iter()
-        .map(|h| h.trim().to_lowercase())
+        .map(|header| header.to_lowercase())
         .collect();
-    let rows: Vec<Vec<String>> = lines.map(|line| split_csv_row(line)).collect();
     Ok((headers, rows))
-}
-
-/// Split one CSV line, respecting double-quoted fields.
-pub fn split_csv_row(line: &str) -> Vec<String> {
-    let mut fields = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    let mut chars = line.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        match ch {
-            '"' if !in_quotes => in_quotes = true,
-            '"' if in_quotes => {
-                if chars.peek() == Some(&'"') {
-                    chars.next();
-                    current.push('"');
-                } else {
-                    in_quotes = false;
-                }
-            }
-            ',' if !in_quotes => {
-                fields.push(current.trim().to_string());
-                current = String::new();
-            }
-            _ => current.push(ch),
-        }
-    }
-    fields.push(current.trim().to_string());
-    fields
 }
 
 // ── Field Accessors ────────────────────────────────────────────────────────────
@@ -316,11 +284,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn split_csv_row_preserves_quoted_commas_and_escaped_quotes() {
+    fn parse_csv_preserves_quoted_commas_and_escaped_quotes() {
         assert_eq!(
-            split_csv_row("2026-01-01,\"1,234.56\",\"Invoice \"\"A\"\"\""),
+            parse_csv("Date,Amount,Note\n2026-01-01,\"1,234.56\",\"Invoice \"\"A\"\"\"")
+                .unwrap()
+                .1
+                .remove(0),
             vec!["2026-01-01", "1,234.56", "Invoice \"A\""]
         );
+    }
+
+    #[test]
+    fn native_import_and_admission_parse_the_same_records() {
+        let csv = "Name,Note\r\nAcme,\"line one\r\nline two\"\r\n\r\nBeta,last";
+        let inspected = lumiere_file_inspection::inspect_csv(csv).unwrap();
+        let (headers, rows) = parse_csv(csv).unwrap();
+        assert_eq!(headers, vec!["name", "note"]);
+        assert_eq!(rows, inspected.rows);
+        assert!(parse_csv("name\n\"unclosed").is_err());
     }
 
     #[test]
