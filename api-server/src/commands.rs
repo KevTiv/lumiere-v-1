@@ -1331,6 +1331,110 @@ mod tests {
         }
     }
 
+#[tokio::test]
+    async fn certification_enqueue_rechecks_company_and_uses_only_the_actor_credential() {
+        use axum::{http::HeaderMap, routing::post, Router};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed_calls = Arc::clone(&calls);
+        let app = Router::new()
+            .route(
+                "/v1/database/test-module/sql",
+                post(|headers: HeaderMap, sql: String| async move {
+                    assert_eq!(headers["authorization"], "Bearer certification-session");
+                    assert!(sql.contains("organization_id = 7"), "{sql}");
+                    let (names, rows) = if sql.contains("FROM user_organization") {
+                        if sql.starts_with("SELECT role_id ") {
+                            (vec!["role_id"], vec![vec![json!(1)]])
+                        } else {
+                            (
+                                vec!["id", "organization_id", "company_id", "is_active"],
+                                vec![vec![json!(1), json!(7), json!(42), json!(true)]],
+                            )
+                        }
+                    } else {
+                        (vec!["id"], vec![])
+                    };
+                    Json(json!([{
+                        "schema": {"elements": names.into_iter().map(|name|
+                            json!({"name": {"some": name}})
+                        ).collect::<Vec<_>>()},
+                        "rows": rows,
+                    }]))
+                }),
+            )
+            .route(
+                "/v1/database/test-module/call/request_ai_skill_certification",
+                post(move |headers: HeaderMap, Json(args): Json<Value>| {
+                    let calls = Arc::clone(&observed_calls);
+                    async move {
+                        assert_eq!(headers["authorization"], "Bearer certification-session");
+                        assert_eq!(
+                            args,
+                            Value::Array(ai_skill_certification_request_args(
+                                7, 42, 11, 3, "retry-key",
+                            ))
+                        );
+                        calls.fetch_add(1, Ordering::SeqCst);
+                        ""
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let mut config =
+            crate::session::test_support::test_config(Some("server-token-must-not-be-used"));
+        config.stdb_host = format!("http://{}", listener.local_addr().expect("address"));
+        let state = AppState::new(config);
+        let identity = "a".repeat(64);
+        let session = ApiSession {
+            stdb_token: "certification-session".into(),
+            identity_hex: identity.clone(),
+            organization_id: Some(7),
+            field_access: Some(stdb_auth::FieldAccessContext {
+                organization_id: 7,
+                role_id: 1,
+                role_name: "skill-admin".into(),
+                is_superuser: false,
+                role_permissions: vec!["ai_skill:write".into()],
+                identity_hex: identity,
+                field_permissions: vec![],
+                role_ids: vec![],
+                org_permissions: vec![],
+            }),
+        };
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("test server");
+        });
+        let accepted =
+            dispatch_ai_skill_certification_request(&state, &session, 42, 11, 3, "retry-key")
+                .await
+                .expect("authorized enqueue");
+        assert_eq!(accepted.actor_identity(), session.identity_hex);
+        assert_eq!(accepted.company_scope().ids(), &[42]);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        assert!(matches!(
+            dispatch_ai_skill_certification_request(&state, &session, 43, 11, 3, "other-key")
+                .await,
+            Err(ApiError::Forbidden(_))
+        ));
+        let mut unaffiliated = session;
+        unaffiliated.organization_id = None;
+        assert!(dispatch_ai_skill_certification_request(
+            &state, &unaffiliated, 42, 11, 3, "no-org",
+        )
+        .await
+        .is_err());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        server.abort();
+    }
+
     #[test]
     fn zero_arg_and_unknown_reducers_are_not_session_exposed() {
         let zero_arg = stdb_client::reducer_contract("apply_global_migrations")
