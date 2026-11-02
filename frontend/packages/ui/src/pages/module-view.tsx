@@ -253,8 +253,10 @@ export function ModuleView({
   const openCreateForm = (tabId: string, prompt?: string, scopeKey?: string) => {
     setAssistantFormPrompt(prompt ? { tabId, text: prompt } : null)
     setAssistantEditorScope(scopeKey ?? null)
-    if (onOpenCreateForm && !useRuntimeCreate) onOpenCreateForm(tabId, scopeKey ? { prompt, scopeKey } : undefined)
-    else setOpenForm(tabId)
+    if (onOpenCreateForm && !useRuntimeCreate) {
+      if (scopeKey) onOpenCreateForm(tabId, { prompt, scopeKey })
+      else onOpenCreateForm(tabId)
+    } else setOpenForm(tabId)
   }
   useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})

@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -6,7 +7,9 @@ import {
   waitFor,
 } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
+import type { AssistantAction } from "@lumiere/query-hooks/assistant-actions"
+import type { ChatMessage } from "../lib/ai-chat-types"
 import type { ModuleConfig } from "../lib/module-types"
 import type { ModuleDataState } from "../lib/module-data-state"
 import type { Role, User } from "../lib/rbac-types"
@@ -58,6 +61,7 @@ vi.mock("../lib/export-dashboard-png", () => ({
 }))
 
 import { ModuleView } from "./module-view"
+import { AIChatPanel } from "../ai-chat/ai-chat-panel"
 
 // Production bridge, ModuleView, permission owner and FormModal/ModularForm.
 // Synthetic module fields isolate orchestration; no native persistence is claimed.
@@ -127,6 +131,34 @@ const role = (allowed: boolean): Role => ({
       ]
     : [],
 })
+
+const formAction: AssistantAction = {
+  version: 1,
+  kind: "open_form",
+  capabilityKey: "sales.order.create",
+  scope: { actorId: "actor-one", organizationId: "11", companyId: "22" },
+  prompt: "Prepare an order for review",
+}
+const actionMessages: ChatMessage[] = [{
+  id: "native-answer", role: "assistant", content: "Prepare the existing order editor.", timestamp: new Date(0),
+  actions: [{ id: "native-form-action", type: "native", label: "Prepare order from full chat", nativeAction: formAction }],
+}]
+
+function FullChatFixture() {
+  const controller = useAssistantNativeFormController("actor-one:11:22")
+  const [docked, setDocked] = useState(false)
+  return <AssistantNativeFormProvider value={controller}>
+    <RBACProvider initialUser={user} initialRoles={[role(true)]} initialPolicies={[]}>
+      <ModuleView config={config} activeTab="orders" data={{ orders: [] }} onFormSubmit={vi.fn()} />
+      <AIChatPanel open docked={docked} onClose={() => undefined} initialMessages={actionMessages} config={{
+        onNativeAction: () => {
+          controller.requestForm({ requestId: "full-chat-form", scopeKey: "actor-one:11:22", moduleId: "sales", tabId: "orders", prompt: formAction.prompt })
+          setDocked(true)
+        },
+      }} />
+    </RBACProvider>
+  </AssistantNativeFormProvider>
+}
 
 function Fixture({
   scope = "actor-one:11:22",
@@ -205,6 +237,7 @@ function Fixture({
 }
 
 beforeAll(() => {
+  Element.prototype.getAnimations ??= () => []
   globalThis.ResizeObserver ??= class {
     observe() {}
     unobserve() {}
@@ -220,6 +253,21 @@ beforeAll(() => {
 afterEach(cleanup)
 
 describe("assistant requests through the native module form owner", () => {
+  it("retains native dialog focus and unsent text when a full chat action docks the assistant", async () => {
+    render(<FullChatFixture />)
+    const composer = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    expect(screen.getByTestId("erp-ai-chat-panel").getAttribute("data-mode")).toBe("full")
+    fireEvent.change(composer, { target: { value: "Keep my next unsent question" } })
+    fireEvent.click(await screen.findByRole("button", { name: "Prepare order from full chat" }))
+    const dialog = await screen.findByTestId("form-modal-assistant-test-order")
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
+    await act(async () => { await Promise.resolve() })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    expect(screen.getByTestId("erp-ai-chat-panel").getAttribute("data-mode")).toBe("side")
+    expect(composer.value).toBe("Keep my next unsent question")
+    expect(screen.getAllByTestId("form-modal-assistant-test-order")).toHaveLength(1)
+  })
+
   it("opens the existing editor once and does not submit or apply the assistant text", async () => {
     const submit = vi.fn()
     render(<Fixture submit={submit} />)
