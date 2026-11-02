@@ -1,3 +1,4 @@
+import json
 import re
 import os
 import subprocess
@@ -43,58 +44,59 @@ class PrivateReleaseTests(unittest.TestCase):
             self.assertEqual(plugin['name'], 'request-termination')
             self.assertEqual(plugin['config']['status_code'], status)
 
-    def test_alpha_pilot_exposes_only_exact_report_inspection_status_and_run_routes(self):
+    def test_alpha_workbench_admits_only_reviewed_paths_and_methods(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
         service = next(item for item in config['services'] if item['name'] == 'web-ai-alpha-pilot')
         self.assertEqual(service['url'], 'http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__')
         routes = service['routes']
+        fixture = json.loads((ROOT / 'scripts/tests/fixtures/kong-alpha-ai-routes.json').read_text())
         for route in routes:
             self.assertFalse(route['strip_path'])
-            self.assertGreater(route['regex_priority'], 0)
+            self.assertEqual(route['regex_priority'], 10)
             for pattern in route['paths']:
                 self.assertTrue(pattern.startswith('~/'), pattern)
+                self.assertTrue(pattern.endswith('$'), pattern)
+
         def allowed(method, path):
             return any(method in route['methods'] and re.match(pattern[1:], path)
                        for route in routes for pattern in route['paths'])
-        for method, path in [('POST', '/api/ai/skills/certifications'),
-                             ('POST', '/api/ai/evidence/runs/history'),
-                             ('POST', '/api/ai/skills/report-analysis'),
-                             ('POST', '/api/ai/evidence/runs/inspect'),
-                             ('POST', '/api/ai/runs/lifecycle'),
-                             ('POST', '/api/ai/skills/report-analysis/readiness'),
-                             ('GET', '/api/ai/skills/certifications'),
-                             ('GET', '/api/ai/skills/certifications/42')]:
-            self.assertTrue(allowed(method, path), (method, path))
-        for method, path in [('GET', '/api/ai/skills/report-analysis'),
-                             ('GET', '/api/ai/runs/lifecycle'),
-                             ('PATCH', '/api/ai/runs/lifecycle'),
-                             ('POST', '/api/ai/runs/lifecycle/'),
-                             ('POST', '/api/ai/runs/lifecycle/extra'),
-                             ('POST', '/prefix/api/ai/runs/lifecycle'),
-                             ('GET', '/api/ai/skills/report-analysis/readiness'),
-                             ('POST', '/api/ai/skills/report-analysis/readiness/'),
-                             ('POST', '/api/ai/skills/report-analysis/readiness/extra'),
-                             ('POST', '/api/ai/skills/other/readiness'),
-                             ('POST', '/api/ai/skills/certifications/42'),
-                             ('POST', '/api/ai/skills/certifications/'),
-                             ('PUT', '/api/ai/skills/certifications'),
-                             ('POST', '/prefix/api/ai/skills/certifications'),
-                             ('GET', '/api/ai/evidence/runs/history'),
-                             ('POST', '/api/ai/evidence/runs/history/'),
-                             ('POST', '/api/ai/evidence/runs/history/extra'),
-                             ('POST', '/prefix/api/ai/evidence/runs/history'),
-                             ('POST', '/api/ai/skills/finance/finance_report_review'),
-                             ('POST', '/api/ai/skills/report-analysis/extra'),
-                             ('GET', '/api/ai/skills/certifications/42/extra'),
-                             ('POST', '/api/ai/evidence/runs/export'),
-                             ('POST', '/api/ai/action-draft/bridge'),
-                             ('POST', '/api/ai/rag'), ('POST', '/api/ai/skills/run'),
-                             ('POST', '/api/ai/evidence/ingestion/documents'),
-                             ('POST', '/api/ai/evidence/ingestion/documents/lifecycle'),
-                             ('POST', '/api/ai/vision/analyze'),
-                             ('POST', '/api/ai/skills/import-mapping'),
-                             ('POST', '/prefix/api/ai/skills/report-analysis')]:
+
+        for method, paths in fixture.items():
+            for path in paths:
+                with self.subTest(method=method, path=path):
+                    self.assertTrue(allowed(method.upper(), path))
+                    for suffix in ['/', '/extra']:
+                        self.assertFalse(allowed(method.upper(), path + suffix))
+                    self.assertFalse(allowed(method.upper(), '/prefix' + path))
+                    for unsupported in ['PUT', 'PATCH', 'DELETE']:
+                        self.assertFalse(allowed(unsupported, path))
+        for method, path in [
+            ('GET', '/api/ai/report/compose'),
+            ('GET', '/api/ai/inventory/low-stock'),
+            ('GET', '/api/ai/evidence/runs/export'),
+            ('GET', '/api/ai/evidence/review-queue'),
+            ('GET', '/api/ai/evidence/runs/history'),
+            ('GET', '/api/ai/skills/finance/finance_report_review'),
+            ('POST', '/api/ai/skills/certifications/42'),
+            ('POST', '/api/ai/knowledge/skill-promotions/company/42'),
+            ('GET', '/api/ai/knowledge/skill-promotions/42/review'),
+            ('POST', '/api/ai/skills/finance/unknown_review'),
+            ('POST', '/api/ai/skills/finance/finance_report_review_extra'),
+            ('POST', '/api/ai/skills/report-analysis/extra'),
+            ('POST', '/api/ai/skills/other/readiness'),
+            ('POST', '/api/ai/skills/run'),
+            ('POST', '/api/ai/rag'),
+            ('POST', '/api/ai/evidence/ingestion/documents'),
+            ('POST', '/api/ai/evidence/ingestion/documents/lifecycle'),
+            ('POST', '/api/ai/context/ingest'),
+            ('POST', '/api/ai/vision/analyze'),
+            ('POST', '/api/ai/skills/import-mapping'),
+        ]:
             self.assertFalse(allowed(method, path), (method, path))
+        for identifier in ['0', '-1', '01', '1x']:
+            self.assertFalse(allowed('GET', '/api/ai/skills/certifications/' + identifier))
+            self.assertFalse(allowed('GET', '/api/ai/knowledge/skill-promotions/company/' + identifier))
+            self.assertFalse(allowed('POST', '/api/ai/knowledge/skill-promotions/' + identifier + '/review'))
 
     def test_every_proxy_service_has_postgres_fail_closed_rate_limits(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())

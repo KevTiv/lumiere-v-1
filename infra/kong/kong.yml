@@ -337,10 +337,11 @@ services:
           fault_tolerant: false
           policy: cluster
 
-  # Alpha report pilot and scoped run controls. Web and gateway still enforce
-  # the session, company scope, current capability grants and checked lifecycle
-  # transitions. Run controls do not admit paid skill or ingestion endpoints.
-  # Exact paths and methods keep every other AI endpoint on the 503 route.
+  # Alpha workbench and reviewed knowledge workflows. Route admission reaches
+  # the existing session-owned BFF; company scope, grants, certification, privacy,
+  # budgets and human approval remain enforced by the owning handlers.
+  # Keep this service name stable so shared PostgreSQL rate counters survive.
+  # Every feature is admitted by exact path and method.
   - name: web-ai-alpha-pilot
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
@@ -381,6 +382,46 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-green-skills
+        paths:
+          - '~/api/ai/report/compose$'
+          - '~/api/ai/inventory/low-stock$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-finance-reviews
+        paths:
+          - '~/api/ai/skills/finance/(?:finance_report_review|bank_reconciliation_review|period_close_review|expense_evidence_review|finance_variance_review)$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-action-drafts
+        paths:
+          - '~/api/ai/action-draft/bridge$'
+          - '~/api/ai/actions/draft$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-evidence-workflows
+        paths:
+          - '~/api/ai/evidence/(?:inspect|review-queue|contributions|decisions|reviews)$'
+          - '~/api/ai/evidence/runs/export$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-knowledge-promotion-read
+        paths:
+          - '~/api/ai/knowledge/skill-promotions/company/[1-9][0-9]*$'
+        methods: [GET]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-knowledge-promotion-write
+        paths:
+          - '~/api/ai/knowledge/skill-promotions$'
+          - '~/api/ai/knowledge/skill-promotions/[1-9][0-9]*/review$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
     plugins: *domain_plugins
 
   - name: web-ai
@@ -395,7 +436,7 @@ services:
         config:
           status_code: 503
           content_type: application/json
-          body: '{"error":"AI is disabled for the initial release"}'
+          body: '{"error":"AI endpoint is not admitted to this Alpha release"}'
 
 plugins:
   - name: response-transformer

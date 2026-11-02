@@ -1,0 +1,32 @@
+{
+  "post": [
+    "/api/ai/skills/certifications",
+    "/api/ai/evidence/runs/history",
+    "/api/ai/skills/report-analysis",
+    "/api/ai/evidence/runs/inspect",
+    "/api/ai/runs/lifecycle",
+    "/api/ai/skills/report-analysis/readiness",
+    "/api/ai/report/compose",
+    "/api/ai/inventory/low-stock",
+    "/api/ai/skills/finance/finance_report_review",
+    "/api/ai/skills/finance/bank_reconciliation_review",
+    "/api/ai/skills/finance/period_close_review",
+    "/api/ai/skills/finance/expense_evidence_review",
+    "/api/ai/skills/finance/finance_variance_review",
+    "/api/ai/action-draft/bridge",
+    "/api/ai/actions/draft",
+    "/api/ai/evidence/inspect",
+    "/api/ai/evidence/review-queue",
+    "/api/ai/evidence/contributions",
+    "/api/ai/evidence/decisions",
+    "/api/ai/evidence/reviews",
+    "/api/ai/evidence/runs/export",
+    "/api/ai/knowledge/skill-promotions",
+    "/api/ai/knowledge/skill-promotions/42/review"
+  ],
+  "get": [
+    "/api/ai/skills/certifications",
+    "/api/ai/skills/certifications/42",
+    "/api/ai/knowledge/skill-promotions/company/42"
+  ]
+}
