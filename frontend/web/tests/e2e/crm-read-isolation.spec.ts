@@ -900,7 +900,17 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
 
     branchContext = await browser.newContext({ baseURL: e2eBaseUrl() })
     const branchPage = await branchContext.newPage()
-    await signIn(branchPage, branchEmail, E2E_PASSWORD)
+    const branchPageErrors: string[] = []
+    const recordBranchPageError = (error: Error) => branchPageErrors.push(error.stack ?? error.message)
+    branchPage.on("pageerror", recordBranchPageError)
+    try {
+      await signIn(branchPage, branchEmail, E2E_PASSWORD)
+    } catch (error) {
+      console.error("[crm-reader-sign-in] Browser errors:", JSON.stringify(branchPageErrors))
+      throw error
+    } finally {
+      branchPage.off("pageerror", recordBranchPageError)
+    }
 
     return {
       context,
