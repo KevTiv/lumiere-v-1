@@ -154,6 +154,19 @@ pub(crate) async fn execute_reducer_call(
     let organization_id = context.organization_id();
     let company_ids = validate_reducer_scope(contract, &args, organization_id)?;
     context.require_company_scope(&company_ids)?;
+    execute_authorized_reducer_call(context, contract, args).await
+}
+
+/// Shared transport for boundaries that already resolved and checked company
+/// scope. Generic operations derive it from the contract; fixed private routes
+/// bind their typed company intent explicitly before reaching this function.
+async fn execute_authorized_reducer_call(
+    context: &TrustedOperationContext,
+    contract: &'static ReducerContract,
+    args: Vec<Value>,
+) -> Result<Json<Value>, ApiError> {
+    context.ensure_contract(contract)?;
+    let organization_id = context.organization_id();
     tracing::info!(
         operation_id = contract.contract_operation_id,
         correlation_id = context.correlation_id(),
@@ -284,8 +297,9 @@ pub(crate) async fn dispatch_ai_skill_certification_request(
     // company parameter. Bind that exact intent explicitly at this boundary.
     let company_scope = authorize_reducer_company_scope(&context, vec![company_id]).await?;
     let context = context.with_company_scope(company_scope)?;
+    context.require_company_scope(&[company_id])?;
     context.require_current_placement(&state.organization_placements)?;
-    let _ = execute_reducer_call(&context, contract, args).await?;
+    let _ = execute_authorized_reducer_call(&context, contract, args).await?;
     Ok(context)
 }
 
