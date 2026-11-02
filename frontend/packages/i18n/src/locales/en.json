@@ -233,6 +233,8 @@
     "forecastFinitePeriod": "Choose a custom date range or a calendar preset before creating a forecast snapshot."
   },
   "workspaceShell": {
+    "accountAndPreferences": "Account and preferences",
+    "resizeNavigation": "Resize navigation",
     "preferences": "Workspace preferences",
     "preferencesDescription": "Make this workspace comfortable for you.",
     "appearance": "Appearance",

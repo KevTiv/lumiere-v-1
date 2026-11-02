@@ -6,6 +6,9 @@
       "scheduled-reports": "Report zateganyijwe"
     }
   },
+  "workspaceShell": {
+    "accountAndPreferences": "Account n’ibyifuzo"
+  },
   "common": {
     "importSource": {
       "description": "Amakuru ya file n’ay’igenzura abitswe hamwe n’iyi nyandiko.",

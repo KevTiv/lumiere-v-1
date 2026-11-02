@@ -44,6 +44,8 @@
     }
   },
   "workspaceShell": {
+    "accountAndPreferences": "Konti n’ibyifuzo",
+    "resizeNavigation": "Hindura ubugari bw’inzira",
     "preferences": "Ibyifuzo by’aho ukorera",
     "preferencesDescription": "Hindura aho ukorera uko ubishaka.",
     "appearance": "Imigaragarire",
