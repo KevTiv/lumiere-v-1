@@ -37,6 +37,7 @@ import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from ".
 import { WorkspaceNav } from "./workspace-nav"
 import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
 import { filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
+import { useAssistantNativeForms, type AssistantNativeFormStatus } from "../components/assistant-native-form-provider"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -74,7 +75,17 @@ interface ModuleViewProps {
   /** Opt in to retaining an open create form and its source workspace across tab changes. */
   onOpenFormChange?: (tab: string | null) => void
   /** Route existing gated create controls to a domain-owned instance of FormModal. */
-  onOpenCreateForm?: (tabId: string) => void
+  onOpenCreateForm?: (tabId: string, assistant?: { prompt?: string; scopeKey: string }) => void
+  /** Custom native editors (for example invoices) keep their existing domain owner. */
+  assistantCreate?: {
+    tabIds: readonly string[]
+    blocked?: boolean
+    open: (tabId: string, prompt?: string, scopeKey?: string) => AssistantNativeFormStatus | "loading"
+  }
+  /** Prevent a second assistant form from replacing a domain-owned editor. */
+  assistantFormBlocked?: boolean
+  /** Dismiss a domain-owned assistant editor when its actor/company scope changes. */
+  onAssistantFormScopeChange?: () => void
   /** Runtime kanban columns + move handlers keyed by entity tab id */
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
   /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
@@ -128,6 +139,9 @@ export function ModuleView({
   onActiveTabChange,
   onOpenFormChange,
   onOpenCreateForm,
+  assistantCreate,
+  assistantFormBlocked,
+  onAssistantFormScopeChange,
   isPending,
   showSubmitSuccessToast,
   renderCreatePreview,
@@ -149,10 +163,10 @@ export function ModuleView({
   const { checkPermission, permissionsReady } = useRBAC()
   const createGate = (permission: EntitySurfacePermission | undefined) =>
     decideCreateGate(permission, (p) => checkPermission(p.resource, p.action).allowed, permissionsReady !== false)
-  const { companyIds } = useErpSession()
+  const { companyIds, activeCompanyId, activeCompanyReady } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
   const aiSelection = useErpAiSelectionState()
-  const defaultCompanyId = companyIds?.[0]
+  const defaultCompanyId = activeCompanyReady === false ? undefined : Number(activeCompanyId ?? companyIds?.[0]) || undefined
   const useRuntimeCreate = runtimeForms != null && runtimeForms.organizationId > 0
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
   // Uncontrolled modules keep the active tab in `?tab=` so every tab is linkable.
@@ -232,9 +246,17 @@ export function ModuleView({
     overview: t("modules.workspaces.overview"), more: t("modules.workspaces.more"),
   })
   const [openForm, setOpenForm] = useState<string | null>(null)
-  const openCreateForm = (tabId: string) => {
-    if (onOpenCreateForm && !useRuntimeCreate) onOpenCreateForm(tabId)
-    else setOpenForm(tabId)
+  const [assistantFormPrompt, setAssistantFormPrompt] = useState<{ tabId: string; text: string } | null>(null)
+  const [assistantEditorScope, setAssistantEditorScope] = useState<string | null>(null)
+  const assistantForms = useAssistantNativeForms()
+  const assistantScopeCurrent = !assistantEditorScope || assistantEditorScope === assistantForms?.scopeKey
+  const openCreateForm = (tabId: string, prompt?: string, scopeKey?: string) => {
+    setAssistantFormPrompt(prompt ? { tabId, text: prompt } : null)
+    setAssistantEditorScope(scopeKey ?? null)
+    if (onOpenCreateForm && !useRuntimeCreate) {
+      if (scopeKey) onOpenCreateForm(tabId, { prompt, scopeKey })
+      else onOpenCreateForm(tabId)
+    } else setOpenForm(tabId)
   }
   useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
@@ -273,6 +295,37 @@ export function ModuleView({
   }, [activeTabUsable])
 
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
+  useEffect(() => {
+    if (!assistantEditorScope || assistantEditorScope === assistantForms?.scopeKey) return
+    setOpenForm(null)
+    setAssistantFormPrompt(null)
+    setAssistantEditorScope(null)
+    onAssistantFormScopeChange?.()
+  }, [assistantEditorScope, assistantForms?.scopeKey, onAssistantFormScopeChange])
+  // Consume a shell-owned, scope-bound presentation request through the very same
+  // create controls as the user. Never submit, replace an editor, or invent a form.
+  useEffect(() => {
+    const request = assistantForms?.pending
+    if (!request || request.moduleId !== config.id || request.tabId !== activeTab) return
+    const settle = (status: AssistantNativeFormStatus) => assistantForms.settle(request.requestId, status)
+    if (!assistantForms.isCurrent(request.requestId)) { settle("unavailable"); return }
+    if (openForm || selectedRecord || assistantFormBlocked || assistantCreate?.blocked || isPending) { settle("busy"); return }
+    if (permissionsReady === false) return
+    if (assistantCreate?.tabIds.includes(request.tabId)) {
+      const status = assistantCreate.open(request.tabId, request.prompt, request.scopeKey)
+      if (status === "opened") setAssistantEditorScope(request.scopeKey)
+      if (status !== "loading") settle(status)
+      return
+    }
+    const tab = config.tabs.find((candidate) => candidate.id === request.tabId)
+    const state = dataState?.[request.tabId]
+    if (state?.status === "loading" || dataLoading?.[request.tabId]) return
+    if (state?.status === "denied") { settle("denied"); return }
+    if (!tab?.createForm || !tab.createPermission || !tabUsable(request.tabId) || (!onFormSubmit && !(!useRuntimeCreate && onOpenCreateForm))) { settle("unavailable"); return }
+    if (createGate(tab.createPermission) !== "allowed") { settle("denied"); return }
+    openCreateForm(tab.id, request.prompt, request.scopeKey)
+    settle("opened")
+  })
   const showDashboardTimeRange =
     dashboardContent == null && activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
   const showDashboardExport = dashboardContent == null && activeTabConfig?.type === "dashboard" && activeTabUsable
@@ -526,7 +579,8 @@ export function ModuleView({
                 {tab.createForm &&
                   (useRuntimeCreate && runtimeForms ? (
                     <RuntimeFormModal
-                      open={openForm === tab.id}
+                      open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
+                      draftKey={assistantEditorScope ? `assistant:${assistantEditorScope}` : undefined}
                       onOpenChange={(open) => !open && setOpenForm(null)}
                       staticConfig={tab.createForm}
                       renderPreview={renderCreatePreview
@@ -545,6 +599,7 @@ export function ModuleView({
                           ? {
                               companyId: defaultCompanyId,
                               formId: tab.createForm.id,
+                              initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
                               entityType:
                                 resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
                             }
@@ -560,7 +615,8 @@ export function ModuleView({
                     />
                   ) : (
                     <FormModal
-                      open={openForm === tab.id}
+                      open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
+                      draftKey={assistantEditorScope ? `assistant:${assistantEditorScope}` : undefined}
                       onOpenChange={(open) => !open && setOpenForm(null)}
                       config={tab.createForm}
                       renderPreview={renderCreatePreview
@@ -573,6 +629,7 @@ export function ModuleView({
                           ? {
                               companyId: defaultCompanyId,
                               formId: tab.createForm.id,
+                              initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
                               entityType:
                                 resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
                             }

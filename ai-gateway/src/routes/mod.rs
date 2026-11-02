@@ -14,6 +14,7 @@ pub mod kaggle;
 mod passage_retrieval;
 pub mod policy;
 pub mod rag;
+mod rag_ui_actions;
 pub mod report;
 pub mod run_lifecycle;
 pub mod search;

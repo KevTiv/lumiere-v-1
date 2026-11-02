@@ -3,6 +3,12 @@ import type { FormConfig } from "./form-types"
 import { serializeAiFormSchema } from "./ai-form-schema"
 
 describe("serializeAiFormSchema", () => {
+  it("excludes disabled fields from editable assistant proposals", () => {
+    expect(serializeAiFormSchema({ id: "readonly", title: "Readonly", sections: [{ id: "main", fields: [
+      { id: "reference", name: "reference", type: "text" },
+      { id: "owner", name: "owner", type: "text", disabled: true, defaultValue: "current-owner" },
+    ] }] }).map((field) => field.name)).toEqual(["reference"])
+  })
   it("keeps only safe schema metadata for AI suggestions", () => {
     const config: FormConfig = {
       id: "customer",

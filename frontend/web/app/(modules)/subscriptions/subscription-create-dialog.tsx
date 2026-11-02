@@ -15,11 +15,12 @@ import { SubscriptionSourceNotice } from './subscription-overview';
 const STEPS = ['order', 'plan', 'billing', 'review'] as const;
 
 /** Domain-owned steps retain one payload while existing forms own validation and focus. */
-export function SubscriptionCreateDialog({ open, onClose, scope, orders, plans, sourceState, onRetry, onCreatePlan, onSubmit, pending = false, currencies = [], customers = [] }: {
+export function SubscriptionCreateDialog({ open, onClose, scope, orders, plans, sourceState, onRetry, onCreatePlan, onSubmit, pending = false, currencies = [], customers = [], assistantPrompt }: {
   open: boolean; onClose: () => void; scope: SubscriptionScope;
   orders: readonly WorkflowRow[]; plans: readonly WorkflowRow[]; currencies?: readonly WorkflowRow[]; customers?: readonly WorkflowRow[];
   sourceState: ModuleDataState; onRetry: () => void; onCreatePlan?: () => void;
   onSubmit: (values: FormValues) => Promise<void>; pending?: boolean;
+  assistantPrompt?: string;
 }) {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
@@ -97,6 +98,7 @@ export function SubscriptionCreateDialog({ open, onClose, scope, orders, plans, 
             </>}
             <Button variant="outline" onClick={requestClose}>{t('common.cancel')}</Button>
           </div> : <ModularForm key={`${scope.organizationId}:${scope.companyId}:${step}`} config={config} scrollable draft={false} isPending={pending}
+            aiAssist={assistantPrompt ? { companyId: Number(scope.companyId), entityType: 'subscription', initialPrompt: assistantPrompt } : undefined}
             onDirtyChange={setDirty} onValuesChange={(next) => { currentValues.current = { ...currentValues.current, ...next }; }}
             onCancel={requestClose} renderPreview={preview}
             leadingActions={step > 0 ? <Button type="button" variant="outline" disabled={pending} onClick={() => {

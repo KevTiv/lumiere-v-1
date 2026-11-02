@@ -4,6 +4,8 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
+import { decodeAiFormSuggestions } from "@lumiere/query-hooks/hooks/ai-form-suggestions"
+import { useErpSession } from "@lumiere/erp-session"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
 import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer, FormValues } from "../lib/form-types"
@@ -117,6 +119,13 @@ export function ModularForm({
   }, [visibleSubmitError])
   useEffect(() => { setSubmissionError(null) }, [config.id])
   const aiSuggest = useAiFormSuggest()
+  const aiRequestInFlight = useRef(false)
+  const aiMounted = useRef(true)
+  useEffect(() => {
+    aiMounted.current = true
+    return () => { aiMounted.current = false }
+  }, [])
+  const { identity: aiIdentity, organizationId: aiOrganizationId } = useErpSession()
   // Initialize form state with default values
   const getInitialValues = useCallback(() => {
     const values: Record<string, unknown> = {}
@@ -174,11 +183,12 @@ export function ModularForm({
   }, [config])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const [aiPanelOpen, setAiPanelOpen] = useState(Boolean(aiAssist?.initialPrompt?.trim()))
   const [aiPrompt, setAiPrompt] = useState(aiAssist?.initialPrompt ?? "")
-  const [aiSuggestions, setAiSuggestions] = useState<Record<string, { value: unknown; confidence: number; note?: string }>>({})
+  const [storedAiSuggestions, setAiSuggestions] = useState<Record<string, { value: unknown; confidence: number; note?: string }>>({})
+  const [aiSuggestionsKey, setAiSuggestionsKey] = useState<string | null>(null)
   const [aiAppliedFields, setAiAppliedFields] = useState<Record<string, { confidence: number; note?: string }>>({})
-  const [aiValidationNotes, setAiValidationNotes] = useState<string[]>([])
+  const [storedAiValidationNotes, setAiValidationNotes] = useState<string[]>([])
   const busy = isSubmitting || !!isPending
   const dirty = formValuesDiffer(values, baselineRef.current)
   const onDirtyChangeRef = useRef(onDirtyChange)
@@ -212,6 +222,11 @@ export function ModularForm({
   })
   const aiSchema = useMemo(() => serializeAiFormSchema(config), [config])
   const aiEnabled = aiAssist?.enabled !== false && !!aiAssist?.companyId && !!aiAssist?.entityType
+  const aiRequestKey = JSON.stringify([aiIdentity, aiOrganizationId, aiAssist?.companyId, aiAssist?.entityType, config.id, aiSchema, aiPrompt])
+  const latestAiRequestKey = useRef(aiRequestKey)
+  latestAiRequestKey.current = aiRequestKey
+  const aiSuggestions = aiSuggestionsKey === aiRequestKey ? storedAiSuggestions : {}
+  const aiValidationNotes = aiSuggestionsKey === aiRequestKey ? storedAiValidationNotes : []
 
   useEffect(() => {
     if (!aiEnabled) return
@@ -252,6 +267,7 @@ export function ModularForm({
   }
 
   const handleAiSuggest = async () => {
+    if (aiRequestInFlight.current) return
     if (!aiEnabled || !aiAssist?.companyId || !aiAssist.entityType) {
       toast.warning("AI form fill needs company context")
       return
@@ -262,6 +278,8 @@ export function ModularForm({
       return
     }
 
+    aiRequestInFlight.current = true
+    const requestKey = aiRequestKey
     try {
       const result = await aiSuggest.mutateAsync({
         companyId: aiAssist.companyId,
@@ -270,6 +288,8 @@ export function ModularForm({
         fields: aiSchema,
         rawText: aiPrompt,
       })
+      if (!aiMounted.current || latestAiRequestKey.current !== requestKey) return
+      setAiSuggestionsKey(requestKey)
       setAiSuggestions(result.suggestions)
       setAiValidationNotes(result.validation_notes.map((note) => note.message))
       const count = Object.keys(result.suggestions).length
@@ -279,12 +299,20 @@ export function ModularForm({
         toast.success(`AI suggested ${count} field${count === 1 ? "" : "s"}`)
       }
     } catch (error) {
+      if (!aiMounted.current || latestAiRequestKey.current !== requestKey) return
       const message = error instanceof Error ? error.message : "AI form suggestion failed"
       toast.error(message)
-    }
+    } finally { aiRequestInFlight.current = false }
   }
 
   const handleApplyAiSuggestions = () => {
+    if (aiRequestInFlight.current) return
+    try {
+      decodeAiFormSuggestions({ suggestions: aiSuggestions, validation_notes: [], sources: [] }, aiSchema)
+    } catch {
+      toast.error("AI form suggestions could not be verified. Your entries are unchanged.")
+      return
+    }
     const entries = Object.entries(aiSuggestions)
     if (entries.length === 0) {
       toast.warning("No AI suggestions to apply")

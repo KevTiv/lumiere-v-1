@@ -19,6 +19,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use stdb_auth::{has_resource_read_permission, registry_get};
 
+mod action_drafts;
 mod activity_work;
 mod expense_allocations;
 #[cfg(test)]
@@ -61,7 +62,7 @@ pub(crate) struct OrgQuery {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct AuthoritativeQuery {
-    #[serde(rename = "companyId")]
+    #[serde(rename = "companyId", alias = "company_id")]
     company_id: u64,
 }
 
@@ -397,6 +398,12 @@ pub(crate) async fn get_authoritative_resource(
     )?;
     let organization_id = context.organization_id();
     context.require_current_placement(&state.organization_placements)?;
+
+    if resource == "ai-action-drafts" {
+        let row = action_drafts::read(&state.stdb, &context, query.company_id, record_id).await?;
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(json!({ "data": row })));
+    }
 
     let owner_read = crate::query_exec::crm_resource(&resource);
     if owner_read {

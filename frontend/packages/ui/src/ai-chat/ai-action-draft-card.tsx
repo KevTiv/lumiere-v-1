@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { isAiActionDraftOutcomeUnknown } from "@lumiere/query-hooks/hooks/ai-action-draft-result"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,9 +13,34 @@ import { AiActionDraftDiffPanel } from "./ai-action-draft-diff-panel"
 
 interface AiActionDraftCardProps {
   draft: ChatActionDraftPayload
+  scopeKey?: string
   onApprove?: (draft: ChatActionDraftPayload) => Promise<void>
   onReject?: (draft: ChatActionDraftPayload, reason?: string) => Promise<void>
   onUpdateDraft?: (draft: ChatActionDraftPayload) => Promise<void>
+  onRefresh?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
+}
+
+const unresolvedAttempts = new Set<string>()
+function attemptStorageKey(scope: string | undefined, draft: ChatActionDraftPayload): string | undefined {
+  return scope ? `lumiere:ai-draft-attempt:v1:${JSON.stringify([scope, draft.companyId, draft.draftId])}` : undefined
+}
+function hasAttempt(key: string | undefined): boolean {
+  if (!key) return false
+  try { return unresolvedAttempts.has(key) || sessionStorage.getItem(key) === "pending" } catch { return true }
+}
+function rememberAttempt(key: string | undefined) {
+  if (!key) return
+  // Persist before dispatch so a reload cannot turn an unresolved attempt into a fresh action.
+  sessionStorage.setItem(key, "pending")
+  unresolvedAttempts.add(key)
+}
+function clearAttempt(key: string | undefined) {
+  if (!key) return
+  unresolvedAttempts.delete(key)
+  try { sessionStorage.removeItem(key) } catch { /* Retaining a marker only keeps the action locked. */ }
+}
+function isTerminalDraft(draft: ChatActionDraftPayload): boolean {
+  return ["approved", "rejected", "failed", "expired"].includes(draft.status ?? "")
 }
 
 function reducerLabel(name: string): string {
@@ -23,9 +49,11 @@ function reducerLabel(name: string): string {
 
 export function AiActionDraftCard({
   draft,
+  scopeKey,
   onApprove,
   onReject,
   onUpdateDraft,
+  onRefresh,
 }: AiActionDraftCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -33,8 +61,90 @@ export function AiActionDraftCard({
   const [editError, setEditError] = useState<string | null>(null)
   const [confirmedElevated, setConfirmedElevated] = useState(false)
   const [confirmedReview, setConfirmedReview] = useState(false)
-  const [busy, setBusy] = useState<"approve" | "reject" | "save" | null>(null)
+  const [busy, setBusy] = useState<"approve" | "reject" | "save" | "refresh" | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const attemptKey = attemptStorageKey(scopeKey, draft)
+  const currentAttempt = useRef(attemptKey)
+  currentAttempt.current = attemptKey
+  const inFlight = useRef(false)
+  const [outcomeUnknown, setOutcomeUnknown] = useState(() => hasAttempt(attemptKey))
+  const [readbackRequired, setReadbackRequired] = useState(Boolean(onRefresh))
+  const refreshRef = useRef(onRefresh)
+  refreshRef.current = onRefresh
+
+  // A restored chat card is presentation history; read the current row before review.
+  useEffect(() => {
+    let current = true
+    const unresolved = hasAttempt(attemptKey)
+    setOutcomeUnknown(unresolved)
+    setError(null)
+    setReadbackRequired(Boolean(refreshRef.current))
+    inFlight.current = Boolean(refreshRef.current)
+    if (refreshRef.current) {
+      setBusy("refresh")
+      void refreshRef.current(draft).then(observed => {
+        if (isTerminalDraft(observed)) clearAttempt(attemptKey)
+        if (!current) return
+        setReadbackRequired(false)
+        setOutcomeUnknown(unresolved && !isTerminalDraft(observed))
+        if (unresolved && !isTerminalDraft(observed)) setError("The outcome is still unconfirmed. No action has been retried.")
+      }).catch(() => {
+        if (current) setError("The saved draft could not be checked. Check its outcome before continuing.")
+      }).finally(() => { if (current) { inFlight.current = false; setBusy(null) } })
+    }
+    return () => { current = false }
+  }, [draft.draftId, draft.companyId, attemptKey])
+
+  const handleRefresh = async () => {
+    if (!onRefresh || inFlight.current) return
+    const key = attemptKey
+    inFlight.current = true
+    setBusy("refresh")
+    setError(null)
+    try {
+      const observed = await onRefresh(draft)
+      if (isTerminalDraft(observed)) clearAttempt(key)
+      if (currentAttempt.current !== key) return
+      if ((outcomeUnknown || hasAttempt(key)) && !isTerminalDraft(observed)) {
+        setError("The outcome is still unconfirmed. No action has been retried.")
+      } else {
+        setOutcomeUnknown(false)
+        setReadbackRequired(false)
+      }
+      setConfirmedReview(false)
+      setConfirmedElevated(false)
+    } catch {
+      if (currentAttempt.current !== key) return
+      setReadbackRequired(true)
+      setError("The saved draft could not be checked. No action has been retried.")
+    } finally { if (currentAttempt.current === key) { inFlight.current = false; setBusy(null) } }
+  }
+
+  const performMutation = async (kind: "approve" | "reject" | "save", action: () => Promise<void>) => {
+    if (inFlight.current || outcomeUnknown || readbackRequired || hasAttempt(attemptKey)) return
+    const key = attemptKey
+    try { rememberAttempt(key) } catch {
+      setError("The action could not retain its recovery identity. No request was sent.")
+      return
+    }
+    inFlight.current = true
+    setBusy(kind)
+    setError(null)
+    try {
+      await action()
+      clearAttempt(key)
+      if (currentAttempt.current === key && kind === "save") setEditing(false)
+    } catch (err) {
+      const uncertain = isAiActionDraftOutcomeUnknown(err)
+      if (!uncertain) clearAttempt(key)
+      if (currentAttempt.current !== key) return
+      setOutcomeUnknown(uncertain)
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      if (currentAttempt.current === key) { inFlight.current = false; setBusy(null) }
+    }
+  }
 
   const status = draft.status ?? "pending"
   const isPending = status === "pending"
@@ -45,16 +155,18 @@ export function AiActionDraftCard({
     setEditError(null)
     setConfirmedReview(false)
     setConfirmedElevated(false)
-  }, [draft.draftId, paramsPreview])
+  }, [draft.draftId, draft.companyId, draft.reducerName, draft.summary, draft.elevated, paramsPreview])
 
   const canApprove =
     isPending &&
+    !outcomeUnknown &&
+    !readbackRequired &&
     confirmedReview &&
     (!draft.elevated || confirmedElevated) &&
     (!editing || editJson === paramsPreview)
 
   const handleSaveParams = async () => {
-    if (!onUpdateDraft || !isPending) return
+    if (!onUpdateDraft || !isPending || outcomeUnknown || readbackRequired || busy != null) return
     setEditError(null)
     let parsed: Record<string, unknown>
     try {
@@ -67,42 +179,17 @@ export function AiActionDraftCard({
       return
     }
 
-    setBusy("save")
-    setError(null)
-    try {
-      await onUpdateDraft({ ...draft, paramsJson: parsed })
-      setEditing(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(null)
-    }
+    await performMutation("save", () => onUpdateDraft({ ...draft, paramsJson: parsed }))
   }
 
   const handleApprove = async () => {
     if (!onApprove || !isPending || !canApprove) return
-    setBusy("approve")
-    setError(null)
-    try {
-      await onApprove(draft)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(null)
-    }
+    await performMutation("approve", () => onApprove(draft))
   }
 
   const handleReject = async () => {
     if (!onReject || !isPending) return
-    setBusy("reject")
-    setError(null)
-    try {
-      await onReject(draft, "Rejected from chat")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(null)
-    }
+    await performMutation("reject", () => onReject(draft, "Rejected from chat"))
   }
 
   return (
@@ -184,7 +271,7 @@ export function AiActionDraftCard({
             </ul>
           ) : null}
 
-          {draft.executionRecordId != null && status === "approved" ? (
+          {draft.executionRecordId != null && status === "approved" && !readbackRequired ? (
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground">
                 Created record #{draft.executionRecordId}
@@ -204,7 +291,8 @@ export function AiActionDraftCard({
             <p className="text-[10px] text-destructive">{draft.executionError}</p>
           ) : null}
 
-          {error ? <p className="text-[10px] text-destructive">{error}</p> : null}
+          {error ? <p role="alert" className="text-[10px] text-destructive">{error}</p> : null}
+          {onRefresh ? <Button type="button" size="sm" variant="outline" className="h-7 text-[10px]" disabled={busy != null} onClick={() => void handleRefresh()} data-testid="ai-action-draft-check-outcome">{busy === "refresh" ? "Checking saved draft…" : "Check outcome"}</Button> : null}
         </div>
       </div>
 
@@ -234,7 +322,7 @@ export function AiActionDraftCard({
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-[10px] gap-1"
-              disabled={busy != null}
+              disabled={busy != null || outcomeUnknown || readbackRequired}
               onClick={() => {
                 setEditing((v) => !v)
                 setEditError(null)
@@ -260,7 +348,7 @@ export function AiActionDraftCard({
                 type="button"
                 size="sm"
                 className="h-7 text-[10px]"
-                disabled={busy != null}
+                disabled={busy != null || outcomeUnknown || readbackRequired}
                 onClick={() => void handleSaveParams()}
               >
                 {busy === "save" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save parameters"}
@@ -298,7 +386,7 @@ export function AiActionDraftCard({
               variant="outline"
               className="h-7 text-[10px] gap-1"
               data-testid="ai-action-draft-reject"
-              disabled={busy != null}
+              disabled={busy != null || outcomeUnknown || readbackRequired}
               onClick={() => void handleReject()}
             >
               {busy === "reject" ? (
