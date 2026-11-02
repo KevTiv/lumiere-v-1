@@ -202,6 +202,93 @@ pub(crate) async fn dispatch_session_reducer(
     Ok(context)
 }
 
+pub(crate) fn skill_certification_request_contract() -> Result<&'static ReducerContract, ApiError> {
+    const REDUCER: &str = "request_ai_skill_certification";
+    let contract = stdb_client::reducer_contract(REDUCER).ok_or_else(|| {
+        ApiError::Forbidden("certification request reducer is absent from the contract".into())
+    })?;
+    let expected = [
+        ("organization_id", ScalarKind::UnsignedInteger, None),
+        (
+            "params",
+            ScalarKind::Composite,
+            Some("RequestAiSkillCertificationParams"),
+        ),
+    ];
+    if contract.name != REDUCER
+        || contract.contract_operation_id != "erp.request_ai_skill_certification"
+        || contract.exposure != Exposure::Denied
+        || contract.organization_position != Some(0)
+        || contract.company_position.is_some()
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind, target))| {
+                actual.name == name && actual.kind == kind && actual.ref_target == target
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "certification request must retain its fixed denied contract".into(),
+        ));
+    }
+    Ok(contract)
+}
+
+fn ai_skill_certification_request_args(
+    organization_id: u64,
+    company_id: u64,
+    skill_version_id: u64,
+    fixture_id: u64,
+    idempotency_key: &str,
+) -> Vec<Value> {
+    vec![
+        json!(organization_id),
+        json!({
+            "company_id": company_id,
+            "skill_version_id": skill_version_id,
+            "fixture_id": fixture_id,
+            "idempotency_key": idempotency_key,
+        }),
+    ]
+}
+
+/// Admit only an enqueue request from the protected certification route.
+/// Claim/completion reducers stay private; membership is checked with the
+/// session credential before the module derives the requester from ctx.sender().
+pub(crate) async fn dispatch_ai_skill_certification_request(
+    state: &AppState,
+    session: &ApiSession,
+    company_id: u64,
+    skill_version_id: u64,
+    fixture_id: u64,
+    idempotency_key: &str,
+) -> Result<TrustedOperationContext, ApiError> {
+    let contract = skill_certification_request_contract()?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        state.client_with_token(&session.stdb_token),
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let args = ai_skill_certification_request_args(
+        context.organization_id(),
+        company_id,
+        skill_version_id,
+        fixture_id,
+        idempotency_key,
+    );
+    let _ = validate_reducer_scope(contract, &args, context.organization_id())?;
+    // The denied contract has a composite company intent, not a top-level
+    // company parameter. Bind that exact intent explicitly at this boundary.
+    let company_scope = authorize_reducer_company_scope(&context, vec![company_id]).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
 /// Only the fixed reviewed-email route may claim provider work. The reducer
 /// remains denied to generic operations and runs as the session actor.
 pub(crate) async fn dispatch_reviewed_mail_mutation(
@@ -1207,6 +1294,41 @@ mod tests {
             validate_reducer_scope(contract, &[json!(7), json!({ "company_id": "wrong" })], 7,),
             Err(ApiError::Unprocessable(_))
         ));
+    }
+
+    #[test]
+    fn certification_enqueue_has_one_private_actor_scoped_boundary() {
+        let contract =
+            skill_certification_request_contract().expect("certification request contract");
+        assert_eq!(contract.exposure, Exposure::Denied);
+        assert!(session_reducer_contract(contract.name).is_err());
+        assert!(session_operation_contract(contract.contract_operation_id).is_err());
+
+        let args = ai_skill_certification_request_args(7, 42, 11, 3, "retry-key");
+        assert_eq!(args[0], json!(7));
+        assert_eq!(
+            args[1],
+            json!({
+                "company_id": 42,
+                "skill_version_id": 11,
+                "fixture_id": 3,
+                "idempotency_key": "retry-key",
+            })
+        );
+        assert!(validate_reducer_scope(contract, &args, 7).is_ok());
+        assert!(matches!(
+            validate_reducer_scope(contract, &args, 8),
+            Err(ApiError::Forbidden(_))
+        ));
+        assert!(ReducerCall::from_name(contract.name, Value::Array(args)).is_ok());
+
+        for reducer in [
+            "claim_ai_skill_certification",
+            "complete_ai_skill_certification",
+            "fail_ai_skill_certification",
+        ] {
+            assert!(session_reducer_contract(reducer).is_err(), "{reducer}");
+        }
     }
 
     #[test]
