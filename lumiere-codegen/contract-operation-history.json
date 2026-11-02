@@ -3002,6 +3002,10 @@
       "name": "nominate_ai_knowledge_entry_version",
       "shape_fingerprint": "sha256:adf0f65a42beff13170e95e91aea5e14272bc960de0f5f388398c8e7b677142b"
     },
+    "erp.nominate_ai_work_program_output": {
+      "name": "nominate_ai_work_program_output",
+      "shape_fingerprint": "sha256:32027035ccc8171858b6f929864419231ee9d1ed0bba56afaf8dcba5cab20750"
+    },
     "erp.nominate_knowledge_guide": {
       "name": "nominate_knowledge_guide",
       "shape_fingerprint": "sha256:3b3260ae646fcd48d962cc1c6564838343ddb613b9cec65aa00f065430e80841"
@@ -3510,6 +3514,10 @@
       "name": "register_ai_skill_certification_runtime_profile",
       "shape_fingerprint": "sha256:8d556825088dea9703a7e5917f3eecb045cd70b6ea5fc2e55832a415fcd8f74d"
     },
+    "erp.register_ai_work_program_recipe": {
+      "name": "register_ai_work_program_recipe",
+      "shape_fingerprint": "sha256:7ff65770725aa7395fc87528503b3efe1507a54aa3b26e683d81b681dbfb8a6e"
+    },
     "erp.register_cold_tier_service_identity": {
       "name": "register_cold_tier_service_identity",
       "shape_fingerprint": "sha256:71198ce9b3e523d8e855f832972cf121a0380bb41848554029bf62c8086b394a"
@@ -3785,6 +3793,10 @@
     "erp.revise_ai_artifact_component": {
       "name": "revise_ai_artifact_component",
       "shape_fingerprint": "sha256:6dc2e06674980b054f13633eaf7a3276647b51a859157f71c9954fac46c80580"
+    },
+    "erp.revoke_ai_work_program_recipe": {
+      "name": "revoke_ai_work_program_recipe",
+      "shape_fingerprint": "sha256:7fb16e759f9e9d7f297bfbdccd8ed72655cbb425de32e9f47c2a4abada0c1373"
     },
     "erp.revoke_delegated_admin_scope": {
       "name": "revoke_delegated_admin_scope",
@@ -4757,6 +4769,10 @@
     "erp.run_workflow_subject_snapshot_tests": {
       "name": "run_workflow_subject_snapshot_tests",
       "shape_fingerprint": "sha256:018a23d399143380aa9cc6006c880bcaaa66e570c099d18b3891b775fef88cff"
+    },
+    "erp.save_ai_work_program_draft": {
+      "name": "save_ai_work_program_draft",
+      "shape_fingerprint": "sha256:91832d015442e47761a5171c3bd17cda16d9b43f342f0be9998203f97ed65c7e"
     },
     "erp.save_import_mapping_template": {
       "name": "save_import_mapping_template",
@@ -6356,6 +6372,14 @@
       "current_operations_fingerprint": "sha256:d7025e8126d9305937e9bf94b8d0bdf52c6ae7612892f882fd7ff25d9a0d67f1",
       "operation_count": 1505,
       "reason": "Publish owner allowance and prepaid contracts with promoted migration 33 and retained build queue"
+    },
+    {
+      "previous_release": "v0.3.164",
+      "previous_ir_sha256": "sha256:679348b7fb3191451ab927024a4ad22e439294bd3d0ae9efc254b5f8d201311e",
+      "previous_operations_fingerprint": "sha256:d7025e8126d9305937e9bf94b8d0bdf52c6ae7612892f882fd7ff25d9a0d67f1",
+      "current_operations_fingerprint": "sha256:97b01f2d689ab56e7c6fd60e43e888bd0a75194bbc309438181a9ba7accb9f36",
+      "operation_count": 1509,
+      "reason": "Add four private reusable-work authoring and reviewed recipe operations; preserve every historical operation shape and deferred execution admission"
     }
   ]
 }

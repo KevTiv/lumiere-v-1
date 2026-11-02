@@ -433,6 +433,54 @@
         "upsert_stdb_row",
         "delete"
       ]
+    },
+    {
+      "source": "spacetimedb/src/ai/work_programs.rs",
+      "function": "save_ai_work_program_draft",
+      "operation": "save_ai_work_program_draft",
+      "operation_id": "erp.save_ai_work_program_draft",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [
+        "audited_changes"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/ai/work_programs.rs",
+      "function": "nominate_ai_work_program_output",
+      "operation": "nominate_ai_work_program_output",
+      "operation_id": "erp.nominate_ai_work_program_output",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [
+        "audited_changes"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/ai/work_program_learning.rs",
+      "function": "register_ai_work_program_recipe",
+      "operation": "register_ai_work_program_recipe",
+      "operation_id": "erp.register_ai_work_program_recipe",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [
+        "audited_changes"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/ai/work_program_learning.rs",
+      "function": "revoke_ai_work_program_recipe",
+      "operation": "revoke_ai_work_program_recipe",
+      "operation_id": "erp.revoke_ai_work_program_recipe",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [
+        "audited_changes"
+      ]
     }
   ],
   "dynamic_commit_helpers": [

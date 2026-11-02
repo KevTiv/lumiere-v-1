@@ -1210,7 +1210,7 @@ fn poll_backoff_ms(attempt: u32) -> u64 {
         .min(POLL_MAX_BACKOFF_MS)
 }
 
-fn graph_hash(graph: &DecisionGraph) -> String {
+pub(super) fn graph_hash(graph: &DecisionGraph) -> String {
     let mut canonical = graph
         .nodes
         .iter()

@@ -8,6 +8,7 @@ The broader program below also includes later capabilities outside that pilot.
 
 Use:
 
+- [`../plans/alpha-harness-reusable-work-railway-plan.md`](../plans/alpha-harness-reusable-work-railway-plan.md) for the current Alpha module scope, reusable WorkProgram/sandbox/report delivery, correction/learning increments and Railway acceptance gates; the six near-term AI workstreams remain separately owned dependencies;
 - [`erp-harness-implementation-coordination-plan.md`](./erp-harness-implementation-coordination-plan.md) for authority, sequencing rules, promotion gates, invariants and coordinator behavior;
 - [`erp-harness-implementation-ledger.md`](./erp-harness-implementation-ledger.md) for the broader bounded implementation program;
 - [`repository-cohesion-outcome-ownership-plan.md`](./repository-cohesion-outcome-ownership-plan.md) for the mandatory seam-eradication/error-outcome architecture before broad new feature work;

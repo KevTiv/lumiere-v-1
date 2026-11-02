@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { ExecutionJournal } from '../src/journal.mjs';
+import { DatabaseSync } from 'node:sqlite';
 import { DatasetBroker } from '../src/broker.mjs';
 import { SandboxController } from '../src/controller.mjs';
 import { runJavaScript } from '../src/runtime/index.mjs';
@@ -183,7 +184,7 @@ test('finalization atomically settles original reservation even after configurat
 test('identical artifact bytes can have separate names without corrupting content identity',()=>{
   const journal=new ExecutionJournal(':memory:');
   try{
-    const artifact={sha256:'a'.repeat(64),mimeType:'application/json',content:'{}',bytes:2};
+    const artifact={sha256:createHash('sha256').update('{}').digest('hex'),mimeType:'application/json',content:'{}',bytes:2};
     journal.putArtifact(SCOPE,{...artifact,name:'first.json',sourceDatasets:['one']});
     journal.putArtifact(SCOPE,{...artifact,name:'second.json',sourceDatasets:['two']});
     assert.equal(journal.getArtifact(SCOPE,artifact.sha256).content,'{}');
@@ -236,4 +237,61 @@ test('SQLite admission independently bounds concurrency, daily compute, identity
     journal.putDataset({id:'expired',expiresAt:new Date(0).toISOString(),rows:[{private:'value'}]});
     assert.equal(journal.purgeExpiredDatasets(),1);assert.deepEqual(journal.getDataset('expired').rows,[]);
   }finally{journal.close();}
+});
+
+
+test('artifact reopen survives destruction and journal restart with no new execution',async t=>{
+  const f=await setup(t);const req=f.request();const result=await f.controller.execute(req);
+  const saved=result.artifacts[0];
+  const journal=f.reopen();
+  const broker=new DatasetBroker({store:journal,authorize:f.authorize});
+  const controller=new SandboxController({journal,broker,provider:f.provider,authorize:f.authorize,mode:'synthetic'});
+  const restored=await dispatchControllerRequest({method:'GET',
+    url:new URL(`/v1/executions/${req.requestKey}/artifacts/${saved.sha256}?${new URLSearchParams(SCOPE)}`,'http://controller.invalid'),
+    broker,controller});
+  assert.deepEqual(restored.artifact,saved);
+  assert.equal(restored.requestKey,req.requestKey);
+  assert.deepEqual(journal.getDataset(f.handle.id).rows,[]);
+  assert.equal(f.calls.create,1);assert.equal(f.calls.execute,1);assert.equal(f.calls.destroy,1);
+  await assert.rejects(controller.readArtifact({scope:{...SCOPE,runId:'4'},requestKey:req.requestKey,artifactHash:saved.sha256}),{code:'execution_not_found'});
+  await assert.rejects(controller.readArtifact({scope:SCOPE,requestKey:req.requestKey,artifactHash:'b'.repeat(64)}),{code:'artifact_not_found'});
+  f.deny();
+  await assert.rejects(controller.readArtifact({scope:SCOPE,requestKey:req.requestKey,artifactHash:saved.sha256}),{code:'authorization_denied'});
+});
+
+test('persisted artifact integrity is enforced at write and read boundaries',()=>{
+  const journal=new ExecutionJournal(':memory:');
+  try {
+    const content='{}';const artifact={content,bytes:2,mimeType:'application/json',sha256:createHash('sha256').update(content).digest('hex')};
+    for(const patch of [{content:'[]'},{bytes:1},{mimeType:'text/html'},{sha256:'a'.repeat(64)}]) {
+      assert.throws(()=>journal.putArtifact(SCOPE,{...artifact,...patch}),{code:'artifact_integrity'});
+    }
+    journal.putArtifact(SCOPE,artifact);
+    assert.deepEqual(journal.getArtifact(SCOPE,artifact.sha256),artifact);
+    assert.equal(journal.getArtifact({...SCOPE,companyId:'9'},artifact.sha256),undefined);
+  } finally {journal.close();}
+});
+
+test('cleanup-pending outputs cannot be reopened before completed teardown',async t=>{
+  const f=await setup(t,{provider:{async destroy(){throw new Error('not yet');}}});
+  const req=f.request();await f.controller.execute(req);
+  const descriptor=f.journal.getExecution(req.requestKey).artifacts[0];
+  await assert.rejects(f.controller.readArtifact({scope:SCOPE,requestKey:req.requestKey,artifactHash:descriptor.sha256}),{code:'artifact_not_available'});
+});
+
+
+test('altered persisted blob or descriptor lineage fails closed on reopen',async t=>{
+  const f=await setup(t);const req=f.request();const saved=(await f.controller.execute(req)).artifacts[0];
+  const db=new DatabaseSync(join(f.root,'journal.sqlite'));
+  try {
+    const blob=db.prepare('SELECT record FROM artifacts WHERE hash = ?').get(saved.sha256);
+    const changed={...JSON.parse(blob.record),content:'[]'};
+    db.prepare('UPDATE artifacts SET record = ? WHERE hash = ?').run(JSON.stringify(changed),saved.sha256);
+    await assert.rejects(f.controller.readArtifact({scope:SCOPE,requestKey:req.requestKey,artifactHash:saved.sha256}),{code:'artifact_integrity'});
+    db.prepare('UPDATE artifacts SET record = ? WHERE hash = ?').run(blob.record,saved.sha256);
+    const record=f.journal.getExecution(req.requestKey);
+    record.artifacts[0].sourceDatasets=['ds_'+ 'f'.repeat(32)];
+    db.prepare('UPDATE executions SET record = ? WHERE request_key = ?').run(JSON.stringify(record),req.requestKey);
+    await assert.rejects(f.controller.readArtifact({scope:SCOPE,requestKey:req.requestKey,artifactHash:saved.sha256}),{code:'artifact_integrity'});
+  } finally {db.close();}
 });

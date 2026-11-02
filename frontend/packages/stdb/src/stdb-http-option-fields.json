@@ -5273,6 +5273,9 @@
     "external_reference",
     "metadata"
   ],
+  "SaveAiWorkProgramDraftParams": [
+    "expected_revision"
+  ],
   "SavedReport": [
     "column_dimension",
     "filter_json",

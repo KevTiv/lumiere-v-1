@@ -5099,6 +5099,26 @@
       "name": "record_ai_prepaid_funding",
       "exposure": "denied",
       "reason": "trusted prepaid operator only; dedicated organization funding-service binding and narrow permission required; never generic session exposed"
+    },
+    {
+      "name": "save_ai_work_program_draft",
+      "exposure": "denied",
+      "reason": "new reusable-work foundation; source-only until immutable generated contracts, typed API transport and reviewed admission are released"
+    },
+    {
+      "name": "nominate_ai_work_program_output",
+      "exposure": "denied",
+      "reason": "new reusable-work foundation; source-only until immutable generated contracts, typed API transport and reviewed admission are released"
+    },
+    {
+      "name": "register_ai_work_program_recipe",
+      "exposure": "denied",
+      "reason": "new reusable-work foundation; source-only until immutable generated contracts, typed API transport and reviewed admission are released"
+    },
+    {
+      "name": "revoke_ai_work_program_recipe",
+      "exposure": "denied",
+      "reason": "new reusable-work foundation; source-only until immutable generated contracts, typed API transport and reviewed admission are released"
     }
   ]
 }

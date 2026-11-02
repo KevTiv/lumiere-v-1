@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import type { Page } from "@playwright/test"
+import type { BrowserContext, Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { fetchDefaultCompanyId, scalarQueryId, signIn, smokeName } from "./helpers"
@@ -15,6 +15,27 @@ import {
 
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
+
+// Fixture teardown has its own budget, outside the scenario's 180 seconds.
+// Playwright retains a scenario failure even if a context also fails to close.
+const qualityTest = test.extend<{
+  personaPages: { warehouse: Page; reader: Page }
+}>({
+  personaPages: [async ({ browser }, use) => {
+    const contexts: BrowserContext[] = []
+    try {
+      const warehouse = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+      contexts.push(warehouse)
+      const reader = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+      contexts.push(reader)
+      await use({ warehouse: await warehouse.newPage(), reader: await reader.newPage() })
+    } finally {
+      const results = await Promise.allSettled(contexts.map((context) => context.close()))
+      const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : [])
+      if (failures.length) throw new AggregateError(failures, "Quality-check persona context cleanup failed")
+    }
+  }, { timeout: 30_000 }],
+})
 
 async function failQualityCheckRequest(
   page: Page,
@@ -56,132 +77,75 @@ async function fetchQualityCheckIdByName(
   return id
 }
 
-test.describe(
+qualityTest.describe(
   "COV-06g exact quality-check fail quarantine",
   { tag: ["@p0", "@cov06", "@cov06g", "@unauthenticated"] },
   () => {
-    test("warehouse persona fails a quality check with exact quarantine quant convergence", async ({
-      browser,
+    qualityTest("warehouse persona fails a quality check with exact quarantine quant convergence", async ({
       page,
+      personaPages: { warehouse: warehousePage, reader: readerPage },
     }) => {
-      test.setTimeout(180_000)
+      qualityTest.setTimeout(180_000)
 
-      await signIn(page, "test@email.com", PERSONA_PASSWORD)
-      const companyId = await fetchDefaultCompanyId(page)
-      const productName = smokeName("cov06g-product")
-      const productId = await createProductFixture(page, productName)
-      const sourceName = smokeName("cov06g-src")
-      const sourceLocationId = await createInternalLocation(page, sourceName)
-      const qcName = smokeName("cov06g-qc")
-      const qcLocationId = await createInternalLocation(page, qcName)
+      const companyId = await qualityTest.step("Sign in fixture owner and resolve company", async () => {
+        await signIn(page, "test@email.com", PERSONA_PASSWORD)
+        return fetchDefaultCompanyId(page)
+      }, { timeout: 30_000 })
 
-      await createStockQuantFixture(
-        page,
-        companyId,
-        productId,
-        sourceLocationId,
-        smokeName("cov06g-quant"),
-        10,
-      )
+      const { productId, sourceLocationId, qcName, qcLocationId, checkId } = await qualityTest.step("Create exact product, locations, source quant and quality check", async () => {
+        const productName = smokeName("cov06g-product")
+        const productId = await createProductFixture(page, productName)
+        const sourceLocationId = await createInternalLocation(page, smokeName("cov06g-src"))
+        const qcName = smokeName("cov06g-qc")
+        const qcLocationId = await createInternalLocation(page, qcName)
+        await createStockQuantFixture(page, companyId, productId, sourceLocationId, smokeName("cov06g-quant"), 10)
+        const checkName = smokeName("cov06g-check")
+        await createQualityCheckViaUi(page, productName, checkName)
+        const checkId = await fetchQualityCheckIdByName(page, checkName)
+        expect(await fetchQuantsAtProductLocation(page, productId, qcLocationId)).toEqual([])
+        return { productId, sourceLocationId, qcName, qcLocationId, checkId }
+      }, { timeout: 60_000 })
 
-      const checkName = smokeName("cov06g-check")
-      await createQualityCheckViaUi(page, productName, checkName)
-      const checkId = await fetchQualityCheckIdByName(page, checkName)
+      await qualityTest.step("Sign in warehouse persona", async () => {
+        await signIn(warehousePage, "fixture.warehouse@example.test", PERSONA_PASSWORD)
+      }, { timeout: 30_000 })
 
-      expect(
-        await fetchQuantsAtProductLocation(page, productId, qcLocationId),
-      ).toEqual([])
+      await qualityTest.step("Fail exact quality check through quarantine UI", async () => {
+        await failQualityCheckViaUi(warehousePage, checkId, qcName, "Damaged in transit")
+      }, { timeout: 45_000 })
 
-      const warehouseContext = await browser.newContext({
-        storageState: { cookies: [], origins: [] },
-      })
-      const warehousePage = await warehouseContext.newPage()
-      const readerContext = await browser.newContext({
-        storageState: { cookies: [], origins: [] },
-      })
-      const readerPage = await readerContext.newPage()
+      const quarantineQuant = await qualityTest.step("Verify exact quarantine and source quantities and canonical focus", async () => {
+        let quant = (await fetchQuantsAtProductLocation(page, productId, qcLocationId))[0]
+        await expect.poll(async () => {
+          const rows = await fetchQuantsAtProductLocation(page, productId, qcLocationId)
+          quant = rows[0]
+          return rows.length
+        }, { timeout: 30_000 }).toBe(1)
+        if (!quant) throw new Error("Expected one quarantine quant")
+        expect(quant).toMatchObject({ productId, locationId: qcLocationId, quantity: 1, availableQuantity: 0 })
+        expect(await fetchQuantsAtProductLocation(page, productId, sourceLocationId))
+          .toMatchObject([{ quantity: 9, availableQuantity: 9 }])
+        await expectCanonicalQuantFocus(warehousePage, quant.id)
+        return quant
+      }, { timeout: 45_000 })
 
-      try {
-        await signIn(
-          warehousePage,
-          "fixture.warehouse@example.test",
-          PERSONA_PASSWORD,
-        )
-
-        await failQualityCheckViaUi(
-          warehousePage,
-          checkId,
-          qcName,
-          "Damaged in transit",
-        )
-
-        let quarantineQuant = (
-          await fetchQuantsAtProductLocation(page, productId, qcLocationId)
-        )[0]
-        await expect
-          .poll(
-            async () => {
-              const rows = await fetchQuantsAtProductLocation(
-                page,
-                productId,
-                qcLocationId,
-              )
-              quarantineQuant = rows[0]
-              return rows.length
-            },
-            { timeout: 30_000 },
-          )
-          .toBe(1)
-        if (!quarantineQuant) throw new Error("Expected one quarantine quant")
-
-        expect(quarantineQuant).toMatchObject({
-          productId,
-          locationId: qcLocationId,
-          quantity: 1,
-          availableQuantity: 0,
-        })
-
-        expect(
-          await fetchQuantsAtProductLocation(page, productId, sourceLocationId),
-        ).toMatchObject([{ quantity: 9, availableQuantity: 9 }])
-
-        await expectCanonicalQuantFocus(warehousePage, quarantineQuant.id)
-
-        // Exact replay is stale: the check is already completed.
-        const staleReplay = await failQualityCheckRequest(
-          warehousePage,
-          companyId,
-          checkId,
-          qcLocationId,
-        )
+      await qualityTest.step("Reject stale warehouse replay without changing either quant", async () => {
+        const staleReplay = await failQualityCheckRequest(warehousePage, companyId, checkId, qcLocationId)
         expect(staleReplay.status()).toBe(422)
-        expect(
-          await fetchQuantsAtProductLocation(page, productId, qcLocationId),
-        ).toEqual([quarantineQuant])
-        expect(
-          await fetchQuantsAtProductLocation(page, productId, sourceLocationId),
-        ).toMatchObject([{ quantity: 9, availableQuantity: 9 }])
+        expect(await fetchQuantsAtProductLocation(page, productId, qcLocationId)).toEqual([quarantineQuant])
+        expect(await fetchQuantsAtProductLocation(page, productId, sourceLocationId))
+          .toMatchObject([{ quantity: 9, availableQuantity: 9 }])
+      }, { timeout: 30_000 })
 
-        // The limited reader is denied without changing any quant.
-        await signIn(
-          readerPage,
-          "fixture.reader@example.test",
-          PERSONA_PASSWORD,
-        )
-        const denial = await failQualityCheckRequest(
-          readerPage,
-          companyId,
-          checkId,
-          qcLocationId,
-        )
+      await qualityTest.step("Sign in limited reader persona", async () => {
+        await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
+      }, { timeout: 30_000 })
+
+      await qualityTest.step("Deny limited reader mutation and preserve quarantine quant", async () => {
+        const denial = await failQualityCheckRequest(readerPage, companyId, checkId, qcLocationId)
         expect(denial.status()).toBe(403)
-        expect(
-          await fetchQuantsAtProductLocation(page, productId, qcLocationId),
-        ).toEqual([quarantineQuant])
-      } finally {
-        await readerContext.close()
-        await warehouseContext.close()
-      }
+        expect(await fetchQuantsAtProductLocation(page, productId, qcLocationId)).toEqual([quarantineQuant])
+      }, { timeout: 30_000 })
     })
   },
 )

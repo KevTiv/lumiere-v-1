@@ -5,6 +5,8 @@ pub mod persistence;
 pub use persistence::{prepare_saved_draft, PreparedDraft};
 pub mod preview;
 pub use preview::*;
+pub mod publication;
+pub use publication::*;
 pub mod validation;
 
 #[cfg(test)]

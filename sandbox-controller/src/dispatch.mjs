@@ -21,6 +21,13 @@ export async function dispatchControllerRequest({method,url,body,broker,controll
     fields(body,['scope','requestKey','program','datasetIds','profileRef']);
     return {execution:await controller.execute(body)};
   }
+  const artifact=/^\/v1\/executions\/([a-f0-9]{64})\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
+  if (artifact && method==='GET') {
+    const scope=Object.fromEntries(url.searchParams);
+    if ([...url.searchParams].length!==SCOPE_FIELDS.length) fields({},SCOPE_FIELDS);
+    fields(scope,SCOPE_FIELDS);
+    return await controller.readArtifact({scope,requestKey:artifact[1],artifactHash:artifact[2]});
+  }
   const match=/^\/v1\/executions\/([a-f0-9]{64})(\/cancel)?$/.exec(url.pathname);
   if (match && method==='POST' && match[2]) {
     fields(body,['scope']);

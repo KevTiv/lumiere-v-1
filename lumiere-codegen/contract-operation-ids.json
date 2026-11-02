@@ -1505,6 +1505,10 @@
     "purge_reviewed_expired_documents": "erp.purge_reviewed_expired_documents",
     "run_configured_record_creation_tests": "erp.run_configured_record_creation_tests",
     "knowledge_guide_authority_read": "erp.knowledge_guide_authority_read",
-    "knowledge_guide_actor_profile_read": "erp.knowledge_guide_actor_profile_read"
+    "knowledge_guide_actor_profile_read": "erp.knowledge_guide_actor_profile_read",
+    "save_ai_work_program_draft": "erp.save_ai_work_program_draft",
+    "nominate_ai_work_program_output": "erp.nominate_ai_work_program_output",
+    "register_ai_work_program_recipe": "erp.register_ai_work_program_recipe",
+    "revoke_ai_work_program_recipe": "erp.revoke_ai_work_program_recipe"
   }
 }

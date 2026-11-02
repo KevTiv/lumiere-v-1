@@ -261,6 +261,60 @@
           "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
         }
       ]
+    },
+    {
+      "name": "save_ai_work_program_draft",
+      "company_paths": [
+        {
+          "path": [
+            "params",
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "current legal entity owning the private reusable-work draft, source output or recipe"
+        }
+      ]
+    },
+    {
+      "name": "nominate_ai_work_program_output",
+      "company_paths": [
+        {
+          "path": [
+            "params",
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "current legal entity owning the private reusable-work draft, source output or recipe"
+        }
+      ]
+    },
+    {
+      "name": "register_ai_work_program_recipe",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "current legal entity owning the private reusable-work draft, source output or recipe"
+        }
+      ]
+    },
+    {
+      "name": "revoke_ai_work_program_recipe",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "current legal entity owning the private reusable-work draft, source output or recipe"
+        }
+      ]
     }
   ]
 }
