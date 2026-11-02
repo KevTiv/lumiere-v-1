@@ -351,7 +351,9 @@ pub(super) async fn read_activity_work(
         .collect::<Vec<_>>()
         .join(" OR ");
     // manual_status checks deleted_at after decoding the optional timestamp.
-    let predicate = format!("organization_id = {org} AND ({source_predicate}) AND auto = false AND is_system = false");
+    let predicate = format!(
+        "organization_id = {org} AND ({source_predicate}) AND auto = false AND is_system = false"
+    );
     let reader = BoundedIdReader::new(owner, "activity", &predicate);
     let mut after = request.after(org, &caller)?;
     let mut rows = Vec::new();
