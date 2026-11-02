@@ -44,6 +44,8 @@
     }
   },
   "workspaceShell": {
+    "accountAndPreferences": "Akaunti na mapendeleo",
+    "resizeNavigation": "Badilisha upana wa urambazaji",
     "preferences": "Mapendeleo ya eneo la kazi",
     "preferencesDescription": "Rekebisha eneo hili la kazi likufae.",
     "appearance": "Mwonekano",

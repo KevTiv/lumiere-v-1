@@ -84,7 +84,8 @@ test.describe("COV-24 distributor order-to-cash workspace", { tag: ["@p0", "@cov
       const readerPage = await readerContext.newPage()
       await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
       await gotoModule(readerPage, "/distributor", "distributor")
-      await readerPage.waitForLoadState("networkidle")
+      // Live queries can keep the network busy; wait for the hydrated empty workspace.
+      await expect(readerPage.getByTestId("distributor-o2c-empty")).toBeVisible({ timeout: 30_000 })
       await expect(readerPage.getByTestId(`distributor-o2c-row-${orderId}`)).toHaveCount(0)
     } finally {
       await readerContext.close()

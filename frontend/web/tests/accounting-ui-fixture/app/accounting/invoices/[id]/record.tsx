@@ -22,7 +22,7 @@ function ReturnRecord({ recordId }: { recordId: string }) {
     if (context) setReturnHref(context.href)
     setHydrated(true)
   }, [recordId])
-  return <DashboardWorkspace sidebar={<DashboardSidebar userProfile={{ name: "Synthetic Accountant" }} />} onOpenSearch={() => {}}>
+  return <DashboardWorkspace userProfile={{ name: "Synthetic Accountant" }} sidebar={<DashboardSidebar />} onOpenSearch={() => {}}>
     <p data-testid="return-record-ready" data-hydrated={hydrated} className="mb-4 text-xs text-muted-foreground">Synthetic record navigation — no ERP API operations</p>
     <RecordPage
       testIdPrefix="invoice"

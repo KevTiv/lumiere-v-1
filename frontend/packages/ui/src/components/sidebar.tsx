@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@lumiere/ui/components/tooltip"
 import { PanelLeftIcon } from "lucide-react"
+import { readPreference, writePreference } from "../lib/theme-storage"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -31,6 +32,10 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_WIDTH_KEY = "lumiere-sidebar-width"
+const SIDEBAR_MIN_WIDTH = 208
+const SIDEBAR_MAX_WIDTH = 400
+const SIDEBAR_SNAP_WIDTH = 160
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -40,6 +45,9 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  width: number
+  setWidth: (width: number) => void
+  setResizing: (resizing: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -60,14 +68,35 @@ function SidebarProvider({
   className,
   style,
   children,
+  resizable = false,
   ...props
 }: React.ComponentProps<"div"> & {
   defaultOpen?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  resizable?: boolean
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+  const [width, setWidth] = React.useState(256)
+  const [resizing, setResizing] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!resizable) return
+    const saved = Number(readPreference(SIDEBAR_WIDTH_KEY))
+    if (Number.isFinite(saved) && saved >= SIDEBAR_MIN_WIDTH && saved <= SIDEBAR_MAX_WIDTH) setWidth(saved)
+  }, [resizable])
+
+  React.useEffect(() => {
+    if (!resizing) return
+    const { cursor, userSelect } = document.body.style
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+    return () => {
+      document.body.style.cursor = cursor
+      document.body.style.userSelect = userSelect
+    }
+  }, [resizing])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -122,8 +151,11 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      width,
+      setWidth,
+      setResizing,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width]
   )
 
   return (
@@ -135,11 +167,13 @@ function SidebarProvider({
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
+            ...(resizable ? { "--sidebar-width": `${width}px` } : {}),
           } as React.CSSProperties
         }
         className={cn(
           "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
-          className
+          className,
+          resizing && "[&_[data-slot=sidebar-gap]]:transition-none [&_[data-slot=sidebar-container]]:transition-none"
         )}
         {...props}
       >
@@ -147,6 +181,72 @@ function SidebarProvider({
       </div>
     </SidebarContext.Provider>
   )
+}
+
+/** Desktop edge resizing preserves the last expanded width when snapped closed. */
+function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div">) {
+  const { open, setOpen, width, setWidth, setResizing, isMobile } = useSidebar()
+  const drag = React.useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
+  const latestWidth = React.useRef(width)
+  latestWidth.current = width
+
+  React.useEffect(() => () => setResizing(false), [setResizing])
+
+  const resize = (next: number) => {
+    const expanded = next >= SIDEBAR_SNAP_WIDTH
+    if (expanded !== open) setOpen(expanded)
+    if (expanded) {
+      latestWidth.current = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, next))
+      setWidth(latestWidth.current)
+    }
+  }
+  const persist = () => writePreference(SIDEBAR_WIDTH_KEY, String(latestWidth.current))
+  const finish = () => {
+    if (!drag.current) return
+    drag.current = null
+    setResizing(false)
+    persist()
+  }
+
+  if (isMobile) return null
+  return <div
+    role="separator"
+    aria-label="Resize navigation"
+    aria-orientation="vertical"
+    aria-valuemin={64}
+    aria-valuemax={SIDEBAR_MAX_WIDTH}
+    aria-valuenow={open ? width : 64}
+    tabIndex={0}
+    data-testid="sidebar-resize-handle"
+    className={cn("absolute inset-y-0 -right-1 z-30 w-2 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 hover:after:bg-sidebar-primary/50 focus-visible:outline-none focus-visible:after:bg-sidebar-primary", className)}
+    onPointerDown={(event) => {
+      if (event.button !== 0 || !event.isPrimary) return
+      event.preventDefault()
+      event.currentTarget.focus()
+      event.currentTarget.setPointerCapture(event.pointerId)
+      const container = event.currentTarget.closest('[data-slot="sidebar-container"]')
+      drag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: container?.getBoundingClientRect().width ?? (open ? width : 64) }
+      setResizing(true)
+    }}
+    onPointerMove={(event) => {
+      if (drag.current?.pointerId !== event.pointerId) return
+      resize(drag.current.startWidth + event.clientX - drag.current.startX)
+    }}
+    onPointerUp={finish}
+    onPointerCancel={finish}
+    onLostPointerCapture={finish}
+    onKeyDown={(event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
+      event.preventDefault()
+      const next = event.key === "Home" ? 64 : event.key === "End" ? SIDEBAR_MAX_WIDTH
+        : !open ? (event.key === "ArrowRight" ? SIDEBAR_MIN_WIDTH : 64)
+        : width <= SIDEBAR_MIN_WIDTH && event.key === "ArrowLeft" ? 64
+        : width + (event.key === "ArrowRight" ? 16 : -16)
+      resize(next)
+      if (next >= SIDEBAR_SNAP_WIDTH) writePreference(SIDEBAR_WIDTH_KEY, String(Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, next))))
+    }}
+    {...props}
+  />
 }
 
 function Sidebar({
@@ -717,6 +817,7 @@ export {
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
+  SidebarResizeHandle,
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,

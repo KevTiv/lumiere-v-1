@@ -36,7 +36,8 @@ test.describe("sign-in and sign-out", () => {
     const resetProbe = await installPostHogResetProbe(page)
     await signIn(page)
 
-    await page.getByTestId("sidebar-sign-out").click()
+    await page.getByTestId("workspace-account-menu").click()
+    await page.getByTestId("workspace-sign-out").click()
 
     await expect.poll(() => resetProbe.wasReset()).toBe(true)
     await expect(page).toHaveURL(/\/sign-in(?:\?|$)/)

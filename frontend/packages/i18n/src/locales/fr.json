@@ -44,6 +44,8 @@
     }
   },
   "workspaceShell": {
+    "accountAndPreferences": "Compte et préférences",
+    "resizeNavigation": "Redimensionner la navigation",
     "preferences": "Préférences de l’espace de travail",
     "preferencesDescription": "Adaptez cet espace de travail à vos besoins.",
     "appearance": "Apparence",

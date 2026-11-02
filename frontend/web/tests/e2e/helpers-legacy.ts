@@ -52,18 +52,18 @@ export async function signIn(
 export async function expectAuthenticatedShell(page: Page) {
   const mobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches)
   const navigationToggle = page.getByTestId("workspace-navigation-toggle")
-  let openedNavigation = false
+  let navigationWasOpen = false
   if (mobile) {
     // Mobile navigation is an unmounted drawer until opened. Prove that the
     // actual authenticated navigation is keyboard reachable before inspecting it.
     await expect(navigationToggle).toHaveCount(1, { timeout: 30_000 })
     await expect(navigationToggle).toBeVisible()
-    if ((await navigationToggle.getAttribute("aria-expanded")) !== "true") {
+    navigationWasOpen = (await navigationToggle.getAttribute("aria-expanded")) === "true"
+    if (!navigationWasOpen) {
       await navigationToggle.focus()
       await expect(navigationToggle).toBeFocused()
       await navigationToggle.press("Enter")
       await expect(navigationToggle).toHaveAttribute("aria-expanded", "true")
-      openedNavigation = true
     }
   }
   // While a streamed page is still resolving, its server-rendered shell and the
@@ -71,13 +71,28 @@ export async function expectAuthenticatedShell(page: Page) {
   // (a strict-mode violation is not retried).
   await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
-  await expect(page.getByTestId("sidebar-user")).toBeVisible()
-  await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
-  if (openedNavigation) {
+  if (mobile) {
+    // Account controls live in the header, outside the modal navigation drawer.
     await page.keyboard.press("Escape")
     await expect(navigationToggle).toHaveAttribute("aria-expanded", "false")
     await expect(page.getByTestId("dashboard-sidebar")).toBeHidden()
     await expect(navigationToggle).toBeFocused()
+  }
+  const accountMenu = page.getByTestId("workspace-account-menu")
+  await expect(accountMenu).toHaveCount(1, { timeout: 30_000 })
+  await expect(accountMenu).toBeVisible()
+  const accountWasOpen = (await accountMenu.getAttribute("aria-expanded")) === "true"
+  if (!accountWasOpen) await accountMenu.click()
+  await expect(page.getByTestId("workspace-user")).toBeVisible()
+  await expect(page.getByTestId("workspace-sign-out")).toBeVisible()
+  if (!accountWasOpen) {
+    await page.keyboard.press("Escape")
+    await expect(page.getByTestId("workspace-user")).toBeHidden()
+    await expect(accountMenu).toBeFocused()
+  }
+  if (navigationWasOpen) {
+    await navigationToggle.click()
+    await expect(navigationToggle).toHaveAttribute("aria-expanded", "true")
   }
   await expectNoAppError(page)
 }

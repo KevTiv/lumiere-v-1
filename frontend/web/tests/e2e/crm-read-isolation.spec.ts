@@ -901,6 +901,12 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
     branchContext = await browser.newContext({ baseURL: e2eBaseUrl() })
     const branchPage = await branchContext.newPage()
     await signIn(branchPage, branchEmail, E2E_PASSWORD)
+    // CRM read access alone has no Finance source records for the work inbox.
+    const followups = await branchPage.request.get(
+      `/api/query/activities?companyId=${branchCompanyId}&workScope=finance&workView=mine`,
+    )
+    expect(followups.status()).toBe(200)
+    expect(await followups.json()).toEqual({ data: [], nextCursor: null })
 
     return {
       context,

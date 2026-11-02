@@ -783,6 +783,11 @@
             "name": "guide_refs",
             "rustType": "Vec<GuideIdentity>",
             "required": false
+          },
+          {
+            "name": "ui_action_offers",
+            "rustType": "Vec<UiActionOffer>",
+            "required": false
           }
         ]
       },

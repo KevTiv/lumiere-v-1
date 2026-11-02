@@ -30,13 +30,15 @@ function AccountingFixture() {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [postRequested, setPostRequested] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [signedOut, setSignedOut] = useState(false)
   const [saved, setSaved] = useState(false)
   const [bankSelection, setBankSelection] = useState("")
   return <QueryClientProvider client={client}><I18nProvider language="en"><RBACProvider useDefaultFixtures><ThemeProvider defaultTheme="light">
-    <DashboardWorkspace sidebar={<DashboardSidebar userProfile={{ name: "Alpha Accountant", email: "accountant@example.test" }} />} onOpenSearch={() => setSearched(true)}>
+    <DashboardWorkspace onSignOut={() => setSignedOut(true)} userProfile={{ name: "Alpha Accountant", email: "accountant@example.test" }} sidebar={<DashboardSidebar onOpenAIChat={() => setSearched(true)} />} onOpenSearch={() => setSearched(true)}>
       <p className="mb-4 text-xs text-muted-foreground" data-testid="fixture-disclosure" data-hydrated={hydrated}>Synthetic UI fixture — no backend operations</p>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold tracking-tight">Accounting</h1><p className="mt-1 text-sm text-muted-foreground">Financial overview and daily work</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setReviewOpen(true)}>Review invoice</Button><Button onClick={() => { setSaved(false); setInvoiceOpen(true) }}>New invoice</Button></div></div>
       {searched && <p role="status">Search requested</p>}
+      {signedOut && <p role="status">Sign out requested</p>}
       {saved && <p role="status">Synthetic draft captured</p>}
       {bankSelection && <p role="status">{bankSelection}</p>}
       {postRequested && <p role="status">Synthetic posting requested</p>}
