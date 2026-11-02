@@ -795,7 +795,8 @@ fn queued_inputs_sql(
     run_id: u64,
     row_limit: usize,
 ) -> String {
-    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}")
+    // POSITION is parsed as a SQL function unless quoted as an identifier.
+    format!("SELECT queued_input_id, \"position\", revision, status, promoted_run_id FROM ai_run_queued_input_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}")
 }
 
 fn queued_input_from_row(row: Value) -> AppResult<LifecycleQueuedInput> {
@@ -1052,14 +1053,22 @@ mod tests {
             let (names, rows) = if sql.contains("FROM ai_run_lifecycle_state_read") {
                 (vec!["run_id", "state", "checkpoint_hash", "cursor", "concurrency_version"],
                  vec![vec![json!(42), json!("agent_settled"), json!("a".repeat(64)), json!(1), json!(2)]])
-            } else {
-                if sql.contains("FROM ai_run_queued_input_read") {
-                    assert!(!sql.contains("payload"));
-                    assert!(!sql.contains("author"));
+            } else if sql.contains("FROM ai_run_queued_input_read") {
+                // Reproduce the production parser's rejection of bare POSITION.
+                if sql.contains(", position,") {
+                    return (axum::http::StatusCode::BAD_REQUEST,
+                        "sql parser error: Expected (, found: , at Line: 1, Column 33".to_owned());
                 }
+                assert!(sql.contains(", \"position\","));
+                assert!(!sql.contains("payload"));
+                assert!(!sql.contains("author"));
+                (vec!["queued_input_id", "position", "revision", "status", "promoted_run_id"],
+                 vec![vec![json!(12), json!(2), json!(3), json!("queued"), json!({"none":[]})],
+                      vec![json!(11), json!(1), json!(2), json!("queued"), json!({"some":99})]])
+            } else {
                 (vec!["id"], vec![])
             };
-            Json(json!([{"schema":{"elements": names.into_iter().map(|name| json!({"name":{"some":name}})).collect::<Vec<_>>()}, "rows":rows}]))
+            (axum::http::StatusCode::OK, json!([{"schema":{"elements": names.into_iter().map(|name| json!({"name":{"some":name}})).collect::<Vec<_>>()}, "rows":rows}]).to_string())
         }));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
@@ -1077,6 +1086,13 @@ mod tests {
         assert_eq!(response.run_id, 42);
         assert_eq!(response.state, "agent_settled");
         assert!(!response.truncated);
+        assert_eq!(response.queued_inputs.len(), 2);
+        assert_eq!(response.queued_inputs[0].id, 11);
+        assert_eq!(response.queued_inputs[0].position, 1);
+        assert_eq!(response.queued_inputs[0].revision, 2);
+        assert_eq!(response.queued_inputs[0].promoted_run_id, Some(99));
+        assert_eq!(response.queued_inputs[1].id, 12);
+        assert_eq!(response.queued_inputs[1].promoted_run_id, None);
     }
 
     #[test]
