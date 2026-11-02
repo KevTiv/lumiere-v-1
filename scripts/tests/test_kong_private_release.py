@@ -51,6 +51,8 @@ class PrivateReleaseTests(unittest.TestCase):
         for route in routes:
             self.assertFalse(route['strip_path'])
             self.assertGreater(route['regex_priority'], 0)
+            for pattern in route['paths']:
+                self.assertTrue(pattern.startswith('~/'), pattern)
         def allowed(method, path):
             return any(method in route['methods'] and re.match(pattern[1:], path)
                        for route in routes for pattern in route['paths'])
