@@ -201,6 +201,7 @@ function SubscriptionsClientLoaded({
   const router = useRouter()
   const { checkPermission, permissionsReady } = useRBAC()
   const [createOpen, setCreateOpen] = useState(false)
+  const [assistantPrompt, setAssistantPrompt] = useState<string | undefined>()
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? "dashboard",
@@ -1005,7 +1006,10 @@ function SubscriptionsClientLoaded({
   return (
     <EntityLabelsProvider value={entityLabels}>
       <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending}
-        onOpenCreateForm={(tabId) => {
+        assistantFormBlocked={createOpen || quickActionForm !== null}
+        onAssistantFormScopeChange={() => { setCreateOpen(false); setQuickActionForm(null); setAssistantPrompt(undefined) }}
+        onOpenCreateForm={(tabId, assistant) => {
+          setAssistantPrompt(assistant?.prompt)
           if (tabId === "subscriptions") setCreateOpen(true)
           else { const tab = config.tabs.find((candidate) => candidate.id === tabId); if (tab?.createForm && tab.createAction) setQuickActionForm({ form: tab.createForm, action: tab.createAction }) }
         }}
@@ -1017,7 +1021,7 @@ function SubscriptionsClientLoaded({
             {checkPermission("subscription", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importSubscriptionCsvFormConfig, action: "importSubscriptionCsv" })}>{t("subscriptions.dashboard.importSubscriptionCsv")}</Button>}
           </div></details>
         </div>} />
-      {createOpen && <SubscriptionCreateDialog key={`${orgId}:${operatingCompanyId}`} open={quickActionForm === null} onClose={() => setCreateOpen(false)} scope={{ organizationId: orgId, companyId: operatingCompanyId }} orders={saleOrders} plans={plans} currencies={currencies} customers={moduleQueryState(contactsQuery).status === "ready" ? contactsQuery.data ?? [] : []}
+      {createOpen && <SubscriptionCreateDialog key={`${orgId}:${operatingCompanyId}`} open={quickActionForm === null} onClose={() => { setCreateOpen(false); setAssistantPrompt(undefined) }} scope={{ organizationId: orgId, companyId: operatingCompanyId }} assistantPrompt={assistantPrompt} orders={saleOrders} plans={plans} currencies={currencies} customers={moduleQueryState(contactsQuery).status === "ready" ? contactsQuery.data ?? [] : []}
         sourceState={mergeModuleStates([dataState.subscriptions, moduleQueryState(saleOrdersQuery), dataState.plans])}
         onRetry={() => { void saleOrdersQuery.refetch(); void plansQuery.refetch(); void subscriptionsQuery.refetch() }}
         onCreatePlan={checkPermission("subscription_plan", "create").allowed ? () => setQuickActionForm({ form: planFormConfig, action: "createPlan" }) : undefined}

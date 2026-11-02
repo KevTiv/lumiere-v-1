@@ -49,6 +49,10 @@ use crate::{
 
 #[path = "rag_context.rs"]
 mod context;
+use super::rag_ui_actions::{
+    offer_prompt, release_proposals, split_candidate, validate_offers, UiActionOffer,
+    UiActionProposal,
+};
 pub use context::RagSource;
 use context::{build_user_prompt, format_retrieved_context, passage_to_ranked, RankedSource};
 
@@ -92,6 +96,9 @@ pub struct RagRequest {
     /// their content and current access are resolved by the document owner.
     #[serde(default)]
     pub guide_refs: Vec<GuideIdentity>,
+    /// BFF-owned native presentation catalog, never caller-provided authority.
+    #[serde(default)]
+    pub ui_action_offers: Vec<UiActionOffer>,
 }
 
 fn default_limit() -> u64 {
@@ -124,6 +131,8 @@ pub struct RagResponse {
     /// Claim-level support and calculation provenance for the gated answer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provenance: Option<TextAnswerProvenance>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ui_actions: Vec<UiActionProposal>,
 }
 
 fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
@@ -139,6 +148,7 @@ fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
         model: None,
         verification: None,
         provenance: None,
+        ui_actions: Vec::new(),
     }
 }
 
@@ -280,6 +290,8 @@ struct RagRelease {
     passages_disclosed: bool,
     /// The durable run must be recorded as failed, with this reason.
     run_failure: Option<&'static str>,
+    /// True only after answer admission, provenance and release checks succeeded.
+    answer_released: bool,
 }
 
 /// §7.3: the candidate is not an answer until the gate has judged it, its
@@ -360,6 +372,7 @@ async fn release_rag_answer(
     }
 
     let passages_disclosed = gated.released.is_some() && run_failure.is_none();
+    let answer_released = gated.released.is_some();
     let answer = gated
         .released
         .clone()
@@ -370,6 +383,7 @@ async fn release_rag_answer(
         provenance: gated.provenance,
         passages_disclosed,
         run_failure,
+        answer_released,
     })
 }
 
@@ -512,6 +526,8 @@ pub async fn post_rag(
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
     validate_guide_refs(&req.guide_refs)
+        .map_err(|error| AppError::BadRequest(error.to_string()))?;
+    validate_offers(&req.ui_action_offers)
         .map_err(|error| AppError::BadRequest(error.to_string()))?;
     let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
         .map_err(|error| AppError::Forbidden(error.to_string()))?;
@@ -784,8 +800,11 @@ pub async fn post_rag(
         LEGACY_SYSTEM_SUFFIX
     };
     let system_prompt = format!(
-        "{}\n\n{}\n\n{}",
-        agent.system_prompt, context_suffix, STRUCTURED_ANSWER_SUFFIX
+        "{}\n\n{}\n\n{}{}",
+        agent.system_prompt,
+        context_suffix,
+        STRUCTURED_ANSWER_SUFFIX,
+        offer_prompt(&req.ui_action_offers)
     );
 
     let mut allowed_supports = live_snapshots
@@ -884,6 +903,7 @@ pub async fn post_rag(
     let generated = program.final_content.clone().ok_or_else(|| {
         AppError::Internal("governed RAG generation produced no final content".into())
     })?;
+    let (answer_candidate, candidate_actions) = split_candidate(&generated);
 
     let review_admission = RoutedRagAdmission {
         store: &model_store,
@@ -908,7 +928,7 @@ pub async fn post_rag(
             snapshots: &live_snapshots,
             evidence: &authorized,
         },
-        &generated,
+        &answer_candidate,
         &review_admission,
         &provenance_sink,
         &evidence_access,
@@ -936,6 +956,12 @@ pub async fn post_rag(
     };
     // The durable run completes only after admission and provenance
     // persistence have succeeded and the release recheck has passed.
+    let ui_actions = release_proposals(
+        candidate_actions,
+        &req.ui_action_offers,
+        &live_snapshots,
+        release.answer_released && release.run_failure.is_none(),
+    );
     let (run_status, run_summary, run_error) = match release.run_failure {
         None => ("completed", Some(release.answer.clone()), None),
         Some(reason) => ("failed", None, Some(reason.to_string())),
@@ -1006,6 +1032,7 @@ pub async fn post_rag(
         model,
         verification,
         provenance,
+        ui_actions,
     }))
 }
 
@@ -1039,7 +1066,7 @@ fn rag_stream_events(response: &RagResponse) -> Vec<(&'static str, String)> {
 }
 
 fn rag_stream_metadata(response: &RagResponse) -> Value {
-    json!({
+    let mut metadata = json!({
         "sources": response.sources,
         "run_id": response.run_id,
         "agent_id": response.agent_id,
@@ -1050,7 +1077,11 @@ fn rag_stream_metadata(response: &RagResponse) -> Value {
         "guide_retrieval_degraded": response.guide_retrieval_degraded,
         "verification": response.verification,
         "provenance": response.provenance,
-    })
+    });
+    if !response.ui_actions.is_empty() {
+        metadata["ui_actions"] = json!(response.ui_actions);
+    }
+    metadata
 }
 
 #[cfg(test)]
@@ -1356,6 +1387,7 @@ mod tests {
             model: Some("test".into()),
             verification: Some(release.verification.clone()),
             provenance: Some(release.provenance.clone()),
+            ui_actions: Vec::new(),
         }
     }
 
@@ -1365,6 +1397,7 @@ mod tests {
     /// they may not, the whole JSON response and every SSE event are.
     fn assert_withheld(release: &RagRelease, response: &RagResponse, secrets: &[&str]) {
         assert!(release.answer.contains("withheld"), "{}", release.answer);
+        assert!(!release.answer_released);
         let mut json_value = serde_json::to_value(response).unwrap();
         let mut events = rag_stream_events(response);
         if release.passages_disclosed {
@@ -1816,8 +1849,17 @@ mod tests {
         for (verdict, claim) in scenarios {
             let checker = ScriptedChecker::new(Ok(verdict));
             let sink = MemorySink::ok();
+            let offers = vec![UiActionOffer {
+                capability_key: "sales.navigate".into(),
+                kind: crate::routes::rag_ui_actions::UiActionKind::Navigate,
+                label: "Open sales".into(),
+                entity_type: None,
+            }];
+            let mut candidate: Value = serde_json::from_str(&passage_candidate(claim)).unwrap();
+            candidate["ui_actions"] = json!([{ "capability_key": "sales.navigate" }]);
+            let (answer_candidate, proposals) = split_candidate(&candidate.to_string());
             let released = release(
-                &passage_candidate(claim),
+                &answer_candidate,
                 &evidence,
                 &[],
                 Some(&checker),
@@ -1825,7 +1867,17 @@ mod tests {
                 &access,
             )
             .await;
-            let response = response_of(&released, &evidence);
+            let mut response = response_of(&released, &evidence);
+            response.ui_actions = release_proposals(
+                proposals,
+                &offers,
+                &[],
+                released.answer_released && released.run_failure.is_none(),
+            );
+            assert_eq!(
+                response.ui_actions.len(),
+                usize::from(verdict == ClaimSupport::Supported)
+            );
             let json_value = serde_json::to_value(&response).unwrap();
 
             let events = rag_stream_events(&response);
@@ -1851,6 +1903,7 @@ mod tests {
                 "verification",
                 "provenance",
                 "retrieval_degraded",
+                "ui_actions",
             ] {
                 assert_eq!(metadata[field], json_value[field], "{field}");
             }

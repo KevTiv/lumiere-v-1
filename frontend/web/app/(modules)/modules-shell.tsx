@@ -2,7 +2,13 @@
 
 import { WorkspaceProfileProvider, useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
+import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-context"
+import { AssistantNativeFormProvider, useAssistantNativeFormController, useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
+import { ALPHA_ASSISTANT_CAPABILITIES, assistantActionHref, decodeAssistantAction, getAssistantCapability, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
 import {
   DashboardSidebar,
   DashboardWorkspace,
@@ -50,6 +56,7 @@ import {
   usePersistGatewayActionDrafts,
   useRejectAiActionDraft,
   useUpdateAiActionDraftParams,
+  fetchAiActionDraftPayload,
 } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useApprovalInboxCount } from "@lumiere/query-hooks/hooks/approvals"
 import { useRecordEvidenceContribution } from "@lumiere/query-hooks/hooks/ai-evidence-contributions"
@@ -64,6 +71,7 @@ import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
 import { useChatImportTasks } from "@/lib/chat-import-tasks"
 import { recordPageHref } from "@/lib/record-page-href"
+import { assistantPresentationReply, modelNativeChatActions, parseNativeChatActions, withNativeActionsMetadata } from "@/lib/assistant-native-actions"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
   useMailMessages,
@@ -129,6 +137,16 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
+  const router = useRouter()
+  const workspaceProfile = useWorkspaceProfile()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const navigationGuard = useContext(NavigationEditorContext)
+  const nativeForms = useAssistantNativeForms()
+  const actionScope = useMemo<AssistantActionScope | null>(() => identity && orgReady && operatingCompanyId
+    ? { actorId: identity, organizationId: String(organizationId), companyId: String(operatingCompanyId) } : null,
+  [identity, orgReady, organizationId, operatingCompanyId])
+  const allowedActionModules = useMemo(() => [...new Set(ALPHA_ASSISTANT_CAPABILITIES.map(capability => capability.module))]
+    .filter(moduleId => isWorkspaceSurfaceVisible(workspaceProfile, moduleId)), [workspaceProfile])
   const rag = useAiMemoryRag()
   const actionDraft = useAiActionDraft()
   const actorHistoryScope = assistantHistoryScope(identity, organizationId, operatingCompanyId)
@@ -144,6 +162,8 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const errorQuestion = useErpAiErrorQuestion()
   const activeScope = useRef<string | null>(null)
   activeScope.current = actorHistoryScope
+  const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules })
+  currentActionContext.current = { actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules }
   const workspaceScope = useMemo(
     () => resolveAiWorkspaceScope(selectedScope, route, selection),
     [selectedScope, route, selection],
@@ -199,7 +219,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       content: row.content,
       timestamp: dateFromStored(row.createDate ?? row.create_date),
       sources: parseStoredSources(row.sourcesJson ?? row.sources_json),
-      actions: parseStoredChatActions(row.metadata) as ChatAction[] | undefined,
+      actions: [...(parseStoredChatActions(row.metadata) ?? []), ...parseNativeChatActions(row.metadata, actionScope)] as ChatAction[],
       guides: parseStoredGuideReferences(row.metadata),
       metadata: {
         model: row.model ?? undefined,
@@ -212,7 +232,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         runId: parseStoredChatRunId(row.metadata),
       },
     }))
-  }, [messagesQuery.data, sessionKey, actorHistoryScope, orgId, operatingCompanyId])
+  }, [messagesQuery.data, sessionKey, actorHistoryScope, orgId, operatingCompanyId, actionScope])
 
   const ensureSession = useCallback(async () => {
     if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) throw new Error("Conversation context is unavailable")
@@ -255,7 +275,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           ui_context_json: JSON.stringify(args.uiContext ?? null),
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
-          metadata: withGuideReferencesMetadata(
+          metadata: withGuideReferencesMetadata(withNativeActionsMetadata(
             args.actions?.length || args.runId != null
               ? chatActionsToMetadata(
                   (args.actions ?? []).filter(
@@ -264,7 +284,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
                   ),
                   args.runId,
                 )
-              : null,
+              : null, args.actions),
             args.guides,
           ),
         }) },
@@ -321,12 +341,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     () => ({
       ...props.config,
       enableFileUpload: true,
+      actionDraftScopeKey: actorHistoryScope ?? undefined,
       guideLibraryHref: operatingCompanyId ? guideLibraryHref(String(operatingCompanyId), module ?? undefined) : undefined,
       onOpenGuide: (request: OpenGuideRequest) => {
         if (actorHistoryScope) setOpenGuide({ scope: actorHistoryScope, request })
       },
       onApproveActionDraft: async (draft: { draftId: number; companyId?: number }) => {
-        await approveActionDraft.mutateAsync({
+        return approveActionDraft.mutateAsync({
           draftId: draft.draftId,
           companyId: draft.companyId,
         })
@@ -335,7 +356,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         draft: { draftId: number; companyId?: number },
         reason?: string,
       ) => {
-        await rejectActionDraft.mutateAsync({
+        return rejectActionDraft.mutateAsync({
           draftId: draft.draftId,
           reason,
           companyId: draft.companyId,
@@ -347,12 +368,43 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         summary: string
         companyId?: number
       }) => {
-        await updateActionDraft.mutateAsync({
+        return updateActionDraft.mutateAsync({
           draftId: draft.draftId,
           paramsJson: JSON.stringify(draft.paramsJson),
           summary: draft.summary,
           companyId: draft.companyId,
         })
+      },
+      onRefreshActionDraft: async (draft: { draftId: number; companyId?: number }) => {
+        if (!operatingCompanyId || (draft.companyId != null && draft.companyId !== operatingCompanyId)) throw new Error("Draft scope changed")
+        return fetchAiActionDraftPayload(orgId, operatingCompanyId, draft.draftId)
+      },
+      onNativeAction: (proposed: AssistantAction) => {
+        const validate = () => {
+          const current = currentActionContext.current
+          const action = current.actionScope && decodeAssistantAction(proposed, current.actionScope, { allowedModules: current.allowedActionModules })
+          const capability = action && getAssistantCapability(action.capabilityKey)
+          if (!action || !capability || !current.actorHistoryScope) throw new Error(i18n.t("aiChat.native.scopeChanged"))
+          if (!current.permissionsReady || !current.checkPermission(capability.permission.resource, capability.permission.action).allowed) throw new Error(i18n.t("aiChat.native.denied"))
+          return { action, capability, scopeKey: current.actorHistoryScope }
+        }
+        validate()
+        const open = () => {
+          try {
+            const { action, capability, scopeKey } = validate()
+            const href = assistantActionHref(action)
+            if (!href) throw new Error(i18n.t("aiChat.native.formUnavailable"))
+            if (action.kind === "open_form") {
+              if (!nativeForms || !capability.tab) throw new Error(i18n.t("aiChat.native.formUnavailable"))
+              const result = nativeForms.requestForm({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, tabId: capability.tab, prompt: action.prompt })
+              if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.formBusy" : "aiChat.native.scopeChanged"))
+            }
+            router.push(href)
+            if (!props.docked) props.onDockToggle?.()
+          } catch (error) { toast.error(error instanceof Error ? error.message : i18n.t("aiChat.native.openFailed")) }
+        }
+        if (navigationGuard) navigationGuard.proceed(open)
+        else open()
       },
       onCiteSource: async ({ messageId, source }: { messageId: string; source: ChatMessageSourceRef }) => {
         if (!sessionKey || operatingCompanyId == null || operatingCompanyId <= 0 || source.passage_id == null) {
@@ -379,6 +431,12 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       sessionKey,
       updateActionDraft,
       module,
+      orgId,
+      nativeForms,
+      navigationGuard,
+      router,
+      props.docked,
+      props.onDockToggle,
     ],
   )
 
@@ -396,6 +454,24 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       const requestScope = historyScope
       const isCurrent = () => currentHistoryScope.current === requestScope
       const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
+      let presentationResolution = !questionGuide && !isAssistantErrorQuestion(userText) && actionScope
+        ? resolveAssistantActionRequest(userText, {
+          scope: actionScope,
+          module: workspaceScope.usesCurrentPage ? module : workspaceScope.pathname.split("/")[1],
+          selection: workspaceScope.selection,
+          allowedModules: allowedActionModules,
+        }) : undefined
+      if (presentationResolution?.kind === "action") {
+        const capability = getAssistantCapability(presentationResolution.action.capabilityKey)
+        if (!capability || !permissionsReady || !checkPermission(capability.permission.resource, capability.permission.action).allowed) {
+          presentationResolution = { kind: "clarify", reason: "unavailable", candidates: [] }
+        }
+      }
+      const presentation = presentationResolution ? assistantPresentationReply(presentationResolution, (key) => i18n.t(key)) : undefined
+      if (presentation) {
+        void persistExchange({ userText, assistantText: presentation.content, sources: presentation.sources, uiContext, actions: presentation.actions })
+        return presentation
+      }
       const turn = await coordinateAssistantTurn({
         isCurrent,
         answer: async () => {
@@ -416,13 +492,19 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
           // Never fall back after dispatch: a missing reply does not prove no run occurred.
           return readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)))
         },
-        drafts: !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
+        drafts: !questionGuide && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
       })
       if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[] }
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
       const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
       const guides = out?.guides
       const draftActions = turn.drafts.kind === "ready" ? turn.drafts.value : []
+      const nativeActions = actionScope ? modelNativeChatActions(out?.ui_actions ?? [], actionScope, userText)
+        .filter(action => {
+          const capability = action.nativeAction && getAssistantCapability(action.nativeAction.capabilityKey)
+          return capability && allowedActionModules.includes(capability.module) && permissionsReady && checkPermission(capability.permission.resource, capability.permission.action).allowed
+        }) : []
+      const actions = [...draftActions, ...nativeActions]
       const failureText = (phase: "answer" | "draft", failure: TurnFailure) => i18n.t(`aiChat.turn.${phase}.${failure}`)
       const parts = [turn.answer.kind === "ready" ? turn.answer.value.answer : failureText("answer", turn.answer.kind)]
       if (turn.drafts.kind === "ready") {
@@ -432,11 +514,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       void persistExchange({
         userText, assistantText: content, sources, uiContext, guides,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
-        actions: draftActions.length ? draftActions : undefined, runId: out?.run_id,
+        actions: actions.length ? actions : undefined, runId: out?.run_id,
       })
-      return { content, runId: out?.run_id, sources, guides, actions: draftActions.length ? draftActions : undefined }
+      return { content, runId: out?.run_id, sources, guides, actions: actions.length ? actions : undefined }
     },
-    [orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange],
+    [orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
@@ -547,10 +629,17 @@ function ModulesContent({
   const messagesVisible = isWorkspaceSurfaceVisible(workspaceProfile, "messages")
   const journalVisible = isWorkspaceSurfaceVisible(workspaceProfile, "journal")
   const notebookVisible = isWorkspaceSurfaceVisible(workspaceProfile, "notebook")
-  const { organizationId } = useErpSession()
+  const { organizationId, identity } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
+  const nativeFormScope = assistantHistoryScope(identity, organizationId, operatingCompanyId)
+  const nativeForms = useAssistantNativeFormController(nativeFormScope)
+  useEffect(() => {
+    const status = nativeForms.outcome?.status
+    if (status === "opened") toast.info(i18n.t("aiChat.native.formOpened"))
+    else if (status) toast.warning(i18n.t(status === "busy" ? "aiChat.native.formBusy" : "aiChat.native.formUnavailable"))
+  }, [nativeForms.outcome])
   const approvalInboxCountQuery = useApprovalInboxCount(
     orgId,
     orgReady && operatingCompanyId != null && operatingCompanyId > 0,
@@ -568,6 +657,7 @@ function ModulesContent({
   }, [])
 
   return (
+    <AssistantNativeFormProvider value={nativeForms}>
     <ErpAiChatControllerProvider open={openAiChat}>
       <DashboardWorkspace
         forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
@@ -628,6 +718,7 @@ function ModulesContent({
         {children}
       </DashboardWorkspace>
     </ErpAiChatControllerProvider>
+    </AssistantNativeFormProvider>
   )
 }
 

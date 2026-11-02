@@ -50,6 +50,12 @@ export type AiRagSource = {
   fetched_at?: string
 }
 
+/** Optional model-selected presentation proposals. Scope and prompts are bound by the host. */
+export interface AiRagUiAction {
+  capability_key: string
+  record_id?: string
+}
+
 export interface AiGuideReference {
   guideId: string
   revision: number
@@ -289,6 +295,7 @@ export function useAiMemoryRag() {
       return (await r.json()) as {
         answer: string
         sources: AiRagSource[]
+        ui_actions?: AiRagUiAction[]
         related_guides?: AiRelatedGuide[]
         guide_retrieval_degraded?: boolean
         run_id?: number

@@ -2670,6 +2670,7 @@ function SalesClientLoaded({
       {savedQuotationNotice && <p role="status" className="mx-4 mb-3 rounded-lg border p-4 text-sm">{t('sales.workspace.savedOpenQuotation', { defaultValue: 'Quotation saved. Open it from Quotations & orders to add products.' })}</p>}
       <ModuleWorkView
         organizationId={organizationId}
+        assistantFormBlocked={quickActionForm !== null || partialDeliveryPicking !== null || cancelPickingTarget !== null || creditReturnOrderId !== null || openReturnForm || chatterTarget !== null}
         config={config}
         dashboardContent={<CompanyModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}

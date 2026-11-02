@@ -29,6 +29,7 @@ test.describe("MVP AI action draft workflow", { tag: "@p0" }, () => {
     const approveCard = page.getByTestId(`ai-action-draft-card-${approveDraftId}`)
     await expect(approveCard).toBeVisible({ timeout: 30_000 })
     await approveCard.getByTestId("ai-action-draft-reviewed").click()
+    await expect(approveCard.getByTestId("ai-action-draft-approve")).toBeEnabled()
 
     const [approveRes] = await Promise.all([
       page.waitForResponse(
@@ -53,6 +54,7 @@ test.describe("MVP AI action draft workflow", { tag: "@p0" }, () => {
 
     const rejectCard = page.getByTestId(`ai-action-draft-card-${rejectDraftId}`)
     await expect(rejectCard).toBeVisible({ timeout: 30_000 })
+    await expect(rejectCard.getByTestId("ai-action-draft-reject")).toBeEnabled()
 
     const [rejectRes] = await Promise.all([
       page.waitForResponse(

@@ -15,6 +15,9 @@ use stdb_auth::FieldAccessContext;
 use stdb_client::StdbClient;
 
 pub(super) enum Source {
+    ActionDraft {
+        row: Value,
+    },
     Allocations {
         parent_exists: bool,
         rows: Vec<Value>,
@@ -29,6 +32,7 @@ pub(super) enum Revocation {
     None,
     ResourcePermission,
     AllocationFields,
+    DraftFields,
     Membership,
     Company,
     InactiveProfile,
@@ -52,6 +56,8 @@ pub(super) async fn fixture(source: Source, revocation: Revocation) -> Fixture {
     let allocations = matches!(&source, Source::Allocations { .. });
     let base_permissions = if allocations {
         vec!["hr_expense:read"]
+    } else if matches!(&source, Source::ActionDraft { .. }) {
+        vec!["ai_action_draft:read", "ai_action_draft:write"]
     } else {
         vec!["contact:create"]
     };
@@ -88,7 +94,14 @@ pub(super) async fn fixture(source: Source, revocation: Revocation) -> Fixture {
             } else if sql.contains(" FROM field_permission ") {
                 if after && matches!(revocation,Revocation::AllocationFields) {
                     vec![json!({"id":1,"organization_id":42,"subject":null,"role_id":1,"resource":"expense-allocations","action":"read","allowed_fields":["billable"]})]
+                } else if after && matches!(revocation,Revocation::DraftFields) {
+                    vec![json!({"id":1,"organization_id":42,"subject":null,"role_id":1,"resource":"ai_action_draft","action":"read","allowed_fields":["status"]})]
                 } else { vec![] }
+            } else if sql.contains(" FROM ai_action_draft ") {
+                assert_eq!(token, "Bearer actor-token");
+                assert!(sql.contains("organization_id = 42 AND company_id = 7 AND id = 9 LIMIT 2"));
+                consumed.store(true, Ordering::SeqCst);
+                match source.as_ref() { Source::ActionDraft {row} => vec![row.clone()], _=>panic!("wrong source") }
             } else if sql.contains(" FROM hr_expense_allocation ") {
                 assert_eq!(token, "Bearer actor-token");
                 assert!(sql.contains("organization_id = 42 AND company_id = 7 AND expense_id = 9"));

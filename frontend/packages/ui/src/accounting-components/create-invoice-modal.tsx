@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../componen
 import { InvoiceCustomFieldInput } from "./invoice-custom-field-input"
 import { runtimeCustomFieldCreateIssues } from "../forms/custom-field-create-admission"
 import { invoiceCustomFieldError, invoiceCustomFieldSupported, invoiceCustomFieldMessages, type InvoiceCustomField, type InvoiceCustomValue } from "./invoice-custom-fields"
+import { AssistantFormProposals } from "../components/assistant-form-proposals"
 
 const emptyProfile: InvoicePersonalizationProfile = { logoUrl: "", accent: "teal", email: "", phone: "", website: "", notice: "", terms: "", paymentInstructions: "", footer: "" }
 const emptySeller: InvoiceDocumentSnapshot["seller"] = { name: "", address: [], taxId: "", registrationNumber: "", email: "", phone: "", website: "" }
@@ -137,6 +138,7 @@ interface ReleasedCreateInvoiceModalProps {
   profileVersionIds?: InvoiceDocumentSnapshot["profileVersionIds"]
   seller?: InvoiceDocumentSnapshot["seller"]
   personalizationState?: ModuleDataState
+  assistantRequest?: { prompt: string; scopeKey: string }
 }
 
 function ReleasedCreateInvoiceModal({
@@ -144,7 +146,7 @@ function ReleasedCreateInvoiceModal({
   journalOptions, partnerOptions, counterpartAccountOptions, lineAccountOptions,
   taxOptions = [], productOptions = [], paymentTermOptions = [], currencyOptions = [], organizationId,
   formId = kind === "bill" ? "new-bill" : "new-invoice",
-  profile, profileVersionIds, seller, personalizationState,
+  profile, profileVersionIds, seller, personalizationState, assistantRequest,
 }: ReleasedCreateInvoiceModalProps) {
   const { t } = useTranslation()
   const { confirm: confirmDiscard, dialog: discardDialog } = useConfirmDialog()
@@ -377,6 +379,24 @@ function ReleasedCreateInvoiceModal({
       <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
       <div ref={scrollBodyRef} data-testid="create-invoice-scroll-body" className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
       {error ? <div className="mb-4 space-y-2 rounded-md border bg-destructive/5 p-3 text-sm [overflow-wrap:anywhere]"><p role="alert" className="text-destructive">{error}</p>{onExplainError ? <Button type="button" variant="outline" size="sm" onClick={() => onExplainError(error)}>{t("common.explainError", { defaultValue: "Explain this error" })}</Button> : null}</div> : null}
+      {assistantRequest ? <AssistantFormProposals key={`${assistantRequest.scopeKey}:${formId}`} scopeKey={assistantRequest.scopeKey} prompt={assistantRequest.prompt} companyId={Number(companyId)} entityType="account_move" formId={formId} blocked={locked || saving || companyMismatch || !personalizationReady} fields={[
+        { name: "partnerId", label: kind === "bill" ? t("accounting.workflowGuide.vendor", { defaultValue: "Vendor" }) : t("accounting.workflowGuide.customer", { defaultValue: "Customer" }), type: "select", required: true, options: partnerOptions },
+        { name: "invoiceDate", label: t("accounting.authoring.invoiceDate", { defaultValue: "Invoice date" }), type: "date", required: true },
+        { name: "dueDate", label: t("accounting.authoring.dueDate", { defaultValue: "Due date" }), type: "date", required: false },
+        { name: "paymentTermId", label: t("accounting.authoring.paymentTerms", { defaultValue: "Payment terms" }), type: "select", required: false, options: paymentTermOptions },
+        { name: "reference", label: t("accounting.authoring.reference", { defaultValue: "Reference" }), type: "text", required: false },
+        { name: "paymentReference", label: t("accounting.authoring.paymentReference", { defaultValue: "Payment reference" }), type: "text", required: false },
+        { name: "notes", label: t("accounting.authoring.notes", { defaultValue: "Notes" }), type: "textarea", required: false },
+      ]} onApply={(values) => {
+        if (typeof values.partnerId === "string") setPartnerId(values.partnerId)
+        if (typeof values.invoiceDate === "string") setInvoiceDate(values.invoiceDate)
+        if (typeof values.dueDate === "string") setDueDate(values.dueDate)
+        if (typeof values.paymentTermId === "string") setPaymentTermId(values.paymentTermId)
+        if (typeof values.reference === "string") setReference(values.reference)
+        if (typeof values.paymentReference === "string") setPaymentReference(values.paymentReference)
+        if (typeof values.notes === "string") setNotes(values.notes)
+        setFormEdited(true)
+      }} /> : null}
       <FinanceReviewWorkspace previewTabTestId="create-invoice-preview-toggle" editor={
       <div className="min-w-0">
       {companyMismatch ? <p role="alert" className="mb-4 rounded-md border p-3 text-sm">This draft belongs to company #{String(draftCompanyId)}. Switch back to continue. Your entries and any previous action are preserved.</p> : null}

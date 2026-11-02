@@ -1,8 +1,11 @@
 /** Map RAG / activity source identifiers to in-app ERP routes (metadata only). */
 
+import { moduleTabHref } from "./record-links"
+import { parseStrictU64, type ScalarId } from "./u64"
+
 export type AiSourceLinkInput = {
   entity_type?: string
-  entity_id?: string | number
+  entity_id?: ScalarId
   source_kind?: string
   source_key?: string
 }
@@ -11,6 +14,12 @@ type ModuleTabTarget = {
   kind: "module_tab"
   module: string
   tab: string
+  /** Bounded Alpha projection; the resource's workflow owner stays unchanged. */
+  navigationModule?: string
+  /** Existing dedicated record page, where the module list is not a record view. */
+  recordPrefix?: string
+  /** Exact-record list when the normal destination is a custom, unfiltered view. */
+  recordTab?: string
 }
 
 type PathPrefixTarget = {
@@ -24,13 +33,17 @@ type SourceRouteTarget = ModuleTabTarget | PathPrefixTarget
 /** Known persisted source kinds and live entity types mapped to ERP routes. */
 const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   // Persisted evidence source kinds.
-  product: { kind: "module_tab", module: "inventory", tab: "products" },
+  product: { kind: "module_tab", module: "inventory", navigationModule: "products", tab: "products" },
+  product_category: { kind: "module_tab", module: "inventory", navigationModule: "products", tab: "product-categories" },
   contact: { kind: "module_tab", module: "crm", tab: "contacts" },
-  document: { kind: "module_tab", module: "documents", tab: "documents" },
+  lead: { kind: "module_tab", module: "crm", tab: "leads" },
+  opportunity: { kind: "module_tab", module: "crm", tab: "opportunities" },
+  document: { kind: "module_tab", module: "documents", tab: "documents", recordPrefix: "/documents" },
   article: { kind: "module_tab", module: "documents", tab: "knowledge-base" },
   knowledge_article: { kind: "module_tab", module: "documents", tab: "knowledge-base" },
-  invoice: { kind: "module_tab", module: "accounting", tab: "invoices" },
-  bill: { kind: "module_tab", module: "accounting", tab: "bills" },
+  // The invoice/bill custom lists do not apply id filters; the ledger does.
+  invoice: { kind: "module_tab", module: "accounting", tab: "invoices", recordTab: "journal-entries" },
+  bill: { kind: "module_tab", module: "accounting", tab: "bills", recordTab: "journal-entries" },
   proposal: { kind: "path_prefix", prefix: "/proposals" },
 
   // Activity memory (context_worker entity_type)
@@ -41,12 +54,27 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   hr_leave: { kind: "module_tab", module: "hr", tab: "leaves" },
   iot_telemetry: { kind: "module_tab", module: "iot", tab: "iot-telemetry" },
   account_move: { kind: "module_tab", module: "accounting", tab: "journal-entries" },
+  account_payment: { kind: "module_tab", module: "accounting", tab: "payments" },
+  hr_expense: { kind: "module_tab", module: "expenses", tab: "expenses" },
+  expense: { kind: "module_tab", module: "expenses", tab: "expenses" },
+  hr_expense_sheet: { kind: "module_tab", module: "expenses", tab: "expense-sheets", recordPrefix: "/expenses/reports" },
+  financial_report: { kind: "module_tab", module: "reports", tab: "reports" },
+  subscription: { kind: "module_tab", module: "subscriptions", tab: "subscriptions", recordPrefix: "/subscriptions" },
+  fleet_vehicle: { kind: "module_tab", module: "fleet", tab: "fleet-vehicles", recordPrefix: "/fleet/vehicles" },
+  calendar_event: { kind: "module_tab", module: "calendar", tab: "calendar", recordPrefix: "/calendar/events" },
   mrp_production: { kind: "module_tab", module: "manufacturing", tab: "orders" },
   purchase_order: { kind: "module_tab", module: "purchasing", tab: "orders" },
   purchase_requisition: { kind: "module_tab", module: "purchasing", tab: "requisitions" },
   stock_picking: { kind: "module_tab", module: "inventory", tab: "transfers" },
-  stock_quant: { kind: "module_tab", module: "inventory", tab: "stock" },
-  stock_production_serial: { kind: "module_tab", module: "inventory", tab: "serials" },
+  stock_quant: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "stock" },
+  stock_production_serial: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "serials" },
+  stock_production_lot: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "lots" },
+  stock_move: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "stock-moves" },
+  stock_location: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "locations" },
+  warehouse: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "warehouses" },
+  inventory_adjustment: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "adjustments" },
+  stock_cycle_count: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "cycle-counts" },
+  replenishment_rule: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "replenishment" },
 }
 
 function normalizeSourceKey(raw?: string): string | undefined {
@@ -56,23 +84,23 @@ function normalizeSourceKey(raw?: string): string | undefined {
   return trimmed.replace(/-/g, "_")
 }
 
-function sourceRecordId(input: AiSourceLinkInput): string | undefined {
-  if (input.entity_id != null && String(input.entity_id).trim() !== "") {
-    return String(input.entity_id).trim()
-  }
-  if (input.source_key != null) {
-    const separator = input.source_key.indexOf(":")
-    const sourceId = separator >= 0 ? input.source_key.slice(separator + 1).trim() : ""
-    if (sourceId) return sourceId
-  }
-  return undefined
+function sourceTarget(key?: string): SourceRouteTarget | undefined {
+  return key && Object.hasOwn(SOURCE_ROUTE_MAP, key) ? SOURCE_ROUTE_MAP[key] : undefined
+}
+
+function sourceRecordId(input: AiSourceLinkInput): { supplied: boolean; id?: string } {
+  const separator = input.source_key?.indexOf(":") ?? -1
+  const value = input.entity_id ?? (separator >= 0 ? input.source_key?.slice(separator + 1) : undefined)
+  if (value == null) return { supplied: false }
+  // Route identities are decimal scalars, not formatted form input or rounded JS numbers.
+  if (typeof value === "string" && !/^\d+$/.test(value)) return { supplied: true }
+  const id = parseStrictU64(value)
+  return { supplied: true, id: id != null && id > 0n ? id.toString() : undefined }
 }
 
 /** Build a module tab href consistent with `useModuleTab` (`?tab=` when not dashboard). */
 export function buildModuleTabHref(module: string, tab: string, defaultTab = "dashboard"): string {
-  const base = `/${module.replace(/^\/+/, "")}`
-  if (!tab || tab === defaultTab) return base
-  return `${base}?tab=${encodeURIComponent(tab)}`
+  return moduleTabHref(module, tab, undefined, defaultTab)
 }
 
 function resolveTarget(target: SourceRouteTarget, recordId?: string): string | undefined {
@@ -80,13 +108,18 @@ function resolveTarget(target: SourceRouteTarget, recordId?: string): string | u
     if (!recordId) return target.prefix
     return `${target.prefix}/${encodeURIComponent(recordId)}`
   }
-  return buildModuleTabHref(target.module, target.tab)
+  if (recordId && target.recordPrefix) return `${target.recordPrefix}/${recordId}`
+  return moduleTabHref(
+    target.navigationModule ?? target.module,
+    recordId ? target.recordTab ?? target.tab : target.tab,
+    recordId ? { id: recordId } : undefined,
+  )
 }
 
 /** Owning module tab for a canonical table name; undefined for path-prefixed or unknown resources. */
 export function resolveErpResourceTarget(resource: string): { module: string; tab: string } | undefined {
   const key = normalizeSourceKey(resource)
-  const target = key ? SOURCE_ROUTE_MAP[key] : undefined
+  const target = sourceTarget(key)
   return target?.kind === "module_tab" ? { module: target.module, tab: target.tab } : undefined
 }
 
@@ -98,12 +131,12 @@ export function resolveErpResourceTarget(resource: string): { module: string; ta
 export function resolveAiSourceHref(input: AiSourceLinkInput): string | undefined {
   const sourceKind = normalizeSourceKey(input.source_kind)
   const entityKey = normalizeSourceKey(input.entity_type)
-  const recordId = sourceRecordId(input)
+  const record = sourceRecordId(input)
+  if (record.supplied && !record.id) return undefined
 
   const target =
-    (sourceKind ? SOURCE_ROUTE_MAP[sourceKind] : undefined) ??
-    (entityKey ? SOURCE_ROUTE_MAP[entityKey] : undefined)
+    sourceTarget(sourceKind) ?? sourceTarget(entityKey)
 
   if (!target) return undefined
-  return resolveTarget(target, recordId)
+  return resolveTarget(target, record.id)
 }

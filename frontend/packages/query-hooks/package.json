@@ -11,6 +11,7 @@
     "./subscription-query": "./src/subscription-query.ts",
     "./semantic-operation-outcome": "./src/semantic-operation-outcome.ts",
     "./ai-ui-context": "./src/ai-ui-context.ts",
+    "./assistant-actions": "./src/assistant-actions.ts",
     "./action-draft-intent": "./src/action-draft-intent.ts",
     "./erp-ai-selection-context": "./src/erp-ai-selection-context.tsx",
     "./hooks/crm": "./src/hooks/crm-public.ts",
@@ -21,7 +22,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/hooks/*.test.ts"
+    "test": "node --import tsx --test src/assistant-actions.test.ts src/hooks/*.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

@@ -424,6 +424,14 @@
       "last90Days": "90 derniers jours",
       "last180Days": "180 derniers jours",
       "yearToDate": "Depuis le début de l’année"
+    },
+    "assistantForm": {
+      "title": "Préparer avec l’IA",
+      "review": "Les suggestions sont des propositions. Vérifiez-les et appliquez-les avant d’enregistrer.",
+      "request": "Votre demande",
+      "unavailable": "Suggestions indisponibles. Remplissez le formulaire ou vérifiez les prérequis.",
+      "suggest": "Proposer des valeurs",
+      "apply": "Appliquer les suggestions"
     }
   },
   "navigation": {

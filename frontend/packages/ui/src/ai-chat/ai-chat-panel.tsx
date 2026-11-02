@@ -35,6 +35,7 @@ import {
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
+import { AiNativeActionCard } from "./ai-native-action-card"
 import { Dialog, DialogContent, DialogTitle } from "../components/dialog"
 import { AssistantGuideCard } from "./assistant-guide-viewer"
 import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guide-types"
@@ -511,8 +512,8 @@ export function AIChatPanel({
   const handleApproveDraft = useCallback(
     async (draft: ChatActionDraftPayload) => {
       if (!config?.onApproveActionDraft) return
-      await config.onApproveActionDraft(draft)
-      patchDraftInMessages(draft.draftId, { status: "approved" })
+      const observed = await config.onApproveActionDraft(draft)
+      if (observed) patchDraftInMessages(draft.draftId, observed)
     },
     [config, patchDraftInMessages],
   )
@@ -520,8 +521,8 @@ export function AIChatPanel({
   const handleRejectDraft = useCallback(
     async (draft: ChatActionDraftPayload, reason?: string) => {
       if (!config?.onRejectActionDraft) return
-      await config.onRejectActionDraft(draft, reason)
-      patchDraftInMessages(draft.draftId, { status: "rejected" })
+      const observed = await config.onRejectActionDraft(draft, reason)
+      if (observed) patchDraftInMessages(draft.draftId, observed)
     },
     [config, patchDraftInMessages],
   )
@@ -529,14 +530,18 @@ export function AIChatPanel({
   const handleUpdateDraft = useCallback(
     async (draft: ChatActionDraftPayload) => {
       if (!config?.onUpdateActionDraft) return
-      await config.onUpdateActionDraft(draft)
-      patchDraftInMessages(draft.draftId, {
-        paramsJson: draft.paramsJson,
-        summary: draft.summary,
-      })
+      const observed = await config.onUpdateActionDraft(draft)
+      if (observed) patchDraftInMessages(draft.draftId, observed)
     },
     [config, patchDraftInMessages],
   )
+
+  const handleRefreshDraft = useCallback(async (draft: ChatActionDraftPayload) => {
+    if (!config?.onRefreshActionDraft) throw new Error("Draft readback is unavailable")
+    const observed = await config.onRefreshActionDraft(draft)
+    if (active.current) patchDraftInMessages(draft.draftId, observed)
+    return observed
+  }, [config, patchDraftInMessages])
 
   const handleCiteSource = useCallback(
     async (messageId: string, sourceKey: string, source: ChatMessageSourceRef) => {
@@ -832,6 +837,7 @@ export function AIChatPanel({
                               <AiActionDraftCard
                                 key={action.id}
                                 draft={action.draft}
+                                scopeKey={config?.actionDraftScopeKey}
                                 onApprove={
                                   config?.onApproveActionDraft ? handleApproveDraft : undefined
                                 }
@@ -841,7 +847,10 @@ export function AIChatPanel({
                                 onUpdateDraft={
                                   config?.onUpdateActionDraft ? handleUpdateDraft : undefined
                                 }
+                                onRefresh={config?.onRefreshActionDraft ? handleRefreshDraft : undefined}
                               />
+                            ) : action.type === "native" && action.nativeAction ? (
+                              <AiNativeActionCard key={action.id} action={action.nativeAction} label={action.label} onOpen={config?.onNativeAction} />
                             ) : null,
                           )}
                         </div>

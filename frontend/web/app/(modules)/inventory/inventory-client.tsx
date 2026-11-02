@@ -3891,6 +3891,7 @@ function InventoryClientLoaded({
       {/* A record selection must not outlive its actor, organization, or company. */}
       <ModuleView
         key={`${identity ?? 'anonymous'}:${sessionOrganizationId ?? 'no-organization'}:${organizationId}:${operatingCompanyId}`}
+        assistantFormBlocked={quickActionForm !== null || editProductRow !== null || editWarehouseRow !== null || partialTransferPicking !== null || assignPickingId !== null || supplierLineProductId !== null || packagingProductId !== null}
         config={config}
         data={data}
         dataLoading={{
