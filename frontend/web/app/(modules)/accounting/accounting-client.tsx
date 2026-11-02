@@ -757,6 +757,7 @@ function AccountingClientReady({
   const [invoiceSheetRecord, setInvoiceSheetRecord] = useState<Record<string, unknown> | null>(null)
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
+  const [assistantFormRequest, setAssistantFormRequest] = useState<{ tabId: string; prompt: string; scopeKey: string } | null>(null)
   const [showCreateBill, setShowCreateBill] = useState(false)
   const [readinessAction, setReadinessAction] = useState<AccountingReadinessAction | undefined>()
   const [pendingAccountingAction, setPendingAccountingAction] = useState<{
@@ -5695,6 +5696,32 @@ function AccountingClientReady({
       </section> : null}
       {companyAvailable ? <ModuleWorkView
         organizationId={organizationId}
+        assistantFormBlocked={quickActionForm !== null || showCreateInvoice || showCreateBill || paymentOperationsLocked || invoiceSheetRecord !== null}
+        onAssistantFormScopeChange={() => { setShowCreateInvoice(false); setShowCreateBill(false); setQuickActionForm(null); setAssistantFormRequest(null) }}
+        assistantCreate={{
+          tabIds: ["invoices", "bills", "journal-entries"],
+          open: (tabId, prompt, scopeKey) => {
+            if (!checkPermission("account_move", "create").allowed) return "denied"
+            if (tabId === "journal-entries") {
+              const state = mergeModuleStates([allMovesRead.state, accountsRead.state, journalsRead.state, saleOrdersRead.state])
+              if (state.status === "loading") return "loading"
+              if (state.status !== "ready") return state.status === "denied" ? "denied" : "unavailable"
+              setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })
+              setAssistantFormRequest(prompt && scopeKey ? { tabId, prompt, scopeKey } : null)
+              return "opened"
+            }
+            if (accountingSetupDataState.status === "loading" || manualInvoiceReadState.status === "loading") return "loading"
+            const action = tabId === "invoices" ? "invoice" : "bill"
+            if (manualInvoiceReadState.status !== "ready" || !readinessByAction[action].isReady) {
+              setReadinessAction(action)
+              return "unavailable"
+            }
+            if (action === "invoice") openInvoiceCreate()
+            else openBillCreate()
+            setAssistantFormRequest(prompt && scopeKey ? { tabId, prompt, scopeKey } : null)
+            return "opened"
+          },
+        }}
         config={config}
         data={data}
         dataLoading={dataLoading}
@@ -6035,10 +6062,11 @@ function AccountingClientReady({
       {/* Create invoice */}
       <CreateInvoiceModal
         open={showCreateInvoice}
+        assistantRequest={assistantFormRequest?.tabId === "invoices" ? assistantFormRequest : undefined}
         onExplainError={explainError}
         kind="invoice"
         companyId={operatingCompanyId}
-        onClose={() => setShowCreateInvoice(false)}
+        onClose={() => { setShowCreateInvoice(false); setAssistantFormRequest(null) }}
         organizationId={organizationId}
         profile={invoicePersonalization.profile}
         profileVersionIds={invoicePersonalization.profileVersionIds}
@@ -6060,10 +6088,11 @@ function AccountingClientReady({
       {/* Create bill (same form, different move type) */}
       <CreateInvoiceModal
         open={showCreateBill}
+        assistantRequest={assistantFormRequest?.tabId === "bills" ? assistantFormRequest : undefined}
         onExplainError={explainError}
         kind="bill"
         companyId={operatingCompanyId}
-        onClose={() => setShowCreateBill(false)}
+        onClose={() => { setShowCreateBill(false); setAssistantFormRequest(null) }}
         organizationId={organizationId}
         journalOptions={manualInvoiceOptions.bill.journals}
         currencyOptions={invoiceCurrencyOptions}
@@ -6083,6 +6112,8 @@ function AccountingClientReady({
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
+        draftKey={`company:${operatingCompanyId}`}
+        aiAssist={assistantFormRequest?.tabId === "journal-entries" ? { companyId: Number(operatingCompanyId), entityType: "account_move", initialPrompt: assistantFormRequest.prompt } : undefined}
         renderPreview={(values) => renderAccountingAuthoringPreview(values, quickActionForm?.form ?? journalEntryFormConfig)}
         closeOnSubmit={false}
         showSubmitSuccessToast={false}

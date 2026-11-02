@@ -888,6 +888,7 @@ function DocumentsClientLoaded({
               },
             },
             createForm: knowledgeArticleFormConfig,
+            createPermission: { resource: "knowledge_article", action: "create" as const },
             entityConfig: withTableActions(
               tab.entityConfig,
               [
@@ -1520,6 +1521,7 @@ function DocumentsClientLoaded({
         />
       ) : null}
       <ModuleView
+        assistantFormBlocked={quickActionForm !== null || templateDesigner !== null || documentRowAction !== null || completeModalRows !== null || ackModalRows !== null}
         config={{
           ...config,
           tabs: config.tabs.map((tab) =>

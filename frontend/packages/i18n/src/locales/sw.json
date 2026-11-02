@@ -422,6 +422,14 @@
       "last90Days": "Siku 90 zilizopita",
       "last180Days": "Siku 180 zilizopita",
       "yearToDate": "Kuanzia mwanzo wa mwaka hadi leo"
+    },
+    "assistantForm": {
+      "title": "Andaa kwa AI",
+      "review": "Mapendekezo haya ni ya kukaguliwa. Yakague na uyatumie kabla ya kuhifadhi.",
+      "request": "Ombi lako",
+      "unavailable": "Mapendekezo hayapatikani. Jaza fomu au kagua mahitaji ya usanidi.",
+      "suggest": "Pendekeza thamani",
+      "apply": "Tumia mapendekezo"
     }
   },
   "navigation": {

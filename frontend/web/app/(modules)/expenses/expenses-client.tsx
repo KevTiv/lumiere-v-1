@@ -204,6 +204,7 @@ function ExpensesClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ action: "createExpense" | "createSheet" } | null>(null)
+  const [assistantPrompt, setAssistantPrompt] = useState<string | undefined>()
   const [rowAction, setRowAction] = useState<
     { tabId: "expenses"; row: Record<string, unknown> } | null
   >(null)
@@ -624,6 +625,7 @@ function ExpensesClientLoaded({
             return {
               ...tab,
               createForm: expenseSheetFormConfig,
+              createPermission: { resource: "hr_expense_sheet", action: "create" as const },
               entityConfig: addCsvToolbar(withReportLink(tab.entityConfig), [
                 {
                   id: "csv-sheets",
@@ -1090,11 +1092,14 @@ function ExpensesClientLoaded({
       ) : null}
       <ModuleWorkView
         organizationId={organizationId}
+        assistantFormBlocked={quickActionForm !== null || workflowForm !== null || rowAction !== null || expenseCreate.attempt !== null}
+        onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined) }}
         config={config}
         dashboardContent={<CompanyModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataState={dataState}
-        onOpenCreateForm={(tabId) => {
+        onOpenCreateForm={(tabId, assistant) => {
+          setAssistantPrompt(assistant?.prompt)
           if (tabId === "expenses") openExpenseCreate()
           else if (tabId === "expense-sheets") setQuickActionForm({ action: "createSheet" })
         }}
@@ -1117,7 +1122,8 @@ function ExpensesClientLoaded({
         closeOnSubmit={quickActionForm?.action === "createSheet"}
         showSubmitSuccessToast={quickActionForm?.action === "createSheet"}
         draft={quickActionForm?.action === "createSheet"}
-        draftKey={reportContinuation ? `report-for-expense-${rowId(reportContinuation.row)}` : undefined}
+        draftKey={`company:${operatingCompanyId}:${reportContinuation ? `report-for-expense-${rowId(reportContinuation.row)}` : "new"}`}
+        aiAssist={assistantPrompt ? { companyId: Number(operatingCompanyId), entityType: quickActionForm?.action === "createSheet" ? "hr_expense_sheet" : "hr_expense", initialPrompt: assistantPrompt } : undefined}
         submissionDisabled={quickActionForm?.action === "createExpense" && expenseCreate.attempt !== null}
         submitError={retainedExpenseMessage}
         onValuesChange={quickActionForm?.action === "createExpense" ? expenseCreate.reattach : undefined}

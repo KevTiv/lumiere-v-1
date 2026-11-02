@@ -611,6 +611,14 @@
       "last90Days": "Last 90 days",
       "last180Days": "Last 180 days",
       "yearToDate": "Year to date"
+    },
+    "assistantForm": {
+      "title": "Prepare with AI",
+      "review": "Suggestions are proposals. Review and apply them before saving.",
+      "request": "Your request",
+      "unavailable": "Suggestions are unavailable. Complete the native form or check its required setup.",
+      "suggest": "Suggest values",
+      "apply": "Apply suggestions"
     }
   },
   "navigation": {
@@ -3800,7 +3808,10 @@
         "email": "Enter a valid email address.",
         "format": "Use the configured format.",
         "invalidPattern": "The configured validation pattern is invalid."
-      }
+      },
+      "invoiceDate": "Invoice date",
+      "reference": "Reference",
+      "notes": "Notes"
     },
     "assetSchedule": {
       "generateFailed": "The saved schedule could not be confirmed. Refresh before you try again.",
@@ -13562,6 +13573,26 @@
     },
     "errorHelp": {
       "explain": "Explain this error"
+    },
+    "native": {
+      "opening": "Opening…",
+      "reviewHint": "Review inputs and use the existing ERP controls to save or approve changes.",
+      "openFailed": "This action could not be opened. Check the current company, access and required setup.",
+      "formReady": "Open the native form to review your request. Nothing has been saved.",
+      "workflowReady": "Open the exact record to review its available workflow steps. No business action has run.",
+      "destinationReady": "Open the requested ERP destination.",
+      "clarify": {
+        "ambiguous_target": "Which module or record do you mean? Include the module name and record number.",
+        "record_required": "Which record should I open? Include its number, or select it in the ERP first.",
+        "unsupported_action": "That action is not available through this Alpha assistant. Use the existing module controls to review supported options.",
+        "scope_required": "Choose your organization and company before opening this action.",
+        "unavailable": "This destination is unavailable in the current Alpha workspace."
+      },
+      "scopeChanged": "The company or signed-in user changed. Ask again in the current workspace.",
+      "denied": "You do not currently have access to this action.",
+      "formUnavailable": "The native form is unavailable. Check access, company setup and required reference data.",
+      "formBusy": "Finish or close the current form before opening another.",
+      "formOpened": "The native form is open. Review its inputs before saving."
     }
   },
   "aiHarness": {

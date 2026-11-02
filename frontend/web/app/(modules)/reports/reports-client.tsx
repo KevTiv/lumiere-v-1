@@ -217,6 +217,7 @@ function ReportsClientLoaded({
   const periodRequested = searchParams?.get("source") === "period-close"
   const periodContext = useMemo(() => readPeriodReportContext(searchParams ?? new URLSearchParams()), [searchParams])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string; reportType?: string } | null>(null)
+  const [assistantPrompt, setAssistantPrompt] = useState<string | undefined>()
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
   const [editTemplateId, setEditTemplateId] = useState<string | null>(null)
@@ -1286,6 +1287,20 @@ function ReportsClientLoaded({
       {validPeriodContext ? <ReportPeriodNotice state={periodState} context={validPeriodContext} /> : null}
       <ModuleView
         key={reportActionScope}
+        assistantFormBlocked={quickActionForm !== null || editReportOpen || editTemplateOpen || metricValuesOpen || recordRunOpen || createDashboardOpen || createWidgetOpen || addWidgetOpen}
+        onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined) }}
+        assistantCreate={{
+          tabIds: ["reports"],
+          open: (_tabId, prompt) => {
+            if (!checkPermission("financial_report", "create").allowed || !checkPermission("financial_report", "write").allowed) return "denied"
+            const state = moduleQueryState(reportsQuery)
+            if (state.status === "loading") return "loading"
+            if (state.status !== "ready" || !operatingCompanyId || !currentUser?.id) return "unavailable"
+            setQuickActionForm({ form: financialReportFormConfig, action: "generateReport" })
+            setAssistantPrompt(prompt)
+            return "opened"
+          },
+        }}
         config={config}
         dashboardContent={<ReportStart reportTypes={validPeriodContext ? ["trialBalance"] : undefined} canGenerate={Boolean(operatingCompanyId && currentUser?.id && checkPermission("financial_report", "create").allowed && checkPermission("financial_report", "write").allowed)} sourceState={moduleQueryState(reportsQuery)} onGenerate={(reportType) => setQuickActionForm({ form: financialReportFormConfig, action: "generateReport", reportType })}><details><summary className="cursor-pointer py-3 text-sm font-medium">{t("reports.workspace.overview")}</summary><ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reports, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections.filter((section) => section.id !== "rep-quick-actions-section")} /></details></ReportStart>}
         data={data}
@@ -1304,6 +1319,8 @@ function ReportsClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionConfig}
+        draftKey={`company:${operatingCompanyId}`}
+        aiAssist={assistantPrompt ? { companyId: Number(operatingCompanyId), entityType: "financial_report", initialPrompt: assistantPrompt } : undefined}
         submissionDisabled={quickActionBlocked}
         submitError={quickActionBlocked ? t("reports.forms.sourceUnavailable", { defaultValue: "Required report records could not be verified. Retry their source list before saving. Your entries are retained." }) : null}
         formLeadingActions={quickActionBlocked && "onRetry" in quickActionSource && quickActionSource.onRetry ? <Button type="button" variant="outline" onClick={quickActionSource.onRetry}>{t("common.retry", { defaultValue: "Retry" })}</Button> : undefined}

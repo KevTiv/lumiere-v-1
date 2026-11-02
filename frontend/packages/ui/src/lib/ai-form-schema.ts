@@ -72,7 +72,7 @@ function validationForField(field: FormField): AiSafeFormValidation | undefined 
 export function serializeAiFormSchema(config: FormConfig): AiSafeFormField[] {
   return config.sections.flatMap((section) =>
     section.fields
-      .filter((field) => AI_SUPPORTED_FIELD_TYPES.has(field.type))
+      .filter((field) => AI_SUPPORTED_FIELD_TYPES.has(field.type) && !field.disabled)
       .map((field) => {
         const safeField: AiSafeFormField = {
           name: field.name,

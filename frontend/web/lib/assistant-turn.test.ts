@@ -96,3 +96,20 @@ test("malformed related-guide metadata cannot hide an independently prepared dra
     assert.deepEqual(result, { answer: { kind: "outcome_unknown" }, drafts: { kind: "ready", value: [42] } })
   }
 })
+
+test("JSON and completed SSE preserve validated native proposals without model authority", async () => {
+  const ui_actions = [{ capability_key: "sales.order.open", record_id: "9007199254740993" }, { capability_key: "accounting.invoice.create" }]
+  const raw = { answer: "Review the order or prepare an invoice.", sources: [], ui_actions }
+  assert.deepEqual(assistantAnswer(raw).ui_actions, ui_actions)
+  const reply = await readAssistantStream(sse(complete.replace('{"sources":["source"],"run_id":7}', JSON.stringify(raw))), data => assistantAnswerMetadata(JSON.parse(data)))
+  assert.deepEqual(reply.ui_actions, ui_actions)
+  assert.equal(reply.ui_actions?.[0]?.record_id, "9007199254740993")
+})
+
+test("invalid optional UI proposals cannot hide a verified answer or grant execution", () => {
+  for (const ui_actions of [[null], [{ capability_key: "call_reducer", params: {} }], [{ capability_key: "sales.order.open", record_id: 9007199254740992 }], [{ capability_key: "accounting.invoice.create", href: "/projects" }]]) {
+    const reply = assistantAnswer({ answer: "Admitted answer", sources: [], ui_actions })
+    assert.equal(reply.answer, "Admitted answer")
+    assert.deepEqual(reply.ui_actions, [])
+  }
+})

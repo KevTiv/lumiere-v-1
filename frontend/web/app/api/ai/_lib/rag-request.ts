@@ -9,6 +9,7 @@ import type { ApiSession } from '@/lib/api-session'
 import type { JsonObject } from './route-helpers'
 import { boundedInteger, positiveInteger, validateCompanyScope } from './route-helpers'
 import { parseRagGuideReferences, type RagGuideReference } from './guide-references'
+import { serverRagUiActionOffers, type RagUiActionOffer } from './rag-ui-actions'
 
 export const MAX_INCLUDE_TYPES = 8
 
@@ -44,6 +45,7 @@ export interface RagPayload {
   include_types?: string[]
   ui_context?: unknown
   guide_refs?: RagGuideReference[]
+  ui_action_offers: RagUiActionOffer[]
 }
 
 export type RagPrepareResult =
@@ -97,6 +99,7 @@ export async function prepareRagPayload(params: {
     limit,
     stdb_token: session.stdbToken,
     identity_hex: session.identityHex,
+    ui_action_offers: serverRagUiActionOffers(session),
   }
   if (include_types?.length) payload.include_types = include_types
   if (ui_context) payload.ui_context = ui_context

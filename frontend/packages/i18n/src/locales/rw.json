@@ -422,6 +422,14 @@
       "last90Days": "Iminsi 90 iheruka",
       "last180Days": "Iminsi 180 iheruka",
       "yearToDate": "Kuva umwaka utangiye kugeza uyu munsi"
+    },
+    "assistantForm": {
+      "title": "Tegura ukoresheje AI",
+      "review": "Suzuma ibyifuzo mbere yo kubishyira muri fomu no kubika.",
+      "request": "Icyo usaba",
+      "unavailable": "Ibyifuzo ntibiboneka. Uzuza fomu cyangwa urebe ibisabwa.",
+      "suggest": "Tanga ibyifuzo",
+      "apply": "Koresha ibyifuzo"
     }
   },
   "navigation": {

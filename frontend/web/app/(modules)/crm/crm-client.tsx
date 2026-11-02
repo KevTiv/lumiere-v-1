@@ -2703,6 +2703,7 @@ function CrmClientLoaded({
       {focusedRecord && <EntityRecordSheet open={focusedLiveRecord != null} onOpenChange={(open) => !open && setFocusedRecord(null)}
         record={focusedLiveRecord} config={focusedRecord.kind === "lead" ? leadRecordSheet : focusedRecord.kind === "opportunity" ? opportunityRecordSheet : contactRecordSheet} />}
       <ModuleView
+        assistantFormBlocked={quickActionForm !== null || workflowModal !== null || focusedRecord !== null}
         config={config}
         dashboardContent={<CompanyModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
         data={data}

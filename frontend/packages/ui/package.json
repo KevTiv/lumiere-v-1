@@ -125,6 +125,7 @@
     "./globals.css": "./src/styles/globals.css",
     "./app-theme.css": "./src/styles/app-theme.css",
     "./postcss.config": "./postcss.config.mjs",
+    "./forms/navigation-guard-context": "./src/forms/navigation-guard-context.ts",
     "./forms/use-unsaved-changes-guard": "./src/forms/use-unsaved-changes-guard.ts",
     "./lib/rbac-context": "./src/lib/rbac-context.tsx",
     "./lib/*": "./src/lib/*.ts",

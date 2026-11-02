@@ -2814,6 +2814,7 @@ function PurchasingClientLoaded({
       )}
       <ModuleWorkView
         organizationId={organizationId}
+        assistantFormBlocked={quickActionForm !== null || billOrderId !== null || operationDialogRequest !== null || configurationActionRequest !== null || intakeReasonRequest !== null || blanketActionRequest !== null || chatterTarget !== null}
         config={configWithOperations}
         dashboardContent={<CompanyModuleInsights input={{ module: "purchasing", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}

@@ -1,5 +1,6 @@
 // AI Chat Panel Types - Similar to v0/Zed IDE ACP
 
+import type { AssistantAction } from "@lumiere/query-hooks/assistant-actions"
 import type { GuideReference, OpenGuideRequest } from "./assistant-guide-types"
 
 export type CitationKind = "live" | "passage" | "activity" | "web"
@@ -65,22 +66,23 @@ export interface ChatActionDraftPayload {
   elevated: boolean
   status?: "pending" | "approved" | "rejected" | "failed" | "expired"
   executionError?: string | null
-  executionRecordId?: number | null
+  executionRecordId?: number | string | null
   executionRecordHref?: string
   expiresAt?: string | null
   sourceQuery?: string | null
   companyId?: number
-  workflowInstanceId?: number
+  workflowInstanceId?: number | string
 }
 
 export interface ChatAction {
   id: string
-  type: "code" | "file" | "command" | "link" | "draft"
+  type: "code" | "file" | "command" | "link" | "draft" | "native"
   label: string
   content?: string
   language?: string
   filePath?: string
   onClick?: () => void
+  nativeAction?: AssistantAction
   draft?: ChatActionDraftPayload
 }
 
@@ -115,9 +117,13 @@ export interface AIChatConfig {
   maxMessages?: number
   enableHistory?: boolean
   enableFileUpload?: boolean
-  onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
-  onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<void>
-  onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<void>
+  /** Stable actor/organization/company identity for unresolved action recovery. */
+  actionDraftScopeKey?: string
+  onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
+  onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<ChatActionDraftPayload | void>
+  onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
+  onNativeAction?: (action: AssistantAction) => Promise<void> | void
+  onRefreshActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
   /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
   onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>
   /** Opens a prepared preview or reauthorizes a saved guide in the host workspace. */

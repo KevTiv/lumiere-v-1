@@ -148,6 +148,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           return {
             ...tab,
             createForm: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create"),
+            createPermission: { resource: "calendar_event", action: "create" as const },
             entityConfig: tab.entityConfig
               ? withInlineEdits(tab.entityConfig, {
                   name: {
@@ -324,6 +325,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     <>
       {actionError ? <p role="alert" className="mb-3 break-words text-sm text-destructive">{actionError}</p> : null}
       <ModuleView
+        assistantFormBlocked={quickActionForm !== null}
         config={config}
         data={data}
         dataState={dataState}

@@ -10,7 +10,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
 
-import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { httpResponseError, responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import { mutateAiActionDraftWithReadback } from "./ai-action-draft-result"
 
 function draftsQueryKey(organizationId: number, companyId?: number) {
   return ["ai-action-drafts", String(organizationId), companyId != null ? String(companyId) : "all"] as const
@@ -32,8 +34,8 @@ function invalidateDraftQueries(
 
 export type AiActionDraftRow = {
   id: number | string
-  organizationId?: number
-  companyId?: number
+  organizationId?: number | string
+  companyId?: number | string
   status?: string
   reducerName?: string
   paramsJson?: string
@@ -60,12 +62,12 @@ export type AiActionDraftPayload = {
   elevated: boolean
   status?: "pending" | "approved" | "rejected" | "failed" | "expired"
   executionError?: string | null
-  executionRecordId?: number | null
+  executionRecordId?: number | string | null
   executionRecordHref?: string
   expiresAt?: string | null
   sourceQuery?: string | null
   companyId?: number
-  workflowInstanceId?: number
+  workflowInstanceId?: number | string
 }
 
 /** Raw JSON returned by the AI gateway HTTP endpoint. */
@@ -99,7 +101,7 @@ export function normalizeGatewayActionDraft(
   wire: GatewayActionDraftWireDto,
 ): GatewayActionDraft {
   return {
-    draftId: Number(wire.draft_id),
+    draftId: safeDraftId(wire.draft_id),
     reducerName: wire.reducer_name,
     paramsJson: normalizeWireParams(wire.params_json),
     confidence: wire.confidence,
@@ -162,27 +164,34 @@ function timestampToIso(raw?: number | string | null): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
-function parseDraftMetadata(raw?: string | null): { workflowInstanceId?: number } {
+function parseDraftMetadata(raw?: string | null): { workflowInstanceId?: number | string } {
   if (!raw?.trim()) return {}
   try {
     const parsed = JSON.parse(raw) as { workflow_instance_id?: number | string }
-    const workflowInstanceId = Number(parsed.workflow_instance_id)
-    if (!Number.isFinite(workflowInstanceId) || workflowInstanceId <= 0) return {}
-    return { workflowInstanceId }
+    const id = parseStrictU64(parsed.workflow_instance_id)
+    if (id == null || id <= 0n) return {}
+    return { workflowInstanceId: id <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(id) : String(id) }
   } catch {
     return {}
   }
 }
 
+function safeDraftId(raw: unknown): number {
+  if (typeof raw === "string" && !/^[1-9]\d*$/.test(raw)) throw new Error("Draft identity is not supported safely")
+  const id = parseStrictU64(raw)
+  if (id == null || id === 0n || id > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Draft identity is not supported safely")
+  return Number(id)
+}
+
 export function aiActionDraftRowToPayload(row: AiActionDraftRow): AiActionDraftPayload {
-  const draftId = Number(row.id)
+  const draftId = safeDraftId(row.id)
   const reducerName = row.reducerName ?? ""
-  const executionRecordIdRaw = row.executionRecordId
-  const executionRecordId =
-    executionRecordIdRaw != null && executionRecordIdRaw !== ""
-      ? Number(executionRecordIdRaw)
-      : null
-  const status = (row.status ?? "pending") as AiActionDraftPayload["status"]
+  const parsedRecordId = parseStrictU64(row.executionRecordId)
+  const executionRecordId = parsedRecordId != null && parsedRecordId > 0n
+    ? parsedRecordId <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(parsedRecordId) : String(parsedRecordId)
+    : null
+  const status = row.status ?? "pending"
+  if (!["pending", "approved", "rejected", "failed", "expired"].includes(status)) throw new Error("Invalid draft status")
   const { workflowInstanceId } = parseDraftMetadata(row.metadata ?? null)
 
   return {
@@ -193,21 +202,13 @@ export function aiActionDraftRowToPayload(row: AiActionDraftRow): AiActionDraftP
     confidence: Number(row.confidence ?? 0),
     warnings: parseWarnings(row.warningsJson),
     elevated: Boolean(row.elevated),
-    status,
+    status: status as AiActionDraftPayload["status"],
     executionError: row.executionError ?? null,
-    executionRecordId:
-      executionRecordId != null && Number.isFinite(executionRecordId)
-        ? executionRecordId
-        : null,
-    executionRecordHref: resolveActionDraftRecordHref(
-      reducerName,
-      executionRecordId != null && Number.isFinite(executionRecordId)
-        ? executionRecordId
-        : null,
-    ),
+    executionRecordId,
+    executionRecordHref: status === "approved" ? resolveActionDraftRecordHref(reducerName, executionRecordId) : undefined,
     expiresAt: timestampToIso(row.expiresAt),
     sourceQuery: row.sourceQuery ?? null,
-    companyId: Number(row.companyId ?? 0) || undefined,
+    companyId: row.companyId != null ? safeDraftId(row.companyId) : undefined,
     workflowInstanceId,
   }
 }
@@ -219,9 +220,9 @@ export async function fetchAiActionDraftInboxRows(): Promise<AiActionDraftRow[]>
   return j.data ?? []
 }
 
-export function useAiActionDraftInbox(organizationId: number, enabled = true) {
+export function useAiActionDraftInbox(organizationId: number, enabled = true, actorScopeKey?: string) {
   return useQuery({
-    queryKey: aiActionDraftInboxQueryKey(organizationId),
+    queryKey: [...aiActionDraftInboxQueryKey(organizationId), actorScopeKey ?? "session"],
     queryFn: fetchAiActionDraftInboxRows,
     enabled: enabled && organizationId > 0,
     refetchInterval: 30_000,
@@ -272,19 +273,50 @@ export function useExpireAiActionDrafts(organizationId: number, companyId: numbe
   })
 }
 
+/** Read an exact current row; historic message metadata never supplies execution authority. */
+export async function fetchAiActionDraftPayload(
+  organizationId: number,
+  companyId: number,
+  draftId: number,
+): Promise<AiActionDraftPayload> {
+  safeDraftId(organizationId); safeDraftId(companyId); safeDraftId(draftId)
+  const r = await apiFetch(`/api/query/ai-action-drafts/${draftId}?company_id=${companyId}`, { cache: "no-store" })
+  if (!r.ok) throw await httpResponseError(r)
+  return exactAiActionDraftPayload(await r.json(), { organizationId, companyId, draftId })
+}
+
+export function exactAiActionDraftPayload(value: unknown, scope: { organizationId: number; companyId: number; draftId: number }): AiActionDraftPayload {
+  const row = value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as { data?: AiActionDraftRow }).data : undefined
+  if (!row || Array.isArray(row)
+    || safeDraftId(row.id) !== scope.draftId
+    || safeDraftId(row.organizationId) !== scope.organizationId
+    || safeDraftId(row.companyId) !== scope.companyId) throw new Error("Draft readback does not match the current scope")
+  return aiActionDraftRowToPayload(row)
+}
+
+function requireDraftCompany(companyId: number, requestedCompanyId?: number) {
+  safeDraftId(companyId)
+  if (requestedCompanyId != null && requestedCompanyId !== companyId) throw new Error("The company changed. Reopen the draft before continuing.")
+}
+
 export function useApproveAiActionDraft(organizationId: number, companyId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: number | { draftId: number; companyId?: number }) => {
-      const draftId = typeof args === "number" ? args : args.draftId
-      const { urlPath, init } = stdbBffCommandPost("approve_ai_action_draft", {
-        companyId,
-        draftId,
+      const draftId = safeDraftId(typeof args === "number" ? args : args.draftId)
+      requireDraftCompany(companyId, typeof args === "number" ? undefined : args.companyId)
+      return mutateAiActionDraftWithReadback({
+        expectedStatus: "approved",
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("approve_ai_action_draft", { companyId, draftId })
+          const r = await apiFetch(urlPath, init)
+          if (!r.ok) throw await httpResponseError(r)
+        },
+        read: () => fetchAiActionDraftPayload(organizationId, companyId, draftId),
       })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => {
+    onSettled: () => {
       invalidateDraftQueries(qc, organizationId, companyId)
       void qc.invalidateQueries({ queryKey: ["tasks", String(organizationId)] })
     },
@@ -294,51 +326,45 @@ export function useApproveAiActionDraft(organizationId: number, companyId: numbe
 export function useRejectAiActionDraft(organizationId: number, companyId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: {
-      draftId: number
-      reason?: string
-      companyId?: number
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("reject_ai_action_draft", {
-        companyId,
-        draftId: args.draftId,
-        reason: args.reason?.trim() || "Rejected by user",
+    mutationFn: async (args: { draftId: number; reason?: string; companyId?: number }) => {
+      requireDraftCompany(companyId, args.companyId)
+      const draftId = safeDraftId(args.draftId)
+      return mutateAiActionDraftWithReadback({
+        expectedStatus: "rejected",
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("reject_ai_action_draft", {
+            companyId, draftId, reason: args.reason?.trim() || "Rejected by user",
+          })
+          const r = await apiFetch(urlPath, init)
+          if (!r.ok) throw await httpResponseError(r)
+        },
+        read: () => fetchAiActionDraftPayload(organizationId, companyId, draftId),
       })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => {
-      invalidateDraftQueries(qc, organizationId, companyId)
-    },
+    onSettled: () => invalidateDraftQueries(qc, organizationId, companyId),
   })
 }
 
 export function useUpdateAiActionDraftParams(organizationId: number, companyId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: {
-      draftId: number
-      paramsJson: string
-      summary?: string
-      companyId?: number
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_ai_action_draft_params", {
-        companyId,
-        draftId: args.draftId,
-        params: stdbParamsToJson(
-          {
-            paramsJson: args.paramsJson,
-            summary: args.summary ?? null,
-          },
-          "UpdateAiActionDraftParamsParams",
-        ),
+    mutationFn: async (args: { draftId: number; paramsJson: string; summary?: string; companyId?: number }) => {
+      requireDraftCompany(companyId, args.companyId)
+      const draftId = safeDraftId(args.draftId)
+      return mutateAiActionDraftWithReadback({
+        expectedStatus: "pending",
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("update_ai_action_draft_params", {
+            companyId, draftId,
+            params: stdbParamsToJson({ paramsJson: args.paramsJson, summary: args.summary ?? null }, "UpdateAiActionDraftParamsParams"),
+          })
+          const r = await apiFetch(urlPath, init)
+          if (!r.ok) throw await httpResponseError(r)
+        },
+        read: () => fetchAiActionDraftPayload(organizationId, companyId, draftId),
       })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
     },
-    onSuccess: () => {
-      invalidateDraftQueries(qc, organizationId, companyId)
-    },
+    onSettled: () => invalidateDraftQueries(qc, organizationId, companyId),
   })
 }
 

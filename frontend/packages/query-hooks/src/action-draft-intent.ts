@@ -14,19 +14,16 @@ export type ActionDraftChatAction = {
     elevated: boolean
     status?: "pending" | "approved" | "rejected" | "failed"
     executionError?: string | null
-    executionRecordId?: number | null
+    executionRecordId?: number | string | null
+    executionRecordHref?: string
     companyId?: number
   }
 }
 
-/** Heuristic: user wants the assistant to propose an ERP mutation draft. */
+/** Legacy draft opt-in. Native explicit requests are resolved by assistant-actions first. */
 export function looksLikeActionDraftRequest(text: string): boolean {
   const trimmed = text.trim()
-  if (!trimmed) return false
-  if (/@create\b/i.test(trimmed)) return true
-  return /\b(create|add|draft|schedule|open|new)\b[\s\S]{0,40}\b(task|todo|order|purchase|quote|sale)\b/i.test(
-    trimmed,
-  )
+  return /^@create\s+(?:sales? order|purchase order)\b/i.test(trimmed)
 }
 
 export function persistedDraftsToChatActions(

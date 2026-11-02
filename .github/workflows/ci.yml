@@ -504,6 +504,9 @@ jobs:
       - name: Assistant document modal and dedicated-page browser regressions
         run: pnpm --dir web test:e2e:assistant-guides
 
+      - name: Assistant native actions browser regressions
+        run: pnpm --dir web test:e2e:assistant-actions
+
       - name: Upload frontend browser diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
