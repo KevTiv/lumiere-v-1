@@ -417,6 +417,21 @@ test("workbook source admissions are retained and malformed or missing handles r
   }
 })
 
+test("server inspection rejects non-object response envelopes", async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    for (const value of [null, [], "file checked", 42, true]) {
+      globalThis.fetch = async () => Response.json(value)
+      await assert.rejects(
+        () => readImportFile(new File(["name\nAcme"], "source.csv")),
+        /invalid result/,
+      )
+    }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("rejects refresh connections, defined-name formulas and worksheet extension cells", async () => {
   for (const parts of [
     {

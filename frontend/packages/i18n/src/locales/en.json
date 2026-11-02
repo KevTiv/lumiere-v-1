@@ -3663,6 +3663,7 @@
       "scopeUnavailable": "Document links or ownership could not be verified. Refresh before attaching a file.",
       "empty": "No supplier documents linked to this bill.",
       "file": "Receipt or supplier document (PDF up to 16 MiB; PNG, JPEG or WebP up to 20 MiB)",
+      "imageLimits": "Images must be non-animated, at most 4096 pixels per side and 4 megapixels.",
       "invalidFile": "Choose a non-empty PDF up to 16 MiB, or PNG, JPEG or WebP up to 20 MiB.",
       "uploading": "Attaching…",
       "attach": "Attach to this bill",

@@ -1838,6 +1838,7 @@
       "title": "Vérification des factures reçues"
     },
     "billDocuments": {
+      "imageLimits": "Les images ne doivent pas être animées et doivent être limitées à 4 096 pixels par côté et à 4 mégapixels.",
       "title": "Documents et reçus fournisseurs"
     },
     "authoring": {

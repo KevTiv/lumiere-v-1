@@ -26,6 +26,19 @@ export type ParsedImportFile = {
   policyVersion?: string
 }
 
+/** Wire fields remain untrusted until the complete response is validated. */
+type ImportInspectionPayload = {
+  companyId?: unknown
+  sourceAdmissionId?: unknown
+  csvText?: unknown
+  headers?: unknown
+  rows?: unknown
+  format?: unknown
+  sourceSha256?: unknown
+  policyVersion?: unknown
+  sheetName?: unknown
+}
+
 type ZipEntry = {
   compressionMethod: number
   flags: number
@@ -646,8 +659,11 @@ export async function readImportFile(
     }
     throw new Error(message)
   }
-  const result = (await response.json()) as Record<string, unknown>
+  const result: ImportInspectionPayload | null = await response.json()
   if (
+    typeof result !== "object" ||
+    result === null ||
+    Array.isArray(result) ||
     (companyId !== undefined && result.companyId !== companyId) ||
     (result.sourceAdmissionId !== undefined &&
       (typeof result.sourceAdmissionId !== "string" ||

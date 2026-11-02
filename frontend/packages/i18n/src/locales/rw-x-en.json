@@ -37,6 +37,7 @@
       "description": "Ohereza file ya CSV, ugenzure ihuzwa ry’inkingi ryatanzwe na AI, urebe imirongo yahinduwe, hanyuma uyinjize muri ERP.",
       "stepUpload": "Ohereza file",
       "uploadHint": "Hitamo file ya CSV UTF-8 kugira ngo utangire.",
+      "safetyPassed": "File yagenzuwe. Suzuma uko inkingi zihuzwa mbere yo kwinjiza amakuru.",
       "downloadErrors": "Manura report y’amakosa (CSV)",
       "bundleModeHint": "Iyi CSV isa n’irimo order n’imirongo yazo. Banza uhuze amakuru y’imitwe hanyuma uhuze ay’imirongo.",
       "lineMappingTitle": "Inkingi z’imirongo ya order",

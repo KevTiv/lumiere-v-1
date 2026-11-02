@@ -1838,6 +1838,7 @@
       "title": "Ukaguzi wa ankara zilizopokelewa"
     },
     "billDocuments": {
+      "imageLimits": "Picha zisizo na uhuishaji pekee, zenye pikseli zisizozidi 4096 kwa kila upande na megapikseli 4 kwa jumla.",
       "title": "Nyaraka na risiti za wasambazaji"
     },
     "authoring": {
