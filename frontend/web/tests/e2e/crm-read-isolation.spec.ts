@@ -901,15 +901,32 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<TenantF
     branchContext = await browser.newContext({ baseURL: e2eBaseUrl() })
     const branchPage = await branchContext.newPage()
     const branchPageErrors: string[] = []
+    const branchConsoleErrors: string[] = []
+    const branchServerErrors: string[] = []
     const recordBranchPageError = (error: Error) => branchPageErrors.push(error.stack ?? error.message)
+    const recordBranchConsoleError = (message: import("@playwright/test").ConsoleMessage) => {
+      if (message.type() === "error") branchConsoleErrors.push(message.text())
+    }
+    const recordBranchServerError = (response: import("@playwright/test").Response) => {
+      if (response.status() >= 500) branchServerErrors.push(`${response.status()} ${new URL(response.url()).pathname}`)
+    }
     branchPage.on("pageerror", recordBranchPageError)
+    branchPage.on("console", recordBranchConsoleError)
+    branchPage.on("response", recordBranchServerError)
     try {
       await signIn(branchPage, branchEmail, E2E_PASSWORD)
     } catch (error) {
       console.error("[crm-reader-sign-in] Browser errors:", JSON.stringify(branchPageErrors))
+      console.error("[crm-reader-sign-in] Console errors:", JSON.stringify(branchConsoleErrors))
+      console.error("[crm-reader-sign-in] Server errors:", JSON.stringify(branchServerErrors))
+      const renderedErrors = await branchPage.getByText(/application error|internal server error|unhandled runtime error/i)
+        .evaluateAll((elements) => elements.map((element) => element.parentElement?.outerHTML.slice(0, 2000)))
+      console.error("[crm-reader-sign-in] Rendered errors:", JSON.stringify(renderedErrors))
       throw error
     } finally {
       branchPage.off("pageerror", recordBranchPageError)
+      branchPage.off("console", recordBranchConsoleError)
+      branchPage.off("response", recordBranchServerError)
     }
 
     return {
