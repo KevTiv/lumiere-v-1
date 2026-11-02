@@ -1,9 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { createLumiereApiClient, registerLumiereApiClient } from "@lumiere/api-client"
+import { HttpResponseError } from "@lumiere/api-client/response-error"
 
 import {
   aiActionDraftRowToPayload,
   exactAiActionDraftPayload,
+  fetchAiActionDraftPayload,
   normalizeGatewayActionDraftResponse,
   resolvePersistedActionDrafts,
   type GatewayActionDraft,
@@ -124,4 +127,97 @@ test("unsafe numeric identities are never rounded into a different draft or resu
   assert.equal(payload.executionRecordId, null)
   assert.equal(payload.executionRecordHref, undefined)
   assert.equal(aiActionDraftRowToPayload({ id: 41, metadata: '{"workflow_instance_id":"9007199254740993"}' }).workflowInstanceId, "9007199254740993")
+})
+
+test("exact draft readback uses the registered authoritative route and never a nested collection URL", async () => {
+  const realFetch = globalThis.fetch
+  const requests: Array<{
+    url: string
+    cache?: RequestCache
+    credentials?: RequestCredentials
+  }> = []
+  registerLumiereApiClient(
+    createLumiereApiClient({ baseUrl: "http://api.test", credentials: "omit" }),
+  )
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      url: String(input),
+      cache: init?.cache,
+      credentials: init?.credentials,
+    })
+    // Mirror the real API route distinction that the CI trace exposed.
+    if (
+      new URL(String(input)).pathname !==
+      "/api/authoritative/ai-action-drafts/41"
+    )
+      return new Response(null, { status: 404 })
+    return new Response(
+      JSON.stringify({
+        data: {
+          id: "41",
+          organizationId: "1",
+          companyId: "3",
+          status: "pending",
+          reducerName: "create_task",
+          paramsJson: '{"name":"Reviewed task"}',
+        },
+      }),
+    )
+  }
+  try {
+    const observed = await fetchAiActionDraftPayload(1, 3, 41)
+    assert.equal(observed.draftId, 41)
+    assert.equal(observed.status, "pending")
+    assert.deepEqual(requests, [
+      {
+        url: "http://api.test/api/authoritative/ai-action-drafts/41?companyId=3",
+        cache: "no-store",
+        credentials: "omit",
+      },
+    ])
+  } finally {
+    globalThis.fetch = realFetch
+    registerLumiereApiClient(null)
+  }
+})
+
+test("unavailable or foreign-company exact readback never falls back to collection data", async () => {
+  const realFetch = globalThis.fetch
+  const requests: string[] = []
+  registerLumiereApiClient(
+    createLumiereApiClient({ baseUrl: "http://api.test", credentials: "omit" }),
+  )
+  try {
+    globalThis.fetch = async (input) => {
+      requests.push(String(input))
+      return new Response(null, { status: 404 })
+    }
+    await assert.rejects(
+      fetchAiActionDraftPayload(1, 3, 41),
+      (error) => error instanceof HttpResponseError && error.status === 404,
+    )
+    globalThis.fetch = async (input) => {
+      requests.push(String(input))
+      return new Response(
+        JSON.stringify({
+          data: {
+            id: "41",
+            organizationId: "1",
+            companyId: "4",
+            status: "pending",
+          },
+        }),
+      )
+    }
+    await assert.rejects(fetchAiActionDraftPayload(1, 3, 41), /current scope/)
+    assert.deepEqual(
+      requests,
+      Array(2).fill(
+        "http://api.test/api/authoritative/ai-action-drafts/41?companyId=3",
+      ),
+    )
+  } finally {
+    globalThis.fetch = realFetch
+    registerLumiereApiClient(null)
+  }
 })

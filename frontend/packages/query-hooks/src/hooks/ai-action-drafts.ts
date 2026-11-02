@@ -280,7 +280,7 @@ export async function fetchAiActionDraftPayload(
   draftId: number,
 ): Promise<AiActionDraftPayload> {
   safeDraftId(organizationId); safeDraftId(companyId); safeDraftId(draftId)
-  const r = await apiFetch(`/api/query/ai-action-drafts/${draftId}?company_id=${companyId}`, { cache: "no-store" })
+  const r = await apiFetch(`/api/authoritative/ai-action-drafts/${draftId}?companyId=${companyId}`, { cache: "no-store" })
   if (!r.ok) throw await httpResponseError(r)
   return exactAiActionDraftPayload(await r.json(), { organizationId, companyId, draftId })
 }

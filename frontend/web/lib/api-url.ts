@@ -14,6 +14,7 @@
 
 const GATEWAY_PREFIXES = [
   '/api/query/',
+  '/api/authoritative/',
   '/api/operations/',
   '/api/compat/reducer/',
   '/api/auth/signin',

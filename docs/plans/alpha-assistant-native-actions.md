@@ -104,6 +104,11 @@ its native allowlist and approval owners. The readback path now obtains the
 exact draft status/result instead of converting a successful HTTP reply into an
 optimistic approved badge.
 
+Preflight and recovery use the existing authoritative resource endpoint,
+`/api/authoritative/ai-action-drafts/{id}?companyId=...`, with caching disabled.
+The same path supports BFF and direct gateway forwarding. An unavailable or
+scope-mismatched read blocks dispatch without falling back to a collection row.
+
 A new native expected-revision/parameter-hash compare-and-swap contract for
 approval was **not** added. Presentation revalidation and post-command readback
 are not proof that an approval is atomically bound to the exact payload the
