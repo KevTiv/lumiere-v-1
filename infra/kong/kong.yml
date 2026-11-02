@@ -350,6 +350,18 @@ services:
         methods: [GET]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-certification-request
+        paths:
+          - '~/api/ai/skills/certifications$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-run-history
+        paths:
+          - '~/api/ai/evidence/runs/history$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-report-and-inspect
         paths:
           - '~/api/ai/skills/report-analysis$'

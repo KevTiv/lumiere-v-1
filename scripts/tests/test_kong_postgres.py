@@ -42,10 +42,10 @@ def wait_for(test, description, timeout=120):
     raise AssertionError('timed out: ' + description)
 
 
-def request(port, path, headers=None):
+def request(port, path, headers=None, method='GET'):
     try:
         with HTTP.open(urllib.request.Request(
-            f'http://127.0.0.1:{port}{path}', headers=headers or {}
+            f'http://127.0.0.1:{port}{path}', headers=headers or {}, method=method
         ), timeout=8) as response:
             return response.status, response.headers
     except urllib.error.HTTPError as error:
@@ -99,6 +99,7 @@ def main():
                'class Handler(BaseHTTPRequestHandler):\n'
                ' def do_GET(self):\n'
                '  self.send_response(200); self.end_headers(); self.wfile.write(b"ok")\n'
+               ' do_POST = do_GET\n'
                'HTTPServer(("0.0.0.0",8080),Handler).serve_forever()')
         with tempfile.TemporaryDirectory() as directory:
             template = Path(directory, 'kong.yml')
@@ -110,6 +111,26 @@ def main():
             template.write_text(yaml.safe_dump(config))
             template.chmod(0o644)  # Kong runs as an unprivileged container user.
             first, port = start_gateway('-first', template)
+            # Prove route admission with the real Kong schema/router. The
+            # pilot's 180/minute limit distinguishes it from web-root (600).
+            for path in ['/api/ai/skills/certifications',
+                         '/api/ai/evidence/runs/history']:
+                status, headers = request(port, path, method='POST')
+                assert status == 200, (path, status)
+                assert headers.get('RateLimit-Limit') == '180', (path, dict(headers))
+                for suffix in ['/', '/extra']:
+                    denied = path + suffix
+                    assert request(port, denied, method='POST')[0] == 503, denied
+                prefixed = '/prefix' + path
+                status, headers = request(port, prefixed, method='POST')
+                assert status == 200, (prefixed, status)
+                assert headers.get('RateLimit-Limit') == '600', (prefixed, dict(headers))
+            for method, path in [('PUT', '/api/ai/skills/certifications'),
+                                 ('POST', '/api/ai/skills/certifications/42'),
+                                 ('GET', '/api/ai/evidence/runs/history'),
+                                 ('POST', '/api/ai/skills/finance/finance_report_review')]:
+                assert request(port, path, method=method)[0] == 503, (method, path)
+            print('Exact certification/history route admission verified', flush=True)
             for i in range(10):
                 status, _ = request(port, '/api/auth/signin', {
                     'X-Forwarded-For': f'198.51.100.{i + 1}',

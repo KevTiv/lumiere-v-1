@@ -51,10 +51,14 @@ class PrivateReleaseTests(unittest.TestCase):
         for route in routes:
             self.assertFalse(route['strip_path'])
             self.assertGreater(route['regex_priority'], 0)
+            for pattern in route['paths']:
+                self.assertTrue(pattern.startswith('~/'), pattern)
         def allowed(method, path):
             return any(method in route['methods'] and re.match(pattern[1:], path)
                        for route in routes for pattern in route['paths'])
-        for method, path in [('POST', '/api/ai/skills/report-analysis'),
+        for method, path in [('POST', '/api/ai/skills/certifications'),
+                             ('POST', '/api/ai/evidence/runs/history'),
+                             ('POST', '/api/ai/skills/report-analysis'),
                              ('POST', '/api/ai/evidence/runs/inspect'),
                              ('POST', '/api/ai/runs/lifecycle'),
                              ('POST', '/api/ai/skills/report-analysis/readiness'),
@@ -71,7 +75,15 @@ class PrivateReleaseTests(unittest.TestCase):
                              ('POST', '/api/ai/skills/report-analysis/readiness/'),
                              ('POST', '/api/ai/skills/report-analysis/readiness/extra'),
                              ('POST', '/api/ai/skills/other/readiness'),
-                             ('POST', '/api/ai/skills/certifications'),
+                             ('POST', '/api/ai/skills/certifications/42'),
+                             ('POST', '/api/ai/skills/certifications/'),
+                             ('PUT', '/api/ai/skills/certifications'),
+                             ('POST', '/prefix/api/ai/skills/certifications'),
+                             ('GET', '/api/ai/evidence/runs/history'),
+                             ('POST', '/api/ai/evidence/runs/history/'),
+                             ('POST', '/api/ai/evidence/runs/history/extra'),
+                             ('POST', '/prefix/api/ai/evidence/runs/history'),
+                             ('POST', '/api/ai/skills/finance/finance_report_review'),
                              ('POST', '/api/ai/skills/report-analysis/extra'),
                              ('GET', '/api/ai/skills/certifications/42/extra'),
                              ('POST', '/api/ai/evidence/runs/export'),
