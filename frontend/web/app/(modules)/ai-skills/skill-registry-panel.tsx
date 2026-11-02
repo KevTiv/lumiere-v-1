@@ -355,6 +355,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                 {t("aiSkills.registry.sections.createVersion")}
               </h4>
               <Textarea
+                variant="plain"
                 rows={6}
                 value={manifestJson}
                 onChange={(event) => setManifestJson(event.target.value)}
@@ -495,12 +496,14 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               <Input value={fixtureKey} onChange={(event) => setFixtureKey(event.target.value)} placeholder={t("aiSkills.registry.placeholders.fixtureKey")} />
               <Input value={fixtureName} onChange={(event) => setFixtureName(event.target.value)} placeholder={t("aiSkills.registry.placeholders.name")} />
               <Textarea
+                variant="plain"
                 rows={3}
                 className="font-mono text-xs"
                 value={fixtureInputJson}
                 onChange={(event) => setFixtureInputJson(event.target.value)}
               />
               <Textarea
+                variant="plain"
                 rows={3}
                 className="font-mono text-xs"
                 value={fixtureExpectedJson}
