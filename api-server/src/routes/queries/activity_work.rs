@@ -293,10 +293,8 @@ pub(super) async fn read_activity_work(
             "Record follow-up company access denied".into(),
         ));
     }
-    let company_rows = owner.query_sql(&format!("SELECT id FROM company WHERE id = {company} AND organization_id = {org} AND deleted_at IS NULL LIMIT 1")).await.map_err(ApiError::internal)?;
-    if company_rows.is_empty() {
-        return Err(ApiError::Forbidden("Company is not active".into()));
-    }
+    // allowed_company_ids already excludes deleted companies. SpacetimeDB HTTP
+    // SQL cannot apply IS NULL to the optional deleted_at column.
     let caller = context
         .actor_identity()
         .trim_start_matches("0x")
@@ -352,7 +350,8 @@ pub(super) async fn read_activity_work(
         .map(|source| format!("res_model = '{}'", source.model))
         .collect::<Vec<_>>()
         .join(" OR ");
-    let predicate = format!("organization_id = {org} AND ({source_predicate}) AND auto = false AND is_system = false AND deleted_at IS NULL");
+    // manual_status checks deleted_at after decoding the optional timestamp.
+    let predicate = format!("organization_id = {org} AND ({source_predicate}) AND auto = false AND is_system = false");
     let reader = BoundedIdReader::new(owner, "activity", &predicate);
     let mut after = request.after(org, &caller)?;
     let mut rows = Vec::new();

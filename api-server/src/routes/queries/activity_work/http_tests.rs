@@ -52,7 +52,7 @@ async fn server() -> Server {
         State(fixture): State<Arc<Fixture>>,
         headers: HeaderMap,
         sql: String,
-    ) -> String {
+    ) -> (axum::http::StatusCode, String) {
         let token = headers
             .get("authorization")
             .unwrap()
@@ -64,6 +64,14 @@ async fn server() -> Server {
             .lock()
             .unwrap()
             .push((token.clone(), sql.clone()));
+        // Match the live HTTP SQL boundary: optional timestamps are SATS sums,
+        // not nullable SQL columns. Read and filter their decoded values.
+        if sql.contains(" IS NULL") {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                "unsupported optional-column null predicate".into(),
+            );
+        }
         let table = sql
             .split_once(" FROM ")
             .unwrap()
@@ -119,10 +127,12 @@ async fn server() -> Server {
             }
             other => panic!("unexpected SQL table {other}: {sql}"),
         };
-        sats(&sql, rows)
+        (axum::http::StatusCode::OK, sats(&sql, rows))
     }
+    let mut deleted = row(2, false);
+    deleted["deleted_at"] = json!(1);
     let fixture = Arc::new(Fixture {
-        rows: vec![row(1, false), row(4, true), row(130, false)],
+        rows: vec![row(1, false), deleted, row(4, true), row(130, false)],
         requests: Mutex::new(vec![]),
     });
     let router = Router::new()
@@ -190,6 +200,30 @@ fn request(cursor: Option<&str>, view: &str, exact: Option<u64>) -> ActivityWork
     )
     .unwrap()
     .unwrap()
+}
+
+#[tokio::test]
+async fn crm_reader_without_authorized_source_models_gets_empty_followups() {
+    let server = server().await;
+    let context = context(&server, &["activities:read", "contacts:read"]);
+    let page = read_activity_work(&server.owner, &context, request(None, "mine", None))
+        .await
+        .unwrap();
+    assert!(page.rows.is_empty());
+    assert!(page.next_cursor.is_none());
+    assert!(!server
+        .fixture
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(_, sql)| sql.contains(" FROM activity ")));
+    let mut foreign_company = request(None, "mine", None);
+    foreign_company.company_id = 8;
+    assert!(matches!(
+        read_activity_work(&server.owner, &context, foreign_company).await,
+        Err(ApiError::Forbidden(_))
+    ));
 }
 
 #[tokio::test]
