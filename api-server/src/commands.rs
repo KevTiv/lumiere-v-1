@@ -1376,7 +1376,11 @@ mod tests {
                         assert_eq!(
                             args,
                             Value::Array(ai_skill_certification_request_args(
-                                7, 42, 11, 3, "retry-key",
+                                7,
+                                42,
+                                11,
+                                3,
+                                "retry-key",
                             ))
                         );
                         calls.fetch_add(1, Ordering::SeqCst);
@@ -1420,14 +1424,18 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
 
         assert!(matches!(
-            dispatch_ai_skill_certification_request(&state, &session, 43, 11, 3, "other-key")
-                .await,
+            dispatch_ai_skill_certification_request(&state, &session, 43, 11, 3, "other-key").await,
             Err(ApiError::Forbidden(_))
         ));
         let mut unaffiliated = session;
         unaffiliated.organization_id = None;
         assert!(dispatch_ai_skill_certification_request(
-            &state, &unaffiliated, 42, 11, 3, "no-org",
+            &state,
+            &unaffiliated,
+            42,
+            11,
+            3,
+            "no-org",
         )
         .await
         .is_err());
