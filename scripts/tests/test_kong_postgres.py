@@ -111,26 +111,35 @@ def main():
             template.write_text(yaml.safe_dump(config))
             template.chmod(0o644)  # Kong runs as an unprivileged container user.
             first, port = start_gateway('-first', template)
-            # Prove route admission with the real Kong schema/router. The
-            # pilot's 180/minute limit distinguishes it from web-root (600).
-            for path in ['/api/ai/skills/certifications',
-                         '/api/ai/evidence/runs/history']:
-                status, headers = request(port, path, method='POST')
-                assert status == 200, (path, status)
-                assert headers.get('RateLimit-Limit') == '180', (path, dict(headers))
-                for suffix in ['/', '/extra']:
-                    denied = path + suffix
-                    assert request(port, denied, method='POST')[0] == 503, denied
-                prefixed = '/prefix' + path
-                status, headers = request(port, prefixed, method='POST')
-                assert status == 200, (prefixed, status)
-                assert headers.get('RateLimit-Limit') == '600', (prefixed, dict(headers))
-            for method, path in [('PUT', '/api/ai/skills/certifications'),
-                                 ('POST', '/api/ai/skills/certifications/42'),
-                                 ('GET', '/api/ai/evidence/runs/history'),
-                                 ('POST', '/api/ai/skills/finance/finance_report_review')]:
+            # The Alpha service's 180/minute limit distinguishes it from web-root (600).
+            fixture = json.loads((ROOT / 'scripts/tests/fixtures/kong-alpha-ai-routes.json').read_text())
+            for method, paths in fixture.items():
+                method = method.upper()
+                for path in paths:
+                    status, headers = request(port, path, method=method)
+                    assert status == 200, (method, path, status)
+                    assert headers.get('RateLimit-Limit') == '180', (path, dict(headers))
+                    for suffix in ['/', '/extra']:
+                        assert request(port, path + suffix, method=method)[0] == 503, (path, suffix)
+                    for unsupported in ['PUT', 'PATCH', 'DELETE']:
+                        assert request(port, path, method=unsupported)[0] == 503, (unsupported, path)
+                    prefixed = '/prefix' + path
+                    status, headers = request(port, prefixed, method=method)
+                    assert status == 200, (method, prefixed, status)
+                    assert headers.get('RateLimit-Limit') == '600', (prefixed, dict(headers))
+            for method, path in [
+                ('GET', '/api/ai/report/compose'),
+                ('GET', '/api/ai/evidence/runs/history'),
+                ('POST', '/api/ai/skills/finance/unknown_review'),
+                ('POST', '/api/ai/skills/run'),
+                ('POST', '/api/ai/rag'),
+                ('POST', '/api/ai/context/ingest'),
+                ('POST', '/api/ai/evidence/ingestion/documents'),
+                ('POST', '/api/ai/knowledge/skill-promotions/0/review'),
+                ('GET', '/api/ai/knowledge/skill-promotions/company/01'),
+            ]:
                 assert request(port, path, method=method)[0] == 503, (method, path)
-            print('Exact certification/history route admission verified', flush=True)
+            print('Exact Alpha workbench route admission verified', flush=True)
             for i in range(10):
                 status, _ = request(port, '/api/auth/signin', {
                     'X-Forwarded-For': f'198.51.100.{i + 1}',

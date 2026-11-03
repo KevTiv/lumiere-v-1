@@ -259,3 +259,9 @@ acceptance and live-provider qualification remain separate from source merging.
 
 The repository's existing release-main workflow automatically follows successful
 main CI. This task does not dispatch a separate deployment or alter that workflow.
+
+## 2026-11-02 — include the workbench and reviewed knowledge routes in Alpha
+
+The Alpha admission change adds exact method/path rules for report composer, low-stock, the five Finance review skills, the action-draft bridge and generator, evidence inspection/review/export, and knowledge promotion. Authentication, actor/company authorization, capability grants, certification, budgets and human approval remain owned by the existing handlers. The edge service identity and fail-closed PostgreSQL rate limits are preserved.
+
+See [route admission evidence](../evidence/alpha-ai-route-admission-2026-11-02.md) for the 18 added cases, local checks, hosted router validation and outstanding runtime acceptance. Admission is not a certification or release-promotion result. PR #364 and the separate unsupported run-history SQL remain independent blockers for the certification run.
