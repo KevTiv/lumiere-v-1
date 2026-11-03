@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { useCalendarTimezone } from "../../../../lib/use-calendar-timezone"
 import { I18nProvider } from "@lumiere/i18n"
@@ -48,9 +49,19 @@ function AccountTimezoneCalendar() {
     timezoneNotice={zone.fallbackReason ? "The saved account timezone is unavailable. The labelled fallback is in use." : undefined}
     onViewModeChange={() => {}} onPrevMonth={() => {}} onNextMonth={() => {}} onToday={() => {}} onSelectDate={() => {}} onSearchChange={() => {}} onSelectEvent={() => {}} />
 }
+const calendarApi = createLumiereApiClient({ baseUrl: "" })
+
 function AccountTimezoneFixture() {
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } }))
-  return <QueryClientProvider client={queryClient}><ErpSessionProvider value={{ identity: "synthetic-calendar-account", organizationId: 1, connected: true, companyIds: [1] }}><AccountTimezoneCalendar /></ErpSessionProvider></QueryClientProvider>
+  return (
+    <LumiereApiProvider client={calendarApi}>
+      <QueryClientProvider client={queryClient}>
+        <ErpSessionProvider value={{ identity: "synthetic-calendar-account", organizationId: 1, connected: true, companyIds: [1] }}>
+          <AccountTimezoneCalendar />
+        </ErpSessionProvider>
+      </QueryClientProvider>
+    </LumiereApiProvider>
+  )
 }
 
 function Preview() {

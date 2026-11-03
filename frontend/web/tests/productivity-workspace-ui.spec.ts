@@ -157,7 +157,11 @@ test.describe("account calendar timezone on narrow screens", () => {
     test(`account zone owns UTC boundaries and spring DST at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 950 })
       await page.route("**/api/auth/profile", (route) => route.fulfill({ json: { data: { name: "Synthetic calendar account", email: "calendar@example.test", firstName: null, lastName: null, timezone: "Europe/Amsterdam" } } }))
-      await ready(page, "/productivity?panel=account-calendar")
+      const [profileResponse] = await Promise.all([
+        page.waitForResponse("**/api/auth/profile"),
+        ready(page, "/productivity?panel=account-calendar"),
+      ])
+      expect(profileResponse.ok()).toBe(true)
       await expect(page.getByTestId("calendar-timezone")).toHaveText("Times shown in Europe/Amsterdam (account setting)")
       await expect(page.getByTestId("calendar-agenda-event-zone-boundary")).toContainText("01:30")
       await expect(page.getByTestId("calendar-agenda-event-zone-spring")).toContainText("03:30")
@@ -168,7 +172,11 @@ test.describe("account calendar timezone on narrow screens", () => {
     test(`invalid account zone is disclosed as browser fallback at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 950 })
       await page.route("**/api/auth/profile", (route) => route.fulfill({ json: { data: { name: "Synthetic calendar account", email: "calendar@example.test", firstName: null, lastName: null, timezone: "Invalid/Zone" } } }))
-      await ready(page, "/productivity?panel=account-calendar")
+      const [profileResponse] = await Promise.all([
+        page.waitForResponse("**/api/auth/profile"),
+        ready(page, "/productivity?panel=account-calendar"),
+      ])
+      expect(profileResponse.ok()).toBe(true)
       await expect(page.getByTestId("calendar-timezone")).toHaveText("Times shown in America/New_York (browser fallback)")
       await expect(page.getByRole("status")).toContainText("saved account timezone is unavailable")
       await expect(page.getByTestId("calendar-agenda-event-zone-boundary")).toHaveCount(0)
