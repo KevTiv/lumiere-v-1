@@ -67,25 +67,44 @@ export function NativeSkillVersionForm({ skillKey, initialVersion, pending, onCr
     }
   }
 
-  return <div className="space-y-3 border-t border-border pt-3">
-    <h4 className="text-sm font-medium">{label("title", "Validate a new skill version")}</h4>
-    <p className="text-xs text-muted-foreground">{label("description", "Attach this skill to the running harness. Skill versions can change independently; fixture certification checks the current adapter before activation.")}</p>
-    <label className="block space-y-1 text-sm">
-      <span>{label("version", "Skill version")}</span>
-      <Input value={version} onChange={(event) => { setVersion(event.target.value); setPrepared(null) }} />
-    </label>
-    <label className="block space-y-1 text-sm">
-      <span>{label("note", "Validation note")}</span>
-      <Input value={note} maxLength={8000} onChange={(event) => setNote(event.target.value)} />
-    </label>
-    <Button size="sm" variant="outline" disabled={loading || pending} onClick={() => void prepare()}>{label("prepare", "Prepare validation")}</Button>
-    {prepared ? <div className="space-y-2 rounded border border-border p-3 text-xs" role="status">
-      <p>{label("attached", "Attached to current harness")} · {skillKey} · {prepared.binding.manifest.risk}</p>
-      <p className="break-all">{prepared.binding.manifest.resources.join(", ")}</p>
-      <p className="break-all">{prepared.binding.manifest.source_hash}</p>
-      <p className="break-all">{label("runtime", "Certification runtime")}: {prepared.runtimeHash}</p>
-      <Button size="sm" disabled={loading || pending || !note.trim()} onClick={() => void create()}>{label("create", "Create version for validation")}</Button>
-    </div> : null}
-    {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
-  </div>
+  return (
+    <div className="space-y-3 border-t border-border pt-3">
+      <h4 className="text-sm font-medium">{label("title", "Validate a new skill version")}</h4>
+      <p className="text-xs text-muted-foreground">
+        {label("description", "Attach this skill to the running harness. Skill versions can change independently; fixture certification checks the current adapter before activation.")}
+      </p>
+      <label className="block space-y-1 text-sm">
+        <span>{label("version", "Skill version")}</span>
+        <Input
+          value={version}
+          onChange={(event) => {
+            setVersion(event.target.value)
+            setPrepared(null)
+          }}
+        />
+      </label>
+      <label className="block space-y-1 text-sm">
+        <span>{label("note", "Validation note")}</span>
+        <Input value={note} maxLength={8000} onChange={(event) => setNote(event.target.value)} />
+      </label>
+      <Button size="sm" variant="outline" disabled={loading || pending} onClick={() => void prepare()}>
+        {label("prepare", "Prepare validation")}
+      </Button>
+      {prepared ? (
+        <div className="space-y-2 rounded border border-border p-3 text-xs" role="status">
+          <p>{label("attached", "Attached to current harness")} · {skillKey} · {prepared.binding.manifest.risk}</p>
+          <p>{prepared.binding.manifest.resources.join(", ")}</p>
+          <details>
+            <summary className="cursor-pointer">{label("runtime", "Certification runtime")}</summary>
+            <p className="mt-1 break-all">{prepared.runtimeHash}</p>
+            <p className="break-all">{prepared.binding.manifest.source_hash}</p>
+          </details>
+          <Button size="sm" disabled={loading || pending || !note.trim()} onClick={() => void create()}>
+            {label("create", "Create version for validation")}
+          </Button>
+        </div>
+      ) : null}
+      {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+    </div>
+  )
 }

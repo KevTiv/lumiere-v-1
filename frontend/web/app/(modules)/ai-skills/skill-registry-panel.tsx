@@ -350,9 +350,12 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                         disabled={
                           promoteVersion.isPending || status === "promoted" || !certificationReady
                         }
-                        onClick={() =>
-                          { setActivationVersionId(id); setActivationNote(""); setActivationConfirmed(false) }
-                        }
+                        onClick={() => {
+                          setActivationVersionId(id)
+                          setActivationNote("")
+                          setActivationConfirmed(false)
+                          setActionError(null)
+                        }}
                       >
                         {t("aiSkills.registry.validation.reviewActivate", { defaultValue: "Review and activate" })}
                       </Button>

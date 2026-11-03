@@ -27,7 +27,7 @@ fn binding(skill_key: &str) -> Option<Value> {
         key if lumiere_finance_review_core::skill(key).is_ok() => (
             harness::finance_skills::manifest(key).ok()?,
             harness::finance_skills::bundle_hash(key),
-            vec!["report:read"],
+            vec![],
         ),
         _ => return None,
     };
@@ -67,10 +67,15 @@ pub async fn get_bindings(State(state): State<AppState>) -> Json<Value> {
     .into_iter()
     .filter_map(binding)
     .collect();
+    let certification_configured = state
+        .config
+        .ai_certification_stdb_token
+        .as_ref()
+        .is_some_and(|token| !token.trim().is_empty());
     Json(json!({
         "bindings": bindings,
         "runtimeHash": state.config.ai_certification_runtime_hash,
-        "certificationConfigured": state.config.ai_certification_stdb_token.as_ref().is_some_and(|token| !token.trim().is_empty()),
+        "certificationConfigured": certification_configured,
     }))
 }
 
@@ -86,7 +91,10 @@ mod tests {
             harness::certification::report_analysis_certification_bundle_hash()
         );
         assert_eq!(report["manifest"]["skill_key"], "report_analysis");
-        assert_eq!(report["manifest"]["output_types"][0], "analytics.report_analysis.result.v1");
+        assert_eq!(
+            report["manifest"]["output_types"][0],
+            "analytics.report_analysis.result.v1"
+        );
         assert!(binding("unregistered_code").is_none());
     }
 }
