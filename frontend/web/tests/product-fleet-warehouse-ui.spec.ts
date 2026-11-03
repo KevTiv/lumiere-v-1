@@ -256,7 +256,7 @@ test("failed vehicle submission retains the form and entered identity", async ({
   await dialog
     .getByRole("textbox", { name: "License plate", exact: false })
     .fill("RAH 918 A");
-  await dialog.getByRole("button", { name: "Submit", exact: true }).click();
+  await dialog.getByRole("button", { name: "Add vehicle", exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Synthetic preview: no record was saved.");
   await expect(

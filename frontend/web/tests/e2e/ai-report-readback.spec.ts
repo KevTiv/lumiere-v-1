@@ -47,11 +47,16 @@ for (const outcome of ["success", "denied", "wrong-run"] as const) {
     await page.goto(`/ai-harness?tab=report-analysis&companyId=${companyId}&runId=${RUN_ID}`)
     if (outcome === "success") {
       await expect(page.getByText("Governed tool transcript", { exact: true })).toBeVisible()
-      await expect(page.getByText("analytics.get_report_data", { exact: true })).toBeVisible()
+      const settledUsage = page.getByText("Settled usage: 0.000042 USD", { exact: true })
+      const operation = page.getByText("analytics.get_report_data", { exact: true })
+      await expect(settledUsage).toBeVisible()
+      await expect(operation).toBeHidden()
+      await page.locator("summary").filter({ hasText: "Technical inspector: execution trace and usage" }).click()
+      await expect(operation).toBeVisible()
       await expect(page.getByText("mistral / mistral-small-2603", { exact: true })).toBeVisible()
       await expect(page.getByText("0.000042 USD settled", { exact: true })).toBeVisible()
       await page.reload()
-      await expect(page.getByText("0.000042 USD settled", { exact: true })).toBeVisible()
+      await expect(settledUsage).toBeVisible()
     } else {
       await expect(page.getByText("Transcript unavailable", { exact: true })).toBeVisible()
       await expect(page.getByText("analytics.get_report_data", { exact: true })).toHaveCount(0)
