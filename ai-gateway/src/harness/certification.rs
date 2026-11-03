@@ -197,7 +197,6 @@ fn execution_request(
 }
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
-const BUILT_IN_SEMVER: &str = "1.0.0";
 pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.8";
 
 struct LowStockCertificationAdapter;
@@ -206,7 +205,7 @@ struct LowStockCertificationAdapter;
 impl CandidateCertificationAdapter for LowStockCertificationAdapter {
     fn supports(&self, version: &CandidateSkillVersion) -> bool {
         version.skill_key == low_stock::LOW_STOCK_SKILL_KEY
-            && version.version == BUILT_IN_SEMVER
+            && super::release_registry::adapter_version_compatible(&version.version, 1)
             && version.source_hash == low_stock_certification_bundle_hash()
     }
 
@@ -264,7 +263,7 @@ struct ReportComposerCertificationAdapter;
 impl CandidateCertificationAdapter for ReportComposerCertificationAdapter {
     fn supports(&self, version: &CandidateSkillVersion) -> bool {
         version.skill_key == report_composer::REPORT_COMPOSER_SKILL_KEY
-            && version.version == BUILT_IN_SEMVER
+            && super::release_registry::adapter_version_compatible(&version.version, 1)
             && version.source_hash == report_composer_certification_bundle_hash()
     }
 
@@ -341,7 +340,7 @@ struct FinanceCertificationAdapter;
 impl CandidateCertificationAdapter for FinanceCertificationAdapter {
     fn supports(&self, version: &CandidateSkillVersion) -> bool {
         lumiere_finance_review_core::skill(&version.skill_key).is_ok()
-            && version.version == lumiere_finance_review_core::VERSION
+            && super::release_registry::adapter_version_compatible(&version.version, 1)
             && version.source_hash == super::finance_skills::bundle_hash(&version.skill_key)
     }
     async fn execute(
@@ -358,7 +357,7 @@ impl CandidateCertificationAdapter for FinanceCertificationAdapter {
 impl CandidateCertificationAdapter for ReportAnalysisCertificationAdapter {
     fn supports(&self, version: &CandidateSkillVersion) -> bool {
         version.skill_key == super::governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY
-            && version.version == REPORT_ANALYSIS_CERTIFICATION_VERSION
+            && super::release_registry::adapter_version_compatible(&version.version, 1)
             && version.source_hash == report_analysis_certification_bundle_hash()
     }
 
@@ -1802,6 +1801,28 @@ mod tests {
             CertificationExecutionError::UnsupportedSkill { ref skill_key, .. }
                 if skill_key == "report_composer"
         ));
+    }
+
+    #[test]
+    fn new_skill_versions_bind_to_existing_adapters_without_a_harness_release() {
+        let mut report = built_in_candidate("report_analysis", 'a').version;
+        report.version = "1.4.2".into();
+        report.source_hash = report_analysis_certification_bundle_hash();
+        assert!(ReportAnalysisCertificationAdapter.supports(&report));
+        report.version = "2.0.0".into();
+        assert!(!ReportAnalysisCertificationAdapter.supports(&report));
+        report.version = "1.4.2".into();
+        report.source_hash = format!("sha256:{}", "f".repeat(64));
+        assert!(!ReportAnalysisCertificationAdapter.supports(&report));
+
+        let mut stock = built_in_candidate("low_stock", 'b').version;
+        stock.version = "1.0.9".into();
+        stock.source_hash = low_stock_certification_bundle_hash();
+        assert!(LowStockCertificationAdapter.supports(&stock));
+        let mut composer = built_in_candidate("report_composer", 'c').version;
+        composer.version = "1.2.0".into();
+        composer.source_hash = report_composer_certification_bundle_hash();
+        assert!(ReportComposerCertificationAdapter.supports(&composer));
     }
 
     #[tokio::test]

@@ -280,6 +280,10 @@ async fn main() -> anyhow::Result<()> {
             post(routes::harness_skills::post_report_readiness),
         )
         .route(
+            "/v1/internal/harness/skill-bindings",
+            get(routes::skill_bindings::get_bindings),
+        )
+        .route(
             "/v1/harness/governed/readiness",
             post(routes::harness_skills::post_governed_readiness),
         )

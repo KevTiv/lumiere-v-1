@@ -27,6 +27,15 @@ import type { AiSkillListItem } from "@lumiere/query-hooks/hooks/ai-skills"
 import { Button, Input } from "@lumiere/ui"
 import { Textarea } from "@lumiere/ui/components/textarea"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@lumiere/ui/components/dialog"
+import { NativeSkillVersionForm } from "./native-skill-version-form"
+import { nextSkillVersion } from "./native-skill-validation"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -130,6 +139,9 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
   const [actionError, setActionError] = useState<string | null>(null)
   const [knowledgeVersionId, setKnowledgeVersionId] = useState("")
   const [promotionReviewNote, setPromotionReviewNote] = useState("")
+  const [activationVersionId, setActivationVersionId] = useState<number | null>(null)
+  const [activationNote, setActivationNote] = useState("")
+  const [activationConfirmed, setActivationConfirmed] = useState(false)
   const requestKeys = useRef(new Map<string, string>())
 
   const effectiveSkillId = skills.some((skill) => skill.id === selectedSkillId)
@@ -165,6 +177,11 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
   )
 
   const selectedSkill = skills.find((skill) => skill.id === effectiveSkillId)
+  const activationVersion = skillVersions.find((version) => versionId(version) === activationVersionId)
+  const activationReady = activationVersionId != null && skillFixtures.length > 0
+    && skillFixtures.every((fixture) => certificationHasPassingEvidence(
+      fixtureRowId(fixture), activationVersionId, certifications.data ?? [], [],
+    ))
 
   const registryLoading =
     versions.isLoading || releases.isLoading || fixtures.isLoading || certifications.isLoading
@@ -333,16 +350,14 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                         disabled={
                           promoteVersion.isPending || status === "promoted" || !certificationReady
                         }
-                        onClick={() =>
-                          void runAction(() =>
-                            promoteVersion.mutateAsync({
-                              skillVersionId: id,
-                              reason: "Promoted from AI Skills admin",
-                            }),
-                          )
-                        }
+                        onClick={() => {
+                          setActivationVersionId(id)
+                          setActivationNote("")
+                          setActivationConfirmed(false)
+                          setActionError(null)
+                        }}
                       >
-                        {t("aiSkills.registry.actions.promote")}
+                        {t("aiSkills.registry.validation.reviewActivate", { defaultValue: "Review and activate" })}
                       </Button>
                     </li>
                   )
@@ -350,7 +365,18 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               </ul>
             )}
 
-            <div className="space-y-2 border-t border-border pt-3">
+            {selectedSkill ? <NativeSkillVersionForm
+              key={`${organizationId}:${effectiveSkillId}:${skillVersions.map((version) => version.version).join(",")}`}
+              skillKey={selectedSkill.skill_key}
+              initialVersion={nextSkillVersion(skillVersions.map((version) => version.version))}
+              pending={createVersion.isPending}
+              onCreate={(manifestJson, reviewNotes, metadata) => createVersion.mutateAsync({
+                skillId: BigInt(effectiveSkillId), manifestJson, reviewNotes, metadata,
+              })}
+            /> : null}
+
+            <details className="space-y-2 border-t border-border pt-3">
+              <summary className="cursor-pointer text-sm text-muted-foreground">{t("aiSkills.registry.validation.advanced", { defaultValue: "Advanced manifest" })}</summary>
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t("aiSkills.registry.sections.createVersion")}
               </h4>
@@ -382,7 +408,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               >
                 {t("aiSkills.registry.actions.createReviewedVersion")}
               </Button>
-            </div>
+            </details>
           </div>
 
           <div className="space-y-3 rounded-lg border border-border p-4">
@@ -663,6 +689,38 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
           )}
         </div>
       </div>
+      <Dialog open={activationVersionId != null} onOpenChange={(open) => { if (!open) setActivationVersionId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("aiSkills.registry.validation.reviewActivate", { defaultValue: "Review and activate" })}</DialogTitle>
+            <DialogDescription>{t("aiSkills.registry.validation.approvalPolicy", { defaultValue: "Owners and organization administrators can approve their own certified skills. Other authors and reviewers need an independent approver. The decision and validation note are recorded." })}</DialogDescription>
+          </DialogHeader>
+          <p className="text-sm">{selectedSkill?.name} · v{activationVersion?.version} · {activationVersion?.risk}</p>
+          <ul className="space-y-2 text-sm">
+            {skillFixtures.map((fixture) => {
+              const request = latestCertificationFor(fixtureRowId(fixture), activationVersionId ?? 0, certifications.data ?? [])
+              return <li key={fixtureRowId(fixture)}>{fixture.name} · {request?.readiness?.ready ? t("aiSkills.registry.certification.passed") : t("aiSkills.registry.certification.pendingSuffix")} · #{request?.id ?? "—"}</li>
+            })}
+          </ul>
+          <label className="space-y-1 text-sm">
+            <span>{t("aiSkills.registry.validation.note", { defaultValue: "Validation note" })}</span>
+            <Textarea variant="plain" rows={3} value={activationNote} maxLength={8000} onChange={(event) => setActivationNote(event.target.value)} />
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={activationConfirmed} onChange={(event) => setActivationConfirmed(event.target.checked)} />
+            {t("aiSkills.registry.validation.confirm", { defaultValue: "I reviewed the skill and its passing fixture evidence and approve activation for this organization." })}
+          </label>
+          {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={promoteVersion.isPending} onClick={() => setActivationVersionId(null)}>{t("common.cancel")}</Button>
+            <Button disabled={!activationReady || !activationNote.trim() || !activationConfirmed || promoteVersion.isPending} onClick={() => void runAction(async () => {
+              if (activationVersionId == null || !activationReady) return
+              await promoteVersion.mutateAsync({ skillVersionId: activationVersionId, reason: activationNote.trim() })
+              setActivationVersionId(null)
+            })}>{t("aiSkills.registry.validation.activate", { defaultValue: "Activate certified skill" })}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

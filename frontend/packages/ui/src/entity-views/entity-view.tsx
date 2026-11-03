@@ -15,6 +15,7 @@ import type {
 import { filterEntitySurface } from "../lib/entity-view-types"
 import type { KanbanColumnDef, KanbanMoveHandler } from "../lib/kanban-board-types"
 import { useRBAC } from "../lib/rbac-context"
+import { cn } from "../lib/utils"
 import { EntityTable } from "./entity-table"
 import { EntityDetail } from "./entity-detail"
 import { EntityBoardView } from "./entity-board"

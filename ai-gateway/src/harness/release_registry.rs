@@ -294,46 +294,25 @@ fn validate_active_adapter_binding(
     expected_version: u32,
     source_hash: &str,
 ) -> Result<(), String> {
+    if !adapter_version_compatible(release_version, expected_version) {
+        return Err(format!(
+            "active skill version '{release_version}' is incompatible with gateway adapter v{expected_version}"
+        ));
+    }
     let expected_source_hash = match skill_key {
         key if lumiere_finance_review_core::skill(key).is_ok() => {
-            if release_version != lumiere_finance_review_core::VERSION || expected_version != 1 {
-                return Err("finance skill release must match compiled version 1.0.0".into());
-            }
             Some(super::finance_skills::bundle_hash(key))
         }
         low_stock::LOW_STOCK_SKILL_KEY => {
-            if release_version != "1.0.0" {
-                return Err(format!(
-                    "active skill version '{release_version}' must exactly match gateway adapter 1.0.0"
-                ));
-            }
             Some(certification::low_stock_certification_bundle_hash())
         }
         report_composer::REPORT_COMPOSER_SKILL_KEY => {
-            if release_version != "1.0.0" {
-                return Err(format!(
-                    "active skill version '{release_version}' must exactly match gateway adapter 1.0.0"
-                ));
-            }
             Some(certification::report_composer_certification_bundle_hash())
         }
         governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY => {
-            if release_version != certification::REPORT_ANALYSIS_CERTIFICATION_VERSION {
-                return Err(format!(
-                    "active report analysis version must exactly match gateway adapter {}",
-                    certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
-                ));
-            }
             Some(certification::report_analysis_certification_bundle_hash())
         }
-        _ => {
-            if semver_major(&release_version) != Some(expected_version) {
-                return Err(format!(
-                    "active skill version '{release_version}' is incompatible with gateway adapter v{expected_version}"
-                ));
-            }
-            None
-        }
+        _ => None,
     };
     if expected_source_hash
         .as_deref()
@@ -345,6 +324,20 @@ fn validate_active_adapter_binding(
         );
     }
     Ok(())
+}
+
+/// Skill release revisions are independent of the compiled adapter revision.
+/// Compatibility never substitutes for the exact certified source binding.
+pub(crate) fn adapter_version_compatible(version: &str, adapter_major: u32) -> bool {
+    let core = version.split(['-', '+']).next().unwrap_or_default();
+    let parts: Vec<_> = core.split('.').collect();
+    parts.len() == 3
+        && parts.iter().all(|part| {
+            !part.is_empty()
+                && (part.len() == 1 || !part.starts_with('0'))
+                && part.bytes().all(|byte| byte.is_ascii_digit())
+        })
+        && semver_major(core) == Some(adapter_major)
 }
 
 fn parse_candidate_version(row: &Value) -> Result<CandidateSkillVersion, String> {
@@ -596,6 +589,16 @@ mod tests {
     }
 
     #[test]
+    fn adapter_compatibility_rejects_malformed_or_incompatible_versions() {
+        for version in ["1.0.1", "1.9.0", "1.0.1-rc.1+build.7"] {
+            assert!(adapter_version_compatible(version, 1));
+        }
+        for version in ["2.0.0", "1", "1.0", "01.0.0", "1.x.0", "1.00.0"] {
+            assert!(!adapter_version_compatible(version, 1));
+        }
+    }
+
+    #[test]
     fn parses_version_and_risk_strictly() {
         assert_eq!(semver_major("1.2.3"), Some(1));
         assert_eq!(semver_major("v1.2.3"), None);
@@ -682,7 +685,7 @@ mod tests {
     }
 
     #[test]
-    fn built_in_dispatch_requires_exact_version_and_bundle_hash() {
+    fn built_in_dispatch_accepts_skill_revisions_but_requires_current_bundle_hash() {
         let report_hash = certification::report_analysis_certification_bundle_hash();
         assert!(validate_active_adapter_binding(
             "report_analysis",
@@ -692,7 +695,7 @@ mod tests {
         )
         .is_ok());
         assert!(
-            validate_active_adapter_binding("report_analysis", "1.0.0", 1, &report_hash).is_err()
+            validate_active_adapter_binding("report_analysis", "1.12.3", 1, &report_hash).is_ok()
         );
         assert!(validate_active_adapter_binding(
             "report_analysis",
@@ -711,7 +714,7 @@ mod tests {
         .is_ok());
         assert!(validate_active_adapter_binding(
             low_stock::LOW_STOCK_SKILL_KEY,
-            "1.0.2",
+            "2.0.0",
             1,
             &low_stock_hash,
         )

@@ -17482,6 +17482,21 @@
       "syncSuccess": "Synced {{count}} bundled skill(s) to SpacetimeDB."
     },
     "registry": {
+      "validation": {
+        "title": "Validate a new skill version",
+        "description": "Attach this skill to the running harness. Skill versions can change independently; fixture certification checks the current adapter before activation.",
+        "version": "Skill version",
+        "note": "Validation note",
+        "prepare": "Prepare validation",
+        "attached": "Attached to current harness",
+        "runtime": "Certification runtime",
+        "create": "Create version for validation",
+        "advanced": "Advanced manifest",
+        "reviewActivate": "Review and activate",
+        "approvalPolicy": "Owners and organization administrators can approve their own certified skills. Other authors and reviewers need an independent approver. The decision and validation note are recorded.",
+        "confirm": "I reviewed the skill and its passing fixture evidence and approve activation for this organization.",
+        "activate": "Activate certified skill"
+      },
       "actions": {
         "accept": "Accept",
         "createFixture": "Create fixture",
