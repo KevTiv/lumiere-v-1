@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { reconciliationModules } from "./reconciliation-modules"
 import { Button } from "@lumiere/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
 
@@ -65,6 +66,7 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
   const [feedback, setFeedback] = useState<Record<string, Feedback>>({})
   const [filter, setFilter] = useState<Status | "all">("all")
+  const [moduleId, setModuleId] = useState<string>("all")
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const importVersion = useRef(0)
@@ -79,6 +81,7 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
       setProposals(next)
       setFeedback({})
       setFilter("all")
+      setModuleId("all")
       setPage(0)
     } catch (cause) {
       if (version !== importVersion.current) return
@@ -88,7 +91,9 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
     }
   }
 
-  const filtered = proposals?.filter(item => filter === "all" || item.status === filter) ?? []
+  const selectedModule = reconciliationModules.find(module => module.id === moduleId)
+  const moduleProposals = (proposals ?? []).filter(item => !selectedModule || selectedModule.rules.includes(item.rule))
+  const filtered = moduleProposals.filter(item => filter === "all" || item.status === filter)
   const visible = filtered.slice(page * 20, (page + 1) * 20)
   const feedbackCount = Object.keys(feedback).length
 
@@ -116,13 +121,27 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
             }} />
           </label>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          {proposals ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Alpha modules</p>
+            <div className="flex flex-wrap gap-2" aria-label="Filter by Alpha module">
+              <Button size="sm" variant="outline" aria-pressed={moduleId === "all"}
+                onClick={() => { setModuleId("all"); setFilter("all"); setPage(0) }}>All modules</Button>
+              {reconciliationModules.map(module => (
+                <Button key={module.id} size="sm" variant="outline" aria-pressed={moduleId === module.id}
+                  onClick={() => { setModuleId(module.id); setFilter("all"); setPage(0) }}>
+                  {module.label}
+                </Button>
+              ))}
+            </div>
+            {selectedModule ? <p className="text-sm text-muted-foreground">{selectedModule.role}</p> : null}
+          </div>
+          {proposals && (!selectedModule || selectedModule.rules.length > 0) ? (
             <>
               <div className="flex flex-wrap gap-2" aria-label="Filter proposals">
                 <Button size="sm" variant="outline" aria-pressed={filter === "all"}
-                  onClick={() => { setFilter("all"); setPage(0) }}>All ({proposals.length})</Button>
+                  onClick={() => { setFilter("all"); setPage(0) }}>All ({moduleProposals.length})</Button>
                 {(Object.keys(labels) as Status[]).map(status => {
-                  const count = proposals.filter(item => item.status === status).length
+                  const count = moduleProposals.filter(item => item.status === status).length
                   return count > 0 ? <Button key={status} size="sm" variant="outline"
                     aria-pressed={filter === status} onClick={() => { setFilter(status); setPage(0) }}>
                     {labels[status]} ({count})
