@@ -316,7 +316,8 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
       if (!params) throw new Error(t("calendar.errors.eventIncomplete", { defaultValue: "Enter an event title and valid times. The end must not be before the start. Your entries are retained." }))
       await createCalendarEvent.mutateAsync(params)
     } else if (action === "editEvent" && quickActionForm?.eventId) {
-      const params = updateCalendarEventParams(formData, eventStateTag(events.find((event) => String(event.id) === quickActionForm.eventId) ?? {}), timeZone, events.find((event) => String(event.id) === quickActionForm.eventId) as unknown as Record<string, unknown> | undefined)
+      const event = events.find((event) => String(event.id) === quickActionForm.eventId)
+      const params = updateCalendarEventParams(formData, eventStateTag(event ?? {}), timeZone, event ? { start: event.start, stop: event.stop } : undefined)
       if (!params) throw new Error(t("calendar.errors.eventIncomplete", { defaultValue: "Enter an event title and valid times. The end must not be before the start. Your entries are retained." }))
       await updateCalendarEvent.mutateAsync({ eventId: quickActionForm.eventId, params })
     }
