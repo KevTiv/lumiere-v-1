@@ -1975,7 +1975,8 @@ fn validate_release_approval(
     }
     if !is_admin {
         return Err(
-            "skill release requires an independent approver or an organization administrator".into(),
+            "skill release requires an independent approver or an organization administrator"
+                .into(),
         );
     }
     if reason.is_none_or(|reason| reason.trim().is_empty()) {
