@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
+import { mockCsvInspection } from "./import-inspection-fixture"
 
 test("reviewed locations reach the correct tracked import without AI", async ({ page }) => {
   let aiRequests = 0
@@ -69,6 +70,7 @@ test("prepared products import with AI disabled and wait for the tracked receipt
 })
 
 test("unknown product cost can be saved for review but cannot be imported", async ({ page }) => {
+  await mockCsvInspection(page, "unknown-cost.csv", "name,category_id,uom_id,uom_po_id,sale_price,cost_price,active\nSynthetic sausage,12,13,13,4800,,false")
   let imported = false
   let saved = false
   await page.route("**/api/query/**", route => {
