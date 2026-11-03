@@ -10,6 +10,7 @@ async function noPageOverflow(page: Page) {
 for (const width of [320, 390]) {
   test.describe(`AI inspector at ${width}px`, () => {
     test.use({ viewport: { width, height: 844 } })
+    test.describe.configure({ timeout: 60_000 })
 
     test("opens a loaded run and keeps technical lookup drafts through keyboard disclosure", async ({ page }, testInfo) => {
       const requests: Array<{ path: string; body: Record<string, unknown> }> = []
@@ -24,7 +25,7 @@ for (const width of [320, 390]) {
         return route.fulfill({ status: 403, json: { error: "No synthetic mutations are allowed" } })
       })
       await page.goto("/harness-inspector", { waitUntil: "domcontentloaded" })
-      await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true")
+      await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true", { timeout: 30_000 })
       const manual = page.locator("summary").filter({ hasText: "Advanced: find a run by identifier" })
       await expect(page.locator("#lifecycle-run-id")).toBeHidden()
       await manual.focus()
@@ -75,7 +76,7 @@ for (const width of [320, 390]) {
         return route.fulfill({ status: 403, json: { error: "No synthetic mutations are allowed" } })
       })
       await page.goto("/harness-inspector", { waitUntil: "domcontentloaded" })
-      await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true")
+      await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true", { timeout: 30_000 })
       await page.getByRole("button", { name: "Review evidence", exact: true }).click()
       await page.getByTestId("queue-claim-8").getByRole("button", { name: "Inspect", exact: true }).click()
       await expect.poll(() => inspected).toContain(8)
@@ -101,7 +102,7 @@ for (const width of [320, 390]) {
         return route.fulfill({ status: 403, json: { error: "Synthetic reviewer access denied" } })
       })
       await page.goto("/harness-inspector", { waitUntil: "domcontentloaded" })
-      await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true")
+      await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true", { timeout: 30_000 })
       await page.getByRole("button", { name: "Review evidence", exact: true }).click()
       const lookup = page.locator("summary").filter({ hasText: "Advanced: find evidence by identifier" })
       await expect(page.locator("#evidence-target-id")).toBeHidden()

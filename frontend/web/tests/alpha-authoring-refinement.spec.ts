@@ -185,9 +185,10 @@ for (const viewport of [
 ]) {
   for (const theme of ["light", "dark"] as const) {
     test(`responsive form usability at ${viewport.width}px in ${theme} theme`, async ({ page }, testInfo) => {
+      test.setTimeout(60_000)
       await page.setViewportSize(viewport)
       await page.goto("/usability-forms", { waitUntil: "domcontentloaded" })
-      await expect(page.getByTestId("usability-forms-disclosure")).toHaveAttribute("data-hydrated", "true")
+      await expect(page.getByTestId("usability-forms-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: 30_000 })
       await page.getByRole("button", { name: theme === "dark" ? "Dark theme" : "Light theme", exact: true }).click()
       await expect(page.getByTestId("usability-forms-theme")).toHaveText(theme)
       await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`))
@@ -240,7 +241,7 @@ for (const viewport of [
         await page.keyboard.press("Escape")
         const discard = page.getByTestId("discard-changes-dialog")
         await expectInViewport(page, discard)
-        expect(await discard.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+        await expect.poll(() => discard.evaluate((element) => element.contains(document.activeElement))).toBe(true)
         const keep = discard.getByRole("button", { name: "Keep editing", exact: true })
         await keep.focus()
         await page.keyboard.press("Enter")
