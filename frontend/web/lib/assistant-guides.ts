@@ -207,6 +207,7 @@ function documentFromResponse(value: unknown): GuideDocument {
   if (guide.sources.some((source) => !source || typeof source !== "object" || Array.isArray(source) ||
       !["live", "passage", "activity", "web"].includes(source.kind) ||
       !["authoritative", "persisted", "retrieved"].includes(source.trust) ||
+      (source.instruction_trust != null && source.instruction_trust !== "untrusted") ||
       Object.entries(source).some(([key, field]) => field != null && !["score", "passage_id"].includes(key) && typeof field !== "string"))) {
     throw new Error("Invalid guide sources")
   }

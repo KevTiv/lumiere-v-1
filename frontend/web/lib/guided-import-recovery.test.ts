@@ -79,3 +79,16 @@ test("corruption, quota failure and mismatched scope fail before dispatch", () =
   assert.throws(() => retainImportRequest(bounded, scope, oversized), /2 MB refresh-recovery limit/)
   assert.equal(readImportRecovery(bounded, scope), null)
 })
+
+
+test("recovery retains the exact origin admission and refuses substituting another origin", () => {
+  const local = storage()
+  const admitted = createCsvImportRequest(8001n, "product", request.csvData, "original.xlsx", { companyId: 9001, currencyId: 646, sourceAdmissionId: "d".repeat(32) }, "e".repeat(32))
+  retainImportRequest(local, scope, admitted)
+  assert.deepEqual(readImportRecovery(local, scope)?.request, admitted)
+  assert.throws(() => retainImportRequest(local, scope, { ...admitted, sourceAdmissionId: "f".repeat(32) }), /retained import result/)
+  const corrupted = storage()
+  corrupted.setItem(importRecoveryKey(scope), JSON.stringify({ version: 1, scope, request: { ...admitted, sourceAdmissionId: "not-an-admission" } }))
+  assert.throws(() => readImportRecovery(corrupted, scope))
+  assert.equal(readImportRecovery(local, { ...scope, companyId: 9002 }), null)
+})

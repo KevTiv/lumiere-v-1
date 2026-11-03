@@ -28,3 +28,11 @@ test("imports reject missing company/currency and preserve the combined Accounti
   const budget=guidedImportRequest({...args,entity:"budget",companies:[{id:22,currencyId:646}]})
   assert.equal(budget.entity,"crossovered_budget")
 })
+
+
+test("guided mapping produces a reviewed derivative linked to its admitted original workbook", () => {
+  const sourceAdmissionId = "d".repeat(32)
+  const request = guidedImportRequest({ organizationId: 7n, companyId: 22, entity: "product", csv: "name,sale_price,cost_price\nReviewed name,10,5", fileName: "original.xlsx", sourceAdmissionId, companies: [{ id: 22, currencyId: 646 }] })
+  assert.equal(request.sourceAdmissionId, sourceAdmissionId)
+  assert.equal(JSON.parse(csvImportRequestBody(request)).sourceAdmissionId, sourceAdmissionId)
+})

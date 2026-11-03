@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
+import { mockCsvInspection, SOURCE_ADMISSION_ID } from "./import-inspection-fixture"
 import type {
   ReviewDetail,
   ReviewHistory,
@@ -620,6 +621,7 @@ async function importHandoffFixture(
   page: Page,
   options: { deferAnalysis?: boolean } = {},
 ) {
+  await mockCsvInspection(page, "draft-products.csv", "name,price,cost\nDraft product,12.50,8.25")
   const item: ReviewRow = {
     ...source(),
     values: {
@@ -650,6 +652,7 @@ async function importHandoffFixture(
   }> = []
   const imports: Array<{
     requestId: string
+    sourceAdmissionId: string
     csvData: string
     fileName: string
     params: { companyId: string; currencyId: string }
@@ -918,6 +921,7 @@ test("review handoff cannot replace a busy or unknown import and explicit recove
     await expect.poll(() => fixture.imports.length).toBe(1)
     const submitted = fixture.imports[0]!
     expect(submitted.requestId).toMatch(/^[a-f0-9]{32}$/)
+    expect(submitted.sourceAdmissionId).toBe(SOURCE_ADMISSION_ID)
     expect(submitted.params).toEqual({ companyId: "9001", currencyId: "9102" })
     const submittedCsv = parseCsvText(submitted.csvData)
     expect(submittedCsv.rows).toHaveLength(1)

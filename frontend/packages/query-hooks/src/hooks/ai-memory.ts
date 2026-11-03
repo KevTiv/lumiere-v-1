@@ -31,6 +31,8 @@ export type AiMemoryContextHit = {
 export type AiRagSource = {
   kind: "live" | "passage" | "activity" | "web"
   trust: "authoritative" | "persisted" | "retrieved"
+  /** Fresh or persisted content still has no instruction or action authority. */
+  instruction_trust?: "untrusted"
   entity_type?: string
   entity_id?: string
   source_kind?: string

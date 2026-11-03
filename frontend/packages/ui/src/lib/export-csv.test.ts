@@ -1,3 +1,4 @@
+import { splitCsvRow } from "@lumiere/erp-shared/csv-import-safety"
 import { describe, expect, it } from "vitest"
 
 import type { DashboardWidget } from "./dashboard-types"
@@ -18,7 +19,10 @@ describe("report CSV export", () => {
       width: "full",
       data: {
         xAxisKey: "period",
-        series: [{ name: "Revenue", color: "blue" }, { name: "Orders", color: "green" }],
+        series: [
+          { name: "Revenue", color: "blue" },
+          { name: "Orders", color: "green" },
+        ],
         values,
       },
     }
@@ -33,10 +37,18 @@ describe("report CSV export", () => {
   })
 
   it("escapes provenance-bearing labels and values without changing their content", () => {
-    expect(rowsToCsv(
-      ["source report", "definition", "company"],
-      [["Report #42, generated", "Definition \"Quarterly\" #7", "Company\nNorth"]],
-    )).toBe(
+    expect(
+      rowsToCsv(
+        ["source report", "definition", "company"],
+        [
+          [
+            "Report #42, generated",
+            'Definition "Quarterly" #7',
+            "Company\nNorth",
+          ],
+        ],
+      ),
+    ).toBe(
       'source report,definition,company\r\n"Report #42, generated","Definition ""Quarterly"" #7","Company\nNorth"',
     )
   })
@@ -47,7 +59,10 @@ describe("report CSV export", () => {
       type: "table",
       title: "Orders",
       width: "full",
-      data: { columns: [{ key: "state", label: "State" }], rows: [{ state: "sale" }] },
+      data: {
+        columns: [{ key: "state", label: "State" }],
+        rows: [{ state: "sale" }],
+      },
     }
     const provenance = reportExportSourceProvenance({
       organizationId: 7,
@@ -60,7 +75,67 @@ describe("report CSV export", () => {
     })
     const csv = widgetDataToCsv(widget, provenance)!
     const [metadata, header, row] = csv.split("\r\n")
-    expect(JSON.parse(metadata.replace("# lumiere-provenance:", ""))).toEqual(provenance)
+    expect(
+      JSON.parse(
+        splitCsvRow(metadata)[0]!.replace("# lumiere-provenance:", ""),
+      ),
+    ).toEqual(provenance)
     expect([header, row]).toEqual(["State", "sale"])
+  })
+})
+
+describe("CSV export input isolation", () => {
+  it("neutralizes text formula labels while preserving true negative numeric values", () => {
+    const csv = rowsToCsv(
+      [" =SUM(A1:A2)", "Amount"],
+      [
+        ["＝HYPERLINK(1)", -15.5],
+        ["\t@command", -2],
+        ["-15.5", 0],
+      ],
+    )
+    const lines = csv.split("\r\n").map(splitCsvRow)
+    expect(lines).toEqual([
+      ["' =SUM(A1:A2)", "Amount"],
+      ["'＝HYPERLINK(1)", "-15.5"],
+      ["'\t@command", "-2"],
+      ["'-15.5", "0"],
+    ])
+  })
+
+  it("quotes audit-style values containing separators, quotes and newlines", () => {
+    expect(
+      rowsToCsv(
+        ["Action", "Details"],
+        [["=cmd(1)", 'name, "changed"\nnext line']],
+      ),
+    ).toBe(`Action,Details\r\n'=cmd(1),"name, ""changed""\nnext line"`)
+  })
+
+  it("keeps comma-bearing provenance and formula-shaped user metadata in one CSV cell", () => {
+    const widget: DashboardWidget = {
+      id: "data",
+      type: "table",
+      title: "Data",
+      width: "full",
+      data: {
+        columns: [{ key: "name", label: "Name" }],
+        rows: [{ name: "Acme" }],
+      },
+    }
+    const provenance = reportExportSourceProvenance({
+      organizationId: 1,
+      companyId: 2,
+      dashboardId: 3,
+      model: 'record,=HYPERLINK("https://example.invalid")',
+      domain: 'note,"=cmd(1)"',
+      groupBy: "name",
+    })
+    const first = widgetDataToCsv(widget, provenance)!.split("\r\n")[0]!
+    const cells = splitCsvRow(first)
+    expect(cells).toHaveLength(1)
+    expect(JSON.parse(cells[0]!.replace("# lumiere-provenance:", ""))).toEqual(
+      provenance,
+    )
   })
 })

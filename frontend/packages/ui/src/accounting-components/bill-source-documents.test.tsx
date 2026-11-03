@@ -8,7 +8,7 @@ afterEach(cleanup)
 const document = { id: 5n, organizationId: 1n, companyId: 2n, resModel: "account_move", resId: 3n, name: "Supplier receipt", isDeleted: false }
 const props = (overrides: Partial<BillSourceDocumentsProps> = {}): BillSourceDocumentsProps => ({ organizationId: 1n, companyId: 2n, billId: 3n, documents: [document], sourceState: { status: "ready" }, onUpload: vi.fn().mockResolvedValue(undefined), onRefresh: vi.fn(), ...overrides })
 const file = () => new File(["receipt bytes"], "receipt.pdf", { type: "application/pdf" })
-const choose = (chosen = file()) => fireEvent.change(screen.getByLabelText("Receipt or supplier document (PDF or image, up to 20 MB)"), { target: { files: [chosen] } })
+const choose = (chosen = file()) => fireEvent.change(screen.getByLabelText("Receipt or supplier document (PDF up to 16 MiB; PNG, JPEG or WebP up to 20 MiB)"), { target: { files: [chosen] } })
 
 describe("manual bill source document path", () => {
   it("shows only canonical linked documents with internal review links", () => {

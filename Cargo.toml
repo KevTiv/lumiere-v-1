@@ -12,6 +12,7 @@ members = [
     "crates/presentation-core",
     "crates/policy-core",
     "crates/finance-review-core",
+    "crates/file-inspection",
 ]
 
 [workspace.package]
@@ -55,6 +56,7 @@ stdb-client = { path = "crates/stdb-client" }
 stdb-auth = { path = "crates/stdb-auth" }
 lumiere-auth-context = { path = "crates/auth-context" }
 lumiere-finance-review-core = { path = "crates/finance-review-core" }
+lumiere-file-inspection = { path = "crates/file-inspection" }
 lumiere-presentation-core = { path = "crates/presentation-core" }
 
 [profile.release]

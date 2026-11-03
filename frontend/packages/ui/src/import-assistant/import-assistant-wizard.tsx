@@ -284,7 +284,7 @@ export function ImportAssistantWizard({
       const text = await file.text()
       if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) return
       const parsed = parseCsvText(text)
-      const report = assertCsvSafeForAi(parsed.headers, parsed.rows.slice(0, 50))
+      const report = assertCsvSafeForAi(parsed.headers, parsed.rows)
       setFileName(file.name)
       setCsvText(text)
       setHeaders(parsed.headers)

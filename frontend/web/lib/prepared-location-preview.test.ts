@@ -23,8 +23,9 @@ test("unsupported parent links, unknown headers and duplicate headers fail close
 })
 
 test("location metadata and row width are validated", () => {
-  const result = previewPreparedLocations(`${header},metadata\nLocation,internal,false,false,[]\nLocation,internal,false,false,{},extra`)
-  assert.deepEqual(result.preview.validation_errors.map(error => error.field), ["metadata", "row"])
+  const result = previewPreparedLocations(`${header},metadata\nLocation,internal,false,false,[]`)
+  assert.deepEqual(result.preview.validation_errors.map(error => error.field), ["metadata"])
+  assert.throws(() => previewPreparedLocations(`${header},metadata\nLocation,internal,false,false,{},extra`), /more fields than the header/)
 })
 
 test("unsafe cells after the first fifty rows fail before any import", () => {

@@ -24,6 +24,7 @@ on:
       - spacetimedb/**
       - crates/presentation-core/**
       - crates/policy-core/**
+      - crates/file-inspection/**
       - lumiere-codegen/**
       - crates/stdb-auth/assets/resource_registry.json
       # Contract pins are part of the release invariant. A pin-only change must
@@ -308,7 +309,7 @@ jobs:
         run: |
           make clean-contracts-live-staging
           make generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
-          dirty="$(git status --porcelain --untracked-files=normal -- spacetimedb crates/presentation-core crates/policy-core lumiere-codegen crates/stdb-auth/assets/resource_registry.json)"
+          dirty="$(git status --porcelain --untracked-files=normal -- spacetimedb crates/presentation-core crates/policy-core crates/file-inspection lumiere-codegen crates/stdb-auth/assets/resource_registry.json)"
           if [ -n "$dirty" ]; then
             echo "Regeneration is not reproducible from the committed tree:"
             echo "$dirty"

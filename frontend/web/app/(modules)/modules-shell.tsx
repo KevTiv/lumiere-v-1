@@ -91,6 +91,7 @@ function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
     passage_id: s.passage_id,
     passage_key: s.passage_key,
     content_hash: s.content_hash,
+    instruction_trust: "untrusted",
     label: s.label,
     field: s.field,
     score: s.score,

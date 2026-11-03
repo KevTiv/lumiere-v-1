@@ -46,6 +46,7 @@ function decodeRecovery(value: unknown, scope: ImportRecoveryScope): ImportRecov
     || typeof stored.entity !== "string" || typeof stored.requestId !== "string"
     || typeof stored.csvData !== "string" || !stored.csvData.trim()
     || typeof stored.fileName !== "string" || !stored.fileName || stored.fileName.length > 1024
+    || (stored.sourceAdmissionId !== undefined && (typeof stored.sourceAdmissionId !== "string" || !/^[a-f0-9]{32}$/.test(stored.sourceAdmissionId)))
     || (stored.currencyId !== undefined && typeof stored.currencyId !== "string")
     || (stored.cacheCompanyId !== undefined && stored.cacheCompanyId !== stored.companyId)) {
     throw new Error("The retained import request does not match this company. No new submission was sent.")
@@ -55,7 +56,7 @@ function decodeRecovery(value: unknown, scope: ImportRecoveryScope): ImportRecov
   }
   const request = createCsvImportRequest(
     BigInt(scope.organizationId), stored.entity, stored.csvData, stored.fileName,
-    { companyId: scope.companyId, currencyId: stored.currencyId, cacheCompanyId: stored.cacheCompanyId },
+    { companyId: scope.companyId, currencyId: stored.currencyId, cacheCompanyId: stored.cacheCompanyId, sourceAdmissionId: stored.sourceAdmissionId as string | undefined },
     stored.requestId,
   )
   return { version: 1, scope: { ...scope, actor: scope.actor.toLowerCase() }, request }

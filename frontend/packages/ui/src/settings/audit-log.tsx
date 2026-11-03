@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { downloadCsv, rowsToCsv } from "../lib/export-csv"
 import { useRBAC } from "@/lib/rbac-context"
 import { useErpSession } from "@lumiere/erp-session"
 import { hasValidOrganizationId } from "@/lib/org-scoped"
@@ -150,26 +151,11 @@ export function AuditLog() {
   }
 
   const handleExport = () => {
-    const csv = [
+    const csv = rowsToCsv(
       ["Timestamp", "User", "Action", "Resource", "Details", "IP"],
-      ...filteredLogs.map((log) => [
-        log.timestamp,
-        log.userName,
-        log.action,
-        log.resource,
-        log.details || "",
-        log.ip || "",
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n")
-
-    const blob = new Blob([csv], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `audit-log-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
+      filteredLogs.map((log) => [log.timestamp, log.userName, log.action, log.resource, log.details || "", log.ip || ""]),
+    )
+    downloadCsv(`audit-log-${new Date().toISOString().split("T")[0]}`, csv)
   }
 
   return (

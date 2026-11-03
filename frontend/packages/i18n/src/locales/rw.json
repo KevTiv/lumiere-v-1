@@ -208,7 +208,7 @@
       "stepPreview": "Reba mbere",
       "uploadHint": "Hitamo dosiye ya CSV UTF-8 kugira ngo utangire.",
       "structureSummary": "Habonetse inkingi {{columns}} n’imirongo {{rows}}",
-      "safetyPassed": "CSV yatsinze igenzura ry’umutekano muri mushakisha",
+      "safetyPassed": "Dosiye yagenzuwe. Suzuma uko inkingi zihuzwa mbere yo kwinjiza amakuru.",
       "analyze": "Sesengura inkingi",
       "analyzing": "Birimo gusesengurwa…",
       "preview": "Reba ibizinjizwa mbere",
@@ -1846,6 +1846,7 @@
       "title": "Igenzura rya fagitire zakiriwe"
     },
     "billDocuments": {
+      "imageLimits": "Amafoto atanyeganyega gusa, atarengeje pigiseli 4096 kuri buri ruhande na pigiseli miliyoni 4 zose.",
       "title": "Inyandiko n’inyemezabwishyu z’abatanga ibicuruzwa"
     },
     "authoring": {

@@ -506,6 +506,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumiere-file-inspection"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "lumiere-policy-core"
 version = "0.1.0"
 
@@ -522,6 +531,7 @@ dependencies = [
 name = "lumiere_v1"
 version = "0.1.0"
 dependencies = [
+ "lumiere-file-inspection",
  "chrono",
  "chrono-tz",
  "hex",

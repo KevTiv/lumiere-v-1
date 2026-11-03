@@ -208,7 +208,7 @@
       "stepPreview": "Hakiki",
       "uploadHint": "Chagua faili ya CSV ya UTF-8 ili kuanza.",
       "structureSummary": "Safu wima {{columns}} · safu za data {{rows}} zimepatikana",
-      "safetyPassed": "CSV imepita ukaguzi wa usalama wa kivinjari",
+      "safetyPassed": "Faili limekaguliwa. Kagua ulinganishaji wa safu kabla ya kuingiza.",
       "analyze": "Changanua safu wima",
       "analyzing": "Inachanganua…",
       "preview": "Hakiki uingizaji",
@@ -1846,6 +1846,7 @@
       "title": "Ukaguzi wa ankara zilizopokelewa"
     },
     "billDocuments": {
+      "imageLimits": "Picha zisizo na uhuishaji pekee, zenye pikseli zisizozidi 4096 kwa kila upande na megapikseli 4 kwa jumla.",
       "title": "Nyaraka na risiti za wasambazaji"
     },
     "authoring": {

@@ -208,7 +208,7 @@
       "stepPreview": "Aperçu",
       "uploadHint": "Choisissez un fichier CSV UTF-8 pour commencer.",
       "structureSummary": "{{columns}} colonnes · {{rows}} lignes de données détectées",
-      "safetyPassed": "Le CSV a passé les contrôles de sécurité du navigateur",
+      "safetyPassed": "Fichier vérifié. Vérifiez la correspondance des colonnes avant l’importation.",
       "analyze": "Analyser les colonnes",
       "analyzing": "Analyse…",
       "preview": "Aperçu de l’importation",
@@ -1846,6 +1846,7 @@
       "title": "Vérification des factures reçues"
     },
     "billDocuments": {
+      "imageLimits": "Les images ne doivent pas être animées et doivent être limitées à 4 096 pixels par côté et à 4 mégapixels.",
       "title": "Documents et reçus fournisseurs"
     },
     "authoring": {

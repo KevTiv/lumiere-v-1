@@ -19,6 +19,7 @@ dev-module = []
 
 [dependencies]
 lumiere-policy-core = { path = "../crates/policy-core" }
+lumiere-file-inspection = { path = "../crates/file-inspection" }
 lumiere-presentation-core = { path = "../crates/presentation-core" }
 spacetimedb = { version = "=2.8.2" }
 spacetimedb-sats = { version = "=2.8.2", features = ["serde"] }

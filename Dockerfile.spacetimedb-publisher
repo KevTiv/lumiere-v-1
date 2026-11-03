@@ -16,6 +16,7 @@ WORKDIR /app
 
 COPY crates/presentation-core crates/presentation-core
 COPY crates/policy-core crates/policy-core
+COPY crates/file-inspection crates/file-inspection
 COPY lumiere-codegen/storage-policy-manifest.json lumiere-codegen/storage-policy-manifest.json
 COPY crates/stdb-auth/assets/resource_registry.json crates/stdb-auth/assets/resource_registry.json
 COPY spacetimedb spacetimedb

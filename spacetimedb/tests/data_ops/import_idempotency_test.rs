@@ -8,9 +8,7 @@ use crate::data_ops::hr_imports::import_hr_payslip_csv;
 use crate::data_ops::import_mapping_templates::{
     finalize_import_assistant_job, FinalizeImportAssistantJobParams,
 };
-use crate::data_ops::import_tracker::{
-    import_content_sha256, import_job, import_job_error,
-};
+use crate::data_ops::import_tracker::{import_content_sha256, import_job, import_job_error};
 use crate::hr::payroll::hr_payslip;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
@@ -83,13 +81,17 @@ pub fn test_contact_assistant_import_replay_is_rejected_by_file_hash(
         .id()
         .find(&jobs[0].id)
         .ok_or("finalized assistant job missing")?;
-    let finalized_metadata = serde_json::from_str::<serde_json::Value>(
-        finalized.metadata.as_deref().unwrap_or("{}"),
-    )
-    .map_err(|error| format!("finalized metadata is invalid: {error}"))?;
-    if finalized_metadata.get("sha256").and_then(|value| value.as_str())
+    let finalized_metadata =
+        serde_json::from_str::<serde_json::Value>(finalized.metadata.as_deref().unwrap_or("{}"))
+            .map_err(|error| format!("finalized metadata is invalid: {error}"))?;
+    if finalized_metadata
+        .get("sha256")
+        .and_then(|value| value.as_str())
         != Some(file_sha256.as_str())
-        || finalized_metadata.get("ai_assisted").and_then(|value| value.as_bool()) != Some(true)
+        || finalized_metadata
+            .get("ai_assisted")
+            .and_then(|value| value.as_bool())
+            != Some(true)
     {
         return Err("assistant finalization erased or forged the exact file identity".to_string());
     }
@@ -190,9 +192,7 @@ pub fn test_payslip_import_replay_is_rejected_by_file_hash(
         ("locale", "1.234,56", "without locale grouping"),
         ("non-finite", "NaN", "finite number"),
     ] {
-        let file = format!(
-            "employee_id,struct_id,name,basic_wage\n1,1,COV22 {suffix},\"{value}\""
-        );
+        let file = format!("employee_id,struct_id,name,basic_wage\n1,1,COV22 {suffix},\"{value}\"");
         let jobs_before = job_count(ctx, org);
         let slips_before = payslip_count(ctx, org);
         import_hr_payslip_csv(ctx, org, file.clone())?;
@@ -236,28 +236,18 @@ pub fn test_payslip_import_replay_is_rejected_by_file_hash(
         "employee_id,struct_id,name,basic_wage\n1,1,COV22 unquoted locale,1.234,56".to_string();
     let jobs_before = job_count(ctx, org);
     let slips_before = payslip_count(ctx, org);
-    import_hr_payslip_csv(ctx, org, unquoted_locale.clone())?;
-    if payslip_count(ctx, org) != slips_before || job_count(ctx, org) != jobs_before + 1 {
-        return Err("unquoted locale money must create one failed job and no payslip".to_string());
+    let structural_error = import_hr_payslip_csv(ctx, org, unquoted_locale)
+        .err()
+        .ok_or("unquoted locale money must reject the structurally invalid file")?;
+    if !structural_error.contains("row is wider than its header") {
+        return Err(format!(
+            "unquoted locale row lost its structural rejection: {structural_error}"
+        ));
     }
-    let unquoted_hash =
-        serde_json::json!({ "sha256": import_content_sha256(&unquoted_locale) }).to_string();
-    let unquoted_job = ctx
-        .db
-        .import_job()
-        .import_job_by_org()
-        .filter(&org)
-        .find(|job| job.metadata.as_deref() == Some(unquoted_hash.as_str()))
-        .ok_or("unquoted locale attempt must retain its exact failed job hash")?;
-    let structural_error = ctx
-        .db
-        .import_job_error()
-        .import_error_by_job()
-        .filter(&unquoted_job.id)
-        .next()
-        .ok_or("unquoted locale attempt must record a structural row error")?;
-    if !structural_error.error_message.contains("column count") {
-        return Err("unquoted locale row did not report its column mismatch".to_string());
+    if payslip_count(ctx, org) != slips_before || job_count(ctx, org) != jobs_before {
+        return Err(
+            "structurally invalid money must leave payslips and import jobs unchanged".to_string(),
+        );
     }
 
     // Structural errors are rejected before creating a job, so they cannot

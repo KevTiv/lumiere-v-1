@@ -1,5 +1,7 @@
 /** Authenticated tracked imports use the dedicated API; no unpublished SDK is assumed. */
 export type TrackedCsvImportScope = {
+  /** Server-owned original-source admission; never a client clean flag. */
+  sourceAdmissionId?: string
   companyId?: bigint | number | string
   currencyId?: bigint | number | string
   /** Cache scope for an org-only import that changes company-scoped product reads. */
@@ -12,6 +14,7 @@ export type CsvImportRequest = {
   requestId: string
   csvData: string
   fileName: string
+  sourceAdmissionId?: string
   companyId?: string
   currencyId?: string
   cacheCompanyId?: string
@@ -51,9 +54,12 @@ export function createCsvImportRequest(
   organizationId: bigint, entity: string, csvData: string, fileName: string,
   scope: TrackedCsvImportScope = {}, requestId = createCsvImportRequestId(),
 ): CsvImportRequest {
+  if (scope.sourceAdmissionId !== undefined && !/^[a-f0-9]{32}$/.test(scope.sourceAdmissionId)) throw new Error("Invalid source admission identity")
+  if (/\.xlsx$/i.test(fileName) && !scope.sourceAdmissionId) throw new Error("Select the workbook again to inspect its original source before importing.")
   if (!/^[a-z][a-z0-9_]*$/.test(entity) || !/^[a-f0-9]{32}$/.test(requestId)) throw new Error("Invalid import request")
   return {
     organizationId: decimalId(organizationId), entity, csvData, fileName, requestId,
+    ...(scope.sourceAdmissionId !== undefined ? { sourceAdmissionId: scope.sourceAdmissionId } : {}),
     companyId: decimalId(scope.companyId),
     ...(scope.currencyId !== undefined ? { currencyId: decimalId(scope.currencyId) } : {}),
     ...(scope.cacheCompanyId !== undefined ? { cacheCompanyId: decimalId(scope.cacheCompanyId) } : {}),
@@ -72,6 +78,7 @@ export function csvImportRequestPath(request: CsvImportRequest, lookup = false):
 export function csvImportRequestBody(request: CsvImportRequest): string {
   return JSON.stringify({
     csvData: request.csvData, fileName: request.fileName, requestId: request.requestId,
+    ...(request.sourceAdmissionId !== undefined ? { sourceAdmissionId: request.sourceAdmissionId } : {}),
     params: { companyId: request.companyId, currencyId: request.currencyId },
   })
 }

@@ -1,3 +1,4 @@
+import { billDocumentContentType } from "@lumiere/erp-shared/document-file-profile"
 import type { CreateDocumentParams } from "@lumiere/stdb/types"
 import { billSourceDocuments, documentActorId, documentId, documentOptional, type BillSourceDocument } from "@lumiere/ui/lib/bill-source-document-model"
 import type { DocumentBlobUploadResult } from "./document-blob-upload"
@@ -15,7 +16,7 @@ function validateManagedUpload(uploaded: DocumentBlobUploadResult, file: File, s
   const baseName = file.name.replace(/\/+$/, "").split("/").pop() || "upload.bin"
   const cleaned = [...baseName].map((character) => /^[A-Za-z0-9. _-]$/.test(character) ? character : "_").join("")
   const canonicalName = cleaned.trim() ? cleaned : "upload.bin"
-  if (!match || match[1] !== String(scope.organizationId) || uploaded.url !== `/api/documents/blobs/object/${match[1]}/${match[2]}/${match[3]}` || !/^[0-9a-f]{64}$/i.test(uploaded.checksum) || uploaded.fileSize !== BigInt(file.size) || uploaded.mimetype !== file.type || uploaded.fileName !== canonicalName) throw new Error("The completed managed upload does not match this file or organization")
+  if (!match || match[1] !== String(scope.organizationId) || uploaded.url !== `/api/documents/blobs/object/${match[1]}/${match[2]}/${match[3]}` || !/^[0-9a-f]{64}$/i.test(uploaded.checksum) || uploaded.fileSize !== BigInt(file.size) || uploaded.mimetype !== billDocumentContentType(file) || uploaded.fileName !== canonicalName) throw new Error("The completed managed upload does not match this file or organization")
 }
 
 export function resolveBillDocumentAttempt(documents: readonly BillSourceDocument[], scope: BillDocumentScope, uploaded: DocumentBlobUploadResult, expectedId?: string): string | null {
@@ -50,7 +51,7 @@ export async function uploadBillSourceDocument(args: {
   const { file, scope } = args
   if (!scope.actorId || !documentId(scope.organizationId) || !documentId(scope.companyId) || !documentId(scope.billId) || !args.isCurrent()) throw new Error("The bill scope or document permissions changed. Reopen this bill before attaching a file.")
   if (scope.companyId > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("This company ID cannot be represented safely by the managed upload API")
-  if (file.size <= 0 || file.size > 20 * 1024 * 1024 || !["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error("Choose a non-empty PDF, PNG, JPEG or WebP file up to 20 MB.")
+  billDocumentContentType(file)
   let uploaded: DocumentBlobUploadResult | undefined
   let linkingStarted = false
   let createdId: string | undefined

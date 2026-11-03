@@ -1,3 +1,4 @@
+import { neutralizeCsvCell } from "@lumiere/erp-shared/csv-import-safety"
 import type { ColumnType, EntityColumn, EntityRow } from "./entity-view-types"
 import { formatTimestampLike, getRowField, unwrapEntityValue } from "./entity-row-values"
 
@@ -10,11 +11,11 @@ export const CSV_BOM = "﻿"
 const DATE_COLUMN_TYPES: ReadonlySet<ColumnType | undefined> = new Set(["date", "datetime", "relative-date"])
 
 /**
- * Stops spreadsheets from running a cell as a formula: text starting with = + - @ tab or CR gets a
- * leading single quote.
+ * Neutralize formula-shaped text for initial CSV viewing. Spreadsheet applications may
+ * alter escaping after a save/reopen; typed XLSX string cells are preferable for that use.
  */
 export function guardCsvInjection(text: string): string {
-  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return neutralizeCsvCell(text)
 }
 
 /** RFC 4180 field: quoted when it holds a comma, quote or line break; quotes are doubled. */
