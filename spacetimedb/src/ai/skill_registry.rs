@@ -649,7 +649,7 @@ pub fn promote_ai_skill_version(
         return Err("skill is not active".to_string());
     }
 
-    require_independent_release_actor(ctx, &version)?;
+    require_release_approval(ctx, &version, reason.as_deref())?;
     require_skill_version_promotion_valid(ctx, version.id)?;
     ensure_fixtures_passed_for_version(ctx, organization_id, version.skill_id, version.id)?;
     set_promotion_certification_state(ctx, version.id, CERTIFICATION_CERTIFIED);
@@ -1462,6 +1462,14 @@ fn transition_release(
                     "skill_version_id": row.skill_version_id,
                     "release_number": row.release_number,
                     "version": version.version,
+                    "approval_mode": if version.created_by == ctx.sender()
+                        || version.reviewed_by == ctx.sender()
+                    {
+                        "organization_admin_self_approval"
+                    } else {
+                        "independent_approval"
+                    },
+                    "reason": row.reason,
                 })
                 .to_string(),
             ),
@@ -1920,8 +1928,8 @@ fn ensure_fixtures_passed_for_version(
     Ok(())
 }
 
-/// The person who authored or reviewed a version cannot promote it. This keeps
-/// the immutable review record and release decision independently attributable.
+/// Rollback retains its independent-actor requirement. Promotion separately
+/// permits explicit, audited organization-admin self-approval.
 fn require_independent_release_actor(
     ctx: &ReducerContext,
     version: &AiSkillVersion,
@@ -1931,6 +1939,47 @@ fn require_independent_release_actor(
             "skill release requires an approver independent of the version author and reviewer"
                 .to_string(),
         );
+    }
+    Ok(())
+}
+
+/// Organization administrators may explicitly approve their own certified skill.
+/// Resolve authority from current tenant membership, never a client role label.
+fn require_release_approval(
+    ctx: &ReducerContext,
+    version: &AiSkillVersion,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    let independent = version.created_by != ctx.sender() && version.reviewed_by != ctx.sender();
+    if independent {
+        return Ok(());
+    }
+    let roles =
+        crate::core::permissions::effective_roles(ctx, version.organization_id, ctx.sender())?;
+    let is_admin = crate::core::access_lifecycle::member_is_admin(
+        ctx,
+        version.organization_id,
+        ctx.sender(),
+        &roles,
+    );
+    validate_release_approval(independent, is_admin, reason)
+}
+
+fn validate_release_approval(
+    independent: bool,
+    is_admin: bool,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    if independent {
+        return Ok(());
+    }
+    if !is_admin {
+        return Err(
+            "skill release requires an independent approver or an organization administrator".into(),
+        );
+    }
+    if reason.is_none_or(|reason| reason.trim().is_empty()) {
+        return Err("administrator self-approval requires a validation note".into());
     }
     Ok(())
 }
@@ -2416,6 +2465,15 @@ fn valid_semver_identifiers(value: &str, reject_numeric_leading_zero: bool) -> b
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn self_approval_requires_current_admin_authority_and_a_note() {
+        assert!(validate_release_approval(false, true, Some("Reviewed fixture evidence")).is_ok());
+        assert!(validate_release_approval(false, false, Some("I am an admin")).is_err());
+        assert!(validate_release_approval(false, true, None).is_err());
+        assert!(validate_release_approval(false, true, Some("  ")).is_err());
+        assert!(validate_release_approval(true, false, None).is_ok());
+    }
 
     fn valid_manifest() -> String {
         serde_json::json!({
