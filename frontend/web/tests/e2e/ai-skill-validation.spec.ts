@@ -96,6 +96,6 @@ test("a changed harness requires another review before creating the version", { 
   await page.getByRole("textbox", { name: "Validation note", exact: true }).fill("Prepared before the harness changed")
   manifest.source_hash = `sha256:${"c".repeat(64)}`
   await page.getByRole("button", { name: "Create version for validation", exact: true }).click()
-  await expect(page.getByRole("alert")).toContainText("The harness changed")
+  await expect(page.getByRole("alert").filter({ hasText: "The harness changed" })).toBeVisible()
   expect(commands).toBe(0)
 })

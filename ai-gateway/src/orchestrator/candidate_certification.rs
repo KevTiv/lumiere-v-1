@@ -855,7 +855,13 @@ mod tests {
             .unwrap();
         assert_ne!(result.actual_output, candidate.fixture.expected_output);
         assert_eq!(result.actual_output["status"], "completed");
-        candidate.version.version = "1.0.0".into();
+        candidate.version.version = "1.0.9".into();
+        let compatible = registry
+            .execute(candidate.clone(), request.environment.clone(), 1, 1)
+            .await
+            .expect("compatible skill revision uses the existing adapter");
+        assert_ne!(compatible.actual_output, candidate.fixture.expected_output);
+        candidate.version.version = "2.0.0".into();
         assert!(matches!(
             registry
                 .execute(candidate.clone(), request.environment.clone(), 1, 1)
