@@ -166,7 +166,8 @@
         "search": "Shakisha…",
         "empty": "Nta bihuye",
         "remove": "Kuraho {{value}}"
-      }
+      },
+      "setupOpensNewTab": "Bifungukira muri tab nshya"
     },
     "formPreview": {
       "label": "Reba mbere"

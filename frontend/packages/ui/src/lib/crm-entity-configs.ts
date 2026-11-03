@@ -58,6 +58,14 @@ const contactEmptyState = (t: TFunction) => ({
 })
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
+const contactTypeBadges = (t: TFunction) => ({
+  type: "badge" as const,
+  badgeLabels: {
+    true: t("crm.contacts.types.company", { defaultValue: "Company" }),
+    false: t("crm.contacts.types.person", { defaultValue: "Person" }),
+  },
+})
+
 const leadStateBadges = (t: TFunction) => ({
   badgeVariants: {
     new: "secondary",
@@ -432,7 +440,7 @@ export const contactsTableConfig = (
         {
           key: "isCompany",
           label: t("crm.contacts.columns.isCompany"),
-          type: "boolean",
+          ...contactTypeBadges(t),
         },
         { key: "city", label: t("crm.contacts.columns.city"), width: "min-w-24" },
         {
@@ -458,7 +466,7 @@ export const contactDetailConfig = (t: TFunction): EntityDetailConfig => ({
         { key: "companyName", label: t("crm.contacts.columns.companyName"), width: "1/2" },
         { key: "email", label: t("crm.contacts.columns.email"), width: "1/2" },
         { key: "phone", label: t("crm.contacts.columns.phone"), width: "1/2" },
-        { key: "isCompany", label: t("crm.contacts.columns.isCompany"), type: "boolean", width: "1/2" },
+        { key: "isCompany", label: t("crm.contacts.columns.isCompany"), ...contactTypeBadges(t), width: "1/2" },
         { key: "city", label: t("crm.contacts.columns.city"), width: "1/2" },
         { key: "countryCode", label: t("crm.contacts.columns.countryId"), width: "1/2" },
       ],

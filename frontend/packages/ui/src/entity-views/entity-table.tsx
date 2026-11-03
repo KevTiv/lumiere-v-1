@@ -423,6 +423,14 @@ export function EntityTable({
   // Row actions only appear once rows are selected; inapplicable ones stay
   // visible but disabled so the selection's state is still explained.
   const selectionActions = actions.filter((action) => action.requiresSelection)
+  const toolbarActions = actions.filter((action) => !action.requiresSelection)
+  const toolbarGroups = new Map<string, { label: string; actions: EntityAction[] }>()
+  for (const action of toolbarActions) {
+    if (!action.toolbarGroup) continue
+    const group = toolbarGroups.get(action.toolbarGroup.id) ?? { label: action.toolbarGroup.label, actions: [] }
+    group.actions.push(action)
+    toolbarGroups.set(action.toolbarGroup.id, group)
+  }
   const renderActionButton = (action: EntityAction) => {
     const Icon = action.icon
     const isPending = pendingActionIds.has(action.id)
@@ -804,7 +812,34 @@ export function EntityTable({
                   {exportLabel}
                 </Button>
               )}
-              {actions.filter((action) => !action.requiresSelection).map(renderActionButton)}
+              {toolbarActions.filter((action) => !action.toolbarGroup).map(renderActionButton)}
+              {Array.from(toolbarGroups, ([id, group]) => (
+                <DropdownMenu key={id}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid={`entity-action-group-${id}`}>
+                      {group.label}
+                      <MoreHorizontal aria-hidden="true" className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="max-h-80 max-w-[calc(100vw-2rem)] overflow-y-auto">
+                    {group.actions.map((action) => {
+                      const Icon = action.icon
+                      const pending = pendingActionIds.has(action.id)
+                      return <DropdownMenuItem
+                        key={action.id}
+                        disabled={pending || (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)}
+                        aria-busy={pending || undefined}
+                        variant={action.variant === "destructive" ? "destructive" : "default"}
+                        onSelect={() => runAction(action)}
+                        data-testid={`entity-action-${action.id}`}
+                      >
+                        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : Icon ? <Icon className="h-4 w-4" /> : null}
+                        <span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{action.label}</span>
+                      </DropdownMenuItem>
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ))}
             </div>
           </div>
         )}
@@ -849,6 +884,11 @@ export function EntityTable({
                 {columns.map((col) => (
                   <TableHead
                     key={col.key}
+                    aria-sort={col.sortable
+                      ? sortedBy?.id === col.key
+                        ? sortedBy.desc ? "descending" : "ascending"
+                        : "none"
+                      : undefined}
                     className={cn(
                       col.width,
                       col.align === "right" && "text-right",
@@ -865,13 +905,6 @@ export function EntityTable({
                           col.align === "center" && "mx-auto",
                         )}
                         onClick={() => handleSort(col.key, col.sortable)}
-                        aria-sort={
-                          sortedBy?.id === col.key
-                            ? sortedBy.desc
-                              ? "descending"
-                              : "ascending"
-                            : "none"
-                        }
                       >
                         {col.label}
                         {getSortIcon(col.key, col.sortable)}

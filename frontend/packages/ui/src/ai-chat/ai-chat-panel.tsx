@@ -43,6 +43,7 @@ import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-ty
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
 import { validateChatImportFiles } from "../lib/chat-import-files"
+import { assistantStarterIds, assistantStarters } from "./assistant-starters"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 
 interface ChatReply {
@@ -683,22 +684,25 @@ export function AIChatPanel({
                   {config?.welcomeMessage || t("aiChat.emptyState.welcome")}
                 </p>
                 <div className={cn("mt-8 grid gap-2", docked ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-                  {([
-                    { labelKey: "aiChat.quickActions.salesSummary", icon: TrendingUp },
-                    { labelKey: "aiChat.quickActions.checkInventory", icon: Package },
-                    { labelKey: "aiChat.quickActions.listCustomers", icon: Users },
-                    { labelKey: "aiChat.quickActions.generateReport", icon: FileText },
-                  ] as const).map(({ labelKey, icon: Icon }) => (
-                    <button
-                      type="button"
-                      key={labelKey}
-                      onClick={() => { setInput(t(labelKey)); inputRef.current?.focus() }}
-                      className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <span>{t(labelKey)}</span>
-                    </button>
-                  ))}
+                  {assistantStarterIds(context).map((id) => {
+                    const starter = assistantStarters[id]
+                    const label = t(`aiChat.starters.${id}.label`, { defaultValue: starter.label })
+                    const prompt = t(`aiChat.starters.${id}.prompt`, { defaultValue: starter.prompt })
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        onClick={() => {
+                          setInput((current) => current.trim() ? `${current}\n\n${prompt}` : prompt)
+                          inputRef.current?.focus()
+                        }}
+                        className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="shrink-0 text-muted-foreground" aria-hidden="true">{iconMap[starter.icon]}</span>
+                        <span>{label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             ) : (

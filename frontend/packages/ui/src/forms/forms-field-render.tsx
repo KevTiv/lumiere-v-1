@@ -69,8 +69,9 @@ export function FormFieldRenderer({
   const { t } = useTranslation()
   const width = field.width || "full"
   const descriptionId = field.description ? `${field.id}-description` : undefined
+  const recoveryId = field.recoveryHelp ? `${field.id}-recovery` : undefined
   const errorId = error ? `${field.id}-error` : undefined
-  const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined
+  const describedBy = [descriptionId, recoveryId, errorId].filter(Boolean).join(" ") || undefined
 
   const renderField = () => {
     switch (field.type) {
@@ -441,6 +442,22 @@ export function FormFieldRenderer({
       {renderField()}
       {field.description && field.type !== "switch" && (
         <p id={descriptionId} className="text-xs leading-5 text-muted-foreground">{field.description}</p>
+      )}
+      {field.recoveryHelp && (
+        <div id={recoveryId} className="space-y-1 text-xs leading-5 text-muted-foreground">
+          <p>{field.recoveryHelp.message}</p>
+          {field.recoveryHelp.action && (
+            <a
+              href={field.recoveryHelp.action.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block font-medium text-primary underline underline-offset-4"
+            >
+              {field.recoveryHelp.action.label}{" "}
+              <span>({t("common.form.setupOpensNewTab", { defaultValue: "opens in a new tab" })})</span>
+            </a>
+          )}
+        </div>
       )}
       {error && (
         <p id={errorId} className="flex items-center gap-1 text-xs leading-5 text-destructive" role="alert">

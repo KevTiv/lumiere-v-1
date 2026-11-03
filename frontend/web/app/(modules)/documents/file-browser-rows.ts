@@ -16,6 +16,7 @@ export interface BrowserDocumentRow {
   isFavorite?: boolean;
   writeUid?: unknown;
   writeDate?: unknown;
+  createDate?: unknown;
 }
 
 /** The folder fields the file browser reads; generated `DocumentFolder` rows satisfy it. */
@@ -50,6 +51,7 @@ export function toBrowserFiles(
       size: knownSize(doc.fileSize),
       folderId: doc.folderId == null ? null : String(doc.folderId),
       updatedAt: epochMs(doc.writeDate),
+      createdAt: epochMs(doc.createDate),
       modifiedBy: doc.writeUid == null ? '—' : resolveIdentityLabel(doc.writeUid, identityLabels),
       isShared: doc.isShared === true,
       isLocked: doc.isLocked === true,

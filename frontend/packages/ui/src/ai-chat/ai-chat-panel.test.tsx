@@ -26,6 +26,21 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("updates starters with page context and preserves an unsent question without sending", () => {
+    const onSendMessage = vi.fn()
+    const { rerender } = render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} context={{ module: "settings", activeTab: "imports" }} />)
+    expect(screen.getByRole("button", { name: "aiChat.starters.importReview.label" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "aiChat.quickActions.salesSummary" })).toBeNull()
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Keep my question" } })
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.starters.sourceHistory.label" }))
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Keep my question\n\naiChat.starters.sourceHistory.prompt")
+    rerender(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} context={{ route: "/sales" }} />)
+    expect(screen.getByRole("button", { name: "aiChat.starters.quotationHelp.label" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "aiChat.starters.importReview.label" })).toBeNull()
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Keep my question\n\naiChat.starters.sourceHistory.prompt")
+    expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
   it("starts a file-only drop without sending or replacing an unsent question", async () => {
     const onImportFiles = vi.fn(async () => {})
     const onSendMessage = vi.fn()

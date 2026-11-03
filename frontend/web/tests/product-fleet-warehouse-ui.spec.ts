@@ -74,7 +74,8 @@ for (const width of [390, 1440]) {
     ).toBeVisible();
     await expect(
       page.getByTestId("module-tab-products-products"),
-    ).toHaveAttribute("aria-selected", "true");
+    ).toHaveCount(0);
+    await expect(page.getByTestId("module-panel-products-products")).toBeVisible();
     await expect(
       page.getByTestId("module-tab-products-warehouse-map"),
     ).toHaveCount(0);

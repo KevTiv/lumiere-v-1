@@ -348,13 +348,18 @@ function OverviewClientLoaded({
       <p className="text-sm text-muted-foreground"><Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link> · {t("overview.financial.historyLink", { defaultValue: "Inspect imported dates and source records awaiting review." })}</p>
       <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today." })}</p>
       {isHydrated ? (
-        <div className="flex flex-col gap-6">
+        <div ref={dashboardGridRef} data-testid="overview-dashboard" className="flex flex-col gap-6">
           <section aria-label="Dashboard resource status" data-testid="overview-resource-status" className="space-y-1 text-sm">
             {Object.entries(resourceStates).flatMap(([resource, state]) => {
               const label = resourceStatusLabel(state)
               return label ? [<p key={resource} data-resource={resource} data-state={state}>{resource}: {label}</p>] : []
             })}
           </section>
+          <DashboardGrid
+            sections={liveSections.filter((section) => section.id === "overview-kpis")}
+            testId="overview-key-metrics"
+            widgetTestIdPrefix="overview-widget"
+          />
           <OwnerControlLoop
             companyReady={operatingCompanyId != null && operatingCompanyId > 0}
             draftBills={movesState ?? ownerControlLoop.draftBills}
@@ -367,16 +372,15 @@ function OverviewClientLoaded({
             lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
             pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
           />
-          <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} />
-          {workspaceProfile === "finance-alpha" && <DailyWorkWorkspace organizationId={organizationId} summary />}
-          <DashboardGrid sections={myWorkSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
+          <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} collapseWhenReady />
           {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
           <DashboardGrid
-            ref={dashboardGridRef}
-            sections={liveSections}
-            testId="overview-dashboard"
+            sections={liveSections.filter((section) => section.id !== "overview-kpis")}
+            testId="overview-analysis"
             widgetTestIdPrefix="overview-widget"
           />
+          {workspaceProfile === "finance-alpha" && <DailyWorkWorkspace organizationId={organizationId} summary />}
+          <DashboardGrid sections={myWorkSections.map((section) => section.id === "overview-work-quick-actions" ? { ...section, title: undefined } : section)} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
         </div>
       ) : (
         <OverviewDashboardSkeleton />

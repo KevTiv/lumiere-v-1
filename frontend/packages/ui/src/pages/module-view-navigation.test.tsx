@@ -94,6 +94,14 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe("module task-area navigation", () => {
+  it("keeps a singleton area's panel named without repeating its tab", () => {
+    route.query = ""
+    render(<ModuleView config={config} />)
+    expect(screen.queryByRole("tablist")).toBeNull()
+    expect(screen.getByRole("tabpanel", { name: "dashboard" }).textContent).toBe("dashboard content")
+    expect(screen.getByTestId("module-area-accounting")).toBeTruthy()
+  })
+
   it("mounts only the active area's triggers and derives the complete tab-to-area map", () => {
     render(<ModuleView config={config} />)
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([

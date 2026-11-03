@@ -126,6 +126,8 @@ export interface EntityAction extends EntityPermissioned {
   variant?: "default" | "outline" | "ghost" | "destructive"
   /** If true, button is disabled when no rows are selected */
   requiresSelection?: boolean
+  /** Groups routine toolbar actions in a menu, after the existing permission filter. */
+  toolbarGroup?: { id: string; label: string }
   /**
    * Presentation-only state gate: when rows are selected and this returns false the button is
    * disabled. Never a permission check — the server re-validates every command.

@@ -10,6 +10,7 @@ export const newFleetVehicleForm = (t: TFunction): FormConfig => ({
   id: "new-fleet-vehicle",
   title: t("fleet.forms.newVehicle.title"),
   description: t("fleet.forms.newVehicle.description"),
+  submitLabel: t("fleet.create"),
   sections: [
     {
       id: "vehicle",

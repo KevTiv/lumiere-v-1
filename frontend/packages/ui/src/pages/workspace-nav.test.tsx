@@ -26,6 +26,16 @@ function Workspace({ initialTab = "dashboard" }: { initialTab?: string }) {
 }
 
 describe("WorkspaceNav", () => {
+  it("uses the workspace link alone when there is only one local view", () => {
+    render(<Workspace />)
+    expect(screen.queryByRole("tablist")).toBeNull()
+    expect(screen.getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page")
+    expect(screen.getByRole("tabpanel").textContent).toBe("dashboard content")
+    fireEvent.click(screen.getByRole("link", { name: "Payables" }))
+    expect(screen.queryByRole("tablist")).toBeNull()
+    expect(screen.getByRole("tabpanel").textContent).toBe("bills content")
+  })
+
   it("derives the workspace and accessible panel from an existing secondary-tab deep link", () => {
     render(<Workspace initialTab="credit-control" />)
     expect(screen.getByRole("link", { name: "Receivables" }).getAttribute("aria-current")).toBe("page")

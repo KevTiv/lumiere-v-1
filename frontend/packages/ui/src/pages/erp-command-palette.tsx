@@ -12,6 +12,7 @@ import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
 import { isRecordSearchQuery } from "../lib/record-search"
+import { buildCommandWorkspaceLinks } from "../lib/command-workspace-links"
 import { RecordSearchResults, type RecordSearchSummary } from "./erp-command-palette-records"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
@@ -103,6 +104,10 @@ export function ErpCommandPalette({
     .sort()
     .join("\n")
   const allowedSurfaceIds = useMemo(() => new Set(allowedSurfaceKey.split("\n")), [allowedSurfaceKey])
+  const workspaceLinks = useMemo(
+    () => buildCommandWorkspaceLinks(accessibleNavGroups, t),
+    [accessibleNavGroups, t],
+  )
   useEffect(() => {
     if (!recordSearchActive) setRecordSummary(null)
   }, [recordSearchActive])
@@ -169,6 +174,24 @@ export function ErpCommandPalette({
               onNavigate={navigate}
               onSummary={setRecordSummary}
             />
+          ) : null}
+
+          {isRecordSearchQuery(search) && workspaceLinks.length > 0 ? (
+            <CommandGroup heading={t("commandPalette.workspaces.heading", { defaultValue: "Go to workspace" })}>
+              {workspaceLinks.map((item) => {
+                const Icon = item.icon
+                return (
+                  <CommandItem
+                    key={item.href}
+                    value={`${item.label} ${item.href} ${item.keywords}`}
+                    onSelect={() => navigate(item.href)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
           ) : null}
 
           {hasQuickActions ? (

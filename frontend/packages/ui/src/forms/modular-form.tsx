@@ -519,9 +519,9 @@ export function ModularForm({
         <div data-form-ai-panel className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className={workspaceStyles.sectionTitle}>Fill with AI</p>
+              <p className={workspaceStyles.sectionTitle}>{t("forms.aiAssist.title", { defaultValue: "Fill with AI" })}</p>
               <p className={cn(workspaceStyles.sectionDescription, "mt-0.5")}>
-                Suggestions only update this form after you apply them.
+                {t("forms.aiAssist.description", { defaultValue: "Suggestions only update this form after you apply them." })}
               </p>
             </div>
             <Button
@@ -532,18 +532,20 @@ export function ModularForm({
               disabled={busy}
             >
               <Sparkles className="mr-2 h-4 w-4" />
-              {aiPanelOpen ? "Hide AI" : "Fill with AI"}
+              {aiPanelOpen ? t("forms.aiAssist.hide", { defaultValue: "Hide AI" }) : t("forms.aiAssist.title", { defaultValue: "Fill with AI" })}
             </Button>
           </div>
 
           {aiPanelOpen ? (
             <div className="space-y-3">
               <Textarea
+                variant="plain"
+                aria-label={t("forms.aiAssist.promptLabel", { defaultValue: "Notes for form suggestions" })}
                 value={aiPrompt}
                 onChange={(event) => setAiPrompt(event.target.value)}
-                placeholder="Paste notes, an email, invoice text, or describe what this form should contain..."
+                placeholder={t("forms.aiAssist.placeholder", { defaultValue: "Paste notes or describe what this form should contain…" })}
                 rows={4}
-                className="bg-background"
+                className="max-h-48 min-h-24 resize-y bg-background"
               />
               {aiValidationNotes.length > 0 ? (
                 <div className="space-y-1">
@@ -563,7 +565,7 @@ export function ModularForm({
                   disabled={busy || aiSuggest.isPending}
                 >
                   {aiSuggest.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Suggest values
+                  {t("forms.aiAssist.suggest", { defaultValue: "Suggest values" })}
                 </Button>
                 <Button
                   type="button"
@@ -571,7 +573,7 @@ export function ModularForm({
                   onClick={handleApplyAiSuggestions}
                   disabled={busy || Object.keys(aiSuggestions).length === 0}
                 >
-                  Apply suggestions
+                  {t("forms.aiAssist.apply", { defaultValue: "Apply suggestions" })}
                 </Button>
               </div>
             </div>

@@ -23,5 +23,9 @@ describe("formatFileSize", () => {
     expect(formatFileSize(25 * 1024 * 1024)).toBe("25 MB")
     expect(formatFileSize(-1)).toBe("—")
     expect(formatFileSize(10n)).toBe("10 B")
+    for (const missing of [null, undefined, "", false, true, {}, []]) {
+      expect(formatFileSize(missing)).toBe("—")
+    }
+    expect(formatFileSize(0)).toBe("0 B")
   })
 })

@@ -93,17 +93,19 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
           </DropdownMenu>
         )}
       </nav>
-      <ContextTabsList aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`}>
-        {localTabs.map((tab) => (
-          <ContextTabsTrigger
-            key={tab.id}
-            value={tab.id}
-            data-testid={`module-tab-${moduleId}-${tab.id}`}
-          >
-            {tab.label}
-          </ContextTabsTrigger>
-        ))}
-      </ContextTabsList>
+      {localTabs.length > 1 && (
+        <ContextTabsList aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`}>
+          {localTabs.map((tab) => (
+            <ContextTabsTrigger
+              key={tab.id}
+              value={tab.id}
+              data-testid={`module-tab-${moduleId}-${tab.id}`}
+            >
+              {tab.label}
+            </ContextTabsTrigger>
+          ))}
+        </ContextTabsList>
+      )}
     </div>
   )
 }

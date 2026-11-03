@@ -166,7 +166,8 @@
         "search": "Tafuta…",
         "empty": "Hakuna vinavyolingana",
         "remove": "Ondoa {{value}}"
-      }
+      },
+      "setupOpensNewTab": "hufunguka kwenye kichupo kipya"
     },
     "formPreview": {
       "label": "Hakiki"

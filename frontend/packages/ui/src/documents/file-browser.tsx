@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import { cn } from "../lib/utils"
 import { fileKindOf, formatFileSize, type FileKind } from "../lib/file-kind"
+import { formatFileDate } from "../lib/file-metadata"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
 import { EmptyStateCard } from "../components/empty-state-card"
@@ -55,6 +56,8 @@ export interface FileBrowserFile {
   folderId: string | null
   /** Epoch ms. */
   updatedAt: number | null
+  /** Original creation time, independently of a known modification time. */
+  createdAt?: number | null
   /** Display name of whoever last changed the file. */
   modifiedBy: string
   isShared?: boolean
@@ -236,12 +239,17 @@ export function FileBrowser({
       .filter(
         (file) => !q || file.name.toLowerCase().includes(q) || file.fileName.toLowerCase().includes(q),
       )
-      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+      .sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0))
   }, [files, activeFolderId, search])
 
   const formatDate = (ms: number | null) =>
-    ms == null ? "—" : new Date(ms).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })
-  const sizeLabel = (bytes: number | null) => bytes == null ? "—" : formatFileSize(bytes)
+    formatFileDate(ms, locale)
+  const sizeLabel = (bytes: number | null) => formatFileSize(bytes)
+  const fileDateLabel = (file: FileBrowserFile) => file.updatedAt != null
+    ? t("documents.browser.updated", { date: formatDate(file.updatedAt) })
+    : file.createdAt != null
+      ? t("documents.browser.created", { defaultValue: "Created {{date}}", date: formatDate(file.createdAt) })
+      : "—"
 
   const upload = async (picked: File[]) => {
     if (!onUpload || picked.length === 0 || uploadBusy.current) return
@@ -493,7 +501,7 @@ export function FileBrowser({
                     {file.name}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {sizeLabel(file.size)} · {formatDate(file.updatedAt)}
+                    {sizeLabel(file.size)} · {fileDateLabel(file)}
                   </p>
                 </div>
               </button>
@@ -507,7 +515,7 @@ export function FileBrowser({
                   <th className="px-3 py-2 font-medium">{t("documents.browser.name")}</th>
                   <th className="px-3 py-2 font-medium">{t("documents.browser.size")}</th>
                   <th className="px-3 py-2 font-medium">{t("documents.browser.modifiedBy")}</th>
-                  <th className="px-3 py-2 font-medium">{t("documents.browser.modified")}</th>
+                  <th className="px-3 py-2 font-medium">{t("documents.browser.date", { defaultValue: "Date" })}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -533,7 +541,7 @@ export function FileBrowser({
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">{sizeLabel(file.size)}</td>
                     <td className="truncate px-3 py-2 text-muted-foreground">{file.modifiedBy}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{formatDate(file.updatedAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{fileDateLabel(file)}</td>
                   </tr>
                 ))}
               </tbody>

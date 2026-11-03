@@ -166,7 +166,8 @@
         "search": "Rechercher…",
         "empty": "Aucun résultat",
         "remove": "Retirer {{value}}"
-      }
+      },
+      "setupOpensNewTab": "s’ouvre dans un nouvel onglet"
     },
     "formPreview": {
       "label": "Aperçu"

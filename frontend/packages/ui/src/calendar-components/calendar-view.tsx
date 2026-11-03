@@ -92,7 +92,7 @@ export function CalendarView({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">{monthYear}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{t("calendar.workspace.timezone", { defaultValue: "Times shown in {{timezone}}", timezone })}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("calendar.workspace.browserTimezone", { defaultValue: "Times shown in {{timezone}} (this browser)", timezone })}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className="min-h-11" variant="outline" onClick={onToday}>{t("calendar.view.today")}</Button>

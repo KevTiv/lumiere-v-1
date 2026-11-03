@@ -7,6 +7,7 @@ export const newProductForm = (t: TFunction): FormConfig => ({
   id: "new-product",
   title: t("inventory.forms.newProduct.title"),
   description: t("inventory.forms.newProduct.description"),
+  submitLabel: t("inventory.forms.newProduct.submitLabel", { defaultValue: "Create product" }),
   sections: [
     {
       id: "product-identity",

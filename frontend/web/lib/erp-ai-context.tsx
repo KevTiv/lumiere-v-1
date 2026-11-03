@@ -53,9 +53,10 @@ function ErpAiRouteContextBridge({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const urlActiveTab = searchParams.get("tab")
+  const settingsSection = pathname === "/settings" ? searchParams.get("section") : null
   const selectionState = useErpAiSelectionState()
   const selectionReporter = useErpAiSelectionReporter()
-  const activeTab = selectionState.activeTab ?? urlActiveTab
+  const activeTab = selectionState.activeTab ?? urlActiveTab ?? settingsSection
 
   useEffect(() => {
     selectionReporter?.setActiveTab(null)

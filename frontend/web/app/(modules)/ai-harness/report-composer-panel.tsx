@@ -46,6 +46,7 @@ import { useAiReportComposer } from "@lumiere/query-hooks/hooks/ai-report-compos
 import type { DecisionOutcome } from "@lumiere/erp-shared/ai-policy-schemas"
 import type { ReportComposerResult } from "@lumiere/erp-shared/ai-report-composer-schemas"
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
+import { calendarDayKey } from "@lumiere/ui/lib/calendar-dates"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
 import { policyOutcomeLabel, riskClassLabel } from "./enum-labels"
@@ -57,7 +58,7 @@ interface ReportComposerPanelProps {
 }
 
 function todayInputValue(): string {
-  return new Date().toISOString().slice(0, 10)
+  return calendarDayKey(new Date())
 }
 
 function timezoneInputValue(): string {
@@ -211,6 +212,7 @@ export function ReportComposerPanel({
                 </InputGroupAddon>
                 <InputGroupInput type="text" value={timezone} readOnly />
               </InputGroup>
+              <p className="text-xs text-muted-foreground">{t("aiHarness.reportComposer.browserTimezone", { defaultValue: "Uses this browser’s timezone. Financial reports may use a different reporting timezone." })}</p>
             </Field>
           </FieldGroup>
 
