@@ -1,5 +1,5 @@
 import { chooseSelectValue } from "../components/select-test-utils"
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { forwardRef, type ReactNode } from "react"
 
@@ -26,6 +26,86 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("prepares ERP actions without sending or replacing unsent work, including after a reply", async () => {
+    const onSendMessage = vi.fn()
+    render(<AIChatPanel open docked onClose={vi.fn()} onSendMessage={onSendMessage} initialMessages={[{ id: "saved", role: "assistant", content: "Review this invoice.", timestamp: new Date() }]} />)
+    await screen.findByText("Review this invoice.")
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Keep my invoice question" } })
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
+    expect(input.value).toBe("Keep my invoice question")
+    expect(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }).getAttribute("aria-pressed")).toBe("true")
+    expect(document.activeElement).toBe(input)
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(screen.getByTestId("erp-ai-chat-message-assistant").textContent).toContain("Review this invoice.")
+  })
+
+  it("finds configured skills with slash, selects several without sending, and sends their prompts together", async () => {
+    const onSendMessage = vi.fn(async () => ({ content: "Prepared for review." }))
+    render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} config={{ skills: [
+      { id: "bank", label: "Reconcile accounts", prompt: "Review reconciliation differences.", keywords: ["bank"] },
+    ] }} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Keep this question /bank" } })
+    expect(screen.getByRole("button", { name: "Reconcile accounts" }).getAttribute("data-active")).toBe("true")
+    fireEvent.keyDown(input, { key: "Enter" })
+    expect(input.value).toBe("Keep this question ")
+    expect(onSendMessage).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: "Keep this question /report" } })
+    fireEvent.keyDown(input, { key: "Tab" })
+    expect(within(screen.getByRole("group", { name: "aiChat.quickActions.label" })).getByRole("button", { name: "aiChat.quickActions.generateReport" }).getAttribute("aria-pressed")).toBe("true")
+    expect(screen.getAllByRole("button", { name: "aiChat.deck.remove" })).toHaveLength(2)
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledExactlyOnceWith("Keep this question\n\naiChat.quickActions.reportPrompt\n\nReview reconciliation differences."))
+  })
+
+  it("cycles slash matches without sending and keeps an unmatched query available to edit", () => {
+    const onSendMessage = vi.fn()
+    render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "/" } })
+    fireEvent.keyDown(input, { key: "ArrowDown" })
+    expect(screen.getByRole("button", { name: "aiChat.quickActions.findRecords" }).getAttribute("data-active")).toBe("true")
+    fireEvent.keyDown(input, { key: "Enter" })
+    expect(input.value).toBe("")
+    expect(screen.getByRole("button", { name: "aiChat.quickActions.findRecords" }).getAttribute("aria-pressed")).toBe("true")
+    fireEvent.change(input, { target: { value: "/no-such-skill" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(input.value).toBe("/no-such-skill")
+    expect(screen.getByText("aiChat.deck.noMatches")).toBeTruthy()
+    fireEvent.keyDown(input, { key: "Escape" })
+    expect(screen.queryByText("aiChat.deck.noMatches")).toBeNull()
+  })
+
+  it("removes a selected skill without changing the typed draft or an in-progress slash query", () => {
+    render(<AIChatPanel open onClose={vi.fn()} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
+    fireEvent.change(input, { target: { value: "Keep this /find" } })
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.remove" }))
+    expect(input.value).toBe("Keep this /find")
+    expect(screen.queryByRole("group", { name: "aiChat.deck.selected" })).toBeNull()
+  })
+
+  it("restores a failed request without duplicating selected skill prompts on retry", async () => {
+    const onSendMessage = vi.fn().mockRejectedValueOnce(new Error("Retry this request")).mockResolvedValue({ content: "Prepared." })
+    render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "New invoice" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("New invoice"))
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(2))
+    expect(onSendMessage.mock.calls[0]?.[0]).toBe("New invoice\n\naiChat.quickActions.createDraftPrompt")
+    expect(onSendMessage.mock.calls[1]?.[0]).toBe(onSendMessage.mock.calls[0]?.[0])
+  })
+
+  it("uses the full dialog layout for error help even when side chat is requested", () => {
+    render(<AIChatPanel open docked modal onClose={vi.fn()} />)
+    expect(screen.getByTestId("erp-ai-chat-panel").getAttribute("data-mode")).toBe("full")
+  })
+
   it("starts a file-only drop without sending or replacing an unsent question", async () => {
     const onImportFiles = vi.fn(async () => {})
     const onSendMessage = vi.fn()
