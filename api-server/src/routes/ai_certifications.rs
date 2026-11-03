@@ -19,7 +19,7 @@ use stdb_config::runtime_is_production;
 use tower_cookies::Cookies;
 
 use crate::{
-    commands::dispatch_session_reducer,
+    commands::{dispatch_ai_skill_certification_request, dispatch_session_reducer},
     error::ApiError,
     query_exec::authorize_membership_company_ids,
     session::parse_stdb_identity_hex,
@@ -178,17 +178,13 @@ async fn request_certification(
     let organization_id = require_org(&session)?;
     ensure_ai_skill_access(session.field_access.as_ref(), "write")?;
 
-    let params = json!({
-        "companyId": body.company_id,
-        "skillVersionId": body.skill_version_id,
-        "fixtureId": body.fixture_id,
-        "idempotencyKey": body.idempotency_key,
-    });
-    let context = dispatch_session_reducer(
+    let context = dispatch_ai_skill_certification_request(
         &state,
         &session,
-        "request_ai_skill_certification",
-        json!([organization_id, params]),
+        body.company_id,
+        body.skill_version_id,
+        body.fixture_id,
+        &body.idempotency_key,
     )
     .await?;
 
