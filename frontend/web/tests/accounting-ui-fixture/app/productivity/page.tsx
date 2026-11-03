@@ -3,6 +3,9 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { ErpSessionProvider } from "@lumiere/erp-session"
+import { useCalendarTimezone } from "../../../../lib/use-calendar-timezone"
 import { I18nProvider } from "@lumiere/i18n"
 import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider"
 import { Button } from "../../../../../packages/ui/src/components/button"
@@ -32,6 +35,23 @@ const initialMessages: MessageRow[] = [
   // A visible message with a mismatched source must remain a separate conversation.
   { id: "103", model: "account_move", resId: "99", parentId: "101", body: "Separate supplier discussion", date: 1793185200000, messageType: { tag: "Comment" }, authorId: "reviewer" },
 ]
+
+const timezoneEvents: CalendarEvent[] = [
+  { ...events[0]!, id: "zone-boundary", title: "Account midnight review", startTime: new Date("2026-03-29T00:30:00Z"), endTime: new Date("2026-03-29T00:45:00Z") },
+  { ...events[0]!, id: "zone-spring", title: "Spring transition review", startTime: new Date("2026-03-29T01:30:00Z"), endTime: new Date("2026-03-29T02:00:00Z") },
+]
+function AccountTimezoneCalendar() {
+  const zone = useCalendarTimezone()
+  const day = calendarDate("2026-03-29", new Date("2026-03-29T12:00:00Z"), zone.timeZone)
+  return <CalendarView events={timezoneEvents} viewMode="day" currentDate={day} selectedDate={null} searchTerm="" selectedEventId={null}
+    timeZone={zone.timeZone} timezoneSource={zone.source} timezoneReady={zone.ready}
+    timezoneNotice={zone.fallbackReason ? "The saved account timezone is unavailable. The labelled fallback is in use." : undefined}
+    onViewModeChange={() => {}} onPrevMonth={() => {}} onNextMonth={() => {}} onToday={() => {}} onSelectDate={() => {}} onSearchChange={() => {}} onSelectEvent={() => {}} />
+}
+function AccountTimezoneFixture() {
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } }))
+  return <QueryClientProvider client={queryClient}><ErpSessionProvider value={{ identity: "synthetic-calendar-account", organizationId: 1, connected: true, companyIds: [1] }}><AccountTimezoneCalendar /></ErpSessionProvider></QueryClientProvider>
+}
 
 function Preview() {
   const router = useRouter()
@@ -74,6 +94,7 @@ function Preview() {
     <p data-testid="productivity-disclosure" data-hydrated={hydrated}>Synthetic productivity preview. Production components; no authentication or ERP operations.</p>
     <nav aria-label="Preview components" className="flex flex-wrap gap-3">{["files", "calendar", "messages"].map((id) => <Link key={id} href={`/productivity?panel=${id}`} className="rounded-md border px-3 py-2 text-sm capitalize">{id}</Link>)}</nav>
     {panel === "files" && <section aria-label="Files preview" className="space-y-4 rounded-xl border p-4"><h1 className="text-xl font-semibold">Files</h1>{params.get("document") ? <div data-testid="synthetic-document"><h2>Document #{params.get("document")}</h2><p>Synthetic record destination; the file ID comes from the production browser.</p><Button onClick={() => { const next = new URLSearchParams(params.toString()); next.delete("document"); router.push(`/productivity?${next}`) }}>Back to files</Button></div> : <FileBrowser folders={folders} files={files} state={browserState} onStateChange={onFileState} onOpenFile={(id) => update({ document: id }, true)} onUpload={async () => { throw new Error("Synthetic upload failure: file outcome unconfirmed") }} />}</section>}
+    {panel === "account-calendar" && <AccountTimezoneFixture />}
     {panel === "calendar" && <section aria-label="Calendar preview" className="space-y-4 rounded-xl border p-4"><h1 className="text-xl font-semibold">Calendar</h1><p data-testid="synthetic-create-count">Create callbacks: {createCount}</p><CalendarView events={events} viewMode={mode} currentDate={date} selectedDate={selectedDate} searchTerm={params.get("search") ?? ""} selectedEventId={eventId} onViewModeChange={setMode} onPrevMonth={() => update({ date: calendarDayKey(new Date(date.getFullYear(), date.getMonth()-1, date.getDate())) })} onNextMonth={() => update({ date: calendarDayKey(new Date(date.getFullYear(), date.getMonth()+1, date.getDate())) })} onToday={() => update({ date: "2026-10-28" })} onSelectDate={(value) => update({ day: calendarDayKey(value) })} onSearchChange={(value) => update({ search: value || null })} onSelectEvent={(id) => update({ event: id }, true)} onCreateEvent={() => setCreateCount((count) => count + 1)} eventHref={(id) => `/calendar/events/${id}`} /></section>}
     {panel === "messages" && <section aria-label="Messages preview" className="space-y-4"><div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => { setCompany(8); update({ message: null }) }}>Switch preview company</Button><p data-testid="reply-callback-count">Reply callbacks: {replies.length}; read callbacks: {checks}</p></div><MessageConversationWorkspace key={company} messages={company === 7 ? messages : []} selectedMessageId={params.get("message")} search={params.get("messageSearch") ?? ""} onSearchChange={(value) => update({ messageSearch: value || null })} onSelectMessage={(id) => update({ message: id }, true)} canReply={company === 7} onReply={reply} onCheckOutcome={async (input) => { setChecks((value) => value + 1); return replyEffect(input) }} sourceLabels={new Map([["account_move:41", "Invoice INV-0041"], ["account_move:99", "Bill BILL-0099"]])} /></section>}
   </main>

@@ -167,6 +167,8 @@ export interface RadioField extends BaseField {
 }
 
 export interface DateField extends BaseField {
+  /** Calendar timezone for date shortcuts; date values remain wall-date strings. */
+  timeZone?: string
   type: "date" | "time" | "datetime"
   defaultValue?: string
   /** Earliest allowed value in the field's string format (`YYYY-MM-DD` for dates). */

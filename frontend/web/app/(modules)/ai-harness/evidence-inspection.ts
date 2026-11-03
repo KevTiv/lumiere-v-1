@@ -57,6 +57,21 @@ export interface EvidenceInspectionView {
   }>
 }
 
+/** Workflow lookup IDs identify a version/node, while the response identifies its component. */
+export function evidenceInspectionMatchesTarget(
+  inspection: EvidenceInspectionView,
+  target: { kind: EvidenceTargetKind; id: number; nodeKey?: string },
+): boolean {
+  if (target.kind !== "workflow_step") {
+    return inspection.targetKind === target.kind && inspection.targetId === target.id
+  }
+  return inspection.targetKind === "component" && inspection.revisions.some((revision) =>
+    revision.id === inspection.targetId
+    && revision.artifactRef === `workflow-version:${target.id}`
+    && revision.componentKey === `node:${target.nodeKey}`,
+  )
+}
+
 const MAX_EXCERPT_CHARS = 1_000
 
 function record(value: unknown): JsonObject | null {

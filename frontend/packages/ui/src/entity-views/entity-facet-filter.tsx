@@ -53,7 +53,7 @@ export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: E
           <Button
             variant="outline"
             size="sm"
-            className="h-8 border-dashed"
+            className="h-auto min-h-11 min-w-0 w-full max-w-full justify-start whitespace-normal"
             aria-label={filter.label}
             data-testid={`entity-facet-${filter.key}`}
           />
@@ -69,7 +69,7 @@ export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: E
                 {chosen.length} selected
               </Badge>
             ) : (
-              <span className="flex gap-1">
+              <span className="flex min-w-0 flex-wrap gap-1">
                 {chosen.map((option) => (
                   <Badge key={option.value} variant="secondary" className="rounded-sm px-1 font-normal">
                     {option.label}
@@ -80,7 +80,7 @@ export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: E
           </>
         ) : null}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-60 p-1">
+      <PopoverContent align="start" className="w-60 max-w-[calc(100vw-2rem)] p-1">
         <ul role="listbox" aria-multiselectable="true" aria-label={filter.label} className="max-h-72 overflow-y-auto">
           {options.map((option) => {
             const isSelected = selected.has(option.value.toLowerCase())
@@ -89,7 +89,7 @@ export function EntityFacetFilter({ filter, value, rows, disabled, onChange }: E
               <li key={option.value} role="option" aria-selected={isSelected}>
                 <label
                   htmlFor={id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                 >
                   <Checkbox
                     id={id}

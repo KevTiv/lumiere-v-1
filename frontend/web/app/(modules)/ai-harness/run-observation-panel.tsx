@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@lumi
 import { Skeleton } from "@lumiere/ui/components/skeleton"
 import { mapRunObservation, type RunObservationView } from "./run-observation"
 import { runStatusLabel } from "./enum-labels"
+import { HarnessInspector } from "./harness-inspector"
 
 export type ObservationState =
   | { status: "idle" }
@@ -76,11 +77,37 @@ export function RunObservation({ observation }: { observation: ObservationState 
             <Badge variant="outline">{t("aiHarness.runLifecycle.runNumber", { id: run.runId })}</Badge>
             <Badge variant="outline">{runStatusLabel(t, run.status)}</Badge>
             <Badge variant="outline">{t("aiHarness.runLifecycle.stepCount", { count: run.stepCount })}</Badge>
-            {run.tokensUsed !== null ? <Badge variant="outline">{t("aiHarness.runLifecycle.tokenCount", { count: run.tokensUsed })}</Badge> : null}
+
           </div>
         </div>
       </CardHeader>
       <CardContent>
+        {run.economics?.outcomeUnknown ? <p role="status" className="mb-3 text-sm font-medium">{t("aiHarness.ux.observation.unknown", { defaultValue: "The result of a provider request is unknown. Inspect the history before starting another request." })}</p> : null}
+        {run.economics?.settledUnits != null ? <p className="mb-3 text-sm">{t("aiHarness.ux.observation.settled", { defaultValue: "Settled usage: {{amount}} {{currency}}", amount: (run.economics.settledUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }), currency: run.economics.currency ?? "units" })}</p> : null}
+        {run.transcript.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.noToolSteps")}</p>
+        ) : (
+          <ol className="flex flex-col gap-3">
+            {run.transcript.map((step) => (
+              <li key={step.id} className="rounded-md border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{t("aiHarness.runLifecycle.stepNumber", { number: step.stepNo })}</Badge>
+
+                    {step.error ? <Badge variant="destructive">{t("aiHarness.runLifecycle.failed")}</Badge> : <Badge variant="outline">{t("aiHarness.runLifecycle.completed")}</Badge>}
+                  </div>
+
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>{step.resultSummary}</span>
+
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+        <HarnessInspector title={t("aiHarness.inspector.execution", { defaultValue: "Technical inspector: execution trace and usage" })}>
+          {run.tokensUsed !== null ? <p className="text-sm">{t("aiHarness.runLifecycle.tokenCount", { count: run.tokensUsed })}</p> : null}
         {run.economics ? (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
             {run.economics.providerModels.map((pair) => <Badge key={`${pair.provider}:${pair.model}`} variant="outline">{pair.provider} / {pair.model}</Badge>)}
@@ -95,28 +122,12 @@ export function RunObservation({ observation }: { observation: ObservationState 
             {run.economics.truncated ? <Badge variant="outline">Economics truncated</Badge> : null}
           </div>
         ) : null}
-        {run.transcript.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.noToolSteps")}</p>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {run.transcript.map((step) => (
-              <li key={step.id} className="rounded-md border p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{t("aiHarness.runLifecycle.stepNumber", { number: step.stepNo })}</Badge>
-                    <span className="font-medium">{step.toolName}</span>
-                    {step.error ? <Badge variant="destructive">{t("aiHarness.runLifecycle.failed")}</Badge> : <Badge variant="outline">{t("aiHarness.runLifecycle.completed")}</Badge>}
-                  </div>
-                  <span className="text-xs text-muted-foreground">{t("aiHarness.runLifecycle.durationMs", { duration: step.durationMs.toLocaleString() })}</span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>{step.resultSummary}</span>
-                  {step.inputHash ? <span title={step.inputHash}>{t("aiHarness.runLifecycle.inputHash", { hash: `${step.inputHash.slice(0, 12)}…` })}</span> : null}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+          <ol className="flex min-w-0 flex-col gap-3">{run.transcript.map((step) => <li key={step.id} className="text-xs">
+            <p>{t("aiHarness.runLifecycle.stepNumber", { number: step.stepNo })}: <code>{step.toolName}</code></p>
+            <p>{t("aiHarness.runLifecycle.durationMs", { duration: step.durationMs.toLocaleString() })}</p>
+            {step.inputHash ? <p><code>{step.inputHash}</code></p> : null}
+          </li>)}</ol>
+        </HarnessInspector>
       </CardContent>
     </Card>
   )

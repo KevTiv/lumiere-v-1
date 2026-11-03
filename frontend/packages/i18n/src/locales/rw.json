@@ -309,7 +309,8 @@
         "clear": "Kuraho ibiyungurura",
         "description": "Gerageza gushakisha ukundi cyangwa ukureho ibiyungurura.",
         "title": "Nta nyandiko zihuye n’ibyo ushaka"
-      }
+      },
+      "groupBy": "Gushyira mu matsinda hakurikijwe"
     },
     "retry": "Ongera ugerageze",
     "recordsDenied": "Ntiwemerewe kureba izi nyandiko.",
@@ -433,6 +434,9 @@
       "unavailable": "Ibyifuzo ntibiboneka. Uzuza fomu cyangwa urebe ibisabwa.",
       "suggest": "Tanga ibyifuzo",
       "apply": "Koresha ibyifuzo"
+    },
+    "listToolbar": {
+      "viewSettings": "Igenamiterere ry’uko bigaragara"
     }
   },
   "navigation": {
@@ -4405,7 +4409,8 @@
       "emailVerificationHint": "Guhindura imeyili bisaba kwemezwa n’uguha umwirondoro n’umuyobozi.",
       "loadError": "Ntibyashobotse kuzana amakuru yawe. Ongera ufungure urupapuro ugerageze.",
       "securityProviderHint": "Uguha umwirondoro ni we ucunga ijambo ry’ibanga n’umutekano wo kwinjira.",
-      "manageSecurity": "Gena umutekano wo kwinjira"
+      "manageSecurity": "Gena umutekano wo kwinjira",
+      "invalidTimezone": "Andika izina ryemewe rya IANA ry’akarere k’igihe, nka Europe/Amsterdam cyangwa Africa/Kigali."
     },
     "customFields": {
       "title": "Imyanya y’amakuru yanjye bwite",

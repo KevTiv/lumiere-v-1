@@ -23,7 +23,11 @@ type HistoryState =
   | { status: "denied"; reason: "signedOut" | "forbidden" }
   | { status: "success"; data: RunHistoryView }
 
-export function RunHistoryPanel({ companyId }: { companyId: number | null }) {
+export function RunHistoryPanel({ companyId, onSelectRun, selectRunDisabled = false }: {
+  companyId: number | null
+  onSelectRun?: (runId: number) => void
+  selectRunDisabled?: boolean
+}) {
   const { t } = useTranslation()
   const activeRequest = useRef<AbortController | null>(null)
   useEffect(() => () => activeRequest.current?.abort(), [])
@@ -133,7 +137,10 @@ export function RunHistoryPanel({ companyId }: { companyId: number | null }) {
                 </div>
               ) : null}
             </div>
-            <a className={buttonVariants({ size: "sm", variant: "outline" })} href={`/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${run.runId}`}>{t("aiHarness.runHistory.inspect")}</a>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {onSelectRun ? <Button type="button" size="sm" disabled={selectRunDisabled || state.status === "loading"} onClick={() => onSelectRun(run.runId)}>{t("aiHarness.runHistory.openRun", { defaultValue: "Open run" })}</Button> : null}
+              <a className={buttonVariants({ size: "sm", variant: "outline" })} href={`/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${run.runId}`}>{t("aiHarness.runHistory.inspect")}</a>
+            </div>
           </div>
         ))}
         {data?.nextCursor && state.status !== "error" ? (

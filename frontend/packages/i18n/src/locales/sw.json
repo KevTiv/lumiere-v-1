@@ -309,7 +309,8 @@
         "clear": "Ondoa vichujio",
         "description": "Jaribu utafutaji mwingine au uondoe vichujio.",
         "title": "Hakuna rekodi zinazolingana"
-      }
+      },
+      "groupBy": "Panga kwa makundi kwa"
     },
     "retry": "Jaribu tena",
     "recordsDenied": "Huna ruhusa ya kufikia rekodi hizi.",
@@ -433,6 +434,9 @@
       "unavailable": "Mapendekezo hayapatikani. Jaza fomu au kagua mahitaji ya usanidi.",
       "suggest": "Pendekeza thamani",
       "apply": "Tumia mapendekezo"
+    },
+    "listToolbar": {
+      "viewSettings": "Mipangilio ya mwonekano"
     }
   },
   "navigation": {
@@ -4405,7 +4409,8 @@
       "emailVerificationHint": "Kubadilisha barua pepe kunahitaji uthibitishaji wa mtoa huduma wa utambulisho na idhini ya msimamizi.",
       "loadError": "Imeshindwa kupakia wasifu wako. Pakia ukurasa upya ili kujaribu tena.",
       "securityProviderHint": "Mtoa huduma wako wa utambulisho anadhibiti nenosiri na usalama wa kuingia.",
-      "manageSecurity": "Dhibiti usalama wa kuingia"
+      "manageSecurity": "Dhibiti usalama wa kuingia",
+      "invalidTimezone": "Weka ukanda wa saa wa IANA unaotambulika, kama Europe/Amsterdam au Africa/Kigali."
     },
     "customFields": {
       "title": "Sehemu zangu maalumu",

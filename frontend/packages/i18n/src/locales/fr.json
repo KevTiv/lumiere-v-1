@@ -309,7 +309,8 @@
         "clear": "Effacer les filtres",
         "description": "Essayez une autre recherche ou effacez les filtres.",
         "title": "Aucun enregistrement correspondant"
-      }
+      },
+      "groupBy": "Regrouper par"
     },
     "retry": "Réessayer",
     "recordsDenied": "Vous n’avez pas accès à ces enregistrements.",
@@ -433,6 +434,9 @@
       "unavailable": "Suggestions indisponibles. Remplissez le formulaire ou vérifiez les prérequis.",
       "suggest": "Proposer des valeurs",
       "apply": "Appliquer les suggestions"
+    },
+    "listToolbar": {
+      "viewSettings": "Paramètres d’affichage"
     }
   },
   "navigation": {
@@ -4405,7 +4409,8 @@
       "emailVerificationHint": "La modification de l’e-mail nécessite la vérification du fournisseur d’identité et l’approbation d’un administrateur.",
       "loadError": "Impossible de charger votre profil. Rechargez la page pour réessayer.",
       "securityProviderHint": "Votre fournisseur d’identité gère votre mot de passe et la sécurité de connexion.",
-      "manageSecurity": "Gérer la sécurité de connexion"
+      "manageSecurity": "Gérer la sécurité de connexion",
+      "invalidTimezone": "Saisissez un fuseau horaire IANA valide, comme Europe/Amsterdam ou Africa/Kigali."
     },
     "customFields": {
       "title": "Mes champs personnalisés",

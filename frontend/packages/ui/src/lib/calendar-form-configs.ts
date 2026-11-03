@@ -13,25 +13,26 @@ interface CalendarEventDefaults {
 
 function allDayLastDate(defaults?: CalendarEventDefaults): string | undefined {
   if (!defaults?.stop) return defaults?.start?.slice(0, 10)
-  const stop = new Date(defaults.stop)
-  const start = defaults.start ? new Date(defaults.start) : null
-  if (defaults.allday && start && stop.getTime() > start.getTime() && stop.getHours() === 0 && stop.getMinutes() === 0) {
-    stop.setDate(stop.getDate() - 1)
-    return `${stop.getFullYear()}-${String(stop.getMonth() + 1).padStart(2, "0")}-${String(stop.getDate()).padStart(2, "0")}`
+  const stopDay = defaults.stop.slice(0, 10)
+  if (defaults.allday && defaults.start && defaults.stop > defaults.start && /^\d{4}-\d{2}-\d{2}T00:00(?::00)?$/.test(defaults.stop)) {
+    const stop = new Date(`${stopDay}T12:00:00Z`)
+    stop.setUTCDate(stop.getUTCDate() - 1)
+    return stop.toISOString().slice(0, 10)
   }
   return defaults.stop.slice(0, 10)
 }
 
-export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefaults, mode: "create" | "edit" = defaults ? "edit" : "create"): FormConfig => ({
+export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefaults, mode: "create" | "edit" = defaults ? "edit" : "create", timeZone?: string): FormConfig => ({
   id: mode === "edit" ? "edit-calendar-event" : "new-calendar-event",
   title: mode === "edit" ? t("calendar.forms.editEvent.title") : t("calendar.forms.newEvent.title"),
-  description: mode === "edit" ? t("calendar.forms.editEvent.description") : t("calendar.forms.newEvent.description"),
+  description: timeZone ? t("calendar.forms.timezoneHint", { defaultValue: "Times use {{timezone}}. Unavailable daylight-saving times are rejected; new repeated times use the earlier occurrence. Unchanged event times keep their original occurrence.", timezone: timeZone }) : mode === "edit" ? t("calendar.forms.editEvent.description") : t("calendar.forms.newEvent.description"),
   submitLabel: mode === "edit" ? t("calendar.forms.editEvent.submit", { defaultValue: "Save event changes" }) : t("calendar.forms.newEvent.submit", { defaultValue: "Create event" }),
   sections: [
     {
       id: "event-details",
       title: t("calendar.forms.newEvent.sections.eventDetails"),
       fields: [
+        ...(timeZone ? [{ id: "eventTimezone", name: "eventTimezone", type: "hidden" as const, defaultValue: timeZone }] : []),
         {
           id: "name",
           name: "name",
@@ -51,6 +52,7 @@ export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefau
           id: "start",
           name: "start",
           type: "datetime",
+          timeZone,
           label: t("calendar.forms.newEvent.fields.start"),
           required: true,
           width: "1/2",
@@ -61,6 +63,7 @@ export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefau
           id: "stop",
           name: "stop",
           type: "datetime",
+          timeZone,
           label: t("calendar.forms.newEvent.fields.stop"),
           required: true,
           width: "1/2",
@@ -68,13 +71,13 @@ export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefau
           visibleWhen: { field: "allday", oneOf: ["false", ""] },
         },
         {
-          id: "allDayStart", name: "allDayStart", type: "date",
+          id: "allDayStart", name: "allDayStart", type: "date", timeZone,
           label: t("calendar.forms.newEvent.fields.startDate", { defaultValue: "Start date" }),
           required: true, width: "1/2", defaultValue: defaults?.start?.slice(0, 10),
           visibleWhen: { field: "allday", equals: "true" },
         },
         {
-          id: "allDayEnd", name: "allDayEnd", type: "date",
+          id: "allDayEnd", name: "allDayEnd", type: "date", timeZone,
           label: t("calendar.forms.newEvent.fields.lastDate", { defaultValue: "Last day" }),
           description: t("calendar.forms.newEvent.fields.lastDateHint", { defaultValue: "Include this date in the event. For one day, choose the same date as the start." }),
           required: true, width: "1/2", defaultValue: allDayLastDate(defaults),

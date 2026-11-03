@@ -176,3 +176,94 @@ test("long invoice rejection stays in the scroll body and leaves actions reachab
   await expectInViewport(page, modal.getByTestId("create-invoice-line-description"))
   await expectInViewport(page, save)
 })
+
+for (const viewport of [
+  { width: 320, height: 568 },
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 1440, height: 900 },
+]) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`responsive form usability at ${viewport.width}px in ${theme} theme`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport)
+      await page.goto("/usability-forms", { waitUntil: "domcontentloaded" })
+      await expect(page.getByTestId("usability-forms-disclosure")).toHaveAttribute("data-hydrated", "true")
+      await page.getByRole("button", { name: theme === "dark" ? "Dark theme" : "Light theme", exact: true }).click()
+      await expect(page.getByTestId("usability-forms-theme")).toHaveText(theme)
+      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${theme}\\b`))
+      await page.evaluate(async () => { await document.fonts.ready })
+
+      for (const form of [
+        { trigger: "New quotation", id: "new-sale-order", field: "clientOrderRef", action: "Save draft quotation" },
+        { trigger: "New product", id: "new-product", field: "name", action: "Create product" },
+        { trigger: "Add vehicle", id: "new-fleet-vehicle", field: "name", action: "Add vehicle" },
+      ]) {
+        const trigger = page.getByRole("button", { name: form.trigger, exact: true })
+        await trigger.focus()
+        await page.keyboard.press("Enter")
+        const modal = page.getByTestId(`form-modal-${form.id}`)
+        const save = modal.getByRole("button", { name: form.action, exact: true })
+        const cancel = modal.getByRole("button", { name: "Cancel", exact: true })
+        const input = modal.getByTestId(`form-field-${form.field}`)
+        await expectInViewport(page, modal)
+        await expectInViewport(page, save)
+        await expectInViewport(page, cancel)
+        await expect(input).toHaveAccessibleName(/\S/)
+        expect(await modal.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+        expect(await modal.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
+
+        if (form.id === "new-sale-order") {
+          await expect(modal.getByLabel("Valid until", { exact: true })).toHaveCount(1)
+          await expect(modal.getByLabel("Promised delivery date", { exact: true })).toHaveCount(1)
+          const setup = modal.getByRole("link", { name: /Open price lists.*opens in a new tab/ })
+          await expect(setup).toHaveAttribute("target", "_blank")
+          await setup.focus()
+          await expectInViewport(page, setup)
+          await page.keyboard.press("Tab")
+          expect(await modal.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+        }
+
+        await input.fill(`Retained ${form.id} entry`)
+        await modal.locator("[data-form-field]").last().scrollIntoViewIfNeeded()
+        await expectInViewport(page, save)
+        await save.focus()
+        await expect(save).toBeFocused()
+        await page.keyboard.press("Shift+Tab")
+        await expect(cancel).toBeFocused()
+        await page.keyboard.press("Tab")
+        await expect(save).toBeFocused()
+        await page.keyboard.press("Tab")
+        expect(await modal.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+        await page.screenshot({ path: testInfo.outputPath(`${form.id}-${viewport.width}-${theme}.png`) })
+
+        await page.keyboard.press("Escape")
+        const discard = page.getByTestId("discard-changes-dialog")
+        await expectInViewport(page, discard)
+        expect(await discard.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+        const keep = discard.getByRole("button", { name: "Keep editing", exact: true })
+        await keep.focus()
+        await page.keyboard.press("Enter")
+        await expect(discard).toBeHidden()
+        await expect(input).toHaveValue(`Retained ${form.id} entry`)
+
+        if (form.id === "new-fleet-vehicle") {
+          await save.focus()
+          await page.keyboard.press("Enter")
+          await expect(modal.getByRole("alert")).toContainText("Synthetic save rejected")
+          await expect(input).toHaveValue(`Retained ${form.id} entry`)
+          await expectInViewport(page, save)
+        }
+        await cancel.click()
+        await expect(discard).toBeVisible()
+        await discard.getByRole("button", { name: "Discard", exact: true }).click()
+        await expect(modal).toBeHidden()
+        // This fixture mounts controlled dialogs without a DialogTrigger. Check
+        // that the page is usable again without assuming trigger-ref restoration.
+        await trigger.focus()
+        await expect(trigger).toBeFocused()
+      }
+      await expect(page.getByTestId("usability-forms-attempts")).toHaveText("1 synthetic save attempts")
+    })
+  }
+}

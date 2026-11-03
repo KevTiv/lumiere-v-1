@@ -457,6 +457,7 @@ export const editExpenseForm = (t: TFunction): FormConfig => ({
 
 export const addExpenseToReportForm = (t: TFunction): FormConfig => ({
   id: "add-expense-to-report",
+  submitLabel: t("expenses.forms.actions.addExpenseToReport", { defaultValue: "Add to expense report" }),
   title: t("expenses.forms.addToReport.title"),
   description: t("expenses.forms.addToReport.description"),
   sections: [
@@ -685,6 +686,7 @@ export const setExpenseAllocationsForm = (t: TFunction, choices: ExpenseAllocati
 
 export const upsertExpenseMileageRateForm = (t: TFunction): FormConfig => ({
   id: "upsert-expense-mileage-rate",
+  submitLabel: t("expenses.forms.actions.upsertExpenseMileageRate", { defaultValue: "Save mileage rate" }),
   title: t("expenses.forms.upsertMileageRate.title"),
   description: t("expenses.forms.upsertMileageRate.description"),
   sections: [
@@ -766,6 +768,7 @@ export const upsertExpenseMileageRateForm = (t: TFunction): FormConfig => ({
 
 export const upsertExpensePerDiemRateForm = (t: TFunction): FormConfig => ({
   id: "upsert-expense-per-diem-rate",
+  submitLabel: t("expenses.forms.actions.upsertExpensePerDiemRate", { defaultValue: "Save daily allowance rate" }),
   title: t("expenses.forms.upsertPerDiemRate.title"),
   description: t("expenses.forms.upsertPerDiemRate.description"),
   sections: [
@@ -842,6 +845,7 @@ export const upsertExpensePerDiemRateForm = (t: TFunction): FormConfig => ({
 
 export const projectRebillExpenseReportForm = (t: TFunction): FormConfig => ({
   id: "project-rebill-expense-report",
+  submitLabel: t("expenses.forms.actions.projectRebillExpenseReport", { defaultValue: "Create rebill invoice" }),
   title: t("expenses.forms.projectRebill.title"),
   description: t("expenses.forms.projectRebill.description"),
   sections: [

@@ -293,6 +293,7 @@ export const newSubscriptionPlanForm = (t: TFunction): FormConfig => ({
 
 export const newDeferredRevenueScheduleForm = (t: TFunction): FormConfig => ({
   id: "new-deferred-revenue-schedule",
+  submitLabel: t("subscriptions.forms.actions.newDeferredRevenueSchedule", { defaultValue: "Create revenue schedule" }),
   title: t("subscriptions.forms.deferredSchedule.title"),
   description: t("subscriptions.forms.deferredSchedule.description"),
   sections: [
@@ -425,6 +426,7 @@ export const newDeferredRevenueScheduleForm = (t: TFunction): FormConfig => ({
 
 export const newRevenueRecognitionRuleForm = (t: TFunction): FormConfig => ({
   id: "new-revenue-recognition-rule",
+  submitLabel: t("subscriptions.forms.actions.newRevenueRecognitionRule", { defaultValue: "Create recognition rule" }),
   title: t("subscriptions.forms.recognitionRule.title"),
   description: t("subscriptions.forms.recognitionRule.description"),
   sections: [
@@ -537,6 +539,7 @@ export const newRevenueRecognitionRuleForm = (t: TFunction): FormConfig => ({
 
 export const closeSubscriptionForm = (t: TFunction): FormConfig => ({
   id: "close-subscription",
+  submitLabel: t("subscriptions.forms.actions.closeSubscription", { defaultValue: "Close subscription" }),
   title: t("subscriptions.forms.closeSubscription.title"),
   description: t("subscriptions.forms.closeSubscription.description"),
   sections: [
@@ -577,6 +580,7 @@ export const closeSubscriptionForm = (t: TFunction): FormConfig => ({
 
 export const generateSubscriptionInvoiceForm = (t: TFunction): FormConfig => ({
   id: "generate-subscription-invoice",
+  submitLabel: t("subscriptions.forms.actions.generateSubscriptionInvoice", { defaultValue: "Generate invoice" }),
   title: t("subscriptions.forms.generateInvoice.title"),
   description: t("subscriptions.forms.generateInvoice.description"),
   sections: [
@@ -650,6 +654,7 @@ export const generateSubscriptionInvoiceForm = (t: TFunction): FormConfig => ({
 
 export const paySubscriptionInvoiceForm = (t: TFunction): FormConfig => ({
   id: "pay-subscription-invoice",
+  submitLabel: t("subscriptions.forms.actions.paySubscriptionInvoice", { defaultValue: "Record payment" }),
   title: t("subscriptions.forms.payInvoice.title", {
     defaultValue: "Apply payment",
   }),
@@ -743,6 +748,7 @@ export const paySubscriptionInvoiceForm = (t: TFunction): FormConfig => ({
 
 export const recognizeDeferredRevenueLineForm = (t: TFunction): FormConfig => ({
   id: "recognize-deferred-revenue-line",
+  submitLabel: t("subscriptions.forms.actions.recognizeDeferredRevenueLine", { defaultValue: "Post recognition" }),
   title: t("subscriptions.forms.recognizeLine.title"),
   description: t("subscriptions.forms.recognizeLine.description"),
   sections: [
@@ -775,6 +781,7 @@ export const recognizeDeferredRevenueLineForm = (t: TFunction): FormConfig => ({
 
 export const importSubscriptionPlanCsvForm = (t: TFunction): FormConfig => ({
   id: "import-subscription-plan-csv",
+  submitLabel: t("subscriptions.forms.actions.importSubscriptionPlanCsv", { defaultValue: "Import subscription plans" }),
   title: t("subscriptions.forms.importPlanCsv.title"),
   description: t("subscriptions.forms.importPlanCsv.description"),
   sections: [
@@ -799,6 +806,7 @@ export const importSubscriptionPlanCsvForm = (t: TFunction): FormConfig => ({
 
 export const importSubscriptionCsvForm = (t: TFunction): FormConfig => ({
   id: "import-subscription-csv",
+  submitLabel: t("subscriptions.forms.actions.importSubscriptionCsv", { defaultValue: "Import subscriptions" }),
   title: t("subscriptions.forms.importSubscriptionCsv.title"),
   description: t("subscriptions.forms.importSubscriptionCsv.description"),
   sections: [
@@ -823,6 +831,7 @@ export const importSubscriptionCsvForm = (t: TFunction): FormConfig => ({
 
 export const amendSubscriptionForm = (t: TFunction): FormConfig => ({
   id: "amend-subscription",
+  submitLabel: t("subscriptions.forms.actions.amendSubscription", { defaultValue: "Save amendment" }),
   title: t("subscriptions.forms.amend.title", { defaultValue: "Amend subscription" }),
   description: t("subscriptions.forms.amend.description", {
     defaultValue: "Change price, quantity, or product with optional mid-period proration.",
@@ -922,6 +931,7 @@ export const amendSubscriptionForm = (t: TFunction): FormConfig => ({
 
 export const renewSubscriptionForm = (t: TFunction): FormConfig => ({
   id: "renew-subscription",
+  submitLabel: t("subscriptions.forms.actions.renewSubscription", { defaultValue: "Renew subscription" }),
   title: t("subscriptions.forms.renew.title", { defaultValue: "Renew / extend term" }),
   description: t("subscriptions.forms.renew.description", {
     defaultValue: "Push the next invoice date forward by N billing intervals.",
@@ -956,6 +966,7 @@ export const renewSubscriptionForm = (t: TFunction): FormConfig => ({
 
 export const cancelSubscriptionForm = (t: TFunction): FormConfig => ({
   id: "cancel-subscription",
+  submitLabel: t("subscriptions.forms.actions.cancelSubscription", { defaultValue: "Cancel subscription" }),
   title: t("subscriptions.forms.cancel.title", { defaultValue: "Cancel subscription" }),
   description: t("subscriptions.forms.cancel.description", {
     defaultValue: "Close the contract and optionally issue an OutRefund credit note.",
@@ -999,6 +1010,7 @@ export const cancelSubscriptionForm = (t: TFunction): FormConfig => ({
 
 export const ingestSubscriptionUsageEventForm = (t: TFunction): FormConfig => ({
   id: "ingest-subscription-usage-event",
+  submitLabel: t("subscriptions.forms.actions.ingestSubscriptionUsageEvent", { defaultValue: "Record usage event" }),
   title: t("subscriptions.forms.ingestUsage.title", { defaultValue: "Ingest usage event" }),
   description: t("subscriptions.forms.ingestUsage.description", {
     defaultValue: "Append an idempotent meter event (org+source+event id).",
@@ -1048,6 +1060,7 @@ export const ingestSubscriptionUsageEventForm = (t: TFunction): FormConfig => ({
 
 export const createSubscriptionPriceTierForm = (t: TFunction): FormConfig => ({
   id: "create-subscription-price-tier",
+  submitLabel: t("subscriptions.forms.actions.createSubscriptionPriceTier", { defaultValue: "Add price tier" }),
   title: t("subscriptions.forms.priceTier.title", { defaultValue: "Add price tier" }),
   description: t("subscriptions.forms.priceTier.description", {
     defaultValue: "Progressive volume band for usage rating.",
@@ -1107,6 +1120,7 @@ export const createSubscriptionPriceTierForm = (t: TFunction): FormConfig => ({
 
 export const setSubscriptionCommitmentForm = (t: TFunction): FormConfig => ({
   id: "set-subscription-commitment",
+  submitLabel: t("subscriptions.forms.actions.setSubscriptionCommitment", { defaultValue: "Save minimum commitment" }),
   title: t("subscriptions.forms.commitment.title", { defaultValue: "Set minimum commitment" }),
   description: t("subscriptions.forms.commitment.description", {
     defaultValue: "True-up floor applied when usage is below this amount at invoice time.",

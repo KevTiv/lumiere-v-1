@@ -6,6 +6,7 @@ const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> =
 
 export const newDocumentForm = (t: TFunction): FormConfig => ({
   id: "new-document",
+  submitLabel: t("documents.forms.actions.newDocument", { defaultValue: "Upload document" }),
   title: t("documents.forms.newDocument.title"),
   description: t("documents.forms.newDocument.description"),
   sections: [
@@ -136,6 +137,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
 
 export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
   id: "new-knowledge-article",
+  submitLabel: t("documents.forms.actions.newKnowledgeArticle", { defaultValue: "Create article" }),
   title: t("documents.forms.newArticle.title"),
   description: t("documents.forms.newArticle.description"),
   sections: [
@@ -202,6 +204,7 @@ export const newKnowledgeArticleForm = (t: TFunction): FormConfig => ({
 
 export const newKnowledgeCategoryForm = (t: TFunction): FormConfig => ({
   id: "new-knowledge-category",
+  submitLabel: t("documents.forms.actions.newKnowledgeCategory", { defaultValue: "Create knowledge category" }),
   title: t("documents.forms.newCategory.title"),
   description: t("documents.forms.newCategory.description"),
   sections: [
@@ -258,6 +261,7 @@ export const newKnowledgeCategoryForm = (t: TFunction): FormConfig => ({
 
 export const newDocumentFolderForm = (t: TFunction): FormConfig => ({
   id: "new-document-folder",
+  submitLabel: t("documents.forms.actions.newDocumentFolder", { defaultValue: "Create folder" }),
   title: t("documents.forms.newFolder.title"),
   description: t("documents.forms.newFolder.description"),
   sections: [
@@ -326,6 +330,7 @@ export const newDocumentFolderForm = (t: TFunction): FormConfig => ({
 
 export const setDocumentRetentionForm = (t: TFunction): FormConfig => ({
   id: "set-document-retention",
+  submitLabel: t("documents.forms.actions.setDocumentRetention", { defaultValue: "Save retention policy" }),
   title: t("documents.forms.setRetention.title"),
   description: t("documents.forms.setRetention.description"),
   sections: [
@@ -358,6 +363,7 @@ export const setDocumentRetentionForm = (t: TFunction): FormConfig => ({
 
 export const newDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
   id: "new-document-processing-job",
+  submitLabel: t("documents.forms.actions.newDocumentProcessingJob", { defaultValue: "Queue processing job" }),
   title: t("documents.forms.newProcessingJob.title"),
   description: t("documents.forms.newProcessingJob.description"),
   sections: [
@@ -435,6 +441,7 @@ export const newDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
 
 export const completeDocumentProcessingJobForm = (t: TFunction): FormConfig => ({
   id: "complete-document-processing-job",
+  submitLabel: t("documents.forms.actions.completeDocumentProcessingJob", { defaultValue: "Record job completion" }),
   title: t("documents.forms.completeProcessingJob.title"),
   description: t("documents.forms.completeProcessingJob.description"),
   sections: [
@@ -495,6 +502,7 @@ export const completeDocumentProcessingJobForm = (t: TFunction): FormConfig => (
 
 export const acknowledgeDocumentInsightForm = (t: TFunction): FormConfig => ({
   id: "acknowledge-document-insight",
+  submitLabel: t("documents.forms.actions.acknowledgeDocumentInsight", { defaultValue: "Acknowledge insight" }),
   title: t("documents.forms.acknowledgeInsight.title"),
   description: t("documents.forms.acknowledgeInsight.description"),
   sections: [

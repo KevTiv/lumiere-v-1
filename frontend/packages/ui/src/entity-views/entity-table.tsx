@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, type MouseEvent } from "react"
 import { useTableDensity } from "../hooks/use-table-density"
 import { TableDensityControl } from "../composed/table-density-control"
+import { ListToolbar, ListToolbarFields, ListToolbarField, ListToolbarActions, ListToolbarSettings, ListToolbarSettingsTrigger } from "../composed/list-toolbar"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
@@ -555,6 +556,8 @@ export function EntityTable({
   const [density, setDensity] = useTableDensity(financeProfile ? (config.listViewKey ?? densityKey) : undefined)
   const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
   const canExport = (allowExport ?? config.allowExport ?? false) && columns.some((col) => !col.sensitive)
+  const hasViewSettings = financeProfile || Boolean(config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable)) || groupableFilters.length > 0 || permittedColumns.length > 1
+  const canClearFilters = Boolean(search.trim()) || Object.entries(persistedFilters).some(([key, value]) => value && value !== "__all__" && !Object.hasOwn(initialFilters ?? {}, key)) || Boolean(onInitialFilterClear && Object.keys(initialFilters ?? {}).length > 0) || Boolean(externalFilter?.active && externalFilter.onClear)
 
   return (
     <TooltipProvider>
@@ -592,29 +595,29 @@ export function EntityTable({
             ))}
           </div>
         )}
-        {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions) && (
-          <div
-            className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs"
-            data-testid="entity-table-toolbar"
-          >
+        {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions || hasViewSettings || canExport) && (
+          <ListToolbar data-testid="entity-table-toolbar">
+            <ListToolbarFields>
             {config.searchable && (
-              <div className="relative min-w-0 flex-1 basis-48">
+              <ListToolbarField label={t("common.search", { defaultValue: "Search" })}>
+                <div className="relative min-w-0">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   aria-label="Search records"
                   placeholder={config.searchPlaceholder ?? "Search…"}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="min-h-11 pl-9"
                 />
-              </div>
+                </div>
+              </ListToolbarField>
             )}
             {config.filters?.map((f) => {
               const raw = filters[f.key] ?? "__all__"
               if (f.faceted && (f.options?.length ?? 0) > 0) {
                 return (
+                  <ListToolbarField key={f.key} label={f.label}>
                   <EntityFacetFilter
-                    key={f.key}
                     filter={f}
                     value={raw}
                     rows={data}
@@ -624,13 +627,14 @@ export function EntityTable({
                       setPersistedFilters((prev) => ({ ...prev, [f.key]: val }))
                     }}
                   />
+                  </ListToolbarField>
                 )
               }
               const selectValue =
                 raw === "__all__" ? "__all__" : radixSelectControlledValue(raw, f.options)
               return (
+                <ListToolbarField key={f.key} label={f.label}>
                 <Select
-                  key={f.key}
                   value={selectValue}
                   disabled={Object.hasOwn(initialFilters ?? {}, f.key) && !onInitialFilterClear}
                   onValueChange={(val) => {
@@ -643,7 +647,7 @@ export function EntityTable({
                     }))
                   }}
                 >
-                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label={f.label}>
+                  <SelectTrigger className="min-h-11 w-full min-w-0 max-w-full" aria-label={f.label}>
                     <SelectValue placeholder={f.placeholder ?? f.label} />
                   </SelectTrigger>
                   <SelectContent>
@@ -658,147 +662,21 @@ export function EntityTable({
                     ))}
                   </SelectContent>
                 </Select>
+                </ListToolbarField>
               )
             })}
-            <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center gap-2">
-              {financeProfile ? <TableDensityControl value={density} onChange={setDensity} /> : null}
-              {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
-                <Popover>
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-auto min-h-7 max-w-full whitespace-normal"
-                        aria-label="Saved filters"
-                        data-testid="entity-saved-filters"
-                      />
-                    }
-                  >
-                    <Bookmark className="mr-2 h-4 w-4" />
-                    Saved filters
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-72 space-y-3">
-                    {savedFilters.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No saved filters yet. Set a search or filters, then save them under a name.
-                      </p>
-                    ) : (
-                      <ul className="space-y-1" data-testid="entity-saved-filter-list">
-                        {savedFilters.map((saved) => (
-                          <li key={saved.name} className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="min-w-0 flex-1 justify-start"
-                              data-testid={`entity-saved-filter-apply-${saved.name}`}
-                              onClick={() => {
-                                setSearch(saved.search)
-                                setPersistedFilters((prev) => ({
-                                  ...Object.fromEntries(Object.keys(prev).map((key) => [key, "__all__"])),
-                                  ...saved.filters,
-                                }))
-                              }}
-                            >
-                              <span className="truncate">{saved.name}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Delete saved filter ${saved.name}`}
-                              data-testid={`entity-saved-filter-delete-${saved.name}`}
-                              onClick={() => setSavedFilters((prev) => removeSavedFilter(prev, saved.name))}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <form
-                      className="flex items-center gap-2"
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        setSavedFilters((prev) =>
-                          upsertSavedFilter(prev, { name: newFilterName, search, filters }),
-                        )
-                        setNewFilterName("")
-                      }}
-                    >
-                      <Input
-                        aria-label="Name for the current filters"
-                        placeholder="Name for current filters"
-                        value={newFilterName}
-                        onChange={(event) => setNewFilterName(event.target.value)}
-                        data-testid="entity-saved-filter-name"
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={!newFilterName.trim()}
-                        data-testid="entity-saved-filter-save"
-                      >
-                        Save
-                      </Button>
-                    </form>
-                  </PopoverContent>
-                </Popover>
-              )}
-              {groupableFilters.length > 0 && (
-                <Select
-                  value={view.groupBy ?? "__none__"}
-                  onValueChange={(val) =>
-                    setView((prev) => ({ ...prev, groupBy: val === "__none__" ? null : String(val) }))
-                  }
-                >
-                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label="Group by" data-testid="entity-group-by">
-                    <SelectValue placeholder="Group by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No grouping</SelectItem>
-                    {groupableFilters.map((filter) => (
-                      <SelectItem key={filter.key} value={filter.key}>
-                        Group by {filter.label.toLowerCase()}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {permittedColumns.length > 1 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto min-h-7 max-w-full whitespace-normal"
-                      aria-label="Choose columns"
-                      data-testid="entity-columns"
-                    >
-                      <Columns3 className="mr-2 h-4 w-4" />
-                      Columns
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-                    {permittedColumns.map((col) => (
-                      <DropdownMenuCheckboxItem
-                        key={col.key}
-                        checked={!view.hiddenColumns.includes(col.key)}
-                        onSelect={(event) => event.preventDefault()}
-                        onCheckedChange={() =>
-                          setView((prev) => ({
-                            ...prev,
-                            hiddenColumns: toggleHiddenColumn(prev.hiddenColumns, col.key, permittedColumnKeys),
-                          }))
-                        }
-                        data-testid={`entity-column-toggle-${col.key}`}
-                      >
-                        {col.label}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              {hasViewSettings ? <ListToolbarSettingsTrigger /> : null}
+            </ListToolbarFields>
+            <ListToolbarActions>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                disabled={!canClearFilters}
+                data-testid="entity-clear-filters"
+              >
+                  {t("common.entityView.noResults.clear", { defaultValue: "Clear filters" })}
+              </Button>
               {canExport && sorted.length > 0 && (
                 <Button
                   variant="outline"
@@ -827,6 +705,7 @@ export function EntityTable({
                       const pending = pendingActionIds.has(action.id)
                       return <DropdownMenuItem
                         key={action.id}
+                        className="min-h-11"
                         disabled={pending || (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)}
                         aria-busy={pending || undefined}
                         variant={action.variant === "destructive" ? "destructive" : "default"}
@@ -840,8 +719,157 @@ export function EntityTable({
                   </DropdownMenuContent>
                 </DropdownMenu>
               ))}
-            </div>
-          </div>
+
+            </ListToolbarActions>
+            {hasViewSettings ? <ListToolbarSettings>
+              <div className="flex min-w-0 max-w-full flex-wrap items-end gap-3">
+              {financeProfile ? <TableDensityControl value={density} onChange={setDensity} /> : null}
+              {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
+                <Popover>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-auto min-h-7 max-w-full whitespace-normal"
+                        aria-label="Saved filters"
+                        data-testid="entity-saved-filters"
+                      />
+                    }
+                  >
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    Saved filters
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 max-w-[calc(100vw-2rem)] space-y-3">
+                    {savedFilters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No saved filters yet. Set a search or filters, then save them under a name.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1" data-testid="entity-saved-filter-list">
+                        {savedFilters.map((saved) => (
+                          <li key={saved.name} className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="min-h-11 min-w-0 flex-1 justify-start"
+                              data-testid={`entity-saved-filter-apply-${saved.name}`}
+                              onClick={() => {
+                                setSearch(saved.search)
+                                setPersistedFilters((prev) => ({
+                                  ...Object.fromEntries(Object.keys(prev).map((key) => [key, "__all__"])),
+                                  ...saved.filters,
+                                }))
+                              }}
+                            >
+                              <span className="truncate">{saved.name}</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="min-h-11 min-w-11"
+                              aria-label={`Delete saved filter ${saved.name}`}
+                              data-testid={`entity-saved-filter-delete-${saved.name}`}
+                              onClick={() => setSavedFilters((prev) => removeSavedFilter(prev, saved.name))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <form
+                      className="flex items-center gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        setSavedFilters((prev) =>
+                          upsertSavedFilter(prev, { name: newFilterName, search, filters }),
+                        )
+                        setNewFilterName("")
+                      }}
+                    >
+                      <Input
+                        className="min-h-11 min-w-0"
+                        aria-label="Name for the current filters"
+                        placeholder="Name for current filters"
+                        value={newFilterName}
+                        onChange={(event) => setNewFilterName(event.target.value)}
+                        data-testid="entity-saved-filter-name"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!newFilterName.trim()}
+                        className="min-h-11"
+                        data-testid="entity-saved-filter-save"
+                      >
+                        Save
+                      </Button>
+                    </form>
+                  </PopoverContent>
+                </Popover>
+              )}
+              {groupableFilters.length > 0 && (
+                <ListToolbarField label={t("common.entityView.groupBy", { defaultValue: "Group by" })}>
+                <Select
+                  value={view.groupBy ?? "__none__"}
+                  onValueChange={(val) =>
+                    setView((prev) => ({ ...prev, groupBy: val === "__none__" ? null : String(val) }))
+                  }
+                >
+                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label="Group by" data-testid="entity-group-by">
+                    <SelectValue placeholder="Group by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No grouping</SelectItem>
+                    {groupableFilters.map((filter) => (
+                      <SelectItem key={filter.key} value={filter.key}>
+                        Group by {filter.label.toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                </ListToolbarField>
+              )}
+              {permittedColumns.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto min-h-7 max-w-full whitespace-normal"
+                      aria-label="Choose columns"
+                      data-testid="entity-columns"
+                    >
+                      <Columns3 className="mr-2 h-4 w-4" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="max-h-[min(70vh,28rem)] max-w-[calc(100vw-2rem)] overflow-y-auto">
+                    <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                    {permittedColumns.map((col) => (
+                      <DropdownMenuCheckboxItem
+                        className="min-h-11"
+                        key={col.key}
+                        checked={!view.hiddenColumns.includes(col.key)}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={() =>
+                          setView((prev) => ({
+                            ...prev,
+                            hiddenColumns: toggleHiddenColumn(prev.hiddenColumns, col.key, permittedColumnKeys),
+                          }))
+                        }
+                        data-testid={`entity-column-toggle-${col.key}`}
+                      >
+                        {col.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              </div>
+            </ListToolbarSettings> : null}
+          </ListToolbar>
         )}
 
         {selectedRows.length > 0 && selectionActions.length > 0 && (

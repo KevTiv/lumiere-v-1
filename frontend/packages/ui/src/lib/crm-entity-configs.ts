@@ -305,8 +305,8 @@ export const opportunitiesTableConfig = (
       },
     },
     viewToggleLabels: {
-      table: t("crm.opportunities.board.viewTable"),
-      board: t("crm.opportunities.board.viewKanban"),
+      table: t("common.entityView.list", { defaultValue: "List" }),
+      board: t("common.entityView.board", { defaultValue: "Board" }),
       ariaLabel: t("crm.opportunities.board.viewToggleLabel"),
     },
     defaultView: "table",

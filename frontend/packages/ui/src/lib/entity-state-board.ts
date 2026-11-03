@@ -39,7 +39,7 @@ export function withReadOnlyStateBoard(
         searchPlaceholder: t("common.entityView.boardSearch", { defaultValue: "Search cards" }),
       },
       viewToggleLabels: {
-        table: t("common.entityView.table", { defaultValue: "Table" }),
+        table: t("common.entityView.list", { defaultValue: "List" }),
         board: t("common.entityView.board", { defaultValue: "Board" }),
         ...(options.pivot
           ? { pivot: t("common.entityView.pivot", { defaultValue: "Summary" }) }

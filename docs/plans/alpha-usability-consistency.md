@@ -15,32 +15,32 @@ implementation status, not a claim that the resulting deployment is certified.
 | UI-05 | The expense dashboard link that opens receipt capture is named Capture receipt. Operations remains the workspace name. |
 | UI-06 | Single-view workspaces omit redundant subtabs. Destination panels remain named; test navigation verifies the visible target panel. |
 | UI-07 | Product imports and catalog maintenance are grouped in toolbar menus. Selection actions retain their existing behavior. Menus use the existing permission-filtered action set, confirmation and pending paths. |
+| UI-08 | Entity lists, boards and accounting worklists share labelled filter and action layouts. View settings disclose density, grouping, column choices and saved preferences; existing filter/pagination state remains with each list. |
 | UI-09 | Density controls use styled rounded segments. |
 | UI-10 | Legacy empty lists receive the existing permission-gated create action when supported. Empty workflow lists omit orphaned table headers. |
 | UI-11 | File cards and tables use readable metadata; a known creation date is explicitly identified when modification time is missing. Upload naming and view names agree. |
+| UI-12 | Calendar uses a validated saved account timezone, falling back explicitly to the browser or UTC. Display, date grouping, event ranges and form conversion use the same zone. DST gaps are rejected; unchanged edits preserve repeated-hour instants. Financial reporting retains UTC semantics. |
 | UI-13 | Overview metrics precede work queues and personal widgets. Ready onboarding can be expanded for review. My work explanations are expandable. Dashboard export still captures the visible overview composition. |
 | UI-14 | Assistant starter questions reflect module and settings section. They prepare editable drafts and preserve unsent questions; they never send or execute automatically. |
 | UI-15 | Form AI uses a compact labelled prompt input. Suggest and Apply remain separate explicit actions. |
+| UI-16 | Assistant inspectors lead with task guidance, authorized choices and results. Named disclosures retain manual identifier lookup, policy details and technical diagnostics without granting access or sending actions automatically. |
+| UI-17 | Domain-specific form actions distinguish creation, saving, assignment, imports, receipt, payment, cancellation and approval; existing reducer behavior is preserved. |
 | UI-18 | Table-header case no longer changes with sortability. aria-sort belongs to the column header. |
 | UI-19 | Global search offers common workflow destinations even when no matching records exist, using admitted and authorized parent surfaces. |
 | UI-20 | My work uses the shared page header and module spacing. |
 
-## Bounded improvements and remaining scope
+## Scope and verification limits
 
-- **UI-08:** shared navigation, density, table and action primitives are improved.
-  Consolidating every invoice/entity-list filter toolbar requires a separate
-  migration that preserves saved filters, pagination and source completeness.
-- **UI-12:** Calendar and Composer explicitly identify the browser timezone;
-  Composer's initial date follows that timezone. Financial reporting retains its
-  existing UTC semantics. Account-timezone calendar grouping/editing needs one
-  coherent conversion change, rather than relabelling browser-local dates.
-- **UI-16:** operational approval wording is simplified. Technical evidence and
-  lifecycle inspectors keep their identifiers and diagnostics. A broader
-  inspector information architecture is still to be designed.
-- **UI-17:** product/vehicle submit labels, quotation date labels, document views
-  and upload labels are aligned. This is not a complete application copy rewrite.
-- These changes do not certify mobile layouts, alternate themes, full language
-  packs, populated financial workflows or every role-specific state.
+The remaining implementation pass completes the four previously bounded audit
+items above. Added browser regressions target production form and inspector
+components at 320, 390, 768 and desktop widths where applicable, including theme,
+keyboard, scrolling and draft-retention behavior. Timezone regressions cover
+account/browser disagreement and daylight-saving transitions.
+
+These are targeted regression checks. They do not certify all language packs,
+all assistive technologies, populated financial workflows or every role-specific
+state. The deployed application still requires an authenticated check of the
+exact resulting commit; this pull request does not merge or deploy itself.
 
 ## Authority and state boundaries
 
@@ -69,6 +69,17 @@ Locally available checks:
 - Translation-key, duplicate-key, locale/core-coverage and generated Kinyarwanda
   loanword checks.
 - Changed plain TypeScript syntax and diff whitespace checks.
+- Eight native timezone/range tests and 285 production-helper conversion
+  assertions across seven zones, including DST gaps and repeated hours.
+- 89 production form factories checked for explicit domain actions; the four
+  expense factories that import React remain part of hosted validation.
+- Seven evidence-inspection tests, including exact selected-target binding.
+
+The first hosted run passed frontend typecheck, UI and web unit suites, i18n,
+contract drift and release-image Rust compilation. It exposed four Rustfmt
+changes, a stale browser-timezone assertion and a server/client boundary error
+in the development-only dashboard preview. This follow-up corrects those issues.
+The new follow-up changes require their own hosted run before being called green.
 
 Mounted React regressions cover form recovery/draft retention, CRM semantic type,
 Assistant context/drafts, explicit AI suggestion application, grouped actions,

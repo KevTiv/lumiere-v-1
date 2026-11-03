@@ -487,6 +487,7 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
 
 export const newAnalyticsMetricForm = (t: TFunction): FormConfig => ({
   id: "new-analytics-metric",
+  submitLabel: t("reports.forms.actions.newAnalyticsMetric", { defaultValue: "Create metric" }),
   title: t("reports.forms.analyticsMetric.title"),
   description: t("reports.forms.analyticsMetric.description"),
   sections: [
@@ -601,6 +602,7 @@ export const newAnalyticsMetricForm = (t: TFunction): FormConfig => ({
 
 export const updateReportTemplateForm = (t: TFunction): FormConfig => ({
   id: "update-report-template",
+  submitLabel: t("reports.forms.actions.updateReportTemplate", { defaultValue: "Save template layout" }),
   title: t("reports.forms.updateReportTemplate.title"),
   description: t("reports.forms.updateReportTemplate.description"),
   sections: [
@@ -665,6 +667,7 @@ export const recordScheduledRunForm = (t: TFunction): FormConfig => ({
 
 export const updateMetricValuesForm = (t: TFunction): FormConfig => ({
   id: "update-metric-values",
+  submitLabel: t("reports.forms.actions.updateMetricValues", { defaultValue: "Save metric values" }),
   title: t("reports.forms.updateMetricValues.title"),
   description: t("reports.forms.updateMetricValues.description"),
   sections: [
@@ -694,6 +697,7 @@ export const updateMetricValuesForm = (t: TFunction): FormConfig => ({
 
 export const newTrialBalanceEntryForm = (t: TFunction): FormConfig => ({
   id: "new-trial-balance-entry",
+  submitLabel: t("reports.forms.actions.newTrialBalanceEntry", { defaultValue: "Add trial balance entry" }),
   title: t("reports.forms.trialBalanceEntry.title"),
   description: t("reports.forms.trialBalanceEntry.description"),
   sections: [
@@ -798,6 +802,7 @@ export const newTrialBalanceEntryForm = (t: TFunction): FormConfig => ({
 
 export const newDashboardForm = (t: TFunction): FormConfig => ({
   id: "new-dashboard",
+  submitLabel: t("reports.forms.actions.newDashboard", { defaultValue: "Create dashboard" }),
   title: t("reports.forms.dashboard.title"),
   description: t("reports.forms.dashboard.description"),
   sections: [
@@ -846,6 +851,7 @@ export const newDashboardForm = (t: TFunction): FormConfig => ({
 
 export const newDashboardWidgetForm = (t: TFunction): FormConfig => ({
   id: "new-dashboard-widget",
+  submitLabel: t("reports.forms.actions.newDashboardWidget", { defaultValue: "Create widget" }),
   title: t("reports.forms.dashboardWidget.title"),
   description: t("reports.forms.dashboardWidget.description"),
   sections: [
@@ -904,6 +910,7 @@ export const newDashboardWidgetForm = (t: TFunction): FormConfig => ({
 
 export const addWidgetToDashboardForm = (t: TFunction): FormConfig => ({
   id: "add-widget-to-dashboard",
+  submitLabel: t("reports.forms.actions.addWidgetToDashboard", { defaultValue: "Add widget to dashboard" }),
   title: t("reports.forms.addWidgetToDashboard.title"),
   description: t("reports.forms.addWidgetToDashboard.description"),
   sections: [
@@ -967,6 +974,7 @@ export const addWidgetToDashboardForm = (t: TFunction): FormConfig => ({
 
 export const updateWidgetLayoutForm = (t: TFunction): FormConfig => ({
   id: "update-widget-layout",
+  submitLabel: t("reports.forms.actions.updateWidgetLayout", { defaultValue: "Save widget layout" }),
   title: t("reports.forms.updateWidgetLayout.title"),
   description: t("reports.forms.updateWidgetLayout.description"),
   sections: [
@@ -1017,6 +1025,7 @@ export const updateWidgetLayoutForm = (t: TFunction): FormConfig => ({
 
 export const shareDashboardForm = (t: TFunction): FormConfig => ({
   id: "share-dashboard",
+  submitLabel: t("reports.forms.actions.shareDashboard", { defaultValue: "Share dashboard" }),
   title: t("reports.forms.shareDashboard.title"),
   description: t("reports.forms.shareDashboard.description"),
   sections: [
@@ -1047,6 +1056,7 @@ export const shareDashboardForm = (t: TFunction): FormConfig => ({
 
 export const updateFinancialReportForm = (t: TFunction): FormConfig => ({
   id: "update-financial-report",
+  submitLabel: t("reports.forms.actions.updateFinancialReport", { defaultValue: "Save report settings" }),
   title: t("reports.forms.updateFinancialReport.title"),
   description: t("reports.forms.updateFinancialReport.description"),
   sections: [

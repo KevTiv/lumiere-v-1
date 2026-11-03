@@ -104,6 +104,7 @@ export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
 
 export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
   id: "edit-purchase-order",
+  submitLabel: t("purchasing.forms.actions.editPurchaseOrder", { defaultValue: "Save purchase order" }),
   title: t("purchasing.forms.editPurchaseOrder.title", {
     defaultValue: "Edit purchase order",
   }),
@@ -318,6 +319,7 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
 /** Add a product line to a draft purchase order (calls `add_purchase_order_line`). */
 export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
   id: "add-purchase-order-line",
+  submitLabel: t("purchasing.forms.actions.addPurchaseOrderLine", { defaultValue: "Add purchase order line" }),
   title: t("purchasing.forms.addPurchaseOrderLine.title"),
   description: t("purchasing.forms.addPurchaseOrderLine.description"),
   sections: [
@@ -388,6 +390,7 @@ export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
 /** Record received quantity on a PO line (`receive_po_line`). */
 export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
   id: "receive-purchase-order-line",
+  submitLabel: t("purchasing.forms.actions.receivePurchaseOrderLine", { defaultValue: "Receive goods" }),
   title: t("purchasing.forms.receivePurchaseOrderLine.title"),
   description: t("purchasing.forms.receivePurchaseOrderLine.description"),
   sections: [
@@ -432,6 +435,7 @@ export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
 /** Record invoiced quantity on a PO line (`invoice_po_line`). */
 export const invoicePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
   id: "invoice-purchase-order-line",
+  submitLabel: t("purchasing.forms.actions.invoicePurchaseOrderLine", { defaultValue: "Record invoiced quantity" }),
   title: t("purchasing.forms.invoicePurchaseOrderLine.title"),
   description: t("purchasing.forms.invoicePurchaseOrderLine.description"),
   sections: [
@@ -466,6 +470,7 @@ export const invoicePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
 /** Update qty/price/product/UoM on a draft PO line (`update_purchase_order_line`). */
 export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
   id: "edit-purchase-order-line",
+  submitLabel: t("purchasing.forms.actions.editPurchaseOrderLine", { defaultValue: "Save purchase order line" }),
   title: t("purchasing.forms.editPurchaseOrderLine.title"),
   description: t("purchasing.forms.editPurchaseOrderLine.description"),
   sections: [
@@ -527,6 +532,7 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
 
 export const newPartnerBankForm = (t: TFunction): FormConfig => ({
   id: "new-partner-bank",
+  submitLabel: t("purchasing.forms.actions.newPartnerBank", { defaultValue: "Add vendor bank account" }),
   title: t("purchasing.forms.newPartnerBank.title"),
   description: t("purchasing.forms.newPartnerBank.description"),
   sections: [
@@ -583,6 +589,7 @@ export const newPartnerBankForm = (t: TFunction): FormConfig => ({
 
 export const editPartnerBankForm = (t: TFunction): FormConfig => ({
   id: "edit-partner-bank",
+  submitLabel: t("purchasing.forms.actions.editPartnerBank", { defaultValue: "Save bank account" }),
   title: t("purchasing.forms.editPartnerBank.title"),
   description: t("purchasing.forms.editPartnerBank.description"),
   sections: [
@@ -644,6 +651,7 @@ const splitMethodOptions = (t: TFunction) => [
 
 export const newLandedCostForm = (t: TFunction): FormConfig => ({
   id: "new-landed-cost",
+  submitLabel: t("purchasing.forms.actions.newLandedCost", { defaultValue: "Create landed cost" }),
   title: t("purchasing.forms.newLandedCost.title"),
   description: t("purchasing.forms.newLandedCost.description"),
   sections: [
@@ -715,6 +723,7 @@ export const newLandedCostForm = (t: TFunction): FormConfig => ({
 
 export const editLandedCostForm = (t: TFunction): FormConfig => ({
   id: "edit-landed-cost",
+  submitLabel: t("purchasing.forms.actions.editLandedCost", { defaultValue: "Save landed cost" }),
   title: t("purchasing.forms.editLandedCost.title"),
   description: t("purchasing.forms.editLandedCost.description"),
   sections: [
@@ -782,6 +791,7 @@ export const editLandedCostForm = (t: TFunction): FormConfig => ({
 
 export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
   id: "add-landed-cost-line",
+  submitLabel: t("purchasing.forms.actions.addLandedCostLine", { defaultValue: "Add landed cost line" }),
   title: t("purchasing.forms.landedCostLine.addTitle"),
   description: t("purchasing.forms.landedCostLine.addDescription"),
   sections: [
@@ -852,6 +862,7 @@ export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
 
 export const removeLandedCostLineForm = (t: TFunction): FormConfig => ({
   id: "remove-landed-cost-line",
+  submitLabel: t("purchasing.forms.actions.removeLandedCostLine", { defaultValue: "Remove landed cost line" }),
   title: t("purchasing.forms.landedCostLine.removeTitle"),
   description: t("purchasing.forms.landedCostLine.removeDescription"),
   sections: [
@@ -877,6 +888,7 @@ export const removeLandedCostLineForm = (t: TFunction): FormConfig => ({
 
 export const newSupplierIntakeForm = (t: TFunction): FormConfig => ({
   id: "new-supplier-intake",
+  submitLabel: t("purchasing.forms.actions.newSupplierIntake", { defaultValue: "Submit supplier intake" }),
   title: t("purchasing.forms.newSupplierIntake.title"),
   description: t("purchasing.forms.newSupplierIntake.description"),
   sections: [
@@ -943,6 +955,7 @@ export const newSupplierIntakeForm = (t: TFunction): FormConfig => ({
 
 export const reviewSupplierIntakeForm = (t: TFunction): FormConfig => ({
   id: "review-supplier-intake",
+  submitLabel: t("purchasing.forms.actions.reviewSupplierIntake", { defaultValue: "Start review" }),
   title: t("purchasing.forms.reviewSupplierIntake.title"),
   description: t("purchasing.forms.reviewSupplierIntake.description"),
   sections: [
@@ -976,6 +989,7 @@ export const reviewSupplierIntakeForm = (t: TFunction): FormConfig => ({
 
 export const editSupplierIntakeForm = (t: TFunction): FormConfig => ({
   id: "edit-supplier-intake",
+  submitLabel: t("purchasing.forms.actions.editSupplierIntake", { defaultValue: "Save supplier intake" }),
   title: t("purchasing.forms.editSupplierIntake.title"),
   description: t("purchasing.forms.editSupplierIntake.description"),
   sections: [

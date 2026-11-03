@@ -339,6 +339,7 @@ export function FormFieldRenderer({
             onChange={(next) => onChange(next)}
             min={field.minDate}
             max={field.maxDate}
+            timeZone={field.timeZone}
             disabled={field.disabled}
             required={field.required}
             aria-invalid={!!error}

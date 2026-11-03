@@ -19,6 +19,7 @@ describe("Finance table density", () => {
     const read = vi.spyOn(localStorage, "getItem").mockImplementation(() => { throw new DOMException("Blocked", "SecurityError") })
     render(table("bills", true))
     expect(write).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "View settings", exact: true }))
     fireEvent.click(screen.getByRole("button", { name: "Compact", exact: true }))
     expect(screen.getByTestId("entity-table").getAttribute("data-density")).toBe("compact")
     expect(write).not.toHaveBeenCalled()
@@ -29,6 +30,7 @@ describe("Finance table density", () => {
   it("preserves selected records while changing density and restores the local preference", async () => {
     const view = render(table("bills"))
     fireEvent.click(screen.getByTestId("entity-select-row-1"))
+    fireEvent.click(screen.getByRole("button", { name: "View settings", exact: true }))
     fireEvent.click(screen.getByRole("button", { name: "Compact", exact: true }))
     expect(screen.getByTestId("entity-table").getAttribute("data-density")).toBe("compact")
     expect(screen.getByTestId("entity-select-row-1").getAttribute("aria-checked")).toBe("true")
@@ -39,6 +41,7 @@ describe("Finance table density", () => {
   })
   it("persists density through a stable list identity without enabling saved filters", async () => {
     const view = render(table("expenses", true))
+    fireEvent.click(screen.getByRole("button", { name: "View settings", exact: true }))
     fireEvent.click(screen.getByRole("button", { name: "Compact", exact: true }))
     await waitFor(() => expect(localStorage.getItem("expenses:density")).toBe("compact"))
     expect(localStorage.getItem("expenses:filters")).toBeNull()

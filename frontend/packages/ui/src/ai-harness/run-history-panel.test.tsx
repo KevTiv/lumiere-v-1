@@ -23,6 +23,22 @@ it("opens evidence for the selected saved run without requesting lifecycle autho
 const run = (runId: number) => ({ runId, status: "completed", skillId: 3, agentId: 4, stepCount: 2, tokensUsed: 120, startedAt: "2026-10-13T10:00:00Z" })
 const page = (runs: ReturnType<typeof run>[], nextCursor: string | null = null) => new Response(JSON.stringify({ runs, nextCursor }))
 
+it("selects a loaded run only on explicit request and respects pending lifecycle work", async () => {
+  const fetch = vi.fn().mockResolvedValue(page([run(42)]))
+  const onSelectRun = vi.fn()
+  vi.stubGlobal("fetch", fetch)
+  const { rerender } = render(<RunHistoryPanel companyId={9} onSelectRun={onSelectRun} selectRunDisabled />)
+  fireEvent.click(screen.getByRole("button", { name: "Load history", exact: true }))
+  const open = await screen.findByRole("button", { name: "Open run", exact: true })
+  expect(onSelectRun).not.toHaveBeenCalled()
+  expect(open.hasAttribute("disabled")).toBe(true)
+  rerender(<RunHistoryPanel companyId={9} onSelectRun={onSelectRun} />)
+  fireEvent.click(open)
+  expect(onSelectRun).toHaveBeenCalledExactlyOnceWith(42)
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole("link", { name: "Inspect", exact: true }).getAttribute("href")).toContain("runId=42")
+})
+
 it("distinguishes a service failure from empty history and retries successfully", async () => {
   const fetch = vi.fn()
     .mockResolvedValueOnce(new Response("{}", { status: 503 }))

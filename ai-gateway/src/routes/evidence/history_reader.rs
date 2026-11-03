@@ -90,7 +90,8 @@ impl HistorySource for ScopedHistory<'_> {
             .await
             .map_err(|error| AppError::Internal(format!("read run history: {error}")))?;
         for row in &rows {
-            if super::row_u64(row, "organizationId", "organization_id") != Some(self.organization_id)
+            if super::row_u64(row, "organizationId", "organization_id")
+                != Some(self.organization_id)
                 || super::row_u64(row, "companyId", "company_id") != Some(self.company_id)
             {
                 return Err(AppError::Internal(
@@ -137,10 +138,7 @@ async fn query(
 
 enum Window {
     Empty,
-    Complete {
-        rows: Vec<Value>,
-        next_upper: u64,
-    },
+    Complete { rows: Vec<Value>, next_upper: u64 },
     Budget,
 }
 
@@ -223,7 +221,14 @@ async fn read_page(
     limit: usize,
     remaining: usize,
 ) -> AppResult<HistoryPage> {
-    read_page_until(source, before, limit, remaining, Instant::now() + HISTORY_READ_TIMEOUT).await
+    read_page_until(
+        source,
+        before,
+        limit,
+        remaining,
+        Instant::now() + HISTORY_READ_TIMEOUT,
+    )
+    .await
 }
 
 async fn read_page_until(
@@ -233,7 +238,10 @@ async fn read_page_until(
     remaining: usize,
     deadline: Instant,
 ) -> AppResult<HistoryPage> {
-    let mut budget = QueryBudget { remaining, deadline };
+    let mut budget = QueryBudget {
+        remaining,
+        deadline,
+    };
     let mut upper = before.map_or(u64::MAX, |id| id.saturating_sub(1));
     let target = limit.saturating_add(1);
     let mut rows = Vec::with_capacity(target);

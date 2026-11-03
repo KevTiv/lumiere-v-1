@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui"
 import {
@@ -46,23 +46,17 @@ import { useAiReportComposer } from "@lumiere/query-hooks/hooks/ai-report-compos
 import type { DecisionOutcome } from "@lumiere/erp-shared/ai-policy-schemas"
 import type { ReportComposerResult } from "@lumiere/erp-shared/ai-report-composer-schemas"
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
-import { calendarDayKey } from "@lumiere/ui/lib/calendar-dates"
+import { zonedCalendarDay } from "@lumiere/erp-shared/calendar-timezone"
+import { useCalendarTimezone } from "@/lib/use-calendar-timezone"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
+import { HarnessInspector } from "./harness-inspector"
 import { policyOutcomeLabel, riskClassLabel } from "./enum-labels"
 
 interface ReportComposerPanelProps {
   organizationId: bigint
   companies: Record<string, unknown>[]
   defaultCompanyId?: number
-}
-
-function todayInputValue(): string {
-  return calendarDayKey(new Date())
-}
-
-function timezoneInputValue(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
 function decisionBadgeVariant(outcome: DecisionOutcome): "default" | "secondary" | "destructive" {
@@ -86,6 +80,8 @@ export function ReportComposerPanel({
   const { t } = useTranslation()
   const catalog = useReportCatalog(organizationId)
   const compose = useAiReportComposer()
+  const calendarTimezone = useCalendarTimezone()
+  const timezone = calendarTimezone.timeZone
 
   const companyOptions = useMemo(
     () => companyRowsToSelectOptions(companies),
@@ -100,8 +96,10 @@ export function ReportComposerPanel({
   const [reportKey, setReportKey] = useState<string>(
     catalog.data?.reports.find((r) => r.key === "daily_business_summary_v1")?.key ?? "",
   )
-  const [date, setDate] = useState(todayInputValue)
-  const [timezone] = useState(timezoneInputValue)
+  const [date, setDate] = useState("")
+  useEffect(() => {
+    if (calendarTimezone.ready) setDate((current) => current || zonedCalendarDay(new Date(), timezone))
+  }, [calendarTimezone.ready, timezone])
 
   const reportOptions = useMemo(
     () =>
@@ -113,7 +111,7 @@ export function ReportComposerPanel({
 
   const handleRun = async () => {
     const companyId = Number(selectedCompanyId)
-    if (!reportKey || !Number.isFinite(companyId) || companyId <= 0) return
+    if (!calendarTimezone.ready || !date || !reportKey || !Number.isFinite(companyId) || companyId <= 0) return
     await compose.mutateAsync({
       reportKey,
       companyId,
@@ -133,12 +131,10 @@ export function ReportComposerPanel({
           <h2 className="text-xl font-semibold tracking-tight">
             {t("aiHarness.reportComposer.title")}
           </h2>
-          <Badge variant="default">
-            {t("aiHarness.reportComposer.greenSkillBadge")}
-          </Badge>
+
         </div>
         <p className="text-sm text-muted-foreground">
-          {t("aiHarness.reportComposer.description")}
+          {t("aiHarness.ux.reportComposer.description", { defaultValue: "Choose a report, company and date to prepare an AI summary with the source figures you can review." })}
         </p>
       </div>
 
@@ -201,7 +197,7 @@ export function ReportComposerPanel({
 
             <Field>
               <FieldLabel>{t("aiHarness.reportComposer.dateLabel")}</FieldLabel>
-              <DatePicker value={date} onChange={setDate} />
+              <DatePicker value={date} onChange={setDate} timeZone={timezone} />
             </Field>
 
             <Field>
@@ -210,9 +206,10 @@ export function ReportComposerPanel({
                 <InputGroupAddon align="inline-start">
                   <Clock />
                 </InputGroupAddon>
-                <InputGroupInput type="text" value={timezone} readOnly />
+                <InputGroupInput type="text" value={calendarTimezone.ready ? timezone : ""} readOnly />
               </InputGroup>
-              <p className="text-xs text-muted-foreground">{t("aiHarness.reportComposer.browserTimezone", { defaultValue: "Uses this browser’s timezone. Financial reports may use a different reporting timezone." })}</p>
+              <p className="text-xs text-muted-foreground">{calendarTimezone.ready ? t(`calendar.workspace.timezoneSource.${calendarTimezone.source}`, { defaultValue: "Times shown in {{timezone}}", timezone }) : t("common.loading")}</p>
+              {calendarTimezone.ready && calendarTimezone.fallbackReason && <p role="status" className="text-xs text-muted-foreground">{t(`calendar.workspace.timezoneFallback.${calendarTimezone.fallbackReason}`, { defaultValue: "The account timezone is unavailable. The labelled fallback timezone is in use." })}</p>}
             </Field>
           </FieldGroup>
 
@@ -221,7 +218,7 @@ export function ReportComposerPanel({
           <Button
             data-testid="report-composer-run"
             disabled={
-              !reportKey ||
+              !calendarTimezone.ready || !date || !reportKey ||
               !selectedCompanyId ||
               compose.isPending
             }
@@ -276,9 +273,7 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
             <Badge variant={decisionBadgeVariant(decision.outcome)}>
               {policyOutcomeLabel(t, decision.outcome)}
             </Badge>
-            {decision.risk && (
-              <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge>
-            )}
+
             {result.decision.privacy && (
               <Badge variant="outline">
                 {t("aiHarness.reportComposer.rowsProcessed", {
@@ -292,7 +287,6 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
             <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
               {decision.reasons.map((reason) => (
                 <li key={reason.code}>
-                  <span className="font-medium">[{reason.code}]</span>{" "}
                   {reason.message}
                 </li>
               ))}
@@ -342,6 +336,13 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
         </>
       )}
 
+      <p className="text-sm leading-6 text-muted-foreground">{decision.outcome === "allow" ? t("aiHarness.ux.reportComposer.nextStep", { defaultValue: "Review the summary against its source figures before using it. To prepare a different report, change the scope above and run it explicitly." }) : t("aiHarness.ux.blockedNextStep", { defaultValue: "Review the explanation above before trying again. No result should be treated as approved while this check is blocked." })}</p>
+      <HarnessInspector title={t("aiHarness.inspector.policy", { defaultValue: "Technical inspector: policy details" })}>
+        <p className="text-sm">{t("aiHarness.reportComposer.description")}</p>
+        <Badge variant="outline">{t("aiHarness.reportComposer.greenSkillBadge")}</Badge>
+        {decision.risk ? <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge> : null}
+        {decision.reasons.map((reason) => <p key={reason.code} className="text-sm"><code>{reason.code}</code>{" "}{reason.message}</p>)}
+      </HarnessInspector>
       <HarnessAuditTrailCard audit={result.audit} />
     </div>
   )

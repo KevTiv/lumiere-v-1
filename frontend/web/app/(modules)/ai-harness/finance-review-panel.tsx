@@ -156,7 +156,7 @@ export function FinanceReviewPanel({
         <CardHeader>
           <CardTitle>{t("aiHarness.finance.title")}</CardTitle>
           <CardDescription>
-            {t("aiHarness.finance.description")}
+            {t("aiHarness.ux.finance.description", { defaultValue: "Choose a finance review task, company and assistant. Set the report scope or source record, then review the findings before taking business action." })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -241,6 +241,7 @@ export function FinanceReviewPanel({
                   {t("aiHarness.finance.question")}
                 </FieldLabel>
                 <Textarea
+                  variant="plain"
                   id="finance-query"
                   maxLength={4000}
                   value={fields.query}

@@ -56,7 +56,7 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 950 })
     await ready(page, "/productivity?panel=calendar&date=2026-10-28&view=agenda")
     await expect(page.getByTestId("calendar-agenda")).toBeVisible()
-    await expect(page.getByText("Times shown in Europe/Amsterdam", { exact: true })).toBeVisible()
+    await expect(page.getByText("Times shown in Europe/Amsterdam (browser fallback)", { exact: true })).toBeVisible()
     await expect(page.getByTestId("calendar-agenda-event-42")).toHaveCount(3)
     await expect(page.getByTestId("calendar-agenda-event-43")).toContainText("Cancelled")
     await expect(page.getByTestId("calendar-agenda-event-44")).toContainText("All day")
@@ -149,3 +149,30 @@ for (const width of [390, 1440]) {
     }
   })
 }
+
+
+test.describe("account calendar timezone on narrow screens", () => {
+  test.use({ timezoneId: "America/New_York" })
+  for (const width of [320, 390]) {
+    test(`account zone owns UTC boundaries and spring DST at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 950 })
+      await page.route("**/api/auth/profile", (route) => route.fulfill({ json: { data: { name: "Synthetic calendar account", email: "calendar@example.test", firstName: null, lastName: null, timezone: "Europe/Amsterdam" } } }))
+      await ready(page, "/productivity?panel=account-calendar")
+      await expect(page.getByTestId("calendar-timezone")).toHaveText("Times shown in Europe/Amsterdam (account setting)")
+      await expect(page.getByTestId("calendar-agenda-event-zone-boundary")).toContainText("01:30")
+      await expect(page.getByTestId("calendar-agenda-event-zone-spring")).toContainText("03:30")
+      await contained(page)
+      await page.screenshot({ path: test.info().outputPath(`account-zone-calendar-${width}.png`), fullPage: true })
+    })
+
+    test(`invalid account zone is disclosed as browser fallback at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 950 })
+      await page.route("**/api/auth/profile", (route) => route.fulfill({ json: { data: { name: "Synthetic calendar account", email: "calendar@example.test", firstName: null, lastName: null, timezone: "Invalid/Zone" } } }))
+      await ready(page, "/productivity?panel=account-calendar")
+      await expect(page.getByTestId("calendar-timezone")).toHaveText("Times shown in America/New_York (browser fallback)")
+      await expect(page.getByRole("status")).toContainText("saved account timezone is unavailable")
+      await expect(page.getByTestId("calendar-agenda-event-zone-boundary")).toHaveCount(0)
+      await contained(page)
+    })
+  }
+})
