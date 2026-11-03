@@ -70,7 +70,7 @@ export function pivotConfig(
       mixedCurrencies: (currencies) =>
         t("common.entityView.pivotMixedCurrencies", {
           defaultValue:
-            "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
+            "These records use more than one currency ({{currencies}}). Monetary measures with mixed currencies are omitted from the summary and CSV.",
           currencies: currencies.join(", "),
         }),
       chartTitle: (measure) =>

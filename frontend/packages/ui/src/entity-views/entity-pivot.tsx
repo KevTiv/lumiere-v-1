@@ -1,9 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type { EntityColumn, EntityPivotConfig, EntityTableConfig } from "../lib/entity-view-types"
-import { buildPivot, pivotToCsvTable, type PivotCell } from "../lib/entity-pivot"
+import { buildPivot, pivotGroupValue, pivotToCsvTable, type PivotCell } from "../lib/entity-pivot"
 import { formatEntityFieldValue, resolveCurrencyCode } from "../lib/entity-row-utils"
 import { downloadCsv, rowsToCsv } from "../lib/export-csv"
 import { Button } from "../components/button"
@@ -44,6 +45,7 @@ export function EntityPivotView({
   className,
 }: EntityPivotViewProps) {
   const { labels } = pivot
+  const { t } = useTranslation()
   const [groupKey, setGroupKey] = useState(pivot.groupKeys[0] ?? "")
   const [columnKey, setColumnKey] = useState(initialColumnKey ?? "")
 
@@ -56,9 +58,28 @@ export function EntityPivotView({
   const fieldLabel = (key: string) =>
     table.filters?.find((filter) => filter.key === key)?.label ?? columnByKey.get(key)?.label ?? key
 
-  const measures = pivot.measureKeys
-    .map((key) => columnByKey.get(key))
-    .filter((column): column is EntityColumn => Boolean(column))
+  const { measures, currencyCodes, omittedAmounts } = useMemo(() => {
+    const measures: EntityColumn[] = []
+    const currencyCodes = new Map<string, string>()
+    let omittedAmounts = false
+    for (const key of pivot.measureKeys) {
+      const column = columnByKey.get(key)
+      if (!column) continue
+      if (column.type === "currency") {
+        const currencyKey = column.currencyKey ?? pivot.currencyKey
+        const code = currencyKey && rows.length
+          ? resolveCurrencyCode(pivotGroupValue(rows[0]!, currencyKey))
+          : undefined
+        if (!code || !currencyKey || rows.some((row) => resolveCurrencyCode(pivotGroupValue(row, currencyKey)) !== code)) {
+          omittedAmounts = true
+          continue
+        }
+        currencyCodes.set(key, code)
+      }
+      measures.push(column)
+    }
+    return { measures, currencyCodes, omittedAmounts }
+  }, [columnByKey, pivot.currencyKey, pivot.measureKeys, rows])
   const measureKeys = measures.map((column) => column.key)
 
   const labelFor = (key: string, value: string) => {
@@ -92,19 +113,18 @@ export function EntityPivotView({
     [rows, groupKey, effectiveColumnKey, measureKeys.join("|"), currencyKey, table],
   )
 
-  // Totals add amounts as they are: they are shown in the rows' currency only when there is a
-  // single one and it is an ISO code; otherwise (mixed, none, numeric ids) the default applies.
-  const currencyCode =
-    result.currencies.length === 1 ? resolveCurrencyCode(result.currencies[0]) : undefined
   const money = (value: number, column: EntityColumn) =>
-    formatEntityFieldValue(value, column.type ?? "number", undefined, undefined, currencyCode)
+    formatEntityFieldValue(value, column.type ?? "number", undefined, undefined, currencyCodes.get(column.key))
 
   const exportCsv = () => {
     const { headers, rows: csvRows } = pivotToCsvTable(result, {
       rowLabel: fieldLabel(groupKey),
       count: labels.count,
       total: labels.total,
-      measures: measures.map((column) => column.label),
+      measures: measures.map((column) => {
+        const code = currencyCodes.get(column.key)
+        return code ? `${column.label} (${code})` : column.label
+      }),
     })
     downloadCsv(`pivot-${groupKey}`, rowsToCsv(headers, csvRows))
   }
@@ -182,9 +202,17 @@ export function EntityPivotView({
         </Button>
       </div>
 
-      {result.mixedCurrencies ? (
+      {rows.length > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {t("common.entityView.pivotScope", { recordCount: rows.length, defaultValue: "Summary of {{recordCount}} available records. List view filters and pagination do not carry over." })}
+        </p>
+      ) : null}
+
+      {omittedAmounts && rows.length > 0 ? (
         <p className="text-sm text-warning" role="note" data-testid="entity-pivot-currency-note">
-          {labels.mixedCurrencies(result.currencies)}
+          {result.mixedCurrencies
+            ? labels.mixedCurrencies(result.currencies)
+            : t("common.entityView.pivotUnknownCurrency", { defaultValue: "Amounts are omitted from the summary and CSV because a single currency could not be verified for every record." })}
         </p>
       ) : null}
 
