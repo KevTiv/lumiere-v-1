@@ -104,6 +104,7 @@ pub fn bundle_hash(key: &str) -> String {
         include_bytes!("finance_skills.rs").as_slice(),
         include_bytes!("finance_review/mod.rs").as_slice(),
         include_bytes!("../tools/finance_review.rs").as_slice(),
+        include_bytes!("../tools/finance_variance_drivers.rs").as_slice(),
         include_bytes!("../orchestrator/governed_programs.rs").as_slice(),
         include_bytes!("../orchestrator/candidate_certification.rs").as_slice(),
         include_bytes!("../../../crates/finance-review-core/src/lib.rs").as_slice(),
