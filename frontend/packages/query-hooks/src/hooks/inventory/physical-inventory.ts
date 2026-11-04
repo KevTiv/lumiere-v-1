@@ -115,8 +115,10 @@ import type {
 export function useInventoryAdjustments(
   organizationId: bigint,
   initialData?: InventoryAdjustment[],
+  enabled = true,
 ) {
   return useQuery<InventoryAdjustment[]>({
+    enabled,
     queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -132,8 +134,10 @@ export function useInventoryAdjustments(
 export function useStockCycleCounts(
   organizationId: bigint,
   initialData?: StockCycleCount[],
+  enabled = true,
 ) {
   return useQuery<StockCycleCount[]>({
+    enabled,
     queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -148,8 +152,10 @@ export function useStockCycleCounts(
 export function useStockInventories(
   organizationId: bigint,
   initialData?: StockInventory[],
+  enabled = true,
 ) {
   return useQuery<StockInventory[]>({
+    enabled,
     queryKey: ['stock-inventories', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -165,8 +171,10 @@ export function useStockInventories(
 export function useAdjustmentReasons(
   organizationId: bigint,
   initialData?: AdjustmentReason[],
+  enabled = true,
 ) {
   return useQuery<AdjustmentReason[]>({
+    enabled,
     queryKey: ['adjustment-reasons', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -499,8 +507,10 @@ export function useReopenInventoryClose(
 export function useInventoryExceptionsShortAtp(
   organizationId: bigint,
   initialData?: InventoryException[],
+  enabled = true,
 ) {
   return useQuery<InventoryException[]>({
+    enabled,
     queryKey: ['inventory-exceptions-short-atp', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -516,8 +526,10 @@ export function useInventoryExceptionsShortAtp(
 export function useInventoryExceptionsExpiredLots(
   organizationId: bigint,
   initialData?: InventoryException[],
+  enabled = true,
 ) {
   return useQuery<InventoryException[]>({
+    enabled,
     queryKey: [
       'inventory-exceptions-expired-lots',
       rqBigIntKey(organizationId),
@@ -536,8 +548,10 @@ export function useInventoryExceptionsExpiredLots(
 export function useInventoryExceptionsOpenQc(
   organizationId: bigint,
   initialData?: InventoryException[],
+  enabled = true,
 ) {
   return useQuery<InventoryException[]>({
+    enabled,
     queryKey: ['inventory-exceptions-open-qc', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -594,8 +608,10 @@ export function useResolveInventoryException(
 export function useInventoryValuations(
   organizationId: bigint,
   initialData?: InventoryValuation[],
+  enabled = true,
 ) {
   return useQuery<InventoryValuation[]>({
+    enabled,
     queryKey: ['inventory-valuations', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(

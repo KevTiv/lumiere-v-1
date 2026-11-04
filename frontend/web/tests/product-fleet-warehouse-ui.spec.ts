@@ -204,6 +204,18 @@ for (const width of [390, 1440]) {
       page.getByTestId("module-tab-warehouse-transfers"),
     ).toHaveAttribute("aria-selected", "true");
     await expect(table).toContainText("INT-00051");
+    await expect(table).toContainText("IN-00052");
+    await expect(table).toContainText("OUT-00053");
+    await expect(table.getByRole("columnheader", { name: "Task", exact: true })).toBeVisible();
+    await chooseFacet(page, "Task", "Internal transfer");
+    await expect(table.getByRole("row")).toHaveCount(2);
+    await expect(table).toContainText("INT-00051");
+    await expect(table).not.toContainText("IN-00052");
+    await expect(table).not.toContainText("OUT-00053");
+    await page.getByTestId("entity-table-toolbar").getByRole("button", { name: /Task/ }).click();
+    await page.getByRole("button", { name: "Clear filter", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(table.getByRole("row")).toHaveCount(4);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,

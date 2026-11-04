@@ -9,7 +9,8 @@ import {
   EXPENSES_WORKSPACE_RESOURCE_KEYS,
   HELPDESK_WORKSPACE_RESOURCE_KEYS,
   HR_WORKSPACE_RESOURCE_KEYS,
-  INVENTORY_WORKSPACE_RESOURCE_KEYS,
+  inventoryWorkspaceResourceKeys,
+  type InventoryWorkspace,
   IOT_WORKSPACE_RESOURCE_KEYS,
   MANUFACTURING_WORKSPACE_RESOURCE_KEYS,
   MESSAGES_WORKSPACE_RESOURCE_KEYS,
@@ -57,8 +58,8 @@ export function useSalesModuleSubscription(): void {
   useModuleSubscription(SALES_WORKSPACE_RESOURCE_KEYS)
 }
 
-export function useInventoryModuleSubscription(): void {
-  useModuleSubscription(INVENTORY_WORKSPACE_RESOURCE_KEYS)
+export function useInventoryModuleSubscription(workspace: InventoryWorkspace = "inventory"): void {
+  useModuleSubscription(inventoryWorkspaceResourceKeys(workspace))
 }
 
 export function useManufacturingModuleSubscription(): void {

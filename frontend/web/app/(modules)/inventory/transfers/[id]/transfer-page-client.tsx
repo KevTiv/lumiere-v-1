@@ -22,7 +22,6 @@ import {
   RecordWorkflowActions,
   SmartButtons,
   StatusBar,
-  buildModuleTabHref,
   stockMovesTableConfig,
   transferDetailConfig,
   transfersTableConfig,
@@ -40,6 +39,7 @@ import {
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { useWorkspaceProfile } from '@lumiere/ui/lib/workspace-profile-context';
 import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
 import type { StockLocation, StockMove, StockPicking } from '@lumiere/stdb/types';
 import {
@@ -59,7 +59,7 @@ import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks'
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
 import { ReadOnlyRows } from '../../../../../components/read-only-rows';
-import { transferBackorders } from '../../transfer-record';
+import { transferBackorders, transferWorkspaceNavigation } from '../../transfer-record';
 import { detailedOperationRows, moveLinesForTransfer } from '../../transfer-move-lines';
 import { transferStatusBar } from '../../transfer-status';
 
@@ -97,8 +97,10 @@ function TransferPageLoaded({
   initialLocations,
   organizationId,
 }: TransferPageClientProps & { organizationId: number }) {
-  useInventoryModuleSubscription();
   const { t } = useTranslation();
+  const workspaceProfile = useWorkspaceProfile();
+  useInventoryModuleSubscription(workspaceProfile === 'finance-alpha' ? 'warehouse' : 'inventory');
+  const workspaceNavigation = transferWorkspaceNavigation(workspaceProfile);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -228,7 +230,7 @@ function TransferPageLoaded({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" render={<Link href={buildModuleTabHref('inventory', 'transfers')} />} nativeButton={false}>
+          <Button variant="outline" render={<Link href={workspaceNavigation.transfersHref} />} nativeButton={false}>
             {t('inventory.transfers.backToTransfers', { defaultValue: 'Back to transfers' })}
           </Button>
         </EmptyContent>
@@ -276,8 +278,13 @@ function TransferPageLoaded({
       <RecordPage
         testIdPrefix="transfer"
         breadcrumbs={[
-          { label: t('nav.inventory', { defaultValue: 'Inventory' }), href: '/inventory' },
-          { label: t('inventory.transfers.title'), href: buildModuleTabHref('inventory', 'transfers') },
+          {
+            label: workspaceNavigation.moduleId === 'warehouse'
+              ? t('modules.tabGroups.warehouse', { defaultValue: 'Warehouse' })
+              : t('nav.inventory', { defaultValue: 'Inventory' }),
+            href: workspaceNavigation.rootHref,
+          },
+          { label: t('inventory.transfers.title'), href: workspaceNavigation.transfersHref },
           { label },
         ]}
         title={label}

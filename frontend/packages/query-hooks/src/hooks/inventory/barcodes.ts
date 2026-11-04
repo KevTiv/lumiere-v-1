@@ -111,8 +111,10 @@ import type {
 export function useBarcodeRules(
   organizationId: bigint,
   initialData?: BarcodeRule[],
+  enabled = true,
 ) {
   return useQuery<BarcodeRule[]>({
+    enabled,
     queryKey: ['barcode-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -128,8 +130,10 @@ export function useBarcodeRules(
 export function useBarcodeNomenclatures(
   organizationId: bigint,
   initialData?: BarcodeNomenclature[],
+  enabled = true,
 ) {
   return useQuery<BarcodeNomenclature[]>({
+    enabled,
     queryKey: ['barcode-nomenclatures', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(

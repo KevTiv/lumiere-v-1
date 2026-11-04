@@ -1,4 +1,6 @@
 'use client';
+
+import { isInventoryWorkspaceReadEnabled } from '@lumiere/stdb/subscriptions';
 import { useStockMoveTabActions } from './stock-move-tab-actions';
 import { useInventoryCountTabActions } from './inventory-count-tab-actions';
 import { useProductionLotTabActions } from './production-lot-tab-actions';
@@ -101,10 +103,13 @@ import {
   productCatalogWorkspace,
 } from './product-catalog';
 import { prepareProductCreate } from './product-create';
+import { warehouseSetup, withWarehouseSetup } from './warehouse-setup';
+import { WarehouseSetupNotice } from './warehouse-setup-notice';
 import {
   WAREHOUSE_TAB_IDS,
   warehouseDataStates,
   warehouseRows,
+  warehouseTransferRows,
   warehouseStockDetail,
   warehouseWorkspace,
 } from './warehouse-workspace';
@@ -447,7 +452,8 @@ function InventoryClientLoaded({
   initialStockProductionSerials,
   organizationId,
 }: InventoryClientLoadedProps) {
-  useInventoryModuleSubscription();
+  useInventoryModuleSubscription(workspace);
+  const readEnabled = (resource: string) => isInventoryWorkspaceReadEnabled(workspace, resource);
   const { t } = useTranslation();
   const { checkPermission, permissionsReady, currentUser } = useRBAC();
   const { identity, organizationId: sessionOrganizationId } = useErpSession();
@@ -527,74 +533,82 @@ function InventoryClientLoaded({
     useState<TimeRangeValue>('30d');
   const openErpAiChat = useOpenErpAiChat();
 
-  const productsRead = moduleCollection(useProducts(orgId, initialProducts));
+  const productsRead = moduleCollection(useProducts(orgId, initialProducts, readEnabled('products')));
   const products = productsRead.rows;
   const productsLoading = productsRead.state.status === 'loading';
-  const productCategoriesRead = moduleCollection(useProductCategories(orgId, initialProductCategories));
+  const productCategoriesRead = moduleCollection(useProductCategories(orgId, initialProductCategories, readEnabled('product-categories')));
   const productCategories = productCategoriesRead.rows;
-  const uomsRead = moduleCollection(useUoms(orgId, initialUoms));
+  const uomsRead = moduleCollection(useUoms(orgId, initialUoms, readEnabled('uoms')));
   const uoms = uomsRead.rows;
-  const { data: stockInventories = [] } = useStockInventories(orgId);
+  const { data: stockInventories = [] } = useStockInventories(orgId, undefined, readEnabled('stock-inventories'));
   const { data: iotDevices = [] } = useIotDevices(orgId);
-  const stockQuantsRead = moduleCollection(useStockQuants(orgId, initialStockQuants));
+  const stockQuantsRead = moduleCollection(useStockQuants(orgId, initialStockQuants, readEnabled('stock-quants')));
   const stockQuants = stockQuantsRead.rows;
   const stockQuantsLoading = stockQuantsRead.state.status === 'loading';
-  const transfersRead = moduleCollection(useStockPickings(orgId, initialTransfers));
+  const transfersRead = moduleCollection(useStockPickings(orgId, initialTransfers, readEnabled('stock-pickings')));
   const transfers = transfersRead.rows;
   const transfersLoading = transfersRead.state.status === 'loading';
-  const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses));
+  const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses, readEnabled('warehouses')));
   const warehouses = warehousesRead.rows;
-  const adjustmentsRead = moduleCollection(useInventoryAdjustments(orgId, initialAdjustments));
+  const adjustmentsRead = moduleCollection(useInventoryAdjustments(orgId, initialAdjustments, readEnabled('inventory-adjustments')));
   const adjustments = adjustmentsRead.rows;
-  const locationsRead = moduleCollection(useStockLocations(orgId, initialStockLocations));
+  const locationsRead = moduleCollection(useStockLocations(orgId, initialStockLocations, readEnabled('stock-locations')));
   const locations = locationsRead.rows;
-  const lotsRead = moduleCollection(useProductionLots(orgId));
+  const setup = warehouseSetup({
+    organizationId: orgId,
+    companyId: selectedOperatingCompanyId,
+    warehouses,
+    locations,
+    warehouseState: warehousesRead.state,
+    locationState: locationsRead.state,
+  });
+  const lotsRead = moduleCollection(useProductionLots(orgId, undefined, readEnabled('stock-production-lots')));
   const lots = lotsRead.rows;
-  const serialsRead = moduleCollection(useStockProductionSerials(orgId, initialStockProductionSerials));
+  const serialsRead = moduleCollection(useStockProductionSerials(orgId, initialStockProductionSerials, readEnabled('stock-production-serials')));
   const serials = serialsRead.rows;
-  const qualityChecksRead = moduleCollection(useQualityChecks(orgId));
+  const qualityChecksRead = moduleCollection(useQualityChecks(orgId, undefined, readEnabled('quality-checks')));
   const qualityChecks = qualityChecksRead.rows;
-  const { data: qualityTeams = [] } = useQualityTeams(orgId);
-  const cycleCountsRead = moduleCollection(useStockCycleCounts(orgId, initialStockCycleCounts));
+  const { data: qualityTeams = [] } = useQualityTeams(orgId, undefined, readEnabled('quality-teams'));
+  const cycleCountsRead = moduleCollection(useStockCycleCounts(orgId, initialStockCycleCounts, readEnabled('stock-cycle-counts')));
   const cycleCounts = cycleCountsRead.rows;
-  const pickingWavesRead = moduleCollection(usePickingWaves(orgId));
+  const pickingWavesRead = moduleCollection(usePickingWaves(orgId, undefined, readEnabled('picking-waves')));
   const pickingWaves = pickingWavesRead.rows;
-  const stockPackagesRead = moduleCollection(useStockPackages(orgId));
+  const stockPackagesRead = moduleCollection(useStockPackages(orgId, undefined, readEnabled('stock-packages')));
   const stockPackages = stockPackagesRead.rows;
-  const warehouseTasksRead = moduleCollection(useWarehouseTasks(orgId));
+  const warehouseTasksRead = moduleCollection(useWarehouseTasks(orgId, undefined, readEnabled('warehouse-tasks')));
   const warehouseTasks = warehouseTasksRead.rows;
-  const stockRoutesRead = moduleCollection(useStockRoutes(orgId));
+  const stockRoutesRead = moduleCollection(useStockRoutes(orgId, undefined, readEnabled('stock-routes')));
   const stockRoutes = stockRoutesRead.rows;
-  const stockRulesRead = moduleCollection(useStockRules(orgId));
+  const stockRulesRead = moduleCollection(useStockRules(orgId, undefined, readEnabled('stock-rules')));
   const stockRules = stockRulesRead.rows;
-  const stockMovesRead = moduleCollection(useStockMoves(orgId, initialStockMoves));
+  const stockMovesRead = moduleCollection(useStockMoves(orgId, initialStockMoves, readEnabled('stock-moves')));
   const stockMoves = stockMovesRead.rows;
-  const inventoryValuationsRead = moduleCollection(useInventoryValuations(orgId, initialInventoryValuations));
+  const inventoryValuationsRead = moduleCollection(useInventoryValuations(orgId, initialInventoryValuations, readEnabled('inventory-valuations')));
   const inventoryValuations = inventoryValuationsRead.rows;
-  const replenishmentRulesListRead = moduleCollection(useReplenishmentRules(orgId, initialReplenishmentRules));
+  const replenishmentRulesListRead = moduleCollection(useReplenishmentRules(orgId, initialReplenishmentRules, readEnabled('replenishment-rules')));
   const replenishmentRulesList = replenishmentRulesListRead.rows;
-  const barcodeRulesRead = moduleCollection(useBarcodeRules(orgId));
+  const barcodeRulesRead = moduleCollection(useBarcodeRules(orgId, undefined, readEnabled('barcode-rules')));
   const barcodeRules = barcodeRulesRead.rows;
-  const adjustmentReasonsRead = moduleCollection(useAdjustmentReasons(orgId));
+  const adjustmentReasonsRead = moduleCollection(useAdjustmentReasons(orgId, undefined, readEnabled('adjustment-reasons')));
   const adjustmentReasons = adjustmentReasonsRead.rows;
-  const barcodeNomenclaturesRead = moduleCollection(useBarcodeNomenclatures(orgId));
+  const barcodeNomenclaturesRead = moduleCollection(useBarcodeNomenclatures(orgId, undefined, readEnabled('barcode-nomenclatures')));
   const barcodeNomenclatures = barcodeNomenclaturesRead.rows;
-  const serialLotTraceabilityRead = moduleCollection(useSerialLotTraceability(orgId));
+  const serialLotTraceabilityRead = moduleCollection(useSerialLotTraceability(orgId, undefined, readEnabled('serial-lot-traceability')));
   const serialLotTraceability = serialLotTraceabilityRead.rows;
-  const stockTraceabilityReportsRead = moduleCollection(useStockTraceabilityReports(orgId));
+  const stockTraceabilityReportsRead = moduleCollection(useStockTraceabilityReports(orgId, undefined, readEnabled('stock-traceability-reports')));
   const stockTraceabilityReports = stockTraceabilityReportsRead.rows;
-  const shortAtpExceptionsRead = moduleCollection(useInventoryExceptionsShortAtp(orgId));
+  const shortAtpExceptionsRead = moduleCollection(useInventoryExceptionsShortAtp(orgId, undefined, readEnabled('inventory-exceptions-short-atp')));
   const shortAtpExceptions = shortAtpExceptionsRead.rows;
-  const expiredLotExceptionsRead = moduleCollection(useInventoryExceptionsExpiredLots(orgId));
+  const expiredLotExceptionsRead = moduleCollection(useInventoryExceptionsExpiredLots(orgId, undefined, readEnabled('inventory-exceptions-expired-lots')));
   const expiredLotExceptions = expiredLotExceptionsRead.rows;
-  const openQcExceptionsRead = moduleCollection(useInventoryExceptionsOpenQc(orgId));
+  const openQcExceptionsRead = moduleCollection(useInventoryExceptionsOpenQc(orgId, undefined, readEnabled('inventory-exceptions-open-qc')));
   const openQcExceptions = openQcExceptionsRead.rows;
   const { data: orgUsers = [] } = useOrgUsers();
   const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists));
   const pricelists = pricelistsRead.rows;
   const { data: contacts = [] } = useContacts(orgId);
-  const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId);
-  const { data: productPackagings = [] } = useProductPackagings(orgId);
+  const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId, readEnabled('product-supplier-infos'));
+  const { data: productPackagings = [] } = useProductPackagings(orgId, readEnabled('product-packagings'));
   const { data: erpDocuments = [] } = useDocuments(orgId);
   const csvImports = {
     importUomCategory: useImportUomCategoryCsv(orgId),
@@ -918,15 +932,15 @@ function InventoryClientLoaded({
   );
 
   const warehouseTemplateOptions = useMemo(() => {
-    if (warehouses.length === 0)
+    if (setup.templates.length === 0)
       return [
         { value: '', label: t('common.lookup.noWarehouses'), disabled: true },
       ];
-    return warehouses.map((w) => ({
+    return setup.templates.map((w) => ({
       value: String(w.id),
       label: `${String(w.name ?? '')} (${String(w.code ?? w.id)})`,
     }));
-  }, [warehouses, t]);
+  }, [setup.templates, t]);
 
   const warehouseFormConfig = useMemo(
     () =>
@@ -1069,7 +1083,7 @@ function InventoryClientLoaded({
     zones,
     slots,
     items: warehouseItems,
-  } = useWarehouse3D(orgId, operatingCompanyId, firstWarehouseId);
+  } = useWarehouse3D(orgId, operatingCompanyId, firstWarehouseId, workspace === 'inventory');
 
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId);
@@ -3285,10 +3299,11 @@ function InventoryClientLoaded({
       ],
     };
     if (workspace === 'products') return productCatalogWorkspace(configured, t);
-    if (workspace === 'warehouse') return warehouseWorkspace(configured, t, locations);
+    if (workspace === 'warehouse') return withWarehouseSetup(warehouseWorkspace(configured, t, locations), setup.status === 'ready');
     return configured;
   }, [
     workspace,
+    setup.status,
     stockMoveTabActions,
     inventoryCountTabActions,
     productionLotTabActions,
@@ -3418,7 +3433,7 @@ function InventoryClientLoaded({
             String(record.id ?? ''),
         };
       }) as unknown as Record<string, unknown>[],
-      transfers: (transfers as Record<string, unknown>[]).map((row) => ({
+      transfers: (workspace === 'warehouse' ? warehouseTransferRows(transfers, locations) : transfers as Record<string, unknown>[]).map((row) => ({
         ...row,
         sheetTitle: String(row.name ?? row.origin ?? row.id ?? ''),
       })),
@@ -3653,7 +3668,8 @@ function InventoryClientLoaded({
     } else if (action === 'createWarehouse') {
       const templateWarehouseId = formData.templateWarehouseId;
       if (templateWarehouseId === '' || templateWarehouseId == null) throw new Error(t('inventory.warehouseWorkspace.setupRequired', { defaultValue: 'Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.' }));
-      const template = warehouses.find(
+      if (setup.status !== 'ready') throw new Error(t('inventory.warehouseWorkspace.setupRequired'));
+      const template = setup.templates.find(
         (w) => String(w.id) === String(templateWarehouseId),
       ) as Record<string, unknown> | undefined;
       if (!template) throw new Error(t('inventory.warehouseWorkspace.setupRequired', { defaultValue: 'Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.' }));
@@ -3888,6 +3904,16 @@ function InventoryClientLoaded({
   return (
     <>
       {activeTabUsable && formDialog}
+      {workspace === 'warehouse' && <WarehouseSetupNotice
+        status={setup.status}
+        canManage={permissionsReady !== false && checkPermission('warehouse', 'create').allowed}
+        onLocations={permissionsReady !== false && checkPermission('stock_location', 'read').allowed ? () => setActiveTab('locations') : undefined}
+        onRetry={(('onRetry' in warehousesRead.state && warehousesRead.state.onRetry) ||
+          ('onRetry' in locationsRead.state && locationsRead.state.onRetry)) ? () => {
+          if ('onRetry' in warehousesRead.state) warehousesRead.state.onRetry?.();
+          if ('onRetry' in locationsRead.state) locationsRead.state.onRetry?.();
+        } : undefined}
+      />}
       {/* A record selection must not outlive its actor, organization, or company. */}
       <ModuleView
         key={`${identity ?? 'anonymous'}:${sessionOrganizationId ?? 'no-organization'}:${organizationId}:${operatingCompanyId}`}

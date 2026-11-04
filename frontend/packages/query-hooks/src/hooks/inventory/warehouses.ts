@@ -112,8 +112,10 @@ import type {
 export function useWarehouses(
   organizationId: bigint,
   initialData?: Warehouse[],
+  enabled = true,
 ) {
   return useQuery<Warehouse[]>({
+    enabled,
     queryKey: ['warehouses', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/warehouses', 'Failed to fetch warehouses'),
@@ -127,9 +129,11 @@ export function useWarehouse3D(
   organizationId: bigint,
   _companyId: bigint,
   warehouseId: bigint,
+  enabled = true,
 ) {
   const orgKey = rqBigIntKey(organizationId);
   const { data: zones3D = [] } = useQuery<Warehouse3DZone[]>({
+    enabled,
     queryKey: ['warehouse-3d-zones', orgKey],
     queryFn: () =>
       fetchQueryList(
@@ -139,6 +143,7 @@ export function useWarehouse3D(
     staleTime: 30_000,
   });
   const { data: allLocations = [] } = useQuery<StockLocation[]>({
+    enabled,
     queryKey: ['stock-locations', orgKey],
     queryFn: () =>
       fetchQueryList(
@@ -148,12 +153,14 @@ export function useWarehouse3D(
     staleTime: 30_000,
   });
   const { data: allQuants = [] } = useQuery<StockQuant[]>({
+    enabled,
     queryKey: ['stock-quants', orgKey],
     queryFn: () =>
       fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
     staleTime: 30_000,
   });
   const { data: products = [] } = useQuery<Product[]>({
+    enabled,
     queryKey: ['products', orgKey],
     queryFn: () =>
       fetchQueryList('/api/query/products', 'Failed to fetch products'),
@@ -161,7 +168,7 @@ export function useWarehouse3D(
   });
 
   return useMemo(() => {
-    if (warehouseId === 0n) {
+    if (!enabled || warehouseId === 0n) {
       return { zones: [], slots: [], items: [] };
     }
     const productById = new Map<string, { name: string; sku: string }>();
@@ -179,7 +186,7 @@ export function useWarehouse3D(
       allQuants,
       productById,
     );
-  }, [warehouseId, zones3D, allLocations, allQuants, products]);
+  }, [enabled, warehouseId, zones3D, allLocations, allQuants, products]);
 }
 
 export function useCreateWarehouse(organizationId: bigint, companyId?: bigint) {

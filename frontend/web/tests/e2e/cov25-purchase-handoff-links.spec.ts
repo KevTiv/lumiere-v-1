@@ -63,9 +63,9 @@ test.describe("COV-25 purchase order → receipt and vendor bill links",
       await expect(sheet.locator('[data-testid^="purchase-order-handoff-picking-"]')).toHaveCount(1)
       await expect(sheet.locator('[data-testid^="purchase-order-handoff-invoice-"]')).toHaveCount(1)
       await receiptLink.click()
-      await expectCanonicalPickingFocus(page, receipt.id)
+      await expectCanonicalPickingFocus(page, receipt.id, "inventory")
       await page.reload()
-      await expectCanonicalPickingFocus(page, receipt.id)
+      await expectCanonicalPickingFocus(page, receipt.id, "inventory")
 
       const reopened = await openHandoffs(page, orderId)
       const billLink = reopened.getByTestId(`purchase-order-handoff-invoice-${billId}`)

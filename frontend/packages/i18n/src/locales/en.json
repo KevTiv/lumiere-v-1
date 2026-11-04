@@ -5855,7 +5855,24 @@
     }
   },
   "inventory": {
+    "warehouseSetup": {
+      "title": "Warehouse setup",
+      "company-required": "Select an operating company before setting up a warehouse.",
+      "loading": "Checking warehouse and location setup…",
+      "unavailable": "Warehouse setup could not be verified. Check your access or try again. Existing data has not been treated as missing.",
+      "locations-required": "No active stock location is available for this company. Create an internal stock location before completing warehouse setup.",
+      "assisted-setup": "The first warehouse needs assisted setup. New warehouse creation becomes available once an active warehouse with usable stock locations and operation types is configured for this company.",
+      "managerNext": "Complete the initial setup with your alpha support contact, then refresh this workspace. New warehouse creation copies the operational configuration of an available warehouse.",
+      "operatorNext": "Ask your organization administrator to complete warehouse setup for the selected company.",
+      "locations": "Open locations"
+    },
     "warehouseWorkspace": {
+      "transferTask": "Task",
+      "receive": "Receive",
+      "deliver": "Deliver",
+      "internalTransfer": "Internal transfer",
+      "otherMovement": "Other movement",
+      "countStockHint": "Use Counts to record stock corrections. Receipts, deliveries and transfers update stock through their own workflows.",
       "scopeChanged": "Your company, account or permissions changed. Reopen this workspace before continuing.",
       "countInputInvalid": "Choose available count, product, location and unit records, and enter a finite quantity of zero or more.",
       "countBaseUnit": "Count in the product’s stock unit. Unit conversion is not applied.",

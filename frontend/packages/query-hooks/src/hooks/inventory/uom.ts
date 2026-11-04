@@ -112,8 +112,13 @@ import type {
   CreateStockQuantParams,
 } from '@lumiere/stdb/types';
 
-export function useUoms(organizationId: bigint, initialData?: Uom[]) {
+export function useUoms(
+  organizationId: bigint,
+  initialData?: Uom[],
+  enabled = true,
+) {
   return useQuery<Uom[]>({
+    enabled,
     queryKey: ['uoms', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/uoms', 'Failed to fetch units of measure'),

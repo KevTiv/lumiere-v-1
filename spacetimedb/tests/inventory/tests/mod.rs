@@ -4,6 +4,7 @@ pub mod inventory_adjustments_tests;
 pub mod product_category_tests;
 pub mod product_update_test;
 pub mod relational_integrity_test;
+pub mod stock_correction_tests;
 pub mod stock_picking_quant_test;
 pub mod stock_test;
 
@@ -84,7 +85,9 @@ pub fn run_inventory_stock_inventory_test(ctx: &ReducerContext) -> Result<(), St
 #[spacetimedb::reducer]
 pub fn run_inventory_adjustment_test(ctx: &ReducerContext) -> Result<(), String> {
     inventory_adjustments_tests::test_inventory_adjustment_create(ctx)
-        .map_err(|e| format!("inventory_adjustment: {e}"))
+        .map_err(|e| format!("inventory_adjustment: {e}"))?;
+    stock_correction_tests::test_stock_correction_regressions(ctx)
+        .map_err(|e| format!("stock_correction: {e}"))
 }
 
 #[spacetimedb::reducer]

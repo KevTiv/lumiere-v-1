@@ -164,4 +164,38 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
     await expect(page).toHaveURL((url) => url.pathname === "/purchasing" && url.searchParams.get("filter") === `id:${orderId}`)
     expect(writes).toEqual([])
   })
+
+  test("keeps direct transfer records and reload return links inside Warehouse", async ({ page }) => {
+    const writes = observeWrites(page)
+    const response = await page.request.get("/api/query/stock-pickings")
+    expect(response.ok()).toBe(true)
+    const payload = await response.json() as { data: Array<Record<string, unknown>> }
+    const receipt = payload.data.find((row) => scalarQueryId(row.purchaseId ?? row.purchase_id) != null
+      && String(row.pickingCode ?? row.picking_code) === "incoming")
+    expect(receipt, "Seeded fixture must contain a PO-owned incoming receipt").toBeTruthy()
+    const receiptId = scalarQueryId(receipt!.id)!
+    const recordPath = `/inventory/transfers/${receiptId}`
+    await page.goto(recordPath)
+    const record = page.getByTestId("transfer-page")
+    await expect(record).toBeVisible()
+    await page.reload()
+    await expect(record).toBeVisible()
+    await expect(record.getByRole("link", { name: "Warehouse", exact: true })).toHaveAttribute("href", "/warehouse")
+    const transfers = record.getByRole("link", { name: "Transfers", exact: true })
+    await expect(transfers).toHaveAttribute("href", "/warehouse?tab=transfers")
+    await expect(record.locator('a[href="/inventory"], a[href^="/inventory?"]')).toHaveCount(0)
+    await transfers.click()
+    await expect(page).toHaveURL((url) => url.pathname === "/warehouse" && url.searchParams.get("tab") === "transfers")
+    await expect(page.locator('[data-testid="module-view-warehouse"]:visible')).toHaveCount(1)
+    await expectFinanceNavigation(page)
+    await page.goBack()
+    await expect(page).toHaveURL((url) => url.pathname === recordPath)
+    await expect(record.getByRole("link", { name: "Transfers", exact: true })).toHaveAttribute("href", "/warehouse?tab=transfers")
+
+    // A nonnumeric ID cannot identify a native u64 record and exercises the missing-record return.
+    await page.goto("/inventory/transfers/missing-transfer")
+    await expect(page.getByTestId("transfer-page-not-found")).toBeVisible()
+    await expect(page.getByRole("link", { name: "Back to transfers", exact: true })).toHaveAttribute("href", "/warehouse?tab=transfers")
+    expect(writes).toEqual([])
+  })
 })

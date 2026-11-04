@@ -8,8 +8,11 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
-use crate::inventory::product::product;
-use crate::inventory::stock::{stock_quant, StockQuant};
+use crate::inventory::stock::stock_quant;
+use crate::inventory::stock_correction::{
+    apply_correction, correction_quant, prepare_correction, validate_correction_target,
+    CorrectionIdentity,
+};
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -116,18 +119,41 @@ pub struct RecordCycleCountLineParams {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
-fn find_quant_for_sheet(
+fn sheet_identity(sheet: &StockCountSheet, company_id: u64) -> CorrectionIdentity {
+    CorrectionIdentity {
+        organization_id: sheet.organization_id,
+        company_id,
+        product_id: sheet.product_id,
+        location_id: sheet.location_id,
+        lot_id: sheet.lot_id,
+        package_id: None,
+    }
+}
+
+/// Count DTOs cannot select package, ownership or variant dimensions. Refuse an
+/// ambiguous physical count rather than create a second, unpackaged balance.
+fn require_plain_count_target(
     ctx: &ReducerContext,
-    sheet: &StockCountSheet,
-    company_id: u64,
-) -> Option<StockQuant> {
-    ctx.db.stock_quant().iter().find(|q| {
-        q.organization_id == sheet.organization_id
-            && q.company_id == company_id
-            && q.product_id == sheet.product_id
-            && q.location_id == sheet.location_id
-            && q.lot_id == sheet.lot_id
-    })
+    target: CorrectionIdentity,
+) -> Result<(), String> {
+    if ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(target.product_id)
+        .any(|q| {
+            q.organization_id == target.organization_id
+                && q.company_id == target.company_id
+                && q.location_id == target.location_id
+                && q.lot_id == target.lot_id
+                && (q.package_id.is_some()
+                    || q.owner_id.is_some()
+                    || q.product_variant_id.is_some())
+        })
+    {
+        return Err("cycle count cannot select packaged, owned or variant stock; use an explicit stock workflow".to_string());
+    }
+    Ok(())
 }
 
 fn compute_sheet_variance_value(
@@ -298,14 +324,34 @@ pub fn record_cycle_count_line(
         return Err("qty_counted must be a non-negative finite number".to_string());
     }
 
-    // Scope expected-qty and cost lookups to both organization and company
-    let existing_quant = ctx.db.stock_quant().iter().find(|q| {
-        q.organization_id == organization_id
-            && q.company_id == company_id
-            && q.product_id == params.product_id
-            && q.location_id == params.location_id
-            && q.lot_id == params.lot_id
-    });
+    if params.location_id != cycle.location_id {
+        return Err("count location must match the cycle count location".to_string());
+    }
+    let target = CorrectionIdentity {
+        organization_id,
+        company_id,
+        product_id: params.product_id,
+        location_id: params.location_id,
+        lot_id: params.lot_id,
+        package_id: None,
+    };
+    validate_correction_target(ctx, target, params.uom_id)?;
+    require_plain_count_target(ctx, target)?;
+    let existing_quant = correction_quant(ctx, target)?;
+    for id in &cycle.line_ids {
+        let line = ctx
+            .db
+            .stock_count_sheet()
+            .id()
+            .find(id)
+            .ok_or("stock count sheet not found")?;
+        if line.product_id == params.product_id
+            && line.location_id == params.location_id
+            && line.lot_id == params.lot_id
+        {
+            return Err("a count line already exists for this stock identity".to_string());
+        }
+    }
 
     let expected_qty = existing_quant.as_ref().map(|q| q.quantity).unwrap_or(0.0);
     let quant_cost = existing_quant.map(|q| q.cost);
@@ -462,80 +508,44 @@ pub fn post_cycle_count_adjustments(
 
     assert_inventory_writable(ctx, organization_id, cycle.company_id)?;
 
-    let mut adjusted_quant_ids: Vec<u64> = Vec::new();
-    let sheet_ids = cycle.line_ids.clone();
-    for sheet_id in sheet_ids {
+    // Resolve and validate every line before writing any quant or processed flag.
+    let mut prepared_lines = Vec::with_capacity(cycle.line_ids.len());
+    let mut identities = std::collections::HashSet::new();
+    for sheet_id in &cycle.line_ids {
         let sheet = ctx
             .db
             .stock_count_sheet()
             .id()
-            .find(&sheet_id)
-            .ok_or("Stock count sheet not found")?;
-
-        if sheet.is_processed {
-            continue;
+            .find(sheet_id)
+            .ok_or("stock count sheet not found")?;
+        if sheet.organization_id != organization_id
+            || sheet.cycle_count_id != cycle_count_id
+            || sheet.location_id != cycle.location_id
+            || sheet.is_processed
+        {
+            return Err("stock count sheet does not belong to this unposted cycle".to_string());
         }
-
-        if let Some(quant) = find_quant_for_sheet(ctx, &sheet, cycle.company_id) {
-            let new_qty = sheet.counted_qty;
-            let new_available = (new_qty - quant.reserved_quantity).max(0.0);
-            let new_value = new_qty * quant.cost;
-
-            let quant_id = quant.id;
-            ctx.db.stock_quant().id().update(StockQuant {
-                quantity: new_qty,
-                available_quantity: new_available,
-                value: new_value,
-                inventory_quantity: new_qty,
-                inventory_diff_quantity: 0.0,
-                inventory_quantity_set: true,
-                inventory_date: Some(ctx.timestamp),
-                user_id: Some(ctx.sender()),
-                ..quant
-            });
-            adjusted_quant_ids.push(quant_id);
-        } else {
-            // New quant: inherit cost and currency from product rather than defaulting to zero
-            let (unit_cost, quant_currency_id) = ctx
-                .db
-                .product()
-                .id()
-                .find(&sheet.product_id)
-                .map(|p| (p.standard_price, Some(p.currency_id)))
-                .unwrap_or((0.0, None));
-
-            let qty = sheet.counted_qty;
-            let inserted = ctx.db.stock_quant().insert(StockQuant {
-                id: 0,
-                organization_id: sheet.organization_id,
-                product_id: sheet.product_id,
-                product_variant_id: None,
-                location_id: sheet.location_id,
-                lot_id: sheet.lot_id,
-                package_id: None,
-                owner_id: None,
-                company_id: cycle.company_id,
-                quantity: qty,
-                reserved_quantity: 0.0,
-                available_quantity: qty,
-                in_date: Some(ctx.timestamp),
-                inventory_quantity: qty,
-                inventory_diff_quantity: 0.0,
-                inventory_quantity_set: true,
-                is_outdated: false,
-                user_id: Some(ctx.sender()),
-                inventory_date: Some(ctx.timestamp),
-                cost: unit_cost,
-                value: qty * unit_cost,
-                cost_method: None,
-                accounting_date: None,
-                currency_id: quant_currency_id,
-                accounting_entry_ids: vec![],
-                metadata: Some("{\"source\":\"cycle_count_post\"}".to_string()),
-            });
-            adjusted_quant_ids.push(inserted.id);
+        let target = sheet_identity(&sheet, cycle.company_id);
+        require_plain_count_target(ctx, target)?;
+        if !identities.insert(target) {
+            return Err("duplicate stock identities in cycle count".to_string());
         }
-
+        let prepared = prepare_correction(
+            ctx,
+            target,
+            sheet.uom_id,
+            sheet.expected_qty,
+            sheet.counted_qty,
+            None,
+        )?;
+        prepared_lines.push((sheet, prepared));
+    }
+    if prepared_lines.is_empty() {
+        return Err("cannot post cycle count without lines".to_string());
+    }
+    let mut adjusted_quant_ids = Vec::with_capacity(prepared_lines.len());
+    for (sheet, prepared) in prepared_lines {
+        adjusted_quant_ids.push(apply_correction(ctx, prepared));
         ctx.db.stock_count_sheet().id().update(StockCountSheet {
             is_processed: true,
             processed_at: Some(ctx.timestamp),
@@ -566,7 +576,7 @@ pub fn post_cycle_count_adjustments(
     );
 
     // Capture the exact quant outcomes this post produced. Every id here was
-    // resolved by identity match (find_quant_for_sheet) or is a fresh insert
+    // resolved by the shared exact correction identity or is a fresh insert
     // whose id we carry directly — never rediscovered by newest/highest id.
     adjusted_quant_ids.sort_unstable();
     adjusted_quant_ids.dedup();

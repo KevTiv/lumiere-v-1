@@ -30,7 +30,7 @@ async function receiveRequest(page: Page, lineId: number, qty: number) {
 
 function isCanonicalReceiptUrl(url: URL, pickingId: number): boolean {
   return (
-    url.pathname === "/inventory" &&
+    url.pathname === "/warehouse" &&
     url.searchParams.get("tab") === "transfers" &&
     url.searchParams.getAll("filter").length === 1 &&
     url.searchParams.get("filter") === `id:${pickingId}`
@@ -43,7 +43,7 @@ async function expectCanonicalReceiptFocus(
 ): Promise<void> {
   await expect(page).toHaveURL((url) => isCanonicalReceiptUrl(url, pickingId))
   await expect(
-    page.getByTestId("module-tab-inventory-transfers"),
+    page.getByTestId("module-tab-warehouse-transfers"),
   ).toHaveAttribute("aria-selected", "true")
 
   const table = activeTabEntityTable(page)

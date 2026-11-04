@@ -1,3 +1,16 @@
+import type { WorkspaceProfile } from '@lumiere/ui/lib/workspace-profile';
+import { moduleTabHref } from '@lumiere/erp-shared/record-links';
+
+/** Resolve return links from the active profile, including direct record opens and reloads. */
+export function transferWorkspaceNavigation(profile: WorkspaceProfile) {
+  const moduleId = profile === 'finance-alpha' ? 'warehouse' : 'inventory';
+  return {
+    moduleId,
+    rootHref: `/${moduleId}`,
+    transfersHref: moduleTabHref(moduleId, 'transfers'),
+  };
+}
+
 /** Where a stock transfer's page lives. */
 export function transferRecordHref(transfer: Record<string, unknown>): string | undefined {
   return transfer.id == null ? undefined : `/inventory/transfers/${String(transfer.id)}`;

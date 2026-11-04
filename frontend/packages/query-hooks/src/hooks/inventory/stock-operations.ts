@@ -131,8 +131,10 @@ export const stockQuantsQueryOptions = (organizationId: bigint) => ({
 export function useStockQuants(
   organizationId: bigint,
   initialData?: StockQuant[],
+  enabled = true,
 ) {
   return useQuery<StockQuant[]>({
+    enabled,
     ...stockQuantsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
@@ -194,8 +196,10 @@ export const stockPickingsQueryOptions = (organizationId: bigint) => ({
 export function useStockPickings(
   organizationId: bigint,
   initialData?: StockPicking[],
+  enabled = true,
 ) {
   return useQuery<StockPicking[]>({
+    enabled,
     ...stockPickingsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
@@ -205,6 +209,7 @@ export function useStockPickings(
 export function useStockLocations(
   organizationId: bigint,
   _initialData?: StockLocation[],
+  enabled = true,
 ) {
   const { activeCompanyId, activeCompanyReady } = useErpSession()
   const companyId = activeCompanyReady ? activeCompanyId : null
@@ -220,7 +225,7 @@ export function useStockLocations(
         'Failed to fetch stock locations',
       )
     },
-    enabled: organizationId > 0n && companyId != null && companyId > 0,
+    enabled: enabled && organizationId > 0n && companyId != null && companyId > 0,
     staleTime: 30_000,
     // The server seed has no company scope. Fetch before exposing selected-company rows.
   });
@@ -237,8 +242,10 @@ export const stockMovesQueryOptions = (organizationId: bigint) => ({
 export function useStockMoves(
   organizationId: bigint,
   initialData?: StockMove[],
+  enabled = true,
 ) {
   return useQuery<StockMove[]>({
+    enabled,
     ...stockMovesQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
@@ -256,8 +263,10 @@ export function useStockMoveLines(organizationId: bigint) {
 export function useStockRoutes(
   organizationId: bigint,
   initialData?: StockRoute[],
+  enabled = true,
 ) {
   return useQuery<StockRoute[]>({
+    enabled,
     queryKey: ['stock-routes', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-routes', 'Failed to fetch stock routes'),
@@ -269,8 +278,10 @@ export function useStockRoutes(
 export function useStockRules(
   organizationId: bigint,
   initialData?: StockRule[],
+  enabled = true,
 ) {
   return useQuery<StockRule[]>({
+    enabled,
     queryKey: ['stock-rules', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/stock-rules', 'Failed to fetch stock rules'),
@@ -282,8 +293,10 @@ export function useStockRules(
 export function usePickingWaves(
   organizationId: bigint,
   initialData?: PickingWave[],
+  enabled = true,
 ) {
   return useQuery<PickingWave[]>({
+    enabled,
     queryKey: ['picking-waves', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -298,8 +311,10 @@ export function usePickingWaves(
 export function useWarehouseTasks(
   organizationId: bigint,
   initialData?: WarehouseTask[],
+  enabled = true,
 ) {
   return useQuery<WarehouseTask[]>({
+    enabled,
     queryKey: ['warehouse-tasks', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -324,8 +339,10 @@ export const replenishmentRulesQueryOptions = (organizationId: bigint) => ({
 export function useReplenishmentRules(
   organizationId: bigint,
   initialData?: ReplenishmentRule[],
+  enabled = true,
 ) {
   return useQuery<ReplenishmentRule[]>({
+    enabled,
     ...replenishmentRulesQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });
@@ -849,8 +866,10 @@ export function useExecuteDirectedPutaway(
 export function useStockPackages(
   organizationId: bigint,
   initialData?: StockPackage[],
+  enabled = true,
 ) {
   return useQuery<StockPackage[]>({
+    enabled,
     queryKey: ['stock-packages', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
