@@ -4,11 +4,13 @@ This runbook accompanies the Mistral capability implementation. A merged PR,
 provider key, successful health probe or saved upload does not establish tenant
 activation. Use one existing shared Mistral agent and its existing monetary pool;
 this procedure does not create credit or increase the monthly allowance.
+Recorded local checks and generated-candidate hashes are in the
+[validation report](mistral-alpha-validation.md).
 
 ## Release before activation
 
 The native module adds private `ai_metered_price` and `ai_metered_usage` tables,
-their dedicated-reader views and five service-only metering operations. Generate
+their dedicated-reader views and five non-client metering operations. Generate
 and review the canonical contracts, storage migration and reconstruction output;
 publish an immutable release and align all consumer pins through the existing
 release lane. Do not hand-edit generated contracts or earlier SQL migrations.
