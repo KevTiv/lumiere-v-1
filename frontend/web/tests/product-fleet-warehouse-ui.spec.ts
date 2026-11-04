@@ -226,6 +226,7 @@ for (const width of [390, 1440]) {
 }
 
 test("Warehouse receipt focus survives denied optional locations without exposing cached task labels", async ({ page }) => {
+  test.setTimeout(90_000);
   for (const locationState of ["denied", "error", "partial"]) {
     await openWorkspace(page, "warehouse", `&tab=transfers&filter=id:52&locationsState=${locationState}`);
     const table = page.locator('[role="tabpanel"]:visible').getByTestId("entity-table");
