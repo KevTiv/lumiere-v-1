@@ -145,6 +145,14 @@ test('structural and certification blockers make zero writes even when setup is 
   }
 })
 
+test('chat binding requires query-embedding permission even without a separate query surface', async () => {
+  const { config, state, client, writes } = fixture()
+  config.surfaces = [config.surfaces[0]]
+  state.agent.allowed_actions = ['chat']
+  await assert.rejects(provisionCapabilities(config, client, true, now), /rag_generation requires the embedding_query agent action/)
+  assert.deepEqual(writes, [])
+})
+
 test('native form/action skill keys enforce their real runtime actions before any writes', async () => {
   const form = fixture()
   form.config.surfaces.push({ skillKey: 'form_suggestion', skillId: 10, sourceHash: digest })

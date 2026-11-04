@@ -109,6 +109,9 @@ async function inspectCapabilities(config, client, now) {
   check(Array.isArray(agent.allowed_actions), 'agent action allowlist is invalid')
   for (const meter of config.meters) check(agent.allowed_models.includes(meter.model), 'metered model is not allowed for shared agent')
   for (const surface of config.surfaces) check(permits(agent.allowed_actions, requiredAction(surface.skillKey)), `agent action is not allowed for ${surface.skillKey}`)
+  if (config.surfaces.some(surface => surface.skillKey === 'rag_generation')) {
+    check(permits(agent.allowed_actions, 'embedding_query'), 'rag_generation requires the embedding_query agent action')
+  }
 
   const period = now.toISOString().slice(0, 7)
   check(config.pricesReviewedAt <= now.toISOString().slice(0, 10), 'pricing review date is in the future')
