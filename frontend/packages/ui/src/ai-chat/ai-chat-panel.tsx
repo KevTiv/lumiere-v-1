@@ -1160,7 +1160,7 @@ export function AIChatPanel({
                 setOpenTools(showSkills ? null : "skills")
               }}>
               <Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
-              {t("aiChat.deck.skills")}
+              {t("aiChat.deck.cards")}
               {selectedSkills.length ? <span>{selectedSkills.length}</span> : null}
             </Button>
           {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex min-h-8 items-center gap-2 text-xs text-primary hover:underline"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}

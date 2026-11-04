@@ -50,7 +50,7 @@ describe("AI chat workspace", () => {
     await screen.findByText("Review this invoice.")
     const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: "Keep my invoice question" } })
-    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.skills" }))
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.cards" }))
     fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
     expect(input.value).toBe("Keep my invoice question")
     expect(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }).getAttribute("aria-pressed")).toBe("true")
@@ -100,7 +100,7 @@ describe("AI chat workspace", () => {
   it("removes a selected skill without changing the typed draft or an in-progress slash query", () => {
     render(<AIChatPanel open onClose={vi.fn()} />)
     const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
-    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.skills" }))
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.cards" }))
     fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
     fireEvent.change(input, { target: { value: "Keep this /find" } })
     fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.remove" }))
@@ -111,7 +111,7 @@ describe("AI chat workspace", () => {
   it("restores a failed request without duplicating selected skill prompts on retry", async () => {
     const onSendMessage = vi.fn().mockRejectedValueOnce(new Error("Retry this request")).mockResolvedValue({ content: "Prepared." })
     render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
-    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.skills" }))
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.cards" }))
     fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
     fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "New invoice" } })
     fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
