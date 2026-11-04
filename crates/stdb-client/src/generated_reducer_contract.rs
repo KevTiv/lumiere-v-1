@@ -724,6 +724,12 @@ const PARAMS_CLAIM_AI_CAPABILITY_EXECUTION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ClaimAiCapabilityExecutionParams") },
 ];
+const PARAMS_CLAIM_AI_METERED_DISPATCH: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "reservation_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "attempt_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "claim_id", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_CLAIM_AI_SKILL_CERTIFICATION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "request_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -980,6 +986,11 @@ const PARAMS_COMPUTE_PURCHASE_ORDER_TOTALS: &[ReducerParam] = &[
 const PARAMS_COMPUTE_SO_TOTALS: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_CONFIGURE_AI_METERED_PRICE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ConfigureAiMeteredPriceParams") },
 ];
 const PARAMS_CONFIGURE_AI_SPEND: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -3715,6 +3726,10 @@ const PARAMS_RECONCILE_ACCOUNT_BANK_STATEMENT_LINE: &[ReducerParam] = &[
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ReconcileAccountBankStatementLineParams") },
 ];
+const PARAMS_RECONCILE_AI_METERED_SPEND: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ReconcileAiMeteredSpendParams") },
+];
 const PARAMS_RECONCILE_AI_PROVIDER_ATTEMPT: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ReconcileAiProviderAttemptParams") },
@@ -4239,6 +4254,10 @@ const PARAMS_REQUEST_WORKFLOW_SUBJECT_SNAPSHOT: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RequestWorkflowSubjectSnapshotParams") },
+];
+const PARAMS_RESERVE_AI_METERED_SPEND: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ReserveAiMeteredSpendParams") },
 ];
 const PARAMS_RESERVE_AI_SPEND: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5323,6 +5342,10 @@ const PARAMS_SET_WORKFLOW_MIGRATION_PLAN_ACTIVE: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "plan_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "active", kind: ScalarKind::Bool, ref_target: None },
+];
+const PARAMS_SETTLE_AI_METERED_SPEND: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SettleAiMeteredSpendParams") },
 ];
 const PARAMS_SETTLE_AI_SPEND: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6739,6 +6762,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "cancel_workflow_timer", contract_operation_id: "erp.cancel_workflow_timer", params: PARAMS_CANCEL_WORKFLOW_TIMER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "check_mo_availability", contract_operation_id: "erp.check_mo_availability", params: PARAMS_CHECK_MO_AVAILABILITY, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "claim_ai_capability_execution", contract_operation_id: "erp.claim_ai_capability_execution", params: PARAMS_CLAIM_AI_CAPABILITY_EXECUTION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "claim_ai_metered_dispatch", contract_operation_id: "erp.claim_ai_metered_dispatch", params: PARAMS_CLAIM_AI_METERED_DISPATCH, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_ai_skill_certification", contract_operation_id: "erp.claim_ai_skill_certification", params: PARAMS_CLAIM_AI_SKILL_CERTIFICATION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_hub_with_token", contract_operation_id: "erp.claim_hub_with_token", params: PARAMS_CLAIM_HUB_WITH_TOKEN, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_queue_job", contract_operation_id: "erp.claim_queue_job", params: PARAMS_CLAIM_QUEUE_JOB, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -6792,6 +6816,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "compute_purchase_order_line_totals", contract_operation_id: "erp.compute_purchase_order_line_totals", params: PARAMS_COMPUTE_PURCHASE_ORDER_LINE_TOTALS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "compute_purchase_order_totals", contract_operation_id: "erp.compute_purchase_order_totals", params: PARAMS_COMPUTE_PURCHASE_ORDER_TOTALS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "compute_so_totals", contract_operation_id: "erp.compute_so_totals", params: PARAMS_COMPUTE_SO_TOTALS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "configure_ai_metered_price", contract_operation_id: "erp.configure_ai_metered_price", params: PARAMS_CONFIGURE_AI_METERED_PRICE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "configure_ai_spend", contract_operation_id: "erp.configure_ai_spend", params: PARAMS_CONFIGURE_AI_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "configure_contact_identity_verification_authority", contract_operation_id: "erp.configure_contact_identity_verification_authority", params: PARAMS_CONFIGURE_CONTACT_IDENTITY_VERIFICATION_AUTHORITY, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "configure_manufacturing_valuation", contract_operation_id: "erp.configure_manufacturing_valuation", params: PARAMS_CONFIGURE_MANUFACTURING_VALUATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7373,6 +7398,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "recompute_relationship_insights", contract_operation_id: "erp.recompute_relationship_insights", params: PARAMS_RECOMPUTE_RELATIONSHIP_INSIGHTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "recompute_workflow_timers_for_calendar", contract_operation_id: "erp.recompute_workflow_timers_for_calendar", params: PARAMS_RECOMPUTE_WORKFLOW_TIMERS_FOR_CALENDAR, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "reconcile_account_bank_statement_line", contract_operation_id: "erp.reconcile_account_bank_statement_line", params: PARAMS_RECONCILE_ACCOUNT_BANK_STATEMENT_LINE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "reconcile_ai_metered_spend", contract_operation_id: "erp.reconcile_ai_metered_spend", params: PARAMS_RECONCILE_AI_METERED_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "reconcile_ai_provider_attempt", contract_operation_id: "erp.reconcile_ai_provider_attempt", params: PARAMS_RECONCILE_AI_PROVIDER_ATTEMPT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "reconcile_ai_run_effect", contract_operation_id: "erp.reconcile_ai_run_effect", params: PARAMS_RECONCILE_AI_RUN_EFFECT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "reconcile_payment_with_invoice", contract_operation_id: "erp.reconcile_payment_with_invoice", params: PARAMS_RECONCILE_PAYMENT_WITH_INVOICE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7478,6 +7504,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "request_embedding_job", contract_operation_id: "erp.request_embedding_job", params: PARAMS_REQUEST_EMBEDDING_JOB, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "request_expense_policy_exception", contract_operation_id: "erp.request_expense_policy_exception", params: PARAMS_REQUEST_EXPENSE_POLICY_EXCEPTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "request_workflow_subject_snapshot", contract_operation_id: "erp.request_workflow_subject_snapshot", params: PARAMS_REQUEST_WORKFLOW_SUBJECT_SNAPSHOT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "reserve_ai_metered_spend", contract_operation_id: "erp.reserve_ai_metered_spend", params: PARAMS_RESERVE_AI_METERED_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "reserve_ai_spend", contract_operation_id: "erp.reserve_ai_spend", params: PARAMS_RESERVE_AI_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "reserve_serial", contract_operation_id: "erp.reserve_serial", params: PARAMS_RESERVE_SERIAL, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "reserve_stock_quant", contract_operation_id: "erp.reserve_stock_quant", params: PARAMS_RESERVE_STOCK_QUANT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7824,6 +7851,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "set_whatsapp_primary_account", contract_operation_id: "erp.set_whatsapp_primary_account", params: PARAMS_SET_WHATSAPP_PRIMARY_ACCOUNT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_workflow_candidate_group_member", contract_operation_id: "erp.set_workflow_candidate_group_member", params: PARAMS_SET_WORKFLOW_CANDIDATE_GROUP_MEMBER, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "set_workflow_migration_plan_active", contract_operation_id: "erp.set_workflow_migration_plan_active", params: PARAMS_SET_WORKFLOW_MIGRATION_PLAN_ACTIVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "settle_ai_metered_spend", contract_operation_id: "erp.settle_ai_metered_spend", params: PARAMS_SETTLE_AI_METERED_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "settle_ai_spend", contract_operation_id: "erp.settle_ai_spend", params: PARAMS_SETTLE_AI_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "settle_sale_commissions", contract_operation_id: "erp.settle_sale_commissions", params: PARAMS_SETTLE_SALE_COMMISSIONS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "setup_fiscal_calendar", contract_operation_id: "erp.setup_fiscal_calendar", params: PARAMS_SETUP_FISCAL_CALENDAR, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8085,6 +8113,7 @@ pub fn company_scope_paths(reducer_name: &str) -> &'static [CompanyScopePath] {
         "create_opportunity" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
         "create_whatsapp_business_account" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
         "nominate_ai_work_program_output" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
+        "reserve_ai_metered_spend" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         "save_ai_work_program_draft" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         _ => &[],
     }
@@ -8238,6 +8267,7 @@ pub mod reducer_names {
     pub const CANCEL_WORKFLOW_TIMER: ReducerName = ReducerName::new("cancel_workflow_timer");
     pub const CHECK_MO_AVAILABILITY: ReducerName = ReducerName::new("check_mo_availability");
     pub const CLAIM_AI_CAPABILITY_EXECUTION: ReducerName = ReducerName::new("claim_ai_capability_execution");
+    pub const CLAIM_AI_METERED_DISPATCH: ReducerName = ReducerName::new("claim_ai_metered_dispatch");
     pub const CLAIM_AI_SKILL_CERTIFICATION: ReducerName = ReducerName::new("claim_ai_skill_certification");
     pub const CLAIM_HUB_WITH_TOKEN: ReducerName = ReducerName::new("claim_hub_with_token");
     pub const CLAIM_QUEUE_JOB: ReducerName = ReducerName::new("claim_queue_job");
@@ -8291,6 +8321,7 @@ pub mod reducer_names {
     pub const COMPUTE_PURCHASE_ORDER_LINE_TOTALS: ReducerName = ReducerName::new("compute_purchase_order_line_totals");
     pub const COMPUTE_PURCHASE_ORDER_TOTALS: ReducerName = ReducerName::new("compute_purchase_order_totals");
     pub const COMPUTE_SO_TOTALS: ReducerName = ReducerName::new("compute_so_totals");
+    pub const CONFIGURE_AI_METERED_PRICE: ReducerName = ReducerName::new("configure_ai_metered_price");
     pub const CONFIGURE_AI_SPEND: ReducerName = ReducerName::new("configure_ai_spend");
     pub const CONFIGURE_CONTACT_IDENTITY_VERIFICATION_AUTHORITY: ReducerName = ReducerName::new("configure_contact_identity_verification_authority");
     pub const CONFIGURE_MANUFACTURING_VALUATION: ReducerName = ReducerName::new("configure_manufacturing_valuation");
@@ -8872,6 +8903,7 @@ pub mod reducer_names {
     pub const RECOMPUTE_RELATIONSHIP_INSIGHTS: ReducerName = ReducerName::new("recompute_relationship_insights");
     pub const RECOMPUTE_WORKFLOW_TIMERS_FOR_CALENDAR: ReducerName = ReducerName::new("recompute_workflow_timers_for_calendar");
     pub const RECONCILE_ACCOUNT_BANK_STATEMENT_LINE: ReducerName = ReducerName::new("reconcile_account_bank_statement_line");
+    pub const RECONCILE_AI_METERED_SPEND: ReducerName = ReducerName::new("reconcile_ai_metered_spend");
     pub const RECONCILE_AI_PROVIDER_ATTEMPT: ReducerName = ReducerName::new("reconcile_ai_provider_attempt");
     pub const RECONCILE_AI_RUN_EFFECT: ReducerName = ReducerName::new("reconcile_ai_run_effect");
     pub const RECONCILE_PAYMENT_WITH_INVOICE: ReducerName = ReducerName::new("reconcile_payment_with_invoice");
@@ -8977,6 +9009,7 @@ pub mod reducer_names {
     pub const REQUEST_EMBEDDING_JOB: ReducerName = ReducerName::new("request_embedding_job");
     pub const REQUEST_EXPENSE_POLICY_EXCEPTION: ReducerName = ReducerName::new("request_expense_policy_exception");
     pub const REQUEST_WORKFLOW_SUBJECT_SNAPSHOT: ReducerName = ReducerName::new("request_workflow_subject_snapshot");
+    pub const RESERVE_AI_METERED_SPEND: ReducerName = ReducerName::new("reserve_ai_metered_spend");
     pub const RESERVE_AI_SPEND: ReducerName = ReducerName::new("reserve_ai_spend");
     pub const RESERVE_SERIAL: ReducerName = ReducerName::new("reserve_serial");
     pub const RESERVE_STOCK_QUANT: ReducerName = ReducerName::new("reserve_stock_quant");
@@ -9323,6 +9356,7 @@ pub mod reducer_names {
     pub const SET_WHATSAPP_PRIMARY_ACCOUNT: ReducerName = ReducerName::new("set_whatsapp_primary_account");
     pub const SET_WORKFLOW_CANDIDATE_GROUP_MEMBER: ReducerName = ReducerName::new("set_workflow_candidate_group_member");
     pub const SET_WORKFLOW_MIGRATION_PLAN_ACTIVE: ReducerName = ReducerName::new("set_workflow_migration_plan_active");
+    pub const SETTLE_AI_METERED_SPEND: ReducerName = ReducerName::new("settle_ai_metered_spend");
     pub const SETTLE_AI_SPEND: ReducerName = ReducerName::new("settle_ai_spend");
     pub const SETTLE_SALE_COMMISSIONS: ReducerName = ReducerName::new("settle_sale_commissions");
     pub const SETUP_FISCAL_CALENDAR: ReducerName = ReducerName::new("setup_fiscal_calendar");
@@ -9723,6 +9757,7 @@ macro_rules! reducer_call {
     ("cancel_workflow_timer", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_WORKFLOW_TIMER, $args) };
     ("check_mo_availability", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CHECK_MO_AVAILABILITY, $args) };
     ("claim_ai_capability_execution", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_CAPABILITY_EXECUTION, $args) };
+    ("claim_ai_metered_dispatch", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_METERED_DISPATCH, $args) };
     ("claim_ai_skill_certification", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_SKILL_CERTIFICATION, $args) };
     ("claim_hub_with_token", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_HUB_WITH_TOKEN, $args) };
     ("claim_queue_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_QUEUE_JOB, $args) };
@@ -9776,6 +9811,7 @@ macro_rules! reducer_call {
     ("compute_purchase_order_line_totals", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPUTE_PURCHASE_ORDER_LINE_TOTALS, $args) };
     ("compute_purchase_order_totals", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPUTE_PURCHASE_ORDER_TOTALS, $args) };
     ("compute_so_totals", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::COMPUTE_SO_TOTALS, $args) };
+    ("configure_ai_metered_price", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CONFIGURE_AI_METERED_PRICE, $args) };
     ("configure_ai_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CONFIGURE_AI_SPEND, $args) };
     ("configure_contact_identity_verification_authority", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CONFIGURE_CONTACT_IDENTITY_VERIFICATION_AUTHORITY, $args) };
     ("configure_manufacturing_valuation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CONFIGURE_MANUFACTURING_VALUATION, $args) };
@@ -10357,6 +10393,7 @@ macro_rules! reducer_call {
     ("recompute_relationship_insights", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECOMPUTE_RELATIONSHIP_INSIGHTS, $args) };
     ("recompute_workflow_timers_for_calendar", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECOMPUTE_WORKFLOW_TIMERS_FOR_CALENDAR, $args) };
     ("reconcile_account_bank_statement_line", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_ACCOUNT_BANK_STATEMENT_LINE, $args) };
+    ("reconcile_ai_metered_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_AI_METERED_SPEND, $args) };
     ("reconcile_ai_provider_attempt", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_AI_PROVIDER_ATTEMPT, $args) };
     ("reconcile_ai_run_effect", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_AI_RUN_EFFECT, $args) };
     ("reconcile_payment_with_invoice", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RECONCILE_PAYMENT_WITH_INVOICE, $args) };
@@ -10462,6 +10499,7 @@ macro_rules! reducer_call {
     ("request_embedding_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REQUEST_EMBEDDING_JOB, $args) };
     ("request_expense_policy_exception", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REQUEST_EXPENSE_POLICY_EXCEPTION, $args) };
     ("request_workflow_subject_snapshot", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REQUEST_WORKFLOW_SUBJECT_SNAPSHOT, $args) };
+    ("reserve_ai_metered_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESERVE_AI_METERED_SPEND, $args) };
     ("reserve_ai_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESERVE_AI_SPEND, $args) };
     ("reserve_serial", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESERVE_SERIAL, $args) };
     ("reserve_stock_quant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESERVE_STOCK_QUANT, $args) };
@@ -10808,6 +10846,7 @@ macro_rules! reducer_call {
     ("set_whatsapp_primary_account", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_WHATSAPP_PRIMARY_ACCOUNT, $args) };
     ("set_workflow_candidate_group_member", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_WORKFLOW_CANDIDATE_GROUP_MEMBER, $args) };
     ("set_workflow_migration_plan_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_WORKFLOW_MIGRATION_PLAN_ACTIVE, $args) };
+    ("settle_ai_metered_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_AI_METERED_SPEND, $args) };
     ("settle_ai_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_AI_SPEND, $args) };
     ("settle_sale_commissions", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_SALE_COMMISSIONS, $args) };
     ("setup_fiscal_calendar", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETUP_FISCAL_CALENDAR, $args) };

@@ -600,6 +600,11 @@
   "AiKnowledgeVersionContent": {
     "nomination_signal": "string"
   },
+  "AiMeteredUsage": {
+    "dispatch_claim": "string",
+    "actual_units": "u32",
+    "result_json": "string"
+  },
   "AiModelProfile": {
     "temperature": "f64",
     "top_p": "f64",
