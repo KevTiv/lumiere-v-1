@@ -20,6 +20,7 @@ import {
   NotificationBell,
   recentNotifications,
 } from "@lumiere/ui"
+import { ChatAlphaAnalytics } from "@/lib/chat-alpha-analytics"
 import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
 import { AssistantGuideHost } from "../../components/assistant-guide-host"
 import { AssistantGuideConversationProvider, useAssistantGuideConversation } from "@/lib/assistant-guide-context"
@@ -581,7 +582,13 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
       onImportFiles={importTasks.onImportFiles}
-      importTaskContent={importTasks.content}
+      importTaskContent={<>
+        {orgReady && identity && operatingCompanyId ? (
+          <ChatAlphaAnalytics key={JSON.stringify([identity, orgId, operatingCompanyId, sessionKey])}
+            companyId={operatingCompanyId} companyName={importCompany?.name} />
+        ) : null}
+        {importTasks.content}
+      </>}
       importCompanyLabel={importCompany?.name ?? (operatingCompanyId ? `Company ${operatingCompanyId}` : undefined)}
       importScopeKey={JSON.stringify([identity, organizationId, operatingCompanyId, sessionKey])}
     />

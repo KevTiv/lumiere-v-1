@@ -4,6 +4,9 @@ use anyhow::{ensure, Context, Result};
 use lumiere_finance_review_core::{self as core, Input};
 use serde_json::{json, Value};
 
+#[path = "finance_variance_drivers.rs"]
+mod finance_variance_drivers;
+
 pub async fn fetch(
     origin: &str,
     token: &str,
@@ -115,16 +118,13 @@ pub fn output(
     mut response: Value,
 ) -> Result<(ToolOutput, Value)> {
     if let Input::Variance(input) = core::parse_input(key, inputs)? {
-        for (field, date) in [
-            ("actual", input.actual_date),
-            ("baseline", input.baseline_date),
-        ] {
+        let verify = |field: &str, date: String| -> Result<_> {
             let request = crate::harness::finance_review::FinanceReviewRequest {
                 report_key: serde_json::from_value(serde_json::to_value(input.report_key)?)?,
                 date,
                 timezone: input.timezone.clone(),
             };
-            crate::harness::finance_review::build_evidence(
+            Ok(crate::harness::finance_review::build_evidence(
                 crate::harness::finance_review::FinanceReviewScope::new(
                     organization,
                     company,
@@ -132,8 +132,12 @@ pub fn output(
                 )?,
                 &request,
                 &serde_json::to_vec(&response["observation"][field])?,
-            )?;
-        }
+            )?)
+        };
+        let actual = verify("actual", input.actual_date)?;
+        let baseline = verify("baseline", input.baseline_date)?;
+        response["observation"]["measuredDrivers"] =
+            finance_variance_drivers::measured_drivers(&actual.observation, &baseline.observation)?;
     }
     if let Input::Report(input) = core::parse_input(key, inputs)? {
         let request = crate::harness::finance_review::FinanceReviewRequest {
