@@ -5,6 +5,7 @@ pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod owner_configuration_test;
+pub mod metered_spend_test;
 pub mod prepaid_test;
 pub mod relational_integrity_test;
 pub mod runtime_reads_test;
@@ -93,6 +94,7 @@ pub fn run_ai_intelligence_events_tests(ctx: &ReducerContext) -> Result<(), Stri
 
 #[spacetimedb::reducer]
 pub fn run_ai_spend_recovery_tests(ctx: &ReducerContext) -> Result<(), String> {
+    metered_spend_test::test_metered_shared_ledger(ctx)?;
     spend_recovery_test::test_abandon_persists_and_releases_atomically(ctx)
         .map_err(|e| format!("spend_recovery_atomic_release: {e}"))?;
     spend_recovery_test::test_recovery_requires_reconcile_permission(ctx)

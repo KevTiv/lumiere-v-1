@@ -6,7 +6,6 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 
 import {
-  optionalPositiveInteger,
   parseJsonBody,
   requireAiRouteContext,
 } from '../../_lib/route-helpers'
@@ -26,14 +25,6 @@ export async function POST(request: NextRequest) {
   if (!ragResult.ok) return ragResult.response
 
   const gwPayload: Record<string, unknown> = { ...ragResult.payload }
-
-  // Stream-only fields — not in the non-streaming RAG route.
-  const agentId = optionalPositiveInteger(body.agent_id)
-  if (agentId !== undefined && !Number.isNaN(agentId)) gwPayload.agent_id = agentId
-  const teamMemberId = optionalPositiveInteger(body.team_member_id)
-  if (teamMemberId !== undefined && !Number.isNaN(teamMemberId)) {
-    gwPayload.team_member_id = teamMemberId
-  }
 
   const headers = new Headers({ 'Content-Type': 'application/json' })
   const secret = process.env['LUMIERE_AI_GATEWAY_INTERNAL_SECRET']

@@ -70,7 +70,7 @@ fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
             let key = config.mistral_api_key.as_deref().ok_or_else(|| {
                 anyhow::anyhow!("MISTRAL_API_KEY required when EMBEDDING_PROVIDER=mistral")
             })?;
-            Ok(Arc::new(MistralEmbed::new(key)))
+            Ok(Arc::new(MistralEmbed::new(key)?))
         }
         "gemini" => {
             let key = config.google_api_key.as_deref().ok_or_else(|| {
@@ -78,10 +78,11 @@ fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
             })?;
             Ok(Arc::new(GeminiEmbed::new(key, &config.gemini_embed_model)))
         }
-        _ => Ok(Arc::new(OllamaEmbed::new(
+        "ollama" => Ok(Arc::new(OllamaEmbed::new(
             &config.ollama_url,
             &config.ollama_embed_model,
         ))),
+        _ => anyhow::bail!("unsupported embedding provider"),
     }
 }
 
@@ -95,12 +96,13 @@ pub fn build(config: &Config, http: reqwest::Client) -> Result<Providers> {
             let key = config.mistral_api_key.as_deref().ok_or_else(|| {
                 anyhow::anyhow!("MISTRAL_API_KEY required when VISION_PROVIDER=mistral")
             })?;
-            Arc::new(MistralVision::new(key))
+            Arc::new(MistralVision::with_model(key, &config.mistral_ocr_model)?)
         }
-        _ => Arc::new(OllamaVision::new(
+        "ollama" => Arc::new(OllamaVision::new(
             &config.ollama_url,
             &config.ollama_vision_model,
         )),
+        _ => anyhow::bail!("unsupported vision provider"),
     };
 
     let parser: Arc<dyn DocumentParser> = match config.document_parser.as_str() {

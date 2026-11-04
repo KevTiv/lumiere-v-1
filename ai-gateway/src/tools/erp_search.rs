@@ -65,12 +65,26 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .map(|v| v as f32)
         .or(Some(0.65));
 
+    let query_vector = async {
+        ctx.vector_store().check_ready().await?;
+        crate::routes::context::admitted_query_vector(
+            &ctx.state,
+            actor,
+            ctx.org_id,
+            ctx.company_id,
+            query,
+            "erp_search",
+            None,
+        )
+        .await
+    }
+    .await;
     let mut retrieval_degraded = false;
-    let company_result = match ctx.providers().embedder.embed(query).await {
+    let company_result = match &query_vector {
         Ok(query_vector) => {
             ctx.vector_store()
                 .search(
-                    query_vector,
+                    query_vector.clone(),
                     ctx.org_id,
                     ctx.company_id,
                     None,
@@ -79,7 +93,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
                 )
                 .await
         }
-        Err(error) => Err(error),
+        Err(_) => Err(anyhow::anyhow!("admitted query embedding unavailable")),
     };
     if let Err(error) = &company_result {
         tracing::warn!(error = %error, "ERP semantic retrieval unavailable");
@@ -88,12 +102,32 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
     retrieval_degraded |= company_outcome.degraded;
     let company_hits = company_outcome.value;
 
-    let org_result = if ctx.org_id > 0 {
-        ctx.rig()
-            .search_scope(ctx.org_id, ctx.company_id, query, limit as usize)
+    let org_result = match query_vector {
+        Ok(vector) => {
+            ctx.rig()
+                .search_scope_with_vector(
+                    ctx.org_id,
+                    ctx.company_id,
+                    &actor.identity_hex,
+                    vector,
+                    limit as usize,
+                )
+                .await
+        }
+        Err(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
+    };
+    let org_result = match org_result {
+        Ok(hits) => {
+            crate::routes::context::reauthorize_activity_hits(
+                &ctx.state,
+                actor,
+                ctx.org_id,
+                ctx.company_id,
+                hits,
+            )
             .await
-    } else {
-        Ok(Vec::new())
+        }
+        Err(error) => Err(error),
     };
     if let Err(error) = &org_result {
         tracing::warn!(error = %error, "ERP activity retrieval unavailable");

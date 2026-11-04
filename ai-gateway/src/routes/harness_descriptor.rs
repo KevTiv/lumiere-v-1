@@ -438,6 +438,8 @@ pub(crate) mod test_support {
             kong_llm_service_token: None,
             kong_llm_readiness_url: None,
             vision_provider: "disabled".into(),
+            mistral_ocr_model: String::new(),
+            mistral_ocr_max_pages: 20,
             document_parser: "plaintext".into(),
             unstructured_url: "http://parser.internal.example".into(),
             unstructured_api_key: None,

@@ -71,3 +71,18 @@ test('rejects duplicate and oversized history pages', () => {
   assert.equal(mapRunHistory({ runs: [run, run], nextCursor: null }), null)
   assert.equal(mapRunHistory({ runs: Array.from({ length: 51 }, (_, i) => ({ ...run, runId: i + 1 })), nextCursor: null }), null)
 })
+
+test('accounting-only OCR history shows pages and accepts null token usage', () => {
+  const run = { runId: 42, status: 'completed', skillId: 0, agentId: 4, stepCount: 0, tokensUsed: null, startedAt: 'now' }
+  const view = mapRunHistory({ runs: [{ ...run, economics: {
+    providerModels: [{ provider: 'mistral', model: 'mistral-ocr-2505' }],
+    inputTokens: 0, outputTokens: 0, settledUnits: 30, currency: 'USD',
+    meteredUsage: { totals: [{ unit: 'pages', allowance: 5, actualUnits: 3 }], complete: true, truncated: false },
+  } }], nextCursor: null })
+  assert.ok(view)
+  assert.equal(view.runs[0]?.tokensUsed, null)
+  assert.equal(view.runs[0]?.economics?.inputTokens, null)
+  assert.equal(view.runs[0]?.economics?.meteredUsage?.totals[0]?.actualUnits, 3)
+  // Optional economics can be absent on an older deployment or byte grant.
+  assert.equal(mapRunHistory({ runs: [run], nextCursor: null })?.runs[0]?.tokensUsed, null)
+})

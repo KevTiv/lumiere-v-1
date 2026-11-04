@@ -30,6 +30,32 @@ fn scope_conditions(organization_id: u64, company_id: u64) -> Vec<Condition> {
 pub struct VectorStore {
     client: Qdrant,
     collection: String,
+    embedding_space: Option<EmbeddingSpace>,
+}
+
+#[derive(Clone, Debug)]
+struct EmbeddingSpace {
+    model: String,
+    dimensions: u64,
+}
+
+fn validate_collection_vectors(config: &VectorsConfig, expected_dimensions: u64) -> Result<()> {
+    match config.config.as_ref() {
+        Some(VectorConfig::Params(params))
+            if params.size == expected_dimensions && params.distance == Distance::Cosine as i32 => Ok(()),
+        _ => anyhow::bail!("Qdrant collection embedding space is incompatible; migrate and reindex before activation"),
+    }
+}
+
+fn validate_vector(vector: &[f32], dimensions: Option<u64>) -> Result<()> {
+    if vector.is_empty()
+        || dimensions.is_some_and(|expected| vector.len() as u64 != expected)
+        || vector.iter().any(|value| !value.is_finite())
+        || vector.iter().all(|value| *value == 0.0)
+    {
+        anyhow::bail!("vector is incompatible with the configured embedding space");
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq, Serialize)]
@@ -124,7 +150,36 @@ impl VectorStore {
             builder = builder.api_key(key);
         }
         let client = builder.build().context("Failed to connect to Qdrant")?;
-        Ok(VectorStore { client, collection })
+        Ok(VectorStore {
+            client,
+            collection,
+            embedding_space: None,
+        })
+    }
+
+    /// Bind all reads/writes to one reviewed embedding model and vector dimension.
+    /// The collection must be migrated before switching to a different space.
+    pub fn with_embedding_space(mut self, model: String, dimensions: u64) -> Result<Self> {
+        if model.trim().is_empty() || dimensions == 0 || dimensions > 65_536 {
+            anyhow::bail!("invalid embedding space");
+        }
+        self.embedding_space = Some(EmbeddingSpace { model, dimensions });
+        Ok(self)
+    }
+
+    async fn check_collection_dimensions(&self, dimensions: u64) -> Result<()> {
+        let info = self
+            .client
+            .collection_info(self.collection.clone())
+            .await
+            .context("read Qdrant collection configuration")?;
+        let config = info
+            .result
+            .and_then(|info| info.config)
+            .and_then(|config| config.params)
+            .and_then(|params| params.vectors_config)
+            .context("Qdrant collection vector configuration unavailable")?;
+        validate_collection_vectors(&config, dimensions)
     }
 
     /// Verify Qdrant is reachable and the configured semantic collection exists.
@@ -142,11 +197,22 @@ impl VectorStore {
         {
             anyhow::bail!("configured Qdrant collection is unavailable");
         }
+        if let Some(space) = &self.embedding_space {
+            self.check_collection_dimensions(space.dimensions).await?;
+        }
         Ok(())
     }
 
     /// Create the collection if it does not already exist.
     pub async fn ensure_collection(&self, dim: u64) -> Result<()> {
+        if dim == 0
+            || self
+                .embedding_space
+                .as_ref()
+                .is_some_and(|space| space.dimensions != dim)
+        {
+            anyhow::bail!("invalid collection embedding dimensions");
+        }
         let collections = self
             .client
             .list_collections()
@@ -198,6 +264,18 @@ impl VectorStore {
             );
         }
 
+        // Existence alone does not prove compatibility with the selected model.
+        self.check_collection_dimensions(dim).await?;
+
+        self.client
+            .create_field_index(CreateFieldIndexCollectionBuilder::new(
+                self.collection.clone(),
+                "embedding_model",
+                FieldType::Keyword,
+            ))
+            .await
+            .context("create embedding-model index")?;
+
         // Reconcile the mandatory organization index even when an operator
         // explicitly points at an existing collection. Legacy points without
         // organization_id remain fail-closed until they are reindexed.
@@ -215,6 +293,17 @@ impl VectorStore {
 
     /// Upsert a vector point into the collection.
     pub async fn upsert(&self, point: EmbedPoint) -> Result<()> {
+        validate_vector(
+            &point.vector,
+            self.embedding_space.as_ref().map(|space| space.dimensions),
+        )?;
+        if self
+            .embedding_space
+            .as_ref()
+            .is_some_and(|space| space.model != point.record.embedding_model)
+        {
+            anyhow::bail!("point embedding model differs from configured embedding space");
+        }
         let payload = semantic_payload(&point.record)?;
 
         self.client
@@ -280,7 +369,14 @@ impl VectorStore {
         limit: u64,
         score_threshold: Option<f32>,
     ) -> Result<Vec<SearchResult>> {
+        validate_vector(
+            &query_vector,
+            self.embedding_space.as_ref().map(|space| space.dimensions),
+        )?;
         let mut conditions = scope_conditions(organization_id, company_id);
+        if let Some(space) = &self.embedding_space {
+            conditions.push(Condition::matches("embedding_model", space.model.clone()));
+        }
 
         let content_types = content_types
             .unwrap_or(&[])
@@ -326,6 +422,13 @@ impl VectorStore {
 
                 let record =
                     scoped_semantic_record_from_payload(&payload, organization_id, company_id)?;
+                if self
+                    .embedding_space
+                    .as_ref()
+                    .is_some_and(|space| record.embedding_model != space.model)
+                {
+                    return None;
+                }
                 Some(SearchResult { score, record })
             })
             .collect();
@@ -352,6 +455,28 @@ mod tests {
         }))
         .expect("payload")
         .into()
+    }
+
+    #[test]
+    fn incompatible_collection_dimensions_or_distance_require_migration() {
+        let config = |size, distance| VectorsConfig {
+            config: Some(VectorConfig::Params(
+                VectorParamsBuilder::new(size, distance).build(),
+            )),
+        };
+        assert!(validate_collection_vectors(&config(1024, Distance::Cosine), 1024).is_ok());
+        assert!(validate_collection_vectors(&config(768, Distance::Cosine), 1024).is_err());
+        assert!(validate_collection_vectors(&config(1024, Distance::Dot), 1024).is_err());
+        assert!(validate_collection_vectors(&VectorsConfig { config: None }, 1024).is_err());
+    }
+
+    #[test]
+    fn invalid_query_and_index_vectors_fail_before_io() {
+        assert!(validate_vector(&[1.0, 0.0], Some(2)).is_ok());
+        assert!(validate_vector(&[1.0, 0.0], Some(1024)).is_err());
+        assert!(validate_vector(&[f32::INFINITY], None).is_err());
+        assert!(validate_vector(&[0.0, 0.0], Some(2)).is_err());
+        assert!(validate_vector(&[], None).is_err());
     }
 
     #[test]

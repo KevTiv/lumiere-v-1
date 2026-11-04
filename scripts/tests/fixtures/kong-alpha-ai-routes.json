@@ -1,5 +1,13 @@
 {
   "post": [
+    "/api/ai/rag",
+    "/api/ai/rag/stream",
+    "/api/ai/forms/suggest",
+    "/api/ai/forms/validate",
+    "/api/ai/context/search",
+    "/api/ai/context/ingest",
+    "/api/ai/evidence/ingestion/documents",
+    "/api/ai/evidence/ingestion/documents/lifecycle",
     "/api/ai/skills/certifications",
     "/api/ai/evidence/runs/history",
     "/api/ai/skills/report-analysis",

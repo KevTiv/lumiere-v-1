@@ -10,6 +10,7 @@ import type { JsonObject } from './route-helpers'
 import { boundedInteger, positiveInteger, validateCompanyScope } from './route-helpers'
 import { parseRagGuideReferences, type RagGuideReference } from './guide-references'
 import { serverRagUiActionOffers, type RagUiActionOffer } from './rag-ui-actions'
+import { parseRagAgentSelection, type RagAgentSelection } from '../rag/agent-selection'
 
 export const MAX_INCLUDE_TYPES = 8
 
@@ -35,7 +36,7 @@ export function sanitizeIncludeTypes(raw: unknown): string[] | undefined {
   return out.length > 0 ? out : undefined
 }
 
-export interface RagPayload {
+export interface RagPayload extends RagAgentSelection {
   company_id: number
   org_id: number
   query: string
@@ -57,7 +58,7 @@ export type RagPrepareResult =
  * limit clamping, include_types and ui_context sanitization, and payload
  * construction with session credentials.
  *
- * Stream-only fields (agent_id, team_member_id) remain in the calling route.
+ * Explicit agent/persona intent is validated identically for JSON and SSE.
  */
 export async function prepareRagPayload(params: {
   body: JsonObject
@@ -75,8 +76,10 @@ export async function prepareRagPayload(params: {
   }
 
   let guideRefs: RagGuideReference[] | undefined
+  let agentSelection: RagAgentSelection
   try {
     guideRefs = parseRagGuideReferences(body.guide_refs)
+    agentSelection = parseRagAgentSelection(body)
   } catch (error) {
     return {
       ok: false,
@@ -93,6 +96,7 @@ export async function prepareRagPayload(params: {
   const ui_context = sanitizeRagUiContext(body.ui_context)
 
   const payload: RagPayload = {
+    ...agentSelection,
     company_id: companyId,
     org_id: orgId,
     query,

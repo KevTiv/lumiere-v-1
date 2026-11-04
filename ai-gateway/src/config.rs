@@ -73,7 +73,7 @@ pub struct Config {
     pub kaggle_cache_ttl_secs: u64,
 
     // ── Embeddings (unified Qdrant pipeline) ─────────────────────────────────
-    /// Embedding provider: "ollama" (default) | "mistral" | "gemini"
+    /// Embedding provider: production defaults to Mistral; explicit disabled is respected.
     pub embedding_provider: String,
     pub ollama_url: String,
     pub ollama_embed_model: String,
@@ -101,6 +101,10 @@ pub struct Config {
 
     // ── Context layer (vision / parser) ──────────────────────────────────────
     pub vision_provider: String,
+    /// Reviewed exact OCR model ID. Rolling aliases are rejected.
+    pub mistral_ocr_model: String,
+    /// Upper bound on pages submitted for one OCR request.
+    pub mistral_ocr_max_pages: u32,
     pub document_parser: String,
     pub unstructured_url: String,
     pub unstructured_api_key: Option<String>,
@@ -168,6 +172,34 @@ impl Config {
             anyhow::bail!("AI_EXECUTION_ENVELOPE_KEY is required in production");
         }
 
+        let production = runtime_is_production();
+        let embedding_provider = select_provider(
+            std::env::var("EMBEDDING_PROVIDER")
+                .ok()
+                .or_else(|| std::env::var("CONTEXT_EMBEDDING_PROVIDER").ok()),
+            production,
+            &["disabled", "mistral", "ollama", "gemini"],
+            "embedding",
+        )?;
+        let vision_provider = select_provider(
+            std::env::var("VISION_PROVIDER").ok(),
+            production,
+            &["disabled", "mistral", "ollama"],
+            "vision",
+        )?;
+        let mistral_ocr_model =
+            validate_mistral_ocr_model(std::env::var("MISTRAL_OCR_MODEL").ok(), &vision_provider)?;
+        let mistral_ocr_max_pages =
+            parse_ocr_max_pages(std::env::var("MISTRAL_OCR_MAX_PAGES").ok())?;
+        let activity_refs_collection = std::env::var("QDRANT_ACTIVITY_REFS_COLLECTION")
+            .unwrap_or_else(|_| {
+                if embedding_provider == "mistral" {
+                    "lumiere_mistral_activity_refs_actor_v2".into()
+                } else {
+                    "lumiere_erp_activity_refs_v1".into()
+                }
+            });
+
         Ok(Config {
             port: std::env::var("PORT")
                 .unwrap_or_else(|_| "8080".to_string())
@@ -180,8 +212,13 @@ impl Config {
             qdrant_url: std::env::var("QDRANT_URL")
                 .unwrap_or_else(|_| "http://localhost:6334".to_string()),
             qdrant_api_key: std::env::var("QDRANT_API_KEY").ok(),
-            qdrant_collection: std::env::var("QDRANT_COLLECTION")
-                .unwrap_or_else(|_| "lumiere_embeddings_org_v3".to_string()),
+            qdrant_collection: std::env::var("QDRANT_COLLECTION").unwrap_or_else(|_| {
+                if embedding_provider == "mistral" {
+                    "lumiere_mistral_embed_1024_v1".to_string()
+                } else {
+                    "lumiere_embeddings_org_v3".to_string()
+                }
+            }),
             stdb_host: normalize_stdb_http_host(
                 &env_stdb_host_or_next_public()
                     .unwrap_or_else(|| "http://127.0.0.1:3000".to_string()),
@@ -220,10 +257,7 @@ impl Config {
                 .parse()
                 .context("KAGGLE_CACHE_TTL_SECS must be a valid number")?,
 
-            embedding_provider: std::env::var("EMBEDDING_PROVIDER")
-                .ok()
-                .or_else(|| std::env::var("CONTEXT_EMBEDDING_PROVIDER").ok())
-                .unwrap_or_else(|| "ollama".to_string()),
+            embedding_provider,
             ollama_url: std::env::var("OLLAMA_URL")
                 .unwrap_or_else(|_| "http://localhost:11434".to_string()),
             ollama_embed_model: std::env::var("OLLAMA_EMBED_MODEL")
@@ -250,15 +284,15 @@ impl Config {
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
 
-            vision_provider: std::env::var("VISION_PROVIDER")
-                .unwrap_or_else(|_| "ollama".to_string()),
+            vision_provider,
+            mistral_ocr_model,
+            mistral_ocr_max_pages,
             document_parser: std::env::var("DOCUMENT_PARSER")
                 .unwrap_or_else(|_| "plaintext".to_string()),
             unstructured_url: std::env::var("UNSTRUCTURED_URL")
                 .unwrap_or_else(|_| "http://localhost:8000".to_string()),
             unstructured_api_key: std::env::var("UNSTRUCTURED_API_KEY").ok(),
-            activity_refs_collection: std::env::var("QDRANT_ACTIVITY_REFS_COLLECTION")
-                .unwrap_or_else(|_| "lumiere_erp_activity_refs_v1".to_string()),
+            activity_refs_collection,
             activity_ingest_interval_secs: std::env::var("ACTIVITY_INGEST_INTERVAL_SECS")
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()
@@ -283,6 +317,55 @@ impl Config {
                 .filter(|v| !v.trim().is_empty()),
         })
     }
+}
+
+fn select_provider(
+    value: Option<String>,
+    production: bool,
+    allowed: &[&str],
+    kind: &str,
+) -> Result<String> {
+    let value = value.unwrap_or_else(|| {
+        if production {
+            "mistral".into()
+        } else {
+            "ollama".into()
+        }
+    });
+    if !allowed.contains(&value.as_str()) {
+        anyhow::bail!("unsupported {kind} provider");
+    }
+    Ok(value)
+}
+
+fn validate_mistral_ocr_model(value: Option<String>, provider: &str) -> Result<String> {
+    let value = value.unwrap_or_default();
+    if provider != "mistral" && value.is_empty() {
+        return Ok(value);
+    }
+    if value.is_empty()
+        || value.len() > 128
+        || value.contains("latest")
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+    {
+        anyhow::bail!(
+            "MISTRAL_OCR_MODEL must name an exact reviewed model without a rolling alias"
+        );
+    }
+    Ok(value)
+}
+
+fn parse_ocr_max_pages(value: Option<String>) -> Result<u32> {
+    let pages = value
+        .unwrap_or_else(|| "20".into())
+        .parse::<u32>()
+        .context("invalid MISTRAL_OCR_MAX_PAGES")?;
+    if !(1..=200).contains(&pages) {
+        anyhow::bail!("MISTRAL_OCR_MAX_PAGES must be between 1 and 200");
+    }
+    Ok(pages)
 }
 
 fn parse_mistral_reasoning(
@@ -402,6 +485,45 @@ fn parse_certification_timeout(value: Option<String>) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn production_selects_mistral_but_explicit_disablement_wins() {
+        let allowed = ["disabled", "mistral", "ollama", "gemini"];
+        assert_eq!(
+            select_provider(None, true, &allowed, "embedding").unwrap(),
+            "mistral"
+        );
+        assert_eq!(
+            select_provider(None, false, &allowed, "embedding").unwrap(),
+            "ollama"
+        );
+        assert_eq!(
+            select_provider(Some("disabled".into()), true, &allowed, "embedding").unwrap(),
+            "disabled"
+        );
+        assert!(select_provider(Some("mistarl".into()), true, &allowed, "embedding").is_err());
+    }
+
+    #[test]
+    fn ocr_requires_reviewed_model_and_bounded_pages() {
+        for model in [
+            None,
+            Some("".into()),
+            Some("mistral-ocr-latest".into()),
+            Some("*".into()),
+        ] {
+            assert!(validate_mistral_ocr_model(model, "mistral").is_err());
+        }
+        assert_eq!(
+            validate_mistral_ocr_model(Some("mistral-ocr-2505".into()), "mistral").unwrap(),
+            "mistral-ocr-2505"
+        );
+        assert!(validate_mistral_ocr_model(None, "disabled").is_ok());
+        assert_eq!(parse_ocr_max_pages(None).unwrap(), 20);
+        for value in ["0", "201", "-1", "invalid"] {
+            assert!(parse_ocr_max_pages(Some(value.into())).is_err());
+        }
+    }
 
     #[test]
     fn mistral_reasoning_defaults_preserve_provider_behavior() {

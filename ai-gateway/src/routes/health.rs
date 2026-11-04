@@ -36,6 +36,21 @@ async fn dependency_probe(state: &AppState) -> anyhow::Result<()> {
     if state.config.embedding_enabled() {
         state.vector_store.check_ready().await?;
     }
+    if state.config.embedding_enabled() || state.config.vision_provider == "mistral" {
+        let reader = state
+            .spend_read_stdb
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("metered provider spend reader is unavailable"))?;
+        // Schema/reader readiness only: do not fetch private cached outputs or
+        // dispatch a provider from a health probe. Tenant prices and grants are
+        // checked separately by the reviewed provisioning/readiness path.
+        reader
+            .query_sql("SELECT id FROM ai_metered_price_read LIMIT 1")
+            .await?;
+        reader
+            .query_sql("SELECT reservation_id FROM ai_metered_usage_read LIMIT 1")
+            .await?;
+    }
     crate::providers::check_readiness(&state.config, &state.http).await?;
     Ok(())
 }

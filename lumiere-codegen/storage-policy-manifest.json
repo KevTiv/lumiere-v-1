@@ -2167,6 +2167,70 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_metered_price",
+      "module": "ai",
+      "rationale": "Immutable Mistral token/page prices; retain the actual unit and reviewed version for shared-pool spend reconstruction.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:mistral-alpha/metered-usage/shared-spend-owner",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_metered_usage",
+      "module": "ai",
+      "rationale": "Private unit-aware provider result and spend metadata; canonical reservation remains the monetary authority.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "ai_spend_reservation",
+          "child_column": "reservation_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "reservation_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:mistral-alpha/metered-usage/shared-spend-owner",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_model_profile",
       "module": "ai",
       "rationale": "Versioned organization-owned model/provider execution configuration for governed intelligence roles.",

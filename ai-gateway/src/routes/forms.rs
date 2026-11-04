@@ -5,7 +5,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
+        resolve_surface_agent,
     },
     error::{AppError, AppResult},
     orchestrator::{
@@ -408,9 +409,11 @@ pub async fn post_suggest(
 
     let prompt = build_suggestion_prompt(&req);
 
-    let agent = resolve_agent(
+    let agent = resolve_surface_agent(
         &state.stdb,
         req.org_id,
+        req.company_id,
+        "form_suggestion",
         req.agent_id,
         req.team_member_id,
         state.config.ollama_supports_tool_calling,
