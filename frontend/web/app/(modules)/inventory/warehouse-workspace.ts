@@ -128,8 +128,11 @@ export type WarehouseTransferTask = "receive" | "deliver" | "internal" | "other"
 export function warehouseTransferRows(
   rows: readonly EntityRow[],
   locations: readonly EntityRow[],
+  locationStatus: ModuleDataState["status"] = "ready",
 ): EntityRow[] {
-  const locationById = recordsById(locations);
+  // A purchasing operator may read their receipts without location-master access.
+  // The route classification is optional: never use denied or stale lookup data.
+  const locationById = recordsById(locationStatus === "ready" ? locations : []);
   const usage = (value: unknown): string | null => {
     const id = rowKey(value);
     const location = id === null ? undefined : locationById.get(id);
@@ -331,11 +334,10 @@ export function warehouseWorkspace(
   };
 }
 
-/** Every joined workspace fails closed if a required source is absent, denied or failed. */
+/** Required joins close their view; optional transfer-task labels do not hide authorized receipts. */
 export function warehouseDataStates<T extends Record<string, ModuleDataState>>(states: T): T {
   const dependencies: Readonly<Record<string, readonly string[]>> = {
     stock: ["products", "locations", "uoms"],
-    transfers: ["locations"],
     "stock-moves": ["products", "locations", "uoms"],
     lots: ["products"],
     serials: ["products", "locations"],

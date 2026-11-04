@@ -3433,7 +3433,7 @@ function InventoryClientLoaded({
             String(record.id ?? ''),
         };
       }) as unknown as Record<string, unknown>[],
-      transfers: (workspace === 'warehouse' ? warehouseTransferRows(transfers, locations) : transfers as Record<string, unknown>[]).map((row) => ({
+      transfers: (workspace === 'warehouse' ? warehouseTransferRows(transfers, locations, locationsRead.state.status) : transfers as Record<string, unknown>[]).map((row) => ({
         ...row,
         sheetTitle: String(row.name ?? row.origin ?? row.id ?? ''),
       })),
@@ -3490,6 +3490,7 @@ function InventoryClientLoaded({
       warehouses,
       adjustments,
       locations,
+      locationsRead.state.status,
       lots,
       serials,
       qualityChecks,

@@ -189,7 +189,25 @@ test("transfer tasks follow readable location routes, including returns, without
   });
   assert.equal("warehouseTransferTask" in rows[0]!, false);
   assert.equal(warehouseTransferRows(rows.slice(0, 1), [])[0]?.warehouseTransferTask, "unavailable");
-  assert.equal(warehouseDataStates({ transfers: ready, locations: { status: "denied" } as ModuleDataState }).transfers.status, "denied");
+});
+
+test("authorized receipt rows survive an unavailable optional location lookup without using cached task labels", () => {
+  const receipt = { id: 24n, name: "IN-00024", state: "done", locationId: 1n, locationDestId: 2n };
+  const cachedLocations = [{ id: 1n, usage: "supplier" }, { id: 2n, usage: "internal" }];
+  for (const status of ["denied", "error", "partial", "loading"] as const) {
+    const locations: ModuleDataState = { status };
+    const states: Record<"transfers" | "locations", ModuleDataState> = warehouseDataStates({ transfers: ready, locations });
+    assert.deepEqual(states.transfers, ready, status);
+    assert.equal(states.locations, locations, status);
+    const rows = warehouseTransferRows([receipt], cachedLocations, status);
+    assert.deepEqual(rows, [{ ...receipt, warehouseTransferTask: "unavailable" }], status);
+  }
+  assert.equal(warehouseTransferRows([receipt], cachedLocations, "ready")[0]?.warehouseTransferTask, "receive");
+  assert.equal(warehouseDataStates({ transfers: ready }).transfers, ready);
+  for (const status of ["denied", "error", "partial", "loading"] as const) {
+    const transferState: ModuleDataState = { status };
+    assert.equal(warehouseDataStates({ transfers: transferState, locations: ready }).transfers, transferState);
+  }
 });
 
 test("transfer task facets preserve lifecycle filters and canonical operation owners", () => {

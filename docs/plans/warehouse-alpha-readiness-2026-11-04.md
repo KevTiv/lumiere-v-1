@@ -14,7 +14,10 @@ broader Inventory/WMS lifecycle or change its evidence scores.
   the subscription registry's existing session retention remain unchanged.
 - Warehouse transfers show Receive, Deliver, Internal transfer, Other movement,
   or Unavailable from readable source/destination location usage. Exact native
-  identifiers and operation owners are preserved.
+  identifiers and operation owners are preserved. This classification is optional:
+  a purchasing operator's authorized receipt list remains available without
+  location-master access, and denied, failed, stale or loading location reads
+  cannot supply cached task labels.
 - Warehouse stock correction points to Counts. Direct quantity setting, quant
   creation and quant CSV import remain outside this bounded operator surface.
 - Alpha workflow results return to Products or Warehouse with exact record
@@ -124,3 +127,24 @@ acceptance open until actually executed.
   the base and left outside this change.
 
 No deployment or production inventory mutation is part of this change.
+
+## CI follow-up
+
+The initial head `90817ef58231fc42d41c8b0d93c7f8c3434ea0f1` passed full frontend
+typechecking, Rust/SpacetimeDB checks, frontend tests/browser regressions and
+production builds. Its live domain reducer sequence, including
+`run_inventory_adjustment_test`, also passed on the matching CI module. This
+supplies the persisted correction proof that the local disk-limited build could
+not execute; it does not imply the full Inventory aggregate ran.
+
+The same E2E run had 28 browser passes and five failures. Three receipt scenarios
+revealed an excessive read dependency: purchasing users may read their stock
+pickings without reading stock locations. Transfer task labels now degrade to
+Unavailable while the primary picking read remains authoritative. The distributor
+test now explicitly expects its unchanged Inventory handoff. The missing-record
+return test uses the shared Button's actual accessible role and additionally
+clicks through to verify the Warehouse destination.
+
+The serial acceptance configuration also includes partial-receipt billing and
+the distributor continuation, so all five failing scenarios are selected. Fresh
+matching-head CI results remain the gate for these follow-up changes.

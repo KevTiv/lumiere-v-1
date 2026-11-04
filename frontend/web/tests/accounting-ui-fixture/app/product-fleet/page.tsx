@@ -25,6 +25,7 @@ import {
 } from "../../../../app/(modules)/inventory/product-catalog";
 import {
   warehouseRows,
+  warehouseDataStates,
   warehouseTransferRows,
   warehouseWorkspace,
 } from "../../../../app/(modules)/inventory/warehouse-workspace";
@@ -248,6 +249,10 @@ function Preview() {
             onRetry: () => setRetryCount((count) => count + 1),
           }
         : { status: "ready" };
+  const requestedLocationState = params.get("locationsState");
+  const locationState: ModuleDataState = ["ready", "denied", "error", "partial", "loading"].includes(requestedLocationState ?? "")
+    ? { status: requestedLocationState as ModuleDataState["status"] }
+    : state;
   const data: Record<string, EntityRow[]> = {
     products: productCatalogRows(products, categories, units),
     "product-categories": productCatalogCategoryRows(categories),
@@ -287,7 +292,14 @@ function Preview() {
         locationId: "21",
         locationDestId: "24",
       },
-    ], locations),
+    ], locations, locationState.status),
+  };
+  const sourceStates = {
+    ...Object.fromEntries(config.tabs.map((tab) => [tab.id, state])),
+    products: state,
+    uoms: state,
+    "adjustment-reasons": state,
+    locations: locationState,
   };
   const tabData = Object.fromEntries(
     config.tabs.map((tab) => [
@@ -316,9 +328,7 @@ function Preview() {
         key={module}
         config={config}
         data={tabData}
-        dataState={Object.fromEntries(
-          config.tabs.map((tab) => [tab.id, state]),
-        )}
+        dataState={module === "warehouse" ? warehouseDataStates(sourceStates) : sourceStates}
         onFormSubmit={async () => {
           throw new Error("Synthetic preview: no record was saved.");
         }}

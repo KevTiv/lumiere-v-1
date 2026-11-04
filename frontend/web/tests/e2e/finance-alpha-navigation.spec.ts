@@ -194,8 +194,15 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
 
     // A nonnumeric ID cannot identify a native u64 record and exercises the missing-record return.
     await page.goto("/inventory/transfers/missing-transfer")
-    await expect(page.getByTestId("transfer-page-not-found")).toBeVisible()
-    await expect(page.getByRole("link", { name: "Back to transfers", exact: true })).toHaveAttribute("href", "/warehouse?tab=transfers")
+    const missingRecord = page.getByTestId("transfer-page-not-found")
+    await expect(missingRecord).toBeVisible()
+    // The shared Button renders this navigation anchor with button semantics.
+    const backToTransfers = missingRecord.getByRole("button", { name: "Back to transfers", exact: true })
+    await expect(backToTransfers).toHaveAttribute("href", "/warehouse?tab=transfers")
+    await backToTransfers.click()
+    await expect(page).toHaveURL((url) => url.pathname === "/warehouse" && url.searchParams.get("tab") === "transfers")
+    await expect(page.locator('[data-testid="module-view-warehouse"]:visible')).toHaveCount(1)
+    await expectFinanceNavigation(page)
     expect(writes).toEqual([])
   })
 })
