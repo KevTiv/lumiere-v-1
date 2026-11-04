@@ -206,13 +206,13 @@ async function inspectCapabilities(config, client, now) {
     }
   }
   for (const meter of config.meters) {
-    const prices = await client.sql(`SELECT * FROM ai_metered_price_read WHERE organization_id = ${org} AND agent_id = ${agentId} AND model = '${meter.model}' AND unit = '${meter.unit}'`, 'spend')
+    const prices = await client.sql(`SELECT id, organization_id, agent_id, model, unit, currency, units_per_1_k, version FROM ai_metered_price_read WHERE organization_id = ${org} AND agent_id = ${agentId} AND model = '${meter.model}' AND unit = '${meter.unit}'`, 'spend')
     check(prices.every(row => number(row.organization_id, 'price organization') === org && number(row.agent_id, 'price agent') === agentId
       && row.model === meter.model && row.unit === meter.unit && row.currency === config.currency), 'metered price scope/currency mismatch')
     check(new Set(prices.map(row => number(row.version, 'price version'))).size === prices.length, 'duplicate metered price versions')
     const latest = prices.reduce((a, b) => !a || number(b.version, 'price version') > number(a.version, 'price version') ? b : a, null)
-    check(!latest || number(latest.units_per_1k, 'metered rate') === meter.unitsPer1k, 'metered price differs; review a separate immutable price update')
-    if (!latest) { priceWrites.push({ model: meter.model, unit: meter.unit, currency: config.currency, units_per_1k: meter.unitsPer1k }); missing.push(`meter:${meter.model}:${meter.unit}`) }
+    check(!latest || number(latest.units_per_1_k, 'metered rate') === meter.unitsPer1k, 'metered price differs; review a separate immutable price update')
+    if (!latest) { priceWrites.push({ model: meter.model, unit: meter.unit, currency: config.currency, units_per_1_k: meter.unitsPer1k }); missing.push(`meter:${meter.model}:${meter.unit}`) }
   }
   return { bindingWrites, priceWrites, missing, billingPeriod: period }
 }

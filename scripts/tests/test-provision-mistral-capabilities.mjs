@@ -64,6 +64,7 @@ function fixture() {
       if (sql.includes('FROM ai_skill_config ')) return state.bindings.filter(row => sql.endsWith(`= ${row.skill_id}`))
       if (sql.includes('FROM ai_metered_price_read ')) {
         assert.equal(role, 'spend')
+        assert.ok(sql.startsWith('SELECT id, organization_id, agent_id, model, unit, currency, units_per_1_k, version FROM '))
         return state.prices.filter(row => sql.includes(`model = '${row.model}'`) && sql.includes(`unit = '${row.unit}'`))
       }
       throw new Error(`unexpected SQL ${sql}`)
@@ -71,6 +72,8 @@ function fixture() {
     async call(name, args) {
       writes.push({ name, args: structuredClone(args) })
       if (name === 'configure_ai_metered_price') {
+        // Names come from the generated HTTPschema reducer params product (Ref 247), not Rust identifiers.
+        assert.deepEqual(Object.keys(args[2]).sort(), ['currency', 'model', 'unit', 'units_per_1_k'])
         state.prices.push({ ...args[2], organization_id: args[0], agent_id: args[1], id: state.prices.length + 1, version: 1 })
       } else if (name === 'upsert_ai_skill_config') {
         const i = state.bindings.findIndex(row => row.skill_id === args[1].skill_id)
@@ -148,7 +151,7 @@ test('structural and certification blockers make zero writes even when setup is 
     disabled: f => { f.state.bindings.push({ organization_id: 9, skill_id: 5, company_id: { some: 3 }, is_enabled: false, config_json: '{}' }) },
     disabledOrg: f => { f.state.bindings.push({ organization_id: 9, skill_id: 5, company_id: { none: [] }, is_enabled: false, config_json: '{}' }) },
     otherAgent: f => { f.state.bindings.push({ organization_id: 9, skill_id: 5, company_id: { some: 3 }, is_enabled: true, config_json: '{"defaultAgentId":99}' }) },
-    lateMeterConflict: f => { f.state.prices.push({ id: 1, organization_id: 9, agent_id: 12, ...f.config.meters[1], units_per_1k: 999, currency: 'USD', version: 1 }) },
+    lateMeterConflict: f => { f.state.prices.push({ id: 1, organization_id: 9, agent_id: 12, ...f.config.meters[1], units_per_1_k: 999, currency: 'USD', version: 1 }) },
   }
   for (const [name, alter] of Object.entries(cases)) {
     const f = fixture(); alter(f)
@@ -177,6 +180,21 @@ test('native form/action skill keys enforce their real runtime actions before an
   action.state.agent.allowed_actions = ['skill_run']
   await assert.rejects(provisionCapabilities(action.config, action.client, true, now), /agent action is not allowed for action_draft_generation/)
   assert.deepEqual(action.writes, [])
+})
+
+test('meter setup uses canonical digit-normalized HTTP field names and detects existing prices', async () => {
+  const { config, state, client, writes } = fixture()
+  state.prices = config.meters.map((meter, index) => ({ id: index + 1, organization_id: 9,
+    agent_id: 12, model: meter.model, unit: meter.unit, currency: 'USD', units_per_1_k: meter.unitsPer1k, version: 1 }))
+  const checked = await provisionCapabilities(config, client, false, now)
+  assert.ok(checked.missing.every(missing => !missing.startsWith('meter:')))
+  await provisionCapabilities(config, client, true, now)
+  assert.ok(writes.every(write => write.name !== 'configure_ai_metered_price'))
+  const absent = fixture()
+  await provisionCapabilities(absent.config, absent.client, true, now)
+  const args = absent.writes.find(write => write.name === 'configure_ai_metered_price').args[2]
+  assert.equal(args.units_per_1_k, absent.config.meters[0].unitsPer1k)
+  assert.equal(Object.hasOwn(args, 'units_per_1k'), false)
 })
 
 test('ambiguous mutation stops without retry or later writes', async () => {
