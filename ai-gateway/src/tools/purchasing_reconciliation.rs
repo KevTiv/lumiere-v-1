@@ -190,7 +190,10 @@ fn propose(
         let line = &lines[&line_id];
         let order_id = id(line, "order_id")?;
         let total = linked.get(&line_id).copied().unwrap_or(0.0)
-            + group.iter().map(|candidate| candidate.quantity).sum::<f64>();
+            + group
+                .iter()
+                .map(|candidate| candidate.quantity)
+                .sum::<f64>();
         let ordered = quantity(line, "product_qty")?;
         let received = quantity(line, "qty_received")?;
         if blocked_lines.contains(&line_id)

@@ -59,17 +59,21 @@ pub async fn post_analytics(
         AnalyticsRequest::PurchasingReconciliation => {
             purchasing_reconciliation::execute(&ctx, &json!({})).await
         }
-        AnalyticsRequest::CompareActivity { source, from, through } => {
-            alpha_data::compare_activity(&ctx, source, &from, &through).await
-        }
+        AnalyticsRequest::CompareActivity {
+            source,
+            from,
+            through,
+        } => alpha_data::compare_activity(&ctx, source, &from, &through).await,
     };
 
-    result.map(Json).map_err(|error| match error.downcast_ref::<ReadError>() {
-        Some(ReadError::Restricted) => AppError::Forbidden(error.to_string()),
-        Some(ReadError::Incomplete) => AppError::Unavailable(error.to_string()),
-        Some(ReadError::Unavailable) | None => {
-            tracing::warn!(%error, "Alpha analytics operation could not complete");
-            AppError::Unavailable("The authorized analysis could not be completed".into())
-        }
-    })
+    result
+        .map(Json)
+        .map_err(|error| match error.downcast_ref::<ReadError>() {
+            Some(ReadError::Restricted) => AppError::Forbidden(error.to_string()),
+            Some(ReadError::Incomplete) => AppError::Unavailable(error.to_string()),
+            Some(ReadError::Unavailable) | None => {
+                tracing::warn!(%error, "Alpha analytics operation could not complete");
+                AppError::Unavailable("The authorized analysis could not be completed".into())
+            }
+        })
 }

@@ -147,25 +147,31 @@ fn summarize_rows(rows: &[Value], date_field: &str) -> Value {
 pub(crate) async fn coverage(ctx: &ToolContext) -> ToolOutput {
     let mut sources = Vec::new();
     for batch in COVERAGE.chunks(3) {
-        let results = futures::future::join_all(batch.iter().map(|&(module, resource, date)| async move {
-            let mut result = match read_rows(ctx, resource, SAMPLE_LIMIT).await {
-                Ok(rows) if rows.iter().all(|row| in_scope(ctx, row)) => summarize_rows(&rows, date),
-                Ok(_) => json!({ "status": "restricted" }),
-                Err(error) => json!({ "status": match error {
+        let results =
+            futures::future::join_all(batch.iter().map(|&(module, resource, date)| async move {
+                let mut result = match read_rows(ctx, resource, SAMPLE_LIMIT).await {
+                    Ok(rows) if rows.iter().all(|row| in_scope(ctx, row)) => {
+                        summarize_rows(&rows, date)
+                    }
+                    Ok(_) => json!({ "status": "restricted" }),
+                    Err(error) => json!({ "status": match error {
                     ReadError::Restricted => "restricted",
                     ReadError::Unavailable => "unavailable",
                     ReadError::Incomplete => "incomplete",
                 } }),
-            };
-            result["module"] = json!(module);
-            result["source"] = json!(resource);
-            result
-        })).await;
+                };
+                result["module"] = json!(module);
+                result["source"] = json!(resource);
+                result
+            }))
+            .await;
         sources.extend(results);
     }
-    sources.extend(SUPPORT.iter().map(|(module, reason)| json!({
-        "module": module, "status": "supporting", "reason": reason,
-    })));
+    sources.extend(SUPPORT.iter().map(|(module, reason)| {
+        json!({
+            "module": module, "status": "supporting", "reason": reason,
+        })
+    }));
     ToolOutput {
         summary: "Data coverage for the active company".into(),
         row_count: Some(sources.len() as u32),
@@ -205,13 +211,19 @@ pub(crate) async fn compare_activity(
     use chrono::{Days, NaiveDate};
 
     let parse = |text: &str| {
-        ensure!(text.len() == 10, "Expected a calendar date in YYYY-MM-DD format");
+        ensure!(
+            text.len() == 10,
+            "Expected a calendar date in YYYY-MM-DD format"
+        );
         NaiveDate::parse_from_str(text, "%Y-%m-%d").context("Invalid calendar date")
     };
     let start = parse(from)?;
     let end = parse(through)?;
     let days = end.signed_duration_since(start).num_days() + 1;
-    ensure!((1..=366).contains(&days), "Select a period of up to 366 days");
+    ensure!(
+        (1..=366).contains(&days),
+        "Select a period of up to 366 days"
+    );
     let baseline_start = start
         .checked_sub_days(Days::new(days as u64))
         .context("Invalid baseline")?;
@@ -224,12 +236,16 @@ pub(crate) async fn compare_activity(
     const LIMIT: u32 = 501;
     let rows = read_rows(ctx, resource, LIMIT).await?;
     ensure!(rows.len() < LIMIT as usize, ReadError::Incomplete);
-    ensure!(rows.iter().all(|row| in_scope(ctx, row)), ReadError::Restricted);
+    ensure!(
+        rows.iter().all(|row| in_scope(ctx, row)),
+        ReadError::Restricted
+    );
 
     let mut current = 0_i64;
     let mut baseline = 0_i64;
     for row in rows {
-        let date = source_date(&row, date_field).context("Activity date is missing or restricted")?;
+        let date =
+            source_date(&row, date_field).context("Activity date is missing or restricted")?;
         if (start..=end).contains(&date) {
             current += 1;
         } else if (baseline_start..=baseline_end).contains(&date) {

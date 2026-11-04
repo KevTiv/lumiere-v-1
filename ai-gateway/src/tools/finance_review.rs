@@ -136,10 +136,8 @@ pub fn output(
         };
         let actual = verify("actual", input.actual_date)?;
         let baseline = verify("baseline", input.baseline_date)?;
-        response["observation"]["measuredDrivers"] = finance_variance_drivers::measured_drivers(
-            &actual.observation,
-            &baseline.observation,
-        )?;
+        response["observation"]["measuredDrivers"] =
+            finance_variance_drivers::measured_drivers(&actual.observation, &baseline.observation)?;
     }
     if let Input::Report(input) = core::parse_input(key, inputs)? {
         let request = crate::harness::finance_review::FinanceReviewRequest {

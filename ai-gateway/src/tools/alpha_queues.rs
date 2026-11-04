@@ -185,13 +185,8 @@ mod tests {
     #[test]
     fn labels_the_row_bound_instead_of_implying_a_complete_queue() {
         let row = json!({"organizationId":7,"companyId":11});
-        let result = summarize(
-            Queue::ApprovalInbox,
-            &vec![row; ROW_LIMIT as usize],
-            7,
-            11,
-        )
-        .unwrap();
+        let result =
+            summarize(Queue::ApprovalInbox, &vec![row; ROW_LIMIT as usize], 7, 11).unwrap();
         assert_eq!(result["atRowLimit"], true);
         assert_eq!(result["counts"]["awaiting_review"], ROW_LIMIT);
     }

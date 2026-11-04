@@ -59,14 +59,8 @@ pub(super) fn measured_drivers(
             // The owner report omits zero buckets. An omitted bucket cites the
             // validated collection so the absence is visible in the source.
             for name in ["current", "1_30", "31_60", "61_90", "over_90"] {
-                let current = actual
-                    .due_buckets
-                    .iter()
-                    .find(|item| item.bucket == name);
-                let previous = baseline
-                    .due_buckets
-                    .iter()
-                    .find(|item| item.bucket == name);
+                let current = actual.due_buckets.iter().find(|item| item.bucket == name);
+                let previous = baseline.due_buckets.iter().find(|item| item.bucket == name);
                 if current.is_none() && previous.is_none() {
                     continue;
                 }
@@ -90,7 +84,11 @@ pub(super) fn measured_drivers(
 
     let total_delta = amount(actual, total_field)? - amount(baseline, total_field)?;
     ensure!(
-        drivers.iter().map(|driver| driver.contribution).sum::<i128>() == total_delta,
+        drivers
+            .iter()
+            .map(|driver| driver.contribution)
+            .sum::<i128>()
+            == total_delta,
         "finance driver contributions do not reconcile"
     );
     drivers.sort_by(|left, right| {
