@@ -56,7 +56,7 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 950 })
     await ready(page, "/productivity?panel=calendar&date=2026-10-28&view=agenda")
     await expect(page.getByTestId("calendar-agenda")).toBeVisible()
-    await expect(page.getByText("Times shown in Europe/Amsterdam", { exact: true })).toBeVisible()
+    await expect(page.getByText("Times shown in Europe/Amsterdam (browser fallback)", { exact: true })).toBeVisible()
     await expect(page.getByTestId("calendar-agenda-event-42")).toHaveCount(3)
     await expect(page.getByTestId("calendar-agenda-event-43")).toContainText("Cancelled")
     await expect(page.getByTestId("calendar-agenda-event-44")).toContainText("All day")
@@ -131,19 +131,56 @@ for (const width of [390, 1440]) {
       await page.goto(`/navigation?module=${module}&company=7`, { waitUntil: "domcontentloaded" })
       await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
       await expect(page.getByTestId(`module-workspace-${module}-${group}`)).toHaveAttribute("aria-current", "page")
-      await expect(page.getByTestId(`module-tab-${module}-${tab}`)).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByTestId(`module-panel-${module}-${tab}`)).toBeVisible()
       await page.getByTestId(`module-workspace-${module}-overflow`).click()
       await page.getByRole("menuitem", { name: "dashboard", exact: true }).click()
       await expect(page).toHaveURL(/tab=dashboard/)
       await page.goBack({ waitUntil: "domcontentloaded" })
       await page.waitForURL((url) => !url.searchParams.has("tab"))
-      await expect(page.getByTestId(`module-tab-${module}-${tab}`)).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByTestId(`module-workspace-${module}-${group}`)).toHaveAttribute("aria-current", "page")
+      await expect(page.getByTestId(`module-panel-${module}-${tab}`)).toBeVisible()
       await page.goForward({ waitUntil: "domcontentloaded" })
       await page.waitForURL(/tab=dashboard/)
       await page.reload({ waitUntil: "domcontentloaded" })
       await expect(page.getByTestId(`module-view-${module}`)).toHaveAttribute("data-hydrated", "true")
-      await expect(page.getByTestId(`module-tab-${module}-dashboard`)).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByTestId(`module-tab-${module}-dashboard`)).toHaveCount(0)
+      await expect(page.getByRole("tabpanel", { name: "dashboard", exact: true })).toBeVisible()
       await contained(page)
     }
   })
 }
+
+
+test.describe("account calendar timezone on narrow screens", () => {
+  test.use({ timezoneId: "America/New_York" })
+  for (const width of [320, 390]) {
+    test(`account zone owns UTC boundaries and spring DST at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 950 })
+      await page.route("**/api/auth/profile", (route) => route.fulfill({ json: { data: { name: "Synthetic calendar account", email: "calendar@example.test", firstName: null, lastName: null, timezone: "Europe/Amsterdam" } } }))
+      const [profileResponse] = await Promise.all([
+        page.waitForResponse("**/api/auth/profile"),
+        ready(page, "/productivity?panel=account-calendar"),
+      ])
+      expect(profileResponse.ok()).toBe(true)
+      await expect(page.getByTestId("calendar-timezone")).toHaveText("Times shown in Europe/Amsterdam (account setting)")
+      await expect(page.getByTestId("calendar-agenda-event-zone-boundary")).toContainText("01:30")
+      await expect(page.getByTestId("calendar-agenda-event-zone-spring")).toContainText("03:30")
+      await contained(page)
+      await page.screenshot({ path: test.info().outputPath(`account-zone-calendar-${width}.png`), fullPage: true })
+    })
+
+    test(`invalid account zone is disclosed as browser fallback at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 950 })
+      await page.route("**/api/auth/profile", (route) => route.fulfill({ json: { data: { name: "Synthetic calendar account", email: "calendar@example.test", firstName: null, lastName: null, timezone: "Invalid/Zone" } } }))
+      const [profileResponse] = await Promise.all([
+        page.waitForResponse("**/api/auth/profile"),
+        ready(page, "/productivity?panel=account-calendar"),
+      ])
+      expect(profileResponse.ok()).toBe(true)
+      await expect(page.getByTestId("calendar-timezone")).toHaveText("Times shown in America/New_York (browser fallback)")
+      await expect(page.getByRole("status")).toContainText("saved account timezone is unavailable")
+      await expect(page.getByTestId("calendar-agenda-event-zone-boundary")).toHaveCount(0)
+      await contained(page)
+    })
+  }
+})

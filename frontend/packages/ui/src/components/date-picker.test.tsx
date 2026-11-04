@@ -211,3 +211,15 @@ describe("DateTimePicker", () => {
     expect(onChange).toHaveBeenLastCalledWith("")
   })
 })
+
+it("uses the explicit calendar timezone for Today without shifting wall-date values", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] })
+  vi.setSystemTime(new Date("2026-11-03T01:00:00Z"))
+  const onChange = vi.fn()
+  try {
+    render(<DatePicker data-testid="due" value="" onChange={onChange} timeZone="Pacific/Honolulu" />)
+    openCalendar()
+    fireEvent.click(await screen.findByTestId("due-shortcut-today"))
+    expect(onChange).toHaveBeenCalledWith("2026-11-02")
+  } finally { vi.useRealTimers() }
+})

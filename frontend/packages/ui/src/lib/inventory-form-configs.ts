@@ -7,6 +7,7 @@ export const newProductForm = (t: TFunction): FormConfig => ({
   id: "new-product",
   title: t("inventory.forms.newProduct.title"),
   description: t("inventory.forms.newProduct.description"),
+  submitLabel: t("inventory.forms.newProduct.submitLabel", { defaultValue: "Create product" }),
   sections: [
     {
       id: "product-identity",
@@ -132,6 +133,7 @@ export const newProductForm = (t: TFunction): FormConfig => ({
 
 export const newTransferForm = (t: TFunction): FormConfig => ({
   id: "new-transfer",
+  submitLabel: t("inventory.forms.actions.newTransfer", { defaultValue: "Create transfer" }),
   title: t("inventory.forms.newTransfer.title"),
   description: t("inventory.forms.newTransfer.description"),
   sections: [
@@ -197,6 +199,7 @@ export const newTransferForm = (t: TFunction): FormConfig => ({
 
 export const newInventoryAdjustmentForm = (t: TFunction): FormConfig => ({
   id: "new-inventory-adjustment",
+  submitLabel: t("inventory.forms.actions.newInventoryAdjustment", { defaultValue: "Create inventory adjustment" }),
   title: t("inventory.forms.newInventoryAdjustment.title"),
   description: t("inventory.forms.newInventoryAdjustment.description"),
   sections: [
@@ -294,6 +297,7 @@ export const newInventoryAdjustmentForm = (t: TFunction): FormConfig => ({
 
 export const newStockLocationForm = (t: TFunction): FormConfig => ({
   id: "new-stock-location",
+  submitLabel: t("inventory.forms.actions.newStockLocation", { defaultValue: "Create location" }),
   title: t("inventory.forms.newStockLocation.title"),
   description: t("inventory.forms.newStockLocation.description"),
   sections: [
@@ -348,6 +352,7 @@ export const newStockLocationForm = (t: TFunction): FormConfig => ({
 
 export const newWarehouseForm = (t: TFunction): FormConfig => ({
   id: "new-warehouse",
+  submitLabel: t("inventory.forms.actions.newWarehouse", { defaultValue: "Create warehouse" }),
   title: t("inventory.forms.newWarehouse.title"),
   description: t("inventory.forms.newWarehouse.description"),
   sections: [
@@ -401,6 +406,7 @@ export const newWarehouseForm = (t: TFunction): FormConfig => ({
 
 export const editWarehouseForm = (t: TFunction): FormConfig => ({
   id: "edit-warehouse",
+  submitLabel: t("inventory.forms.actions.editWarehouse", { defaultValue: "Save warehouse" }),
   title: t("inventory.forms.editWarehouse.title"),
   description: t("inventory.forms.editWarehouse.description"),
   sections: [
@@ -501,6 +507,7 @@ export const editWarehouseForm = (t: TFunction): FormConfig => ({
 
 export const editProductForm = (t: TFunction): FormConfig => ({
   id: "edit-product",
+  submitLabel: t("inventory.forms.actions.editProduct", { defaultValue: "Save product" }),
   title: t("inventory.forms.editProduct.title"),
   description: t("inventory.forms.editProduct.description"),
   sections: [
@@ -571,6 +578,7 @@ export const editProductForm = (t: TFunction): FormConfig => ({
 
 export const assignUserToPickingForm = (t: TFunction): FormConfig => ({
   id: "assign-user-picking",
+  submitLabel: t("inventory.forms.actions.assignUserToPicking", { defaultValue: "Assign user" }),
   title: t("inventory.forms.assignUserToPicking.title"),
   description: t("inventory.forms.assignUserToPicking.description"),
   sections: [
@@ -594,6 +602,7 @@ export const assignUserToPickingForm = (t: TFunction): FormConfig => ({
 
 export const newProductVariantForm = (t: TFunction): FormConfig => ({
   id: "new-product-variant",
+  submitLabel: t("inventory.forms.actions.newProductVariant", { defaultValue: "Create variant" }),
   title: t("inventory.forms.newProductVariant.title"),
   description: t("inventory.forms.newProductVariant.description"),
   sections: [
@@ -646,6 +655,7 @@ export const newProductVariantForm = (t: TFunction): FormConfig => ({
 
 export const newQualityCheckForm = (t: TFunction): FormConfig => ({
   id: "new-quality-check",
+  submitLabel: t("inventory.forms.actions.newQualityCheck", { defaultValue: "Create quality check" }),
   title: t("inventory.forms.newQualityCheck.title"),
   description: t("inventory.forms.newQualityCheck.description"),
   sections: [
@@ -727,6 +737,7 @@ export const newQualityCheckForm = (t: TFunction): FormConfig => ({
 
 export const newQualityAlertForm = (t: TFunction): FormConfig => ({
   id: "new-quality-alert",
+  submitLabel: t("inventory.forms.actions.newQualityAlert", { defaultValue: "Create quality alert" }),
   title: t("inventory.forms.newQualityAlert.title"),
   description: t("inventory.forms.newQualityAlert.description"),
   sections: [
@@ -986,6 +997,7 @@ export const lotDetailForm = (t: TFunction): FormConfig => ({
 
 export const newQualityPointForm = (t: TFunction): FormConfig => ({
   id: "new-quality-point",
+  submitLabel: t("inventory.forms.actions.newQualityPoint", { defaultValue: "Create quality control point" }),
   title: t("inventory.forms.newQualityPoint.title"),
   description: t("inventory.forms.newQualityPoint.description"),
   sections: [
@@ -1048,6 +1060,7 @@ export const newQualityPointForm = (t: TFunction): FormConfig => ({
 
 export const newQualityTeamForm = (t: TFunction): FormConfig => ({
   id: "new-quality-team",
+  submitLabel: t("inventory.forms.actions.newQualityTeam", { defaultValue: "Create quality team" }),
   title: t("inventory.forms.newQualityTeam.title"),
   description: t("inventory.forms.newQualityTeam.description"),
   sections: [
@@ -1087,6 +1100,7 @@ export const newQualityTeamForm = (t: TFunction): FormConfig => ({
 
 export const newBarcodeRuleForm = (t: TFunction): FormConfig => ({
   id: "new-barcode-rule",
+  submitLabel: t("inventory.forms.actions.newBarcodeRule", { defaultValue: "Create barcode rule" }),
   title: t("inventory.forms.newBarcodeRule.title"),
   description: t("inventory.forms.newBarcodeRule.description"),
   sections: [
@@ -1157,6 +1171,7 @@ export const newBarcodeRuleForm = (t: TFunction): FormConfig => ({
 
 export const newReplenishmentRuleForm = (t: TFunction): FormConfig => ({
   id: "new-replenishment-rule",
+  submitLabel: t("inventory.forms.actions.newReplenishmentRule", { defaultValue: "Create replenishment rule" }),
   title: t("inventory.forms.newReplenishmentRule.title"),
   description: t("inventory.forms.newReplenishmentRule.description"),
   sections: [
@@ -1272,6 +1287,7 @@ export const newReplenishmentRuleForm = (t: TFunction): FormConfig => ({
 
 export const newPickingWaveForm = (t: TFunction): FormConfig => ({
   id: "new-picking-wave",
+  submitLabel: t("inventory.forms.actions.newPickingWave", { defaultValue: "Create picking wave" }),
   title: t("inventory.forms.newPickingWave.title"),
   description: t("inventory.forms.newPickingWave.description"),
   sections: [
@@ -1321,6 +1337,7 @@ export const newPickingWaveForm = (t: TFunction): FormConfig => ({
 
 export const newProductCategoryForm = (t: TFunction): FormConfig => ({
   id: "new-product-category",
+  submitLabel: t("inventory.forms.actions.newProductCategory", { defaultValue: "Create product category" }),
   title: t("inventory.forms.newProductCategory.title"),
   description: t("inventory.forms.newProductCategory.description"),
   sections: [
@@ -1396,6 +1413,7 @@ export const newProductCategoryForm = (t: TFunction): FormConfig => ({
 
 export const newStockQuantForm = (t: TFunction): FormConfig => ({
   id: "new-stock-quant",
+  submitLabel: t("inventory.forms.actions.newStockQuant", { defaultValue: "Add stock line" }),
   title: t("inventory.forms.newStockQuant.title"),
   description: t("inventory.forms.newStockQuant.description"),
   sections: [
@@ -1453,6 +1471,7 @@ export const newStockQuantForm = (t: TFunction): FormConfig => ({
 
 export const newWarehouse3dZoneForm = (t: TFunction): FormConfig => ({
   id: "new-warehouse-3d-zone",
+  submitLabel: t("inventory.forms.actions.newWarehouse3dZone", { defaultValue: "Add 3D zone" }),
   title: t("inventory.forms.newWarehouse3dZone.title"),
   description: t("inventory.forms.newWarehouse3dZone.description"),
   sections: [
@@ -1555,6 +1574,7 @@ export const newWarehouse3dZoneForm = (t: TFunction): FormConfig => ({
 
 export const newProductSupplierLineForm = (t: TFunction): FormConfig => ({
   id: "new-product-supplier-line",
+  submitLabel: t("inventory.forms.actions.newProductSupplierLine", { defaultValue: "Add supplier line" }),
   title: t("inventory.forms.newProductSupplierLine.title"),
   description: t("inventory.forms.newProductSupplierLine.description"),
   sections: [
@@ -1629,6 +1649,7 @@ export const newProductSupplierLineForm = (t: TFunction): FormConfig => ({
 
 export const newProductPackagingForm = (t: TFunction): FormConfig => ({
   id: "new-product-packaging",
+  submitLabel: t("inventory.forms.actions.newProductPackaging", { defaultValue: "Add packaging" }),
   title: t("inventory.forms.newProductPackaging.title"),
   description: t("inventory.forms.newProductPackaging.description"),
   sections: [

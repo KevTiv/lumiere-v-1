@@ -103,12 +103,15 @@ export interface TabCreateCta {
 type ViewWithEmptyState = EntityViewConfig["view"]
 
 /**
- * Lets a list that opted into an `emptyState` (it has a title) use its module tab's "New" form as
+ * Lets a list with an empty-state title or legacy empty message use its module tab's "New" form as
  * the first-time CTA, gated by the tab's create permission. A list that already names an action
  * id or its own handler keeps it; it only picks up the permission gate.
  */
 export function withTabCreateCta(view: ViewWithEmptyState, cta: TabCreateCta): ViewWithEmptyState {
-  const patch = (state: ListEmptyStateConfig | undefined): ListEmptyStateConfig | undefined => {
+  const patch = (configuredState: ListEmptyStateConfig | undefined, emptyMessage: string | undefined): ListEmptyStateConfig | undefined => {
+    const state = !configuredState?.title && emptyMessage
+      ? { ...configuredState, title: emptyMessage }
+      : configuredState
     if (!state?.title) return state
     if (state.primaryActionId) return state
     if (state.onAction) {
@@ -122,11 +125,11 @@ export function withTabCreateCta(view: ViewWithEmptyState, cta: TabCreateCta): V
     }
   }
   if (view.mode === "table") {
-    const emptyState = patch(view.emptyState)
+    const emptyState = patch(view.emptyState, view.emptyMessage)
     return emptyState === view.emptyState ? view : { ...view, emptyState }
   }
   if (view.mode === "table-or-board") {
-    const emptyState = patch(view.table.emptyState)
+    const emptyState = patch(view.table.emptyState, view.table.emptyMessage)
     return emptyState === view.table.emptyState ? view : { ...view, table: { ...view.table, emptyState } }
   }
   return view

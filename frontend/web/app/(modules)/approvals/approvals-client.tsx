@@ -202,7 +202,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         >
           {target
             ? `No open approval task matches ${target.model} #${target.resId}.`
-            : "No open tasks for this company. Guarded actions create version-pinned human tasks when approval is required."}
+            : t("approvals.empty.noTasks", { defaultValue: "No requests are waiting for approval in this company. New requests appear here when a business action needs review." })}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -442,14 +442,12 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
       )}
 
       <section className="space-y-2 rounded-lg border bg-card p-5">
-        <h3 className="font-medium">Workflow policy</h3>
+        <h3 className="font-medium">{t("approvals.policy.title", { defaultValue: "Approval rules" })}</h3>
         <p className="text-sm text-muted-foreground">
-          Approval rules are published workflow versions with human-task nodes. Create and publish
-          definitions in the{" "}
+          {t("approvals.policy.description", { defaultValue: "Approval rules determine which business actions need review." })}{" "}
           <Link href="/workflows" className="text-primary hover:underline">
-            Workflows
-          </Link>{" "}
-          module.
+            {t("approvals.policy.link", { defaultValue: "Manage approval rules" })}
+          </Link>
         </p>
       </section>
     </div>

@@ -16,7 +16,8 @@ const STATIC_FIELD_ALIASES: Record<string, readonly string[]> = {
   expectedrevenue: ["expected_revenue", "revenue"],
   datedeadline: ["date_deadline", "deadline"],
   clientorderref: ["client_order_ref", "order_number", "ordernumber"],
-  validitydate: ["validity_date", "delivery_date", "deliverydate"],
+  validitydate: ["validity_date"],
+  commitmentdate: ["commitment_date", "delivery_date", "deliverydate"],
 }
 
 function stdbFieldKeys(field: ParsedFormField): string[] {
@@ -33,6 +34,9 @@ function findMatchingStdbField(
   staticField: { id: string; name: string },
   stdbFields: ParsedFormField[],
 ): ParsedFormField | undefined {
+  const exactKeys = new Set([staticField.id, staticField.name].map(normalizeFormFieldKey))
+  const exactMatch = stdbFields.find((field) => stdbFieldKeys(field).some((key) => exactKeys.has(key)))
+  if (exactMatch) return exactMatch
   const keys = new Set(staticFieldKeys(staticField))
   return stdbFields.find((f) => stdbFieldKeys(f).some((k) => keys.has(k)))
 }
@@ -227,7 +231,12 @@ export function mergeRuntimeFormConfig(
     ...section,
     fields: section.fields
       .map((field) => {
-        const inRoleOrEnabled = findMatchingStdbField(field, runtime.fields)
+        const sourceMatch = preferStdb ? findMatchingStdbField(field, sourceFields) : undefined
+        // Resolve the authoritative binding before applying the role-enabled set.
+        // A legacy alias must not revive a disabled canonical field.
+        const inRoleOrEnabled = sourceMatch
+          ? runtime.fields.find((candidate) => candidate.fieldId === sourceMatch.fieldId)
+          : findMatchingStdbField(field, runtime.fields)
         if (inRoleOrEnabled) {
           matchedStdbIds.add(inRoleOrEnabled.fieldId)
           const runtimeIsArray = inRoleOrEnabled.type === "MultiSelect" || inRoleOrEnabled.type === "Tags"
@@ -248,7 +257,7 @@ export function mergeRuntimeFormConfig(
           // The static renderer remains authoritative, including Custom runtime metadata.
           return applyStdbOverrides(field, inRoleOrEnabled)
         }
-        if (preferStdb && findMatchingStdbField(field, sourceFields)) {
+        if (sourceMatch) {
           // Defined in STDB but not enabled for this role / is_enabled=false → hide
           return null
         }

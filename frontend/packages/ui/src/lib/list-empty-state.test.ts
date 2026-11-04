@@ -82,6 +82,21 @@ describe("withTabCreateCta", () => {
     expect(out).toMatchObject({ emptyState: { actionLabel: "New order", onAction: cta.onClick, permission: cta.permission } })
   })
 
+  it("offers the same permission-gated create form for a legacy empty message", () => {
+    const view = { ...table(), emptyMessage: "No vehicles yet." }
+    const out = withTabCreateCta(view, cta)
+    expect(out).toMatchObject({ emptyState: { title: "No vehicles yet.", actionLabel: "New order", onAction: cta.onClick, permission: cta.permission } })
+    if (out.mode !== "table") throw new Error("Expected table view")
+    expect(resolveEmptyCtas(out.emptyState, [], () => false)).toEqual({ primary: null, secondary: null, readOnly: true })
+    expect(resolveEmptyCtas(out.emptyState, [], () => true).primary?.onClick).toBe(cta.onClick)
+  })
+
+  it("preserves a legacy empty state's custom action while adding its missing title", () => {
+    const onAction = vi.fn()
+    const out = withTabCreateCta({ ...table({ actionLabel: "Own", onAction }), emptyMessage: "No records" }, cta)
+    expect(out).toMatchObject({ emptyState: { title: "No records", actionLabel: "Own", onAction, permission: cta.permission } })
+  })
+
   it("keeps an existing handler and an action id, adding only the gate", () => {
     const onAction = vi.fn()
     const own = withTabCreateCta(table({ title: "t", actionLabel: "Own", onAction }), cta)

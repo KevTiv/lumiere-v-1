@@ -1,5 +1,25 @@
 import { test, expect } from "@playwright/test"
 
+test("ready onboarding can be reopened and missing setup stays expanded", async ({ page }) => {
+  await page.route("**/api/query/companies", route => route.fulfill({ json: { data: [
+    { id: "2", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
+    { id: "3", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 6, fiscalYearEndDay: 30 },
+  ] } }))
+  await page.route("**/api/query/contacts", route => route.fulfill({ json: { data: [
+    { id: "9", organizationId: "1", companyId: "2", isCustomer: true },
+  ] } }))
+  await page.goto("/activation")
+  const panel = page.getByTestId("activation-checklist")
+  await expect(panel.locator('[data-check="contact"]')).toHaveAttribute("data-state", "ready")
+  await page.getByRole("button", { name: "Compact completed setup", exact: true }).click()
+  await expect(panel).toBeHidden()
+  await page.locator("summary").filter({ hasText: "Review setup and first tasks" }).click()
+  await expect(panel).toBeVisible()
+  await page.getByRole("button", { name: "Company 3", exact: true }).click()
+  await expect(panel).toBeVisible()
+  await expect(panel.locator('[data-check="contact"]')).toHaveAttribute("data-state", "missing")
+})
+
 for (const width of [320, 390, 768, 1440]) {
   test(`activation keeps scope, role, task choice and layout at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 })

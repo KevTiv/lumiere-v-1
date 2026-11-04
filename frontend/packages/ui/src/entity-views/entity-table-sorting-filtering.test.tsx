@@ -59,24 +59,25 @@ const drawnIds = () =>
     .map((row) => row.getAttribute("data-testid")!.replace("entity-row-", ""))
 
 const header = (name: string) => screen.getByRole("button", { name })
+const columnHeader = (name: string) => screen.getByRole("columnheader", { name })
 
 describe("EntityTable sorting", () => {
   it("draws newest first until a column is chosen, with no column marked sorted", () => {
     renderTable()
 
     expect(drawnIds()).toEqual(["3", "2", "1"])
-    expect(header("Name").getAttribute("aria-sort")).toBe("none")
+    expect(columnHeader("Name").getAttribute("aria-sort")).toBe("none")
   })
 
   it("sorts ascending on the first click, descending on the second", () => {
     renderTable()
 
     fireEvent.click(header("Name"))
-    expect(header("Name").getAttribute("aria-sort")).toBe("ascending")
+    expect(columnHeader("Name").getAttribute("aria-sort")).toBe("ascending")
     expect(drawnIds()).toEqual(["2", "1", "3"])
 
     fireEvent.click(header("Name"))
-    expect(header("Name").getAttribute("aria-sort")).toBe("descending")
+    expect(columnHeader("Name").getAttribute("aria-sort")).toBe("descending")
     expect(drawnIds()).toEqual(["3", "1", "2"])
   })
 
@@ -96,14 +97,15 @@ describe("EntityTable sorting", () => {
     fireEvent.click(header("Name"))
     fireEvent.click(header("Total"))
 
-    expect(header("Name").getAttribute("aria-sort")).toBe("none")
-    expect(header("Total").getAttribute("aria-sort")).toBe("ascending")
+    expect(columnHeader("Name").getAttribute("aria-sort")).toBe("none")
+    expect(columnHeader("Total").getAttribute("aria-sort")).toBe("ascending")
   })
 
   it("gives columns that are not sortable no sort button", () => {
     renderTable()
 
     expect(screen.queryByRole("button", { name: "State" })).toBeNull()
+    expect(columnHeader("State").hasAttribute("aria-sort")).toBe(false)
   })
 })
 

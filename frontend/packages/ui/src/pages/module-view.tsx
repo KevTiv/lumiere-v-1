@@ -367,21 +367,23 @@ export function ModuleView({
                 </SelectGroup></SelectContent>
               </Select>
             </div>
-            <div ref={tabListRef} className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" data-testid={`module-tabs-${config.id}`}>
-              <TabsList variant="line" className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
-                {visibleTabs.map((tab) => (
-                  <TabsTrigger
-                    key={tab.id}
-                    className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
-                    data-navigation-group={currentArea.id}
-                    value={tab.id}
-                    data-testid={`module-tab-${config.id}-${tab.id}`}
-                  >
-                    {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+            {visibleTabs.length > 1 && (
+              <div ref={tabListRef} className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" data-testid={`module-tabs-${config.id}`}>
+                <TabsList variant="line" className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
+                  {visibleTabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                      data-navigation-group={currentArea.id}
+                      value={tab.id}
+                      data-testid={`module-tab-${config.id}-${tab.id}`}
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+            )}
           </>
         ) : (
           <WorkspaceNav
@@ -400,6 +402,7 @@ export function ModuleView({
             value={tab.id}
             keepMounted={onOpenFormChange != null && openForm === tab.id}
             className="mt-6"
+            aria-label={tab.label}
             aria-busy={dataState?.[tab.id]?.status === "loading"}
             data-testid={`module-panel-${config.id}-${tab.id}`}
           >

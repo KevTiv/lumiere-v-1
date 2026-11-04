@@ -31,6 +31,12 @@ export interface BaseField {
   label?: string
   placeholder?: string
   description?: string
+  /** Owner-supplied prerequisite guidance, kept apart from runtime field descriptions. */
+  recoveryHelp?: {
+    message: string
+    /** Opens setup separately so the current form and its entered values stay mounted. */
+    action?: { href: string; label: string }
+  }
   required?: boolean
   disabled?: boolean
   autoComplete?: string
@@ -161,6 +167,8 @@ export interface RadioField extends BaseField {
 }
 
 export interface DateField extends BaseField {
+  /** Calendar timezone for date shortcuts; date values remain wall-date strings. */
+  timeZone?: string
   type: "date" | "time" | "datetime"
   defaultValue?: string
   /** Earliest allowed value in the field's string format (`YYYY-MM-DD` for dates). */

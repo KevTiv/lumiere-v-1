@@ -39,7 +39,7 @@ export function withReadOnlyStateBoard(
         searchPlaceholder: t("common.entityView.boardSearch", { defaultValue: "Search cards" }),
       },
       viewToggleLabels: {
-        table: t("common.entityView.table", { defaultValue: "Table" }),
+        table: t("common.entityView.list", { defaultValue: "List" }),
         board: t("common.entityView.board", { defaultValue: "Board" }),
         ...(options.pivot
           ? { pivot: t("common.entityView.pivot", { defaultValue: "Summary" }) }
@@ -70,7 +70,7 @@ export function pivotConfig(
       mixedCurrencies: (currencies) =>
         t("common.entityView.pivotMixedCurrencies", {
           defaultValue:
-            "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
+            "These records use more than one currency ({{currencies}}). Monetary measures with mixed currencies are omitted from the summary and CSV.",
           currencies: currencies.join(", "),
         }),
       chartTitle: (measure) =>

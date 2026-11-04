@@ -166,7 +166,8 @@
         "search": "Tafuta…",
         "empty": "Hakuna vinavyolingana",
         "remove": "Ondoa {{value}}"
-      }
+      },
+      "setupOpensNewTab": "hufunguka kwenye kichupo kipya"
     },
     "formPreview": {
       "label": "Hakiki"
@@ -290,7 +291,9 @@
       "pivotCount": "Idadi",
       "pivotEmpty": "Haijawekwa",
       "pivotGroupBy": "Panga kwa",
-      "pivotMixedCurrencies": "Rekodi hizi zinatumia sarafu zaidi ya moja ({{currencies}}). Jumla zinaongeza kiasi kama kilivyo bila kubadilisha sarafu.",
+      "pivotMixedCurrencies": "Rekodi hizi zinatumia sarafu tofauti ({{currencies}}). Kiasi cha sarafu tofauti hakijumuishwi katika muhtasari na CSV.",
+      "pivotScope": "Muhtasari wa rekodi {{recordCount}} zinazopatikana. Vichujio na upangaji wa kurasa wa orodha hautumiki hapa.",
+      "pivotUnknownCurrency": "Kiasi hakijumuishwi katika muhtasari na CSV kwa sababu sarafu moja haikuweza kuthibitishwa kwa rekodi zote.",
       "pivotNoData": "Hakuna rekodi za kufupisha",
       "pivotNone": "Hakuna",
       "pivotTotal": "Jumla",
@@ -308,7 +311,8 @@
         "clear": "Ondoa vichujio",
         "description": "Jaribu utafutaji mwingine au uondoe vichujio.",
         "title": "Hakuna rekodi zinazolingana"
-      }
+      },
+      "groupBy": "Panga kwa makundi kwa"
     },
     "retry": "Jaribu tena",
     "recordsDenied": "Huna ruhusa ya kufikia rekodi hizi.",
@@ -432,6 +436,9 @@
       "unavailable": "Mapendekezo hayapatikani. Jaza fomu au kagua mahitaji ya usanidi.",
       "suggest": "Pendekeza thamani",
       "apply": "Tumia mapendekezo"
+    },
+    "listToolbar": {
+      "viewSettings": "Mipangilio ya mwonekano"
     }
   },
   "navigation": {
@@ -4404,7 +4411,8 @@
       "emailVerificationHint": "Kubadilisha barua pepe kunahitaji uthibitishaji wa mtoa huduma wa utambulisho na idhini ya msimamizi.",
       "loadError": "Imeshindwa kupakia wasifu wako. Pakia ukurasa upya ili kujaribu tena.",
       "securityProviderHint": "Mtoa huduma wako wa utambulisho anadhibiti nenosiri na usalama wa kuingia.",
-      "manageSecurity": "Dhibiti usalama wa kuingia"
+      "manageSecurity": "Dhibiti usalama wa kuingia",
+      "invalidTimezone": "Weka ukanda wa saa wa IANA unaotambulika, kama Europe/Amsterdam au Africa/Kigali."
     },
     "customFields": {
       "title": "Sehemu zangu maalumu",

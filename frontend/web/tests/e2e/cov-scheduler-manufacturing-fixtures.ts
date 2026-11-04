@@ -173,9 +173,8 @@ export async function prepareOutput(page: Page, companyId: number, moId: number)
 }
 export async function openRow(page: Page, tab: "orders" | "boms", recordId: number) {
   await gotoModule(page, `/manufacturing?tab=${tab}&filter=id:${recordId}`, "manufacturing")
-  await expect(page.getByTestId(`module-tab-manufacturing-${tab}`)).toHaveCount(1, { timeout: 30_000 })
-  await expect(page.getByTestId(`module-tab-manufacturing-${tab}`)).toHaveAttribute("aria-selected", "true")
-  const panel = page.locator('[role="tabpanel"]:visible')
+  const panel = page.getByTestId(`module-panel-manufacturing-${tab}`)
+  await expect(panel).toBeVisible({ timeout: 30_000 })
   await panel.getByTestId(`entity-row-${recordId}`).click()
   const formId = `manufacturing-${tab === "orders" ? "order" : "bom"}-row-${recordId}`
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()

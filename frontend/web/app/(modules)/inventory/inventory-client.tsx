@@ -2405,26 +2405,31 @@ function InventoryClientLoaded({
               actions: [
                 {
                   id: 'csv-uom-category',
+                  toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
                   label: t('inventory.csvImport.toolbarUomCategories'),
                   onClick: () => setCsvKind('uomCategory'),
                 },
                 {
                   id: 'csv-uom',
+                  toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
                   label: t('inventory.csvImport.toolbarUoms'),
                   onClick: () => setCsvKind('uom'),
                 },
                 {
                   id: 'csv-product-category',
+                  toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
                   label: t('inventory.csvImport.toolbarProductCategories'),
                   onClick: () => setCsvKind('productCategory'),
                 },
                 {
                   id: 'csv-product',
+                  toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
                   label: t('inventory.csvImport.toolbarProducts'),
                   onClick: () => setCsvKind('product'),
                 },
                 {
                   id: 'csv-product-variant',
+                  toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
                   label: t('inventory.csvImport.toolbarVariants'),
                   onClick: () => setCsvKind('productVariant'),
                 },
@@ -2588,6 +2593,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'update-product-variant',
+                  toolbarGroup: { id: 'manage', label: t('inventory.productActions.manageMenu', { defaultValue: 'Manage catalog' }) },
                   label: t('inventory.productActions.updateVariantById'),
                   requiresSelection: false,
                   onClick: async () => {
@@ -2618,6 +2624,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'create-uom-category',
+                  toolbarGroup: { id: 'manage', label: t('inventory.productActions.manageMenu', { defaultValue: 'Manage catalog' }) },
                   label: t('inventory.uomActions.createCategory'),
                   requiresSelection: false,
                   onClick: async () => {
@@ -2645,6 +2652,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'create-uom',
+                  toolbarGroup: { id: 'manage', label: t('inventory.productActions.manageMenu', { defaultValue: 'Manage catalog' }) },
                   label: t('inventory.uomActions.createUom'),
                   requiresSelection: false,
                   onClick: async () => {
@@ -2706,6 +2714,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'create-uom-conversion',
+                  toolbarGroup: { id: 'manage', label: t('inventory.productActions.manageMenu', { defaultValue: 'Manage catalog' }) },
                   label: t('inventory.uomActions.createConversion'),
                   requiresSelection: false,
                   onClick: async () => {
@@ -2764,6 +2773,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'update-supplier-line',
+                  toolbarGroup: { id: 'manage', label: t('inventory.productActions.manageMenu', { defaultValue: 'Manage catalog' }) },
                   label: t('inventory.productActions.updateSupplierLineById'),
                   requiresSelection: false,
                   onClick: async () => {
@@ -2798,6 +2808,7 @@ function InventoryClientLoaded({
                 },
                 {
                   id: 'update-packaging-row',
+                  toolbarGroup: { id: 'manage', label: t('inventory.productActions.manageMenu', { defaultValue: 'Manage catalog' }) },
                   label: t('inventory.productActions.updatePackagingById'),
                   requiresSelection: false,
                   onClick: async () => {

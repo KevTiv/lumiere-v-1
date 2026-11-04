@@ -88,3 +88,14 @@ test('an uploaded file is named after its file name', () => {
   assert.equal(documentNameFromFile('.env'), '.env');
   assert.equal(documentNameFromFile('README'), 'README');
 });
+
+
+test('creation metadata stays separate when a document has no modification timestamp', () => {
+  const [file] = toBrowserFiles([{
+    ...documents[2]!,
+    createDate: { microsSinceUnixEpoch: 4_000_000_000n },
+  }], labels);
+  assert.equal(file!.createdAt, 4_000_000);
+  assert.equal(file!.updatedAt, null);
+  assert.equal(file!.modifiedBy, '—');
+});

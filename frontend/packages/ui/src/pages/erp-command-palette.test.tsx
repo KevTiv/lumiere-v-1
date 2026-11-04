@@ -41,6 +41,7 @@ vi.mock("../lib/navigation-catalog", () => ({
       label: "Modules",
       items: [
         { surfaceId: "sales", label: "Sales", href: "/sales", icon: () => null, resource: "module:sales" },
+        { surfaceId: "accounting", label: "Accounting", href: "/accounting", icon: () => null, resource: "module:accounting" },
         { surfaceId: "crm", label: "CRM", href: "/crm", icon: () => null, resource: "module:crm" },
         { surfaceId: "products", label: "Products", href: "/products", icon: () => null, resource: "module:inventory" },
         { surfaceId: "warehouse", label: "Warehouse", href: "/warehouse", icon: () => null, resource: "module:inventory" },
@@ -118,6 +119,23 @@ function type(text: string) {
 }
 
 describe("ErpCommandPalette records", () => {
+  it("offers an invoice workspace when the company has no invoice records", () => {
+    data.rows = {}
+    openPalette()
+    type("invoice")
+    fireEvent.click(screen.getByRole("option", { name: "Customer invoices" }))
+    expect(push).toHaveBeenCalledWith("/accounting?tab=invoices")
+  })
+
+  it.each(["denied", "hidden"])("omits workflow shortcuts when the parent is %s", (gate) => {
+    if (gate === "denied") rbac.denied.add("module:accounting")
+    else navigation.hidden.add("accounting")
+    openPalette()
+    type("invoice")
+    expect(screen.queryByRole("option", { name: "Customer invoices" })).toBeNull()
+    expect(hookCalls.names).not.toContain("account_move")
+  })
+
   it.each(["finance-alpha", "full"] as const)("keeps deferred feature actions aligned with the %s profile", (profile) => {
     const onOpenNotebook = vi.fn()
     const onOpenJournal = vi.fn()

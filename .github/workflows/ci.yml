@@ -505,9 +505,9 @@ jobs:
       - name: Product, Fleet and Warehouse browser regressions
         run: pnpm --dir web test:e2e:product-fleet-warehouse
 
-      - name: Accounting next-action and authoring browser regressions
+      - name: Accounting, forms and shared usability browser regressions
         working-directory: frontend/web
-        run: pnpm exec playwright test --config playwright.accounting-ui.config.ts accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts
+        run: pnpm exec playwright test --config playwright.accounting-ui.config.ts accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts harness-inspector-ui.spec.ts list-toolbar-ui.spec.ts
 
       - name: Assistant document modal and dedicated-page browser regressions
         run: pnpm --dir web test:e2e:assistant-guides

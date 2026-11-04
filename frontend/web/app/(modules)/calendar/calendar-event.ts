@@ -1,5 +1,6 @@
 import { variantTag } from '@lumiere/erp-workflows';
 import { calendarEventFormRange, localCalendarDate } from '../../../lib/calendar-event-range';
+import { zonedCalendarInput } from "@lumiere/erp-shared/calendar-timezone";
 import type { CalendarEvent } from '@lumiere/ui/lib/calendar-types';
 
 type Row = Record<string, unknown>;
@@ -25,9 +26,18 @@ export function eventMicros(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Shared event table/detail display in the active calendar timezone. */
+export function eventTimestampLabel(value: unknown, locale?: string, timeZone?: string): string {
+  const raw = value && typeof value === 'object' && 'microsSinceUnixEpoch' in value ? value.microsSinceUnixEpoch : value;
+  if (raw == null || raw === '' || !Number.isFinite(Number(raw))) return '—';
+  const date = new Date(Number(raw) / 1000);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString(locale, { timeZone }) : '—';
+}
+
 /** `datetime-local` text of a timestamp cell, for form defaults. */
-export function eventInputValue(value: unknown): string {
+export function eventInputValue(value: unknown, timeZone?: string): string {
   const date = new Date(eventMicros(value) / 1000);
+  if (timeZone) return zonedCalendarInput(date, timeZone);
   // datetime-local is read back as local time by the form mapper. Using UTC here
   // changes the saved instant when the browser timezone is not UTC.
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -78,9 +88,9 @@ export function calendarReturnHref(value: string | null): string {
  * Parameters for `update_calendar_event` from the edit form; null when the title is empty or a
  * date does not parse. The event keeps `state` (confirmed by default, as the list's edit does).
  */
-export function updateCalendarEventParams(formData: Row, state = 'confirmed'): Row | null {
+export function updateCalendarEventParams(formData: Row, state = 'confirmed', timeZone?: string, originalEvent?: Row): Row | null {
   const name = String(formData.name ?? '').trim();
-  const range = calendarEventFormRange(formData);
+  const range = calendarEventFormRange(formData, { timeZone, originalStart: originalEvent?.start != null ? new Date(eventMicros(originalEvent.start) / 1000) : undefined, originalStop: originalEvent?.stop != null ? new Date(eventMicros(originalEvent.stop) / 1000) : undefined });
   if (!name || !range) return null;
   return {
     name,

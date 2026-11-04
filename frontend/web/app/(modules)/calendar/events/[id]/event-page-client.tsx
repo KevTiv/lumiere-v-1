@@ -50,6 +50,7 @@ import {
   useUpdateCalendarEvent,
   type CalendarEvent,
 } from '@lumiere/query-hooks/hooks/calendar';
+import { useCalendarTimezone } from "@/lib/use-calendar-timezone";
 import { toCreateCalendarEventParams } from '@/lib/calendar-create-params';
 import { duplicateName } from '@/lib/record-standard-actions';
 import { useCalendarModuleSubscription } from '@/lib/module-subscription-hooks';
@@ -64,6 +65,7 @@ import {
   eventAttendees,
   calendarReturnHref,
   eventInputValue,
+  eventTimestampLabel,
   eventMicros,
   eventStateActions,
   eventStateParams,
@@ -106,6 +108,8 @@ function CalendarEventPageLoaded({
 }: CalendarEventPageClientProps & { organizationId: number; readScope: CalendarReadScope; canWrite: boolean; canDelete: boolean; canCreate: boolean }) {
   useCalendarModuleSubscription();
   const { t, i18n } = useTranslation();
+  const calendarTimezone = useCalendarTimezone();
+  const { timeZone } = calendarTimezone;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -123,6 +127,7 @@ function CalendarEventPageLoaded({
   const createEvent = useCreateCalendarEvent(orgId);
 
   const [editing, setEditing] = useState(false);
+  const [formTimezone, setFormTimezone] = useState<string | null>(null);
   const [editingRecurrence, setEditingRecurrence] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -167,9 +172,9 @@ function CalendarEventPageLoaded({
     [pathname, router, searchParams],
   );
 
-  if (!event) {
+  if (!event || !calendarTimezone.ready) {
     if (eventsRead.state.status !== 'loading' && eventsRead.state.status !== 'ready') return <ModuleDataNotice state={eventsRead.state} />;
-    if (eventsRead.state.status === 'loading') {
+    if (eventsRead.state.status === 'loading' || !calendarTimezone.ready) {
       return (
         <div className="space-y-4" data-testid="calendar-event-page-loading">
           <Skeleton className="h-6 w-64" />
@@ -208,9 +213,9 @@ function CalendarEventPageLoaded({
         onError: (error) => showWorkflowToast({ kind: 'error', title, description: error.message }),
       },
     );
-  const when = (value: unknown) => new Date(eventMicros(value) / 1000).toLocaleString(i18n.language);
+  const when = (value: unknown) => eventTimestampLabel(value, i18n.language, timeZone);
   const subtitle = event.allday
-    ? `${new Date(eventMicros(event.start) / 1000).toLocaleDateString(i18n.language)} · ${t('calendar.events.columns.allday')}`
+    ? `${new Date(eventMicros(event.start) / 1000).toLocaleDateString(i18n.language, { timeZone })} · ${t('calendar.events.columns.allday')}`
     : `${when(event.start)} — ${when(event.stop)}`;
 
   const detailConfig = {
@@ -219,8 +224,8 @@ function CalendarEventPageLoaded({
       {
         id: 'event',
         fields: [
-          { key: 'start', label: t('calendar.events.columns.start'), type: 'datetime' as const },
-          { key: 'stop', label: t('calendar.events.columns.stop'), type: 'datetime' as const },
+          { key: 'start', label: t('calendar.events.columns.start'), type: 'datetime' as const, render: (value: unknown) => when(value) },
+          { key: 'stop', label: t('calendar.events.columns.stop'), type: 'datetime' as const, render: (value: unknown) => when(value) },
           { key: 'location', label: t('calendar.events.columns.location') },
           { key: 'allday', label: t('calendar.events.columns.allday'), type: 'boolean' as const },
           { key: 'privacy', label: t('calendar.events.columns.privacy') },
@@ -273,6 +278,7 @@ function CalendarEventPageLoaded({
 
   return (
     <>
+      {calendarTimezone.fallbackReason && <p role="status" className="break-words text-sm text-muted-foreground">{t(`calendar.workspace.timezoneFallback.${calendarTimezone.fallbackReason}`, { defaultValue: "The account timezone is unavailable. The labelled fallback timezone is in use." })}</p>}
       <RecordPage
         testIdPrefix="calendar-event"
         breadcrumbs={[
@@ -281,7 +287,7 @@ function CalendarEventPageLoaded({
           { label },
         ]}
         title={label}
-        subtitle={subtitle}
+        subtitle={`${subtitle} · ${t(`calendar.workspace.timezoneSource.${calendarTimezone.source}`, { defaultValue: "Times shown in {{timezone}}", timezone: timeZone })}`}
         badge={
           <Badge variant={status.terminal ? 'destructive' : 'secondary'}>
             {status.terminal?.label ?? status.steps.find((step) => step.id === status.current)?.label ?? ''}
@@ -301,7 +307,7 @@ function CalendarEventPageLoaded({
                 {t('calendar.eventDetail.confirm', { defaultValue: 'Confirm event' })}
               </Button>
             ) : null}
-            <Button variant={stateActions.confirm ? 'outline' : 'default'} size="sm" disabled={!canWrite} data-testid="calendar-event-edit" onClick={() => setEditing(true)}>
+            <Button variant={stateActions.confirm ? 'outline' : 'default'} size="sm" disabled={!canWrite || !calendarTimezone.ready} data-testid="calendar-event-edit" onClick={() => { setFormTimezone(timeZone); setEditing(true); }}>
               {t('calendar.eventDetail.edit')}
             </Button>
             <Button variant="outline" size="sm" disabled={!canWrite} data-testid="calendar-event-recurrence" onClick={() => setEditingRecurrence(true)}>
@@ -326,7 +332,7 @@ function CalendarEventPageLoaded({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={!canCreate} data-testid="calendar-event-action-duplicate" onSelect={() => setDuplicating(true)}>
+                <DropdownMenuItem disabled={!canCreate || !calendarTimezone.ready} data-testid="calendar-event-action-duplicate" onSelect={() => { setFormTimezone(timeZone); setDuplicating(true); }}>
                   {t('calendar.eventDetail.duplicate', { defaultValue: 'Duplicate' })}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -398,19 +404,19 @@ function CalendarEventPageLoaded({
           }}
           config={newCalendarEventForm(t, {
             name: String(event.name ?? ''),
-            start: eventInputValue(event.start),
-            stop: eventInputValue(event.stop),
+            start: eventInputValue(event.start, formTimezone ?? timeZone),
+            stop: eventInputValue(event.stop, formTimezone ?? timeZone),
             allday: Boolean(event.allday),
             privacy: variantTag(event.privacy).toLowerCase() || 'public',
             location: event.location ? String(event.location) : '',
             description: event.description ? String(event.description) : '',
-          })}
-          isPending={updateEvent.isPending}
+          }, 'edit', formTimezone ?? timeZone)}
+          isPending={updateEvent.isPending || !calendarTimezone.ready}
           closeOnSubmit={false}
           submitError={editError}
           onSubmit={async (formData) => {
             setEditError(null);
-            const params = updateCalendarEventParams(formData, eventStateTag(event) || 'confirmed');
+            const params = updateCalendarEventParams(formData, eventStateTag(event) || 'confirmed', timeZone, event);
             if (!params) {
               setEditError(t('common.validation.required'));
               return;
@@ -436,19 +442,19 @@ function CalendarEventPageLoaded({
           }}
           config={newCalendarEventForm(t, {
             name: duplicateName('calendar.events', event.name),
-            start: eventInputValue(event.start),
-            stop: eventInputValue(event.stop),
+            start: eventInputValue(event.start, formTimezone ?? timeZone),
+            stop: eventInputValue(event.stop, formTimezone ?? timeZone),
             allday: Boolean(event.allday),
             privacy: variantTag(event.privacy).toLowerCase() || 'public',
             location: event.location ? String(event.location) : '',
             description: event.description ? String(event.description) : '',
-          }, 'create')}
-          isPending={createEvent.isPending}
+          }, 'create', formTimezone ?? timeZone)}
+          isPending={createEvent.isPending || !calendarTimezone.ready}
           closeOnSubmit={false}
           submitError={duplicateError}
           onSubmit={async (formData) => {
             setDuplicateError(null);
-            const params = toCreateCalendarEventParams(formData);
+            const params = toCreateCalendarEventParams(formData, timeZone);
             if (!params) {
               setDuplicateError(t('common.validation.required'));
               return;

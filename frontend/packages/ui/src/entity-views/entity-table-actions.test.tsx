@@ -56,6 +56,29 @@ afterEach(() => {
 })
 
 describe("EntityTable selection", () => {
+  it("keeps grouped actions behind a menu and preserves confirmation", async () => {
+    const onClick = vi.fn()
+    renderTable([{
+      id: "import", label: "Import products", toolbarGroup: { id: "imports", label: "Import" },
+      confirm: { title: "Review import", description: "Review before continuing", confirmLabel: "Continue import", cancelLabel: "Cancel" },
+      onClick,
+    }])
+    expect(screen.queryByRole("menuitem", { name: "Import products" })).toBeNull()
+    fireEvent.keyDown(screen.getByTestId("entity-action-group-imports"), { key: "ArrowDown" })
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Import products" }))
+    expect(onClick).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByText("Continue import"))
+    await waitFor(() => expect(onClick).toHaveBeenCalledWith([]))
+  })
+
+  it("does not expose a toolbar group when every action is denied", () => {
+    renderTable([{
+      id: "restricted", label: "Restricted import", toolbarGroup: { id: "imports", label: "Import" },
+      permission: { resource: "product", action: "create" }, onClick: vi.fn(),
+    }])
+    expect(screen.queryByTestId("entity-action-group-imports")).toBeNull()
+  })
+
   it("ticks rows with checkboxes and can untick the last one", () => {
     renderTable([{ id: "close", label: "Close", requiresSelection: true, onClick: vi.fn() }])
 

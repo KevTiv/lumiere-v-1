@@ -10,6 +10,7 @@ export const newFleetVehicleForm = (t: TFunction): FormConfig => ({
   id: "new-fleet-vehicle",
   title: t("fleet.forms.newVehicle.title"),
   description: t("fleet.forms.newVehicle.description"),
+  submitLabel: t("fleet.create"),
   sections: [
     {
       id: "vehicle",
@@ -73,6 +74,7 @@ export const assignFleetDriverForm = (
   employees: FleetFormOption[],
 ): FormConfig => ({
   id: "assign-fleet-driver",
+  submitLabel: t("fleet.forms.actions.assignFleetDriver", { defaultValue: "Save driver assignment" }),
   title: t("fleet.lifecycle.assignments.action"),
   description: t("fleet.lifecycle.assignments.description"),
   sections: [{
@@ -92,6 +94,7 @@ export const recordFleetServiceForm = (
   accounts: FleetFormOption[],
 ): FormConfig => ({
   id: "record-fleet-service",
+  submitLabel: t("fleet.forms.actions.recordFleetService", { defaultValue: "Record service" }),
   title: t("fleet.lifecycle.service.action"),
   description: t("fleet.lifecycle.service.description"),
   sections: [{
@@ -117,6 +120,7 @@ export const recordFleetInspectionForm = (
   employees: FleetFormOption[],
 ): FormConfig => ({
   id: "record-fleet-inspection",
+  submitLabel: t("fleet.forms.actions.recordFleetInspection", { defaultValue: "Record inspection" }),
   title: t("fleet.lifecycle.inspections.action"),
   description: t("fleet.lifecycle.inspections.description"),
   sections: [{

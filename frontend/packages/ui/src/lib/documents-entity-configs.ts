@@ -1,4 +1,7 @@
 import type { ReactNode } from "react"
+import { i18n } from "@lumiere/i18n"
+import { formatFileSize } from "./file-kind"
+import { formatFileDate } from "./file-metadata"
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
@@ -51,14 +54,14 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "name", sensitive: true, label: t("documents.documents.columns.name"), width: "min-w-48" },
       { key: "fileName", sensitive: true, label: t("documents.documents.columns.fileName"), width: "min-w-36" },
       { key: "mimetype", label: t("documents.documents.columns.mimetype"), width: "min-w-24" },
-      { key: "fileSize", label: t("documents.documents.columns.fileSize"), type: "number", align: "right" },
+      { key: "fileSize", label: t("documents.documents.columns.fileSize"), type: "number", align: "right", render: formatFileSize },
       { key: "fiscalKind", label: t("documents.documents.columns.fiscalKind"), width: "min-w-28" },
       { key: "residencyRegion", label: t("documents.documents.columns.residencyRegion"), width: "min-w-20" },
       { key: "retentionDays", label: t("documents.documents.columns.retentionDays"), type: "number", align: "right" },
       { key: "isFavorite", label: t("documents.documents.columns.isFavorite"), type: "boolean" },
       { key: "isShared", label: t("documents.documents.columns.isShared"), type: "boolean" },
       { key: "versionCount", label: t("documents.documents.columns.versionCount"), type: "number", align: "right" },
-      { key: "createDate", label: t("documents.documents.columns.createDate"), type: "date" },
+      { key: "createDate", label: t("documents.documents.columns.createDate"), type: "date", render: (value) => formatFileDate(value, i18n.resolvedLanguage ?? i18n.language) },
     ],
     emptyMessage: t("documents.documents.emptyMessage"),
   },

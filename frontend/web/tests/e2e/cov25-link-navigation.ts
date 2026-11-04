@@ -3,16 +3,13 @@ import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 import { activeTabEntityTable, gotoModule } from "./helpers"
 
 export type RecordTarget = { module: string; tab: string; id: number }
-const tabTestId = (target: RecordTarget) => target.module === "sales" && target.tab === "orders"
-  ? "module-tab-sales-orders" : `module-tab-${target.module}-${target.tab}`
 
 export async function expectExactRecordFocus(page: Page, target: RecordTarget) {
   await expect(page).toHaveURL((url) => url.pathname === `/${target.module}` &&
     url.searchParams.get("tab") === target.tab &&
     url.searchParams.getAll("filter").length === 1 &&
     url.searchParams.get("filter") === `id:${target.id}`)
-  await expect(page.getByTestId(tabTestId(target))).toHaveCount(1, { timeout: 30_000 })
-  await expect(page.getByTestId(tabTestId(target))).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByTestId(`module-panel-${target.module}-${target.tab}`)).toBeVisible({ timeout: 30_000 })
   const table = activeTabEntityTable(page)
   await expect(table.getByTestId(`entity-row-${target.id}`)).toBeVisible({ timeout: 30_000 })
   await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1)

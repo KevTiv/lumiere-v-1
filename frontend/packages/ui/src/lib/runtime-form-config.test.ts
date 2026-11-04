@@ -18,6 +18,56 @@ const runtime = (...fields: ParsedFormField[]): MergedFormConfiguration => ({
   config: {} as MergedFormConfiguration["config"], fields, sourceFields: fields, customFields: fields,
 })
 
+describe("commercial date bindings", () => {
+  const quotation: FormConfig = {
+    id: "new-sale-order", title: "New quotation",
+    sections: [{ id: "dates", fields: [
+      { id: "validityDate", name: "validityDate", type: "date", label: "Valid until" },
+      { id: "commitmentDate", name: "commitmentDate", type: "date", label: "Promised delivery date" },
+    ] }],
+  }
+
+  it("applies legacy delivery metadata and defaults only to the delivery commitment", () => {
+    const delivery = field({ fieldId: "delivery_date", name: "delivery_date", type: "Date", label: "Delivery Date", defaultValue: "2026-12-01", isSystem: true })
+    const merged = mergeRuntimeFormConfig(quotation, runtime(delivery)).config.sections[0].fields
+    assert.equal(merged[0].label, "Valid until")
+    assert.equal(merged[0].defaultValue, undefined)
+    assert.equal(merged[0].required, undefined)
+    assert.equal(merged[1].label, "Delivery Date")
+    assert.equal(merged[1].defaultValue, "2026-12-01")
+    assert.equal(merged[1].required, true)
+  })
+
+  it("does not hide quotation expiry when the runtime delivery field is disabled", () => {
+    const delivery = field({ fieldId: "delivery_date", name: "delivery_date", type: "Date", isSystem: true, isEnabled: false })
+    const merged = mergeRuntimeFormConfig(quotation, { ...runtime(), sourceFields: [delivery] }, { preferStdbVisibility: true, runtimeFromDatabase: true })
+    assert.deepEqual(merged.config.sections[0].fields.map((item) => item.name), ["validityDate"])
+  })
+
+  it("prefers canonical delivery metadata even when a legacy alias appears first", () => {
+    const delivery = field({ fieldId: "delivery_date", name: "delivery_date", type: "Date", label: "Legacy delivery", defaultValue: "2026-12-01", isSystem: true })
+    const commitment = field({ fieldId: "commitment_date", name: "commitment_date", type: "Date", label: "Promised delivery date", defaultValue: "2026-12-02", isSystem: true })
+    const merged = mergeRuntimeFormConfig(quotation, runtime(delivery, commitment)).config.sections[0].fields
+    assert.equal(merged[0].label, "Valid until")
+    assert.equal(merged[1].label, "Promised delivery date")
+    assert.equal(merged[1].defaultValue, "2026-12-02")
+  })
+
+  it("does not let an enabled legacy alias revive a disabled canonical delivery field", () => {
+    const legacy = field({ fieldId: "delivery_date", name: "delivery_date", type: "Date", isSystem: true })
+    const canonical = field({ fieldId: "commitment_date", name: "commitment_date", type: "Date", isSystem: true, isEnabled: false })
+    const merged = mergeRuntimeFormConfig(quotation, { ...runtime(legacy), sourceFields: [legacy, canonical] }, { preferStdbVisibility: true, runtimeFromDatabase: true })
+    assert.deepEqual(merged.config.sections[0].fields.map((item) => item.name), ["validityDate"])
+  })
+
+  it("retains legacy delivery fallback when source field metadata is empty", () => {
+    const legacy = field({ fieldId: "delivery_date", name: "delivery_date", type: "Date", label: "Legacy delivery", isSystem: true })
+    const merged = mergeRuntimeFormConfig(quotation, { ...runtime(legacy), sourceFields: [] }, { preferStdbVisibility: true, runtimeFromDatabase: true })
+    assert.deepEqual(merged.config.sections[0].fields.map((item) => item.name), ["validityDate", "commitmentDate"])
+    assert.equal(merged.config.sections[0].fields[1].label, "Legacy delivery")
+  })
+})
+
 describe("runtime form cardinality", () => {
   it("preserves multiple defaults, custom identity, and disabled options", () => {
     const result = parsedFieldToModularField(field({ defaultValue: ["north", "south"] }))

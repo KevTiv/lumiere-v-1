@@ -6,7 +6,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import { AlertCircle, BookOpenCheck, Building2, CheckCircle2, Download, MessageSquarePlus, Search, ShieldX } from "lucide-react"
-import { Button } from "@lumiere/ui"
+import { Button } from "@lumiere/ui/components/button"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@lumiere/ui/components/card"
@@ -18,8 +18,9 @@ import { Skeleton } from "@lumiere/ui/components/skeleton"
 import { Textarea } from "@lumiere/ui/components/textarea"
 
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
-import { mapEvidenceInspection, type EvidenceInspectionView, type EvidenceTargetKind } from "./evidence-inspection"
+import { evidenceInspectionMatchesTarget, mapEvidenceInspection, type EvidenceInspectionView, type EvidenceTargetKind } from "./evidence-inspection"
 import { EvidenceReviewQueuePanel } from "./evidence-review-queue-panel"
+import { HarnessInspector } from "./harness-inspector"
 import { availabilityLabel, claimKindLabel, evidenceMethodLabel, evidenceOutcomeLabel, evidenceStatusLabel, linkStateLabel, reviewTargetLabel } from "./enum-labels"
 
 interface EvidenceReviewerPanelProps {
@@ -55,15 +56,23 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
   const [nodeKey, setNodeKey] = useState("")
   const [request, setRequest] = useState<RequestState>({ status: "idle" })
   const [decisionTitle, setDecisionTitle] = useState("")
+  const [captureOpen, setCaptureOpen] = useState(false)
+  const decisionTitleInput = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (captureOpen) decisionTitleInput.current?.focus() }, [captureOpen])
   const [adoptedClaims, setAdoptedClaims] = useState("")
   const [decisionRationale, setDecisionRationale] = useState("")
   const [reviewOutcome, setReviewOutcome] = useState("accepted")
   const [reviewNote, setReviewNote] = useState("")
   const [mutation, setMutation] = useState<MutationState>({ status: "idle" })
   const captureEventRef = useRef<string | null>(null)
+  const inspectionRequest = useRef(0)
+  const inspectionController = useRef<AbortController | null>(null)
+  useEffect(() => () => { inspectionRequest.current += 1; inspectionController.current?.abort() }, [])
   const isLoading = request.status === "loading"
 
   const changeTarget = (update: () => void) => {
+    inspectionRequest.current += 1
+    inspectionController.current?.abort()
     update()
     setRequest({ status: "idle" })
   }
@@ -71,6 +80,10 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
   const loadInspection = async (
     override?: { kind: EvidenceTargetKind; id: number; nodeKey?: string; companyId?: number },
   ) => {
+    const requestId = ++inspectionRequest.current
+    inspectionController.current?.abort()
+    const controller = new AbortController()
+    inspectionController.current = controller
     const parsedCompanyId = override?.companyId ?? Number(companyId)
     const inspectKind = override?.kind ?? kind
     const parsedTargetId = override?.id ?? Number(targetId)
@@ -96,8 +109,10 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
           id: parsedTargetId,
           ...(inspectKind === "workflow_step" ? { nodeKey: inspectNodeKey } : {}),
         }),
+        signal: controller.signal,
       })
       const payload = await response.json().catch(() => ({})) as JsonObject
+      if (controller.signal.aborted || requestId !== inspectionRequest.current) return
       if (response.status === 401 || response.status === 403) {
         setRequest({
           status: "denied",
@@ -115,12 +130,13 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         return
       }
       const mapped = mapEvidenceInspection(payload)
-      if (!mapped) {
+      if (!mapped || !evidenceInspectionMatchesTarget(mapped, { kind: inspectKind, id: parsedTargetId, nodeKey: inspectNodeKey })) {
         setRequest({ status: "error", message: t("aiHarness.evidenceReviewer.errors.inspectionIncomplete") })
         return
       }
       setRequest({ status: "success", data: mapped })
     } catch {
+      if (controller.signal.aborted || requestId !== inspectionRequest.current) return
       setRequest({ status: "error", message: t("aiHarness.evidenceReviewer.errors.inspectionUnavailable") })
     }
   }
@@ -139,6 +155,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
       setCompanyId(String(selectedCompanyId))
     }
     let cancelled = false
+    const linkedRequestId = ++inspectionRequest.current
     void (async () => {
       setRequest({ status: "loading" })
       try {
@@ -148,7 +165,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
           body: JSON.stringify({ companyId: selectedCompanyId, runId }),
         })
         const payload = await response.json().catch(() => ({})) as JsonObject
-        if (cancelled) return
+        if (cancelled || linkedRequestId !== inspectionRequest.current) return
         if (!response.ok) {
           setRequest({
             status: response.status === 401 || response.status === 403 ? "denied" : "error",
@@ -173,7 +190,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         setTargetId(String(claimId))
         await loadInspection({ kind: "claim", id: claimId, companyId: selectedCompanyId })
       } catch {
-        if (!cancelled) {
+        if (!cancelled && linkedRequestId === inspectionRequest.current) {
           setRequest({ status: "error", message: t("aiHarness.evidenceReviewer.errors.runInspectionUnavailable") })
         }
       }
@@ -261,6 +278,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
     const parsedCompanyId = Number(companyId)
     const parsedTargetId = Number(targetId)
     if (!Number.isSafeInteger(parsedCompanyId) || parsedCompanyId <= 0 || !Number.isSafeInteger(parsedTargetId) || parsedTargetId <= 0) return
+    if (request.status !== "success" || !evidenceInspectionMatchesTarget(request.data, { kind, id: parsedTargetId, nodeKey })) return
     setMutation({ status: "loading" })
     try {
       const response = await fetch("/api/ai/evidence/reviews", {
@@ -284,10 +302,10 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         <div className="flex items-center gap-2">
           <BookOpenCheck />
           <h2 className="text-xl font-semibold tracking-tight">{t("aiHarness.evidenceReviewer.title")}</h2>
-          <Badge variant="outline">{t("aiHarness.evidenceReviewer.reviewerOnly")}</Badge>
+
         </div>
         <p className="text-sm text-muted-foreground">
-          {t("aiHarness.evidenceReviewer.description")}
+          {t("aiHarness.ux.evidence.description", { defaultValue: "Choose a company, open an item from its review queue, and read the supporting evidence before recording your assessment." })}
         </p>
         {Number.isSafeInteger(linkedRunId) && linkedRunId > 0 ? (
           <Button type="button" variant="outline" className="mt-2 w-fit" onClick={() => void exportLinkedRun()}>
@@ -298,23 +316,23 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t("aiHarness.evidenceReviewer.findLineage")}</CardTitle>
-          <CardDescription>{t("aiHarness.evidenceReviewer.sessionIdentity")}</CardDescription>
+          <CardTitle className="text-base">{t("aiHarness.ux.evidence.companyTitle", { defaultValue: "Choose what to review" })}</CardTitle>
+          <CardDescription>{t("aiHarness.ux.evidence.queueFirst", { defaultValue: "The review queue shows the items available to you. Open an item to check its sources; opening it does not record a verdict." })}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={inspect}>
-            <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Field>
-                <FieldLabel>{t("aiHarness.evidenceReviewer.company")}</FieldLabel>
+                <FieldLabel htmlFor="evidence-company">{t("aiHarness.evidenceReviewer.company")}</FieldLabel>
                 <Select
                   value={companyId}
                   onValueChange={(value) => changeTarget(() => {
                     captureEventRef.current = null
                     setCompanyId(value)
+                    setAdoptedClaims("")
+                    setMutation({ status: "idle" })
                   })}
-                  disabled={companyOptions.length === 0 || isLoading}
+                  disabled={companyOptions.length === 0 || isLoading || mutation.status === "loading"}
                 >
-                  <SelectTrigger><Building2 /><SelectValue placeholder={t("aiHarness.evidenceReviewer.companyPlaceholder")} /></SelectTrigger>
+                  <SelectTrigger id="evidence-company"><Building2 /><SelectValue placeholder={t("aiHarness.evidenceReviewer.companyPlaceholder")} /></SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       {companyOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -322,8 +340,34 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
                   </SelectContent>
                 </Select>
               </Field>
+        </CardContent>
+      </Card>
+
+      <EvidenceReviewQueuePanel
+        key={companyId}
+        companyId={companyId}
+        onInspect={(target) => {
+          setKind(target.kind)
+          setReviewOutcome(target.kind === "decision" ? "accepted" : "supported")
+          setReviewNote("")
+          setTargetId(String(target.id))
+          if (target.nodeKey) setNodeKey(target.nodeKey)
+          void loadInspection(target)
+        }}
+      />
+
+      <HarnessInspector title={t("aiHarness.inspector.evidenceLookup", { defaultValue: "Advanced: find evidence by identifier" })}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("aiHarness.evidenceReviewer.findLineage")}</CardTitle>
+          <CardDescription>{t("aiHarness.evidenceReviewer.sessionIdentity")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={inspect}>
+            <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-3">
+
               <Field>
-                <FieldLabel>{t("aiHarness.evidenceReviewer.recordType")}</FieldLabel>
+                <FieldLabel htmlFor="evidence-record-kind">{t("aiHarness.evidenceReviewer.recordType")}</FieldLabel>
                 <Select
                   value={kind}
                   onValueChange={(value) => changeTarget(() => {
@@ -333,7 +377,7 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
                   })}
                   disabled={isLoading}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="evidence-record-kind"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       <SelectItem value="decision">{t("aiHarness.evidenceReviewer.decision")}</SelectItem>
@@ -373,7 +417,9 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
           </form>
         </CardContent>
       </Card>
+      </HarnessInspector>
 
+      <HarnessInspector open={captureOpen} onOpenChange={setCaptureOpen} title={t("aiHarness.inspector.proposeDecision", { defaultValue: "Advanced: propose a decision from claim references" })}>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t("aiHarness.evidenceReviewer.captureDecisionTitle")}</CardTitle>
@@ -382,27 +428,20 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={captureDecision}>
             <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field><FieldLabel htmlFor="decision-title">{t("aiHarness.evidenceReviewer.decisionTitle")}</FieldLabel><Input id="decision-title" maxLength={512} value={decisionTitle} onChange={(event) => { captureEventRef.current = null; setDecisionTitle(event.target.value) }} /></Field>
+              <Field><FieldLabel htmlFor="decision-title">{t("aiHarness.evidenceReviewer.decisionTitle")}</FieldLabel><Input ref={decisionTitleInput} id="decision-title" maxLength={512} value={decisionTitle} onChange={(event) => { captureEventRef.current = null; setDecisionTitle(event.target.value) }} /></Field>
               <Field><FieldLabel htmlFor="adopted-claims">{t("aiHarness.evidenceReviewer.adoptedClaimIds")}</FieldLabel><Input id="adopted-claims" inputMode="numeric" placeholder={t("aiHarness.evidenceReviewer.adoptedClaimIdsPlaceholder")} value={adoptedClaims} onChange={(event) => { captureEventRef.current = null; setAdoptedClaims(event.target.value) }} /></Field>
             </FieldGroup>
-            <Field><FieldLabel htmlFor="decision-rationale">{t("aiHarness.evidenceReviewer.observableRationale")}</FieldLabel><Textarea id="decision-rationale" maxLength={2000} value={decisionRationale} onChange={(event) => { captureEventRef.current = null; setDecisionRationale(event.target.value) }} /></Field>
+            <Field><FieldLabel htmlFor="decision-rationale">{t("aiHarness.evidenceReviewer.observableRationale")}</FieldLabel><Textarea variant="plain" id="decision-rationale" maxLength={2000} value={decisionRationale} onChange={(event) => { captureEventRef.current = null; setDecisionRationale(event.target.value) }} /></Field>
             <Button type="submit" disabled={mutation.status === "loading" || !companyId}><MessageSquarePlus data-icon="inline-start" /> {t("aiHarness.evidenceReviewer.captureProposedDecision")}</Button>
           </form>
         </CardContent>
       </Card>
+      </HarnessInspector>
 
       {mutation.status === "success" ? <Alert><CheckCircle2 /><AlertTitle>{t("aiHarness.evidenceReviewer.saved")}</AlertTitle><AlertDescription>{mutation.message}</AlertDescription></Alert> : null}
       {mutation.status === "error" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("aiHarness.evidenceReviewer.mutationRejected")}</AlertTitle><AlertDescription>{mutation.message}</AlertDescription></Alert> : null}
 
-      <EvidenceReviewQueuePanel
-        companyId={companyId}
-        onInspect={(target) => {
-          setKind(target.kind)
-          setTargetId(String(target.id))
-          if (target.nodeKey) setNodeKey(target.nodeKey)
-          void loadInspection(target)
-        }}
-      />
+
 
       {request.status === "idle" ? <EmptyReviewerState /> : null}
       {request.status === "loading" ? <ReviewerSkeleton /> : null}
@@ -412,7 +451,16 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
       {request.status === "error" ? (
         <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("aiHarness.evidenceReviewer.inspectionUnavailable")}</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert>
       ) : null}
-      {request.status === "success" ? <InspectionResult inspection={request.data} /> : null}
+      {request.status === "success" ? <>
+        <p className="text-sm leading-6 text-muted-foreground">{t("aiHarness.ux.evidence.nextStep", { defaultValue: "Read the statements and their supporting sources below before recording a review. Missing or unavailable evidence should be resolved before you accept a decision." })}</p>
+        <InspectionResult inspection={request.data} />
+        {request.data.targetKind === "claim" ? <Button type="button" variant="outline" className="self-start whitespace-normal text-left" onClick={() => {
+          const claimId = String(request.data.targetId)
+          setAdoptedClaims((previous) => [...new Set([...previous.split(",").map((id) => id.trim()).filter(Boolean), claimId])].join(", "))
+          captureEventRef.current = null
+          setCaptureOpen(true)
+        }}>{t("aiHarness.ux.evidence.useClaim", { defaultValue: "Use this claim in a proposed decision" })}</Button> : null}
+      </> : null}
       {request.status === "success" && kind !== "workflow_step" ? (
         <Card>
           <CardHeader><CardTitle className="text-base">{t("aiHarness.evidenceReviewer.recordVerdict")}</CardTitle><CardDescription>{t("aiHarness.evidenceReviewer.recordVerdictDescription")}</CardDescription></CardHeader>
@@ -438,7 +486,7 @@ function EmptyReviewerState() {
       <EmptyHeader>
         <EmptyTitle>{t("aiHarness.evidenceReviewer.noEvidenceSelected")}</EmptyTitle>
         <EmptyDescription>
-          {t("aiHarness.evidenceReviewer.noEvidenceDescription")}
+          {t("aiHarness.ux.evidence.empty", { defaultValue: "Open a claim, decision or workflow step from the review queue. If you already have its identifier, use the advanced lookup." })}
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
@@ -465,11 +513,13 @@ function InspectionResult({ inspection }: { inspection: EvidenceInspectionView }
             <Badge variant={inspection.lineagePasses ? "default" : "destructive"}>{inspection.lineagePasses ? t("aiHarness.evidenceReviewer.lineagePasses") : t("aiHarness.evidenceReviewer.reviewRequired")}</Badge>
           </div>
         </CardHeader>
-        {inspection.findings.length > 0 ? <CardContent><ul className="flex list-disc flex-col gap-1 pl-5 text-sm">{inspection.findings.map((finding, index) => <li key={`${finding.code}-${index}`}><span className="font-medium">{finding.code || finding.severity}:</span> {finding.message}</li>)}</ul></CardContent> : null}
+        {inspection.findings.length > 0 ? <CardContent><ul className="flex list-disc flex-col gap-1 pl-5 text-sm">{inspection.findings.map((finding, index) => <li key={`${finding.code}-${index}`}>{finding.message}</li>)}</ul></CardContent> : null}
       </Card>
 
-      {inspection.revisions.length > 0 ? (
-        <Card>
+      <HarnessInspector title={t("aiHarness.inspector.lineage", { defaultValue: "Technical inspector: evidence lineage" })}>
+        <p className="text-sm">{reviewTargetLabel(t, inspection.targetKind)} <code>#{inspection.targetId}</code></p>
+        {inspection.findings.map((finding, index) => <p key={`${finding.code}-${index}`} className="text-sm"><code>{finding.code || finding.severity}</code>{" "}{finding.message}</p>)}
+        {inspection.revisions.length > 0 ? <Card>
           <CardHeader><CardTitle className="text-base">{t("aiHarness.evidenceReviewer.stepRevisions")}</CardTitle><CardDescription>{t("aiHarness.evidenceReviewer.stepRevisionsDescription")}</CardDescription></CardHeader>
           <CardContent>
             <ol className="flex flex-col gap-1 text-sm">
@@ -481,8 +531,8 @@ function InspectionResult({ inspection }: { inspection: EvidenceInspectionView }
               ))}
             </ol>
           </CardContent>
-        </Card>
-      ) : null}
+        </Card> : null}
+      </HarnessInspector>
 
       {inspection.decisions.map((decision) => (
         <Card key={decision.id}><CardHeader><CardTitle className="text-base">{t("aiHarness.evidenceReviewer.decisionHeading", { id: decision.id, title: decision.title || t("aiHarness.evidenceReviewer.untitledDecision") })}</CardTitle><CardDescription>{evidenceStatusLabel(t, decision.status)}</CardDescription></CardHeader><CardContent className="text-sm leading-relaxed">{decision.rationale || t("aiHarness.evidenceReviewer.noRationale")}</CardContent></Card>

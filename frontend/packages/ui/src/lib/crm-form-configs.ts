@@ -549,6 +549,7 @@ export const convertOpportunityToOrderForm = (t: TFunction): FormConfig => ({
 
 export const assignTagToContactForm = (t: TFunction): FormConfig => ({
   id: "assign-tag-contact",
+  submitLabel: t("crm.forms.actions.assignTagToContact", { defaultValue: "Assign tag" }),
   title: t("crm.forms.assignTag.title"),
   description: t("crm.forms.assignTag.description"),
   sections: [
@@ -572,6 +573,7 @@ export const assignTagToContactForm = (t: TFunction): FormConfig => ({
 
 export const addContactToSegmentForm = (t: TFunction): FormConfig => ({
   id: "add-contact-segment",
+  submitLabel: t("crm.forms.actions.addContactToSegment", { defaultValue: "Add to segment" }),
   title: t("crm.forms.addToSegment.title"),
   description: t("crm.forms.addToSegment.description"),
   sections: [
@@ -651,6 +653,7 @@ export const newActivityForm = (t: TFunction, activityTypes?: OpportunityStageOp
 
 export const newContactTagForm = (t: TFunction): FormConfig => ({
   id: "new-contact-tag",
+  submitLabel: t("crm.forms.actions.newContactTag", { defaultValue: "Create contact tag" }),
   title: t("crm.forms.newContactTag.title"),
   description: t("crm.forms.newContactTag.description"),
   sections: [
@@ -689,6 +692,7 @@ export const newContactTagForm = (t: TFunction): FormConfig => ({
 
 export const newContactCategoryForm = (t: TFunction): FormConfig => ({
   id: "new-contact-category",
+  submitLabel: t("crm.forms.actions.newContactCategory", { defaultValue: "Create contact category" }),
   title: t("crm.forms.newContactCategory.title"),
   description: t("crm.forms.newContactCategory.description"),
   sections: [
@@ -793,6 +797,7 @@ export const editContactCategoryForm = (t: TFunction): FormConfig => ({
  */
 export const assignCategoryToContactForm = (t: TFunction): FormConfig => ({
   id: "assign-category-contact",
+  submitLabel: t("crm.forms.actions.assignCategoryToContact", { defaultValue: "Assign category" }),
   title: t("crm.forms.assignCategory.title"),
   description: t("crm.forms.assignCategory.description"),
   sections: [
@@ -816,6 +821,7 @@ export const assignCategoryToContactForm = (t: TFunction): FormConfig => ({
 
 export const newContactSegmentForm = (t: TFunction): FormConfig => ({
   id: "new-contact-segment",
+  submitLabel: t("crm.forms.actions.newContactSegment", { defaultValue: "Create contact segment" }),
   title: t("crm.forms.newContactSegment.title"),
   description: t("crm.forms.newContactSegment.description"),
   sections: [
@@ -1026,6 +1032,7 @@ const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> =
 
 export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
   id: "add-opportunity-line",
+  submitLabel: t("crm.forms.actions.addOpportunityLine", { defaultValue: "Add opportunity line" }),
   title: t("crm.forms.addOpportunityLine.title"),
   description: t("crm.forms.addOpportunityLine.description"),
   sections: [
@@ -1135,6 +1142,7 @@ export const mergeContactsForm = (
   survivorOptions: { value: string; label: string }[],
 ): FormConfig => ({
   id: "merge-contacts",
+  submitLabel: t("crm.forms.actions.mergeContacts", { defaultValue: "Merge contacts" }),
   title: t("crm.forms.mergeContacts.title"),
   description: t("crm.forms.mergeContacts.description"),
   sections: [

@@ -166,7 +166,8 @@
         "search": "Shakisha…",
         "empty": "Nta bihuye",
         "remove": "Kuraho {{value}}"
-      }
+      },
+      "setupOpensNewTab": "Bifungukira muri tab nshya"
     },
     "formPreview": {
       "label": "Reba mbere"
@@ -290,7 +291,9 @@
       "pivotCount": "Umubare",
       "pivotEmpty": "Ntibyashyizweho",
       "pivotGroupBy": "Shyira mu matsinda ukurikije",
-      "pivotMixedCurrencies": "Izi nyandiko zikoresha amafaranga atandukanye ({{currencies}}). Ibiteranyo biteranya amafaranga uko ari, nta kuvunja.",
+      "pivotMixedCurrencies": "Izi nyandiko zikoresha amafaranga atandukanye ({{currencies}}). Imibare y’amafaranga atandukanye ntigaragara mu ncamake no muri CSV.",
+      "pivotScope": "Incamake y’inyandiko {{recordCount}} zihari. Muyunguruzi n’amapaji by’urutonde ntibikoreshwa hano.",
+      "pivotUnknownCurrency": "Imibare y’amafaranga ntigaragara mu ncamake no muri CSV kuko ifaranga rimwe ritashoboye kwemezwa ku nyandiko zose.",
       "pivotNoData": "Nta nyandiko zo guhinira hamwe",
       "pivotNone": "Nta na kimwe",
       "pivotTotal": "Igiteranyo",
@@ -308,7 +311,8 @@
         "clear": "Kuraho ibiyungurura",
         "description": "Gerageza gushakisha ukundi cyangwa ukureho ibiyungurura.",
         "title": "Nta nyandiko zihuye n’ibyo ushaka"
-      }
+      },
+      "groupBy": "Gushyira mu matsinda hakurikijwe"
     },
     "retry": "Ongera ugerageze",
     "recordsDenied": "Ntiwemerewe kureba izi nyandiko.",
@@ -432,6 +436,9 @@
       "unavailable": "Ibyifuzo ntibiboneka. Uzuza fomu cyangwa urebe ibisabwa.",
       "suggest": "Tanga ibyifuzo",
       "apply": "Koresha ibyifuzo"
+    },
+    "listToolbar": {
+      "viewSettings": "Igenamiterere ry’uko bigaragara"
     }
   },
   "navigation": {
@@ -4404,7 +4411,8 @@
       "emailVerificationHint": "Guhindura imeyili bisaba kwemezwa n’uguha umwirondoro n’umuyobozi.",
       "loadError": "Ntibyashobotse kuzana amakuru yawe. Ongera ufungure urupapuro ugerageze.",
       "securityProviderHint": "Uguha umwirondoro ni we ucunga ijambo ry’ibanga n’umutekano wo kwinjira.",
-      "manageSecurity": "Gena umutekano wo kwinjira"
+      "manageSecurity": "Gena umutekano wo kwinjira",
+      "invalidTimezone": "Andika izina ryemewe rya IANA ry’akarere k’igihe, nka Europe/Amsterdam cyangwa Africa/Kigali."
     },
     "customFields": {
       "title": "Imyanya y’amakuru yanjye bwite",

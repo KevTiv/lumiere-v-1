@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { zonedCalendarDay, validCalendarTimezone } from "@lumiere/erp-shared/calendar-timezone"
 import { addDays, endOfMonth, format, isValid, startOfDay } from "date-fns"
 import { ptBR } from "date-fns/locale/pt-BR"
 import { CalendarIcon } from "lucide-react"
@@ -138,6 +139,8 @@ function useCoarsePointer(): boolean {
 type InputProps = Omit<React.ComponentProps<"input">, "value" | "onChange" | "type" | "min" | "max" | "defaultValue">
 
 export interface DatePickerProps extends InputProps {
+  /** Explicit calendar timezone for Today/Tomorrow shortcuts only. */
+  timeZone?: string
   /** `YYYY-MM-DD`, or `""` for no date. */
   value: string
   onChange: (value: string) => void
@@ -162,6 +165,7 @@ export function DatePicker({
   min,
   max,
   hideShortcuts,
+  timeZone,
   containerClassName,
   className,
   disabled,
@@ -237,7 +241,8 @@ export function DatePicker({
   }
 
   const shortcuts = React.useMemo(() => {
-    const today = startOfDay(new Date())
+    const chosenZone = validCalendarTimezone(timeZone)
+    const today = chosenZone ? fromIsoDate(zonedCalendarDay(new Date(), chosenZone))! : startOfDay(new Date())
     return [
       { key: "today", label: t("ui.datePicker.today", { defaultValue: "Today" }), date: today },
       { key: "tomorrow", label: t("ui.datePicker.tomorrow", { defaultValue: "Tomorrow" }), date: addDays(today, 1) },
@@ -247,7 +252,7 @@ export function DatePicker({
     ]
     // Recompute when the panel opens so "today" is never stale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, open])
+  }, [t, open, timeZone])
 
   const minDate = fromIsoDate(min)
   const maxDate = fromIsoDate(max)
