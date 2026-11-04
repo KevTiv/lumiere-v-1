@@ -30,6 +30,7 @@ interface DashboardSidebarProps {
   onOpenJournal?: () => void
   onOpenNotebook?: () => void
   onOpenAIChat?: () => void
+  aiChatOpen?: boolean
   /** Apply the fail-closed first-test-organization product admission profile. */
   firstOrgProfile?: boolean
   /** Optional nav badge counts keyed by href (e.g. pending AI approvals). */
@@ -48,6 +49,7 @@ function DashboardSidebarContent({
   onOpenJournal,
   onOpenNotebook,
   onOpenAIChat,
+  aiChatOpen = false,
   firstOrgProfile = false,
   navBadges,
 }: DashboardSidebarProps) {
@@ -93,8 +95,8 @@ function DashboardSidebarContent({
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
-    <aside id="dashboard-navigation" data-testid="dashboard-sidebar" className="flex h-full min-h-0 flex-col bg-sidebar">
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border px-3">
+    <aside id="dashboard-navigation" data-testid="dashboard-sidebar" className="flex h-full min-h-0 flex-col bg-background text-foreground">
+      <div className={cn("flex h-14 shrink-0 items-center justify-between border-b border-border/70 px-3", isCollapsed && "justify-center px-0")}>
         {!isCollapsed && (
           <span className="truncate text-sm font-semibold tracking-[-0.01em] text-sidebar-foreground">{t("nav.erpSystem")}</span>
         )}
@@ -103,17 +105,17 @@ function DashboardSidebarContent({
           size="icon"
           onClick={toggleSidebar}
           aria-label={isMobile ? t("workspaceShell.closeNavigation", { defaultValue: "Close navigation" }) : isCollapsed ? t("workspaceShell.expandNavigation", { defaultValue: "Expand navigation" }) : t("workspaceShell.collapseNavigation", { defaultValue: "Collapse navigation" })}
-          className="text-sidebar-foreground hover:bg-sidebar-accent"
+          className="size-9 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           {isCollapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
 
-      <div className="border-b border-sidebar-border px-2 py-2">
+      <div className="px-2 py-3">
         <CompanySwitcher collapsed={isCollapsed} />
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3">
+      <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-2">
         {navGroups.map((group, groupIndex) => {
           const groupKey = group.items[0]!.surfaceId
           const expanded = !group.label || isCollapsed || !collapsedGroups.includes(groupKey)
@@ -123,7 +125,7 @@ function DashboardSidebarContent({
             {!isCollapsed && group.label && (
               <button type="button" aria-expanded={expanded} aria-controls={groupId}
                 onClick={() => toggleGroup(groupKey)}
-                className="flex w-full items-center justify-between rounded-md px-2.5 py-1 text-[0.68rem] font-medium uppercase tracking-[0.08em] text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
+                className="mb-1 flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <span className="truncate">{group.label}</span>
                 <ChevronDown aria-hidden="true" className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
               </button>
@@ -148,10 +150,11 @@ function DashboardSidebarContent({
                       onClick={() => setOpenMobile(false)}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
-                        "relative w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                        "relative flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isCollapsed && "mx-auto size-10 w-10 justify-center p-0",
                         active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:inset-y-2 before:start-0 before:w-0.5 before:rounded-full before:bg-sidebar-primary"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
@@ -178,8 +181,9 @@ function DashboardSidebarContent({
                     data-testid={`sidebar-link-${item.href.replace(/^\//, "")}-locked`}
                     title={isCollapsed ? item.label : undefined}
                     className={cn(
-                      "w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm",
-                      "text-sidebar-foreground opacity-40 cursor-not-allowed"
+                      "flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm",
+                      "cursor-not-allowed text-muted-foreground opacity-40",
+                      isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -197,7 +201,7 @@ function DashboardSidebarContent({
         )})}
       </nav>
 
-      <div className="flex flex-col gap-1.5 border-t border-sidebar-border px-2 py-2">
+      <div className="flex flex-col gap-1.5 border-t border-border/70 px-2 py-3">
         {onOpenJournal && quickActionIsVisible("journal") && (
           <button
             type="button"
@@ -205,9 +209,9 @@ function DashboardSidebarContent({
             title="Open Journal"
             aria-label="Open Journal"
             className={cn(
-              "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
-              "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              isCollapsed && "justify-center"
+              "flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+              isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
             )}
           >
             <BookMarked className="h-4 w-4 shrink-0" />
@@ -224,9 +228,9 @@ function DashboardSidebarContent({
             title="Open Notebook"
             aria-label="Open Notebook"
             className={cn(
-              "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
-              "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              isCollapsed && "justify-center"
+              "flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+              isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
             )}
           >
             <BookOpen className="h-4 w-4 shrink-0" />
@@ -242,11 +246,12 @@ function DashboardSidebarContent({
             onClick={() => runQuickAction(onOpenAIChat)}
             title="Open AI Assistant"
             aria-label="Open AI Assistant"
+            aria-pressed={aiChatOpen}
             data-testid="sidebar-open-ai-chat"
             className={cn(
-              "flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-sm transition-colors",
-              "text-sidebar-foreground/80 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              isCollapsed && "justify-center"
+              "flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              aiChatOpen ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+              isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
             )}
           >
             <Sparkles className="h-4 w-4 shrink-0" />

@@ -13373,6 +13373,20 @@
     }
   },
   "aiChat": {
+    "deck": {
+      "hint": "Type / to find skills",
+      "previous": "Previous skill",
+      "next": "Next skill",
+      "cards": "Skills",
+      "noMatches": "No matching skills. Try another name.",
+      "selected": "Selected skills",
+      "remove": "Remove {{label}}",
+      "skills": "skills",
+      "draftDescription": "Prepare a new ERP record for review.",
+      "findDescription": "Search customers, orders, and records.",
+      "reportDescription": "Prepare a report from your ERP data.",
+      "explainDescription": "Understand this page and its actions."
+    },
     "decision": {
       "failed": "Your answer could not be confirmed. Check the request and try again.",
       "unavailable": "This decision request is unavailable. Refresh to check its current state.",
@@ -13534,7 +13548,15 @@
       "salesSummary": "Sales summary",
       "checkInventory": "Check inventory",
       "listCustomers": "List customers",
-      "generateReport": "Generate report"
+      "generateReport": "Generate report",
+      "label": "ERP quick actions",
+      "createDraft": "Create a draft",
+      "createDraftPrompt": "Help me prepare a new record in this ERP context. Ask me for any missing details before preparing a draft for review.",
+      "findRecords": "Find records",
+      "findRecordsPrompt": "Help me find ERP records in this context. Ask me what to look for.",
+      "reportPrompt": "Help me prepare a report from this ERP context. Ask me which period and measures to include.",
+      "explainPage": "Explain this page",
+      "explainPagePrompt": "Explain this ERP page and the actions I can take here."
     },
     "commands": "Commands",
     "thinking": "Thinking...",

@@ -31,8 +31,9 @@ import {
   PanelRight,
   PanelRightClose,
   Paperclip,
+  Search,
 } from "lucide-react"
-import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload } from "@/lib/ai-chat-types"
+import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload, ChatSkill } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
 import { AiNativeActionCard } from "./ai-native-action-card"
@@ -44,6 +45,8 @@ import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
 import { validateChatImportFiles } from "../lib/chat-import-files"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
+import { ActionSkillList } from "./action-skill-list"
+import { matchingChatSkills, slashSkillToken } from "../lib/chat-skill-search"
 
 interface ChatReply {
   content: string
@@ -104,6 +107,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "user": <User className="h-4 w-4" />,
   "help-circle": <HelpCircle className="h-4 w-4" />,
   "book-open": <BookOpen className="h-4 w-4" />,
+  "search": <Search className="h-4 w-4" />,
 }
 
 const categoryColors: Record<string, string> = aiChatCategoryPillClass
@@ -143,7 +147,7 @@ function selectionSummaryFromContext(context?: ChatContext): string | null {
 export function AIChatPanel({
   open,
   onClose,
-  docked = false,
+  docked: requestedDocked = false,
   onDockToggle,
   contextOptions,
   selectedContext,
@@ -162,8 +166,14 @@ export function AIChatPanel({
   onStreamMessage,
 }: AIChatPanelProps) {
   const { t } = useTranslation()
+  const docked = requestedDocked && !modal
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
+  const [composerCaret, setComposerCaret] = useState(0)
+  const [dismissedSlash, setDismissedSlash] = useState<string | null>(null)
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
+  const [activeSkillId, setActiveSkillId] = useState("draft")
+  const pendingCaret = useRef<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [guideError, setGuideError] = useState<string | null>(null)
@@ -201,6 +211,63 @@ export function AIChatPanel({
 
   const commands = config?.commands || defaultAtCommands
   const selectionSummary = selectionSummaryFromContext(context)
+  const builtInSkills: ChatSkill[] = [
+    {
+      id: "draft",
+      label: t("aiChat.quickActions.createDraft"),
+      icon: "plus-circle",
+      description: t("aiChat.deck.draftDescription"),
+      keywords: ["create", "new", "draft"],
+      prompt: t("aiChat.quickActions.createDraftPrompt"),
+    },
+    {
+      id: "find",
+      label: t("aiChat.quickActions.findRecords"),
+      icon: "search",
+      description: t("aiChat.deck.findDescription"),
+      keywords: ["find", "search", "records"],
+      prompt: t("aiChat.quickActions.findRecordsPrompt"),
+    },
+    {
+      id: "report",
+      label: t("aiChat.quickActions.generateReport"),
+      icon: "file-text",
+      description: t("aiChat.deck.reportDescription"),
+      keywords: ["report", "analysis", "summary"],
+      prompt: t("aiChat.quickActions.reportPrompt"),
+    },
+    {
+      id: "explain",
+      label: t("aiChat.quickActions.explainPage"),
+      icon: "help-circle",
+      description: t("aiChat.deck.explainDescription"),
+      keywords: ["explain", "help", "guide"],
+      prompt: t("aiChat.quickActions.explainPagePrompt"),
+    },
+  ]
+  const skills = Array.from(new Map([...builtInSkills, ...(config?.skills ?? [])].map(skill => [skill.id, skill])).values())
+  const selectedSkills = skills.filter(skill => selectedSkillIds.includes(skill.id))
+  const slashSignature = `${input}:${composerCaret}`
+  const slash = dismissedSlash === slashSignature ? null : slashSkillToken(input, composerCaret)
+  const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
+  const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
+
+  const toggleSkill = (id: string) => {
+    setSelectedSkillIds(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
+    setActiveSkillId(id)
+    if (slash) {
+      pendingCaret.current = slash.start
+      setComposerCaret(slash.start)
+      setInput(input.slice(0, slash.start) + input.slice(slash.end))
+    }
+    inputRef.current?.focus()
+  }
+
+  useEffect(() => {
+    if (pendingCaret.current === null) return
+    inputRef.current?.setSelectionRange(pendingCaret.current, pendingCaret.current)
+    pendingCaret.current = null
+  }, [input])
 
   const handleImportFiles = async (files: File[]) => {
     if (files.length === 0 || fileImportAttempt.current?.scope === fileScope) return
@@ -265,7 +332,8 @@ export function AIChatPanel({
   // Scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current && messages) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      const viewport = scrollRef.current.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? scrollRef.current
+      viewport.scrollTop = viewport.scrollHeight
     }
   }, [messages])
 
@@ -304,6 +372,24 @@ export function AIChatPanel({
   }, [input])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.nativeEvent.isComposing) return
+    if (slash) {
+      if (["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"].includes(e.key)) {
+        if (!matchingSkills.length) return
+        e.preventDefault()
+        const direction = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1
+        const index = matchingSkills.findIndex(skill => skill.id === focusedSkillId)
+        setActiveSkillId(matchingSkills[(index + direction + matchingSkills.length) % matchingSkills.length]!.id)
+      } else if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+        e.preventDefault()
+        if (focusedSkillId) toggleSkill(focusedSkillId)
+      } else if (e.key === "Escape") {
+        e.preventDefault()
+        if (focusedSkillId) setActiveSkillId(focusedSkillId)
+        setDismissedSlash(slashSignature)
+      }
+      return
+    }
     if (showCommands && filteredCommands.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault()
@@ -328,12 +414,13 @@ export function AIChatPanel({
   }
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    if ((!input.trim() && selectedSkills.length === 0) || isLoading || slash) return
+    const submittedInput = input
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: [input.trim(), ...selectedSkills.map(skill => skill.prompt)].filter(Boolean).join("\n\n"),
       timestamp: new Date(),
     }
 
@@ -459,7 +546,7 @@ export function AIChatPanel({
       if (!active.current) return
       const msg = err instanceof Error ? err.message : String(err)
       setSendError(msg)
-      setInput((current) => current === "" ? userMessage.content : current)
+      setInput((current) => current === "" ? submittedInput : current)
       setMessages((prev) => [
         ...prev,
         {
@@ -601,24 +688,35 @@ export function AIChatPanel({
       }}
       aria-label={config?.title || t("aiChat.title")}
       className={cn(
-        "relative z-50 flex min-h-0 flex-col overflow-hidden bg-background text-foreground",
+        "relative z-50 flex min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground",
         docked
-          ? "fixed inset-0 sm:relative sm:inset-auto sm:h-full sm:w-[380px] sm:shrink-0 sm:border-l sm:border-border xl:w-[420px]"
+          ? "fixed inset-0 h-dvh w-full lg:relative lg:inset-auto lg:h-full lg:w-[360px] lg:shrink-0 lg:bg-transparent xl:w-[380px] 2xl:w-[420px]"
           : "fixed inset-0 h-dvh w-screen",
       )}
     >
       {draggingFiles ? <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/95 p-6 text-center text-sm" role="status">{t("aiChat.import.dropFiles", { defaultValue: "Drop CSV or XLSX files to attach them" })}</div> : null}
-      <header className="flex min-h-[64px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg">
             <Sparkles className="size-4 text-foreground" aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold tracking-tight">{config?.title || t("aiChat.title")}</h2>
-            <p className="truncate text-xs text-muted-foreground">{docked ? "Working alongside your module" : "Business workspace"}</p>
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
+          {onDockToggle ? (
+            <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
+              {docked ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="icon" onClick={onClose} className="size-9 shrink-0" aria-label={t("common.close")}>
+            <X className="size-4" />
+          </Button>
+        </div>
+      </header>
+
+      {(contextOptions?.length && onContextChange) || (config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref)) ? <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2">
           {contextOptions && contextOptions.length > 0 && onContextChange ? (
             <label className="min-w-0">
               <span className="sr-only">Assistant context</span>
@@ -628,7 +726,7 @@ export function AIChatPanel({
               >
                 <SelectTrigger
                   data-testid="erp-ai-chat-context"
-                  className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
+                  className="h-8 w-[190px] max-w-full border-border bg-card text-xs"
                   aria-label={"Assistant context"}
                 >
                   <SelectValue />
@@ -650,22 +748,12 @@ export function AIChatPanel({
               </Select>
             </label>
           ) : null}
-          {onDockToggle ? (
-            <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
-              {docked ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
-            </Button>
-          ) : null}
-          <Button variant="ghost" size="icon" onClick={onClose} className="size-9 shrink-0" aria-label={t("common.close")}>
-            <X className="size-4" />
-          </Button>
-        </div>
-      </header>
-
-      {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-xs text-primary hover:underline sm:px-6"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}
+          {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex min-h-8 items-center gap-2 text-xs text-primary hover:underline"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}
+      </div> : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
-          <div className={cn("mx-auto w-full max-w-[820px] px-4 py-8 sm:px-8", docked ? "sm:px-4" : "sm:py-12")}>
+          <div className="mx-auto w-full max-w-[820px] px-4 py-6">
           {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
           {guideError ? <p role="alert" className="mb-4 break-words text-sm text-destructive">{guideError}</p> : null}
           {historySaveFailed ? <p role="alert" className="mb-4 break-words rounded-md border p-3 text-sm">{t("aiChat.historySaveFailed", { defaultValue: "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed." })}</p> : null}
@@ -693,7 +781,7 @@ export function AIChatPanel({
                       type="button"
                       key={labelKey}
                       onClick={() => { setInput(t(labelKey)); inputRef.current?.focus() }}
-                      className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <span>{t(labelKey)}</span>
@@ -702,7 +790,7 @@ export function AIChatPanel({
                 </div>
               </div>
             ) : (
-              <div className="space-y-8 pb-8">
+              <div className="space-y-6 pb-2">
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -718,9 +806,9 @@ export function AIChatPanel({
                       message.role === "user" ? "items-end max-w-[90%]" : "items-start w-full"
                     )}>
                       <div className={cn(
-                        "max-w-full min-w-0 break-words text-[14px] leading-7",
+                        "max-w-full min-w-0 break-words text-sm leading-6",
                         message.role === "user"
-                          ? "rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-foreground"
+                          ? "rounded-2xl rounded-br-md border border-border/50 bg-card px-4 py-2.5 text-foreground"
                           : "text-foreground"
                       )}>
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
@@ -855,7 +943,7 @@ export function AIChatPanel({
                           )}
                         </div>
                       )}
-                      <div className="flex flex-wrap items-center gap-3 px-1 pt-1">
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
                         <span className="text-[11px] text-muted-foreground">
                           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
@@ -908,9 +996,10 @@ export function AIChatPanel({
             )}
           </div>
         </ScrollArea>
-        {showCommands && filteredCommands.length > 0 && (
+        <div className="relative shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+        {!slash && showCommands && filteredCommands.length > 0 && (
             <div
-              className="absolute bottom-[152px] left-4 right-4 z-20 mx-auto max-w-[790px] overflow-auto rounded-xl border border-border bg-popover p-1 shadow-lg max-h-[240px]"
+              className="absolute bottom-full left-4 right-4 z-20 mb-2 overflow-auto rounded-xl border border-border bg-popover p-1 shadow-lg max-h-[240px]"
             >
               <div className="p-1.5 border-b border-border">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-1.5">
@@ -959,17 +1048,22 @@ export function AIChatPanel({
               </div>
             </div>
           )}
-        <div className="shrink-0 border-t border-border/70 bg-background/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 sm:px-5">
+        <div className="mx-auto w-full max-w-[820px] px-4">
+          <ActionSkillList className="mb-3" items={skills.map(skill => ({ ...skill, icon: iconMap[skill.icon ?? ""] ?? <Sparkles className="size-4" /> }))}
+            selectedIds={selectedSkillIds} activeId={focusedSkillId} matchingIds={slash ? matchingSkills.map(skill => skill.id) : undefined}
+            disabled={isLoading} onToggle={toggleSkill} onRemove={id => { setSelectedSkillIds(current => current.filter(value => value !== id)); inputRef.current?.focus() }}
+            onActiveChange={setActiveSkillId} />
           {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
           {fileImportBusy ? <p role="status" className="mx-auto mb-2 flex max-w-[790px] items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("aiChat.import.savingAttachments", { defaultValue: "Saving attachments…" })}</p> : null}
           {config?.enableFileUpload && importCompanyLabel ? <p className="mx-auto mb-2 max-w-[790px] truncate text-xs text-muted-foreground" title={importCompanyLabel}>{t("aiChat.import.destination", { defaultValue: "Import into {{company}}", company: importCompanyLabel })}</p> : null}
-          <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-ring">
+          <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border/50 bg-muted/60 p-2 transition-colors focus-within:border-ring">
             <Textarea
               variant="plain"
               ref={inputRef}
               data-testid="erp-ai-chat-input"
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) => { setInput(event.target.value); setComposerCaret(event.target.selectionStart) }}
+              onSelect={(event) => setComposerCaret(event.currentTarget.selectionStart)}
               onKeyDown={handleKeyDown}
               placeholder={config?.placeholder || t("aiChat.placeholder")}
               rows={2}
@@ -982,7 +1076,7 @@ export function AIChatPanel({
                   <input ref={fileInputRef} type="file" multiple accept=".csv,.xlsx" hidden data-testid="erp-ai-chat-file-input" disabled={!fileImportEnabled || fileImportBusy} aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void handleImportFiles(files) }} />
                   <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" data-testid="erp-ai-chat-attach" disabled={!fileImportEnabled || fileImportBusy} onClick={() => fileInputRef.current?.click()} aria-label={t("aiChat.import.attachFiles", { defaultValue: "Attach CSV or XLSX files" })} title={t("aiChat.import.attachFiles", { defaultValue: "Attach CSV or XLSX files" })}><Paperclip className="size-4" aria-hidden="true" /></Button>
                 </> : null}
-                <span><kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}</span>
+                <span><kbd className="rounded bg-muted px-1 py-0.5">/</kbd> {t("aiChat.deck.skills")} · <kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}</span>
                 {selectionSummary ? (
                   <Badge variant="outline" className="max-w-[180px] truncate text-[10px]" title={t("aiChat.selectionContext")}>
                     <CheckSquare className="mr-1 size-3 shrink-0" aria-hidden="true" />
@@ -994,7 +1088,7 @@ export function AIChatPanel({
                 size="icon"
                 data-testid="erp-ai-chat-send"
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={(!input.trim() && selectedSkills.length === 0) || isLoading || slash !== null}
                 className="size-9 shrink-0 rounded-xl"
                 aria-label="Send message"
               >
@@ -1005,6 +1099,7 @@ export function AIChatPanel({
           <p className="mx-auto mt-2 max-w-[790px] text-center text-[11px] text-muted-foreground">
             Suggested actions require review. Lumière checks your current permissions.
           </p>
+        </div>
         </div>
       </div>
     </section>
