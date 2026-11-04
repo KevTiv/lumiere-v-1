@@ -59,9 +59,10 @@ Retain separate writer, spend-reader and certification identities. Give the
 writer only the exact reviewed native metering, provider-attempt, queue and
 evidence permissions for the organization. Queue cancellation is required for
 ambiguous paid-job recovery. The spend reader must have its existing active
-`ai_spend_reader` organization binding. A pricing operator needs the distinct
-`ai_spend/configure_meter` permission; ordinary users cannot supply provider
-prices through a browser request.
+`ai_spend_reader` organization binding. Price configuration requires an existing active platform superuser and the
+`ai_spend/configure_meter` permission. Do not promote an organization owner to
+activate this feature; use the existing platform operations identity. Tenant
+owner wildcards cannot change the native meter prices, including by direct calls.
 
 Use existing catalog records for the following infrastructure bindings. They
 identify bounded native services and do not manufacture executable skill

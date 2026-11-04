@@ -4,6 +4,9 @@ use crate::ai::metered_spend::*;
 use crate::ai::prepaid::{ai_prepaid_account, AiPrepaidAccount};
 use crate::ai::skills::ai_agent_run;
 use crate::ai::spend::*;
+use crate::core::users::{
+    find_user_profile_for_identity, find_user_profile_for_organization, user_profile, UserProfile,
+};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use spacetimedb::{ReducerContext, Table};
 
@@ -67,6 +70,54 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
                 units_per_1k: rate,
             },
         )?;
+    }
+    // A tenant Owner retains its wildcard permission but cannot manufacture a
+    // cheaper immutable price through a direct native reducer call.
+    let platform_profile = find_user_profile_for_identity(ctx, ctx.sender())
+        .ok_or("platform fixture profile missing")?;
+    let tenant_profile = find_user_profile_for_organization(ctx, ctx.sender(), f.organization_id)
+        .ok_or("tenant fixture profile missing")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..platform_profile.clone()
+    });
+    if tenant_profile.id != platform_profile.id {
+        ctx.db.user_profile().id().update(UserProfile {
+            is_superuser: false,
+            ..tenant_profile.clone()
+        });
+    }
+    let owner_permission =
+        crate::helpers::check_permission(ctx, f.organization_id, "ai_spend", "configure_meter");
+    let owner_price_change = configure_ai_metered_price(
+        ctx,
+        f.organization_id,
+        run.agent_id,
+        ConfigureAiMeteredPriceParams {
+            model: "mistral-ocr-2603".into(),
+            unit: "pages".into(),
+            currency: "USD".into(),
+            units_per_1k: 1,
+        },
+    );
+    ctx.db.user_profile().id().update(platform_profile.clone());
+    if tenant_profile.id != platform_profile.id {
+        ctx.db.user_profile().id().update(tenant_profile);
+    }
+    owner_permission.map_err(|error| {
+        format!("Owner wildcard fixture lost its ordinary configure permission: {error}")
+    })?;
+    if owner_price_change.is_ok() {
+        return Err("ordinary tenant Owner changed platform provider meter prices".into());
+    }
+    if ctx
+        .db
+        .ai_metered_price()
+        .ai_metered_price_by_org()
+        .filter(&f.organization_id)
+        .any(|price| price.model == "mistral-ocr-2603" && price.units_per_1k == 1)
+    {
+        return Err("denied tenant price configuration persisted a lower price".into());
     }
     let params = ReserveAiMeteredSpendParams {
         company_id: f.company_id,

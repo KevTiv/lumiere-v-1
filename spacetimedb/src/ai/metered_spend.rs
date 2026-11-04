@@ -14,6 +14,7 @@ use super::{
         AiSpendBudget, AiSpendReservation,
     },
 };
+use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_USAGE: u32 = 10_000_000;
@@ -133,7 +134,14 @@ pub fn configure_ai_metered_price(
     agent_id: u64,
     params: ConfigureAiMeteredPriceParams,
 ) -> Result<(), String> {
-    // Human owner permissions do not manufacture provider prices or funding.
+    // Tenant Owner wildcards are not platform authority to change provider prices.
+    let platform_user =
+        find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
+    if !platform_user.is_active || !platform_user.is_superuser {
+        return Err(
+            "only an active platform superuser may configure metered provider prices".into(),
+        );
+    }
     check_permission(ctx, organization_id, "ai_spend", "configure_meter")?;
     validate_meter(&params.model, &params.unit)?;
     if params.currency.len() != 3
