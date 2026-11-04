@@ -71,12 +71,12 @@ async function destinationStock(page: Page, move: Row): Promise<number> {
 async function expectReceiptFocus(page: Page, pickingId: number): Promise<void> {
   await expect(page).toHaveURL(
     (url) =>
-      url.pathname === "/inventory" &&
+      url.pathname === "/warehouse" &&
       url.searchParams.get("tab") === "transfers" &&
       url.searchParams.getAll("filter").length === 1 &&
       url.searchParams.get("filter") === `id:${pickingId}`,
   )
-  await expect(page.getByTestId("module-tab-inventory-transfers")).toHaveAttribute(
+  await expect(page.getByTestId("module-tab-warehouse-transfers")).toHaveAttribute(
     "aria-selected",
     "true",
   )

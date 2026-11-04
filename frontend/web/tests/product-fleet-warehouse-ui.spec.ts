@@ -205,6 +205,18 @@ for (const width of [390, 1440]) {
       page.getByTestId("module-tab-warehouse-transfers"),
     ).toHaveAttribute("aria-selected", "true");
     await expect(table).toContainText("INT-00051");
+    await expect(table).toContainText("IN-00052");
+    await expect(table).toContainText("OUT-00053");
+    await expect(table.getByRole("columnheader", { name: "Task", exact: true })).toBeVisible();
+    await chooseFacet(page, "Task", "Internal transfer");
+    await expect(table.getByRole("row")).toHaveCount(2);
+    await expect(table).toContainText("INT-00051");
+    await expect(table).not.toContainText("IN-00052");
+    await expect(table).not.toContainText("OUT-00053");
+    await page.getByTestId("entity-table-toolbar").getByRole("button", { name: /Task/ }).click();
+    await page.getByRole("button", { name: "Clear filter", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(table.getByRole("row")).toHaveCount(4);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,
@@ -213,6 +225,24 @@ for (const width of [390, 1440]) {
     expect(apiRequests).toEqual([]);
   });
 }
+
+test("Warehouse receipt focus survives denied optional locations without exposing cached task labels", async ({ page }) => {
+  test.setTimeout(90_000);
+  for (const locationState of ["denied", "error", "partial"]) {
+    await openWorkspace(page, "warehouse", `&tab=transfers&filter=id:52&locationsState=${locationState}`);
+    const table = page.locator('[role="tabpanel"]:visible').getByTestId("entity-table");
+    await expect(table.getByTestId("entity-row-52")).toBeVisible();
+    await expect(table.locator('[data-testid^="entity-row-"]')).toHaveCount(1);
+    await expect(table.getByTestId("entity-active-filter-id")).toContainText("id: 52");
+    await expect(table.getByTestId("entity-row-52")).toContainText("Unavailable");
+    await page.reload();
+    await expect(table.getByTestId("entity-row-52")).toBeVisible();
+    await expect(table.getByTestId("entity-row-52")).toContainText("Unavailable");
+  }
+  await openWorkspace(page, "warehouse", "&tab=transfers&filter=id:52&state=denied&locationsState=ready");
+  await expect(page.getByTestId("entity-row-52")).toHaveCount(0);
+  await expect(page.getByText("You do not have access to these records.", { exact: true })).toBeVisible();
+});
 
 for (const module of ["products", "fleet", "warehouse"]) {
   test(`${module} distinguishes failed and denied reads from a real empty collection`, async ({

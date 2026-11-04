@@ -4,6 +4,8 @@ import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildModuleTabHref, showWorkflowToast } from '@lumiere/ui';
 import { useTranslation } from '@lumiere/i18n';
+import type { WorkspaceProfile } from '@lumiere/ui/lib/workspace-profile';
+import { useWorkspaceProfile } from '@lumiere/ui/lib/workspace-profile-context';
 import {
   resolveRecordLocation,
   type ErpRecordRef,
@@ -11,16 +13,17 @@ import {
   type TransitionNotice,
 } from '@lumiere/erp-workflows';
 import { phCapture } from '@/lib/posthog-browser';
+import { inventoryWorkspaceModule } from '../lib/inventory-workspace-navigation';
 
 /**
  * Resolve a canonical workflow result to its UI-owned record URL. The destination's server query
  * remains the authorization boundary; a presentation-only module permission must not discard a
  * result that the operation and canonical readback already authorized.
  */
-export function workflowRecordHref(ref: ErpRecordRef): string | undefined {
+export function workflowRecordHref(ref: ErpRecordRef, profile: WorkspaceProfile = 'full'): string | undefined {
   const location = resolveRecordLocation(ref);
   return location
-    ? buildModuleTabHref(location.module, location.tab, location.filter)
+    ? buildModuleTabHref(inventoryWorkspaceModule(profile, location.module, location.tab), location.tab, location.filter)
     : undefined;
 }
 
@@ -36,6 +39,7 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
   const { organizationId } = options;
   const { t } = useTranslation();
   const router = useRouter();
+  const workspaceProfile = useWorkspaceProfile();
 
   const notify = useCallback(
     (notice: TransitionNotice) => {
@@ -73,10 +77,10 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
 
   const navigate = useCallback(
     (ref: ErpRecordRef) => {
-      const href = workflowRecordHref(ref);
+      const href = workflowRecordHref(ref, workspaceProfile);
       if (href) router.push(href);
     },
-    [router],
+    [router, workspaceProfile],
   );
 
   const record = useCallback(

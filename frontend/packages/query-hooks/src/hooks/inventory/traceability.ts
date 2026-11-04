@@ -112,8 +112,10 @@ import type {
 export function useProductionLots(
   organizationId: bigint,
   initialData?: StockProductionLot[],
+  enabled = true,
 ) {
   return useQuery<StockProductionLot[]>({
+    enabled,
     queryKey: ['stock-production-lots', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -129,8 +131,10 @@ export function useProductionLots(
 export function useSerialLotTraceability(
   organizationId: bigint,
   initialData?: SerialLotTraceability[],
+  enabled = true,
 ) {
   return useQuery<SerialLotTraceability[]>({
+    enabled,
     queryKey: ['serial-lot-traceability', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -145,8 +149,10 @@ export function useSerialLotTraceability(
 export function useStockTraceabilityReports(
   organizationId: bigint,
   initialData?: StockTraceabilityReport[],
+  enabled = true,
 ) {
   return useQuery<StockTraceabilityReport[]>({
+    enabled,
     queryKey: ['stock-traceability-reports', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -172,8 +178,10 @@ export const stockProductionSerialsQueryOptions = (organizationId: bigint) => ({
 export function useStockProductionSerials(
   organizationId: bigint,
   initialData?: StockProductionSerial[],
+  enabled = true,
 ) {
   return useQuery<StockProductionSerial[]>({
+    enabled,
     ...stockProductionSerialsQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
   });

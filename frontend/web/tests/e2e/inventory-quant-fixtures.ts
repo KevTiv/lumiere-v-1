@@ -577,8 +577,8 @@ export async function moveQuantViaInventoryUi(
   targetLocationLabel: string,
   quantity: number,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "stock")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "stock")
   await selectEntityRowById(page, quantId)
   await page.getByTestId("entity-action-move-stock-quant").click()
   await expect(page.getByTestId("form-modal-move-stock-quant")).toBeVisible({
@@ -605,8 +605,7 @@ export async function moveQuantViaInventoryUi(
 /**
  * Drive one bounded cycle count end-to-end through the wizard UI: create plan →
  * start session → record exactly one line → validate → post adjustments.
- * The wizard auto-advances to the newest plan it created at the chosen
- * location, so this only targets the newest one at that location.
+ * The operator explicitly chooses the uniquely named plan created by this run.
  */
 export async function runCycleCountToPostedViaWizardUi(
   page: Page,
@@ -617,8 +616,8 @@ export async function runCycleCountToPostedViaWizardUi(
     countedQty: number
   },
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "cycle-wizard")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "cycle-wizard")
 
   await chooseSelectOptionByTriggerValue(page, page.locator("#cc-loc"), params.locationId)
   const planName = smokeName("cov06d-count")
@@ -715,13 +714,13 @@ export async function expectCanonicalQuantFocus(
 ): Promise<void> {
   await expect(page).toHaveURL((url) => {
     return (
-      url.pathname === "/inventory" &&
+      url.pathname === "/warehouse" &&
       url.searchParams.get("tab") === "stock" &&
       url.searchParams.getAll("filter").length === 1 &&
       url.searchParams.get("filter") === `id:${quantId}`
     )
   })
-  await expect(page.getByTestId("module-tab-inventory-stock")).toHaveAttribute(
+  await expect(page.getByTestId("module-tab-warehouse-stock")).toHaveAttribute(
     "aria-selected",
     "true",
   )
@@ -849,8 +848,8 @@ export async function scheduleReplenishmentRunViaUi(
   page: Page,
   ruleId: number,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "replenishment")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "replenishment")
   await selectEntityRowById(page, ruleId)
   await Promise.all([
     page.waitForResponse(
@@ -867,8 +866,8 @@ export async function cancelReplenishmentRunViaUi(
   page: Page,
   ruleId: number,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "replenishment")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "replenishment")
   await selectEntityRowById(page, ruleId)
   await Promise.all([
     page.waitForResponse(
@@ -907,8 +906,8 @@ export async function createSerialViaUi(
   productName: string,
   name: string,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "serials")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "serials")
 
   await page.getByTestId("entity-action-create-serial").click()
   await expect(page.getByTestId("form-modal-form-dialog")).toBeVisible()
@@ -952,8 +951,8 @@ export async function reserveSerialViaUi(
   page: Page,
   serialId: number,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "serials")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "serials")
   await selectEntityRowById(page, serialId)
 
   await Promise.all([
@@ -972,14 +971,14 @@ export async function expectCanonicalSerialFocus(
 ): Promise<void> {
   await expect(page).toHaveURL((url) => {
     return (
-      url.pathname === "/inventory" &&
+      url.pathname === "/warehouse" &&
       url.searchParams.get("tab") === "serials" &&
       url.searchParams.getAll("filter").length === 1 &&
       url.searchParams.get("filter") === `id:${serialId}`
     )
   })
   await expect(
-    page.getByTestId("module-tab-inventory-serials"),
+    page.getByTestId("module-tab-warehouse-serials"),
   ).toHaveAttribute("aria-selected", "true")
 
   const table = activeTabEntityTable(page)
@@ -996,8 +995,8 @@ export async function setWarehouseQcLocationViaUi(
   warehouseId: number,
   locationName: string | undefined,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "warehouses")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "warehouses")
   await selectEntityRowById(page, warehouseId)
   await page.getByTestId("entity-action-edit-warehouse").click()
   await expect(page.getByTestId("form-modal-edit-warehouse")).toBeVisible({
@@ -1039,8 +1038,8 @@ export async function fetchWarehouseQcLocationId(
 
 /** Mark a serial in use through the Serial numbers tab's row action. */
 export async function useSerialViaUi(page: Page, serialId: number): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "serials")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "serials")
   await selectEntityRowById(page, serialId)
 
   await Promise.all([
@@ -1059,8 +1058,8 @@ export async function blockSerialViaUi(
   serialId: number,
   reason: string,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "serials")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "serials")
   // A row click opens the serial detail; selectEntityRowById would dismiss it.
   const row = page
     .locator('[role="tabpanel"]:visible')

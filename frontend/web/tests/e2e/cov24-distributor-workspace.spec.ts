@@ -59,7 +59,7 @@ test.describe("COV-24 distributor order-to-cash workspace", { tag: ["@p0", "@cov
 
     // The picking link lands on exactly that transfer in Inventory.
     await page.getByTestId(`distributor-o2c-${orderId}-picking-${delivery!.id}`).click()
-    await expectCanonicalPickingFocus(page, delivery!.id)
+    await expectCanonicalPickingFocus(page, delivery!.id, "inventory")
 
     // ── Deliver it through the canonical Inventory actions ────────────────
     const next = { draft: "confirm", confirmed: "assign", assigned: "validate" } as const

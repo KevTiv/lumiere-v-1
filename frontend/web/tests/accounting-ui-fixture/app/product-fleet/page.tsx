@@ -25,6 +25,8 @@ import {
 } from "../../../../app/(modules)/inventory/product-catalog";
 import {
   warehouseRows,
+  warehouseDataStates,
+  warehouseTransferRows,
   warehouseWorkspace,
 } from "../../../../app/(modules)/inventory/warehouse-workspace";
 import {
@@ -151,6 +153,8 @@ const locations = [
     completeName: "Musanze / Stock",
     usage: "internal",
   },
+  { id: "23", name: "Suppliers", usage: "supplier" },
+  { id: "24", name: "Customers", usage: "customer" },
 ];
 const stock = [
   {
@@ -245,6 +249,10 @@ function Preview() {
             onRetry: () => setRetryCount((count) => count + 1),
           }
         : { status: "ready" };
+  const requestedLocationState = params.get("locationsState");
+  const locationState: ModuleDataState = ["ready", "denied", "error", "partial", "loading"].includes(requestedLocationState ?? "")
+    ? { status: requestedLocationState as ModuleDataState["status"] }
+    : state;
   const data: Record<string, EntityRow[]> = {
     products: productCatalogRows(products, categories, units),
     "product-categories": productCatalogCategoryRows(categories),
@@ -258,7 +266,7 @@ function Preview() {
       { id: "31", name: "Kigali warehouse", code: "KGL", active: true },
       { id: "32", name: "Musanze warehouse", code: "MSZ", active: true },
     ],
-    transfers: [
+    transfers: warehouseTransferRows([
       {
         id: "51",
         name: "INT-00051",
@@ -268,7 +276,30 @@ function Preview() {
         locationDestId: "22",
         scheduledDate: "2026-10-30T08:30:00Z",
       },
-    ],
+      {
+        id: "52",
+        name: "IN-00052",
+        state: "assigned",
+        origin: "Purchase receipt",
+        locationId: "23",
+        locationDestId: "21",
+      },
+      {
+        id: "53",
+        name: "OUT-00053",
+        state: "confirmed",
+        origin: "Sales delivery",
+        locationId: "21",
+        locationDestId: "24",
+      },
+    ], locations, locationState.status),
+  };
+  const sourceStates = {
+    ...Object.fromEntries(config.tabs.map((tab) => [tab.id, state])),
+    products: state,
+    uoms: state,
+    "adjustment-reasons": state,
+    locations: locationState,
   };
   const tabData = Object.fromEntries(
     config.tabs.map((tab) => [
@@ -297,9 +328,7 @@ function Preview() {
         key={module}
         config={config}
         data={tabData}
-        dataState={Object.fromEntries(
-          config.tabs.map((tab) => [tab.id, state]),
-        )}
+        dataState={module === "warehouse" ? warehouseDataStates(sourceStates) : sourceStates}
         onFormSubmit={async () => {
           throw new Error("Synthetic preview: no record was saved.");
         }}

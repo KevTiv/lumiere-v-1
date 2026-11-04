@@ -11,10 +11,8 @@ import {
   unwrapEntityValue,
 } from "@lumiere/ui/lib/entity-row-values";
 
-export const PRODUCT_CATALOG_TAB_IDS = [
-  "products",
-  "product-categories",
-] as const;
+import { PRODUCT_CATALOG_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
+export { PRODUCT_CATALOG_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 
 // Match the existing native owners; this gates discovery, never server authority.
 const CATALOG_ACTION_PERMISSIONS: Readonly<
