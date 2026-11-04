@@ -7,6 +7,7 @@ import type { ChatDecisionAnswer } from "@lumiere/ui/lib/chat-decision-types"
 import { Button } from "@lumiere/ui/components/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
 import { apiFetch } from "./api-fetch"
+import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
 import { ImportReviewWorkspace } from "./import-review-workspace"
 import {
@@ -167,6 +168,7 @@ export function useChatImportTasks(args: {
   const visible = state.key === key && state.epoch === epoch && scope ? state : null
   const selectedReview = review?.key === key && review.epoch === epoch ? review : null
   const content = scope && visible ? <div className="space-y-3" data-testid="chat-import-tasks">
+    {visible.available ? <ChatReconciliationPreview key={key} organizationId={scope.organizationId} companyId={scope.companyId} /> : null}
     {visible.busy ? <p role="status" className="text-sm">{t("aiChat.import.savingTask", { defaultValue: "Saving files or checking the selected action…" })}</p> : null}
     {visible.error ? <p role="alert" className="text-sm text-destructive">{visible.error}</p> : null}
     {visible.pointer ? <p role="status" className="text-sm">{t("aiChat.import.uncertain", { defaultValue: "An upload has no confirmed result yet. Check again, or select the same original files in the same order to retry its saved request." })}</p> : null}
