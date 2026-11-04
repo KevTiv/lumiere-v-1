@@ -634,6 +634,15 @@ pub fn accept_ai_provider_attempt(
     if params.request_key.trim().is_empty() || params.request_key.len() > MAX_REQUEST_KEY_LEN {
         return Err("invalid request key".into());
     }
+    if ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&params.reservation_id)
+        .is_some_and(|row| row.price_snapshot_id == 0 && row.reserved_by != ctx.sender())
+    {
+        return Err("metered attempt acceptance requires its original reservation writer".into());
+    }
     if let Some(existing) = ctx
         .db
         .ai_provider_attempt()

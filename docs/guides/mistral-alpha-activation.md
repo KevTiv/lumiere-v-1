@@ -55,14 +55,22 @@ is compatible, and query callers check readiness before paying for embeddings.
 
 ## Identities, prices and company bindings
 
-Retain separate writer, spend-reader and certification identities. Give the
+Retain separate writer, spend-reader and certification identities. Register the
+existing writer's verified identity as the exact active `ai_spend_writer`
+organization binding through the platform-owned service registration operation.
+The registering administrator must be distinct from that writer. Give the
 writer only the exact reviewed native metering, provider-attempt, queue and
-evidence permissions for the organization. Queue cancellation is required for
+evidence permissions for the organization. Tenant owner wildcards cannot create
+trusted metering rows or settle another writer's paid attempt. Queue cancellation is required for
 ambiguous paid-job recovery. The spend reader must have its existing active
 `ai_spend_reader` organization binding. Price configuration requires an existing active platform superuser and the
 `ai_spend/configure_meter` permission. Do not promote an organization owner to
 activate this feature; use the existing platform operations identity. Tenant
 owner wildcards cannot change the native meter prices, including by direct calls.
+Uncertain-outcome reconciliation likewise requires platform pricing/recovery
+authority and its separate permission; a caller-supplied approval label alone
+does not grant that authority. A writer rotation retains old holds for approved
+reconciliation rather than transferring dispatch ownership silently.
 
 Use existing catalog records for the following infrastructure bindings. They
 identify bounded native services and do not manufacture executable skill

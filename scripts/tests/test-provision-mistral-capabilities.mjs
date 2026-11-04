@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { planCapabilities, provisionCapabilities, validateManifest } from '../provision-mistral-capabilities.mjs'
+import { httpClient } from '../provision-ai-harness.mjs'
 
 const now = new Date('2026-11-04T12:00:00Z')
 const digest = `sha256:${'a'.repeat(64)}`
@@ -36,12 +37,16 @@ function fixture() {
     evidence: [{ id: 40, fixture_id: 41, organization_id: 9, company_id: 3, skill_id: 5, skill_version_id: 30,
       source_hash: digest, status: { Passed: [] } }],
     bindings: [], prices: [], ownerPools: [],
+    writers: [{ organization_id: 9, service_name: 'ai_spend_writer', is_active: true, identity: ['b'.repeat(64)] }],
+    writerIdentity: 'b'.repeat(64),
   }
   const writes = [], reads = []
   const client = {
     async verifyTarget(org) { assert.equal(org, 9) },
+    async writerIdentity() { return state.writerIdentity },
     async sql(sql, role) {
       reads.push({ sql, role })
+      if (sql.includes('FROM cold_tier_service_identity ')) { assert.ok(sql.includes("service_name = 'ai_spend_writer'")); return state.writers }
       if (sql.includes('FROM company ')) return [{ id: 3, organization_id: 9 }]
       if (sql.includes('FROM ai_agent ')) return [state.agent]
       if (sql.includes('FROM ai_spend_budget_read ')) { assert.equal(role, 'spend'); return state.budgets }
@@ -112,6 +117,13 @@ test('explicit apply is idempotent and preserves budget, settings, instructions 
 
 test('structural and certification blockers make zero writes even when setup is missing', async () => {
   const cases = {
+    writerMissing: f => { f.state.writers = [] },
+    writerAmbiguous: f => { f.state.writers.push({ ...f.state.writers[0] }) },
+    writerForeign: f => { f.state.writers[0].organization_id = 10 },
+    writerInactive: f => { f.state.writers[0].is_active = false },
+    writerWrongService: f => { f.state.writers[0].service_name = 'ai_spend_reader' },
+    writerWrongIdentity: f => { f.state.writers[0].identity = ['c'.repeat(64)] },
+    writerUnverified: f => { f.state.writerIdentity = '' },
     companyScope: f => { const sql = f.client.sql; f.client.sql = async (query, role) => query.includes('FROM company ') ? [{ id: 3, organization_id: 10 }] : sql(query, role) },
     companyAgent: f => { f.state.agent.company_id = { some: 3 } },
     provider: f => { f.state.agent.provider = 'ollama' },
@@ -185,6 +197,25 @@ test('manifest rejects secret fields, unsafe identity, arbitrary units and missi
   ]) {
     const config = manifest(); mutate(config); assert.throws(() => validateManifest(config))
   }
+})
+
+test('writer identity probe authenticates STDB_TOKEN and requires server identity without reducer calls', async () => {
+  const requests = []
+  const env = { STDB_HOST: 'http://127.0.0.1:3000', STDB_MODULE: 'fixture', STDB_SERVER_TOKEN: 'owner-fixture',
+    AI_SPEND_READ_STDB_TOKEN: 'reader-fixture', STDB_TOKEN: 'writer-fixture', AI_GATEWAY_URL: 'http://127.0.0.1:8090',
+    LUMIERE_AI_GATEWAY_INTERNAL_SECRET: 'internal-fixture' }
+  const client = httpClient(env, async (url, init) => {
+    requests.push({ url, ...init })
+    return new Response('[]', { headers: { 'spacetime-identity': `0x${'B'.repeat(64)}` } })
+  })
+  assert.equal(await client.writerIdentity(), 'b'.repeat(64))
+  assert.equal(requests.length, 1)
+  assert.ok(requests[0].url.endsWith('/sql'))
+  assert.equal(requests[0].headers.Authorization, 'Bearer writer-fixture')
+  assert.equal(requests[0].body, 'SELECT id FROM organization LIMIT 1')
+  assert.equal(requests[0].redirect, 'error')
+  const unavailable = httpClient(env, async () => new Response('[]'))
+  await assert.rejects(unavailable.writerIdentity(), /spend writer identity not verified by server/)
 })
 
 test('CLI plan runs without credentials or network configuration', () => {

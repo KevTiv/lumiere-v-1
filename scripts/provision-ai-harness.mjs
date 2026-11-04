@@ -265,6 +265,15 @@ export function httpClient(env, fetcher = fetch) {
     async call(name, args) {
       await request(`${base}/v1/database/${database}/call/${name}`, owner, JSON.stringify(args), 'application/json')
     },
+    async writerIdentity() {
+      // A configured token name is not proof of the runtime writer's identity.
+      // This authenticated SELECT is non-billable and performs no reducer call.
+      const response = await request(`${base}/v1/database/${database}/sql`, required('STDB_TOKEN'),
+        'SELECT id FROM organization LIMIT 1', 'text/plain')
+      const identity = response.headers.get('spacetime-identity')?.replace(/^0x/, '').toLowerCase()
+      requireValue(/^[a-f0-9]{64}$/.test(identity ?? ''), 'spend writer identity not verified by server')
+      return identity
+    },
     async verifyTarget(organizationId) {
       await this.sql('SELECT id FROM organization LIMIT 1', 'spend')
       requireValue(/^[a-f0-9]{64}$/.test(lastReaderIdentity ?? ''), 'spend reader identity not verified by server')

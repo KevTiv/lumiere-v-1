@@ -4,6 +4,7 @@ use crate::ai::metered_spend::*;
 use crate::ai::prepaid::{ai_prepaid_account, AiPrepaidAccount};
 use crate::ai::skills::ai_agent_run;
 use crate::ai::spend::*;
+use crate::core::cold_tier_identity::{cold_tier_service_identity, ColdTierServiceIdentity};
 use crate::core::users::{
     find_user_profile_for_identity, find_user_profile_for_organization, user_profile, UserProfile,
 };
@@ -104,6 +105,33 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
             units_per_1k: 1,
         },
     );
+    let owner_reserve = reserve_ai_metered_spend(
+        ctx,
+        f.organization_id,
+        ReserveAiMeteredSpendParams {
+            company_id: f.company_id,
+            agent_id: run.agent_id,
+            run_id: 0,
+            actor_identity: ctx.sender().to_hex().to_string(),
+            request_key: "owner:fake:ocr".into(),
+            model: "mistral-ocr-2603".into(),
+            unit: "pages".into(),
+            allowance: 1,
+        },
+    );
+    let owner_reconcile = reconcile_ai_metered_spend(
+        ctx,
+        f.organization_id,
+        ReconcileAiMeteredSpendParams {
+            reservation_id: 0,
+            attempt_id: 0,
+            actual_units: 0,
+            result_json: "null".into(),
+            actor_identity: "owner".into(),
+            approval_id: "owner:approval".into(),
+            resolution: "invented output".into(),
+        },
+    );
     let platform_profile = ctx
         .db
         .user_profile()
@@ -129,6 +157,14 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
     owner_permission.map_err(|error| {
         format!("Owner wildcard fixture lost its ordinary configure permission: {error}")
     })?;
+    if owner_reserve.is_ok()
+        || owner_reconcile
+            .as_ref()
+            .err()
+            .is_none_or(|error| !error.contains("active platform superuser"))
+    {
+        return Err("ordinary Owner could fabricate or reconcile trusted provider output".into());
+    }
     if owner_price_change.is_ok() {
         return Err("ordinary tenant Owner changed platform provider meter prices".into());
     }
@@ -151,6 +187,23 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
         unit: "pages".into(),
         allowance: 5,
     };
+    // Platform privilege alone cannot impersonate the dedicated runtime writer.
+    if reserve_ai_metered_spend(ctx, f.organization_id, params.clone()).is_ok() {
+        return Err("unregistered superuser bypassed the service writer boundary".into());
+    }
+    let writer_key = format!("metered-test-writer-{}", f.organization_id);
+    ctx.db
+        .cold_tier_service_identity()
+        .insert(ColdTierServiceIdentity {
+            platform_id: writer_key.clone(),
+            organization_id: f.organization_id,
+            service_name: "ai_spend_writer".into(),
+            identity: ctx.sender(),
+            is_active: true,
+            registered_by: ctx.sender(),
+            registered_at: ctx.timestamp,
+            retired_at: None,
+        });
     let mut bad = params.clone();
     bad.company_id = foreign.company_id;
     if reserve_ai_metered_spend(ctx, f.organization_id, bad).is_ok() {
@@ -237,6 +290,61 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
         .filter((&f.organization_id, &params.request_key))
         .next()
         .ok_or("attempt absent")?;
+    let binding = ctx
+        .db
+        .cold_tier_service_identity()
+        .platform_id()
+        .find(&writer_key)
+        .ok_or("writer binding missing")?;
+    ctx.db
+        .cold_tier_service_identity()
+        .platform_id()
+        .update(ColdTierServiceIdentity {
+            identity: spacetimedb::Identity::__dummy(),
+            ..binding.clone()
+        });
+    if claim_ai_metered_dispatch(
+        ctx,
+        f.organization_id,
+        reservation.id,
+        attempt.id,
+        "f".repeat(32),
+    )
+    .is_ok()
+        || settle_ai_metered_spend(
+            ctx,
+            f.organization_id,
+            SettleAiMeteredSpendParams {
+                reservation_id: reservation.id,
+                attempt_id: attempt.id,
+                actual_units: 0,
+                result_json: "null".into(),
+            },
+        )
+        .is_ok()
+    {
+        return Err("foreign service writer claimed or settled another service's debit".into());
+    }
+    ctx.db
+        .cold_tier_service_identity()
+        .platform_id()
+        .update(binding);
+    ctx.db.ai_provider_attempt().id().update(AiProviderAttempt {
+        accepted_by: spacetimedb::Identity::__dummy(),
+        ..attempt.clone()
+    });
+    if claim_ai_metered_dispatch(
+        ctx,
+        f.organization_id,
+        reservation.id,
+        attempt.id,
+        "f".repeat(32),
+    )
+    .is_ok()
+    {
+        return Err("writer claimed another identity's accepted attempt".into());
+    }
+    ctx.db.ai_provider_attempt().id().update(attempt.clone());
     let claim = "a".repeat(32);
     if mark_ai_provider_attempt_dispatched(ctx, f.organization_id, attempt.id).is_ok() {
         return Err("legacy dispatch bypassed unique metered invocation owner".into());
@@ -260,6 +368,70 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
     {
         return Err("different invocation acquired the same dispatch".into());
     }
+    let dispatched = ctx
+        .db
+        .ai_provider_attempt()
+        .id()
+        .find(attempt.id)
+        .ok_or("dispatched attempt missing")?;
+    ctx.db.ai_provider_attempt().id().update(AiProviderAttempt {
+        accepted_by: spacetimedb::Identity::__dummy(),
+        ..dispatched.clone()
+    });
+    if settle_ai_metered_spend(
+        ctx,
+        f.organization_id,
+        SettleAiMeteredSpendParams {
+            reservation_id: reservation.id,
+            attempt_id: attempt.id,
+            actual_units: 0,
+            result_json: "null".into(),
+        },
+    )
+    .is_ok()
+    {
+        return Err("writer zero-settled another identity's dispatched attempt".into());
+    }
+    ctx.db.ai_provider_attempt().id().update(dispatched);
+    ctx.db
+        .ai_spend_reservation()
+        .id()
+        .update(AiSpendReservation {
+            reserved_by: spacetimedb::Identity::__dummy(),
+            ..reservation.clone()
+        });
+    if accept_ai_provider_attempt(
+        ctx,
+        f.organization_id,
+        AcceptAiProviderAttemptParams {
+            company_id: f.company_id,
+            agent_id: run.agent_id,
+            run_id: meter.run_id,
+            reservation_id: reservation.id,
+            request_key: params.request_key.clone(),
+            provider: "mistral".into(),
+            model: params.model.clone(),
+        },
+    )
+    .is_ok()
+        || settle_ai_metered_spend(
+            ctx,
+            f.organization_id,
+            SettleAiMeteredSpendParams {
+                reservation_id: reservation.id,
+                attempt_id: attempt.id,
+                actual_units: 0,
+                result_json: "null".into(),
+            },
+        )
+        .is_ok()
+    {
+        return Err("foreign reservation writer accepted or zero-settled a debit".into());
+    }
+    ctx.db
+        .ai_spend_reservation()
+        .id()
+        .update(reservation.clone());
     if settle_ai_metered_spend(
         ctx,
         f.organization_id,

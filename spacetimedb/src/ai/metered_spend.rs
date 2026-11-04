@@ -14,10 +14,38 @@ use super::{
         AiSpendBudget, AiSpendReservation,
     },
 };
+use crate::core::cold_tier_identity::cold_tier_service_identity;
 use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_USAGE: u32 = 10_000_000;
+
+fn require_metered_writer(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+    let service = "ai_spend_writer".to_string();
+    let bindings: Vec<_> = ctx
+        .db
+        .cold_tier_service_identity()
+        .cold_tier_service_identity_by_name()
+        .filter((organization_id, &service))
+        .filter(|binding| binding.is_active)
+        .collect();
+    if bindings.len() != 1 || bindings[0].identity != ctx.sender() {
+        return Err(
+            "metered provider operations require the registered ai_spend_writer identity".into(),
+        );
+    }
+    Ok(())
+}
+fn require_platform_superuser(ctx: &ReducerContext) -> Result<(), String> {
+    let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
+    if !user.is_active || !user.is_superuser {
+        return Err(
+            "metered price configuration and reconciliation require an active platform superuser"
+                .into(),
+        );
+    }
+    Ok(())
+}
 
 #[derive(Clone)]
 #[spacetimedb::table(accessor = ai_metered_price,
@@ -135,13 +163,7 @@ pub fn configure_ai_metered_price(
     params: ConfigureAiMeteredPriceParams,
 ) -> Result<(), String> {
     // Tenant Owner wildcards are not platform authority to change provider prices.
-    let platform_user =
-        find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
-    if !platform_user.is_active || !platform_user.is_superuser {
-        return Err(
-            "only an active platform superuser may configure metered provider prices".into(),
-        );
-    }
+    require_platform_superuser(ctx)?;
     check_permission(ctx, organization_id, "ai_spend", "configure_meter")?;
     validate_meter(&params.model, &params.unit)?;
     if params.currency.len() != 3
@@ -220,6 +242,7 @@ pub fn reserve_ai_metered_spend(
     organization_id: u64,
     params: ReserveAiMeteredSpendParams,
 ) -> Result<(), String> {
+    require_metered_writer(ctx, organization_id)?;
     check_permission(ctx, organization_id, "ai_spend", "reserve")?;
     validate_meter(&params.model, &params.unit)?;
     if params.company_id == 0
@@ -432,6 +455,7 @@ pub fn claim_ai_metered_dispatch(
     attempt_id: u64,
     claim_id: String,
 ) -> Result<(), String> {
+    require_metered_writer(ctx, organization_id)?;
     check_permission(ctx, organization_id, "ai_spend", "reserve")?;
     if claim_id.len() != 32 || !claim_id.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("invalid metered dispatch claim".into());
@@ -455,6 +479,8 @@ pub fn claim_ai_metered_dispatch(
         .find(&attempt_id)
         .ok_or("attempt not found")?;
     if meter.organization_id != organization_id
+        || reservation.reserved_by != ctx.sender()
+        || attempt.accepted_by != ctx.sender()
         || reservation.organization_id != organization_id
         || attempt.organization_id != organization_id
         || attempt.reservation_id != reservation_id
@@ -521,6 +547,7 @@ pub fn settle_ai_metered_spend(
     organization_id: u64,
     params: SettleAiMeteredSpendParams,
 ) -> Result<(), String> {
+    require_metered_writer(ctx, organization_id)?;
     check_permission(ctx, organization_id, "ai_spend", "settle")?;
     settle_meter(ctx, organization_id, params, None)
 }
@@ -531,6 +558,7 @@ pub fn reconcile_ai_metered_spend(
     organization_id: u64,
     params: ReconcileAiMeteredSpendParams,
 ) -> Result<(), String> {
+    require_platform_superuser(ctx)?;
     check_permission(ctx, organization_id, "ai_spend", "reconcile")?;
     spend::validate_recovery_attribution(
         &params.actor_identity,
@@ -593,6 +621,14 @@ fn settle_meter(
         || params.actual_units > meter.allowance
     {
         return Err("metered settlement scope or usage does not match".into());
+    }
+    if attribution.is_none()
+        && (reservation.reserved_by != ctx.sender() || attempt.accepted_by != ctx.sender())
+    {
+        return Err(
+            "ordinary metered settlement requires the original reservation and attempt writer"
+                .into(),
+        );
     }
     if reservation.status == "settled" {
         if meter.actual_units == Some(params.actual_units)

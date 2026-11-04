@@ -75,7 +75,7 @@ export function planCapabilities(config) {
     surfaces: config.surfaces, meters: config.meters, billableCalls: 0, deploymentAcceptance: false,
     writes: ['missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
     remainingGates: ['immutable contract release and aligned deployment', 'provider usage and billing acceptance', 'signed-in company isolation and recovery acceptance'],
-    prerequisites: ['existing shared agent and current-month monetary pool', 'reviewed model policy',
+    prerequisites: ['existing shared agent and current-month monetary pool', 'reviewed model policy', 'exact platform-registered ai_spend_writer matching the gateway identity',
       'matching active certificates for generative surfaces', 'explicit existing infrastructure skill catalog entries'] }
 }
 
@@ -98,6 +98,14 @@ function permits(actions, action) {
 async function inspectCapabilities(config, client, now) {
   const org = config.organizationId, companyId = config.companyId, agentId = config.agentId
   await client.verifyTarget(org)
+  const writerIdentity = await client.writerIdentity()
+  check(typeof writerIdentity === 'string' && /^[a-f0-9]{64}$/.test(writerIdentity), 'spend writer identity not verified by server')
+  const writers = await client.sql(`SELECT organization_id, service_name, identity, is_active FROM cold_tier_service_identity WHERE organization_id = ${org} AND service_name = 'ai_spend_writer' AND is_active = true`)
+  const writer = one(writers, 'active platform spend writer binding')
+  const rawWriterIdentity = Array.isArray(writer.identity) && writer.identity.length === 1 ? writer.identity[0] : unwrap(writer.identity)
+  const registeredIdentity = (typeof rawWriterIdentity === 'string' ? rawWriterIdentity : rawWriterIdentity?.__identity__)?.replace(/^0x/, '').toLowerCase()
+  check(number(writer.organization_id, 'writer organization') === org && writer.service_name === 'ai_spend_writer'
+    && writer.is_active === true && registeredIdentity === writerIdentity, 'platform spend writer binding does not match the gateway identity')
   const company = one(await client.sql(`SELECT id, organization_id FROM company WHERE id = ${companyId}`), 'company')
   check(number(company.id, 'company id') === companyId && number(company.organization_id, 'company organization') === org, 'company scope mismatch')
   const agent = one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND id = ${agentId}`), 'shared agent')
