@@ -10,7 +10,12 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::inventory::stock::{increase_quant_at_location, require_product_in_org, stock_quant};
+use crate::inventory::stock::require_product_in_org;
+use crate::inventory::stock_correction::{
+    apply_correction, correction_quant, prepare_correction, require_nonnegative_finite,
+    validate_correction_target, CorrectionIdentity,
+};
+use crate::inventory::warehouse::stock_location;
 use serde_json;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -329,8 +334,35 @@ pub fn create_inventory_adjustment(
         return Err("Adjustment name cannot be empty".to_string());
     }
 
-    // Resolve company_id server-side; never trust caller-supplied value.
-    let company_id = company_id_from_scope(ctx, organization_id, None)?;
+    // Parent/location provenance supplies the company without choosing an unrelated default.
+    let company_id = if let Some(id) = params.inventory_id {
+        let inventory = ctx
+            .db
+            .stock_inventory()
+            .id()
+            .find(id)
+            .ok_or("inventory not found")?;
+        if inventory.organization_id != organization_id {
+            return Err("inventory does not belong to this organization".to_string());
+        }
+        if inventory.state == "done" || inventory.state == "cancel" {
+            return Err("inventory is no longer editable".to_string());
+        }
+        inventory.company_id
+    } else {
+        let location = ctx
+            .db
+            .stock_location()
+            .id()
+            .find(params.location_id)
+            .ok_or("location not found")?;
+        if location.organization_id != organization_id {
+            return Err("location does not belong to this organization".to_string());
+        }
+        location
+            .company_id
+            .ok_or("shared location requires an inventory parent to select the company")?
+    };
 
     // Validate reason via relation and derive reason_code server-side.
     let reason = ctx
@@ -351,22 +383,28 @@ pub fn create_inventory_adjustment(
     // organization, and is active before allowing the adjustment.
     require_product_in_org(ctx, organization_id, params.product_id)?;
 
-    // Derive quantity_before and unit_cost from the current on-hand stock quant (server-authoritative).
-    let existing_quant = ctx
-        .db
-        .stock_quant()
-        .quant_by_product()
-        .filter(&params.product_id)
-        .find(|q| {
-            q.organization_id == organization_id
-                && q.company_id == company_id
-                && q.location_id == params.location_id
-                && q.lot_id == params.lot_id
-                && q.owner_id.is_none()
-        });
-
-    let quantity_before = existing_quant.as_ref().map(|q| q.quantity).unwrap_or(0.0);
-    let unit_cost = existing_quant.map(|q| q.cost).unwrap_or(0.0);
+    require_nonnegative_finite(params.quantity_after, "quantity_after")?;
+    let target = CorrectionIdentity {
+        organization_id,
+        company_id,
+        product_id: params.product_id,
+        location_id: params.location_id,
+        lot_id: params.lot_id,
+        package_id: params.package_id,
+    };
+    let (product_cost, _) = validate_correction_target(ctx, target, params.uom_id)?;
+    let existing_quant = correction_quant(ctx, target)?;
+    let quantity_before = existing_quant.as_ref().map_or(0.0, |q| q.quantity);
+    let unit_cost = existing_quant.as_ref().map_or(product_cost, |q| q.cost);
+    // Validate reservations, the period lock, and valuation before creating a draft.
+    prepare_correction(
+        ctx,
+        target,
+        params.uom_id,
+        quantity_before,
+        params.quantity_after,
+        Some(unit_cost),
+    )?;
 
     let difference = params.quantity_after - quantity_before;
     let total_value = difference * unit_cost;
@@ -675,60 +713,22 @@ pub fn process_inventory_adjustment(
     let company_id = adjustment.company_id;
     let delta = adjustment.quantity_after - adjustment.quantity_before;
 
-    // Apply stock mutation based on the signed delta.
-    if delta > 0.0 {
-        // Stock increased: add on-hand quantity at the location.
-        increase_quant_at_location(
-            ctx,
+    let prepared = prepare_correction(
+        ctx,
+        CorrectionIdentity {
             organization_id,
             company_id,
-            adjustment.product_id,
-            adjustment.location_id,
-            delta,
-            adjustment.unit_cost,
-        )?;
-    } else if delta < 0.0 {
-        // Stock decreased: consume on-hand quantity at the location.
-        // We model a negative delta as a negative-qty increase (write-down).
-        // TODO: replace with a dedicated decrease_quant_at_location once available.
-        increase_quant_at_location(
-            ctx,
-            organization_id,
-            company_id,
-            adjustment.product_id,
-            adjustment.location_id,
-            delta, // negative value: increase_quant_at_location guards qty <= 0 as no-op,
-            adjustment.unit_cost, // so we update the quant directly instead.
-        )
-        .ok(); // increase_quant_at_location skips qty <= 0; handle via direct quant update below.
-
-        // Direct quant write-down for the negative delta case.
-        if let Some(quant) = ctx
-            .db
-            .stock_quant()
-            .quant_by_product()
-            .filter(&adjustment.product_id)
-            .find(|q| {
-                q.organization_id == organization_id
-                    && q.company_id == company_id
-                    && q.location_id == adjustment.location_id
-                    && q.lot_id == adjustment.lot_id
-                    && q.owner_id.is_none()
-            })
-        {
-            let new_qty = (quant.quantity + delta).max(0.0);
-            let available_qty = (new_qty - quant.reserved_quantity).max(0.0);
-            ctx.db
-                .stock_quant()
-                .id()
-                .update(crate::inventory::stock::StockQuant {
-                    quantity: new_qty,
-                    available_quantity: available_qty,
-                    ..quant
-                });
-        }
-    }
-    // delta == 0.0: quantities are equal, no stock move needed.
+            product_id: adjustment.product_id,
+            location_id: adjustment.location_id,
+            lot_id: adjustment.lot_id,
+            package_id: adjustment.package_id,
+        },
+        adjustment.uom_id,
+        adjustment.quantity_before,
+        adjustment.quantity_after,
+        Some(adjustment.unit_cost),
+    )?;
+    apply_correction(ctx, prepared);
 
     ctx.db
         .inventory_adjustment()

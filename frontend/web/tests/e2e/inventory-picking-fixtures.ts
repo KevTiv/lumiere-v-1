@@ -82,8 +82,8 @@ export async function runPickingActionViaInventoryUi(
     validate: "validate_stock_picking",
   } as const
 
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "transfers")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "transfers")
   await selectEntityRowById(page, pickingId)
   await clickEntityActionAndWaitForReducer(
     page,
@@ -95,17 +95,18 @@ export async function runPickingActionViaInventoryUi(
 export async function expectCanonicalPickingFocus(
   page: Page,
   pickingId: number,
+  workspace: "inventory" | "warehouse" = "warehouse",
 ): Promise<void> {
   await expect(page).toHaveURL((url) => {
     return (
-      url.pathname === "/inventory" &&
+      url.pathname === `/${workspace}` &&
       url.searchParams.get("tab") === "transfers" &&
       url.searchParams.getAll("filter").length === 1 &&
       url.searchParams.get("filter") === `id:${pickingId}`
     )
   })
   await expect(
-    page.getByTestId("module-tab-inventory-transfers"),
+    page.getByTestId(`module-tab-${workspace}-transfers`),
   ).toHaveAttribute("aria-selected", "true")
 
   const table = activeTabEntityTable(page)
@@ -162,8 +163,8 @@ export async function partialValidatePickingViaInventoryUi(
   moveId: number,
   quantityDone: number,
 ): Promise<void> {
-  await gotoModule(page, "/inventory", "inventory")
-  await selectModuleTab(page, "inventory", "transfers")
+  await gotoModule(page, "/warehouse", "warehouse")
+  await selectModuleTab(page, "warehouse", "transfers")
   await selectEntityRowById(page, pickingId)
   await page.getByTestId("entity-action-partial-validate-picking").click()
   await expect(

@@ -1,7 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { transferBackorders, transferRecordHref } from './transfer-record';
+import { transferBackorders, transferRecordHref, transferWorkspaceNavigation } from './transfer-record';
+
+test('alpha transfer return links stay inside Warehouse even for a direct canonical record open', () => {
+  assert.deepEqual(transferWorkspaceNavigation('finance-alpha'), {
+    moduleId: 'warehouse',
+    rootHref: '/warehouse',
+    transfersHref: '/warehouse?tab=transfers',
+  });
+  assert.equal(transferRecordHref({ id: 9007199254740993n }), '/inventory/transfers/9007199254740993');
+});
+
+test('full-profile transfer return links preserve the Inventory workspace', () => {
+  assert.deepEqual(transferWorkspaceNavigation('full'), {
+    moduleId: 'inventory',
+    rootHref: '/inventory',
+    transfersHref: '/inventory?tab=transfers',
+  });
+});
 
 test('href points at the transfer page', () => {
   assert.equal(transferRecordHref({ id: 7n }), '/inventory/transfers/7');

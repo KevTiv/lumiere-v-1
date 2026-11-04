@@ -47,7 +47,7 @@ test.describe("COV-25 sale order → delivery link", { tag: ["@p0", "@cov25", "@
     await expect(link).toHaveAttribute("href", pickingHref(delivery!.id))
     await expect(sheet.locator('[data-testid^="sale-order-handoff-picking-"]')).toHaveCount(1)
     await link.click()
-    await expectCanonicalPickingFocus(page, delivery!.id)
+    await expectCanonicalPickingFocus(page, delivery!.id, "inventory")
     await clickCanonicalHandoff(page, source, `sale-order-handoff-picking-${delivery!.id}`, { module: "inventory", tab: "transfers", id: delivery!.id })
 
     // The invoice must be produced through Sales' existing operator form, then read by FK.

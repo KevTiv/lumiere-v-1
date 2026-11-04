@@ -11,10 +11,8 @@ import { getRowField, unwrapEntityValue } from "@lumiere/ui/lib/entity-row-value
 import { mergeModuleStates, type ModuleDataState } from "@lumiere/ui/lib/module-data-state";
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
 
-export const WAREHOUSE_TAB_IDS = [
-  "stock", "lots", "serials", "transfers", "stock-moves", "adjustments",
-  "cycle-counts", "cycle-wizard", "warehouses", "locations", "replenishment",
-] as const;
+import { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
+export { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 
 const CREATE_PERMISSIONS: Readonly<Record<string, EntitySurfacePermission>> = {
   stock: { resource: "stock_quant", action: "create" },
@@ -124,6 +122,41 @@ export function warehouseRows(
   });
 }
 
+export type WarehouseTransferTask = "receive" | "deliver" | "internal" | "other" | "unavailable";
+
+/** Classify the recorded location route, never a guessed picking-type ID or document name. */
+export function warehouseTransferRows(
+  rows: readonly EntityRow[],
+  locations: readonly EntityRow[],
+  locationStatus: ModuleDataState["status"] = "ready",
+): EntityRow[] {
+  // A purchasing operator may read their receipts without location-master access.
+  // The route classification is optional: never use denied or stale lookup data.
+  const locationById = recordsById(locationStatus === "ready" ? locations : []);
+  const usage = (value: unknown): string | null => {
+    const id = rowKey(value);
+    const location = id === null ? undefined : locationById.get(id);
+    return location ? label(getRowField(location, "usage")) : null;
+  };
+  return rows.map((row) => {
+    const source = usage(getRowField(row, "locationId"));
+    const destination = usage(getRowField(row, "locationDestId"));
+    let warehouseTransferTask: WarehouseTransferTask = "unavailable";
+    if (source && destination) {
+      if ((source === "supplier" || source === "customer") && destination === "internal") {
+        warehouseTransferTask = "receive";
+      } else if (source === "internal" && (destination === "customer" || destination === "supplier")) {
+        warehouseTransferTask = "deliver";
+      } else if (source === "internal" && destination === "internal") {
+        warehouseTransferTask = "internal";
+      } else {
+        warehouseTransferTask = "other";
+      }
+    }
+    return { ...row, warehouseTransferTask };
+  });
+}
+
 const REFERENCE_COLUMNS: Readonly<Record<string, string>> = {
   productId: "warehouseProductName",
   locationId: "warehouseLocationName",
@@ -140,6 +173,14 @@ export function warehouseTable(
   if (config.view.mode !== "table") return config;
   const view = config.view;
   const unavailable = t("inventory.warehouseWorkspace.referenceUnavailable", { defaultValue: "Unavailable" });
+  const countStockHint = t("inventory.warehouseWorkspace.countStockHint", { defaultValue: "Use Counts to record stock corrections. Receipts, deliveries and transfers update stock through their own workflows." });
+  const transferTasks = [
+    { value: "receive", label: t("inventory.warehouseWorkspace.receive", { defaultValue: "Receive" }) },
+    { value: "deliver", label: t("inventory.warehouseWorkspace.deliver", { defaultValue: "Deliver" }) },
+    { value: "internal", label: t("inventory.warehouseWorkspace.internalTransfer", { defaultValue: "Internal transfer" }) },
+    { value: "other", label: t("inventory.warehouseWorkspace.otherMovement", { defaultValue: "Other movement" }) },
+    { value: "unavailable", label: unavailable },
+  ];
   const referenceColumn = (column: EntityColumn): EntityColumn => {
     const key = REFERENCE_COLUMNS[column.key];
     if (!key) return column;
@@ -174,6 +215,16 @@ export function warehouseTable(
     ];
   } else if (tabId === "stock-moves") {
     columns = [...columns, { key: "warehouseUnitName", label: t("inventory.byRecord.uom"), render: (value) => label(value) ?? unavailable }];
+  } else if (tabId === "transfers") {
+    columns = [
+      ...columns,
+      {
+        key: "warehouseTransferTask",
+        label: t("inventory.warehouseWorkspace.transferTask", { defaultValue: "Task" }),
+        type: "text",
+        render: (value) => transferTasks.find((task) => task.value === value)?.label ?? unavailable,
+      },
+    ];
   }
   const namedReferences = view.columns.some((column) => column.key in REFERENCE_COLUMNS);
   const locationOptions = [...recordsById(locations)].flatMap(([value, location]) => {
@@ -182,6 +233,7 @@ export function warehouseTable(
   });
   return {
     ...config,
+    ...(tabId === "stock" ? { description: countStockHint } : {}),
     view: {
       ...view,
       columns,
@@ -194,10 +246,16 @@ export function warehouseTable(
         : view.searchKeys,
       filters: tabId === "stock"
         ? [...(view.filters ?? []), { key: "warehouseLocationId", label: t("inventory.byRecord.location"), type: "select", faceted: true, options: locationOptions }]
+        : tabId === "transfers"
+          ? [...(view.filters ?? []), { key: "warehouseTransferTask", label: t("inventory.warehouseWorkspace.transferTask", { defaultValue: "Task" }), type: "select", faceted: true, options: transferTasks }]
         : view.filters,
+      ...(tabId === "stock" && view.emptyState ? {
+        emptyState: { ...view.emptyState, description: countStockHint, actionLabel: undefined, onAction: undefined },
+      } : {}),
       // Native `execute` is not yet an Action in the shared RBAC presentation model.
       // Keep immediate execution out of this bounded workspace until its exact gate exists.
-      actions: view.actions?.filter((action) => action.id !== "execute-replenishment-rule").map((action) => {
+      actions: view.actions?.filter((action) => action.id !== "execute-replenishment-rule" &&
+        !(tabId === "stock" && ["set-quant-qty", "csv-stock-quant"].includes(action.id))).map((action) => {
         const permission = action.permission ?? ACTION_PERMISSIONS[action.id];
         return permission ? { ...action, permission } : action;
       }),
@@ -250,6 +308,7 @@ export function warehouseWorkspace(
     if (!source) return [];
     return [{
       ...source,
+      ...(id === "stock" ? { createForm: undefined, createAction: undefined, createLabel: undefined } : {}),
       createPermission: source.createPermission ?? CREATE_PERMISSIONS[id],
       entityConfig: source.entityConfig ? warehouseTable(source.entityConfig, id, locations, t) : undefined,
     }];
@@ -275,7 +334,7 @@ export function warehouseWorkspace(
   };
 }
 
-/** Every joined workspace fails closed if a required source is absent, denied or failed. */
+/** Required joins close their view; optional transfer-task labels do not hide authorized receipts. */
 export function warehouseDataStates<T extends Record<string, ModuleDataState>>(states: T): T {
   const dependencies: Readonly<Record<string, readonly string[]>> = {
     stock: ["products", "locations", "uoms"],

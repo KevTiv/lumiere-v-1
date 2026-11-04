@@ -1,3 +1,5 @@
+import { parseStrictU64 } from '@lumiere/erp-shared/u64'
+
 /**
  * Build {@link CreateWarehouseParams} for HTTP reducer calls by cloning operational
  * IDs from an existing warehouse row (API rows may be camelCase or snake_case).
@@ -11,13 +13,9 @@ export function u64FromRow(
   if (v == null || v === "") {
     throw new Error(`warehouse field '${camel}' is required but was missing`)
   }
-  try {
-    return BigInt(String(v))
-  } catch {
-    throw new Error(
-      `warehouse field '${camel}' could not be parsed as a u64: ${String(v)}`,
-    )
-  }
+  const parsed = parseStrictU64(v)
+  if (parsed == null || parsed <= 0n) throw new Error(`warehouse field '${camel}' must be a positive u64`)
+  return parsed
 }
 
 export function optU64FromRow(
@@ -27,11 +25,7 @@ export function optU64FromRow(
 ): bigint | undefined {
   const v = row[camel] ?? row[snake]
   if (v == null || v === "") return undefined
-  try {
-    return BigInt(String(v))
-  } catch {
-    return undefined
-  }
+  return u64FromRow(row, camel, snake)
 }
 
 export function u64ArrayFromRow(
@@ -40,14 +34,9 @@ export function u64ArrayFromRow(
   snake: string,
 ): bigint[] {
   const v = row[camel] ?? row[snake]
-  if (v == null || !Array.isArray(v)) return []
-  return v.map((x) => {
-    try {
-      return BigInt(String(x))
-    } catch {
-      return 0n
-    }
-  })
+  if (v == null) return []
+  if (!Array.isArray(v)) throw new Error(`warehouse field '${camel}' must be an array`)
+  return v.map(value => u64FromRow({ value }, 'value', 'value'))
 }
 
 export function buildCreateWarehouseParamsFromTemplate(
@@ -68,21 +57,17 @@ export function buildCreateWarehouseParamsFromTemplate(
     throw new Error("Warehouse name and code are required")
   }
 
-  const n = (b: bigint) => Number(b)
-  const optNum = (camel: string, snake: string) => {
-    const x = optU64FromRow(template, camel, snake)
-    return x === undefined ? undefined : n(x)
-  }
+  const optId = (camel: string, snake: string) => optU64FromRow(template, camel, snake)
 
   return {
     name,
     code,
-    lotStockId: n(u64FromRow(template, "lotStockId", "lot_stock_id")),
-    inTypeId: n(u64FromRow(template, "inTypeId", "in_type_id")),
-    outTypeId: n(u64FromRow(template, "outTypeId", "out_type_id")),
-    intTypeId: n(u64FromRow(template, "intTypeId", "int_type_id")),
-    packTypeId: n(u64FromRow(template, "packTypeId", "pack_type_id")),
-    pickTypeId: n(u64FromRow(template, "pickTypeId", "pick_type_id")),
+    lotStockId: u64FromRow(template, "lotStockId", "lot_stock_id"),
+    inTypeId: u64FromRow(template, "inTypeId", "in_type_id"),
+    outTypeId: u64FromRow(template, "outTypeId", "out_type_id"),
+    intTypeId: u64FromRow(template, "intTypeId", "int_type_id"),
+    packTypeId: u64FromRow(template, "packTypeId", "pack_type_id"),
+    pickTypeId: u64FromRow(template, "pickTypeId", "pick_type_id"),
     receptionSteps: String(template.receptionSteps ?? template.reception_steps ?? "one_step"),
     deliverySteps: String(template.deliverySteps ?? template.delivery_steps ?? "ship"),
     manufactureSteps: String(
@@ -103,22 +88,20 @@ export function buildCreateWarehouseParamsFromTemplate(
       template.subcontractingToResupply ?? template.subcontracting_to_resupply ?? false,
     ),
     sequence: opts.sequence,
-    partnerId: optNum("partnerId", "partner_id"),
-    whInputStockLocId: optNum("whInputStockLocId", "wh_input_stock_loc_id"),
-    whPackStockLocId: optNum("whPackStockLocId", "wh_pack_stock_loc_id"),
-    whOutputStockLocId: optNum("whOutputStockLocId", "wh_output_stock_loc_id"),
-    whQcStockLocId: optNum("whQcStockLocId", "wh_qc_stock_loc_id"),
-    whScrapLocId: optNum("whScrapLocId", "wh_scrap_loc_id"),
-    qcTypeId: optNum("qcTypeId", "qc_type_id"),
-    returnTypeId: optNum("returnTypeId", "return_type_id"),
-    viewLocationId: optNum("viewLocationId", "view_location_id"),
-    mtoPullId: optNum("mtoPullId", "mto_pull_id"),
-    buyPullId: optNum("buyPullId", "buy_pull_id"),
-    resupplyWhIds: u64ArrayFromRow(template, "resupplyWhIds", "resupply_wh_ids").map((x) => n(x)),
-    resupplyFromIds: u64ArrayFromRow(template, "resupplyFromIds", "resupply_from_ids").map((x) =>
-      n(x),
-    ),
-    pbhDpmIds: u64ArrayFromRow(template, "pbhDpmIds", "pbh_dpm_ids").map((x) => n(x)),
+    partnerId: optId("partnerId", "partner_id"),
+    whInputStockLocId: optId("whInputStockLocId", "wh_input_stock_loc_id"),
+    whPackStockLocId: optId("whPackStockLocId", "wh_pack_stock_loc_id"),
+    whOutputStockLocId: optId("whOutputStockLocId", "wh_output_stock_loc_id"),
+    whQcStockLocId: optId("whQcStockLocId", "wh_qc_stock_loc_id"),
+    whScrapLocId: optId("whScrapLocId", "wh_scrap_loc_id"),
+    qcTypeId: optId("qcTypeId", "qc_type_id"),
+    returnTypeId: optId("returnTypeId", "return_type_id"),
+    viewLocationId: optId("viewLocationId", "view_location_id"),
+    mtoPullId: optId("mtoPullId", "mto_pull_id"),
+    buyPullId: optId("buyPullId", "buy_pull_id"),
+    resupplyWhIds: u64ArrayFromRow(template, "resupplyWhIds", "resupply_wh_ids"),
+    resupplyFromIds: u64ArrayFromRow(template, "resupplyFromIds", "resupply_from_ids"),
+    pbhDpmIds: u64ArrayFromRow(template, "pbhDpmIds", "pbh_dpm_ids"),
     metadata: template.metadata != null ? String(template.metadata) : undefined,
   }
 }

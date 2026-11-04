@@ -29,6 +29,11 @@ export {
 } from "./proposals-workspace";
 export {
   INVENTORY_WORKSPACE_RESOURCE_KEYS,
+  PRODUCT_CATALOG_RESOURCE_KEYS,
+  WAREHOUSE_OPERATIONS_RESOURCE_KEYS,
+  inventoryWorkspaceResourceKeys,
+  isInventoryWorkspaceReadEnabled,
+  type InventoryWorkspace,
   type InventoryWorkspaceResourceKey,
   type InventoryWorkspaceSubscriptionContext,
 } from "./inventory-workspace";

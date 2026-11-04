@@ -118,8 +118,10 @@ import type {
 export function useProducts(
   organizationId: bigint,
   initialData?: Product[],
+  enabled = true,
 ) {
   return useQuery<Product[]>({
+    enabled,
     queryKey: ['products', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/products', 'Failed to fetch products'),
@@ -156,8 +158,12 @@ export function useProductAttributeLines(organizationId: bigint) {
 }
 
 /** Read-only list served by the authorized HTTP query path (`/api/query/product-supplier-infos`). */
-export function useProductSupplierInfos(organizationId: bigint) {
+export function useProductSupplierInfos(
+  organizationId: bigint,
+  enabled = true,
+) {
   return useQuery<QueryRows>({
+    enabled,
     queryKey: ['product-supplier-infos', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/product-supplier-infos', 'Failed to read vendor prices'),
     staleTime: 30_000,
@@ -165,8 +171,12 @@ export function useProductSupplierInfos(organizationId: bigint) {
 }
 
 /** Read-only list served by the authorized HTTP query path (`/api/query/product-packagings`). */
-export function useProductPackagings(organizationId: bigint) {
+export function useProductPackagings(
+  organizationId: bigint,
+  enabled = true,
+) {
   return useQuery<QueryRows>({
+    enabled,
     queryKey: ['product-packagings', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/product-packagings', 'Failed to read product packagings'),
     staleTime: 30_000,
@@ -176,8 +186,10 @@ export function useProductPackagings(organizationId: bigint) {
 export function useProductCategories(
   organizationId: bigint,
   initialData?: ProductCategory[],
+  enabled = true,
 ) {
   return useQuery<ProductCategory[]>({
+    enabled,
     queryKey: ['product-categories', rqBigIntKey(organizationId)],
     queryFn: async () => {
       const rows = await fetchQueryList(

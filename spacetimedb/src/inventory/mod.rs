@@ -50,6 +50,8 @@ pub use cycle_count::*;
 pub use product_category::*;
 pub mod replenishment;
 pub mod stock;
+pub(crate) mod stock_correction;
+mod stock_correction_balance;
 pub mod tracking;
 pub mod valuation;
 pub mod warehouse;

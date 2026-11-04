@@ -112,8 +112,10 @@ import type {
 export function useQualityChecks(
   organizationId: bigint,
   initialData?: QualityCheck[],
+  enabled = true,
 ) {
   return useQuery<QualityCheck[]>({
+    enabled,
     queryKey: ['quality-checks', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
@@ -144,8 +146,10 @@ export function useQualityAlerts(
 export function useQualityTeams(
   organizationId: bigint,
   initialData?: QueryRows,
+  enabled = true,
 ) {
   return useQuery<QueryRows>({
+    enabled,
     queryKey: ['quality-teams', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
