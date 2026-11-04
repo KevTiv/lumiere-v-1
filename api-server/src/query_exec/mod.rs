@@ -184,7 +184,7 @@ async fn read_resource_query_for_company(
         .await;
     }
 
-    if let Some(rows) = crate::workflow_reads::execute_private_workflow_query(
+    if let Some(mut rows) = crate::workflow_reads::execute_private_workflow_query(
         client,
         resource,
         organization_id,
@@ -193,6 +193,11 @@ async fn read_resource_query_for_company(
     )
     .await?
     {
+        if resource == "workflow-human-tasks-inbox" {
+            if let Some(company_id) = requested_company_id {
+                rows.retain(|row| row_company_matches(row, company_id, false));
+            }
+        }
         return Ok(rows);
     }
 

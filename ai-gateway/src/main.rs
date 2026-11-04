@@ -216,6 +216,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/harness/descriptor",
             get(routes::harness_descriptor::get_descriptor),
         )
+        .route(
+            "/v1/alpha/analytics",
+            post(routes::alpha_analytics::post_analytics),
+        )
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
