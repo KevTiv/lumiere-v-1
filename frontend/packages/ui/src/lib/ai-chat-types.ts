@@ -115,6 +115,8 @@ export interface AIChatConfig {
   placeholder?: string
   welcomeMessage?: string
   commands: AtCommand[]
+  /** Add skills, or override a built-in skill by its stable id. These prepare prompts, never execute actions on selection. */
+  skills?: readonly ChatSkill[]
   contextProviders?: ContextProvider[]
   maxMessages?: number
   enableHistory?: boolean
@@ -131,6 +133,16 @@ export interface AIChatConfig {
   /** Opens a prepared preview or reauthorizes a saved guide in the host workspace. */
   onOpenGuide?: (request: OpenGuideRequest) => void | Promise<void>
   guideLibraryHref?: string
+}
+
+export interface ChatSkill {
+  id: string
+  label: string
+  description?: string
+  prompt: string
+  /** An icon name from the chat icon registry. */
+  icon?: string
+  keywords?: readonly string[]
 }
 
 export interface ContextProvider {

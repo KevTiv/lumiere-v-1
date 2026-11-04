@@ -217,6 +217,7 @@ export { mlSnippets, reportTemplates as notebookReportTemplates } from "./lib/no
 
 // Feature components
 export * from "./ai-chat/ai-chat-panel";
+export * from "./ai-chat/action-skill-list";
 export * from "./ai-chat/chat-decision-card";
 export * from "./lib/chat-decision-types";
 export * from "./ai-chat/ai-action-draft-card";

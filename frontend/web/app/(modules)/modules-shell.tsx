@@ -621,7 +621,7 @@ function ModulesContent({
   firstOrgProfile: boolean
 }) {
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
-  const [isAIChatDocked, setIsAIChatDocked] = useState(false)
+  const [isAIChatDocked, setIsAIChatDocked] = useState(true)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -653,6 +653,7 @@ function ModulesContent({
   }, [approvalInboxCountQuery.count])
 
   const openAiChat = useCallback(() => {
+    setIsAIChatDocked(true)
     setIsAIChatOpen(true)
   }, [])
 
@@ -673,6 +674,7 @@ function ModulesContent({
             onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
             onOpenNotebook={notebookVisible ? () => setIsNotebookOpen(true) : undefined}
             onOpenAIChat={openAiChat}
+            aiChatOpen={isAIChatOpen}
           />
         }
         overlays={
@@ -681,7 +683,6 @@ function ModulesContent({
               open={isAIChatOpen}
               onClose={() => {
                 setIsAIChatOpen(false)
-                setIsAIChatDocked(false)
               }}
               docked={isAIChatDocked}
               onDockToggle={() => setIsAIChatDocked((prev) => !prev)}

@@ -19,9 +19,24 @@ type RecordRef = { kind: string; id: number; revision: number }
 type Proposal = { key: string; rule: string; source: RecordRef; targets: RecordRef[]; matchedFields: string[]; status: Status }
 type Feedback = { action: "unresolved" | "needs evidence" | "preferred match"; targetId?: number }
 
-function object(value: unknown): Record<string, unknown> {
+type PreviewObject = {
+  organization_id?: unknown
+  company_id?: unknown
+  proposals?: unknown
+  kind?: unknown
+  id?: unknown
+  revision?: unknown
+  proposal_key?: unknown
+  rule?: unknown
+  status?: unknown
+  source?: unknown
+  targets?: unknown
+  matched_fields?: unknown
+}
+
+function object(value: unknown): PreviewObject {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error()
-  return value as Record<string, unknown>
+  return value as PreviewObject
 }
 
 function recordRef(value: unknown): RecordRef {

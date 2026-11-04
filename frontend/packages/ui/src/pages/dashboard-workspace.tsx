@@ -134,34 +134,36 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
   return (
     <DashboardWorkspaceContext value={true}>
       <SidebarProvider resizable open={forceCollapsed ? false : sidebarOpen} onOpenChange={setSidebarOpen}
-        className="h-svh min-h-0 overflow-hidden bg-muted/30 text-foreground"
+        className="h-svh min-h-0 overflow-hidden bg-muted/20 text-foreground md:gap-3 md:p-3"
         style={{ "--sidebar-width-icon": "4rem" } as React.CSSProperties}>
-        {sidebar}
-        <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-transparent">
-          <header data-testid="workspace-header" className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur-sm sm:px-5">
-            <div className="flex min-w-0 items-center gap-2">
-              <WorkspaceNavigationTrigger />
-              <span className="h-4 w-px bg-border" aria-hidden="true" />
-              <MobileCompanySwitcher />
-              <Button variant="ghost" onClick={onOpenSearch} aria-label={t("workspaceShell.search", { defaultValue: "Search modules and records" })}
-                data-testid="workspace-search" className="min-w-0 gap-2 text-muted-foreground sm:w-64 sm:justify-start">
-                <Search className="size-4 shrink-0" />
-                <span className="hidden truncate text-xs sm:inline sm:text-sm">{t("workspaceShell.search", { defaultValue: "Search modules and records" })}</span>
-                <kbd className="ml-auto hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] sm:inline-block">⌘ / Ctrl K</kbd>
-              </Button>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <WorkspaceAccountMenu userProfile={userProfile} onSignOut={onSignOut} />
-              {notifications}
-            </div>
-          </header>
-          <HeaderTrailingProvider value={null}>
-            <div data-testid="workspace-content" data-content-width={width}
-              className={cn("mx-auto w-full min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7", width === "centered" && "max-w-[1600px]")}>
-              {children}
-            </div>
-          </HeaderTrailingProvider>
-        </SidebarInset>
+        <div data-testid="erp-workspace-stack" className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-2xl md:border md:border-border/70 md:shadow-sm [&_[data-slot=sidebar-container]]:absolute [&_[data-slot=sidebar-container]]:h-full">
+          {sidebar}
+          <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-background">
+            <header data-testid="workspace-header" className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur-sm sm:px-5">
+              <div className="flex min-w-0 items-center gap-2">
+                <WorkspaceNavigationTrigger />
+                <span className="h-4 w-px bg-border" aria-hidden="true" />
+                <MobileCompanySwitcher />
+                <Button variant="ghost" onClick={onOpenSearch} aria-label={t("workspaceShell.search", { defaultValue: "Search modules and records" })}
+                  data-testid="workspace-search" className="min-w-0 gap-2 text-muted-foreground sm:w-64 sm:justify-start">
+                  <Search className="size-4 shrink-0" />
+                  <span className="hidden truncate text-xs sm:inline sm:text-sm">{t("workspaceShell.search", { defaultValue: "Search modules and records" })}</span>
+                  <kbd className="ml-auto hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] sm:inline-block">⌘ / Ctrl K</kbd>
+                </Button>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <WorkspaceAccountMenu userProfile={userProfile} onSignOut={onSignOut} />
+                {notifications}
+              </div>
+            </header>
+            <HeaderTrailingProvider value={null}>
+              <div data-testid="workspace-content" data-content-width={width}
+                className={cn("mx-auto w-full min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7", width === "centered" && "max-w-[1600px]")}>
+                {children}
+              </div>
+            </HeaderTrailingProvider>
+          </SidebarInset>
+        </div>
         {overlays}
       </SidebarProvider>
     </DashboardWorkspaceContext>
