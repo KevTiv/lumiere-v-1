@@ -382,6 +382,12 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-analytics
+        paths:
+          - '~/api/ai/alpha-analytics$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-green-skills
         paths:
           - '~/api/ai/report/compose$'
