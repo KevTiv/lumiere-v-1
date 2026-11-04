@@ -9,7 +9,9 @@ for (const width of [320, 390, 768, 1440]) {
       if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url())
     })
     await page.goto("/list-toolbar", { waitUntil: "domcontentloaded" })
-    await expect(page.getByTestId("toolbar-disclosure")).toHaveAttribute("data-hydrated", "true")
+    // SSR is visible before cold client chunks finish loading. Give hydration its
+    // own bounded budget while keeping the interaction assertions at 5 seconds.
+    await expect(page.getByTestId("toolbar-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: 60_000 })
     const generic = page.getByRole("region", { name: "Generic records", exact: true })
     const search = generic.getByRole("textbox", { name: "Search records", exact: true })
     const settings = generic.getByRole("button", { name: "View settings", exact: true })

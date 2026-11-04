@@ -7,7 +7,10 @@ const apiRequests = new WeakMap<Page, string[]>()
 async function choose(page: Page, trigger: Locator, label: string | RegExp) {
   await trigger.scrollIntoViewIfNeeded()
   await trigger.click()
+  await expect(trigger).toHaveAttribute("aria-expanded", "true")
   await page.getByRole("option", { name: label, exact: typeof label === "string" }).click()
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+  await expect(trigger).toContainText(label)
 }
 async function expectBefore(first: Locator, second: Locator) {
   const secondId = await second.getAttribute("id")
@@ -126,29 +129,34 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 720 
   })
 }
 
-test("expense types show relevant inputs and keep the attached receipt during type changes", async ({ page }) => {
-  await page.getByRole("button", { name: "New expense", exact: true }).click()
-  const modal = page.getByTestId("form-modal-new-expense")
-  const receipt = modal.getByTestId("form-field-receiptFile")
-  const amount = modal.getByTestId("form-field-totalAmount")
-  const quantity = modal.getByTestId("form-field-quantity")
-  const kind = modal.getByTestId("form-field-lineKind")
-  await receipt.setInputFiles({ name: "travel-receipt.png", mimeType: "image/png", buffer: image })
-  await amount.fill("25.15")
-  await quantity.fill("2")
-  await choose(page, kind, /Mileage/)
-  await expect(modal.getByTestId("form-field-mileageDistance")).toBeVisible()
-  await expect(modal.getByTestId("form-field-mileageRateId")).toBeVisible()
-  await expect(amount).toHaveCount(0)
-  await expect(modal.getByTestId("form-field-perDiemDays")).toHaveCount(0)
-  await choose(page, kind, /PerDiem|Per diem|Daily allowance/)
-  await expect(modal.getByTestId("form-field-perDiemDays")).toBeVisible()
-  await expect(modal.getByTestId("form-field-perDiemRateId")).toBeVisible()
-  await expect(modal.getByTestId("form-field-mileageDistance")).toHaveCount(0)
-  await choose(page, kind, "Purchase")
-  await expect(amount).toHaveValue("25.15")
-  await expect(quantity).toHaveValue("2")
-  expect(await receipt.evaluate((element) => (element as HTMLInputElement).files?.[0]?.name)).toBe("travel-receipt.png")
+test.describe("expense type transitions", () => {
+  // Includes fixture hydration and three select transitions on shared CI workers.
+  test.setTimeout(60_000)
+
+  test("expense types show relevant inputs and keep the attached receipt during type changes", async ({ page }) => {
+    await page.getByRole("button", { name: "New expense", exact: true }).click()
+    const modal = page.getByTestId("form-modal-new-expense")
+    const receipt = modal.getByTestId("form-field-receiptFile")
+    const amount = modal.getByTestId("form-field-totalAmount")
+    const quantity = modal.getByTestId("form-field-quantity")
+    const kind = modal.getByTestId("form-field-lineKind")
+    await receipt.setInputFiles({ name: "travel-receipt.png", mimeType: "image/png", buffer: image })
+    await amount.fill("25.15")
+    await quantity.fill("2")
+    await choose(page, kind, /Mileage/)
+    await expect(modal.getByTestId("form-field-mileageDistance")).toBeVisible()
+    await expect(modal.getByTestId("form-field-mileageRateId")).toBeVisible()
+    await expect(amount).toHaveCount(0)
+    await expect(modal.getByTestId("form-field-perDiemDays")).toHaveCount(0)
+    await choose(page, kind, /PerDiem|Per diem|Daily allowance/)
+    await expect(modal.getByTestId("form-field-perDiemDays")).toBeVisible()
+    await expect(modal.getByTestId("form-field-perDiemRateId")).toBeVisible()
+    await expect(modal.getByTestId("form-field-mileageDistance")).toHaveCount(0)
+    await choose(page, kind, "Purchase")
+    await expect(amount).toHaveValue("25.15")
+    await expect(quantity).toHaveValue("2")
+    expect(await receipt.evaluate((element) => (element as HTMLInputElement).files?.[0]?.name)).toBe("travel-receipt.png")
+  })
 })
 
 
