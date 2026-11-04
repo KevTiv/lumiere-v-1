@@ -77,14 +77,18 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("platform fixture profile missing")?;
     let tenant_profile = find_user_profile_for_organization(ctx, ctx.sender(), f.organization_id)
         .ok_or("tenant fixture profile missing")?;
+    let platform_profile_id = platform_profile.id;
+    let tenant_profile_id = tenant_profile.id;
+    let platform_was_superuser = platform_profile.is_superuser;
+    let tenant_was_superuser = tenant_profile.is_superuser;
     ctx.db.user_profile().id().update(UserProfile {
         is_superuser: false,
-        ..platform_profile.clone()
+        ..platform_profile
     });
-    if tenant_profile.id != platform_profile.id {
+    if tenant_profile_id != platform_profile_id {
         ctx.db.user_profile().id().update(UserProfile {
             is_superuser: false,
-            ..tenant_profile.clone()
+            ..tenant_profile
         });
     }
     let owner_permission =
@@ -100,9 +104,27 @@ pub fn test_metered_shared_ledger(ctx: &ReducerContext) -> Result<(), String> {
             units_per_1k: 1,
         },
     );
-    ctx.db.user_profile().id().update(platform_profile.clone());
-    if tenant_profile.id != platform_profile.id {
-        ctx.db.user_profile().id().update(tenant_profile);
+    let platform_profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(platform_profile_id)
+        .ok_or("platform fixture profile disappeared")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: platform_was_superuser,
+        ..platform_profile
+    });
+    if tenant_profile_id != platform_profile_id {
+        let tenant_profile = ctx
+            .db
+            .user_profile()
+            .id()
+            .find(tenant_profile_id)
+            .ok_or("tenant fixture profile disappeared")?;
+        ctx.db.user_profile().id().update(UserProfile {
+            is_superuser: tenant_was_superuser,
+            ..tenant_profile
+        });
     }
     owner_permission.map_err(|error| {
         format!("Owner wildcard fixture lost its ordinary configure permission: {error}")
