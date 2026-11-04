@@ -14365,12 +14365,15 @@
       "units": "units",
       "reservationStatus": "Reservation {{status}}",
       "inspect": "Inspect",
-      "openRun": "Open run"
+      "openRun": "Open run",
+      "meteredRequest": "Metered service request",
+      "summaryWithoutTokens": "Steps: {{steps}} · Started: {{started}}"
     },
     "ux": {
       "observation": {
         "unknown": "The result of a provider request is unknown. Inspect the history before starting another request.",
-        "settled": "Settled usage: {{amount}} {{currency}}"
+        "settled": "Settled usage: {{amount}} {{currency}}",
+        "meteredUnavailable": "Metered usage is pending or unavailable."
       },
       "reportAnalysis": {
         "description": "Ask a question about this company’s reports, choose an available assistant, and review the answer against its sources."
