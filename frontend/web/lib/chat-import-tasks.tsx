@@ -224,5 +224,9 @@ export function useChatImportTasks(args: {
     </Dialog> : null}
   </div> : null
 
-  return { onImportFiles: visible?.available ? importFiles : undefined, content }
+  return {
+    onImportFiles: visible?.available ? importFiles : undefined,
+    fileNames: visible?.tasks.flatMap(task => task.files.map(file => file.fileName)),
+    content,
+  }
 }

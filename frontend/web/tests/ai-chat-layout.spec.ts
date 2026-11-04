@@ -25,6 +25,9 @@ for (const width of [320, 390, 768, 1024, 1440]) {
       expect(bounds.width).toBe(width)
     }
     await input.fill("Keep this question")
+    await expect(panel.getByRole("group", { name: "ERP quick actions" })).toBeHidden()
+    await expect(panel.locator("header")).toHaveCSS("border-bottom-width", "0px")
+    await panel.getByRole("button", { name: "Skills", exact: true }).click()
     await panel.getByRole("button", { name: "Create a draft", exact: true }).click()
     await expect(input).toHaveValue("Keep this question")
     await expect(panel.getByRole("button", { name: "Create a draft", exact: true })).toHaveAttribute("aria-pressed", "true")
@@ -55,6 +58,7 @@ for (const width of [390, 1440]) {
     await page.getByRole("button", { name: "Ask Lumière", exact: true }).last().click()
     const panel = page.getByTestId("erp-ai-chat-panel")
     const input = panel.getByTestId("erp-ai-chat-input")
+    await panel.getByRole("button", { name: "Skills", exact: true }).click()
     const list = panel.getByRole("region", { name: "Skills" })
     expect(await list.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
     await list.hover()

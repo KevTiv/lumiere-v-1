@@ -39,6 +39,9 @@ describe("AI chat workspace", () => {
     expect(screen.queryByRole("button", { name: "aiChat.starters.importReview.label" })).toBeNull()
     expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Keep my question\n\naiChat.starters.sourceHistory.prompt")
     expect(onSendMessage).not.toHaveBeenCalled()
+    rerender(<AIChatPanel open docked onClose={vi.fn()} onSendMessage={onSendMessage} context={{ route: "/sales" }} />)
+    expect(screen.queryByRole("button", { name: "aiChat.starters.quotationHelp.label" })).toBeNull()
+    expect(screen.queryByRole("group", { name: "aiChat.quickActions.label" })).toBeNull()
   })
 
   it("prepares ERP actions without sending or replacing unsent work, including after a reply", async () => {
@@ -47,6 +50,7 @@ describe("AI chat workspace", () => {
     await screen.findByText("Review this invoice.")
     const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
     fireEvent.change(input, { target: { value: "Keep my invoice question" } })
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.skills" }))
     fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
     expect(input.value).toBe("Keep my invoice question")
     expect(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }).getAttribute("aria-pressed")).toBe("true")
@@ -96,6 +100,7 @@ describe("AI chat workspace", () => {
   it("removes a selected skill without changing the typed draft or an in-progress slash query", () => {
     render(<AIChatPanel open onClose={vi.fn()} />)
     const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.skills" }))
     fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
     fireEvent.change(input, { target: { value: "Keep this /find" } })
     fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.remove" }))
@@ -106,6 +111,7 @@ describe("AI chat workspace", () => {
   it("restores a failed request without duplicating selected skill prompts on retry", async () => {
     const onSendMessage = vi.fn().mockRejectedValueOnce(new Error("Retry this request")).mockResolvedValue({ content: "Prepared." })
     render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} />)
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.deck.skills" }))
     fireEvent.click(screen.getByRole("button", { name: "aiChat.quickActions.createDraft" }))
     fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "New invoice" } })
     fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
@@ -137,7 +143,10 @@ describe("AI chat workspace", () => {
 
   it("accepts multiple files from the picker and clears it for future selection", async () => {
     const onImportFiles = vi.fn(async () => {})
-    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} />)
+    render(<AIChatPanel open docked onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} importFileNames={["saved-counts.csv"]} />)
+    expect(screen.queryByRole("button", { name: "aiChat.workspace.addFiles" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    expect(screen.getByRole("listitem").textContent).toBe("saved-counts.csv")
     const files = [new File(["name\nEggs"], "products.csv"), new File(["workbook"], "counts.XLSX")]
     const input = screen.getByTestId("erp-ai-chat-file-input") as HTMLInputElement
     const click = vi.spyOn(input, "click")
