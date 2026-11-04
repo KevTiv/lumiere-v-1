@@ -16,6 +16,7 @@ export default function ActivationFixture() {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } }))
   const [companyId, setCompanyId] = useState<number | null>(2)
   const [ready, setReady] = useState(true)
+  const [compact, setCompact] = useState(false)
   return <QueryClientProvider client={client}><LumiereApiProvider client={api}><I18nProvider>
     <RBACProvider initialUser={user} initialRoles={[]} initialPolicies={policies} permissionsReady={ready}>
       <main className="mx-auto max-w-5xl space-y-4 p-3 sm:p-6">
@@ -25,8 +26,9 @@ export default function ActivationFixture() {
           <button onClick={() => setCompanyId(3)}>Company 3</button>
           <button onClick={() => setCompanyId(null)}>No company</button>
           <button onClick={() => setReady(value => !value)}>Toggle permissions</button>
+          <button onClick={() => setCompact(value => !value)}>Compact completed setup</button>
         </div>
-        <ActivationChecklistPanel organizationId={1} companyId={companyId} />
+        <ActivationChecklistPanel organizationId={1} companyId={companyId} collapseWhenReady={compact} />
       </main>
     </RBACProvider>
   </I18nProvider></LumiereApiProvider></QueryClientProvider>

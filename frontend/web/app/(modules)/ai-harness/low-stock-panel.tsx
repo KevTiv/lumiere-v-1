@@ -45,6 +45,7 @@ import type { LowStockScanResult } from "@lumiere/erp-shared/ai-low-stock-schema
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
+import { HarnessInspector } from "./harness-inspector"
 import { policyOutcomeLabel, riskClassLabel } from "./enum-labels"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
@@ -104,12 +105,10 @@ export function LowStockPanel({
           <h2 className="text-xl font-semibold tracking-tight">
             {t("aiHarness.lowStock.title")}
           </h2>
-          <Badge variant="default">
-            {t("aiHarness.lowStock.greenSkillBadge")}
-          </Badge>
+
         </div>
         <p className="text-sm text-muted-foreground">
-          {t("aiHarness.lowStock.description")}
+          {t("aiHarness.ux.lowStock.description", { defaultValue: "Find products whose stock is below your chosen threshold, then review which ones need attention." })}
         </p>
       </div>
 
@@ -125,13 +124,13 @@ export function LowStockPanel({
         <CardContent>
           <FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel>{t("aiHarness.lowStock.companyLabel")}</FieldLabel>
+              <FieldLabel htmlFor="low-stock-company">{t("aiHarness.lowStock.companyLabel")}</FieldLabel>
               <Select
                 value={selectedCompanyId}
                 onValueChange={setSelectedCompanyId}
                 disabled={companyOptions.length === 0}
               >
-                <SelectTrigger>
+                <SelectTrigger id="low-stock-company">
                   <Building2 data-icon="inline-start" />
                   <SelectValue
                     placeholder={t("aiHarness.lowStock.companyPlaceholder")}
@@ -148,12 +147,13 @@ export function LowStockPanel({
             </Field>
 
             <Field>
-              <FieldLabel>{t("aiHarness.lowStock.thresholdLabel")}</FieldLabel>
+              <FieldLabel htmlFor="low-stock-threshold">{t("aiHarness.lowStock.thresholdLabel")}</FieldLabel>
               <InputGroup>
                 <InputGroupAddon align="inline-start">
                   <PackageSearch />
                 </InputGroupAddon>
                 <InputGroupInput
+                  id="low-stock-threshold"
                   type="number"
                   min={0}
                   step={1}
@@ -218,15 +218,12 @@ function LowStockResultView({ result }: { result: LowStockScanResult }) {
             <Badge variant={decisionBadgeVariant(decision.outcome)}>
               {policyOutcomeLabel(t, decision.outcome)}
             </Badge>
-            {decision.risk && (
-              <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge>
-            )}
+
           </div>
           {decision.reasons.length > 0 && (
             <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-muted-foreground">
               {decision.reasons.map((reason) => (
                 <li key={reason.code}>
-                  <span className="font-medium">[{reason.code}]</span>{" "}
                   {reason.message}
                 </li>
               ))}
@@ -289,6 +286,13 @@ function LowStockResultView({ result }: { result: LowStockScanResult }) {
         </>
       )}
 
+      <p className="text-sm leading-6 text-muted-foreground">{decision.outcome === "allow" ? t("aiHarness.ux.lowStock.nextStep", { defaultValue: "Review the quantities and reorder levels before deciding what to replenish. This scan does not create a purchase order or change stock." }) : t("aiHarness.ux.blockedNextStep", { defaultValue: "Review the explanation above before trying again. No result should be treated as approved while this check is blocked." })}</p>
+      <HarnessInspector title={t("aiHarness.inspector.policy", { defaultValue: "Technical inspector: policy details" })}>
+        <p className="text-sm">{t("aiHarness.lowStock.description")}</p>
+        <Badge variant="outline">{t("aiHarness.lowStock.greenSkillBadge")}</Badge>
+        {decision.risk ? <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge> : null}
+        {decision.reasons.map((reason) => <p key={reason.code} className="text-sm"><code>{reason.code}</code>{" "}{reason.message}</p>)}
+      </HarnessInspector>
       <HarnessAuditTrailCard audit={result.audit} />
     </div>
   )

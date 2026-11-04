@@ -91,7 +91,7 @@ export function ReportAnalysisPanel({ organizationId, companies, savedRun }: {
     <Card>
       <CardHeader>
         <CardTitle>{t("aiHarness.reportAnalysis.title")}</CardTitle>
-        <CardDescription>{t("aiHarness.reportAnalysis.description")}</CardDescription>
+        <CardDescription>{t("aiHarness.ux.reportAnalysis.description", { defaultValue: "Ask a question about this company’s reports, choose an available assistant, and review the answer against its sources." })}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
@@ -116,7 +116,7 @@ export function ReportAnalysisPanel({ organizationId, companies, savedRun }: {
             availableAgents.length === 0 && <p role="status">{t("aiHarness.reportAnalysis.noAgents")}</p>}
           <Field>
             <FieldLabel htmlFor="report-analysis-query">{t("aiHarness.reportAnalysis.question")}</FieldLabel>
-            <Textarea id="report-analysis-query" value={query} onChange={(event) => { setQuery(event.target.value); analysis.reset() }} disabled={analysis.isPending} maxLength={4000} required rows={4} />
+            <Textarea variant="plain" id="report-analysis-query" value={query} onChange={(event) => { setQuery(event.target.value); analysis.reset() }} disabled={analysis.isPending} maxLength={4000} required rows={4} />
           </Field>
           {selectedAgentId && <div aria-live="polite">
             {readinessLoading || !matchingReadiness ? <p role="status">{t("aiHarness.reportReadiness.checking")}</p> : matchingReadiness.status === "blocked" ?

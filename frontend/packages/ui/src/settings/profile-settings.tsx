@@ -1,5 +1,7 @@
 "use client"
 
+import { validCalendarTimezone } from "@lumiere/erp-shared/calendar-timezone"
+
 import { useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useCurrentUserProfile, useUpdateUserProfile } from "@lumiere/query-hooks/hooks/auth"
@@ -84,11 +86,13 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
                 setProfileError(null)
                 setSaved(false)
                 try {
+                  const timezone = validCalendarTimezone(form.get("timezone"))
+                  if (!timezone) { setProfileError(t("settings.profile.invalidTimezone", { defaultValue: "Enter a valid IANA timezone, such as Europe/Amsterdam or Africa/Kigali." })); return }
                   await saveProfile.mutateAsync({
                     name: String(form.get('name') ?? '').trim(),
                     firstName: String(form.get('firstName') ?? '').trim(),
                     lastName: String(form.get('lastName') ?? '').trim(),
-                    timezone: String(form.get('timezone') ?? 'UTC'),
+                    timezone,
                     language: String(form.get('language') ?? 'en'),
                   })
                   setSaved(true)

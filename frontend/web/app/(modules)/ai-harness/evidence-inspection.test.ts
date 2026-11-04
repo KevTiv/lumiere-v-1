@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapEvidenceInspection } from './evidence-inspection'
+import { evidenceInspectionMatchesTarget, mapEvidenceInspection } from './evidence-inspection'
+
+test('binds inspection results to the selected record or exact workflow version and node', () => {
+  const claim = mapEvidenceInspection({ targetKind: 'claim', targetId: 8 })!
+  assert.equal(evidenceInspectionMatchesTarget(claim, { kind: 'claim', id: 8 }), true)
+  assert.equal(evidenceInspectionMatchesTarget(claim, { kind: 'claim', id: 9 }), false)
+  assert.equal(evidenceInspectionMatchesTarget(claim, { kind: 'decision', id: 8 }), false)
+  const step = mapEvidenceInspection({ targetKind: 'component', targetId: 7, revisions: [{ id: 7, artifactRef: 'workflow-version:42', componentKey: 'node:review', version: 2 }] })!
+  assert.equal(evidenceInspectionMatchesTarget(step, { kind: 'workflow_step', id: 42, nodeKey: 'review' }), true)
+  assert.equal(evidenceInspectionMatchesTarget(step, { kind: 'workflow_step', id: 43, nodeKey: 'review' }), false)
+  assert.equal(evidenceInspectionMatchesTarget(step, { kind: 'workflow_step', id: 42, nodeKey: 'other' }), false)
+})
 
 test('maps reviewer lineage and bounds passage excerpts', () => {
   const view = mapEvidenceInspection({

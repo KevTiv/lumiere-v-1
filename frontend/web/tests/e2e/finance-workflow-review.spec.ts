@@ -331,10 +331,8 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     await expect(page.getByRole("menu")).toHaveCount(0)
     await gotoModule(page, "/accounting?tab=dashboard", "accounting")
     await expect(module.getByTestId("module-workspace-accounting-overview")).toHaveAttribute("aria-current", "page")
-    await expect(module.getByTestId("module-tab-accounting-dashboard")).toHaveAttribute(
-      "aria-selected",
-      "true",
-    )
+    await expect(module.getByTestId("module-tab-accounting-dashboard")).toHaveCount(0)
+    await expect(module.getByTestId("module-panel-accounting-dashboard")).toBeVisible()
     expect(writes).toEqual([])
   })
 })

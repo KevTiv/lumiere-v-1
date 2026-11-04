@@ -37,10 +37,13 @@ function text(value: unknown, max: number): string {
 
 export function mapRunHistory(payload: unknown): RunHistoryView | null {
   const root = record(payload)
-  if (!root || !Array.isArray(root.runs)) return null
-  const cursor = root.nextCursor == null ? null : text(root.nextCursor, 32)
+  if (!root || !Array.isArray(root.runs) || root.runs.length > 50) return null
+  if (root.nextCursor !== null && typeof root.nextCursor !== 'string') return null
+  const cursor = root.nextCursor === null ? null : text(root.nextCursor, 32)
   if (cursor !== null && !/^[A-Za-z0-9_-]{11}$/.test(cursor)) return null
-  const runs = root.runs.slice(0, 50).flatMap((value) => {
+  const runs: RunHistoryView['runs'] = []
+  const ids = new Set<number>()
+  for (const value of root.runs) {
     const item = record(value)
     const runId = item && positiveInteger(item.runId)
     const skillId = item && positiveInteger(item.skillId)
@@ -49,8 +52,9 @@ export function mapRunHistory(payload: unknown): RunHistoryView | null {
     const tokensUsed = item && nonnegativeInteger(item.tokensUsed)
     const status = item ? text(item.status, 64) : ''
     const startedAt = item ? text(item.startedAt, 128) : ''
-    if (!item || !runId || !skillId || !agentId || stepCount === null || tokensUsed === null || !status || !startedAt) return []
-    return [{
+    if (!item || !runId || !skillId || !agentId || stepCount === null || tokensUsed === null || !status || !startedAt || ids.has(runId)) return null
+    ids.add(runId)
+    runs.push({
       runId,
       status,
       skillId,
@@ -60,8 +64,8 @@ export function mapRunHistory(payload: unknown): RunHistoryView | null {
       startedAt,
       completedAt: item.completedAt == null ? null : text(item.completedAt, 128) || null,
       economics: item.economics == null ? null : mapRunEconomics(item.economics),
-    }]
-  })
+    })
+  }
   return { runs, nextCursor: cursor }
 }
 

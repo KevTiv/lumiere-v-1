@@ -11,11 +11,12 @@ import { calendarEventFormRange } from "./calendar-event-range"
 
 export function toCreateCalendarEventParams(
   formData: Record<string, unknown>,
+  timeZone?: string,
 ): CreateCalendarEventParams | null {
   const name = String(formData.name ?? "").trim()
   if (!name) return null
 
-  const range = calendarEventFormRange(formData)
+  const range = calendarEventFormRange(formData, { timeZone })
   if (!range) return null
 
   return {

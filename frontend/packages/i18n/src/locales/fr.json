@@ -166,7 +166,8 @@
         "search": "Rechercher…",
         "empty": "Aucun résultat",
         "remove": "Retirer {{value}}"
-      }
+      },
+      "setupOpensNewTab": "s’ouvre dans un nouvel onglet"
     },
     "formPreview": {
       "label": "Aperçu"
@@ -290,7 +291,9 @@
       "pivotCount": "Nombre",
       "pivotEmpty": "Non défini",
       "pivotGroupBy": "Regrouper par",
-      "pivotMixedCurrencies": "Ces enregistrements utilisent plusieurs devises ({{currencies}}). Les totaux additionnent les montants sans conversion.",
+      "pivotMixedCurrencies": "Ces enregistrements utilisent plusieurs devises ({{currencies}}). Les montants en devises différentes sont exclus du résumé et du CSV.",
+      "pivotScope": "Résumé de {{recordCount}} enregistrements disponibles. Les filtres et la pagination de la liste ne sont pas repris.",
+      "pivotUnknownCurrency": "Les montants sont exclus du résumé et du CSV car une devise unique n’a pas pu être vérifiée pour tous les enregistrements.",
       "pivotNoData": "Aucun enregistrement à résumer",
       "pivotNone": "Aucun",
       "pivotTotal": "Total",
@@ -308,7 +311,8 @@
         "clear": "Effacer les filtres",
         "description": "Essayez une autre recherche ou effacez les filtres.",
         "title": "Aucun enregistrement correspondant"
-      }
+      },
+      "groupBy": "Regrouper par"
     },
     "retry": "Réessayer",
     "recordsDenied": "Vous n’avez pas accès à ces enregistrements.",
@@ -432,6 +436,9 @@
       "unavailable": "Suggestions indisponibles. Remplissez le formulaire ou vérifiez les prérequis.",
       "suggest": "Proposer des valeurs",
       "apply": "Appliquer les suggestions"
+    },
+    "listToolbar": {
+      "viewSettings": "Paramètres d’affichage"
     }
   },
   "navigation": {
@@ -4404,7 +4411,8 @@
       "emailVerificationHint": "La modification de l’e-mail nécessite la vérification du fournisseur d’identité et l’approbation d’un administrateur.",
       "loadError": "Impossible de charger votre profil. Rechargez la page pour réessayer.",
       "securityProviderHint": "Votre fournisseur d’identité gère votre mot de passe et la sécurité de connexion.",
-      "manageSecurity": "Gérer la sécurité de connexion"
+      "manageSecurity": "Gérer la sécurité de connexion",
+      "invalidTimezone": "Saisissez un fuseau horaire IANA valide, comme Europe/Amsterdam ou Africa/Kigali."
     },
     "customFields": {
       "title": "Mes champs personnalisés",

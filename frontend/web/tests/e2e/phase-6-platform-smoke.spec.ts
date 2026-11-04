@@ -131,7 +131,7 @@ test.describe("Phase 6 platform smoke", { tag: "@phase-6" }, () => {
 
   test("workflows module loads without error", async ({ page }) => {
     await gotoModule(page, "/workflows", "workflows")
-    await expect(page.getByTestId("module-tab-workflows-dashboard")).toBeVisible()
+    await expect(page.getByTestId("module-panel-workflows-dashboard")).toBeVisible()
     await expect(page.getByTestId("quick-action-new_workflow")).toBeVisible()
     await expectNoAppError(page)
   })

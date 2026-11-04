@@ -109,6 +109,7 @@ describe("EntityTable saved view", () => {
     await screen.findByText("SO-001")
     expect(screen.queryByText("SO-003")).toBeNull()
 
+    fireEvent.click(screen.getByRole("button", { name: "View settings", exact: true }))
     fireEvent.click(screen.getByTestId("entity-saved-filters"))
     fireEvent.change(await screen.findByTestId("entity-saved-filter-name"), { target: { value: "Drafts" } })
     fireEvent.click(screen.getByTestId("entity-saved-filter-save"))

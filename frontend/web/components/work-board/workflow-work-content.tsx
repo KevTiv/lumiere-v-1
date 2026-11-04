@@ -605,7 +605,7 @@ export function WorkflowWorkContent({
                 pendingMove: t("workBoard.saving"),
               }}
             />
-          ) : (
+          ) : rows.length > 0 ? (
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -646,7 +646,7 @@ export function WorkflowWorkContent({
                 </tbody>
               </table>
             </div>
-          )}
+          ) : null}
           {query.hasNextPage && (
             <Button
               variant="outline"

@@ -2417,7 +2417,7 @@ export const documentsModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "entity",
       entityConfig: documentsTableConfig(t),
       createForm: newDocumentForm(t),
-      createLabel: "Upload Document",
+      createLabel: t("documents.browser.upload"),
       createAction: "uploadDocument",
     },
     {

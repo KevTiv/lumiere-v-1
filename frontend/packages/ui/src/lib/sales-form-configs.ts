@@ -161,6 +161,7 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
 
 export const newPricelistForm = (t: TFunction): FormConfig => ({
   id: "new-pricelist",
+  submitLabel: t("sales.forms.actions.newPricelist", { defaultValue: "Create price list" }),
   title: t("sales.forms.newPricelist.title"),
   description: t("sales.forms.newPricelist.description"),
   sections: [
@@ -206,6 +207,7 @@ export const newPricelistForm = (t: TFunction): FormConfig => ({
 
 export const newPricelistItemForm = (t: TFunction): FormConfig => ({
   id: "new-pricelist-item",
+  submitLabel: t("sales.forms.actions.newPricelistItem", { defaultValue: "Add price rule" }),
   title: t("sales.forms.newPricelistItem.title"),
   description: t("sales.forms.newPricelistItem.description"),
   sections: [
@@ -322,6 +324,7 @@ export const newPricelistItemForm = (t: TFunction): FormConfig => ({
 
 export const newPickingBatchForm = (t: TFunction): FormConfig => ({
   id: "new-picking-batch",
+  submitLabel: t("sales.forms.actions.newPickingBatch", { defaultValue: "Create delivery batch" }),
   title: t("sales.forms.newPickingBatch.title"),
   description: t("sales.forms.newPickingBatch.description"),
   sections: [
@@ -363,6 +366,7 @@ export const newPickingBatchForm = (t: TFunction): FormConfig => ({
 
 export const newDeliveryPriceRuleForm = (t: TFunction): FormConfig => ({
   id: "new-delivery-price-rule",
+  submitLabel: t("sales.forms.actions.newDeliveryPriceRule", { defaultValue: "Create delivery price rule" }),
   title: t("sales.forms.newDeliveryPriceRule.title"),
   description: t("sales.forms.newDeliveryPriceRule.description"),
   sections: [
@@ -428,6 +432,7 @@ export const newDeliveryPriceRuleForm = (t: TFunction): FormConfig => ({
 
 export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
   id: "new-delivery-carrier",
+  submitLabel: t("sales.forms.actions.newDeliveryCarrier", { defaultValue: "Create delivery carrier" }),
   title: t("sales.forms.newDeliveryCarrier.title"),
   description: t("sales.forms.newDeliveryCarrier.description"),
   sections: [
@@ -603,6 +608,7 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
 
 export const newShippingMethodForm = (t: TFunction): FormConfig => ({
   id: "new-shipping-method",
+  submitLabel: t("sales.forms.actions.newShippingMethod", { defaultValue: "Create shipping method" }),
   title: t("sales.forms.newShippingMethod.title"),
   description: t("sales.forms.newShippingMethod.description"),
   sections: [
@@ -691,6 +697,7 @@ export const newShippingMethodForm = (t: TFunction): FormConfig => ({
 
 export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
   id: "new-pos-payment-method",
+  submitLabel: t("sales.forms.actions.newPosPaymentMethod", { defaultValue: "Create payment method" }),
   title: t("sales.forms.newPosPaymentMethod.title"),
   description: t("sales.forms.newPosPaymentMethod.description"),
   sections: [
@@ -805,6 +812,7 @@ export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
 
 export const newLoyaltyProgramForm = (t: TFunction): FormConfig => ({
   id: "new-loyalty-program",
+  submitLabel: t("sales.forms.actions.newLoyaltyProgram", { defaultValue: "Create loyalty program" }),
   title: t("sales.forms.newLoyaltyProgram.title"),
   description: t("sales.forms.newLoyaltyProgram.description"),
   sections: [
@@ -893,6 +901,7 @@ export const newLoyaltyProgramForm = (t: TFunction): FormConfig => ({
 
 export const newLoyaltyCardForm = (t: TFunction): FormConfig => ({
   id: "new-loyalty-card",
+  submitLabel: t("sales.forms.actions.newLoyaltyCard", { defaultValue: "Create loyalty card" }),
   title: t("sales.forms.newLoyaltyCard.title"),
   description: t("sales.forms.newLoyaltyCard.description"),
   sections: [
@@ -1064,6 +1073,7 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
 /** Draft line edits — quantity/price/discount (mirrors purchasing edit-line form). */
 export const editSaleOrderLineForm = (t: TFunction): FormConfig => ({
   id: "edit-sale-order-line",
+  submitLabel: t("sales.forms.actions.editSaleOrderLine", { defaultValue: "Save order line" }),
   title: t("sales.forms.editSaleOrderLine.title", {
     defaultValue: "Edit sale order line",
   }),
@@ -1225,6 +1235,7 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
 
 export const addReturnOrderLineForm = (t: TFunction): FormConfig => ({
   id: "add-return-order-line",
+  submitLabel: t("sales.forms.actions.addReturnOrderLine", { defaultValue: "Add return line" }),
   title: t("sales.forms.addReturnOrderLine.title"),
   description: t("sales.forms.addReturnOrderLine.description"),
   sections: [
@@ -1286,6 +1297,7 @@ export const newReturnOrderForm = (t: TFunction): FormConfig => {
   const lineFields = addReturnOrderLineForm(t).sections.flatMap((s) => s.fields)
   return {
     id: "new-return-order",
+    submitLabel: t("sales.forms.actions.newReturnOrder", { defaultValue: "Create return order" }),
     title: t("sales.forms.newReturnOrder.title"),
     description: t("sales.forms.newReturnOrder.description"),
     sections: [

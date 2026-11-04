@@ -34,6 +34,7 @@ export function fileKindOf(mimetype: string | null | undefined, fileName: string
 
 /** Plain-language size: 1536 → "1.5 KB". */
 export function formatFileSize(bytes: unknown): string {
+  if (bytes == null || bytes === "" || !["number", "bigint", "string"].includes(typeof bytes)) return "—"
   const n = Number(bytes)
   if (!Number.isFinite(n) || n < 0) return "—"
   if (n < 1024) return `${n} B`

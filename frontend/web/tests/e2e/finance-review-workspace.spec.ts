@@ -167,6 +167,7 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
     const table = activeTabEntityTable(page)
     const row = table.locator('[data-testid^="entity-row-"]').first()
     const firstId = await row.getAttribute("data-testid")
+    await table.getByRole("button", { name: "View settings", exact: true }).click()
     await table.getByRole("button", { name: "Comfortable", exact: true }).click()
     const tall = (await row.boundingBox())!.height
     await table.getByRole("button", { name: "Compact", exact: true }).click()

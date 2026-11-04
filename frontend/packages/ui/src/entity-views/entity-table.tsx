@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, type MouseEvent } from "react"
 import { useTableDensity } from "../hooks/use-table-density"
 import { TableDensityControl } from "../composed/table-density-control"
+import { ListToolbar, ListToolbarFields, ListToolbarField, ListToolbarActions, ListToolbarSettings, ListToolbarSettingsTrigger } from "../composed/list-toolbar"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
@@ -423,6 +424,14 @@ export function EntityTable({
   // Row actions only appear once rows are selected; inapplicable ones stay
   // visible but disabled so the selection's state is still explained.
   const selectionActions = actions.filter((action) => action.requiresSelection)
+  const toolbarActions = actions.filter((action) => !action.requiresSelection)
+  const toolbarGroups = new Map<string, { label: string; actions: EntityAction[] }>()
+  for (const action of toolbarActions) {
+    if (!action.toolbarGroup) continue
+    const group = toolbarGroups.get(action.toolbarGroup.id) ?? { label: action.toolbarGroup.label, actions: [] }
+    group.actions.push(action)
+    toolbarGroups.set(action.toolbarGroup.id, group)
+  }
   const renderActionButton = (action: EntityAction) => {
     const Icon = action.icon
     const isPending = pendingActionIds.has(action.id)
@@ -547,6 +556,8 @@ export function EntityTable({
   const [density, setDensity] = useTableDensity(financeProfile ? (config.listViewKey ?? densityKey) : undefined)
   const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
   const canExport = (allowExport ?? config.allowExport ?? false) && columns.some((col) => !col.sensitive)
+  const hasViewSettings = financeProfile || Boolean(config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable)) || groupableFilters.length > 0 || permittedColumns.length > 1
+  const canClearFilters = Boolean(search.trim()) || Object.entries(persistedFilters).some(([key, value]) => value && value !== "__all__" && !Object.hasOwn(initialFilters ?? {}, key)) || Boolean(onInitialFilterClear && Object.keys(initialFilters ?? {}).length > 0) || Boolean(externalFilter?.active && externalFilter.onClear)
 
   return (
     <TooltipProvider>
@@ -584,29 +595,29 @@ export function EntityTable({
             ))}
           </div>
         )}
-        {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions) && (
-          <div
-            className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs"
-            data-testid="entity-table-toolbar"
-          >
+        {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions || hasViewSettings || canExport) && (
+          <ListToolbar data-testid="entity-table-toolbar">
+            <ListToolbarFields>
             {config.searchable && (
-              <div className="relative min-w-0 flex-1 basis-48">
+              <ListToolbarField label={t("common.search", { defaultValue: "Search" })}>
+                <div className="relative min-w-0">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   aria-label="Search records"
                   placeholder={config.searchPlaceholder ?? "Search…"}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="min-h-11 pl-9"
                 />
-              </div>
+                </div>
+              </ListToolbarField>
             )}
             {config.filters?.map((f) => {
               const raw = filters[f.key] ?? "__all__"
               if (f.faceted && (f.options?.length ?? 0) > 0) {
                 return (
+                  <ListToolbarField key={f.key} label={f.label}>
                   <EntityFacetFilter
-                    key={f.key}
                     filter={f}
                     value={raw}
                     rows={data}
@@ -616,13 +627,14 @@ export function EntityTable({
                       setPersistedFilters((prev) => ({ ...prev, [f.key]: val }))
                     }}
                   />
+                  </ListToolbarField>
                 )
               }
               const selectValue =
                 raw === "__all__" ? "__all__" : radixSelectControlledValue(raw, f.options)
               return (
+                <ListToolbarField key={f.key} label={f.label}>
                 <Select
-                  key={f.key}
                   value={selectValue}
                   disabled={Object.hasOwn(initialFilters ?? {}, f.key) && !onInitialFilterClear}
                   onValueChange={(val) => {
@@ -635,7 +647,7 @@ export function EntityTable({
                     }))
                   }}
                 >
-                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label={f.label}>
+                  <SelectTrigger className="min-h-11 w-full min-w-0 max-w-full" aria-label={f.label}>
                     <SelectValue placeholder={f.placeholder ?? f.label} />
                   </SelectTrigger>
                   <SelectContent>
@@ -650,9 +662,67 @@ export function EntityTable({
                     ))}
                   </SelectContent>
                 </Select>
+                </ListToolbarField>
               )
             })}
-            <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center gap-2">
+              {hasViewSettings ? <ListToolbarSettingsTrigger /> : null}
+            </ListToolbarFields>
+            <ListToolbarActions>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                disabled={!canClearFilters}
+                data-testid="entity-clear-filters"
+              >
+                  {t("common.entityView.noResults.clear", { defaultValue: "Clear filters" })}
+              </Button>
+              {canExport && sorted.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportCsv}
+                  aria-label={exportLabel}
+                  className="h-auto min-h-7 max-w-full whitespace-normal"
+                  data-testid="entity-table-export"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  {exportLabel}
+                </Button>
+              )}
+              {toolbarActions.filter((action) => !action.toolbarGroup).map(renderActionButton)}
+              {Array.from(toolbarGroups, ([id, group]) => (
+                <DropdownMenu key={id}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid={`entity-action-group-${id}`}>
+                      {group.label}
+                      <MoreHorizontal aria-hidden="true" className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="max-h-80 max-w-[calc(100vw-2rem)] overflow-y-auto">
+                    {group.actions.map((action) => {
+                      const Icon = action.icon
+                      const pending = pendingActionIds.has(action.id)
+                      return <DropdownMenuItem
+                        key={action.id}
+                        className="min-h-11"
+                        disabled={pending || (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)}
+                        aria-busy={pending || undefined}
+                        variant={action.variant === "destructive" ? "destructive" : "default"}
+                        onSelect={() => runAction(action)}
+                        data-testid={`entity-action-${action.id}`}
+                      >
+                        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : Icon ? <Icon className="h-4 w-4" /> : null}
+                        <span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{action.label}</span>
+                      </DropdownMenuItem>
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ))}
+
+            </ListToolbarActions>
+            {hasViewSettings ? <ListToolbarSettings>
+              <div className="flex min-w-0 max-w-full flex-wrap items-end gap-3">
               {financeProfile ? <TableDensityControl value={density} onChange={setDensity} /> : null}
               {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
                 <Popover>
@@ -670,7 +740,7 @@ export function EntityTable({
                     <Bookmark className="mr-2 h-4 w-4" />
                     Saved filters
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-72 space-y-3">
+                  <PopoverContent align="end" className="w-72 max-w-[calc(100vw-2rem)] space-y-3">
                     {savedFilters.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         No saved filters yet. Set a search or filters, then save them under a name.
@@ -682,7 +752,7 @@ export function EntityTable({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="min-w-0 flex-1 justify-start"
+                              className="min-h-11 min-w-0 flex-1 justify-start"
                               data-testid={`entity-saved-filter-apply-${saved.name}`}
                               onClick={() => {
                                 setSearch(saved.search)
@@ -697,6 +767,7 @@ export function EntityTable({
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="min-h-11 min-w-11"
                               aria-label={`Delete saved filter ${saved.name}`}
                               data-testid={`entity-saved-filter-delete-${saved.name}`}
                               onClick={() => setSavedFilters((prev) => removeSavedFilter(prev, saved.name))}
@@ -718,6 +789,7 @@ export function EntityTable({
                       }}
                     >
                       <Input
+                        className="min-h-11 min-w-0"
                         aria-label="Name for the current filters"
                         placeholder="Name for current filters"
                         value={newFilterName}
@@ -728,6 +800,7 @@ export function EntityTable({
                         type="submit"
                         size="sm"
                         disabled={!newFilterName.trim()}
+                        className="min-h-11"
                         data-testid="entity-saved-filter-save"
                       >
                         Save
@@ -737,6 +810,7 @@ export function EntityTable({
                 </Popover>
               )}
               {groupableFilters.length > 0 && (
+                <ListToolbarField label={t("common.entityView.groupBy", { defaultValue: "Group by" })}>
                 <Select
                   value={view.groupBy ?? "__none__"}
                   onValueChange={(val) =>
@@ -755,6 +829,7 @@ export function EntityTable({
                     ))}
                   </SelectContent>
                 </Select>
+                </ListToolbarField>
               )}
               {permittedColumns.length > 1 && (
                 <DropdownMenu>
@@ -770,10 +845,11 @@ export function EntityTable({
                       Columns
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="max-h-[min(70vh,28rem)] max-w-[calc(100vw-2rem)] overflow-y-auto">
                     <DropdownMenuLabel>Show columns</DropdownMenuLabel>
                     {permittedColumns.map((col) => (
                       <DropdownMenuCheckboxItem
+                        className="min-h-11"
                         key={col.key}
                         checked={!view.hiddenColumns.includes(col.key)}
                         onSelect={(event) => event.preventDefault()}
@@ -791,22 +867,9 @@ export function EntityTable({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {canExport && sorted.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportCsv}
-                  aria-label={exportLabel}
-                  className="h-auto min-h-7 max-w-full whitespace-normal"
-                  data-testid="entity-table-export"
-                >
-                  <FileDown className="mr-2 h-4 w-4" />
-                  {exportLabel}
-                </Button>
-              )}
-              {actions.filter((action) => !action.requiresSelection).map(renderActionButton)}
-            </div>
-          </div>
+              </div>
+            </ListToolbarSettings> : null}
+          </ListToolbar>
         )}
 
         {selectedRows.length > 0 && selectionActions.length > 0 && (
@@ -849,6 +912,11 @@ export function EntityTable({
                 {columns.map((col) => (
                   <TableHead
                     key={col.key}
+                    aria-sort={col.sortable
+                      ? sortedBy?.id === col.key
+                        ? sortedBy.desc ? "descending" : "ascending"
+                        : "none"
+                      : undefined}
                     className={cn(
                       col.width,
                       col.align === "right" && "text-right",
@@ -865,13 +933,6 @@ export function EntityTable({
                           col.align === "center" && "mx-auto",
                         )}
                         onClick={() => handleSort(col.key, col.sortable)}
-                        aria-sort={
-                          sortedBy?.id === col.key
-                            ? sortedBy.desc
-                              ? "descending"
-                              : "ascending"
-                            : "none"
-                        }
                       >
                         {col.label}
                         {getSortIcon(col.key, col.sortable)}

@@ -73,7 +73,8 @@ for (const width of [320, 390, 768, 1440]) {
       await root.getByTestId(`module-workspace-${module}-overflow`).click()
       await page.getByRole("menuitem", { name: "future-extension", exact: true }).click()
       await page.waitForURL((url) => url.searchParams.get("tab") === "future-extension")
-      await expect(root.getByTestId(`module-tab-${module}-future-extension`)).toHaveAttribute("aria-selected", "true")
+      await expect(root.getByTestId(`module-tab-${module}-future-extension`)).toHaveCount(0)
+      await expect(root.getByRole("tabpanel", { name: "future-extension", exact: true })).toBeVisible()
       await expect(page.getByTestId("navigation-content")).toContainText("future-extension content")
       await expect(page.getByRole("menu")).toHaveCount(0)
     }

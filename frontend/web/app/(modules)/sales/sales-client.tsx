@@ -7,6 +7,7 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
 import { CompanyModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
@@ -1137,16 +1138,54 @@ function SalesClientLoaded({
     return map;
   }, [users]);
 
-  const saleOrderFormConfig = useMemo(
-    () =>
+  const saleOrderFormConfig = useMemo(() => {
+    const canSetUp = (resource: string, module: string) => permissionsReady === true &&
+      checkPermission(module, 'read').allowed && checkPermission(resource, 'create').allowed;
+    const canCreateCustomer = canSetUp('contact', 'module:crm');
+    const canCreatePricelist = canSetUp('pricelist', 'module:sales');
+    const canCreateWarehouse = canSetUp('warehouse', 'module:inventory');
+    return withFormChoiceSetup(
       mergeSelectOptionsForFields(newSaleOrderForm(t), {
         partnerId: partnerFieldOptions,
         pricelistId: pricelistFieldOptions,
         warehouseId: warehouseFieldOptions,
         paymentTermId: paymentTermFieldOptions,
       }),
-    [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions],
-  );
+      {
+        partnerId: {
+          ready: contactsRead.state.status === 'ready',
+          message: canCreateCustomer
+            ? t('sales.forms.setup.customerMissing', { defaultValue: 'Add a customer in a separate tab, then return to this quotation. Your entries stay here.' })
+            : t('sales.forms.setup.customerMissingAsk', { defaultValue: 'No customers are available. Ask an administrator to add a customer, then return to this quotation.' }),
+          action: canCreateCustomer ? {
+            href: buildModuleTabHref('crm', 'contacts'),
+            label: t('sales.forms.setup.openContacts', { defaultValue: 'Open contacts' }),
+          } : undefined,
+        },
+        pricelistId: {
+          ready: pricelistsRead.state.status === 'ready',
+          message: canCreatePricelist
+            ? t('sales.forms.setup.pricelistMissing', { defaultValue: 'Create a price list with a currency in a separate tab, then return to this quotation. Your entries stay here.' })
+            : t('sales.forms.setup.pricelistMissingAsk', { defaultValue: 'No price lists are available. Ask an administrator to create a price list with a currency, then return to this quotation.' }),
+          action: canCreatePricelist ? {
+            href: buildModuleTabHref('sales', 'pricelists'),
+            label: t('sales.forms.setup.openPricelists', { defaultValue: 'Open price lists' }),
+          } : undefined,
+        },
+        warehouseId: {
+          ready: warehousesRead.state.status === 'ready',
+          message: canCreateWarehouse
+            ? t('sales.forms.setup.warehouseMissing', { defaultValue: 'Add a warehouse in a separate tab, then return to this quotation. Your entries stay here.' })
+            : t('sales.forms.setup.warehouseMissingAsk', { defaultValue: 'No warehouses are available. Ask an administrator to add one in Warehouse setup, then return to this quotation.' }),
+          action: canCreateWarehouse ? {
+            href: buildModuleTabHref('warehouse', 'warehouses'),
+            label: t('sales.forms.setup.openWarehouses', { defaultValue: 'Open Warehouse setup' }),
+          } : undefined,
+        },
+      },
+    );
+  }, [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions,
+    permissionsReady, checkPermission, contactsRead.state.status, pricelistsRead.state.status, warehousesRead.state.status]);
 
   const openCreateSaleOrder = useCallback(
     () => setQuickActionForm({ form: saleOrderFormConfig, action: 'createSaleOrder' }),
@@ -2719,7 +2758,7 @@ function SalesClientLoaded({
       <RuntimeFormModal
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        staticConfig={quickActionForm?.form ?? saleOrderFormConfig}
+        staticConfig={quickActionForm?.action === 'createSaleOrder' ? saleOrderFormConfig : quickActionForm?.form ?? saleOrderFormConfig}
         moduleId="sales"
         organizationId={organizationId}
         roleId={runtimeRoleId}

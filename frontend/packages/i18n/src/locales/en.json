@@ -34,7 +34,8 @@
     "chooseTask": "What would you like to do first?",
     "noTasks": "No supported first task is available for your current permissions. Ask your organization administrator for the access needed for your work.",
     "companySettings": "Review company settings",
-    "refresh": "Refresh checks"
+    "refresh": "Refresh checks",
+    "reviewSetup": "Review setup and first tasks"
   },
   "recordChanges": {
     "title": "Changes",
@@ -154,7 +155,8 @@
       "statements": "Financial statements",
       "trial-balance": "Trial balance",
       "scheduled-reports": "Scheduled reports",
-      "dashboards": "Saved dashboards"
+      "dashboards": "Saved dashboards",
+      "captureReceipt": "Capture receipt"
     },
     "modules": {
       "sales": {
@@ -315,8 +317,8 @@
     "lookup": {
       "noJournals": "No journals available — create journals in accounting settings first.",
       "noPartners": "No customers yet — add contacts in CRM first.",
-      "noPricelists": "No pricelists available — create a pricelist first.",
-      "noWarehouses": "No warehouses available — create a warehouse in Inventory first.",
+      "noPricelists": "No price lists available.",
+      "noWarehouses": "No warehouses available.",
       "noVendors": "No vendors yet — mark contacts as vendors in CRM or add supplier info.",
       "noStockMoves": "No operation types or locations found — create stock moves or quants first.",
       "noProducts": "No products in catalog — create a product first.",
@@ -355,7 +357,8 @@
         "search": "Search...",
         "empty": "No matches",
         "remove": "Remove {{value}}"
-      }
+      },
+      "setupOpensNewTab": "opens in a new tab"
     },
     "formPreview": {
       "label": "Preview"
@@ -479,7 +482,9 @@
       "pivotCount": "Count",
       "pivotEmpty": "Not set",
       "pivotGroupBy": "Group by",
-      "pivotMixedCurrencies": "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
+      "pivotMixedCurrencies": "These records use more than one currency ({{currencies}}). Monetary measures with mixed currencies are omitted from the summary and CSV.",
+      "pivotScope": "Summary of {{recordCount}} available records. List view filters and pagination do not carry over.",
+      "pivotUnknownCurrency": "Amounts are omitted from the summary and CSV because a single currency could not be verified for every record.",
       "pivotNoData": "No records to summarise",
       "pivotNone": "None",
       "pivotTotal": "Total",
@@ -497,7 +502,8 @@
         "clear": "Clear filters",
         "description": "Try a different search or clear the filters.",
         "title": "No matching records"
-      }
+      },
+      "groupBy": "Group by"
     },
     "retry": "Retry",
     "recordsDenied": "You do not have access to these records.",
@@ -621,6 +627,9 @@
       "unavailable": "Suggestions are unavailable. Complete the native form or check its required setup.",
       "suggest": "Suggest values",
       "apply": "Apply suggestions"
+    },
+    "listToolbar": {
+      "viewSettings": "View settings"
     }
   },
   "navigation": {
@@ -4077,6 +4086,10 @@
       },
       "emptyState": {
         "hint": "Contacts are the people and companies you sell to; leads, orders and invoices link back to them."
+      },
+      "types": {
+        "company": "Company",
+        "person": "Person"
       }
     },
     "activities": {
@@ -4716,7 +4729,17 @@
       "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
       "openPipelineSetup": "Open Pipeline setup",
       "customFieldsCreateUnavailable": "Saving custom fields during creation is not available yet. Your entries are retained and no record was created.",
-      "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved during creation yet. Creation is disabled before any record is created. Ask an administrator to use a form without custom fields. Your entries are retained."
+      "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved during creation yet. Creation is disabled before any record is created. Ask an administrator to use a form without custom fields. Your entries are retained.",
+      "actions": {
+        "assignTagToContact": "Assign tag",
+        "addContactToSegment": "Add to segment",
+        "newContactTag": "Create contact tag",
+        "newContactCategory": "Create contact category",
+        "assignCategoryToContact": "Assign category",
+        "newContactSegment": "Create contact segment",
+        "addOpportunityLine": "Add opportunity line",
+        "mergeContacts": "Merge contacts"
+      }
     },
     "consent": {
       "tabLabel": "Consent",
@@ -6510,7 +6533,9 @@
       "virtualAvailablePrompt": "Forecast quantity",
       "updateVariantById": "Update variant…",
       "variantIdPrompt": "Variant ID",
-      "variantNamePrompt": "Variant name"
+      "variantNamePrompt": "Variant name",
+      "importMenu": "Import",
+      "manageMenu": "Manage catalog"
     },
     "warehouseActions": {
       "confirmDelete": "Delete this warehouse?",
@@ -6626,7 +6651,7 @@
     },
     "forms": {
       "newProduct": {
-        "title": "New Product",
+        "title": "New product",
         "description": "Add a product to the catalog",
         "sections": {
           "identity": "Identity",
@@ -6659,10 +6684,11 @@
           "pricelistPlaceholder": "Select pricelist…",
           "description": "Description",
           "descriptionPlaceholder": "Internal notes about this product…"
-        }
+        },
+        "submitLabel": "Create product"
       },
       "newTransfer": {
-        "title": "New Transfer",
+        "title": "New transfer",
         "description": "Create a stock movement",
         "sections": {
           "transferDetails": "Transfer Details"
@@ -6679,7 +6705,7 @@
         }
       },
       "newInventoryAdjustment": {
-        "title": "New Inventory Adjustment",
+        "title": "New inventory adjustment",
         "description": "Start a physical inventory count",
         "sections": {
           "adjustmentDetails": "Adjustment Details"
@@ -7155,6 +7181,28 @@
           "weight": "Weight",
           "maxWeight": "Max weight"
         }
+      },
+      "actions": {
+        "newTransfer": "Create transfer",
+        "newInventoryAdjustment": "Create inventory adjustment",
+        "newStockLocation": "Create location",
+        "newWarehouse": "Create warehouse",
+        "editWarehouse": "Save warehouse",
+        "editProduct": "Save product",
+        "assignUserToPicking": "Assign user",
+        "newProductVariant": "Create variant",
+        "newQualityCheck": "Create quality check",
+        "newQualityAlert": "Create quality alert",
+        "newQualityPoint": "Create quality control point",
+        "newQualityTeam": "Create quality team",
+        "newBarcodeRule": "Create barcode rule",
+        "newReplenishmentRule": "Create replenishment rule",
+        "newPickingWave": "Create picking wave",
+        "newProductCategory": "Create product category",
+        "newStockQuant": "Add stock line",
+        "newWarehouse3dZone": "Add 3D zone",
+        "newProductSupplierLine": "Add supplier line",
+        "newProductPackaging": "Add packaging"
       }
     },
     "byRecord": {
@@ -7982,6 +8030,22 @@
         "requiredBillContext": "Choose the purchase journal, expense account and vendor payable account, then check the bill date and adjustments. Your entries have been retained.",
         "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
         "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved with a new purchase order yet. Creation is disabled before any purchase order is created. Ask an administrator to use a form without custom fields. Your entries are retained."
+      },
+      "actions": {
+        "editPurchaseOrder": "Save purchase order",
+        "addPurchaseOrderLine": "Add purchase order line",
+        "receivePurchaseOrderLine": "Receive goods",
+        "invoicePurchaseOrderLine": "Record invoiced quantity",
+        "editPurchaseOrderLine": "Save purchase order line",
+        "newPartnerBank": "Add vendor bank account",
+        "editPartnerBank": "Save bank account",
+        "newLandedCost": "Create landed cost",
+        "editLandedCost": "Save landed cost",
+        "addLandedCostLine": "Add landed cost line",
+        "removeLandedCostLine": "Remove landed cost line",
+        "newSupplierIntake": "Submit supplier intake",
+        "reviewSupplierIntake": "Start review",
+        "editSupplierIntake": "Save supplier intake"
       }
     },
     "ops": {
@@ -8830,8 +8894,8 @@
           "warehousePlaceholder": "Select warehouse…",
           "paymentTermId": "Payment Terms",
           "paymentTermPlaceholder": "Select payment terms…",
-          "validityDate": "Expiration Date",
-          "commitmentDate": "Delivery Date",
+          "validityDate": "Valid until",
+          "commitmentDate": "Promised delivery date",
           "note": "Notes",
           "notePlaceholder": "Internal notes…",
           "commissionRatePercent": "Commission rate %",
@@ -8840,7 +8904,7 @@
         }
       },
       "newPricelist": {
-        "title": "New Pricelist",
+        "title": "New price list",
         "description": "Create a product pricelist",
         "sections": {
           "pricelistDetails": "Pricelist Details"
@@ -9205,6 +9269,31 @@
         "requiredInvoiceAccounts": "Choose the invoice journal, sales account and customer receivable account. Your entries have been retained.",
         "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
         "customFieldsCreateReadiness": "This form includes custom fields that cannot be saved with a new quotation yet. Creation is disabled before any quotation is created. Ask an administrator to use a form without custom fields. Your entries are retained."
+      },
+      "setup": {
+        "customerMissing": "Add a customer in a separate tab, then return to this quotation. Your entries stay here.",
+        "customerMissingAsk": "No customers are available. Ask an administrator to add a customer, then return to this quotation.",
+        "openContacts": "Open contacts",
+        "pricelistMissing": "Create a price list with a currency in a separate tab, then return to this quotation. Your entries stay here.",
+        "pricelistMissingAsk": "No price lists are available. Ask an administrator to create a price list with a currency, then return to this quotation.",
+        "openPricelists": "Open price lists",
+        "warehouseMissing": "Add a warehouse in a separate tab, then return to this quotation. Your entries stay here.",
+        "warehouseMissingAsk": "No warehouses are available. Ask an administrator to add one in Warehouse setup, then return to this quotation.",
+        "openWarehouses": "Open Warehouse setup"
+      },
+      "actions": {
+        "newPricelist": "Create price list",
+        "newPricelistItem": "Add price rule",
+        "newPickingBatch": "Create delivery batch",
+        "newDeliveryPriceRule": "Create delivery price rule",
+        "newDeliveryCarrier": "Create delivery carrier",
+        "newShippingMethod": "Create shipping method",
+        "newPosPaymentMethod": "Create payment method",
+        "newLoyaltyProgram": "Create loyalty program",
+        "newLoyaltyCard": "Create loyalty card",
+        "editSaleOrderLine": "Save order line",
+        "addReturnOrderLine": "Add return line",
+        "newReturnOrder": "Create return order"
       }
     },
     "actions": {
@@ -10142,7 +10231,8 @@
         "title": "Edit Event",
         "description": "Update the event details",
         "submit": "Save event changes"
-      }
+      },
+      "timezoneHint": "Times use {{timezone}}. Unavailable daylight-saving times are rejected; new repeated times use the earlier occurrence. Unchanged event times keep their original occurrence."
     },
     "eventDetail": {
       "edit": "Edit",
@@ -10204,7 +10294,19 @@
       "previous": "Previous period",
       "next": "Next period",
       "agendaRange": "{{start}} to {{end}}",
-      "eventDetails": "Event details"
+      "eventDetails": "Event details",
+      "browserTimezone": "Times shown in {{timezone}} (this browser)",
+      "timezoneSource": {
+        "account": "Times shown in {{timezone}} (account setting)",
+        "browser": "Times shown in {{timezone}} (browser fallback)",
+        "utc": "Times shown in {{timezone}} (UTC fallback)"
+      },
+      "timezoneFallback": {
+        "profileUnavailable": "Your account timezone could not be loaded. The labelled fallback is in use; your saved setting has not changed.",
+        "invalidSetting": "Your saved timezone is not recognised. The labelled fallback is in use. Review your timezone in Settings.",
+        "missingSetting": "No account timezone is saved. The browser timezone is in use.",
+        "browserUnavailable": "Your account and browser timezone are unavailable. UTC is in use."
+      }
     }
   },
   "documents": {
@@ -10465,7 +10567,7 @@
     },
     "forms": {
       "newDocument": {
-        "title": "Upload Document",
+        "title": "Upload document",
         "description": "Add a new document to the repository",
         "sections": {
           "documentDetails": "Document Details",
@@ -10509,7 +10611,7 @@
         }
       },
       "newArticle": {
-        "title": "New Article",
+        "title": "New article",
         "description": "Create a knowledge base article",
         "sections": {
           "article": "Article"
@@ -10665,6 +10767,16 @@
         "expense": "Expense",
         "purchaseOrder": "Purchase order",
         "salesOrder": "Sales order"
+      },
+      "actions": {
+        "newDocument": "Upload document",
+        "newKnowledgeArticle": "Create article",
+        "newKnowledgeCategory": "Create knowledge category",
+        "newDocumentFolder": "Create folder",
+        "setDocumentRetention": "Save retention policy",
+        "newDocumentProcessingJob": "Queue processing job",
+        "completeDocumentProcessingJob": "Record job completion",
+        "acknowledgeDocumentInsight": "Acknowledge insight"
       }
     },
     "backToDocuments": "Back to documents",
@@ -10763,8 +10875,8 @@
       "size": "Size",
       "modifiedBy": "Modified by",
       "modified": "Modified",
-      "viewFiles": "Files",
-      "viewTable": "Table",
+      "viewFiles": "Folder browser",
+      "viewTable": "Record table",
       "uploadFailed": "Upload failed",
       "uploaded": "Uploaded",
       "openUploaded": "Open file",
@@ -10772,7 +10884,9 @@
       "filesLoaded": "{{count}} loaded files",
       "foldersLoading": "Loading folders. Upload and new-folder actions will be available when the folders are ready.",
       "foldersDenied": "You do not have access to folders. You can still inspect the available files.",
-      "foldersUnavailable": "Folders could not be loaded. You can still inspect the available files. Retry folders to restore upload and new-folder actions."
+      "foldersUnavailable": "Folders could not be loaded. You can still inspect the available files. Retry folders to restore upload and new-folder actions.",
+      "created": "Created {{date}}",
+      "date": "Date"
     },
     "studio": {
       "templateDesignActions": "Template design actions",
@@ -11710,7 +11824,23 @@
       },
       "sourceUnavailable": "Required records could not be verified. Retry the source list before saving. Your entries are retained.",
       "csvRequired": "Choose or paste the CSV data before importing.",
-      "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
+      "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
+      "actions": {
+        "newDeferredRevenueSchedule": "Create revenue schedule",
+        "newRevenueRecognitionRule": "Create recognition rule",
+        "closeSubscription": "Close subscription",
+        "generateSubscriptionInvoice": "Generate invoice",
+        "paySubscriptionInvoice": "Record payment",
+        "recognizeDeferredRevenueLine": "Post recognition",
+        "importSubscriptionPlanCsv": "Import subscription plans",
+        "importSubscriptionCsv": "Import subscriptions",
+        "amendSubscription": "Save amendment",
+        "renewSubscription": "Renew subscription",
+        "cancelSubscription": "Cancel subscription",
+        "ingestSubscriptionUsageEvent": "Record usage event",
+        "createSubscriptionPriceTier": "Add price tier",
+        "setSubscriptionCommitment": "Save minimum commitment"
+      }
     },
     "dashboard": {
       "importPlanCsv": "Import plans (CSV)",
@@ -12542,6 +12672,12 @@
         "financeSourcesDenied": "You do not have access to the journals or accounts needed for this action. Ask your administrator to check your access.",
         "financeSourcesLoading": "Loading journals and accounts. Your entries are retained.",
         "employeeDefaultHint": "Selected from the active employee record linked to your signed-in account in this company. Change it if you are entering an expense for someone else."
+      },
+      "actions": {
+        "addExpenseToReport": "Add to expense report",
+        "upsertExpenseMileageRate": "Save mileage rate",
+        "upsertExpensePerDiemRate": "Save daily allowance rate",
+        "projectRebillExpenseReport": "Create rebill invoice"
       }
     },
     "operationsTab": "Operations",
@@ -13618,6 +13754,100 @@
       "formUnavailable": "The native form is unavailable. Check access, company setup and required reference data.",
       "formBusy": "Finish or close the current form before opening another.",
       "formOpened": "The native form is open. Review its inputs before saving."
+    },
+    "starters": {
+      "pageHelp": {
+        "label": "Explain this page",
+        "prompt": "Explain what I can do on the current page and where to start."
+      },
+      "nextSteps": {
+        "label": "Choose my next step",
+        "prompt": "Help me choose the next useful task in this workspace. Explain any required setup first."
+      },
+      "draftHelp": {
+        "label": "Help prepare a draft",
+        "prompt": "Walk me through preparing a draft in this workspace, including what I should review before saving."
+      },
+      "importReview": {
+        "label": "Understand import review",
+        "prompt": "Explain how to review and correct imported records on this page, including what needs my confirmation."
+      },
+      "sourceHistory": {
+        "label": "Understand source history",
+        "prompt": "Explain the difference between saved source history, confirmed source rows and imported business records."
+      },
+      "importHelp": {
+        "label": "Prepare an import",
+        "prompt": "Help me prepare a CSV or XLSX import. Explain required fields, references and how I can review the result before saving."
+      },
+      "companySetup": {
+        "label": "Check company setup",
+        "prompt": "Walk me through company setup and explain which settings are required before I start business workflows."
+      },
+      "accessHelp": {
+        "label": "Understand access settings",
+        "prompt": "Explain the organization access settings on this page and what I should review before changing them. Do not change permissions."
+      },
+      "quotationHelp": {
+        "label": "Prepare a quotation",
+        "prompt": "Walk me through preparing a quotation, including customer, price list, currency, validity and delivery details."
+      },
+      "pricingHelp": {
+        "label": "Understand price lists",
+        "prompt": "Explain how to choose the price list and currency for a quotation and resolve missing setup."
+      },
+      "fulfillmentHelp": {
+        "label": "Understand order fulfillment",
+        "prompt": "Explain the steps from a confirmed order to delivery and invoicing, including what needs review."
+      },
+      "stockHelp": {
+        "label": "Understand stock quantities",
+        "prompt": "Explain the stock quantities shown here and how on-hand, available and reserved quantities differ."
+      },
+      "productHelp": {
+        "label": "Prepare a product",
+        "prompt": "Walk me through product setup, including category, units, pricing and purchase or sales settings."
+      },
+      "trackingHelp": {
+        "label": "Understand stock tracking",
+        "prompt": "Explain how to use locations, lots and serial numbers in this workspace."
+      },
+      "invoiceHelp": {
+        "label": "Review an invoice",
+        "prompt": "Explain what to review on an invoice or vendor bill before posting it."
+      },
+      "paymentHelp": {
+        "label": "Understand reconciliation",
+        "prompt": "Walk me through reviewing and reconciling a payment against the correct business records."
+      },
+      "reportHelp": {
+        "label": "Choose a financial report",
+        "prompt": "Help me choose a financial report and explain the period, currency and source records I should check."
+      },
+      "followupHelp": {
+        "label": "Plan a follow-up",
+        "prompt": "Help me plan a useful CRM follow-up and explain how to assign and track it."
+      },
+      "contactHelp": {
+        "label": "Prepare a contact",
+        "prompt": "Walk me through adding or reviewing a contact and its customer or supplier relationship."
+      },
+      "pipelineHelp": {
+        "label": "Understand the pipeline",
+        "prompt": "Explain the steps from a new enquiry to a qualified opportunity and the next action to review."
+      },
+      "fileHelp": {
+        "label": "Find and review a file",
+        "prompt": "Explain how to find and review files in this workspace and understand their metadata."
+      },
+      "templateHelp": {
+        "label": "Work with a template",
+        "prompt": "Walk me through choosing and preparing a document template for review."
+      },
+      "knowledgeHelp": {
+        "label": "Use saved guides",
+        "prompt": "Explain how to find, review and use saved guides in this workspace."
+      }
     }
   },
   "aiHarness": {
@@ -13789,7 +14019,8 @@
       "decisionTitle": "Policy decision",
       "summaryTitle": "Summary",
       "citationsTitle": "Citations",
-      "rowsProcessed": "{{count}} rows"
+      "rowsProcessed": "{{count}} rows",
+      "browserTimezone": "Uses this browser’s timezone. Financial reports may use a different reporting timezone."
     },
     "redAction": {
       "title": "Red Action Drafts",
@@ -14090,6 +14321,84 @@
       "customer_balances_v1": "Customer balances",
       "supplier_payables_v1": "Supplier payables",
       "failed": "The review could not be confirmed. Check the selected skill’s active release and your source access; inspect saved runs before starting again."
+    },
+    "runHistory": {
+      "title": "Recent AI runs",
+      "description": "View recent runs for the selected company.",
+      "idle": "Load history to choose a run to inspect.",
+      "load": "Load history",
+      "retry": "Try again",
+      "checkAccess": "Check access again",
+      "deniedTitle": "Run history access required",
+      "signedOut": "Your session has expired. Sign in again, then check access.",
+      "forbidden": "You do not have permission to view run history for this company. Ask an administrator to review your access.",
+      "unavailableTitle": "Run history unavailable",
+      "unavailable": "Run history could not be loaded. Try again.",
+      "incomplete": "The run history response was incomplete. Try again.",
+      "empty": "No AI runs are available for this company.",
+      "loadOlder": "Load older runs",
+      "run": "Run #{{id}}",
+      "identifiers": "Skill {{skill}} · Agent {{agent}}",
+      "summary": "Steps: {{steps}} · Tokens: {{tokens}} · Started: {{started}}",
+      "providersTruncated": "Provider list truncated",
+      "outcomeUnknown": "Outcome unknown",
+      "economicsTruncated": "Economics truncated",
+      "settled": "{{amount}} {{currency}} settled",
+      "reserved": "{{amount}} {{currency}} reserved",
+      "units": "units",
+      "reservationStatus": "Reservation {{status}}",
+      "inspect": "Inspect",
+      "openRun": "Open run"
+    },
+    "ux": {
+      "observation": {
+        "unknown": "The result of a provider request is unknown. Inspect the history before starting another request.",
+        "settled": "Settled usage: {{amount}} {{currency}}"
+      },
+      "reportAnalysis": {
+        "description": "Ask a question about this company’s reports, choose an available assistant, and review the answer against its sources."
+      },
+      "reportComposer": {
+        "description": "Choose a report, company and date to prepare an AI summary with the source figures you can review.",
+        "nextStep": "Review the summary against its source figures before using it. To prepare a different report, change the scope above and run it explicitly."
+      },
+      "blockedNextStep": "Review the explanation above before trying again. No result should be treated as approved while this check is blocked.",
+      "lowStock": {
+        "description": "Find products whose stock is below your chosen threshold, then review which ones need attention.",
+        "nextStep": "Review the quantities and reorder levels before deciding what to replenish. This scan does not create a purchase order or change stock."
+      },
+      "evidence": {
+        "description": "Choose a company, open an item from its review queue, and read the supporting evidence before recording your assessment.",
+        "companyTitle": "Choose what to review",
+        "queueFirst": "The review queue shows the items available to you. Open an item to check its sources; opening it does not record a verdict.",
+        "nextStep": "Read the statements and their supporting sources below before recording a review. Missing or unavailable evidence should be resolved before you accept a decision.",
+        "useClaim": "Use this claim in a proposed decision",
+        "empty": "Open a claim, decision or workflow step from the review queue. If you already have its identifier, use the advanced lookup."
+      },
+      "lifecycle": {
+        "description": "Choose a company and open a recent AI run to review its progress, answer questions or choose its next action.",
+        "companyTitle": "Review AI activity",
+        "historyFirst": "Load recent activity for this company, then open a run. Your permissions are checked again when you inspect it or submit an action.",
+        "nextStep": "Review the output and any open questions before choosing an action below. Actions run only when you explicitly submit them; a missing continuation keeps controls unavailable."
+      },
+      "finance": {
+        "description": "Choose a finance review task, company and assistant. Set the report scope or source record, then review the findings before taking business action."
+      }
+    },
+    "inspector": {
+      "execution": "Technical inspector: execution trace and usage",
+      "policy": "Technical inspector: policy details",
+      "evidenceLookup": "Advanced: find evidence by identifier",
+      "proposeDecision": "Advanced: propose a decision from claim references",
+      "lineage": "Technical inspector: evidence lineage",
+      "runLookup": "Advanced: find a run by identifier",
+      "continuation": "Technical inspector: run checkpoint",
+      "checkpointHash": "Checkpoint hash",
+      "cursor": "Cursor",
+      "version": "Concurrency version",
+      "title": "Technical inspector",
+      "description": "Identifiers and diagnostic details for support and advanced review. Opening this section does not run an action or change access.",
+      "audit": "Technical inspector: audit trail"
     }
   },
   "map": {
@@ -14226,6 +14535,11 @@
         "title": "Edit vehicle",
         "description": "Update vehicle driver or service type.",
         "section": "Vehicle details"
+      },
+      "actions": {
+        "assignFleetDriver": "Save driver assignment",
+        "recordFleetService": "Record service",
+        "recordFleetInspection": "Record inspection"
       }
     },
     "lifecycle": {
@@ -15082,7 +15396,8 @@
       "emailVerificationHint": "Email changes require identity-provider verification and administrator approval.",
       "loadError": "Could not load your profile. Reload to try again.",
       "securityProviderHint": "Your identity provider manages your password and sign-in security.",
-      "manageSecurity": "Manage sign-in security"
+      "manageSecurity": "Manage sign-in security",
+      "invalidTimezone": "Enter a valid IANA timezone, such as Europe/Amsterdam or Africa/Kigali."
     },
     "customFields": {
       "title": "My Custom Fields",
@@ -16087,7 +16402,7 @@
         }
       },
       "dashboard": {
-        "title": "Create Dashboard",
+        "title": "Create dashboard",
         "description": "Create a new dashboard for reports and analytics",
         "sections": {
           "main": "Dashboard Details"
@@ -16103,7 +16418,7 @@
         }
       },
       "dashboardWidget": {
-        "title": "Create Widget",
+        "title": "Create widget",
         "description": "Add a new widget to dashboards",
         "sections": {
           "main": "Widget Details"
@@ -16135,7 +16450,7 @@
         }
       },
       "addWidgetToDashboard": {
-        "title": "Add Widget to Dashboard",
+        "title": "Add widget to dashboard",
         "description": "Configure widget placement on the dashboard",
         "sections": {
           "layout": "Layout & Position"
@@ -16149,7 +16464,7 @@
         }
       },
       "updateWidgetLayout": {
-        "title": "Update Widget Layout",
+        "title": "Update widget layout",
         "description": "Adjust widget position and size",
         "sections": {
           "layout": "Layout"
@@ -16162,7 +16477,7 @@
         }
       },
       "shareDashboard": {
-        "title": "Share Dashboard",
+        "title": "Share dashboard",
         "description": "Share this dashboard with users or teams",
         "sections": {
           "share": "Sharing Options"
@@ -16173,7 +16488,7 @@
         }
       },
       "updateFinancialReport": {
-        "title": "Update Financial Report",
+        "title": "Update financial report",
         "description": "Edit draft report settings (dates, display, and metadata). Only draft reports can be updated.",
         "sections": {
           "update": "Report Details"
@@ -16194,7 +16509,19 @@
       },
       "sourceUnavailable": "Required report records could not be verified. Retry their source list before saving. Your entries are retained.",
       "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
-      "selectedRecordUnavailable": "The selected record is unavailable. Close and reopen this form."
+      "selectedRecordUnavailable": "The selected record is unavailable. Close and reopen this form.",
+      "actions": {
+        "newAnalyticsMetric": "Create metric",
+        "updateReportTemplate": "Save template layout",
+        "updateMetricValues": "Save metric values",
+        "newTrialBalanceEntry": "Add trial balance entry",
+        "newDashboard": "Create dashboard",
+        "newDashboardWidget": "Create widget",
+        "addWidgetToDashboard": "Add widget to dashboard",
+        "updateWidgetLayout": "Save widget layout",
+        "shareDashboard": "Share dashboard",
+        "updateFinancialReport": "Save report settings"
+      }
     },
     "pivot": {
       "title": "Pivot explorer",
@@ -17057,6 +17384,20 @@
     "records": {
       "loading": "Searching records...",
       "failed": "Some records could not be searched. Try again."
+    },
+    "workspaces": {
+      "heading": "Go to workspace",
+      "customerInvoices": "Customer invoices",
+      "vendorBills": "Vendor bills",
+      "quotations": "Quotations and sales orders",
+      "contacts": "Contacts",
+      "purchaseOrders": "Purchase orders",
+      "captureReceipt": "Capture receipt",
+      "expenseReports": "Expense reports",
+      "stockTransfers": "Stock transfers",
+      "productCategories": "Product categories",
+      "subscriptionBilling": "Subscription billing",
+      "documentTemplates": "Document templates"
     }
   },
   "recordHeader": {
@@ -17612,7 +17953,9 @@
       "deadlineUnavailable": "Due date unavailable",
       "coverage": "This inbox covers Accounting, Sales, Purchasing and Expenses. CRM follow-ups, subscription billing and report schedules remain in their own workspaces.",
       "subscriptionBilling": "Subscriptions due to bill",
-      "reportSchedules": "Report schedules"
+      "reportSchedules": "Report schedules",
+      "shortDescription": "Review your assignments and record follow-ups.",
+      "help": "How this inbox works"
     }
   },
   "financeReview": {
@@ -17804,6 +18147,14 @@
       "taskRevision": "Task revision",
       "workflowRevision": "Workflow revision",
       "sourceRevision": "Reviewed source revision"
+    },
+    "empty": {
+      "noTasks": "No requests are waiting for approval in this company. New requests appear here when a business action needs review."
+    },
+    "policy": {
+      "title": "Approval rules",
+      "description": "Approval rules determine which business actions need review.",
+      "link": "Manage approval rules"
     }
   },
   "productivity": {
@@ -17911,5 +18262,16 @@
     "revision": "Review revision {{revision}}",
     "importRow": "Import row {{row}}",
     "sourceRow": "Source row {{row}}"
+  },
+  "forms": {
+    "aiAssist": {
+      "title": "Fill with AI",
+      "description": "Suggestions only update this form after you apply them.",
+      "hide": "Hide AI",
+      "promptLabel": "Notes for form suggestions",
+      "placeholder": "Paste notes or describe what this form should contain…",
+      "suggest": "Suggest values",
+      "apply": "Apply suggestions"
+    }
   }
 }

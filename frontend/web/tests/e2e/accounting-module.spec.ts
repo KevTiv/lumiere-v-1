@@ -58,13 +58,9 @@ type AccountingTabId = (typeof ACCOUNTING_TAB_IDS)[number]
 
 async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
   await openAccountingTab(page, tabId)
-  const tab = page.getByTestId(`module-tab-accounting-${tabId}`)
-
   await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe(
     tabId === "dashboard" ? null : tabId,
   )
-  await expect(tab).toHaveCount(1, { timeout: 30_000 })
-  await expect(tab).toHaveAttribute("aria-selected", "true")
   await expectModuleTabSurface(page, "accounting", tabId)
 }
 

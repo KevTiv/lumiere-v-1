@@ -44,3 +44,17 @@ test("invalid dates and reversed all-day ranges cannot reach the reducer", () =>
   assert.equal(calendarEventFormRange({ allday: true, allDayStart: "2026-10-29", allDayEnd: "2026-10-28" }), null)
   assert.equal(calendarEventFormRange({ allday: true, allDayStart: "2026-10-28" }), null)
 })
+
+
+test("explicit account timezone owns timed and all-day input despite another browser timezone", () => inTimezone("America/Los_Angeles", () => {
+  const spring = calendarEventFormRange({ allday: true, allDayStart: "2026-03-29", allDayEnd: "2026-03-29" }, { timeZone: "Europe/Amsterdam" })
+  assert.equal(spring!.start.toISOString(), "2026-03-28T23:00:00.000Z")
+  assert.equal(spring!.stop.toISOString(), "2026-03-29T22:00:00.000Z")
+  const autumn = calendarEventFormRange({ allday: true, allDayStart: "2026-10-25", allDayEnd: "2026-10-25" }, { timeZone: "Europe/Amsterdam" })
+  assert.equal(autumn!.stop.getTime() - autumn!.start.getTime(), 25 * 3_600_000)
+  assert.equal(calendarEventFormRange({ start: "2026-03-29T02:30", stop: "2026-03-29T04:00" }, { timeZone: "Europe/Amsterdam" }), null)
+  const repeated = calendarEventFormRange({ start: "2026-10-25T02:30", stop: "2026-10-25T03:30" }, { timeZone: "Europe/Amsterdam", originalStart: new Date("2026-10-25T01:30:00Z") })
+  assert.equal(repeated!.start.toISOString(), "2026-10-25T01:30:00.000Z")
+  const frozen = calendarEventFormRange({ eventTimezone: "Africa/Kigali", start: "2026-11-03T09:00", stop: "2026-11-03T10:00" }, { timeZone: "America/New_York" })
+  assert.equal(frozen!.start.toISOString(), "2026-11-03T07:00:00.000Z")
+}))

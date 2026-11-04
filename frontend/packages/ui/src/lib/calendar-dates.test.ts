@@ -47,3 +47,18 @@ describe("calendar dates and visible intervals", () => {
     }
   })
 })
+
+
+it("groups UTC instants by account-zone occupied dates, including short and long DST days", () => {
+  const zone = "Europe/Amsterdam"
+  const day = calendarDate("2026-03-29", new Date(), zone)
+  expect(calendarDayKey(day, zone)).toBe("2026-03-29")
+  expect(shiftCalendarDate(day, 1, zone).getTime() - day.getTime()).toBe(23 * 3_600_000)
+  const before = event("before", new Date("2026-03-28T22:00:00Z"), new Date("2026-03-28T23:00:00Z"))
+  const overnight = event("overnight", new Date("2026-03-28T23:30:00Z"), new Date("2026-03-29T23:00:00Z"))
+  expect(calendarEventOccursOnDay(before, day, zone)).toBe(false)
+  expect(calendarEventOccursOnDay(overnight, day, zone)).toBe(true)
+  expect(calendarEventsForDay([before, overnight], day, zone).map((row) => row.id)).toEqual(["overnight"])
+  const autumn = calendarDate("2026-10-25", new Date(), zone)
+  expect(shiftCalendarDate(autumn, 1, zone).getTime() - autumn.getTime()).toBe(25 * 3_600_000)
+})

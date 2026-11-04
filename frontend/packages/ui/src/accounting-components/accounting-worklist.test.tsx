@@ -128,7 +128,7 @@ describe("scoped accounting worklists", () => {
     expect(screen.getByRole("combobox", { name: "Balance queue" })).toBeTruthy()
     expect(screen.queryByRole("textbox", { name: "View name" })).toBeNull()
     expect(screen.queryByRole("combobox", { name: "Saved views" })).toBeNull()
-    expect(screen.queryByTestId("table-density")).toBeNull()
+    expect(screen.queryByRole("group", { name: "Table density" })).toBeNull()
     const disclosure = screen.getByRole("button", { name: "View settings" })
     expect(disclosure.getAttribute("aria-expanded")).toBe("false")
     fireEvent.click(disclosure)

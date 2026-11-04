@@ -62,7 +62,7 @@ describe("EntityView table/board toggle", () => {
     render(<EntityView config={config} data={data} onRowClick={onRowClick} />)
     expect(screen.getByTestId("entity-board-readonly")).toBeTruthy()
 
-    fireEvent.click(screen.getByRole("button", { name: "Table" }))
+    fireEvent.click(screen.getByRole("button", { name: "List" }))
     expect(screen.getByTestId("table")).toBeTruthy()
     expect(window.localStorage.getItem("lumiere:entity-view-mode:toggle-test")).toBe("table")
   })

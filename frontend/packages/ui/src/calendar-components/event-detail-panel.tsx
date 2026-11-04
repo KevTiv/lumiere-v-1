@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 
 interface EventDetailPanelProps {
   event: CalendarEvent
+  timeZone?: string
   onClose: () => void
   onEdit?: () => void
   onDelete?: () => void
@@ -19,9 +20,10 @@ interface EventDetailPanelProps {
   openHref?: string
 }
 
-export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }: EventDetailPanelProps) {
+export function EventDetailPanel({ event, timeZone, onClose, onEdit, onDelete, openHref }: EventDetailPanelProps) {
   const { t, i18n } = useTranslation()
   const config = eventTypeConfig[event.type]
+  const displayedEnd = event.allDay && event.endTime > event.startTime ? new Date(event.endTime.getTime() - 1) : event.endTime
 
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose() }}>
@@ -53,7 +55,7 @@ export function EventDetailPanel({ event, onClose, onEdit, onDelete, openHref }:
             <span>
               {event.allDay ? t("calendar.workspace.allDay", { defaultValue: "All day" }) : null}
               {event.allDay ? " · " : ""}
-              {event.allDay ? event.startTime.toLocaleDateString(i18n.language) : event.startTime.toLocaleString(i18n.language)} - {event.allDay ? event.endTime.toLocaleDateString(i18n.language) : event.endTime.toLocaleString(i18n.language)}
+              {event.allDay ? event.startTime.toLocaleDateString(i18n.language, { timeZone }) : event.startTime.toLocaleString(i18n.language, { timeZone })} - {event.allDay ? displayedEnd.toLocaleDateString(i18n.language, { timeZone }) : event.endTime.toLocaleString(i18n.language, { timeZone })}
             </span>
           </div>
           {event.location && (

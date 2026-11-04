@@ -148,8 +148,9 @@ describe("ModuleView workspace URL state", () => {
     expect(screen.getByRole("tab", { name: "credit-control" }).getAttribute("aria-selected")).toBe("true")
     navigation.search = ""
     rerender(view())
-    expect(screen.getByRole("tab", { name: "dashboard" }).getAttribute("aria-selected")).toBe("true")
-    expect(screen.getByRole("tabpanel").textContent).toBe("dashboard records")
+    expect(screen.queryByRole("tablist")).toBeNull()
+    expect(screen.getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page")
+    expect(screen.getByRole("tabpanel", { name: "dashboard" }).textContent).toBe("dashboard records")
     navigation.search = "tab=invoices"
     rerender(view())
     expect(screen.getByRole("tabpanel").textContent).toBe("invoices records")

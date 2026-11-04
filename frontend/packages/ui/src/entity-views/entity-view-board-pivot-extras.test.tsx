@@ -94,11 +94,20 @@ describe("currency formatting", () => {
     expect(within(screen.getByTestId("entity-pivot-total")).getByText("€45.00")).toBeTruthy()
   })
 
-  it("falls back to USD for numeric ids and mixed currencies", () => {
-    const withIds = rows.map((row) => ({ ...row, currencyCode: 7 }))
-    render(<EntityView config={config} data={withIds} />)
+  it.each([7, undefined, "USD"])("omits amounts when one row has currency %s", (currencyCode) => {
+    const data = rows.map((row, index) => index === 0 ? { ...row, currencyCode } : row)
+    render(<EntityView config={config} data={data} />)
     fireEvent.click(screen.getByRole("button", { name: "Summary" }))
-    expect(within(screen.getByTestId("entity-pivot-total")).getByText("$45.00")).toBeTruthy()
+    expect(screen.getByTestId("entity-pivot-currency-note").textContent).toContain("omitted")
+    expect(screen.getByTestId("entity-pivot-total").textContent).toBe("Total3")
+    expect(screen.queryByTestId("entity-pivot-chart")).toBeNull()
+    fireEvent.click(screen.getByTestId("entity-pivot-export"))
+    expect(String(csv.download.mock.calls[0]![1]).split("\r\n")).toEqual([
+      "State,Count",
+      "Draft,1",
+      "Confirmed,2",
+      "Total,3",
+    ])
   })
 
   it("table currency cells render with the row's code", () => {
@@ -119,7 +128,7 @@ describe("pivot columns by and CSV", () => {
     const [name, text] = csv.download.mock.calls[0]!
     expect(name).toBe("pivot-state")
     expect(String(text).split("\r\n")).toEqual([
-      "State,Count,Total",
+      "State,Count,Total (EUR)",
       "Draft,1,10",
       "Confirmed,2,35",
       "Total,3,45",

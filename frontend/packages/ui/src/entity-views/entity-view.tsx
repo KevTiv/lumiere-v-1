@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import type { TFunction } from "i18next"
+import { useTranslation } from "@lumiere/i18n"
 import { BarChart3, LayoutGrid, List } from "lucide-react"
-import { cn } from "../lib/utils"
 import type {
   EntityDetailConfig,
   EntityPermissioned,
@@ -15,6 +15,7 @@ import type {
 import { filterEntitySurface } from "../lib/entity-view-types"
 import type { KanbanColumnDef, KanbanMoveHandler } from "../lib/kanban-board-types"
 import { useRBAC } from "../lib/rbac-context"
+import { cn } from "../lib/utils"
 import { EntityTable } from "./entity-table"
 import { EntityDetail } from "./entity-detail"
 import { EntityBoardView } from "./entity-board"
@@ -27,9 +28,11 @@ import { resolveAccountingRelationLabel } from "@lumiere/stdb/read-models"
 
 export { EntityLabelsProvider, labelsFromOptions, labelsFromRows, useEntityLabels } from "../lib/entity-labels-context"
 import { unwrapEntityValue } from "../lib/entity-row-values"
+import { ListViewToggle, type ListViewOption } from "../composed/list-view-toggle"
+import { ListToolbar, ListToolbarFields, ListToolbarField, ListToolbarActions } from "../composed/list-toolbar"
 import { Input } from "../components/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import {
   Select,
   SelectContent,
@@ -217,48 +220,12 @@ export function EntityViewToggle({
   showBoard?: boolean
   showPivot?: boolean
 }) {
-  return (
-    <div
-      className="flex items-center border border-border rounded-lg p-1"
-      role="group"
-      aria-label={labels.ariaLabel ?? labels.table}
-    >
-      <Button
-        variant={mode === "table" ? "secondary" : "ghost"}
-        size="sm"
-        className="h-7 px-2 gap-1.5"
-        onClick={() => onChange("table")}
-        aria-pressed={mode === "table"}
-      >
-        <List className="h-4 w-4" />
-        {labels.table}
-      </Button>
-      {showBoard ? (
-        <Button
-          variant={mode === "board" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn("h-7 px-2 gap-1.5", mode === "board" && "shadow-sm")}
-          onClick={() => onChange("board")}
-          aria-pressed={mode === "board"}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          {labels.board}
-        </Button>
-      ) : null}
-      {showPivot ? (
-        <Button
-          variant={mode === "pivot" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn("h-7 px-2 gap-1.5", mode === "pivot" && "shadow-sm")}
-          onClick={() => onChange("pivot")}
-          aria-pressed={mode === "pivot"}
-        >
-          <BarChart3 className="h-4 w-4" />
-          {labels.pivot}
-        </Button>
-      ) : null}
-    </div>
-  )
+  const options: ListViewOption<EntitySurfaceMode>[] = [
+    { value: "table", label: labels.table, icon: List },
+    ...(showBoard ? [{ value: "board" as const, label: labels.board, icon: LayoutGrid }] : []),
+    ...(showPivot ? [{ value: "pivot" as const, label: labels.pivot ?? "Summary", icon: BarChart3 }] : []),
+  ]
+  return <ListViewToggle value={mode} onChange={onChange} options={options} label={labels.ariaLabel ?? labels.table} />
 }
 
 /**
@@ -343,6 +310,7 @@ export function EntityView({
   onInitialFilterClear,
   externalFilter,
 }: EntityViewProps) {
+  const { t } = useTranslation()
   const hybrid =
     config.view.mode === "table-or-board" ? (config.view as EntityTableBoardViewConfig) : null
   const [surfaceMode, setSurfaceMode] = useState<EntitySurfaceMode>(
@@ -463,22 +431,25 @@ export function EntityView({
           ) : effectiveBoardColumns.length ? (
             <div className="space-y-3">
               {!onBoardMove && (searchKeys.length > 0 || boardFilterDefs.length > 0) ? (
-                <div className="flex flex-wrap items-center gap-2">
+                <ListToolbar><ListToolbarFields>
               {searchKeys.length > 0 ? (
+                <ListToolbarField label={t("common.search", { defaultValue: "Search" })}>
                 <Input
                   type="search"
                   value={boardSearch}
                   onChange={(event) => setBoardSearch(event.target.value)}
                   placeholder={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder}
                   aria-label={hybrid.board.searchPlaceholder ?? tableConfig.searchPlaceholder ?? "Search"}
-                  className="h-8 max-w-xs"
+                  className="min-h-11 min-w-0 w-full"
                   data-testid="entity-board-search"
                 />
+                </ListToolbarField>
               ) : null}
               {boardFilterDefs.map((filter) => (
-                <Select key={filter.key} value={boardFilters[filter.key] ?? ALL_FILTER_VALUE} onValueChange={(value) => setBoardFilters((prev) => ({ ...prev, [filter.key]: value }))}>
+                <ListToolbarField key={filter.key} label={filter.label}>
+                <Select value={boardFilters[filter.key] ?? ALL_FILTER_VALUE} onValueChange={(value) => setBoardFilters((prev) => ({ ...prev, [filter.key]: value }))}>
                   <SelectTrigger
-                    className="h-8 w-auto min-w-36"
+                    className="min-h-11 w-full min-w-0"
                     aria-label={filter.label}
                     data-testid={`entity-board-filter-${filter.key}`}
                   >
@@ -491,8 +462,16 @@ export function EntityView({
                     ))}
                   </SelectContent>
                 </Select>
+                </ListToolbarField>
               ))}
-                </div>
+                </ListToolbarFields>
+                  <ListToolbarActions><Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!boardSearch.trim() && !Object.values(boardFilters).some((value) => value && value !== ALL_FILTER_VALUE)}
+                    onClick={() => { setBoardSearch(""); setBoardFilters({}) }}
+                  >{t("common.entityView.noResults.clear", { defaultValue: "Clear filters" })}</Button></ListToolbarActions>
+                </ListToolbar>
               ) : null}
               <EntityBoardView
                 config={boardConfig}

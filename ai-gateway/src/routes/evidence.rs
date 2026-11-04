@@ -5,6 +5,8 @@
 //! return an excerpt for a source outside that scope, or for a passage whose
 //! access was revoked or whose content was deleted.
 
+mod history_reader;
+
 pub(crate) use lumiere_auth_context::CapabilityGrantBounds;
 use lumiere_auth_context::{ActorContext as ActorCredentials, CapabilityGrantEnvelope};
 use std::time::Duration;
@@ -739,31 +741,39 @@ pub async fn post_run_history(
     if limit == 0 {
         return Err(AppError::Forbidden("run history row grant is empty".into()));
     }
-    let cursor_clause = before_run_id
-        .map(|id| format!(" AND id < {id}"))
-        .unwrap_or_default();
-    let query_limit = limit.saturating_add(1);
-    let mut rows = state
-        .stdb
-        .query_sql(&format!(
-            "SELECT id, status, skill_id, agent_id, step_count, tokens_used, started_at, completed_at FROM ai_agent_run WHERE organization_id = {} AND company_id = {}{} ORDER BY id DESC LIMIT {}",
-            actor.organization_id, actor.company_id, cursor_clause, query_limit
-        ))
-        .await
-        .map_err(|error| AppError::Internal(format!("read run history: {error}")))?;
-    let mut has_more = rows.len() > limit;
-    rows.truncate(limit);
+    let page = history_reader::read_run_history(
+        &state.stdb,
+        actor.organization_id,
+        actor.company_id,
+        before_run_id,
+        limit,
+    )
+    .await?;
+    let mut has_more = page.has_more;
+    let rows = page.rows;
     let mut runs = Vec::with_capacity(rows.len());
     for row in rows {
         runs.push(history_item_from_row(&row)?);
     }
     let organization_id = actor.organization_id;
     let company_id = actor.company_id;
+    // Economics are optional. Bound the whole enrichment phase, not each row:
+    // a slow provider ledger must not consume the API's 15s forward timeout.
+    let economics_deadline = tokio::time::Instant::now() + Duration::from_secs(2);
     let runs = stream::iter(runs.into_iter().map(|mut item| {
         let state = &state;
         async move {
-            item.economics =
-                load_run_economics(state, organization_id, company_id, item.run_id).await;
+            item.economics = if tokio::time::Instant::now() < economics_deadline {
+                tokio::time::timeout_at(
+                    economics_deadline,
+                    load_run_economics(state, organization_id, company_id, item.run_id),
+                )
+                .await
+                .ok()
+                .flatten()
+            } else {
+                None
+            };
             item
         }
     }))

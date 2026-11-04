@@ -45,8 +45,9 @@ test('maps bounded history and economics without retaining private run fields', 
   assert.equal('errorMessage' in (view.runs[0] ?? {}), false)
 })
 
-test('rejects malformed cursors and drops malformed rows', () => {
+test('rejects malformed cursors and rows instead of presenting incomplete history as empty', () => {
   assert.equal(mapRunHistory({ runs: [], nextCursor: '42' }), null)
+  assert.equal(mapRunHistory({ runs: [] }), null)
   const view = mapRunHistory({
     runs: [
       { runId: 0, status: 'completed', skillId: 1, agentId: 1, stepCount: 0, tokensUsed: 0, startedAt: 'now' },
@@ -54,8 +55,8 @@ test('rejects malformed cursors and drops malformed rows', () => {
     ],
     nextCursor: null,
   })
-  assert.ok(view)
-  assert.deepEqual(view.runs.map((run) => run.runId), [1])
+  assert.equal(view, null)
+  assert.deepEqual(mapRunHistory({ runs: [], nextCursor: null }), { runs: [], nextCursor: null })
 })
 
 test('browser history request contains no authority', () => {
@@ -63,4 +64,10 @@ test('browser history request contains no authority', () => {
   assert.deepEqual(request, { companyId: 9, cursor, limit: 20 })
   assert.equal('organizationId' in request, false)
   assert.equal('actorIdentity' in request, false)
+})
+
+test('rejects duplicate and oversized history pages', () => {
+  const run = { runId: 1, status: 'completed', skillId: 1, agentId: 1, stepCount: 0, tokensUsed: 0, startedAt: 'now' }
+  assert.equal(mapRunHistory({ runs: [run, run], nextCursor: null }), null)
+  assert.equal(mapRunHistory({ runs: Array.from({ length: 51 }, (_, i) => ({ ...run, runId: i + 1 })), nextCursor: null }), null)
 })

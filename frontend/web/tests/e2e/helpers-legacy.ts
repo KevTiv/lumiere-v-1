@@ -127,6 +127,13 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
   const moduleView = await currentModuleView(page, moduleId)
   const tab = moduleView.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  const panel = moduleView.getByTestId(`module-panel-${moduleId}-${tabId}`)
+  // A workspace with one view has no redundant local tab. An already active
+  // panel is also the right surface when it contains its own independent tabs.
+  if (await panel.isVisible()) {
+    await expectModuleTabSurface(page, moduleId, tabId)
+    return
+  }
   if (!(await tab.isVisible())) {
     const areaTrigger = moduleView.getByTestId(`module-area-${moduleId}`)
     if (await areaTrigger.count()) {
@@ -154,8 +161,10 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
       await currentModuleView(page, moduleId)
     }
   }
-  await tab.click()
-  await expect(tab).toHaveAttribute("aria-selected", "true")
+  if (await tab.isVisible()) {
+    await tab.click()
+    await expect(tab).toHaveAttribute("aria-selected", "true")
+  }
   await expectModuleTabSurface(page, moduleId, tabId)
 }
 

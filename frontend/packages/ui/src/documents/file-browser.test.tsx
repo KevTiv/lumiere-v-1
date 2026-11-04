@@ -223,3 +223,15 @@ describe("FileBrowser", () => {
     expect(shownFileIds()).toEqual(["1", "2", "3"])
   })
 })
+
+
+it("shows a known creation date without inventing a modification date or author", () => {
+  const createdFile = { ...files[0]!, updatedAt: null, createdAt: new Date(2026, 9, 31).getTime(), modifiedBy: "—" }
+  render(<FileBrowser folders={[]} files={[createdFile]} />)
+  const card = screen.getByTestId("file-browser-file-1")
+  expect(card.textContent).toContain("Created")
+  expect(card.textContent).not.toContain("Updated")
+  fireEvent.click(screen.getByRole("button", { name: "List view" }))
+  expect(screen.getByTestId("file-browser-row-1").textContent).toContain("Created")
+  expect(screen.getByRole("columnheader", { name: "Date" })).toBeTruthy()
+})

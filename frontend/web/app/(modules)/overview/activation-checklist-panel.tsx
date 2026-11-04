@@ -12,7 +12,7 @@ import {
 } from "./activation-checklist"
 
 /** Deterministic post-tenant assistance; forms remain the only business owners. */
-export function ActivationChecklistPanel({ organizationId, companyId }: { organizationId: number; companyId: number | null }) {
+export function ActivationChecklistPanel({ organizationId, companyId, collapseWhenReady = false }: { organizationId: number; companyId: number | null; collapseWhenReady?: boolean }) {
   const { t } = useTranslation()
   const { currentUser, checkPermission, permissionsReady, isAdmin } = useRBAC()
   const router = useRouter()
@@ -53,8 +53,9 @@ export function ActivationChecklistPanel({ organizationId, companyId }: { organi
     ...(selected === "contact" ? [{ id: "contact", label: t("activation.checks.contact", { defaultValue: "Saved contact in this company" }), state: checks.contactState }] : []),
     ...(selected === "quotation" ? [{ id: "customer", label: t("activation.checks.customer", { defaultValue: "Saved customer in this company" }), state: checks.customerState }] : []),
   ]
-  return <section aria-labelledby="activation-title" data-testid="activation-checklist" className="min-w-0 rounded-xl border p-4 sm:p-6">
-    <h2 id="activation-title" className="text-lg font-semibold">{t("activation.title", { defaultValue: "Getting started" })}</h2>
+  const completed = collapseWhenReady && permissionsCurrent && !searchParams.has("activation") && rows.every((row) => row.state === "ready")
+  const content = <section aria-labelledby="activation-title" data-testid="activation-checklist" className="min-w-0 rounded-xl border p-4 sm:p-6">
+    {!completed && <h2 id="activation-title" className="text-lg font-semibold">{t("activation.title", { defaultValue: "Getting started" })}</h2>}
     <p className="mt-1 text-sm text-muted-foreground">{t("activation.description", { defaultValue: "Choose a first task for your role. Check your company settings and find the form you need." })}</p>
     {!permissionsCurrent ? <p role="status" className="mt-3 text-sm">{t("activation.permissionsUnavailable", { defaultValue: "Current permissions are unavailable. Refresh your session before choosing a task." })}</p> : <>
       <ul className="my-4 space-y-2 text-sm" aria-live="polite">
@@ -82,4 +83,11 @@ export function ActivationChecklistPanel({ organizationId, companyId }: { organi
     </>}
     <Button type="button" variant="outline" className="mt-4" disabled={companies.isFetching || contacts.isFetching} onClick={() => { void Promise.allSettled([companies.refetch(), contacts.refetch()]) }}>{t("activation.refresh", { defaultValue: "Refresh checks" })}</Button>
   </section>
+  return completed ? <details className="min-w-0 rounded-xl border p-4 sm:p-6">
+    <summary className="w-fit cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <h2 id="activation-title" className="inline text-lg font-semibold">{t("activation.title", { defaultValue: "Getting started" })}</h2>
+      <span className="ml-3 text-sm text-muted-foreground">{t("activation.reviewSetup", { defaultValue: "Review setup and first tasks" })}</span>
+    </summary>
+    <div className="mt-4">{content}</div>
+  </details> : content
 }

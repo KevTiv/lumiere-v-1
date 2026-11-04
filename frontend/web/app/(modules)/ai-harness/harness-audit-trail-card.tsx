@@ -1,12 +1,7 @@
 "use client"
 
 import { useTranslation } from "@lumiere/i18n"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@lumiere/ui/components/card"
+import { HarnessInspector } from "./harness-inspector"
 import { Badge } from "@lumiere/ui/components/badge"
 
 import type { HarnessAuditTrail } from "@lumiere/erp-shared/ai-report-composer-schemas"
@@ -15,18 +10,13 @@ export function HarnessAuditTrailCard({ audit }: { audit: HarnessAuditTrail }) {
   const { t } = useTranslation()
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          {t("aiHarness.auditTrail.title")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <HarnessInspector title={t("aiHarness.inspector.audit", { defaultValue: "Technical inspector: audit trail" })}>
+      <div className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-muted-foreground">
             {t("aiHarness.auditTrail.correlationId")}
           </span>
-          <code className="rounded bg-muted px-2 py-0.5 text-xs">
+          <code className="min-w-0 rounded bg-muted px-2 py-0.5 text-xs [overflow-wrap:anywhere]">
             {audit.correlationId}
           </code>
         </div>
@@ -44,7 +34,7 @@ export function HarnessAuditTrailCard({ audit }: { audit: HarnessAuditTrail }) {
             </li>
           ))}
         </ol>
-      </CardContent>
-    </Card>
+      </div>
+    </HarnessInspector>
   )
 }

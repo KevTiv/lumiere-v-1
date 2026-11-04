@@ -1,12 +1,7 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { ChevronDown } from "lucide-react"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../components/collapsible"
+import { ListToolbar, ListToolbarFields, ListToolbarField, ListToolbarActions, ListToolbarSettings, ListToolbarSettingsTrigger } from "../composed/list-toolbar"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
@@ -120,13 +115,11 @@ export function AccountingWorklistToolbar({
     return filterValue
   }
   return (
-    <Collapsible
-      className="flex min-w-0 flex-col gap-3"
+    <ListToolbar
       data-testid="accounting-worklist-toolbar"
     >
-      <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto]">
-        <label className="min-w-0 space-y-1 text-xs font-medium">
-          <span>{t("common.search", { defaultValue: "Search" })}</span>
+      <ListToolbarFields>
+        <ListToolbarField label={t("common.search", { defaultValue: "Search" })}>
           <Input
             className="h-11 min-h-11"
             value={initialFilters.search ?? value.search}
@@ -139,9 +132,8 @@ export function AccountingWorklistToolbar({
               defaultValue: "Document or partner",
             })}
           />
-        </label>
-        <label className="min-w-0 space-y-1 text-xs font-medium">
-          <span>{t("accounting.journalEntries.state")}</span>
+        </ListToolbarField>
+        <ListToolbarField label={t("accounting.journalEntries.state")}>
           <Select
             value={
               String(initialFilters.status ?? value.filters.status ?? "") ||
@@ -172,11 +164,8 @@ export function AccountingWorklistToolbar({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
-        <label className="min-w-0 space-y-1 text-xs font-medium">
-          <span>
-            {t("accounting.worklists.currency", { defaultValue: "Currency" })}
-          </span>
+        </ListToolbarField>
+        <ListToolbarField label={t("accounting.worklists.currency", { defaultValue: "Currency" })}>
           <Select
             value={
               String(
@@ -215,11 +204,8 @@ export function AccountingWorklistToolbar({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
-        <label className="min-w-0 space-y-1 text-xs font-medium">
-          <span>
-            {t("accounting.worklists.queue", { defaultValue: "Balance queue" })}
-          </span>
+        </ListToolbarField>
+        <ListToolbarField label={t("accounting.worklists.queue", { defaultValue: "Balance queue" })}>
           <Select
             value={
               String(initialFilters.queue ?? value.filters.queue ?? "") ||
@@ -262,16 +248,9 @@ export function AccountingWorklistToolbar({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </label>
-        <CollapsibleTrigger
-          render={<Button variant="outline" className="min-h-11" />}
-        >
-          {t("accounting.worklists.viewSettings", {
-            defaultValue: "View settings",
-          })}
-          <ChevronDown data-icon="inline-end" />
-        </CollapsibleTrigger>
-      </div>
+        </ListToolbarField>
+        <ListToolbarSettingsTrigger />
+      </ListToolbarFields>
       {Object.keys(initialFilters).length > 0 && (
         <div className="space-y-2">
           <div
@@ -306,14 +285,11 @@ export function AccountingWorklistToolbar({
           </div>
         </div>
       )}
-      <CollapsibleContent className="flex min-w-0 flex-col gap-3 rounded-md border p-3">
+      <ListToolbarSettings>
         <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <label className="min-w-0 space-y-1 text-xs font-medium">
-            <span>
-              {t("accounting.worklists.savedViews", {
+          <ListToolbarField label={t("accounting.worklists.savedViews", {
                 defaultValue: "Saved views",
-              })}
-            </span>
+              })}>
             <Select
               value={chosenView === "" ? "__none__" : `saved:${chosenView}`}
               onValueChange={(selectValue) => {
@@ -352,13 +328,10 @@ export function AccountingWorklistToolbar({
                 </SelectGroup>
               </SelectContent>
             </Select>
-          </label>
-          <label className="min-w-0 space-y-1 text-xs font-medium">
-            <span>
-              {t("accounting.worklists.viewName", {
+          </ListToolbarField>
+          <ListToolbarField label={t("accounting.worklists.viewName", {
                 defaultValue: "View name",
-              })}
-            </span>
+              })}>
             <Input
               className="h-11 min-h-11"
               value={name}
@@ -368,7 +341,7 @@ export function AccountingWorklistToolbar({
                 defaultValue: "e.g. Overdue customers",
               })}
             />
-          </label>
+          </ListToolbarField>
           <div className={workspaceStyles.actions}>
             <Button
               className="min-h-11"
@@ -463,8 +436,8 @@ export function AccountingWorklistToolbar({
               "Open is a balance state, not proof of delivery or approval. CSV exports always include currency context.",
           })}
         </p>
-      </CollapsibleContent>
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+      </ListToolbarSettings>
+      <ListToolbarActions>
         <Button
           className="min-h-11"
           variant="ghost"
@@ -504,7 +477,7 @@ export function AccountingWorklistToolbar({
                 })}
           </Button>
         )}
-      </div>
-    </Collapsible>
+      </ListToolbarActions>
+    </ListToolbar>
   )
 }

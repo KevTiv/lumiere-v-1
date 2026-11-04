@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 
 import type { FormConfig } from "../lib/form-types"
+import { withFormChoiceSetup } from "../lib/form-choice-setup"
 import { FormModal } from "./form-modal"
 
 beforeAll(() => {
@@ -57,22 +58,33 @@ function renderForm(onSubmit: (values: Record<string, unknown>) => void) {
 describe("searchable select field in a form dialog", () => {
   it("refreshes linked choices without replacing edited fields or the selected file", async () => {
     const submit = vi.fn()
-    const configWithOptions = (options: Array<{ value: string; label: string }>): FormConfig => ({
+    const configWithOptions = (options: Array<{ value: string; label: string }>): FormConfig => withFormChoiceSetup({
       ...config,
       sections: [{ id: "main", fields: [
         { id: "partnerId", name: "partnerId", label: "Partner", type: "select", required: true, options, searchable: true },
         { id: "purpose", name: "purpose", label: "Purpose", type: "text" },
         { id: "receipt", name: "receipt", label: "Receipt", type: "file" },
       ] }],
+    }, {
+      partnerId: {
+        ready: true,
+        message: "Add a partner separately, then return. Your entries stay here.",
+        action: { href: "/crm?tab=contacts", label: "Open contacts" },
+      },
     })
     const props = { open: true, onOpenChange: vi.fn(), onSubmit: submit, draft: false }
     const { rerender } = render(<FormModal {...props} config={configWithOptions([])} />)
+    const setupLink = screen.getByRole("link", { name: /Open contacts.*opens in a new tab/ })
+    expect(setupLink.getAttribute("target")).toBe("_blank")
+    expect(setupLink.getAttribute("rel")).toContain("noopener")
+    expect(screen.getByTestId("form-field-partnerId").getAttribute("aria-describedby")).toContain("partnerId-recovery")
     fireEvent.change(screen.getByTestId("form-field-purpose"), { target: { value: "Receipt to retain" } })
     const receipt = new File(["receipt"], "receipt.pdf", { type: "application/pdf" })
     const fileInput = screen.getByTestId("form-field-receipt") as HTMLInputElement
     fireEvent.change(fileInput, { target: { files: [receipt] } })
 
     rerender(<FormModal {...props} config={configWithOptions([{ value: "7", label: "Available employee" }])} />)
+    expect(screen.queryByRole("link", { name: /Open contacts/ })).toBeNull()
     expect((screen.getByTestId("form-field-purpose") as HTMLInputElement).value).toBe("Receipt to retain")
     expect(fileInput.files?.[0]).toBe(receipt)
     fireEvent.click(screen.getByTestId("form-field-partnerId"))
