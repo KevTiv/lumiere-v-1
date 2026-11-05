@@ -1509,6 +1509,13 @@
     "save_ai_work_program_draft": "erp.save_ai_work_program_draft",
     "nominate_ai_work_program_output": "erp.nominate_ai_work_program_output",
     "register_ai_work_program_recipe": "erp.register_ai_work_program_recipe",
-    "revoke_ai_work_program_recipe": "erp.revoke_ai_work_program_recipe"
+    "revoke_ai_work_program_recipe": "erp.revoke_ai_work_program_recipe",
+    "ai_metered_price_read": "erp.ai_metered_price_read",
+    "ai_metered_usage_read": "erp.ai_metered_usage_read",
+    "claim_ai_metered_dispatch": "erp.claim_ai_metered_dispatch",
+    "configure_ai_metered_price": "erp.configure_ai_metered_price",
+    "reconcile_ai_metered_spend": "erp.reconcile_ai_metered_spend",
+    "reserve_ai_metered_spend": "erp.reserve_ai_metered_spend",
+    "settle_ai_metered_spend": "erp.settle_ai_metered_spend"
   }
 }

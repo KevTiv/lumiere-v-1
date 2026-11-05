@@ -530,6 +530,10 @@ fn parse_ix_cols(src: &str, struct_name: &str) -> Vec<String> {
         }
     }
 
+    // SDK IxCols declaration order is not a schema contract. Match the
+    // canonical IR renderer's alphabetical scalar-index layout so equivalent
+    // SDK snapshots cannot change DDL checksums or fail the planning guard.
+    cols.sort();
     cols
 }
 
@@ -792,6 +796,26 @@ pub struct AccountAccountType {
             ("company_id".to_string(), "Option<u64>".to_string())
         );
         assert_eq!(fields[2], ("tags".to_string(), "Vec<String>".to_string()));
+    }
+
+    #[test]
+    fn scalar_index_order_is_independent_of_sdk_declaration_order() {
+        let prefix = "pub struct ExampleIxCols {\n";
+        let fields = [
+            "pub organization_id: __sdk::__query_builder::IxCol<Example, u64>,\n",
+            "pub id: __sdk::__query_builder::IxCol<Example, u64>,\n",
+            "pub company_id: __sdk::__query_builder::IxCol<Example, u64>,\n",
+        ];
+        let original = format!("{}{}{}{}}}", prefix, fields[0], fields[1], fields[2]);
+        let reordered = format!("{}{}{}{}}}", prefix, fields[2], fields[0], fields[1]);
+        assert_eq!(
+            parse_ix_cols(&original, "Example"),
+            vec!["company_id", "id", "organization_id"]
+        );
+        assert_eq!(
+            parse_ix_cols(&original, "Example"),
+            parse_ix_cols(&reordered, "Example")
+        );
     }
 
     #[test]

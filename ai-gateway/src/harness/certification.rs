@@ -197,7 +197,7 @@ fn execution_request(
 }
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
-pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.8";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.9";
 
 struct LowStockCertificationAdapter;
 

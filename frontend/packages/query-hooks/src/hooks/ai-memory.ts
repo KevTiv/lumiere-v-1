@@ -144,16 +144,30 @@ export function useAiMemorySearch() {
   })
 }
 
+export type AiActivityReference = {
+  resource_kind: "sale_order" | "purchase_order" | "project_task" | "account_move" | "mrp_production" | "product" | "contact"
+  /** Decimal string preserves the full native u64 identity. */
+  resource_id: string
+}
+
+export type AiActivityIngestResult = {
+  indexed: number
+  unchanged: number
+  withheld: number
+  automatic_backfill: false
+}
+
+/** Index only explicitly selected records in the active company and current actor scope. */
 export function useAiMemoryIngest() {
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (args: { companyId: number; resources: AiActivityReference[] }) => {
       const r = await apiFetch("/api/ai/context/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify({ companyId: args.companyId, resources: args.resources }),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as { ingested: number }
+      return (await r.json()) as AiActivityIngestResult
     },
   })
 }

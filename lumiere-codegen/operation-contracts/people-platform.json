@@ -6100,6 +6100,76 @@
       "evidence": "spacetimedb/src/ai/work_program_learning.rs: append-only scoped recipe revocation; grants no execution or publication authority.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
+    },
+    "ai_metered_price_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "ai_metered_usage_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "claim_ai_metered_dispatch": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: one invocation owns each durable provider dispatch claim"
+    },
+    "configure_ai_metered_price": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "reconcile_ai_metered_spend": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "reserve_ai_metered_spend": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "settle_ai_metered_spend": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
     }
   }
 }

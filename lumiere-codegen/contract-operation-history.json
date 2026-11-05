@@ -214,49 +214,57 @@
       "name": "ai_knowledge_review_read",
       "shape_fingerprint": "sha256:d4a2365d00592762515fb1e75a8ef12329181bce0c53ed235a3ac7e486cc280b"
     },
+    "erp.ai_metered_price_read": {
+      "name": "ai_metered_price_read",
+      "shape_fingerprint": "sha256:a65c2d26f22064a9443530bd64277655c60c438c60c794373b0a11d13e968f37"
+    },
+    "erp.ai_metered_usage_read": {
+      "name": "ai_metered_usage_read",
+      "shape_fingerprint": "sha256:afb60f1cdf3b6142aaff23f5f7ed689648be7c8748a8933310ad1a9d7df89541"
+    },
     "erp.ai_owner_configuration_read": {
       "name": "ai_owner_configuration_read",
-      "shape_fingerprint": "sha256:a2a78be5740af688683f0c032aa3b0f5683f9250c40088057adf0fd4de8ef352"
+      "shape_fingerprint": "sha256:44526ffdfac10fe1cccb29b2864b34200eed416fdb6bb650256edc088d361f3b"
     },
     "erp.ai_owner_configuration_receipt_read": {
       "name": "ai_owner_configuration_receipt_read",
-      "shape_fingerprint": "sha256:0b9829f489d1fa838d4a4f5d6ce5811a7cdc6f1a682ea72ac6f3297d4bac7d34"
+      "shape_fingerprint": "sha256:4e49ca11b68606e00096b5529e939491390529d66fae897f8b3637b826d2452d"
     },
     "erp.ai_provider_attempt_read": {
       "name": "ai_provider_attempt_read",
-      "shape_fingerprint": "sha256:2c1f9f4e10cdfad63a23fecf8218858c6ce426d406527e9555f1236800ec83dc"
+      "shape_fingerprint": "sha256:42028015f32ce1af77bb5753396fdffeb92de063e1c8dcf134d68eb442428594"
     },
     "erp.ai_run_budget_park_read": {
       "name": "ai_run_budget_park_read",
-      "shape_fingerprint": "sha256:a93a2e463231d10b2cf82999141e1c0c628d02c5c373e2bb8790976dfce37211"
+      "shape_fingerprint": "sha256:3e17807d33821d3e98a245397791ba44799996010a4ce698469cfa179915d702"
     },
     "erp.ai_run_lifecycle_event_read": {
       "name": "ai_run_lifecycle_event_read",
-      "shape_fingerprint": "sha256:456bc5063da3b5e0c05736cf78b334a48149c04b5d9e66b4fe3ed4964e5b9343"
+      "shape_fingerprint": "sha256:8aa935e4916a7d1302b9e8d40d9caab594b33343fc62d4ba17d4df1c373141c5"
     },
     "erp.ai_run_lifecycle_state_read": {
       "name": "ai_run_lifecycle_state_read",
-      "shape_fingerprint": "sha256:1862cfded9ebbc07e11a4c101ce0de613661ba3b386b7e0d9563c55555a56fc0"
+      "shape_fingerprint": "sha256:8ed0d29fe776d8574ff03db3239e25e08620f5b0353c5d6d85e85ed1d55bc6b6"
     },
     "erp.ai_run_question_read": {
       "name": "ai_run_question_read",
-      "shape_fingerprint": "sha256:012bd495a0c85f715639123caf201cebea36189ef0e953858a85b386ab63973f"
+      "shape_fingerprint": "sha256:81d8a25990b9d95c79532a4af9f703f7d29bc768cd9b044a1642fe52ee406547"
     },
     "erp.ai_run_queued_input_read": {
       "name": "ai_run_queued_input_read",
-      "shape_fingerprint": "sha256:d03012f50151432dce48961839e573ecf75922fca6642c67036262acd7a08ca4"
+      "shape_fingerprint": "sha256:b2538948082cf2261002faaf073431b72d5bf321fa9ef30ffe59263a84604603"
     },
     "erp.ai_spend_budget_read": {
       "name": "ai_spend_budget_read",
-      "shape_fingerprint": "sha256:e68210954d919a77878b02c44acf0c7c9fd5c9751bce2f026f99889d03ed1589"
+      "shape_fingerprint": "sha256:40570d23efe18aac8be843454cd291e2915b6197186827434e6543693acfbcc6"
     },
     "erp.ai_spend_price_snapshot_read": {
       "name": "ai_spend_price_snapshot_read",
-      "shape_fingerprint": "sha256:fbca309e823864d7ac76b272077ccaee940369b7dc8d966a32236a0f149783f0"
+      "shape_fingerprint": "sha256:a9001c356bd227398e46a47accfc789932b78efd443db7d2b856bd7a2b9db839"
     },
     "erp.ai_spend_reservation_read": {
       "name": "ai_spend_reservation_read",
-      "shape_fingerprint": "sha256:4ce0e04915045ec50f6dc77076d12bfb5dc6f6948bcc77b4fc3e12dd9aa59265"
+      "shape_fingerprint": "sha256:5944b8d36dfa821971a82a602bfb1c5839ed4a1ff0a3f9562cfbb4dd5f0a3be6"
     },
     "erp.allocate_payment_transaction": {
       "name": "allocate_payment_transaction",
@@ -690,6 +698,10 @@
       "name": "claim_ai_capability_execution",
       "shape_fingerprint": "sha256:b0258ed27ba5c8ffd1f86c86d0f1611b9dd05d8b6c5ea74d8c9f6ed039d8f093"
     },
+    "erp.claim_ai_metered_dispatch": {
+      "name": "claim_ai_metered_dispatch",
+      "shape_fingerprint": "sha256:0376d8a71a98482af1c36b3a290585e52b0b1177ed47d289740c328c8fac64b4"
+    },
     "erp.claim_ai_skill_certification": {
       "name": "claim_ai_skill_certification",
       "shape_fingerprint": "sha256:b43bd1bbaab2432f113ac15b8c4ee7f5780042fc64aea6445523dd6b0b2f8dc9"
@@ -901,6 +913,10 @@
     "erp.compute_so_totals": {
       "name": "compute_so_totals",
       "shape_fingerprint": "sha256:4ebd60a2cd64d1a1a48db121c9ee900eb4e9f05842cf732aedc7899bb4d96019"
+    },
+    "erp.configure_ai_metered_price": {
+      "name": "configure_ai_metered_price",
+      "shape_fingerprint": "sha256:592842a80a872d5f0c57a5c2c77512fcacc404cbfc55ee4588882c07214f956e"
     },
     "erp.configure_ai_spend": {
       "name": "configure_ai_spend",
@@ -2576,7 +2592,7 @@
     },
     "erp.helpdesk_related_record_read": {
       "name": "helpdesk_related_record_read",
-      "shape_fingerprint": "sha256:f995de0416be2ed767d4a93d9f076453a9491de32bfb0284143387ddc9986641"
+      "shape_fingerprint": "sha256:d72513a17107f761e3b64b5485bc6d307b86447fdb1dd494931eeb9bf8283637"
     },
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
@@ -2872,11 +2888,11 @@
     },
     "erp.knowledge_guide_actor_profile_read": {
       "name": "knowledge_guide_actor_profile_read",
-      "shape_fingerprint": "sha256:d2a83fc5b4ab5feca02e8676990f1a0ff89a0258e72ad22c8646d3bb669b93cc"
+      "shape_fingerprint": "sha256:329b639ef39bbca47153a5a752694c3bc6fe6d24163f6f3a59b79c7009590b44"
     },
     "erp.knowledge_guide_authority_read": {
       "name": "knowledge_guide_authority_read",
-      "shape_fingerprint": "sha256:f2fc3822d9c62a481f0c214b157ed1f55749dcebaa3f945dfb644440e4af64ea"
+      "shape_fingerprint": "sha256:7a2321ca445a47e70cc957497900d5cbf8d877c56ba5493798080d7ba8f5b032"
     },
     "erp.link_device_to_location": {
       "name": "link_device_to_location",
@@ -3237,6 +3253,10 @@
     "erp.reconcile_account_bank_statement_line": {
       "name": "reconcile_account_bank_statement_line",
       "shape_fingerprint": "sha256:54966591ab3c66badf5ae08bfe59c0dd9430490e1a581a1f00a75ced60eb345b"
+    },
+    "erp.reconcile_ai_metered_spend": {
+      "name": "reconcile_ai_metered_spend",
+      "shape_fingerprint": "sha256:9469c22e5cbeaae7d65687bf458c28c6c916fb8bf42801a02533c85fd0d3acef"
     },
     "erp.reconcile_ai_provider_attempt": {
       "name": "reconcile_ai_provider_attempt",
@@ -3657,6 +3677,10 @@
     "erp.request_workflow_subject_snapshot": {
       "name": "request_workflow_subject_snapshot",
       "shape_fingerprint": "sha256:5495da63ae66197c23b96b11d0ce55bdc10d9c936aef805d4077b423c69e84c1"
+    },
+    "erp.reserve_ai_metered_spend": {
+      "name": "reserve_ai_metered_spend",
+      "shape_fingerprint": "sha256:6a7114065958d8bdc20703407c9464399081450c526352de6a735b964cfd3bbb"
     },
     "erp.reserve_ai_spend": {
       "name": "reserve_ai_spend",
@@ -5042,6 +5066,10 @@
       "name": "set_workflow_migration_plan_active",
       "shape_fingerprint": "sha256:b4859c17b8e66760430b501ef7605dc4b2852b78c19d82e1792ee423a59e3a6a"
     },
+    "erp.settle_ai_metered_spend": {
+      "name": "settle_ai_metered_spend",
+      "shape_fingerprint": "sha256:bf40613b825078f5f09fcb281917298f6ae5a045d53cb8f8fa4aeb922a0a3541"
+    },
     "erp.settle_ai_spend": {
       "name": "settle_ai_spend",
       "shape_fingerprint": "sha256:b161e41160e50f10cd8603e3f538975a7f6d8f711ca1ee4c8b7ec846277aa655"
@@ -6380,6 +6408,14 @@
       "current_operations_fingerprint": "sha256:97b01f2d689ab56e7c6fd60e43e888bd0a75194bbc309438181a9ba7accb9f36",
       "operation_count": 1509,
       "reason": "Add four private reusable-work authoring and reviewed recipe operations; preserve every historical operation shape and deferred execution admission"
+    },
+    {
+      "previous_release": "v0.3.165",
+      "previous_ir_sha256": "sha256:d603eaadae25a7c03a4d235ade4a70ac7cd5da3b7f486352af6823e404c53658",
+      "previous_operations_fingerprint": "sha256:97b01f2d689ab56e7c6fd60e43e888bd0a75194bbc309438181a9ba7accb9f36",
+      "current_operations_fingerprint": "sha256:aea82dc1b1ff0a524189824a7fd32e6cdaad0837f9fcc541f4e3f5c7eb2ae8d9",
+      "operation_count": 1516,
+      "reason": "release on top of v0.3.165: add ai_metered_price_read, ai_metered_usage_read, claim_ai_metered_dispatch, configure_ai_metered_price, reconcile_ai_metered_spend, reserve_ai_metered_spend, settle_ai_metered_spend; change the shape of ai_owner_configuration_read, ai_owner_configuration_receipt_read, ai_provider_attempt_read, ai_run_budget_park_read, ai_run_lifecycle_event_read, ai_run_lifecycle_state_read, ai_run_question_read, ai_run_queued_input_read, ai_spend_budget_read, ai_spend_price_snapshot_read, ai_spend_reservation_read, helpdesk_related_record_read, knowledge_guide_actor_profile_read, knowledge_guide_authority_read"
     }
   ]
 }

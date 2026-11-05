@@ -122,13 +122,20 @@ export function RunHistoryPanel({ companyId, onSelectRun, selectRunDisabled = fa
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{t("aiHarness.runHistory.run", { id: run.runId })}</span>
                 <Badge variant="outline">{runStatusLabel(t, run.status)}</Badge>
-                <span className="text-xs text-muted-foreground">{t("aiHarness.runHistory.identifiers", { skill: run.skillId, agent: run.agentId })}</span>
+                <span className="text-xs text-muted-foreground">{run.skillId === 0
+                  ? t("aiHarness.runHistory.meteredRequest", { defaultValue: "Metered service request" })
+                  : t("aiHarness.runHistory.identifiers", { skill: run.skillId, agent: run.agentId })}</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{t("aiHarness.runHistory.summary", { steps: run.stepCount, tokens: run.tokensUsed.toLocaleString(), started: run.startedAt })}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{run.tokensUsed === null
+                ? t("aiHarness.runHistory.summaryWithoutTokens", { defaultValue: "{{steps}} steps · {{started}}", steps: run.stepCount, started: run.startedAt })
+                : t("aiHarness.runHistory.summary", { steps: run.stepCount, tokens: run.tokensUsed.toLocaleString(), started: run.startedAt })}</p>
               {run.economics ? (
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   {run.economics.providerModels.map((pair) => <Badge key={`${pair.provider}:${pair.model}`} variant="outline">{pair.provider} / {pair.model}</Badge>)}
                   {run.economics.providerModelsTruncated ? <Badge variant="outline">{t("aiHarness.runHistory.providersTruncated")}</Badge> : null}
+                  {run.economics.meteredUsage ? <span>{run.economics.meteredUsage.complete
+                    ? run.economics.meteredUsage.totals.map((total) => `${total.actualUnits?.toLocaleString()} ${total.unit}`).join(" · ")
+                    : t("aiHarness.ux.observation.meteredUnavailable", { defaultValue: "Metered usage is pending or unavailable." })}</span> : null}
                   {run.economics.settledUnits !== null ? <span>{t("aiHarness.runHistory.settled", { amount: run.economics.settledUnits.toLocaleString(), currency: run.economics.currency ?? t("aiHarness.runHistory.units") })}</span> : null}
                   {run.economics.reservedUnits !== null ? <span>{t("aiHarness.runHistory.reserved", { amount: run.economics.reservedUnits.toLocaleString(), currency: run.economics.currency ?? t("aiHarness.runHistory.units") })}</span> : null}
                   {run.economics.reservationStatuses.map((status) => <Badge key={`reservation:${status}`} variant="outline">{t("aiHarness.runHistory.reservationStatus", { status })}</Badge>)}

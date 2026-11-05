@@ -37,6 +37,7 @@ import {
   useAiGatewayHealth,
   useAiMemoryIngest,
   useAiMemorySearch,
+  type AiActivityReference,
 } from "@lumiere/query-hooks/hooks/ai-memory"
 import { aiAgentCreateFormConfig, aiAgentEditFormConfig } from "@/lib/ai-agent-form-configs"
 import { aiReducerAllowlistCreateFormConfig } from "@/lib/ai-reducer-allowlist-form-configs"
@@ -181,6 +182,10 @@ export function AiSettings() {
   const memorySearchMutation = useAiMemorySearch()
   const gatewayHealthMutation = useAiGatewayHealth()
   const [memoryTestQuery, setMemoryTestQuery] = useState("")
+  const [memoryResourceKind, setMemoryResourceKind] = useState<AiActivityReference["resource_kind"]>("sale_order")
+  const [memoryResourceId, setMemoryResourceId] = useState("")
+  const memoryReferenceReady = /^[1-9][0-9]{0,19}$/.test(memoryResourceId)
+    && BigInt(memoryResourceId) <= 18_446_744_073_709_551_615n
   const [memorySearchPreview, setMemorySearchPreview] = useState<string | null>(null)
 
   const agents = agentsQuery.data ?? []
@@ -632,20 +637,40 @@ export function AiSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">{t("settings.ai.memoryOpsNote")}</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="memory-resource-kind">{t("settings.ai.memoryRecordTypeLabel", { defaultValue: "Record type" })}</Label>
+              <Select value={memoryResourceKind} onValueChange={(value) => setMemoryResourceKind(value as AiActivityReference["resource_kind"])}>
+                <SelectTrigger id="memory-resource-kind" className="w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {([
+                    ["sale_order", "Sale order"], ["purchase_order", "Purchase order"],
+                    ["project_task", "Task"], ["account_move", "Journal entry"],
+                    ["mrp_production", "Manufacturing order"], ["product", "Product"], ["contact", "Contact"],
+                  ] as const).map(([value, label]) => <SelectItem key={value} value={value}>{t(`settings.ai.memoryRecordTypes.${value}`, { defaultValue: label })}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="memory-resource-id">{t("settings.ai.memoryRecordId", { defaultValue: "Record ID" })}</Label>
+              <Input id="memory-resource-id" className="w-48" inputMode="numeric" value={memoryResourceId} onChange={(event) => setMemoryResourceId(event.target.value)} disabled={mutating || !orgReady} />
+            </div>
             <Button
               type="button"
               variant="secondary"
               size="sm"
-              disabled={mutating || !orgReady}
+              disabled={mutating || !orgReady || !activeCompanyId || !memoryReferenceReady}
               onClick={() => {
+                if (!activeCompanyId || !memoryReferenceReady) return
                 setMemorySearchPreview(null)
-                void memoryIngestMutation.mutate(undefined, {
+                void memoryIngestMutation.mutate({ companyId: activeCompanyId, resources: [{ resource_kind: memoryResourceKind, resource_id: memoryResourceId }] }, {
                   onSuccess: (data) => {
                     toast({
                       title: t("settings.ai.memoryIngestDone"),
-                      description: t("settings.ai.memoryIngestCount", {
-                        count: data.ingested ?? 0,
+                      description: t("settings.ai.memoryIngestOutcome", {
+                        indexed: data.indexed,
+                        unchanged: data.unchanged,
+                        withheld: data.withheld,
                       }),
                     })
                   },

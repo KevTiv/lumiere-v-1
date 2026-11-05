@@ -345,6 +345,20 @@ services:
   - name: web-ai-alpha-pilot
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
+      - name: web-ai-alpha-contextual-chat
+        paths:
+          - '~/api/ai/rag(?:/stream)?$'
+          - '~/api/ai/forms/(?:suggest|validate)$'
+          - '~/api/ai/context/(?:search|ingest)$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-document-evidence
+        paths:
+          - '~/api/ai/evidence/ingestion/documents(?:/lifecycle)?$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-certification-read
         paths:
           - '~/api/ai/skills/certifications(?:/[1-9][0-9]*)?$'

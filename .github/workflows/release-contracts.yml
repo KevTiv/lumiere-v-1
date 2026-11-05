@@ -282,6 +282,7 @@ jobs:
       - name: Commit regenerated sources
         if: steps.changes.outputs.release == 'true'
         run: |
+          python3 -B scripts/generate-finance-change-review-inventory.py
           git add -A
           git status --short
           if ! git diff --cached --quiet; then
@@ -318,6 +319,7 @@ jobs:
           fi
           python3 scripts/verify-operation-history.py
           python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+          python3 -B scripts/generate-finance-change-review-inventory.py --check
 
       # api-server consumes durable follow-up migrations from the migration
       # ledger. A pending one has no catalog entry, so publishing it would fail

@@ -71,6 +71,23 @@ pub struct ProviderModelSummary {
 
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct MeteredUsageTotal {
+    /// Only native billing units, never provider response content.
+    pub unit: String,
+    pub allowance: Option<u64>,
+    pub actual_units: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MeteredUsageSummary {
+    pub totals: Vec<MeteredUsageTotal>,
+    pub complete: bool,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RunEconomicsSummary {
     pub provider_models: Vec<ProviderModelSummary>,
     pub provider_models_truncated: bool,
@@ -84,6 +101,8 @@ pub struct RunEconomicsSummary {
     pub reserved_units: Option<u64>,
     pub settled_units: Option<u64>,
     pub truncated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metered_usage: Option<MeteredUsageSummary>,
 }
 
 #[derive(Debug, Serialize)]
@@ -109,7 +128,7 @@ pub struct RunEvidenceInspection {
     pub status: String,
     pub answer: Option<String>,
     pub step_count: u64,
-    pub tokens_used: u64,
+    pub tokens_used: Option<u64>,
     pub error_message: Option<String>,
     pub transcript: Vec<RunTranscriptStep>,
     pub contribution_ids: Vec<u64>,
@@ -127,7 +146,7 @@ pub struct RunHistoryItem {
     pub skill_id: u64,
     pub agent_id: u64,
     pub step_count: u64,
-    pub tokens_used: u64,
+    pub tokens_used: Option<u64>,
     pub started_at: String,
     pub completed_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -382,6 +401,20 @@ fn allowed_reservation_status(value: &str) -> bool {
     matches!(value, "reserved" | "settled" | "released")
 }
 
+fn row_matches_run(row: &Value, organization_id: u64, company_id: u64, run_id: u64) -> bool {
+    row_u64(row, "organizationId", "organization_id") == Some(organization_id)
+        && row_u64(row, "companyId", "company_id") == Some(company_id)
+        && row_u64(row, "runId", "run_id") == Some(run_id)
+}
+
+fn is_native_metered_row(row: &Value) -> bool {
+    // Native non-generation reservations deliberately have no LLM price snapshot.
+    // Model recognition also covers old projections that omit that sentinel.
+    row_u64(row, "priceSnapshotId", "price_snapshot_id") == Some(0)
+        || bounded_row_text(row, "model", "model", 128)
+            .is_some_and(|model| model == "mistral-embed" || model.starts_with("mistral-ocr-"))
+}
+
 fn economics_from_rows(
     organization_id: u64,
     company_id: u64,
@@ -415,6 +448,10 @@ fn economics_from_rows(
 
     let truncated =
         attempts.len() > MAX_RUN_ECONOMICS_ROWS || reservations.len() > MAX_RUN_ECONOMICS_ROWS;
+    let metered = attempts
+        .iter()
+        .chain(reservations.iter())
+        .any(|row| is_native_metered_row(row));
     let attempts = attempts.into_iter().take(MAX_RUN_ECONOMICS_ROWS);
     let reservations = reservations
         .into_iter()
@@ -502,13 +539,98 @@ fn economics_from_rows(
         attempt_statuses: attempt_statuses.into_iter().collect(),
         reservation_statuses: reservation_statuses.into_iter().collect(),
         outcome_unknown,
-        input_tokens: (!truncated && usage_complete).then_some(input_tokens),
-        output_tokens: (!truncated && usage_complete).then_some(output_tokens),
+        input_tokens: (!metered && !truncated && usage_complete).then_some(input_tokens),
+        output_tokens: (!metered && !truncated && usage_complete).then_some(output_tokens),
         currency,
         reserved_units: (!truncated).then_some(reserved_units),
         settled_units: (!truncated).then_some(settled_units),
         truncated,
+        metered_usage: metered.then_some(MeteredUsageSummary {
+            totals: vec![],
+            complete: false,
+            truncated,
+        }),
     })
+}
+
+/// Join only exact-run native meters to canonical reservations. Unknown,
+/// outstanding, malformed or truncated usage never becomes a zero total.
+fn apply_metered_usage(
+    summary: &mut RunEconomicsSummary,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    reservation_rows: &[Value],
+    meter_rows: &[Value],
+) {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let rows = meter_rows
+        .iter()
+        .filter(|row| row_matches_run(row, organization_id, company_id, run_id))
+        .take(MAX_RUN_ECONOMICS_ROWS + 1)
+        .collect::<Vec<_>>();
+    if rows.is_empty() {
+        return;
+    }
+    summary.input_tokens = None;
+    summary.output_tokens = None;
+    let reservations = reservation_rows
+        .iter()
+        .filter(|row| row_matches_run(row, organization_id, company_id, run_id))
+        .filter(|row| is_native_metered_row(row))
+        .filter_map(|row| row_u64(row, "id", "id").map(|id| (id, row)))
+        .collect::<BTreeMap<_, _>>();
+    let truncated = summary.truncated || rows.len() > MAX_RUN_ECONOMICS_ROWS;
+    let mut complete = !truncated;
+    let mut seen = BTreeSet::new();
+    let mut totals = BTreeMap::<String, (Option<u64>, Option<u64>)>::new();
+    for row in rows.into_iter().take(MAX_RUN_ECONOMICS_ROWS) {
+        let Some(id) = row_u64(row, "reservationId", "reservation_id") else {
+            complete = false;
+            continue;
+        };
+        let Some(reservation) = reservations.get(&id).filter(|_| seen.insert(id)) else {
+            complete = false;
+            continue;
+        };
+        let unit = row_text(row, "unit", "unit").unwrap_or_default();
+        let model = row_text(row, "model", "model");
+        if !matches!(unit.as_str(), "tokens" | "pages")
+            || model != row_text(reservation, "model", "model")
+        {
+            complete = false;
+            continue;
+        }
+        let allowance = row_u64(row, "allowance", "allowance").filter(|units| *units > 0);
+        let actual = row_u64(row, "actualUnits", "actual_units")
+            .filter(|units| allowance.is_some_and(|allowance| *units <= allowance));
+        let settled = row_text(reservation, "status", "status").as_deref() == Some("settled");
+        complete &= allowance.is_some() && actual.is_some() && settled;
+        let total = totals.entry(unit).or_insert((Some(0), Some(0)));
+        total.0 = total
+            .0
+            .zip(allowance)
+            .and_then(|(total, value)| total.checked_add(value));
+        total.1 = total
+            .1
+            .zip(actual)
+            .and_then(|(total, value)| total.checked_add(value));
+        complete &= total.0.is_some() && total.1.is_some();
+    }
+    complete &= seen.len() == reservations.len() && !reservations.is_empty();
+    summary.metered_usage = Some(MeteredUsageSummary {
+        totals: totals
+            .into_iter()
+            .map(|(unit, (allowance, actual_units))| MeteredUsageTotal {
+                unit,
+                allowance: (!truncated).then_some(allowance).flatten(),
+                actual_units: complete.then_some(actual_units).flatten(),
+            })
+            .collect(),
+        complete,
+        truncated,
+    });
 }
 
 async fn load_run_economics(
@@ -530,18 +652,39 @@ async fn load_run_economics(
         .ok()?;
     let reservations = reader
         .query_sql(&format!(
-            "SELECT id, organization_id, company_id, run_id, provider, model, currency, reserved_units, settled_units, status FROM ai_spend_reservation_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"
+            "SELECT id, organization_id, company_id, run_id, provider, model, price_snapshot_id, currency, reserved_units, settled_units, status FROM ai_spend_reservation_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"
         ))
         .await
         .map_err(|error| tracing::warn!(%error, run_id, "run reservation economics unavailable"))
         .ok()?;
-    economics_from_rows(
+    let mut summary = economics_from_rows(
         organization_id,
         company_id,
         run_id,
         &attempts,
         &reservations,
-    )
+    )?;
+    if summary.metered_usage.is_none() {
+        return Some(summary);
+    }
+    // Older deployments may not have the native meter view. Preserve their
+    // monetary and legacy LLM summaries; recognized native meters stay unknown.
+    let meter_query = format!(
+        "SELECT reservation_id, organization_id, company_id, run_id, model, unit, allowance, actual_units FROM ai_metered_usage_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"
+    );
+    if let Ok(Ok(rows)) =
+        tokio::time::timeout(Duration::from_millis(250), reader.query_sql(&meter_query)).await
+    {
+        apply_metered_usage(
+            &mut summary,
+            organization_id,
+            company_id,
+            run_id,
+            &reservations,
+            &rows,
+        );
+    }
+    Some(summary)
 }
 
 fn redacted_step(row: &Value) -> Option<RunTranscriptStep> {
@@ -667,7 +810,7 @@ async fn inspect_run(
         status: row_text(&run, "status", "status").unwrap_or_else(|| "unknown".into()),
         answer: row_text(&run, "summary", "summary"),
         step_count: row_u64(&run, "stepCount", "step_count").unwrap_or_default(),
-        tokens_used: row_u64(&run, "tokensUsed", "tokens_used").unwrap_or_default(),
+        tokens_used: Some(row_u64(&run, "tokensUsed", "tokens_used").unwrap_or_default()),
         error_message: row_text(&run, "errorMessage", "error_message"),
         transcript,
         contribution_ids,
@@ -675,6 +818,14 @@ async fn inspect_run(
         claims,
         economics: load_run_economics(state, actor.organization_id, actor.company_id, run_id).await,
     };
+    if row_u64(&run, "skillId", "skill_id") == Some(0)
+        || inspection
+            .economics
+            .as_ref()
+            .is_some_and(|summary| summary.metered_usage.is_some())
+    {
+        inspection.tokens_used = None;
+    }
     enforce_run_byte_bound(&mut inspection, grant.max_bytes, shape)?;
     Ok(inspection)
 }
@@ -709,7 +860,8 @@ fn history_item_from_row(row: &Value) -> AppResult<RunHistoryItem> {
         skill_id: required_number("skillId", "skill_id")?,
         agent_id: required_number("agentId", "agent_id")?,
         step_count: required_number("stepCount", "step_count")?,
-        tokens_used: required_number("tokensUsed", "tokens_used")?,
+        tokens_used: (required_number("skillId", "skill_id")? != 0)
+            .then_some(required_number("tokensUsed", "tokens_used")?),
         started_at: bounded_row_display(row, "startedAt", "started_at", 128)
             .filter(|value| !value.is_empty())
             .ok_or_else(|| AppError::Internal("run history row is missing startedAt".into()))?,
@@ -774,6 +926,13 @@ pub async fn post_run_history(
             } else {
                 None
             };
+            if item
+                .economics
+                .as_ref()
+                .is_some_and(|summary| summary.metered_usage.is_some())
+            {
+                item.tokens_used = None;
+            }
             item
         }
     }))
@@ -933,7 +1092,7 @@ mod route_tests {
             status: "completed".to_string(),
             answer: Some("sensitive answer".repeat(50)),
             step_count: 1,
-            tokens_used: 20,
+            tokens_used: Some(20),
             error_message: None,
             transcript: vec![RunTranscriptStep {
                 id: 1,
@@ -964,6 +1123,7 @@ mod route_tests {
                 reserved_units: Some(10),
                 settled_units: Some(10),
                 truncated: false,
+                metered_usage: None,
             }),
         };
         let minimal = RunEvidenceInspection {
@@ -971,7 +1131,7 @@ mod route_tests {
             status: "completed".to_string(),
             answer: None,
             step_count: 1,
-            tokens_used: 20,
+            tokens_used: Some(20),
             error_message: None,
             transcript: vec![],
             contribution_ids: vec![],
@@ -1402,6 +1562,136 @@ mod route_tests {
         huge["inputTokens"] = json!(u64::MAX);
         let summary = economics_from_rows(7, 9, 42, &[known, huge], &[]).expect("usage");
         assert_eq!(summary.input_tokens, None);
+    }
+
+    #[test]
+    fn native_metered_usage_is_exact_scoped_and_never_exports_private_output() {
+        let attempts = vec![json!({"organizationId":7,"companyId":9,"runId":42,
+            "provider":"mistral","model":"mistral-ocr-2505","status":"succeeded",
+            "inputTokens":0,"outputTokens":0})];
+        let reservations = vec![json!({"id":90,"organizationId":7,"companyId":9,"runId":42,
+            "model":"mistral-ocr-2505","priceSnapshotId":0,"status":"settled",
+            "currency":"USD","reservedUnits":50,"settledUnits":30})];
+        let meters = vec![
+            json!({"reservationId":90,"organizationId":7,"companyId":9,"runId":42,
+                "model":"mistral-ocr-2505","unit":"pages","allowance":5,"actualUnits":3,
+                "resultJson":"private document text","actorIdentity":"private identity","requestKey":"private key"}),
+            json!({"reservationId":91,"organizationId":8,"companyId":9,"runId":42,
+                "model":"foreign","unit":"pages","allowance":99,"actualUnits":99}),
+        ];
+        let mut summary = economics_from_rows(7, 9, 42, &attempts, &reservations).unwrap();
+        // Even before native metadata is available, LLM token0 is not usage.
+        assert_eq!(summary.input_tokens, None);
+        assert_eq!(summary.output_tokens, None);
+        assert!(!summary.metered_usage.as_ref().unwrap().complete);
+        apply_metered_usage(&mut summary, 7, 9, 42, &reservations, &meters);
+        let usage = summary.metered_usage.as_ref().unwrap();
+        assert!(usage.complete);
+        assert_eq!(
+            usage.totals,
+            vec![MeteredUsageTotal {
+                unit: "pages".into(),
+                allowance: Some(5),
+                actual_units: Some(3)
+            }]
+        );
+        assert_eq!(summary.settled_units, Some(30));
+        let encoded = serde_json::to_string(&summary).unwrap();
+        for forbidden in [
+            "private",
+            "resultJson",
+            "actorIdentity",
+            "requestKey",
+            "foreign",
+        ] {
+            assert!(!encoded.contains(forbidden), "{forbidden}");
+        }
+    }
+
+    #[test]
+    fn native_usage_missing_pending_or_malformed_never_claims_a_complete_total() {
+        let reservation = json!({"id":90,"organizationId":7,"companyId":9,"runId":42,
+            "model":"mistral-embed","priceSnapshotId":0,"status":"settled",
+            "currency":"USD","reservedUnits":50,"settledUnits":30});
+        let meter = json!({"reservationId":90,"organizationId":7,"companyId":9,"runId":42,
+            "model":"mistral-embed","unit":"tokens","allowance":100,"actualUnits":75});
+        let missing = economics_from_rows(7, 9, 42, &[], &[reservation.clone()]).unwrap();
+        assert!(missing.metered_usage.as_ref().unwrap().totals.is_empty());
+        assert_eq!(missing.input_tokens, None);
+        assert_eq!(missing.settled_units, Some(30));
+        for patch in [
+            json!({"actualUnits":null}),
+            json!({"actualUnits":101}),
+            json!({"reservationId":91}),
+            json!({"unit":"requests"}),
+            json!({"model":"other"}),
+            json!({"allowance":null}),
+        ] {
+            let mut row = meter.clone();
+            row.as_object_mut()
+                .unwrap()
+                .extend(patch.as_object().unwrap().clone());
+            let mut summary = missing.clone();
+            apply_metered_usage(&mut summary, 7, 9, 42, &[reservation.clone()], &[row]);
+            let usage = summary.metered_usage.unwrap();
+            assert!(!usage.complete);
+            assert!(usage
+                .totals
+                .iter()
+                .all(|total| total.actual_units.is_none()));
+        }
+        let mut pending = reservation.clone();
+        pending["status"] = json!("reserved");
+        let mut summary = missing.clone();
+        apply_metered_usage(&mut summary, 7, 9, 42, &[pending], &[meter.clone()]);
+        assert!(!summary.metered_usage.as_ref().unwrap().complete);
+        let mut complete = missing.clone();
+        apply_metered_usage(
+            &mut complete,
+            7,
+            9,
+            42,
+            &[reservation.clone()],
+            &[meter.clone()],
+        );
+        assert_eq!(
+            complete.metered_usage.unwrap().totals[0].actual_units,
+            Some(75)
+        );
+        let mut duplicate = missing.clone();
+        apply_metered_usage(
+            &mut duplicate,
+            7,
+            9,
+            42,
+            &[reservation.clone()],
+            &[meter.clone(), meter.clone()],
+        );
+        assert!(!duplicate.metered_usage.unwrap().complete);
+        let mut truncated = missing;
+        apply_metered_usage(
+            &mut truncated,
+            7,
+            9,
+            42,
+            &[reservation],
+            &vec![meter; MAX_RUN_ECONOMICS_ROWS + 1],
+        );
+        let usage = truncated.metered_usage.unwrap();
+        assert!(usage.truncated);
+        assert!(!usage.complete);
+        assert!(usage
+            .totals
+            .iter()
+            .all(|total| total.allowance.is_none() && total.actual_units.is_none()));
+    }
+
+    #[test]
+    fn native_accounting_history_never_exposes_the_run_token_placeholder() {
+        let item = history_item_from_row(&json!({"id":42,"status":"completed","skillId":0,
+            "agentId":7,"stepCount":0,"tokensUsed":0,"startedAt":"2026-11-04"}))
+        .unwrap();
+        assert_eq!(item.tokens_used, None);
     }
 
     #[test]
