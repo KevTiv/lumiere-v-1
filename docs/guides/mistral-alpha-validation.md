@@ -250,3 +250,9 @@ table equality, prior migration checksum and application-time preservation,
 and startup replay checks. All 16 compatibility cases then passed against a real
 temporary PostgreSQL 18.6 instance with `C4_TEST_PG=1`, zero failures and no skips.
 The temporary databases and container were removed after verification.
+
+The checked-in ledger regression was also advanced to 18 released files and
+pending version 37, adding migration 36's exact checksum while preserving all
+prior checksum assertions. The complete current-source codegen suite then
+passed all 144 ordinary tests, followed by the normally ignored parity test
+against the actual published staging tree: 145 cases validated in total.
