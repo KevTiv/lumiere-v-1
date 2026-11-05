@@ -43,6 +43,10 @@ oversized rows remain archived and explicitly flagged for section selection.
 
 ## Review and use
 
+The app upload preparation uses the same supplementary-row interpreter as this
+command. It keeps every original row, and adds proposals only in preparation
+mode. Inspection-only mode retains evidence without those proposals.
+
 1. Open original reports in Documents. The document admission profile accepts
    bounded CSV records with blank headings and repeated sections. Every cell is
    inspected, including tail notes. Native CSV imports still require a flat

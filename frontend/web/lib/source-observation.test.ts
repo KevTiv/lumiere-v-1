@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { interpretSourceText, sourceHistoryLink, sourceHistorySelection } from "./source-observation"
+import { interpretSourceCells, interpretSourceText, sourceHistoryLink, sourceHistorySelection } from "./source-observation"
 
 test("mixed-language notes produce explanations without payment or stock effects", () => {
   assert.deepEqual(interpretSourceText("PAYEMENT CHEQ").map((hint) => hint.key), ["cheque"])
@@ -25,4 +25,13 @@ test("verified-source links retain exact large dataset IDs and reset across comp
   assert.throws(() => sourceHistoryLink(0), /operating company/)
   assert.throws(() => sourceHistoryLink(7, "1&companyId=8"), /dataset/)
   assert.equal(sourceHistorySelection("?historyCompany=7&historyBatch=bad&historyVerified=true", 7).batchId, null)
+})
+
+test("prepared row evidence explains individual source cells without changing them", () => {
+  const original = JSON.stringify(["customer", "100", "CREDIT", "MOMO HQ"])
+  const hints = interpretSourceCells(original)
+  assert.deepEqual(hints.map((hint) => hint.key), ["credit", "mobileMoney", "headOffice"])
+  assert.equal(hints[0]!.original, "CREDIT")
+  assert.deepEqual(JSON.parse(original), ["customer", "100", "CREDIT", "MOMO HQ"])
+  assert.deepEqual(interpretSourceCells('[{"type":"credit"}]'), [])
 })

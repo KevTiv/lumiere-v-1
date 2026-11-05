@@ -11,14 +11,27 @@ from datetime import date
 from decimal import Decimal
 import hashlib
 import io
+import importlib.util
 import json
 from pathlib import Path
 import re
-from farm_history_source import (
-    alias_proposals, compact, coverage_summary, date_proposals, digest, interpret_note,
-    is_expense_heading, number,
-    payment_note, supplemental_observations, supplemental_review_datasets,
+# The API executes preparation with Python -I; resolve only this trusted sibling.
+_source_spec = importlib.util.spec_from_file_location(
+    "farm_history_source", Path(__file__).with_name("farm_history_source.py")
 )
+source_notes = importlib.util.module_from_spec(_source_spec)
+_source_spec.loader.exec_module(source_notes)
+alias_proposals = source_notes.alias_proposals
+compact = source_notes.compact
+coverage_summary = source_notes.coverage_summary
+date_proposals = source_notes.date_proposals
+digest = source_notes.digest
+interpret_note = source_notes.interpret_note
+is_expense_heading = source_notes.is_expense_heading
+number = source_notes.number
+payment_note = source_notes.payment_note
+supplemental_observations = source_notes.supplemental_observations
+supplemental_review_datasets = source_notes.supplemental_review_datasets
 
 
 def period(title):

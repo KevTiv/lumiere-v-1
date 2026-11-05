@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { interpretSourceText } from "./source-observation"
+import { interpretSourceCells } from "./source-observation"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -156,7 +156,7 @@ export function ImportReviewEditor({
   const { t } = useTranslation()
   const [decision, setDecision] = useState(() => reviewDecision(item))
   const interpretations = item.source.fields.flatMap((field) =>
-    field.sourceValue ? interpretSourceText(field.sourceValue) : [],
+    field.sourceValue ? interpretSourceCells(field.sourceValue) : [],
   )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -30,6 +30,20 @@ export function interpretSourceText(original: string): SourceInterpretation[] {
   return result
 }
 
+/** Prepared report rows preserve individual cells as a JSON evidence field. */
+export function interpretSourceCells(original: string): SourceInterpretation[] {
+  if (original.trimStart().startsWith("[")) {
+    try {
+      const cells: unknown = JSON.parse(original)
+      if (Array.isArray(cells) && cells.length <= 200 && cells.every((cell): cell is string => typeof cell === "string"))
+        return cells.flatMap(interpretSourceText)
+    } catch {
+      // A malformed evidence value stays literal text; it never becomes a proposal.
+    }
+  }
+  return interpretSourceText(original)
+}
+
 /** Links are navigation only. The history API resolves current actor/company access. */
 export function sourceHistoryLink(companyId: number, batchId?: string): string {
   if (!Number.isSafeInteger(companyId) || companyId <= 0)

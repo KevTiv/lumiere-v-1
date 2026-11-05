@@ -269,7 +269,7 @@ def supplemental_review_datasets(observations):
                 "issue": issue, "fields": fields, "proposed": proposed}
         candidate = {"format": "lumiere-import-review/v1", "title": "Additional historic report observations",
                      "targetEntity": "source_observation", "sourceFile": "CONTROLE SHOP source archive", "items": items + [item]}
-        if items and (len(items) == 1000 or len(json.dumps(candidate, ensure_ascii=False).encode()) > 3_800_000):
+        if items and (len(items) == 1000 or len(json.dumps(candidate, ensure_ascii=False, indent=2).encode()) > 3_800_000):
             candidate["items"] = items
             datasets.append(candidate)
             items = []

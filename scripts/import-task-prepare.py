@@ -212,6 +212,7 @@ AUDIT_ISSUES = {
     "overlapping_shop_periods": "Audit periods overlap for the same location. Review their coverage before combining totals.",
     "missing_or_ambiguous_period": "The reporting period is missing or ambiguous.",
     "invalid_period_year": "The reporting year is invalid.",
+    "suspicious_audit_period": "This daily/weekly/monthly report spans more than 62 days. Review its year before using the period.",
     "invalid_period": "The reporting period contains an invalid date.",
     "reversed_period": "The reporting period ends before it starts.",
     "file_and_title_shop_disagree": "The filename and report heading identify different locations.",
@@ -330,7 +331,7 @@ def business_date(block):
             "from": period["start"], "toExclusive": end, "raw": block["title"]}
 
 
-DATE_HEADERS = {"date", "as_of", "invoice_date", "business_date"}
+DATE_HEADERS = {"date", "as_of", "invoice_date", "business_date", "count_date", "balance_date", "source_count_date"}
 
 
 def source_day(raw, *, day_first=False):
@@ -400,6 +401,21 @@ def observation_items(file, blocks, *, inspection_only=False):
     by_record = {line["source"]["row"]: (block, line) for block in blocks for line in block["lines"]}
     items = []
     supplementary = supplementary_date_facts(file)
+    # Use the same tail interpretation as offline recovery, retaining every raw
+    # row here. The API owns revisions and human confirmation of all proposals.
+    tail_items = {}
+    tail_dates = {}
+    if blocks and not inspection_only:
+        observations, _ = farm.supplemental_observations(
+            [{"file": file["name"], "sha256": file["sha256"],
+              "rows": [cells for _, cells in file["rows"]]}], blocks
+        )
+        for dataset in farm.supplemental_review_datasets(observations):
+            for item in dataset["items"]:
+                tail_items[item["source"]["row"]] = item
+        by_id = {block["id"]: block for block in blocks}
+        tail_dates = {observation["source"]["row"]: business_date(by_id[observation["audit_id"]])
+                      for observation in observations}
     first = next(((index, cells) for index, (_, cells) in enumerate(file["rows"], 1)
                   if any(cell.strip() for cell in cells)), (0, []))
     date_columns = [index for index, value in enumerate(first[1])
@@ -445,6 +461,18 @@ def observation_items(file, blocks, *, inspection_only=False):
                 fields.append(field(key, value, kind="decimal"))
                 proposed[key] = proposed_value(value or "", "decimal")
             item["businessDate"] = business_date(block)
+        if record_index in tail_items:
+            tail = tail_items[record_index]
+            issues.append(tail["issue"])
+            item["businessDate"] = tail_dates[record_index]
+            for value in tail["fields"]:
+                # source_cells already holds the complete original row.
+                if value["key"].startswith("source_text_"):
+                    continue
+                fields.append(value)
+                candidate = tail["proposed"][value["key"]]
+                proposed[value["key"]] = (proposed_value(candidate or "", "decimal")
+                                           if value["kind"] == "decimal" else candidate)
         if file["sheet"]:
             fields.append(field("source_worksheet", file["sheet"]))
             proposed["source_worksheet"] = file["sheet"]
@@ -513,9 +541,9 @@ def prepare(payload):
             issue = None
             if block["data_hash"] == other["data_hash"]:
                 issue = "duplicate_audit_dataset"
-            elif block["file_shop"] == other["file_shop"] and block["title"] == other["title"]:
+            elif block["shop"] == other["shop"] and block["title"] == other["title"]:
                 issue = "conflicting_same_title_audits"
-            elif (block["file_shop"] is not None and block["file_shop"] == other["file_shop"]
+            elif (block["shop"] is not None and block["shop"] == other["shop"]
                   and block["period"] and other["period"]
                   and max(block["period"]["start"], other["period"]["start"]) <= min(block["period"]["end"], other["period"]["end"])):
                 issue = "overlapping_shop_periods"
