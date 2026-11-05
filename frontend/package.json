@@ -81,5 +81,8 @@
     "@rn-primitives/toggle-group": "^1.2.0",
     "@rn-primitives/toolbar": "^1.2.0",
     "@rn-primitives/tooltip": "^1.2.0"
+  },
+  "engines": {
+    "node": "26.x"
   }
 }

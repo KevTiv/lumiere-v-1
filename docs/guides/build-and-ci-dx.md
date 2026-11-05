@@ -7,6 +7,19 @@ workstream: moving Rust modules alone does not create smaller compilation units.
 
 ## Daily local loop
 
+Use Node 26, as selected by the root `.nvmrc` and `.node-version`. With nvm:
+
+```sh
+nvm install
+nvm use
+npm install --global pnpm@10.31.0
+```
+
+CI and all Node container stages use the same major version. The Playwright
+image keeps its browser dependencies and uses an explicit Node 26 binary.
+The UI test workers disable Node's host Web Storage so jsdom supplies browser
+storage for each test environment.
+
 For a focused generation and browser-transport check, run `make dx-check`.
 Use `make dx-check-rust` or `make dx-check-frontend` to check one lane. These
 commands require the Rust/Python toolchains, prepared vendored Rust contracts,
@@ -108,7 +121,7 @@ previously inlined in every workflow job:
 | Action | Purpose | Replaces |
 | --- | --- | --- |
 | `setup-contracts-ssh` | Read-only SSH key + known_hosts for the private lumiere-contracts git dependency | 8 identical 11-line inline blocks across all workflows |
-| `setup-frontend` | Pinned pnpm 10.31.0 + Node 22 with lockfile-based cache | 5 identical pnpm/Node setup blocks |
+| `setup-frontend` | Pinned pnpm 10.31.0 + Node 26 from `.nvmrc`, with lockfile-based cache | 5 identical pnpm/Node setup blocks |
 | `setup-spacetime-cli` | Cache + install + PATH for the pinned SpacetimeDB CLI | 2 identical cache/install/PATH blocks (ci.yml, e2e-smoke.yml) |
 
 Each workflow passes its own `secrets.LUMIERE_CONTRACTS_DEPLOY_KEY` and

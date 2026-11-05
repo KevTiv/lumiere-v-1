@@ -1,0 +1,60 @@
+import { expect, test } from "@playwright/test"
+
+test("minimized navigation centers icons and shows faded JSX previews only for page links", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 950 })
+  await page.goto("/sidebar-preview")
+  await expect(page.getByTestId("sidebar-preview-ready")).toHaveAttribute("data-hydrated", "true")
+  const sidebar = page.getByTestId("dashboard-sidebar")
+  const accounting = page.getByTestId("sidebar-link-accounting")
+  await accounting.hover()
+  await page.waitForTimeout(400)
+  await expect(page.getByTestId("sidebar-page-preview")).toHaveCount(0)
+  await page.getByTestId("workspace-navigation-toggle").click()
+  await expect(page.locator('[data-slot="sidebar"][data-state="collapsed"]')).toBeVisible()
+  await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBeLessThanOrEqual(48)
+  const center = (await sidebar.boundingBox())!.x + (await sidebar.boundingBox())!.width / 2
+  for (const control of [sidebar.getByRole("button", { name: "Expand navigation" }), accounting, page.getByTestId("sidebar-open-ai-chat")]) {
+    const icon = control.locator("svg").first()
+    const box = await (await icon.count() ? icon : control).boundingBox()
+    expect(Math.abs(box!.x + box!.width / 2 - center)).toBeLessThan(1)
+  }
+  const linkBox = (await accounting.boundingBox())!
+  expect(linkBox.height).toBe(36)
+  await accounting.hover()
+  const preview = page.getByTestId("sidebar-page-preview")
+  await expect(preview).toBeVisible()
+  await expect(preview).toContainText("Accounting")
+  await expect(preview.getByTestId("sidebar-page-thumbnail")).toHaveAttribute("data-preview-layout", "dashboard")
+  await expect(preview.getByTestId("sidebar-preview-fade")).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath("sidebar-preview.png") })
+  await page.getByTestId("sidebar-open-ai-chat").hover()
+  await expect(preview).toBeHidden()
+  await page.getByTestId("workspace-navigation-toggle").click()
+  await accounting.hover()
+  await page.waitForTimeout(400)
+  await expect(preview).toHaveCount(0)
+})
+
+for (const width of [390, 1440]) {
+  test(`tables align tall-row content at the top and page after 25 rows at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 950 })
+    await page.goto("/sidebar-preview")
+    await expect(page.getByTestId("sidebar-preview-ready")).toHaveAttribute("data-hydrated", "true")
+    const table = page.getByRole("table")
+    await expect(table.locator("tbody tr")).toHaveCount(25)
+    await expect(page.getByTestId("record-name-1")).toHaveCSS("vertical-align", "top")
+    await expect(page.getByText("1-25 of 61")).toBeVisible()
+    await page.getByLabel("Go to next page").click()
+    await expect(page.getByTestId("record-name-26")).toBeVisible()
+    await expect(page.getByTestId("record-name-1")).toHaveCount(0)
+    await page.getByLabel("Page 3", { exact: true }).click()
+    await expect(table.locator("tbody tr")).toHaveCount(11)
+    await expect(page.getByTestId("record-name-61")).toBeVisible()
+    await page.getByLabel("Filter records").fill("Record 6")
+    await expect(table.locator("tbody tr")).toHaveCount(3)
+    await expect(page.getByTestId("table-pager")).toHaveCount(0)
+    await page.getByLabel("Filter records").fill("")
+    await expect(page.getByText("1-25 of 61")).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
+  })
+}

@@ -38,7 +38,7 @@ export function ImportPreviewGrid({ preview }: ImportPreviewGridProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {previewErrors.slice(0, 12).map((item, idx) => (
+              {previewErrors.map((item, idx) => (
                 <TableRow key={`${item.row_index}-${item.field}-${idx}`}>
                   <TableCell>{item.row_index + 1}</TableCell>
                   <TableCell>{item.field}</TableCell>
@@ -66,7 +66,7 @@ export function ImportPreviewGrid({ preview }: ImportPreviewGridProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {preview.rows.slice(0, 8).map((row, idx) => (
+              {preview.rows.map((row, idx) => (
                 <TableRow key={idx}>
                   {previewColumns.map((key) => (
                     <TableCell key={key} className="max-w-[180px] truncate">

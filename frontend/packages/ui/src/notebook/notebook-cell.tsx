@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { NotebookCell, CellOutput } from "@/lib/notebook-types"
+import { Table, TableBody } from "../components/table"
 import { CodeMirrorEditor } from "./codemirror-editor"
 
 interface NotebookCellProps {
@@ -123,10 +124,19 @@ export function NotebookCellComponent({
       case "table":
         return (
           <div className="overflow-x-auto">
-            <table className="text-xs border-collapse">
-              <tbody>
-                {(output.data as string[][])?.map((row, i) => (
-                  <tr key={i} className={i === 0 ? "font-semibold bg-muted" : ""}>
+            <Table className="text-xs border-collapse">
+              <thead>
+                {(output.data as string[][])?.slice(0, 1).map((row) => (
+                  <tr key="header">
+                    {row.map((cell, index) => (
+                      <th key={index} className="border border-border bg-muted px-2 py-1 text-left font-semibold">{cell}</th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <TableBody>
+                {(output.data as string[][])?.slice(1).map((row, i) => (
+                  <tr key={i}>
                     {row.map((cell, j) => (
                       <td key={j} className="border border-border px-2 py-1">
                         {cell}
@@ -134,8 +144,8 @@ export function NotebookCellComponent({
                     ))}
                   </tr>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )
       case "chart":

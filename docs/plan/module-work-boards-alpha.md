@@ -116,7 +116,7 @@ An active or stranded claim must first be cancelled by an authorized workflow op
 
 ### Legacy cancellation inventory and repair
 
-Before alpha acceptance, run the read-only inventory for each intended organization/company using the reviewed database target and its operator credential. The script uses the existing `STDB_HOST`, `STDB_MODULE` and `STDB_SERVER_TOKEN` environment variables; it has no target defaults and never prints the credential. Use the same Node 22+ runtime as CI, with JSON number source context support.
+Before alpha acceptance, run the read-only inventory for each intended organization/company using the reviewed database target and its operator credential. The script uses the existing `STDB_HOST`, `STDB_MODULE` and `STDB_SERVER_TOKEN` environment variables; it has no target defaults and never prints the credential. Use the same Node 26 runtime as CI, with JSON number source context support.
 
 ```sh
 node scripts/inventory-workflow-cancellations.mjs "$ALPHA_ORGANIZATION_ID" "$ALPHA_COMPANY_ID" > workflow-cancellation-inventory.json

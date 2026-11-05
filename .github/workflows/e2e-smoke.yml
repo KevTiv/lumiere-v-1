@@ -417,9 +417,9 @@ jobs:
             frontend/web/.next/cache/webpack
             frontend/web/.next/cache/turbopack
             frontend/web/.next/cache/swc
-          key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
+          key: next-compiler-v1-${{ runner.os }}-node26-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
-            next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+            next-compiler-v1-${{ runner.os }}-node26-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
 
       - name: Build exact-commit E2E artifacts
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'

@@ -145,7 +145,7 @@ function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated, onEdit
   const [togglingId, setTogglingId] = useState<string | null>(null)
   return (
     <>
-      <Table>
+      <Table pagination={false}>
       <TableHeader>
         <TableRow>
           <TableHead className="w-20">{t("accounting.accounts.code")}</TableHead>
