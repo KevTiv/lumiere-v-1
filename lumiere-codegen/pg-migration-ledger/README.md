@@ -39,8 +39,11 @@ After a generated release, copy the published pending file here, add it to
    change set, `Expand` phase) with
    `sql: include_str!("../../../lumiere-codegen/pg-migration-ledger/<file>.sql")`,
    and raise `durable_postgres.application_catalog_version` in
-   `release-compatibility-manifest.json`. The release workflow recomputes the
-   catalog checksum when it pins.
+   `release-compatibility-manifest.json`. Compute the complete catalog checksum
+   with `cargo run --locked -p api-server --example migration_catalog_checksum`
+   and record it as `durable_postgres.application_catalog_checksum` before
+   validating or committing the promotion. The release workflow recomputes the
+   same checksum against the new contracts pin.
 
 The ledger file is the single source of truth: api-server embeds it and the
 contracts release republishes the same bytes, so the catalog never depends on a
