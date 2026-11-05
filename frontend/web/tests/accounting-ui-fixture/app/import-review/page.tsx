@@ -17,6 +17,7 @@ export default function Page() {
   const [result, setResult] = useState("")
   const [workspace, setWorkspace] = useState(false)
   const [actor, setActor] = useState("ab".repeat(32))
+  const [companyId, setCompanyId] = useState(9001)
   return (
     <LumiereApiProvider client={webApi}>
       <QueryClientProvider client={client}>
@@ -27,7 +28,7 @@ export default function Page() {
                 identity: actor,
                 connected: true,
                 organizationId: 8001,
-                companyIds: [9001],
+                companyIds: [9001, 9002],
               }}
             >
               <ThemeProvider defaultTheme="light">
@@ -37,6 +38,9 @@ export default function Page() {
                     onClick={() => setActor("cd".repeat(32))}
                   >
                     Change review actor
+                  </button>
+                  <button type="button" onClick={() => setCompanyId(9002)}>
+                    Change review company
                   </button>
                   <p>
                     Synthetic source review fixture. HTTP responses are
@@ -50,7 +54,7 @@ export default function Page() {
                   ) : (
                     <ImportReviewPanel
                       organizationId={8001}
-                      companyId={9001}
+                      companyId={companyId}
                       initialId="1"
                       onContinue={(source) => setResult(source.csv)}
                     />
