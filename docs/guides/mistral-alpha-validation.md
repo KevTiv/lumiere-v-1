@@ -186,13 +186,39 @@ erp.reserve_ai_metered_spend
 erp.settle_ai_metered_spend
 ```
 
-The release lane must bind these to the actual immutable release and align its
-consumer pins. No future tag, operation-history revision or release checksum was
-invented for this draft.
+The release lane binds these to the actual immutable release and aligns its
+consumer pins. No future tag, operation-history revision or release checksum is
+inferred from this candidate.
 
 The [migration ledger workflow](../../lumiere-codegen/pg-migration-ledger/README.md)
 owns promotion of pending SQL. Its tracked destination is
 `lumiere-codegen/pg-migration-ledger/0036_durable_projection_delta.sql`, promoted
 with the consumer, ledger advancement, an API migration catalog entry and the
-application catalog compatibility update. This candidate retains migration 36
-as generated staging evidence; it does not register or apply that migration.
+application catalog compatibility update.
+
+## CI follow-up on 5 November 2026
+
+The first CI failure was the generated finance change-review inventory: its
+input checksums had not been refreshed for the new native operation metadata.
+Regeneration fixed that failure. Native module declarations were also sorted
+with the repository's changed-file formatter, and current main's browser-test
+stabilization was merged. The next CI run passed its scope, native compilation,
+frontend typecheck and PDF structural checks.
+
+The schema change also requires matching published contracts for the pinned
+generation and live-schema drift checks. Migration 36 has now been promoted
+verbatim into the tracked ledger with its API consumer. The ledger records 36 as
+released and advances the next pending version to 37. API migration 36 is the
+`alpha_mistral_metered_spend` change set 25 in the Expand phase. All previous SQL
+files retain their original bytes; no database migration was executed here.
+
+The runtime's migration catalog checksum example produced
+`sha256:b6cbf01ce1c022cf428f646e9b472258e9bedc8e291dd5391fa856d1a7406427`,
+now recorded alongside application catalog version 36 in the compatibility
+manifest. All 43 targeted API migration and audit unit tests passed, including
+preservation of the deployed 35-migration prefix and the exact two-table SQL.
+Independent review and the release-manifest verifier passed.
+
+The contract publisher now regenerates the finance inventory before committing
+generated sources and checks it after clean regeneration. This preserves the
+CI inventory gate throughout the normal publication and pin-alignment process.

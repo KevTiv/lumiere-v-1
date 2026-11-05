@@ -356,6 +356,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0035_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 36,
+        name: "alpha_mistral_metered_spend",
+        change_set: 25,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0036_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1456,6 +1465,43 @@ mod tests {
                 .contains(&format!("CREATE TABLE IF NOT EXISTS \"{table}\"")));
         }
         assert!(!migration.sql.to_ascii_lowercase().contains("drop table"));
+    }
+
+    #[test]
+    fn metered_spend_expand_preserves_released_reusable_work_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..35]),
+            "sha256:4667c1999cf9d1098aee11d7eafc258941b8e2552458a04ec1e807fc0dcffabc"
+        );
+        let migration = MIGRATIONS[35];
+        assert_eq!(migration.version, 36);
+        assert_eq!(migration.name, "alpha_mistral_metered_spend");
+        assert_eq!(migration.change_set, 25);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert_eq!(
+            migration_checksum(migration.sql),
+            "sha256:eef4538410f2054d9e2597c3013de912f7a97f3aa9d47c8a3b08969e869e406f"
+        );
+        for table in ["ai_metered_price", "ai_metered_usage"] {
+            assert!(migration
+                .sql
+                .contains(&format!("CREATE TABLE IF NOT EXISTS \"{table}\"")));
+        }
+        assert_eq!(
+            migration.sql.matches("CREATE TABLE IF NOT EXISTS").count(),
+            2
+        );
+        let lower_sql = migration.sql.to_ascii_lowercase();
+        assert!(!lower_sql.contains("alter table"));
+        assert!(!lower_sql.contains("drop table"));
+        let applied_prefix: Vec<_> = MIGRATIONS[..35]
+            .iter()
+            .map(|migration| applied(*migration, migration_checksum(migration.sql)))
+            .collect();
+        assert_eq!(
+            first_pending_migration(&applied_prefix, MIGRATIONS).expect("released prefix is valid"),
+            35
+        );
     }
 
     #[test]
