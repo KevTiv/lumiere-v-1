@@ -31,6 +31,8 @@ function mount(companyId = 7, actorIdentity = "operator-one", verifiedOnly = fal
 }
 
 beforeEach(() => {
+  // Base UI checks pointer events; jsdom does not provide the browser constructor.
+  vi.stubGlobal("PointerEvent", MouseEvent)
   request.mockReset()
   request.mockImplementation(async (input) => {
     const url = queryUrl(input), company = Number(url.searchParams.get("companyId"))
@@ -40,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   for (const client of clients.splice(0)) client.clear()
 })
 
