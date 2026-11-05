@@ -474,7 +474,7 @@ mod tests {
         );
         let store = crate::document_blob_store::DocumentBlobStoreConfig::Local {
             root: std::env::temp_dir()
-                .join(format!("legacy-source-receipt-{}", uuid::Uuid::new_v4())),
+                .join(format!("legacy-source-receipt-{}", rand::random::<u64>())),
         };
         let page = read_sources(
             &server.owner,
@@ -509,7 +509,7 @@ mod tests {
             "review-import-v1:42:7:{actor}:{request}"
         )));
         let root =
-            std::env::temp_dir().join(format!("history-review-policy-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("history-review-policy-{}", rand::random::<u64>()));
         let store =
             crate::document_blob_store::DocumentBlobStoreConfig::Local { root: root.clone() };
         let receipt = json!({"version":1,"organizationId":"42","companyId":"7","actor":actor,"requestId":request,"entity":"product","contentSha256":"a".repeat(64),"rows":[{"importRow":2,"batchId":"3","itemId":"9","revision":2}]});
@@ -574,7 +574,7 @@ mod tests {
             fixture::access(&["business_history:read", "product:read"], None),
         );
         let root =
-            std::env::temp_dir().join(format!("history-source-page-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("history-source-page-{}", rand::random::<u64>()));
         let store = crate::document_blob_store::DocumentBlobStoreConfig::Local { root };
         let adapter = record_adapter("product").unwrap();
         let mut cursor = None;
@@ -620,7 +620,7 @@ mod tests {
         );
         let store = crate::document_blob_store::DocumentBlobStoreConfig::Local {
             root: std::env::temp_dir()
-                .join(format!("history-source-revoke-{}", uuid::Uuid::new_v4())),
+                .join(format!("history-source-revoke-{}", rand::random::<u64>())),
         };
         let result = read_sources(
             &server.owner,

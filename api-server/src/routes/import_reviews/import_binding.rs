@@ -490,7 +490,7 @@ mod tests {
     #[tokio::test]
     async fn retained_review_binding_is_exact_and_does_not_infer_legacy_references() {
         let root =
-            std::env::temp_dir().join(format!("history-review-binding-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("history-review-binding-{}", rand::random::<u64>()));
         let store = storage::DocumentBlobStoreConfig::Local { root: root.clone() };
         let actor = "a".repeat(64);
         let request = "b".repeat(32);
