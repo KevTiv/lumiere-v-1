@@ -10,13 +10,14 @@ Recorded local checks and generated-candidate hashes are in the
 ## Release before activation
 
 The native module adds private `ai_metered_price` and `ai_metered_usage` tables,
-their dedicated-reader views and five non-client metering operations. Generate
-and review the canonical contracts, storage migration and reconstruction output;
-publish an immutable release and align all consumer pins through the existing
-release lane. Do not hand-edit generated contracts or earlier SQL migrations.
-The draft-backend branch deliberately does not publish an immutable contract tag.
-Unknown metering operations fail before provider dispatch until the matching
-contracts and module are deployed.
+their dedicated-reader views and five non-client metering operations. The
+canonical contracts are published as immutable release `v0.3.166`, and the Rust
+and frontend consumer pins match that release. Migration 36 is registered in
+the durable ledger and API catalog with the generated reconstruction output.
+Future schema changes must follow the same generation, review, publication and
+pin-alignment lane. Do not hand-edit generated contracts or earlier migrations.
+Metering requires the matching contracts and module to be deployed before
+provider dispatch.
 
 Deploy the module, durable storage migration, API, AI gateway, web and Kong as one
 compatible ordered stack release. Retain the previous coherent artifacts and

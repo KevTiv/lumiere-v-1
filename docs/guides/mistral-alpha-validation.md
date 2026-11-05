@@ -1,9 +1,10 @@
 # Mistral Alpha validation
 
 Local validation on 4 November 2026 generated the native metering contract
-candidate from an actual disposable SpacetimeDB instance. Contract publication,
-pin alignment, migration activation and deployed paid-provider acceptance remain
-release prerequisites. See [activation](mistral-alpha-activation.md) for those gates.
+candidate from an actual disposable SpacetimeDB instance. The 5 November CI
+follow-up below records immutable publication as `v0.3.166`, consumer pin
+alignment and migration promotion. Deployed migration activation and paid-provider
+acceptance remain prerequisites. See [activation](mistral-alpha-activation.md).
 
 ## Provenance
 
@@ -174,7 +175,7 @@ No paid Mistral calls were made.
 
 ## Release handoff
 
-Operation-history verification intentionally reports exactly these unrecorded IDs:
+Before publication, operation-history verification reported these new IDs:
 
 ```text
 erp.ai_metered_price_read
@@ -186,9 +187,8 @@ erp.reserve_ai_metered_spend
 erp.settle_ai_metered_spend
 ```
 
-The release lane binds these to the actual immutable release and aligns its
-consumer pins. No future tag, operation-history revision or release checksum is
-inferred from this candidate.
+The normal release workflow recorded these in the history revision from
+`v0.3.165` to `v0.3.166` and aligned the consumer pins.
 
 The [migration ledger workflow](../../lumiere-codegen/pg-migration-ledger/README.md)
 owns promotion of pending SQL. Its tracked destination is
@@ -210,7 +210,7 @@ generation and live-schema drift checks. Migration 36 has now been promoted
 verbatim into the tracked ledger with its API consumer. The ledger records 36 as
 released and advances the next pending version to 37. API migration 36 is the
 `alpha_mistral_metered_spend` change set 25 in the Expand phase. All previous SQL
-files retain their original bytes; no database migration was executed here.
+files retain their original bytes; no production database was migrated.
 
 The runtime's migration catalog checksum example produced
 `sha256:b6cbf01ce1c022cf428f646e9b472258e9bedc8e291dd5391fa856d1a7406427`,
@@ -222,3 +222,31 @@ Independent review and the release-manifest verifier passed.
 The contract publisher now regenerates the finance inventory before committing
 generated sources and checks it after clean regeneration. This preserves the
 CI inventory gate throughout the normal publication and pin-alignment process.
+
+The [publisher run](https://github.com/KevTiv/lumiere-v-1/actions/runs/42005497610)
+completed successfully, including clean regeneration, candidate checks,
+publication and fresh pin verification:
+
+| Published artifact | Value |
+| --- | --- |
+| Contracts version | `0.3.166` |
+| Contracts repository revision | `661f611b1c182deaab1ab46d43a6f46fb5a2c3f2` |
+| Clean producer source commit | `d45e8e0d8240ace526df7078483d6c70bd0af1e4` |
+| Published IR artifact SHA-256 | `33bb9d3540d4bc283e8237bde0267b2c8cc92578d2afaf819a44a123f2f03589` |
+| Published semantic schema hash | `de4944288266bb62e43523d7348bfa58fd9a07927fb0cdca75d4386fdd677cd5` |
+
+The semantic hash matches the reviewed candidate. The history also records 14
+existing read-view schema indexes shifting by two after the two metering views
+were added. Offline comparison found no changes to their targets, authorization,
+inputs or recursively reachable return fields, types, nullability or ordering.
+All 1,516 candidate operation fingerprints match the published history.
+After loading the verified `0.3.166` package, `make check-codegen-pinned` passed,
+including operation history, HTTP Option metadata and storage policy for all
+535 tables.
+
+The C4 PostgreSQL compatibility suite exposed a static expected-table list that
+needed the two new metering tables. That list was updated while retaining exact
+table equality, prior migration checksum and application-time preservation,
+and startup replay checks. All 16 compatibility cases then passed against a real
+temporary PostgreSQL 18.6 instance with `C4_TEST_PG=1`, zero failures and no skips.
+The temporary databases and container were removed after verification.
