@@ -520,6 +520,8 @@ mod generated_registry_tests {
             kong_llm_service_token: None,
             kong_llm_readiness_url: None,
             vision_provider: "ollama".into(),
+            mistral_ocr_model: String::new(),
+            mistral_ocr_max_pages: 20,
             document_parser: "plain".into(),
             unstructured_url: "http://127.0.0.1:8000".into(),
             unstructured_api_key: None,

@@ -174,10 +174,43 @@ pub async fn collect_briefing_context(
         .to_string();
     let top_k = req.top_k.unwrap_or(DEFAULT_TOP_K).clamp(1, MAX_TOP_K);
 
-    let search_result = state
-        .rig
-        .search_scope(req.org_id, req.company_id, &query, top_k)
-        .await;
+    let search_result = async {
+        state.rig.check_ready().await?;
+        let vector = crate::routes::context::admitted_query_vector(
+            state,
+            actor,
+            req.org_id,
+            req.company_id,
+            &query,
+            "daily_briefing",
+            None,
+        )
+        .await?;
+        state
+            .rig
+            .search_scope_with_vector(
+                req.org_id,
+                req.company_id,
+                &actor.identity_hex,
+                vector,
+                top_k,
+            )
+            .await
+    }
+    .await;
+    let search_result = match search_result {
+        Ok(hits) => {
+            crate::routes::context::reauthorize_activity_hits(
+                state,
+                actor,
+                req.org_id,
+                req.company_id,
+                hits,
+            )
+            .await
+        }
+        Err(error) => Err(error),
+    };
     if let Err(error) = &search_result {
         tracing::warn!(
             org_id = req.org_id,

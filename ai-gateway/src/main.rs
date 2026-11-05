@@ -5,6 +5,7 @@ mod context_worker;
 mod error;
 mod harness;
 mod kaggle;
+mod non_llm_spend;
 mod orchestrator;
 mod providers;
 mod qdrant_client;
@@ -24,7 +25,7 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::Response,
@@ -130,9 +131,17 @@ async fn main() -> anyhow::Result<()> {
 
     let http = reqwest::Client::new();
     let providers = build_providers(&config, http.clone())?;
+    let vector_store = if config.embedding_enabled() {
+        vector_store.with_embedding_space(
+            config.embedding_model_name(),
+            providers.embedder.dimensions(),
+        )?
+    } else {
+        vector_store
+    };
     let rig = RigContext::new(&config, providers.clone()).await?;
-    if config.embedding_enabled() {
-        accept_optional_semantic_init(
+    let embedding_index_ready = if config.embedding_enabled() {
+        let ready = accept_optional_semantic_init(
             "primary semantic collection",
             vector_store
                 .ensure_collection(providers.embedder.dimensions())
@@ -142,7 +151,10 @@ async fn main() -> anyhow::Result<()> {
             "activity reference collection",
             rig.ensure_collection().await,
         );
-    }
+        ready
+    } else {
+        false
+    };
 
     let config = Arc::new(config);
     let certification_stdb = config.ai_certification_stdb_token.as_ref().map(|token| {
@@ -177,7 +189,7 @@ async fn main() -> anyhow::Result<()> {
         agent_rate_limiter: Arc::new(crate::rate_limit::AgentRateLimiter::new()),
     };
 
-    if config.embedding_enabled() {
+    if embedding_index_ready {
         tokio::spawn(worker::run(
             config.clone(),
             providers.embedder.clone(),
@@ -185,7 +197,7 @@ async fn main() -> anyhow::Result<()> {
             stdb.clone(),
         ));
     } else {
-        tracing::info!("Embedding collection initialization and queue worker disabled");
+        tracing::info!("Embedding queue worker disabled or awaiting a compatible index");
     }
 
     if let Some(certification_stdb) = certification_stdb {
@@ -255,6 +267,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/import/preview", post(routes::import::post_preview))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
+        .route(
+            "/v1/documents/ocr",
+            post(routes::ocr::post_ocr).layer(DefaultBodyLimit::max(14 * 1024 * 1024)),
+        )
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))

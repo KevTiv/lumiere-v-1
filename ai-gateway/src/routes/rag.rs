@@ -14,7 +14,7 @@ use std::time::Instant;
 use crate::{
     ai_agent::{
         agent_allows_live_read, enforce_chargeable_limits, ensure_allowed_action,
-        ensure_model_allowed, resolve_agent,
+        ensure_model_allowed, resolve_chat_agent,
     },
     error::{AppError, AppResult},
     harness::{
@@ -592,13 +592,40 @@ pub async fn post_rag(
         vector_types.push("ai_evidence_passage".to_string());
     }
     let content_type_filter = (!vector_types.is_empty()).then_some(vector_types.as_slice());
+    let agent = resolve_chat_agent(
+        &state.stdb,
+        org_id,
+        req.company_id,
+        req.agent_id,
+        req.team_member_id,
+        state.config.ollama_supports_tool_calling,
+    )
+    .await
+    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+    // Authorize and meter one query vector, then reuse it across both indexes.
+    // No provider charge is made for a missing or incompatible collection.
+    let query_vector = async {
+        state.vector_store.check_ready().await?;
+        super::context::admitted_query_vector(
+            &state,
+            &actor,
+            org_id,
+            req.company_id,
+            &req.query,
+            "rag",
+            Some(&agent),
+        )
+        .await
+    }
+    .await;
     let mut retrieval_degraded = false;
-    let company_result = match state.providers.embedder.embed(&req.query).await {
+    let company_result = match &query_vector {
         Ok(query_vector) => {
             state
                 .vector_store
                 .search_content_types(
-                    query_vector,
+                    query_vector.clone(),
                     org_id,
                     req.company_id,
                     content_type_filter,
@@ -607,7 +634,7 @@ pub async fn post_rag(
                 )
                 .await
         }
-        Err(error) => Err(error),
+        Err(_) => Err(anyhow::anyhow!("admitted query embedding unavailable")),
     };
     if let Err(error) = &company_result {
         tracing::warn!(
@@ -622,10 +649,28 @@ pub async fn post_rag(
     let company_hits = company_outcome.value;
 
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
-    let org_result = state
-        .rig
-        .search_scope(org_id, req.company_id, req.query.trim(), org_top_k)
-        .await;
+    let org_result = match query_vector {
+        Ok(vector) => {
+            state
+                .rig
+                .search_scope_with_vector(
+                    org_id,
+                    req.company_id,
+                    &actor.identity_hex,
+                    vector,
+                    org_top_k,
+                )
+                .await
+        }
+        Err(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
+    };
+    let org_result = match org_result {
+        Ok(hits) => {
+            super::context::reauthorize_activity_hits(&state, &actor, org_id, req.company_id, hits)
+                .await
+        }
+        Err(error) => Err(error),
+    };
     if let Err(error) = &org_result {
         tracing::warn!(
             org_id,
@@ -640,16 +685,6 @@ pub async fn post_rag(
 
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
-
-    let agent = resolve_agent(
-        &state.stdb,
-        org_id,
-        req.agent_id,
-        req.team_member_id,
-        state.config.ollama_supports_tool_calling,
-    )
-    .await
-    .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
     let allowed_types =
         (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());

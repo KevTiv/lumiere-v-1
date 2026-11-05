@@ -54,6 +54,12 @@ pub async fn check_readiness(config: &Config, http: &reqwest::Client) -> Result<
 }
 
 fn validate_configuration(config: &Config) -> Result<()> {
+    if !["disabled", "mistral", "ollama", "gemini"].contains(&config.embedding_provider.as_str()) {
+        return Err(anyhow!("unsupported embedding provider"));
+    }
+    if !["disabled", "mistral", "ollama"].contains(&config.vision_provider.as_str()) {
+        return Err(anyhow!("unsupported vision provider"));
+    }
     match config.embedding_provider.as_str() {
         "mistral" if missing(config.mistral_api_key.as_deref()) => {
             return Err(anyhow!("embedding provider credentials are unavailable"));
@@ -272,6 +278,8 @@ pub(super) mod readiness_tests {
             kong_llm_service_token: None,
             kong_llm_readiness_url: None,
             vision_provider: "ollama".into(),
+            mistral_ocr_model: String::new(),
+            mistral_ocr_max_pages: 20,
             document_parser: "plaintext".into(),
             unstructured_url: "http://parser".into(),
             unstructured_api_key: None,

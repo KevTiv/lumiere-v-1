@@ -5,8 +5,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     ai_agent::{
-        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
-        AgentLimitViolation,
+        enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed,
+        resolve_surface_agent, AgentLimitViolation,
     },
     ai_spend::{self, input_request_key, RequestKind, SpendReader},
     error::{AppError, AppResult},
@@ -351,9 +351,11 @@ async fn draft_actions_llm(
         ));
     }
 
-    let agent = resolve_agent(
+    let agent = resolve_surface_agent(
         &state.stdb,
         org_id,
+        req.company_id,
+        "action_draft_generation",
         req.agent_id,
         req.team_member_id,
         state.config.ollama_supports_tool_calling,

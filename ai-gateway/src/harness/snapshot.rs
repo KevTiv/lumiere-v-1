@@ -669,6 +669,7 @@ mod tests {
                     tags: vec!["activity".into()],
                 },
                 activity_timestamp: 1,
+                actor_identity: "test-actor".into(),
             },
         }
     }

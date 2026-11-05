@@ -9,7 +9,7 @@ export interface RunHistoryView {
     skillId: number
     agentId: number
     stepCount: number
-    tokensUsed: number
+    tokensUsed: number | null
     startedAt: string
     completedAt: string | null
     economics: RunEconomicsView | null
@@ -46,24 +46,26 @@ export function mapRunHistory(payload: unknown): RunHistoryView | null {
   for (const value of root.runs) {
     const item = record(value)
     const runId = item && positiveInteger(item.runId)
-    const skillId = item && positiveInteger(item.skillId)
+    const skillId = item && nonnegativeInteger(item.skillId)
     const agentId = item && positiveInteger(item.agentId)
     const stepCount = item && nonnegativeInteger(item.stepCount)
-    const tokensUsed = item && nonnegativeInteger(item.tokensUsed)
+    const tokensUsed = item?.tokensUsed === null ? null : item && nonnegativeInteger(item.tokensUsed)
     const status = item ? text(item.status, 64) : ''
     const startedAt = item ? text(item.startedAt, 128) : ''
-    if (!item || !runId || !skillId || !agentId || stepCount === null || tokensUsed === null || !status || !startedAt || ids.has(runId)) return null
+    if (!item || !runId || skillId === null || !agentId || stepCount === null ||
+        (item.tokensUsed !== null && tokensUsed === null) || !status || !startedAt || ids.has(runId)) return null
     ids.add(runId)
+    const economics = item.economics == null ? null : mapRunEconomics(item.economics)
     runs.push({
       runId,
       status,
       skillId,
       agentId,
       stepCount,
-      tokensUsed,
+      tokensUsed: skillId === 0 || economics?.meteredUsage || (item.economics != null && !economics) ? null : tokensUsed,
       startedAt,
       completedAt: item.completedAt == null ? null : text(item.completedAt, 128) || null,
-      economics: item.economics == null ? null : mapRunEconomics(item.economics),
+      economics,
     })
   }
   return { runs, nextCursor: cursor }

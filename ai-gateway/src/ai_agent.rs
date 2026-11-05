@@ -64,6 +64,87 @@ pub async fn resolve_agent(
     Ok(config)
 }
 
+/// Resolve a surface's own company skill binding before the organization default.
+/// One skill's agent binding never grants authority to a different surface.
+pub async fn resolve_surface_agent(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    skill_key: &str,
+    requested_agent_id: Option<u64>,
+    team_member_id: Option<u64>,
+    ollama_supports_tool_calling: bool,
+) -> Result<ResolvedAgentConfig> {
+    use crate::orchestrator::skill_loader::{load_skill, skill_agent_id};
+
+    if org_id == 0 || company_id == 0 {
+        anyhow::bail!("AI surface requires organization and company scope");
+    }
+    let skill = load_skill(stdb, org_id, company_id, skill_key).await?;
+    if skill.id == 0 {
+        anyhow::bail!("AI surface skill '{skill_key}' is not provisioned");
+    }
+    if !skill.enabled {
+        anyhow::bail!("AI surface is disabled for this company");
+    }
+    let agent_id = skill_agent_id(&skill.config_json, requested_agent_id, team_member_id)?;
+    let agent = resolve_agent(
+        stdb,
+        org_id,
+        agent_id,
+        team_member_id,
+        ollama_supports_tool_calling,
+    )
+    .await?;
+    let scope_rows = stdb
+        .query_sql(&format!(
+            "SELECT id, company_id FROM ai_agent WHERE organization_id = {org_id} AND id = {} LIMIT 2",
+            agent.agent_id
+        ))
+        .await
+        .context("read AI agent company binding")?;
+    if scope_rows.len() != 1 || !agent_company_matches(&scope_rows[0], company_id) {
+        anyhow::bail!("AI agent is unavailable for this company");
+    }
+    Ok(agent)
+}
+
+pub async fn resolve_chat_agent(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    requested_agent_id: Option<u64>,
+    team_member_id: Option<u64>,
+    ollama_supports_tool_calling: bool,
+) -> Result<ResolvedAgentConfig> {
+    let agent = resolve_surface_agent(
+        stdb,
+        org_id,
+        company_id,
+        "rag_generation",
+        requested_agent_id,
+        team_member_id,
+        ollama_supports_tool_calling,
+    )
+    .await?;
+    ensure_allowed_action(&agent, "chat")?;
+    ensure_model_allowed(&agent)?;
+    Ok(agent)
+}
+
+fn agent_company_matches(row: &Value, company_id: u64) -> bool {
+    match row.get("companyId").or_else(|| row.get("company_id")) {
+        Some(Value::Null) => true,
+        Some(value) => {
+            value
+                .as_u64()
+                .or_else(|| value.as_str().and_then(|id| id.parse::<u64>().ok()))
+                == Some(company_id)
+        }
+        None => false,
+    }
+}
+
 pub fn agent_allows_live_read(agent: &ResolvedAgentConfig) -> bool {
     agent
         .allowed_actions
@@ -397,6 +478,121 @@ fn string_vec_field(row: &Value, camel: &str, snake: Option<&str>) -> Vec<String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn chat_resolves_its_company_binding_and_preserves_explicit_intent() {
+        use axum::{extract::State, routing::post, Json, Router};
+        use serde_json::json;
+
+        fn sats(rows: Vec<Value>) -> Value {
+            let names: Vec<String> = rows
+                .first()
+                .and_then(Value::as_object)
+                .map(|row| row.keys().cloned().collect())
+                .unwrap_or_default();
+            json!([{
+                "schema": { "elements": names.iter().map(|name| json!({"name": {"some": name}})).collect::<Vec<_>>() },
+                "rows": rows.iter().map(|row| names.iter().map(|name| row[name].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()
+            }])
+        }
+
+        async fn sql(State(case): State<&'static str>, statement: String) -> Json<Value> {
+            assert!(
+                statement.starts_with("SELECT "),
+                "agent resolution is read-only"
+            );
+            assert!(
+                !statement.contains("is_default"),
+                "company binding must win"
+            );
+            let rows = if statement.contains("FROM ai_skill_config ") {
+                vec![json!({
+                    "id": 7, "company_id": 3, "is_enabled": case != "disabled",
+                    "config_json": "{\"defaultAgentId\":42}"
+                })]
+            } else if statement.contains("FROM ai_skill ") {
+                assert!(statement.contains("skill_key = 'rag_generation'"));
+                if case == "unprovisioned" {
+                    vec![]
+                } else {
+                    vec![json!({ "id": 8, "skill_key": "rag_generation" })]
+                }
+            } else if statement.contains("FROM ai_team_member ") {
+                vec![json!({ "id": 9, "ai_agent_id": 55 })]
+            } else if statement.contains("FROM ai_agent ") {
+                let expected_id = match case {
+                    "explicit" | "persona" => 55,
+                    _ => 42,
+                };
+                assert!(statement.contains(&format!("id = {expected_id}")));
+                vec![json!({
+                    "id": expected_id, "company_id": if case == "wrong-company" { 4 } else { 3 },
+                    "is_active": true, "provider": "mistral", "model": "mistral-small-2603",
+                    "allowed_actions": ["chat"], "allowed_models": ["mistral-small-2603"]
+                })]
+            } else {
+                panic!("unexpected agent query: {statement}");
+            };
+            Json(sats(rows))
+        }
+
+        for case in [
+            "bound",
+            "explicit",
+            "persona",
+            "wrong-company",
+            "disabled",
+            "unprovisioned",
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let base = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                axum::serve(
+                    listener,
+                    Router::new()
+                        .route("/v1/database/fixture/sql", post(sql))
+                        .with_state(case),
+                )
+                .await
+                .unwrap();
+            });
+            let stdb = StdbClient::new(base, "fixture".into(), "gateway".into());
+            let result = resolve_chat_agent(
+                &stdb,
+                1,
+                3,
+                (case == "explicit").then_some(55),
+                (case == "persona").then_some(9),
+                false,
+            )
+            .await;
+            if matches!(case, "wrong-company" | "disabled" | "unprovisioned") {
+                assert!(result.is_err(), "{case}");
+            } else {
+                assert_eq!(
+                    result.unwrap().agent_id,
+                    if case == "bound" { 42 } else { 55 }
+                );
+            }
+            server.abort();
+        }
+    }
+
+    #[test]
+    fn chat_agent_company_binding_is_explicit_and_fail_closed() {
+        use serde_json::json;
+        assert!(agent_company_matches(&json!({ "companyId": null }), 7));
+        assert!(agent_company_matches(&json!({ "company_id": 7 }), 7));
+        assert!(agent_company_matches(&json!({ "companyId": "7" }), 7));
+        for row in [
+            json!({}),
+            json!({ "companyId": 8 }),
+            json!({ "companyId": { "some": [7] } }),
+            json!({ "companyId": "invalid" }),
+        ] {
+            assert!(!agent_company_matches(&row, 7));
+        }
+    }
 
     fn sample_agent(
         monthly_budget: Option<f64>,

@@ -31,6 +31,13 @@ export interface RunEconomicsView {
   reservedUnits: number | null
   settledUnits: number | null
   truncated: boolean
+  meteredUsage: MeteredUsageView | null
+}
+
+export interface MeteredUsageView {
+  totals: Array<{ unit: 'tokens' | 'pages'; allowance: number | null; actualUnits: number | null }>
+  complete: boolean
+  truncated: boolean
 }
 
 const MAX_STEPS = 200
@@ -55,6 +62,28 @@ function boundedText(value: unknown, maxLength: number): string {
 
 const ATTEMPT_STATUSES = new Set(['accepted', 'dispatched', 'succeeded', 'failed', 'outcome_unknown', 'abandoned'])
 const RESERVATION_STATUSES = new Set(['reserved', 'settled', 'released'])
+
+function mapMeteredUsage(value: unknown): MeteredUsageView | null {
+  const item = record(value)
+  if (!item || !Array.isArray(item.totals) || item.totals.length > 2 ||
+      typeof item.complete !== 'boolean' || typeof item.truncated !== 'boolean') return null
+  const totals: MeteredUsageView['totals'] = []
+  const seen = new Set<string>()
+  for (const value of item.totals) {
+    const total = record(value)
+    if (!total || (total.unit !== 'pages' && total.unit !== 'tokens') || seen.has(total.unit)) return null
+    seen.add(total.unit)
+    const allowance = total.allowance == null ? null : positiveInteger(total.allowance)
+    const actualUnits = total.actualUnits == null ? null : nonnegativeInteger(total.actualUnits)
+    if ((total.allowance != null && allowance === null) || (total.actualUnits != null && actualUnits === null) ||
+        (actualUnits !== null && (allowance === null || actualUnits > allowance)) ||
+        (item.truncated && (allowance !== null || actualUnits !== null)) ||
+        (!item.complete && actualUnits !== null)) return null
+    totals.push({ unit: total.unit, allowance, actualUnits })
+  }
+  if (item.complete && (item.truncated || totals.length === 0 || totals.some((total) => total.actualUnits === null))) return null
+  return { totals, complete: item.complete, truncated: item.truncated }
+}
 
 export function mapRunEconomics(value: unknown): RunEconomicsView | null {
   const item = record(value)
@@ -85,6 +114,13 @@ export function mapRunEconomics(value: unknown): RunEconomicsView | null {
     .slice(0, 8)
     .flatMap((status) => typeof status === 'string' && allowed.has(status) ? [status] : [])
   const currency = item.currency == null ? null : boundedText(item.currency, 16) || null
+  // A native meter is separate from generation token counters, including when
+  // an older gateway or a missing read view supplies no native usage metadata.
+  const metered = item.meteredUsage != null || providerModels.some(({ model }) =>
+    model === 'mistral-embed' || model.startsWith('mistral-ocr-'))
+  const meteredUsage = metered
+    ? mapMeteredUsage(item.meteredUsage) ?? { totals: [], complete: false, truncated: false }
+    : null
   return {
     providerModels,
     providerModelsTruncated: item.providerModelsTruncated === true,
@@ -92,21 +128,22 @@ export function mapRunEconomics(value: unknown): RunEconomicsView | null {
     attemptStatuses: statuses(item.attemptStatuses, ATTEMPT_STATUSES),
     reservationStatuses: statuses(item.reservationStatuses, RESERVATION_STATUSES),
     outcomeUnknown: item.outcomeUnknown === true,
-    inputTokens,
-    outputTokens,
+    inputTokens: metered ? null : inputTokens,
+    outputTokens: metered ? null : outputTokens,
     currency,
     reservedUnits,
     settledUnits,
     truncated,
+    meteredUsage,
   }
 }
 
 /** Prefer complete, settled provider usage for a waiting run. A run-row
  * counter is only final on a terminal run; zero on a wait state is not evidence
  * that the provider consumed no tokens. Unknown/partial usage stays unknown. */
-function observedTokens(status: string, recorded: number, economics: RunEconomicsView | null): number | null {
+function observedTokens(status: string, recorded: number | null, economics: RunEconomicsView | null): number | null {
   if (economics) {
-    if (economics.truncated || economics.outcomeUnknown || economics.attemptCount === null ||
+    if (economics.meteredUsage || economics.truncated || economics.outcomeUnknown || economics.attemptCount === null ||
         economics.attemptStatuses.length === 0 ||
         economics.attemptStatuses.some((value) => value !== 'succeeded' && value !== 'failed') ||
         economics.reservationStatuses.length === 0 ||
@@ -128,8 +165,8 @@ export function mapRunObservation(payload: unknown): RunObservationView | null {
   if (!root) return null
   const runId = positiveInteger(root.runId)
   const stepCount = nonnegativeInteger(root.stepCount)
-  const tokensUsed = nonnegativeInteger(root.tokensUsed)
-  if (!runId || stepCount === null || tokensUsed === null) return null
+  const tokensUsed = root.tokensUsed === null ? null : nonnegativeInteger(root.tokensUsed)
+  if (!runId || stepCount === null || (root.tokensUsed !== null && tokensUsed === null)) return null
 
   const seen = new Set<number>()
   const transcript = (Array.isArray(root.transcript) ? root.transcript : [])

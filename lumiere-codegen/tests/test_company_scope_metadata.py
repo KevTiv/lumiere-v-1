@@ -94,6 +94,19 @@ class CompanyScopeMetadataTest(unittest.TestCase):
                     all(re.fullmatch(r"[a-z][a-z0-9_]*", part) for part in annotation["path"])
                 )
 
+    def test_metered_company_binding_is_explicit_without_forged_company_inputs(self):
+        reserve = self.reducers["reserve_ai_metered_spend"]
+        self.assertEqual(len(reserve["company_paths"]), 1)
+        self.assertEqual(reserve["company_paths"][0]["path"], ["params", "company_id"])
+        self.assertTrue(reserve["company_paths"][0]["required"])
+        self.assertFalse(reserve["company_paths"][0]["nullable"])
+        for name in (
+            "configure_ai_metered_price", "claim_ai_metered_dispatch",
+            "settle_ai_metered_spend", "reconcile_ai_metered_spend",
+        ):
+            self.assertEqual(self.reducers[name]["company_paths"], [])
+            self.assertTrue(self.reducers[name]["asserts_no_company_parameter"])
+
     def test_top_level_contract_scope_is_not_duplicated(self):
         source = CONTRACT_PATH.read_text()
         expected = {

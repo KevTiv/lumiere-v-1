@@ -4,7 +4,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::non_llm_spend::{
+    execute_metered, MeteredRecoveryRequired, MeteredResult, MeteredScope, MeteredUnit,
+};
 use anyhow::Context;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
@@ -59,6 +63,13 @@ async fn process_batch(
     let count = jobs.len();
     let model = config.embedding_model_name();
     let mut worker_ids = HashMap::new();
+    let spend_reader = config.ai_spend_read_stdb_token.as_ref().map(|token| {
+        StdbClient::new(
+            config.stdb_host.clone(),
+            config.stdb_module.clone(),
+            token.clone(),
+        )
+    });
 
     for job in jobs {
         let worker_id = match worker_ids.get(&job.organization_id).copied() {
@@ -103,6 +114,8 @@ async fn process_batch(
             job.organization_id,
             &model,
             &job.payload,
+            spend_reader.as_ref(),
+            config.ollama_supports_tool_calling,
         )
         .await;
 
@@ -146,6 +159,24 @@ async fn process_batch(
             }
             Err(error) => {
                 tracing::error!(job_id = job.job_id, %error, "embedding job failed");
+                if error.downcast_ref::<MeteredRecoveryRequired>().is_some() {
+                    // Terminal queue cancellation preserves the financial hold and
+                    // requires an operator to reconcile before explicitly rebuilding.
+                    let result = stdb
+                        .call_reducer(stdb_client::reducer_call!(
+                            "cancel_queue_job",
+                            serde_json::json!([job.organization_id, job.job_id, {
+                                "expected_revision":lease.claimed_revision,
+                                "reason":"metered embedding needs explicit financial reconciliation"
+                            }])
+                        ))
+                        .await;
+                    if let Err(cancel_error) = result {
+                        tracing::error!(job_id=job.job_id, %cancel_error,
+                            "could not cancel uncertain embedding; durable dispatch guard prevents another paid call");
+                    }
+                    continue;
+                }
                 let error_summary = error.to_string();
                 if let Err(completion_error) = stdb
                     .complete_queue_job(
@@ -185,6 +216,8 @@ async fn process_claimed_job(
     organization_id: u64,
     embedding_model: &str,
     payload: &EmbedJobPayload,
+    spend_reader: Option<&StdbClient>,
+    ollama_supports_tool_calling: bool,
 ) -> anyhow::Result<ProcessedEmbedding> {
     let index_state = embedding_index_state_for_job(stdb, organization_id, payload)
         .await
@@ -194,7 +227,79 @@ async fn process_claimed_job(
             let passage = canonical_passage_for_job(stdb, organization_id, payload)
                 .await
                 .context("failed to load canonical passage")?;
-            let vector = embedder.embed(&passage.text).await?;
+            if embedder.name() != "mistral" {
+                anyhow::bail!("document indexing requires the metered Mistral embedding adapter");
+            }
+            if passage.text.trim().is_empty() || passage.text.len() > 16_384 {
+                anyhow::bail!("canonical passage exceeds the Mistral embedding input bounds");
+            }
+            vector_store
+                .check_ready()
+                .await
+                .context("semantic index readiness is required before paid embedding")?;
+            let reader =
+                spend_reader.context("document indexing requires the private spend reader")?;
+            let agent = crate::ai_agent::resolve_surface_agent(
+                stdb,
+                organization_id,
+                payload.company_id,
+                "document_embeddings",
+                None,
+                None,
+                ollama_supports_tool_calling,
+            )
+            .await?;
+            crate::ai_agent::ensure_allowed_action(&agent, "embedding_index")?;
+            if agent.provider != "mistral"
+                || !agent.allowed_models.iter().any(|m| m == embedding_model)
+            {
+                anyhow::bail!("document embedding model is not admitted by its surface agent");
+            }
+            let allowance = u32::try_from(passage.text.len())
+                .context("passage exceeds embedding allowance")?
+                .checked_add(32)
+                .context("embedding allowance overflow")?;
+            let identity = serde_json::to_vec(&(
+                organization_id,
+                payload.company_id,
+                passage.id,
+                &passage.fingerprint,
+                &payload.index_generation,
+                embedding_model,
+            ))?;
+            let digest = format!("{:x}", Sha256::digest(identity));
+            let inputs = vec![passage.text.clone()];
+            let vector = execute_metered(
+                stdb,
+                reader,
+                MeteredScope {
+                    organization_id,
+                    company_id: payload.company_id,
+                    agent_id: agent.agent_id,
+                    run_id: 0,
+                    actor_identity: String::new(),
+                    request_key: format!("document:embedding:{digest}"),
+                    model: embedding_model.to_owned(),
+                    unit: MeteredUnit::Tokens,
+                    allowance,
+                },
+                || async {
+                    let result = embedder.embed_batch_with_usage(&inputs).await?;
+                    let units = result
+                        .input_tokens
+                        .context("Mistral embedding usage is required")?;
+                    if result.vectors.len() != 1 {
+                        anyhow::bail!("embedding response count mismatch");
+                    }
+                    let value = result
+                        .vectors
+                        .into_iter()
+                        .next()
+                        .context("missing embedding vector")?;
+                    Ok(MeteredResult { value, units })
+                },
+            )
+            .await?;
             let dimension =
                 u32::try_from(vector.len()).context("embedding vector dimension exceeds u32")?;
             vector_store
