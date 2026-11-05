@@ -227,6 +227,34 @@ class PreparationTests(unittest.TestCase):
         self.assertIsNone(item["proposed"]["cost_unit_price"])
         self.assertEqual(json.loads(item["proposed"]["source_cells"]), rows[2])
 
+    def test_farm_tail_notes_are_reviewable_in_live_preparation_and_isolated_cli(self):
+        rows = [["AUDIT ZINIA 1/1/2023-7/1/2023"],
+                ["DESCRIPTION", "SI", "ENTRE", "TOTAL", "SF", "QTES S", "PU", "TOTAL", "QTES S", "PU", "TOTAL"],
+                ["CHICKEN", "10", "2", "12", "4", "8", "100", "800", "8", "150", "1200"],
+                ["TOTAL", "", "", "", "", "", "", "800", "", "", "1200"],
+                ["DÉPENSES"], ["Ubukode", "500"], ["MOMO HQ", "1000"], ["local note", "2", "300"]]
+        selected = csv_source("ZINIA.csv", rows)
+        payload = {"mode": "prepare_import", "files": [selected]}
+        result = subprocess.run([sys.executable, "-B", "-I", str(SCRIPT)], input=json.dumps(payload),
+                                text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        batch = json.loads(result.stdout)["datasets"][0]
+        self.assertEqual(batch["targetEntity"], "source_observation")
+        self.assertEqual(len(batch["items"]), len(rows))
+        rent, momo, unknown = batch["items"][-3:]
+        self.assertEqual(rent["proposed"]["category"], "rent")
+        self.assertEqual(rent["proposed"]["amount"], "500")
+        self.assertEqual(momo["proposed"]["reported_method"], "mobile_money")
+        self.assertEqual(momo["proposed"]["reported_destination"], "HQ")
+        self.assertIsNone(unknown["proposed"]["amount"])
+        for item in [rent, momo, unknown]:
+            self.assertTrue(all(not value["export"] for value in item["fields"]))
+            self.assertNotIn("payment_verified", item["proposed"])
+            self.assertEqual(json.loads(item["proposed"]["source_cells"]), rows[item["source"]["row"] - 1])
+            self.assertEqual(item["businessDate"]["from"], "2023-01-01")
+        inspection = module.prepare({**payload, "mode": "inspect_only"})
+        self.assertTrue(all("reported_method" not in item["proposed"] for item in inspection["datasets"][0]["items"]))
+
     def test_duplicate_conflicting_and_overlapping_farm_files_remain_visible(self):
         header = ["DESCRIPTION", "SI", "ENTRE", "TOTAL", "SF", "QTES S", "PU", "TOTAL", "QTES S", "PU", "TOTAL"]
         row = ["CHICKEN", "10", "2", "12", "4", "8", "100", "800", "8", "150", "1200"]

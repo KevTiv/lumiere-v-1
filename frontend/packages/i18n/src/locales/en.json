@@ -13526,6 +13526,14 @@
     }
   },
   "aiChat": {
+    "workspace": {
+      "context": "Workspace context",
+      "modules": "Modules",
+      "files": "Files",
+      "addFiles": "Add CSV or XLSX files",
+      "noFiles": "No files attached.",
+      "noSkills": "No skills selected."
+    },
     "deck": {
       "hint": "Type / to find skills",
       "previous": "Previous skill",
@@ -15774,6 +15782,17 @@
       "errorsLoading": "Loading import row errors…"
     },
     "importReview": {
+      "sourceMeaning": "Interpret source notes",
+      "historicalFacts": "Confirm the source values you know, even when other facts remain unresolved. Confirmed facts are available in source history. Business documents and current balances require their own complete import.",
+      "viewHistoricalFacts": "View confirmed historical facts",
+      "meaning": {
+        "cheque": "The source mentions a cheque payment. Clearance and payment evidence remain unverified.",
+        "credit": "The source reports credit terms at that historical date. Today's outstanding balance is unknown.",
+        "mobileMoney": "The source mentions mobile money. An account, transaction reference and verified settlement are still needed.",
+        "headOffice": "HQ is a reported settlement destination. Confirm the account and whether this is an internal transfer.",
+        "stockCondition": "This label appears to describe chickens with an issue. Clarify the stock condition and location. It does not establish a write-off or a pieces-to-kilograms conversion.",
+        "rent": "This text refers to rent. The location label does not identify the landlord or supplier."
+      },
       "companyRequired": "Select an operating company to review source data.",
       "save": "Save review",
       "proposed": "Proposed values",
@@ -18242,6 +18261,11 @@
   "purchasing.dashboard.orderValue": "Order value",
   "purchasing.dashboard.vendorUnavailable": "Vendor unavailable",
   "availableHistory": {
+    "verifiedOnly": "Only rows with confirmed facts",
+    "verifiedHint": "Includes partially reviewed rows with confirmed fields. Unconfirmed interpretations remain hidden; original text, dates and row labels remain source context. These observations do not change posted documents or current balances.",
+    "confirmedValue": "Value confirmed",
+    "unconfirmed": "Unconfirmed",
+    "openVerified": "Historical source facts",
     "loadingCompany": "Loading the current company…",
     "companyRequired": "Select an operating company to inspect its history.",
     "changed": "Source history changed while loading. Refresh to see the current rows.",

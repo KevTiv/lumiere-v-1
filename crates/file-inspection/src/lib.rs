@@ -2,7 +2,7 @@
 
 mod csv;
 
-pub use csv::parse_csv;
+pub use csv::{parse_csv, parse_csv_records};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -93,6 +93,47 @@ pub struct InspectedCsv {
     pub content_sha256: String,
     pub dataset_sha256: String,
     pub report: InspectionReport,
+}
+
+/// A report is a record matrix, not an assertion about importable column names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InspectedCsvRecords {
+    pub records: Vec<Vec<String>>,
+    pub content_sha256: String,
+    pub dataset_sha256: String,
+    pub report: InspectionReport,
+}
+
+/// Inspect every report record, including headings, blank records and footers.
+/// Source record and column locations remain stable across section boundaries.
+///
+/// # Errors
+/// Rejects malformed CSV, unsupported controls and exceeded resource budgets.
+pub fn inspect_csv_records(text: &str) -> Result<InspectedCsvRecords, InspectionError> {
+    let records = parse_csv_records(text)?;
+    let cells = records.iter().map(Vec::len).sum();
+    let mut report = InspectionReport::new(records.len(), cells);
+    for (row, record) in records.iter().enumerate() {
+        for (column, value) in record.iter().enumerate() {
+            inspect_cell(&mut report, &format!("record[{row}].col[{column}]"), value);
+        }
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"lumiere-csv-records-v1\0");
+    digest.update((records.len() as u64).to_be_bytes());
+    for record in &records {
+        digest.update((record.len() as u64).to_be_bytes());
+        for value in record {
+            digest.update((value.len() as u64).to_be_bytes());
+            digest.update(value.as_bytes());
+        }
+    }
+    Ok(InspectedCsvRecords {
+        records,
+        content_sha256: format!("{:x}", Sha256::digest(text.as_bytes())),
+        dataset_sha256: format!("{:x}", digest.finalize()),
+        report,
+    })
 }
 
 /// Inspect every accepted CSV cell and bind the result to the exact bytes and dataset.

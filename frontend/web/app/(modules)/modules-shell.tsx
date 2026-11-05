@@ -132,7 +132,10 @@ function dateFromStored(raw: unknown): Date {
   return new Date()
 }
 
-function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context">) {
+function ErpAiChatPanel({
+  firstOrgProfile,
+  ...props
+}: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context"> & { firstOrgProfile: boolean }) {
   const { organizationId, identity } = useErpSession()
   const { route, module, activeTab, selection } = useErpAiRouteContext()
   const orgId = organizationId ?? 0
@@ -582,6 +585,8 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
       onImportFiles={importTasks.onImportFiles}
+      importFileNames={importTasks.fileNames}
+      showWorkbench={!firstOrgProfile && permissionsReady && checkPermission("dashboard:analytics", "read").allowed}
       importTaskContent={<>
         {orgReady && identity && operatingCompanyId ? (
           <ChatAlphaAnalytics key={JSON.stringify([identity, orgId, operatingCompanyId, sessionKey])}
@@ -687,6 +692,7 @@ function ModulesContent({
         overlays={
           <>
             <ErpAiChatPanel
+              firstOrgProfile={firstOrgProfile}
               open={isAIChatOpen}
               onClose={() => {
                 setIsAIChatOpen(false)

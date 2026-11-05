@@ -8,35 +8,30 @@ import argparse
 from collections import Counter, defaultdict
 import csv
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 import hashlib
 import io
+import importlib.util
 import json
 from pathlib import Path
 import re
-
-
-def compact(value):
-    return " ".join(value.split())
-
-
-def number(value):
-    value = value.strip()
-    if not value:
-        return None
-    if "," in value:
-        if not re.fullmatch(r"[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?", value):
-            return None
-        value = value.replace(",", "")
-    try:
-        result = Decimal(value)
-        return str(result) if result.is_finite() else None
-    except InvalidOperation:
-        return None
-
-
-def digest(value):
-    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+# The API executes preparation with Python -I; resolve only this trusted sibling.
+_source_spec = importlib.util.spec_from_file_location(
+    "farm_history_source", Path(__file__).with_name("farm_history_source.py")
+)
+source_notes = importlib.util.module_from_spec(_source_spec)
+_source_spec.loader.exec_module(source_notes)
+alias_proposals = source_notes.alias_proposals
+compact = source_notes.compact
+coverage_summary = source_notes.coverage_summary
+date_proposals = source_notes.date_proposals
+digest = source_notes.digest
+interpret_note = source_notes.interpret_note
+is_expense_heading = source_notes.is_expense_heading
+number = source_notes.number
+payment_note = source_notes.payment_note
+supplemental_observations = source_notes.supplemental_observations
+supplemental_review_datasets = source_notes.supplemental_review_datasets
 
 
 def period(title):
@@ -55,6 +50,8 @@ def period(title):
         return None, "invalid_period"
     if start > end:
         return None, "reversed_period"
+    if (end - start).days > 62:
+        return None, "suspicious_audit_period"
     return {"start": start.isoformat(), "end": end.isoformat()}, None
 
 
@@ -94,11 +91,16 @@ def audit_blocks(filename, rows):
         header, d = headers[0]
         dates, date_issue = period(title)
         shop = file_shop(filename)
+        title_shops = [name for name in ["NYABUGOGO", "KICUKIRO", "KIMIRONKO", "ZINIA", "GISIMENT"]
+                       if name in title.upper()]
+        reported_shop = title_shops[0] if len(title_shops) == 1 else None
         issues = []
         if date_issue:
             issues.append(date_issue)
-        if shop == "KIMIRONKO" and "KICUKIRO" in title.upper():
+        if reported_shop and shop != reported_shop:
             issues.append("file_and_title_shop_disagree")
+        supplementary_start_row = end + 1
+        primary_total_row = None
         lines, last_product, total_row = [], None, None
         fields = ["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
                   "consumed_quantity", "cost_unit_price", "consumed_cost", "sold_quantity",
@@ -108,8 +110,11 @@ def audit_blocks(filename, rows):
             prefix = [compact(c).upper() for c in row[:d + 7]]
             if any(c.startswith("TOTAL") for c in prefix):
                 total_row = row
+                supplementary_start_row = start + offset + 1
+                primary_total_row = start + offset + 1
                 break
-            if any(c.startswith(("DEPAN", "DEPEN", "EXPENSE")) for c in prefix):
+            if any(is_expense_heading(cell) for cell in prefix):
+                supplementary_start_row = start + offset + 1
                 break
             raw_name = compact(row[d]) if len(row) > d else ""
             values = {key: number(row[d + k + 1]) if len(row) > d + k + 1 else None
@@ -119,9 +124,12 @@ def audit_blocks(filename, rows):
             ):
                 total_row = row
                 issues.append("unlabeled_primary_subtotal")
+                supplementary_start_row = start + offset + 1
+                primary_total_row = start + offset + 1
                 break
             if raw_name.upper().startswith(("VERSEMENT", "VERF", "VERI", "CASH", "MOMO", "RETOUR HQ", "DIFFERENCE")):
                 issues.append("settlement_section_without_primary_subtotal")
+                supplementary_start_row = start + offset + 1
                 break
             if raw_name:
                 last_product = raw_name
@@ -163,11 +171,22 @@ def audit_blocks(filename, rows):
             issues.append("missing_primary_subtotal")
         canonical_lines = [{k: v for k, v in line.items() if k not in {"source", "issues"}}
                            for line in lines]
-        block_key = digest([shop, compact(title), canonical_lines, totals])
+        block_key = digest([reported_shop or shop, compact(title), canonical_lines, totals])
         blocks.append({"id": f"audit-{block_key[:24]}", "source": source(filename, start + 1),
                        "source_end_row": end, "title": compact(title), "file_shop": shop,
+                       "shop": reported_shop or shop,
+                       "shop_basis": "explicit_report_heading" if reported_shop else "source_filename",
+                       "supplementary_start_row": supplementary_start_row,
+                       "primary_total_row": primary_total_row,
                        "period": dates, "issues": issues, "lines": lines, "totals": totals,
                        "content_hash": digest(nonempty_rows(block_rows)), "data_hash": block_key})
+    for index, block in enumerate(blocks):
+        if block["period"] is None:
+            previous = next((item["period"] for item in reversed(blocks[:index])
+                             if item["period"] and item["shop"] == block["shop"]), None)
+            following = next((item["period"] for item in blocks[index + 1:]
+                              if item["period"] and item["shop"] == block["shop"]), None)
+            block["period_proposals"] = date_proposals(block["title"], previous, following)
     return blocks
 
 
@@ -198,7 +217,7 @@ def prepare(folder, output):
     audits = list(unique.values())
     identities = defaultdict(list)
     for block in audits:
-        identities[(block["file_shop"], block["title"])].append(block)
+        identities[(block["shop"], block["title"])].append(block)
     conflicts = []
     for (shop, title), candidates in identities.items():
         if len(candidates) > 1:
@@ -210,7 +229,7 @@ def prepare(folder, output):
         if not block["period"]:
             continue
         for other in audits[i + 1:]:
-            if other["file_shop"] != block["file_shop"] or not other["period"]:
+            if other["shop"] != block["shop"] or not other["period"]:
                 continue
             start = max(block["period"]["start"], other["period"]["start"])
             end = min(block["period"]["end"], other["period"]["end"])
@@ -257,6 +276,26 @@ def prepare(folder, output):
                        "unit_price": number(sales_rows[i - 1][4]), "amount": number(sales_rows[i - 1][5]),
                        "comment": sales_rows[i - 1][6], "product": None, "unit": None, "currency": "RWF",
                        "payment_verified": False} for i in range(10, 16)] if sales_rows else []
+    for observation in customer_sales:
+        observation["payment_note"] = payment_note(observation["comment"])
+    for observation in inventory:
+        observation["interpretation_proposal"] = interpret_note(observation["product_label"])
+    additional, coverage = supplemental_observations(raw_sources, blocks)
+    represented = {(item["source"]["file"], item["source"]["row"]): kind
+                   for kind, group in [("balance_snapshot", balances), ("staff_reference", staff),
+                                       ("inventory_snapshot", inventory), ("customer_sale_observation", customer_sales)]
+                   for item in group}
+    for row in coverage:
+        known = represented.get((row["source"]["file"], row["source"]["row"]))
+        if known:
+            row["disposition"] = known
+    review_datasets = supplemental_review_datasets(additional)
+    aliases = alias_proposals([line["product_label"] for block in audits for line in block["lines"]]
+                              + [item["product_label"] for item in inventory])
+    review_keys = {item["key"] for dataset in review_datasets for item in dataset["items"]}
+    for row in coverage:
+        if row.get("observation_id") and row["observation_id"] not in review_keys:
+            row["disposition"] = "review_size_limit_requires_section_selection"
     issue_counts = Counter()
     for block in audits:
         block["issues"] = sorted(set(block["issues"]))
@@ -272,6 +311,9 @@ def prepare(folder, output):
                "distinct_product_labels": len({line["product_label"] for b in audits for line in b["lines"]}),
                "staff_references": len(staff), "balance_snapshots": len(balances),
                "inventory_count_lines": len(inventory), "customer_sales_observations": len(customer_sales),
+               "additional_source_observations": len(additional),
+               "source_coverage": coverage_summary(coverage),
+               "additional_review_documents": len(review_datasets),
                "issues": dict(sorted(issue_counts.items())), "production_writes": 0}
     proposal = {
         "organization": {"name": "Umunupfu Chicken | Mugisha Farm", "code": "UMUNUPFU_MUGISHA",
@@ -301,8 +343,20 @@ def prepare(folder, output):
                            ("overlapping-periods.json", overlaps), ("supplementary-observations.json", supplements),
                            ("balance-snapshots.json", balances), ("staff-references.json", staff),
                            ("inventory-snapshot.json", inventory), ("customer-sales.json", customer_sales),
+                           ("additional-observations.json", additional), ("source-coverage.json", coverage),
+                           ("alias-proposals.json", aliases),
                            ("import-proposal.json", proposal)]:
         (output / filename).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+    review_output = output / "additional-source-reviews"
+    review_output.mkdir(exist_ok=True)
+    # Only this generator's numbered outputs are replaced; unrelated operator
+    # files and the immutable source archive are never removed.
+    for stale in review_output.glob("additional-source-*.json"):
+        if re.fullmatch(r"additional-source-\d{4}\.json", stale.name):
+            stale.unlink()
+    for index, dataset in enumerate(review_datasets, 1):
+        (review_output / f"additional-source-{index:04}.json").write_text(
+            json.dumps(dataset, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
     return proposal
 

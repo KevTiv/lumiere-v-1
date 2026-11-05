@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ExpensesClient } from "./expenses-client"
+import { SourceHistoryLink } from "../../../components/source-history-link"
 
 const SSR_RESOURCES = ["expenses", "expense-sheets", "pricelists", "employees"] as const
 
@@ -16,12 +17,15 @@ export default async function ExpensesPage() {
   )
 
   return (
-    <ExpensesClient
-      initialExpenses={expenses}
-      initialSheets={sheets}
-      initialPricelists={pricelists}
-      initialEmployees={employees}
-      organizationId={session.organizationId}
-    />
+    <>
+      <SourceHistoryLink organizationId={session.organizationId} />
+      <ExpensesClient
+        initialExpenses={expenses}
+        initialSheets={sheets}
+        initialPricelists={pricelists}
+        initialEmployees={employees}
+        organizationId={session.organizationId}
+      />
+    </>
   )
 }

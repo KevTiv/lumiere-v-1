@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { interpretSourceCells } from "./source-observation"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -154,6 +155,9 @@ export function ImportReviewEditor({
 }) {
   const { t } = useTranslation()
   const [decision, setDecision] = useState(() => reviewDecision(item))
+  const interpretations = item.source.fields.flatMap((field) =>
+    field.sourceValue ? interpretSourceCells(field.sourceValue) : [],
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uncertain, setUncertain] = useState(false)
@@ -232,6 +236,21 @@ export function ImportReviewEditor({
         <div>
           <h4 className="font-semibold">{item.source.label}</h4>
           <p className="text-sm text-muted-foreground">{item.source.issue}</p>
+          {interpretations.length ? (
+            <details className="rounded-md border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                {t("settings.importReview.sourceMeaning", { defaultValue: "Interpret source notes" })}
+              </summary>
+              <ul className="mt-2 space-y-2 text-sm">
+                {interpretations.map((hint, index) => (
+                  <li key={`${hint.key}:${index}`}>
+                    <span className="font-medium">{hint.original}</span>{": "}
+                    {t(`settings.importReview.meaning.${hint.key}`, { defaultValue: hint.message })}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
         </div>
         <Button
           variant="ghost"

@@ -63,9 +63,9 @@ class PreflightTests(unittest.TestCase):
             output = root / "output"
             with contextlib.redirect_stdout(io.StringIO()):
                 module.prepare(source, output)
-                first = {p.name: p.read_bytes() for p in output.iterdir()}
+                first = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()}
                 module.prepare(source, output)
-            self.assertEqual(first, {p.name: p.read_bytes() for p in output.iterdir()})
+            self.assertEqual(first, {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()})
             summary = json.loads((output / "import-proposal.json").read_text())["summary"]
             self.assertEqual(summary["unique_audit_datasets"], 1)
             self.assertEqual(summary["duplicate_audit_datasets"], 1)

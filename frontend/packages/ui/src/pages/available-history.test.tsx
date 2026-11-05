@@ -22,15 +22,17 @@ const clients: QueryClient[] = []
 const queryUrl = (input: string | URL | Request) => new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://example.test")
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } })
 
-function mount(companyId = 7, actorIdentity = "operator-one") {
+function mount(companyId = 7, actorIdentity = "operator-one", verifiedOnly = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   clients.push(client)
-  const component = (company: number, actor: string) => <QueryClientProvider client={client}><AvailableHistory organizationId={42} companyId={company} actorIdentity={actor} timeZone="Africa/Kigali" /></QueryClientProvider>
+  const component = (company: number, actor: string) => <QueryClientProvider client={client}><AvailableHistory organizationId={42} companyId={company} actorIdentity={actor} timeZone="Africa/Kigali" initialVerifiedOnly={verifiedOnly} /></QueryClientProvider>
   const view = render(component(companyId, actorIdentity))
   return { ...view, client, changeScope: (company: number, actor = actorIdentity) => view.rerender(component(company, actor)) }
 }
 
 beforeEach(() => {
+  // Base UI checks pointer events; jsdom does not provide the browser constructor.
+  vi.stubGlobal("PointerEvent", MouseEvent)
   request.mockReset()
   request.mockImplementation(async (input) => {
     const url = queryUrl(input), company = Number(url.searchParams.get("companyId"))
@@ -40,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   for (const client of clients.splice(0)) client.clear()
 })
 
@@ -56,6 +59,28 @@ describe("Available source history", () => {
     expect(screen.getByText("January")).toBeTruthy()
     expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0)
     expect(screen.getByText(/Confirmed source values still need their business import/)).toBeTruthy()
+  })
+
+  it("shows only confirmed values for partially reviewed historical facts", async () => {
+    request.mockImplementation(async (input) => {
+      if (queryUrl(input).pathname.endsWith("coverage")) return json(sourceHistoryCoverage())
+      const fixture = sourceHistoryRows(), row = fixture.data[1]!
+      return json({ ...fixture, data: [{ ...row, confirmedFields: ["quantity"],
+        values: { ...row.values, category: "unreviewed-proposal" },
+        fields: [...row.fields, { key: "category", label: "Category", kind: "text", sourceValue: null, required: false }],
+      }] })
+    })
+    mount(7, "operator-one", true)
+    await screen.findByText("Undated source observation")
+    const url = request.mock.calls.map(([input]) => queryUrl(input)).find((url) => url.pathname.endsWith("rows"))!
+    expect(url.searchParams.get("verifiedOnly")).toBe("true")
+    fireEvent.click(screen.getByText("Inspect source and values"))
+    expect(screen.getByText("Value confirmed")).toBeTruthy()
+    expect(screen.getAllByText("Unconfirmed").length).toBeGreaterThan(0)
+    expect(screen.queryByText("unreviewed-proposal")).toBeNull()
+    expect(screen.getByText("January")).toBeTruthy()
+    fireEvent.click(screen.getByRole("checkbox", { name: "Only rows with confirmed facts" }))
+    expect(await screen.findByText("unreviewed-proposal")).toBeTruthy()
   })
 
   it("navigates any year/month, applies complete custom dates, and excludes bounds for unknown dates", async () => {

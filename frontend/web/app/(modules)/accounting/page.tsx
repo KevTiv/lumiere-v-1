@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { AccountingClient } from "./accounting-client"
+import { SourceHistoryLink } from "../../../components/source-history-link"
 
 const SSR_RESOURCES = [
   // Generated company-scoped reads load after active-company resolution in the browser.
@@ -18,10 +19,13 @@ export default async function AccountingPage() {
     await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
-    <AccountingClient
-      initialFiscalYears={fiscalYears}
-      initialAccountPeriods={accountPeriods}
-      organizationId={session.organizationId}
-    />
+    <>
+      <SourceHistoryLink organizationId={session.organizationId} />
+      <AccountingClient
+        initialFiscalYears={fiscalYears}
+        initialAccountPeriods={accountPeriods}
+        organizationId={session.organizationId}
+      />
+    </>
   )
 }

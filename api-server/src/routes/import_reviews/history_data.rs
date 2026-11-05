@@ -89,6 +89,8 @@ pub(super) struct RowsQuery {
     #[serde(default)]
     date_mode: DateMode,
     state: Option<ReviewState>,
+    #[serde(default)]
+    verified_only: bool,
     cursor: Option<String>,
     snapshot: Option<String>,
     limit: Option<u32>,
@@ -131,7 +133,8 @@ impl RowsQuery {
     fn filter_key(&self) -> Result<String, ApiError> {
         fingerprint(
             &json!({"batchId":self.batch_id,"from":self.from,"toExclusive":self.to_exclusive,
-            "dateMode":self.date_mode,"state":self.state,"limit":self.limit.unwrap_or(50)}),
+            "dateMode":self.date_mode,"state":self.state,"verifiedOnly":self.verified_only,
+            "limit":self.limit.unwrap_or(50)}),
         )
     }
 }
@@ -309,7 +312,7 @@ fn row_date_sql(query: &RowsQuery) -> String {
     // Push keyset, dataset and state restrictions into the indexed source scan.
     // The default All available page needs date metadata for at most limit+1
     // rows. Date-filtered pages must evaluate source precision before limiting.
-    let filters = "AND ($3::bigint IS NULL OR item.batch_id=$3) AND ($7::text IS NULL OR item.state=$7) AND item.id>$8";
+    let filters = "AND ($3::bigint IS NULL OR item.batch_id=$3) AND ($7::text IS NULL OR item.state=$7) AND item.id>$8 AND (NOT $10::boolean OR (item.state <> 'excluded' AND (item.state='confirmed' OR jsonb_array_length(item.confirmed_fields)>0)))";
     if query.date_mode == DateMode::All && query.from.is_none() && query.to_exclusive.is_none() {
         date_sql(&format!("{filters} ORDER BY item.id LIMIT $9"))
     } else {
@@ -496,7 +499,9 @@ async fn rows_data(
         AND ($4::text IS NULL OR date_to_exclusive > $4::text::date)
         AND ($5::text IS NULL OR date_from < $5::text::date)
         AND ($6='all' OR ($6='dated' AND date_from IS NOT NULL) OR date_precision=$6)
-        AND ($7::text IS NULL OR state=$7) AND id>$8 ORDER BY id LIMIT $9", row_date_sql(query));
+        AND ($7::text IS NULL OR state=$7) AND id>$8
+        AND (NOT $10::boolean OR (state <> 'excluded' AND (state='confirmed' OR jsonb_array_length(confirmed_fields)>0)))
+        ORDER BY id LIMIT $9", row_date_sql(query));
     let state = query.state.map(ReviewState::as_str);
     let rows = tx
         .query(
@@ -511,6 +516,7 @@ async fn rows_data(
                 &state,
                 &after,
                 &(limit + 1),
+                &query.verified_only,
             ],
         )
         .await

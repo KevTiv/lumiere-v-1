@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useId } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,6 +31,9 @@ import {
   PanelRight,
   PanelRightClose,
   Paperclip,
+  Files,
+  Layers3,
+  SlidersHorizontal,
   Search,
 } from "lucide-react"
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload, ChatSkill } from "@/lib/ai-chat-types"
@@ -82,6 +85,8 @@ interface AIChatPanelProps {
   /** Server-backed task cards are owned by the host, separately from text replies. */
   importTaskContent?: React.ReactNode
   importCompanyLabel?: string
+  importFileNames?: readonly string[]
+  showWorkbench?: boolean
   /** The host can include actor and organization when the panel is not remounted on scope changes. */
   importScopeKey?: string
   onStreamMessage?: (
@@ -163,6 +168,8 @@ export function AIChatPanel({
   onImportFiles,
   importTaskContent,
   importCompanyLabel,
+  importFileNames,
+  showWorkbench,
   importScopeKey,
   onStreamMessage,
 }: AIChatPanelProps) {
@@ -170,6 +177,11 @@ export function AIChatPanel({
   const docked = requestedDocked && !modal
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
+  const [openTools, setOpenTools] = useState<"files" | "skills" | null>(null)
+  const [contextVisible, setContextVisible] = useState(true)
+  const contextId = useId()
+  const skillsId = useId()
+  const filesId = useId()
   const [composerCaret, setComposerCaret] = useState(0)
   const [dismissedSlash, setDismissedSlash] = useState<string | null>(null)
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
@@ -250,6 +262,11 @@ export function AIChatPanel({
   const selectedSkills = skills.filter(skill => selectedSkillIds.includes(skill.id))
   const slashSignature = `${input}:${composerCaret}`
   const slash = dismissedSlash === slashSignature ? null : slashSkillToken(input, composerCaret)
+  const showSkills = openTools === "skills" || slash !== null
+  const showFiles = openTools === "files" && slash === null
+  const moduleLabel = contextOptions?.find(option => option.value === selectedContext)?.label ?? contextOptions?.[0]?.label
+  const canShowContext = !docked && !modal
+  const showContext = canShowContext && contextVisible
   const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
   const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
 
@@ -257,6 +274,7 @@ export function AIChatPanel({
     setSelectedSkillIds(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
     setActiveSkillId(id)
     if (slash) {
+      setOpenTools("skills")
       pendingCaret.current = slash.start
       setComposerCaret(slash.start)
       setInput(input.slice(0, slash.start) + input.slice(slash.end))
@@ -696,7 +714,7 @@ export function AIChatPanel({
       )}
     >
       {draggingFiles ? <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/95 p-6 text-center text-sm" role="status">{t("aiChat.import.dropFiles", { defaultValue: "Drop CSV or XLSX files to attach them" })}</div> : null}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-4">
+      <header className={cn("flex h-14 shrink-0 items-center justify-between gap-3 px-4", !docked && "border-b border-border")}>
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg">
             <Sparkles className="size-4 text-foreground" aria-hidden="true" />
@@ -706,6 +724,13 @@ export function AIChatPanel({
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
+          {canShowContext ? (
+            <Button variant="ghost" size="icon" className="hidden size-9 lg:inline-flex"
+              aria-label={t("aiChat.workspace.context")} aria-expanded={showContext} aria-controls={contextId}
+              onClick={() => setContextVisible(visible => !visible)}>
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
           {onDockToggle ? (
             <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
               {docked ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
@@ -717,42 +742,8 @@ export function AIChatPanel({
         </div>
       </header>
 
-      {(contextOptions?.length && onContextChange) || (config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref)) ? <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-4 py-2">
-          {contextOptions && contextOptions.length > 0 && onContextChange ? (
-            <label className="min-w-0">
-              <span className="sr-only">Assistant context</span>
-              <Select
-                value={String(selectedContext ?? contextOptions[0]?.value ?? "")}
-                onValueChange={(nextValue) => onContextChange(nextValue)}
-              >
-                <SelectTrigger
-                  data-testid="erp-ai-chat-context"
-                  className="h-8 w-[190px] max-w-full border-border bg-card text-xs"
-                  aria-label={"Assistant context"}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
-                    <SelectGroup key={group}>
-                      <SelectLabel>{group}</SelectLabel>
-                      {contextOptions
-                        .filter((option) => option.group === group)
-                        .map((option) => (
-                          <SelectItem key={option.value} value={String(option.value)}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-          ) : null}
-          {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex min-h-8 items-center gap-2 text-xs text-primary hover:underline"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}
-      </div> : null}
-
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
           <div className="mx-auto w-full max-w-[820px] px-4 py-6">
           {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
@@ -771,27 +762,29 @@ export function AIChatPanel({
                 <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
                   {config?.welcomeMessage || t("aiChat.emptyState.welcome")}
                 </p>
-                <div className={cn("mt-8 grid gap-2", docked ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
-                  {assistantStarterIds(context).map((id) => {
-                    const starter = assistantStarters[id]
-                    const label = t(`aiChat.starters.${id}.label`, { defaultValue: starter.label })
-                    const prompt = t(`aiChat.starters.${id}.prompt`, { defaultValue: starter.prompt })
-                    return (
-                      <button
-                        type="button"
-                        key={id}
-                        onClick={() => {
-                          setInput((current) => current.trim() ? `${current}\n\n${prompt}` : prompt)
-                          inputRef.current?.focus()
-                        }}
-                        className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <span className="shrink-0 text-muted-foreground" aria-hidden="true">{iconMap[starter.icon]}</span>
-                        <span>{label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                {!docked ? (
+                  <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {assistantStarterIds(context).map((id) => {
+                      const starter = assistantStarters[id]
+                      const label = t(`aiChat.starters.${id}.label`, { defaultValue: starter.label })
+                      const prompt = t(`aiChat.starters.${id}.prompt`, { defaultValue: starter.prompt })
+                      return (
+                        <button
+                          type="button"
+                          key={id}
+                          onClick={() => {
+                            setInput((current) => current.trim() ? `${current}\n\n${prompt}` : prompt)
+                            inputRef.current?.focus()
+                          }}
+                          className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span className="shrink-0 text-muted-foreground" aria-hidden="true">{iconMap[starter.icon]}</span>
+                          <span>{label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-6 pb-2">
@@ -1053,10 +1046,30 @@ export function AIChatPanel({
             </div>
           )}
         <div className="mx-auto w-full max-w-[820px] px-4">
-          <ActionSkillList className="mb-3" items={skills.map(skill => ({ ...skill, icon: iconMap[skill.icon ?? ""] ?? <Sparkles className="size-4" /> }))}
-            selectedIds={selectedSkillIds} activeId={focusedSkillId} matchingIds={slash ? matchingSkills.map(skill => skill.id) : undefined}
-            disabled={isLoading} onToggle={toggleSkill} onRemove={id => { setSelectedSkillIds(current => current.filter(value => value !== id)); inputRef.current?.focus() }}
-            onActiveChange={setActiveSkillId} />
+          <div id={skillsId} hidden={!showSkills}>
+            <ActionSkillList className="mb-3" items={skills.map(skill => ({ ...skill, icon: iconMap[skill.icon ?? ""] ?? <Sparkles className="size-4" /> }))}
+              selectedIds={selectedSkillIds} activeId={focusedSkillId} matchingIds={slash ? matchingSkills.map(skill => skill.id) : undefined}
+              disabled={isLoading} onToggle={toggleSkill} onRemove={id => { setSelectedSkillIds(current => current.filter(value => value !== id)); inputRef.current?.focus() }}
+              onActiveChange={setActiveSkillId} />
+            {showWorkbench ? (
+              <a href="/ai-harness" target="_blank" rel="noreferrer" className="mb-3 inline-block text-xs text-primary hover:underline">
+                {t("aiHarness.title")}
+              </a>
+            ) : null}
+          </div>
+          {config?.enableFileUpload ? (
+            <div id={filesId} hidden={!showFiles} className="mb-3 space-y-2 rounded-lg border bg-card p-3">
+              <ChatFileNames names={importFileNames} />
+              <input ref={fileInputRef} type="file" multiple accept=".csv,.xlsx" hidden data-testid="erp-ai-chat-file-input"
+                disabled={!fileImportEnabled || fileImportBusy} aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })}
+                onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void handleImportFiles(files) }} />
+              <Button type="button" variant="outline" size="sm" data-testid="erp-ai-chat-attach"
+                disabled={!fileImportEnabled || fileImportBusy} onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="size-4" aria-hidden="true" />
+                {t("aiChat.workspace.addFiles")}
+              </Button>
+            </div>
+          ) : null}
           {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
           {fileImportBusy ? <p role="status" className="mx-auto mb-2 flex max-w-[790px] items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("aiChat.import.savingAttachments", { defaultValue: "Saving attachments…" })}</p> : null}
           {config?.enableFileUpload && importCompanyLabel ? <p className="mx-auto mb-2 max-w-[790px] truncate text-xs text-muted-foreground" title={importCompanyLabel}>{t("aiChat.import.destination", { defaultValue: "Import into {{company}}", company: importCompanyLabel })}</p> : null}
@@ -1076,10 +1089,6 @@ export function AIChatPanel({
             />
             <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 pl-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {config?.enableFileUpload ? <>
-                  <input ref={fileInputRef} type="file" multiple accept=".csv,.xlsx" hidden data-testid="erp-ai-chat-file-input" disabled={!fileImportEnabled || fileImportBusy} aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void handleImportFiles(files) }} />
-                  <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" data-testid="erp-ai-chat-attach" disabled={!fileImportEnabled || fileImportBusy} onClick={() => fileInputRef.current?.click()} aria-label={t("aiChat.import.attachFiles", { defaultValue: "Attach CSV or XLSX files" })} title={t("aiChat.import.attachFiles", { defaultValue: "Attach CSV or XLSX files" })}><Paperclip className="size-4" aria-hidden="true" /></Button>
-                </> : null}
                 <span><kbd className="rounded bg-muted px-1 py-0.5">/</kbd> {t("aiChat.deck.skills")} · <kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}</span>
                 {selectionSummary ? (
                   <Badge variant="outline" className="max-w-[180px] truncate text-[10px]" title={t("aiChat.selectionContext")}>
@@ -1100,13 +1109,106 @@ export function AIChatPanel({
               </Button>
             </div>
           </div>
+          <div className="mx-2 flex max-w-[790px] flex-wrap items-center gap-1 rounded-b-xl bg-muted/60 px-2 py-1">
+          {contextOptions && contextOptions.length > 0 && onContextChange ? (
+            <div className="flex min-w-0 items-center gap-1">
+              <Layers3 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <Select
+                value={String(selectedContext ?? contextOptions[0]?.value ?? "")}
+                onValueChange={(nextValue) => onContextChange(nextValue)}
+              >
+                <SelectTrigger
+                  data-testid="erp-ai-chat-context"
+                  className="h-9 max-w-[10rem] border-transparent bg-transparent text-xs"
+                  aria-label={"Assistant context"}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
+                    <SelectGroup key={group}>
+                      <SelectLabel>{group}</SelectLabel>
+                      {contextOptions
+                        .filter((option) => option.group === group)
+                        .map((option) => (
+                          <SelectItem key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+            {config?.enableFileUpload ? (
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-2 text-xs"
+                aria-controls={filesId} aria-expanded={showFiles}
+                onClick={() => {
+                  if (slash) setDismissedSlash(slashSignature)
+                  setOpenTools(showFiles ? null : "files")
+                }}>
+                <Files className="size-4 text-muted-foreground" aria-hidden="true" />
+                {t("aiChat.workspace.files")}
+                {importFileNames?.length ? <span>{importFileNames.length}</span> : null}
+              </Button>
+            ) : null}
+            <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-2 text-xs"
+              aria-controls={skillsId} aria-expanded={showSkills}
+              onClick={() => {
+                if (slash) setDismissedSlash(slashSignature)
+                setOpenTools(showSkills ? null : "skills")
+              }}>
+              <Sparkles className="size-4 text-muted-foreground" aria-hidden="true" />
+              {t("aiChat.deck.cards")}
+              {selectedSkills.length ? <span>{selectedSkills.length}</span> : null}
+            </Button>
+          {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex min-h-8 items-center gap-2 text-xs text-primary hover:underline"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}
+          </div>
           <p className="mx-auto mt-2 max-w-[790px] text-center text-[11px] text-muted-foreground">
             Suggested actions require review. Lumière checks your current permissions.
           </p>
         </div>
         </div>
       </div>
+      {canShowContext ? (
+        <aside id={contextId} aria-label={t("aiChat.workspace.context")}
+          className={cn("hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-muted/30 xl:w-80", showContext && "lg:block")}>
+          <h3 className="border-b px-5 py-4 text-sm font-semibold">{t("aiChat.workspace.context")}</h3>
+          {moduleLabel || context?.activeView ? (
+            <section className="space-y-2 border-b px-5 py-4">
+              <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.modules")}</h4>
+              <p className="text-sm font-medium">{moduleLabel ?? context?.activeView}</p>
+              {selectionSummary ? <p className="break-words text-xs text-muted-foreground">{selectionSummary}</p> : null}
+            </section>
+          ) : null}
+          {config?.enableFileUpload ? (
+            <section className="space-y-2 border-b px-5 py-4">
+              <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.files")}</h4>
+              <ChatFileNames names={importFileNames} />
+            </section>
+          ) : null}
+          <section className="space-y-2 px-5 py-4">
+            <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.deck.selected")}</h4>
+            {selectedSkills.length ? (
+              <ul className="space-y-1 text-xs">
+                {selectedSkills.map(skill => <li key={skill.id}>{skill.label}</li>)}
+              </ul>
+            ) : <p className="text-xs text-muted-foreground">{t("aiChat.workspace.noSkills")}</p>}
+          </section>
+        </aside>
+      ) : null}
+      </div>
     </section>
   )
   return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
+}
+
+function ChatFileNames({ names }: { names?: readonly string[] }) {
+  const { t } = useTranslation()
+  return names?.length ? (
+    <ul className="max-h-32 space-y-1 overflow-y-auto text-xs">
+      {names.map((name, index) => <li className="break-words" key={index}>{name}</li>)}
+    </ul>
+  ) : <p className="text-xs text-muted-foreground">{t("aiChat.workspace.noFiles")}</p>
 }
