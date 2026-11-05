@@ -20,6 +20,9 @@ fn ranges_have_no_recent_date_cap_and_unknown_dates_are_explicit() {
     assert!(query.validate().is_err());
     query.from = None;
     assert!(query.validate().is_ok());
+    let original_filter = query.filter_key().unwrap();
+    query.verified_only = true;
+    assert_ne!(query.filter_key().unwrap(), original_filter);
     query.limit = Some(101);
     assert!(query.validate().is_err());
     assert!(
@@ -420,6 +423,56 @@ async fn exercise_history(pool: &deadpool_postgres::Pool) -> Result<()> {
             && corrected_rows[0]["businessDate"]["from"] == "2020-01-01"
             && corrected_rows[0]["businessDate"]["raw"] == "2022-02-31"
     );
+    tx.rollback().await?;
+    exercise_confirmed_facts(&client, pool, batch, oldest, invalid).await?;
+    Ok(())
+}
+
+
+/// Confirmation is filtered before pagination, including after long unreviewed runs.
+async fn exercise_confirmed_facts(
+    client: &tokio_postgres::Client,
+    pool: &deadpool_postgres::Pool,
+    batch: i64,
+    oldest: i64,
+    excluded: i64,
+) -> Result<()> {
+    let mut expected = vec![oldest.to_string()];
+    for key in ["as_of", "count_date", "source_count_date", "balance_date"] {
+        let id = add_item(client, batch, key, None, None, "confirmed").await?;
+        let source = json!({"key":key,"label":"Dated snapshot","source":{"file":"historic.csv","row":7},
+            "fields":[{"key":key,"label":"Snapshot date","kind":"date","sourceValue":"2022-10-05","required":false}]});
+        client.execute("UPDATE lumiere_platform.import_review_item SET source_json=$1 WHERE id=$2", &[&source,&id]).await?;
+        expected.push(id.to_string());
+    }
+    let partial = add_item(client, batch, "partial", None, None, "needs_review").await?;
+    client.execute("UPDATE lumiere_platform.import_review_item SET confirmed_fields='[\"amount\"]' WHERE id=$1 OR id=$2", &[&partial,&excluded]).await?;
+    expected.push(partial.to_string());
+    let mut connection = pool.get().await?;
+    let tx = connection.transaction().await?;
+    let mut filters = query();
+    filters.verified_only = true;
+    let mut cursor = 0;
+    let mut actual = Vec::new();
+    loop {
+        let (rows, next) = rows_data(&tx, "8001", "9001", &filters, cursor, 1).await?;
+        ensure!(rows.len() == 1);
+        let row = &rows[0];
+        actual.push(row["id"].as_str().unwrap().to_owned());
+        ensure!(row["state"] != "excluded");
+        if row["id"] == partial.to_string() {
+            ensure!(row["state"] == "needs_review" && row["confirmedFields"] == json!(["amount"]));
+        } else if row["id"] != oldest.to_string() {
+            ensure!(row["businessDate"]["from"] == "2022-10-05");
+        }
+        match next {
+            Some(after) => cursor = after,
+            None => break,
+        }
+    }
+    ensure!(actual == expected);
+    let (other, _) = rows_data(&tx, "8002", "9001", &filters, 0, 50).await?;
+    ensure!(other.is_empty(), "confirmation cannot cross tenant scope");
     tx.rollback().await?;
     Ok(())
 }

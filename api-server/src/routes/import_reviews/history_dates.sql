@@ -36,11 +36,11 @@ WITH scoped AS (
 ), candidates AS MATERIALIZED (
     SELECT declared.*,
         (SELECT count(*) FROM jsonb_each_text(date_values) entry
-         WHERE entry.key = ANY(ARRAY['date','business_date','businessDate','source_date','sourceDate','observation_date','observationDate','snapshot_date','snapshotDate','date_order','dateOrder','invoice_date','invoiceDate'])) AS single_count,
+         WHERE entry.key = ANY(ARRAY['date','business_date','businessDate','source_date','sourceDate','observation_date','observationDate','snapshot_date','snapshotDate','date_order','dateOrder','invoice_date','invoiceDate','as_of','asOf','source_as_of','sourceAsOf','source_count_date','sourceCountDate','count_date','countDate','balance_date','balanceDate'])) AS single_count,
         (SELECT min(entry.value) FROM jsonb_each_text(date_values) entry
-         WHERE entry.key = ANY(ARRAY['date','business_date','businessDate','source_date','sourceDate','observation_date','observationDate','snapshot_date','snapshotDate','date_order','dateOrder','invoice_date','invoiceDate'])) AS single_value,
+         WHERE entry.key = ANY(ARRAY['date','business_date','businessDate','source_date','sourceDate','observation_date','observationDate','snapshot_date','snapshotDate','date_order','dateOrder','invoice_date','invoiceDate','as_of','asOf','source_as_of','sourceAsOf','source_count_date','sourceCountDate','count_date','countDate','balance_date','balanceDate'])) AS single_value,
         (SELECT min(entry.value) FROM jsonb_each_text(source_date_values) entry
-         WHERE entry.key = ANY(ARRAY['date','business_date','businessDate','source_date','sourceDate','observation_date','observationDate','snapshot_date','snapshotDate','date_order','dateOrder','invoice_date','invoiceDate'])) AS single_source_value,
+         WHERE entry.key = ANY(ARRAY['date','business_date','businessDate','source_date','sourceDate','observation_date','observationDate','snapshot_date','snapshotDate','date_order','dateOrder','invoice_date','invoiceDate','as_of','asOf','source_as_of','sourceAsOf','source_count_date','sourceCountDate','count_date','countDate','balance_date','balanceDate'])) AS single_source_value,
         (SELECT count(*) FROM jsonb_each_text(date_values) entry
          WHERE entry.key = ANY(ARRAY['period_start','periodStart','date_from','dateFrom','start_date','startDate'])) AS start_count,
         (SELECT min(entry.value) FROM jsonb_each_text(date_values) entry

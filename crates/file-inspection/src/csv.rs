@@ -19,6 +19,27 @@ enum FieldState {
 /// # Errors
 /// Rejects invalid quote placement, controls and exceeded byte/shape/cell budgets.
 pub fn parse_csv(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), InspectionError> {
+    let mut records = parse_csv_records(text)?.into_iter();
+    let headers = records
+        .next()
+        .ok_or(InspectionError::InvalidCsv("is empty"))?;
+    if headers.iter().all(|header| header.is_empty()) {
+        return Err(InspectionError::InvalidCsv("header row is empty"));
+    }
+    let rows: Vec<Vec<String>> = records.collect();
+    if rows.iter().any(|row| row.len() > headers.len()) {
+        return Err(InspectionError::InvalidCsv("row is wider than its header"));
+    }
+    Ok((headers, rows))
+}
+
+/// Parse bounded CSV records without asserting a flat business-table layout.
+/// Leading blank records and repeated, differently sized report sections retain
+/// their original record positions. Native imports still use [`parse_csv`].
+///
+/// # Errors
+/// Rejects the same malformed quoting, controls and resource limits as flat CSV.
+pub fn parse_csv_records(text: &str) -> Result<Vec<Vec<String>>, InspectionError> {
     validate_content_bytes(text.len())?;
     validate_controls(text)?;
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
@@ -89,18 +110,7 @@ pub fn parse_csv(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Inspecti
         push_field(&mut row, &mut field, &mut total_cells)?;
         push_record(&mut records, &mut row)?;
     }
-    let mut records = records.into_iter();
-    let headers = records
-        .next()
-        .ok_or(InspectionError::InvalidCsv("is empty"))?;
-    if headers.iter().all(|header| header.is_empty()) {
-        return Err(InspectionError::InvalidCsv("header row is empty"));
-    }
-    let rows: Vec<Vec<String>> = records.collect();
-    if rows.iter().any(|row| row.len() > headers.len()) {
-        return Err(InspectionError::InvalidCsv("row is wider than its header"));
-    }
-    Ok((headers, rows))
+    Ok(records)
 }
 
 fn push_char(field: &mut String, ch: char, count: &mut usize) -> Result<(), InspectionError> {

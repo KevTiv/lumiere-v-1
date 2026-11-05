@@ -128,3 +128,24 @@ test("year/month shortcuts and day arithmetic preserve historical dates and leap
   assert.throws(() => historyCalendarPeriod(2022, 13), /valid year/)
   assert.throws(() => shiftHistoryDate("2022-02-31", 1), /valid calendar date/)
 })
+
+
+test("confirmed-fact filters participate in requests, cache identities and continuation", () => {
+  const verified = { ...filters, verifiedOnly: true }
+  const url = params(historyRowsUrl(7, verified, "next-row", "snapshot-1"))
+  assert.equal(url.get("verifiedOnly"), "true")
+  assert.equal(url.get("cursor"), "next-row")
+  assert.equal(params(historyRowsUrl(7, filters)).has("verifiedOnly"), false)
+  assert.notDeepEqual(historyQueryKey("rows", scope, filters), historyQueryKey("rows", scope, verified))
+})
+
+test("partial confirmation preserves unresolved facts and rejects invented field confirmations", () => {
+  const fixture = sourceHistoryRows(), row = fixture.data[1]!
+  const parse = (confirmedFields: unknown) => parseHistoryRows({ ...fixture, data: [{ ...row, confirmedFields }] }, scope)
+  const partial = parse(["quantity"]).data[0]!
+  assert.equal(partial.state, "needs_review")
+  assert.deepEqual(partial.confirmedFields, ["quantity"])
+  assert.equal(partial.values.business_date, null)
+  for (const invalid of [["made_up_field"], ["quantity", "quantity"], "quantity", null])
+    assert.throws(() => parse(invalid), /invalid data/)
+})

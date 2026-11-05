@@ -63,6 +63,7 @@ import {
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
 import { resetHistoryQueries } from "./history-data"
+import { sourceHistoryLink } from "./source-observation"
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(url, init)
@@ -588,9 +589,14 @@ function ReviewWorkspace({
             </p>
           ) : null}
           {allowImport && !["product", "stock_location", "contact"].includes(detail.data.targetEntity) ? (
-            <p className="text-sm text-muted-foreground">
-              {t("settings.importReview.moduleSpecific")}
-            </p>
+            <div className="space-y-2 text-sm">
+              <p className="text-muted-foreground">
+                {t("settings.importReview.historicalFacts", { defaultValue: "Confirm the source values you know, even when other facts remain unresolved. Confirmed facts are available in source history. Business documents and current balances require their own complete import." })}
+              </p>
+              {!selected && !unavailable ? <a className="font-medium underline underline-offset-4" href={sourceHistoryLink(companyId, detail.data.id)}>
+                {t("settings.importReview.viewHistoricalFacts", { defaultValue: "View confirmed historical facts" })}
+              </a> : null}
+            </div>
           ) : null}
           <p className="text-sm" role="status">
             {t("settings.importReview.grouped.summary", {

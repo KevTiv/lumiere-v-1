@@ -6,6 +6,9 @@ from pathlib import Path
 import tempfile
 import unittest
 import csv
+import sys
+
+sys.path.insert(0, str(Path(__file__).parents[1]))
 
 spec = importlib.util.spec_from_file_location("farm_preflight", Path(__file__).parents[1] / "farm-history-preflight.py")
 module = importlib.util.module_from_spec(spec)
@@ -63,9 +66,9 @@ class PreflightTests(unittest.TestCase):
             output = root / "output"
             with contextlib.redirect_stdout(io.StringIO()):
                 module.prepare(source, output)
-                first = {p.name: p.read_bytes() for p in output.iterdir()}
+                first = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()}
                 module.prepare(source, output)
-            self.assertEqual(first, {p.name: p.read_bytes() for p in output.iterdir()})
+            self.assertEqual(first, {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()})
             summary = json.loads((output / "import-proposal.json").read_text())["summary"]
             self.assertEqual(summary["unique_audit_datasets"], 1)
             self.assertEqual(summary["duplicate_audit_datasets"], 1)

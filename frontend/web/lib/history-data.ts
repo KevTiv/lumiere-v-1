@@ -61,6 +61,7 @@ export interface HistoryRow {
   fields: Array<{ key: string; label: string; sourceValue: string | null }>
   state: HistoryReviewState
   revision: number
+  confirmedFields?: string[]
   businessDate: {
     precision: "day" | "month" | "year" | "interval" | "undated" | "invalid"
     from: string | null
@@ -81,6 +82,7 @@ export interface HistoryFilters {
   timeZone: string
   dateMode: HistoryDateMode
   state: HistoryReviewState | "all"
+  verifiedOnly?: boolean
 }
 
 type JsonValue = null | boolean | number | string | JsonValue[] | JsonObject
@@ -209,12 +211,16 @@ export function parseHistoryRows(value: unknown, scope: HistoryScope, snapshot?:
       return { key: nonempty(field.key), label: text(field.label), sourceValue: field.sourceValue == null ? null : text(field.sourceValue) }
     })
     if (new Set(fields.map((field) => field.key)).size !== fields.length) malformed()
+    const confirmedFields = row.confirmedFields === undefined ? [] : array(row.confirmedFields, nonempty)
+    if (new Set(confirmedFields).size !== confirmedFields.length
+      || confirmedFields.some((key) => !fields.some((field) => field.key === key))) malformed()
     return {
       id: id(row.id), batchId: id(row.batchId), title: text(row.title), targetEntity: nonempty(row.targetEntity),
       sourceFile: text(row.sourceFile), label: text(row.label),
       source: { file: text(source.file), row: count(source.row), sha256: text(source.sha256), ...(source.rowBasis === undefined ? {} : { rowBasis: text(source.rowBasis) }) },
       values: Object.fromEntries(Object.entries(object(row.values)).map(([key, value]) => [key, nullableText(value)])), fields,
       state: oneOf(row.state, ["needs_review", "confirmed", "excluded"]), revision: count(row.revision),
+      confirmedFields,
       businessDate: { precision, from, toExclusive, raw: nullableText(businessDate.raw), basis: text(businessDate.basis) }, issue: text(row.issue),
     }
   })
@@ -249,6 +255,7 @@ export function historyRowsUrl(companyId: number, filters: HistoryFilters, curso
   params.set("dateMode", filters.dateMode)
   if (filters.batchId !== null) params.set("batchId", id(filters.batchId))
   if (filters.state !== "all") params.set("state", filters.state)
+  if (filters.verifiedOnly) params.set("verifiedOnly", "true")
   if (filters.dateMode !== "undated" && filters.dateMode !== "invalid") {
     const { from, through } = historyPeriodDates(filters.period, { timeZone: filters.timeZone })
     if (from !== null) params.set("from", from)

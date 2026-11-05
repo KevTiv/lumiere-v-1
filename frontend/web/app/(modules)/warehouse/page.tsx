@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
 import { InventoryClient } from "../inventory/inventory-client";
+import { SourceHistoryLink } from "@/components/source-history-link";
 
 const WAREHOUSE_RESOURCES = [
   "products", "stock-quants", "stock-pickings", "warehouses",
@@ -17,20 +18,23 @@ export default async function WarehousePage() {
     await serverPrefetchQueryLists(session, WAREHOUSE_RESOURCES);
 
   return (
-    <InventoryClient
-      workspace="warehouse"
-      organizationId={session.organizationId}
-      initialProducts={products}
-      initialStockQuants={stockQuants}
-      initialTransfers={transfers}
-      initialWarehouses={warehouses}
-      initialAdjustments={adjustments}
-      initialUoms={uoms}
-      initialStockLocations={locations}
-      initialStockCycleCounts={cycleCounts}
-      initialStockMoves={stockMoves}
-      initialReplenishmentRules={replenishmentRules}
-      initialStockProductionSerials={serials}
-    />
+    <>
+      <SourceHistoryLink organizationId={session.organizationId} />
+      <InventoryClient
+        workspace="warehouse"
+        organizationId={session.organizationId}
+        initialProducts={products}
+        initialStockQuants={stockQuants}
+        initialTransfers={transfers}
+        initialWarehouses={warehouses}
+        initialAdjustments={adjustments}
+        initialUoms={uoms}
+        initialStockLocations={locations}
+        initialStockCycleCounts={cycleCounts}
+        initialStockMoves={stockMoves}
+        initialReplenishmentRules={replenishmentRules}
+        initialStockProductionSerials={serials}
+      />
+    </>
   );
 }
