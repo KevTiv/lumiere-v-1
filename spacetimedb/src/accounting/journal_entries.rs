@@ -3,6 +3,7 @@
 /// # 7.2 Journal Entries
 ///
 /// Tables for accounting journal entries and move lines.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::budgeting::{
@@ -25,9 +26,7 @@ use crate::core::business_changes::{capture_business_change, BusinessChangeInput
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
-use crate::helpers::{
-    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
-};
+use crate::helpers::{calculate_tax, check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::stock_quant;
 use crate::projects::milestones::{project_milestone, ProjectMilestone};
@@ -915,9 +914,10 @@ pub fn compute_invoice_totals(
 
     compute_invoice_totals_internal(ctx, organization_id, move_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "compute_invoice_totals",
         AuditLogParams {
             company_id: Some(move_record.company_id),
             table_name: "account_move",
@@ -932,7 +932,7 @@ pub fn compute_invoice_totals(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1317,9 +1317,10 @@ pub fn post_invoice(
         ..refreshed
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_invoice",
         AuditLogParams {
             company_id: Some(move_record.company_id),
             table_name: "account_move",
@@ -1330,7 +1331,7 @@ pub fn post_invoice(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     if move_record.move_type == MoveType::OutInvoice {
         if let Some(sale_order_id) = move_record.sale_order_id {
@@ -1456,9 +1457,10 @@ pub fn create_account_move(
         metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_move",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -1471,7 +1473,7 @@ pub fn create_account_move(
             changed_fields: vec!["move_type".to_string(), "date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -2164,9 +2166,10 @@ pub fn create_manual_invoice(
         return Err("manual invoice persisted totals do not match derived totals".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_manual_invoice",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "account_move",
@@ -2186,7 +2189,7 @@ pub fn create_manual_invoice(
             changed_fields: vec!["lines".to_string(), "amount_total".to_string()],
             metadata: None,
         },
-    );
+    )?;
     record_result(
         ctx,
         organization_id,
@@ -2558,9 +2561,10 @@ pub fn post_account_move_impl(
         ..move_record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_account_move",
         AuditLogParams {
             company_id: Some(move_record.company_id),
             table_name: "account_move",
@@ -2571,7 +2575,7 @@ pub fn post_account_move_impl(
             changed_fields: vec!["state".to_string(), "posted_before".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     // Auto-sync budget actuals for lines that carry an analytic account
     let move_date = move_record.date;
@@ -2704,9 +2708,10 @@ pub fn cancel_account_move(
         ..move_record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_account_move",
         AuditLogParams {
             company_id: Some(move_record.company_id),
             table_name: "account_move",
@@ -2717,7 +2722,7 @@ pub fn cancel_account_move(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2779,9 +2784,10 @@ pub fn reset_account_move_to_draft(
         ..move_record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reset_account_move_to_draft",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -2792,7 +2798,7 @@ pub fn reset_account_move_to_draft(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3148,7 +3154,8 @@ fn correct_po_bill_line(
     crate::purchasing::purchase_orders::persist_line_match_state(ctx, &po, source);
     crate::purchasing::purchase_orders::refresh_po_invoice_status(ctx, organization_id, po.id)?;
     compute_invoice_totals_internal(ctx, organization_id, bill.id)?;
-    write_audit_log_v2(ctx, organization_id, AuditLogParams { company_id: Some(bill.company_id), table_name: "account_move_line", record_id: updated.id, action: "CORRECT_ECONOMICS", old_values: Some(before.to_string()), new_values: Some(serde_json::json!({"quantity": quantity, "price_unit": price, "subtotal": subtotal, "total": total}).to_string()), changed_fields: vec!["quantity".into(), "price_unit".into(), "price_subtotal".into()], metadata: Some(serde_json::json!({"currency_id": bill.currency_id, "company_currency_id": bill.company_currency_id, "fx_rate": fx, "discount": updated.discount, "tax_ids": updated.tax_ids}).to_string()) });
+    write_business_audit(ctx, organization_id,
+        "update_account_move_line", AuditLogParams { company_id: Some(bill.company_id), table_name: "account_move_line", record_id: updated.id, action: "CORRECT_ECONOMICS", old_values: Some(before.to_string()), new_values: Some(serde_json::json!({"quantity": quantity, "price_unit": price, "subtotal": subtotal, "total": total}).to_string()), changed_fields: vec!["quantity".into(), "price_unit".into(), "price_subtotal".into()], metadata: Some(serde_json::json!({"currency_id": bill.currency_id, "company_currency_id": bill.company_currency_id, "fx_rate": fx, "discount": updated.discount, "tax_ids": updated.tax_ids}).to_string()) })?;
     Ok(())
 }
 
@@ -3603,9 +3610,10 @@ pub fn delete_account_move_line(
 
     ctx.db.account_move_line().id().delete(&line_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_account_move_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move_line",
@@ -3623,7 +3631,7 @@ pub fn delete_account_move_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3913,9 +3921,10 @@ pub fn create_invoice_from_sale_order(
             ..order
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_invoice_from_sale_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -3937,7 +3946,7 @@ pub fn create_invoice_from_sale_order(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     let committed_order = ctx
         .db
@@ -4584,9 +4593,10 @@ pub fn create_bill_from_purchase_order(
         purchase_order_id,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_bill_from_purchase_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -4626,7 +4636,7 @@ pub fn create_bill_from_purchase_order(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Created bill {} for purchase order {}",
@@ -4916,9 +4926,10 @@ pub fn create_credit_note_from_invoice(
         ..credit_note.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_credit_note_from_invoice",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -4941,7 +4952,7 @@ pub fn create_credit_note_from_invoice(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Created credit note {} from invoice {}",
@@ -5235,9 +5246,10 @@ pub(super) fn reconcile_payment_with_invoice_impl(
         ..payment_move
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reconcile_payment_with_invoice",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -5254,7 +5266,7 @@ pub(super) fn reconcile_payment_with_invoice_impl(
             changed_fields: vec!["payment_state".to_string(), "amount_residual".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Reconciled payment {} against invoice {}",
@@ -5573,9 +5585,10 @@ pub fn bill_timesheets(
         });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "bill_timesheets",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -5602,7 +5615,7 @@ pub fn bill_timesheets(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     refresh_project_margin_for_projects(ctx, organization_id, company_id, project_ids);
 
@@ -5849,9 +5862,10 @@ pub fn bill_project_milestone(
         ..milestone
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "bill_project_milestone",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -5876,7 +5890,7 @@ pub fn bill_project_milestone(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     refresh_project_margin_for_projects(ctx, organization_id, company_id, [project_id]);
 

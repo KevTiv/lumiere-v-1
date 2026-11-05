@@ -2,6 +2,7 @@
 mod access_lifecycle_test;
 pub mod bootstrap_commit_test;
 pub mod chatter_post_message_test;
+mod native_history_test;
 pub mod operational_messaging_test;
 pub mod permissions_tests;
 pub mod queue_tests;
@@ -11,6 +12,7 @@ use spacetimedb::ReducerContext;
 
 #[spacetimedb::reducer]
 pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
+    native_history_test::test_native_audit_capture(ctx)?;
     run_core_operational_messaging_test(ctx)?;
     run_core_chatter_post_message_test(ctx)?;
     run_core_sod_test(ctx)?;

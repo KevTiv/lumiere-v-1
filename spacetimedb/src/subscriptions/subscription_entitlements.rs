@@ -2,7 +2,8 @@
 
 use super::GrantSubscriptionEntitlementParams;
 use super::{subscription_entitlement, SubscriptionEntitlement};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::business_changes::write_business_audit;
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use spacetimedb::{ReducerContext, Table};
 
@@ -57,9 +58,10 @@ pub fn grant_subscription_entitlement(
             created_by: ctx.sender(),
             metadata: params.metadata.unwrap_or_default(),
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "grant_subscription_entitlement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_entitlement",
@@ -73,7 +75,7 @@ pub fn grant_subscription_entitlement(
             changed_fields: vec!["feature_code".to_string(), "status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -102,9 +104,10 @@ pub fn revoke_subscription_entitlement(
             revoked_at: Some(ctx.timestamp),
             ..row.clone()
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "revoke_subscription_entitlement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_entitlement",
@@ -115,6 +118,6 @@ pub fn revoke_subscription_entitlement(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

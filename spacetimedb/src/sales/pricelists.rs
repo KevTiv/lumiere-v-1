@@ -1,11 +1,13 @@
+use crate::core::business_changes::write_business_audit;
 /// Pricelists — ProductPricelist & ProductPricelistItem
 ///
 /// Backs the `pricelist_id` foreign key on SaleOrder, Product, Opportunity,
 /// POSConfig, POSTransaction, SubscriptionTemplate, and IntercompanyRule.
+use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::{ComputePrice, DiscountPolicy, PricelistAppliedOn};
 
@@ -189,9 +191,10 @@ pub fn create_pricelist(
         is_active: true,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_pricelist",
         AuditLogParams {
             company_id: None,
             table_name: "product_pricelist",
@@ -202,7 +205,7 @@ pub fn create_pricelist(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -226,6 +229,7 @@ pub fn update_pricelist(
     if pl.organization_id != organization_id {
         return Err("Pricelist belongs to a different organization".to_string());
     }
+    let history_before = native_row_snapshot(&pl)?;
     ctx.db.product_pricelist().id().update(ProductPricelist {
         name: name.unwrap_or(pl.name.clone()),
         currency_id: currency_id.unwrap_or(pl.currency_id),
@@ -233,6 +237,29 @@ pub fn update_pricelist(
         is_active: is_active.unwrap_or(pl.is_active),
         ..pl
     });
+
+    let history_after = ctx
+        .db
+        .product_pricelist()
+        .id()
+        .find(&pricelist_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "update_pricelist",
+        AuditLogParams {
+            company_id: pl.company_id,
+            table_name: "product_pricelist",
+            record_id: pricelist_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -264,6 +291,22 @@ pub fn delete_pricelist(
     for iid in item_ids {
         ctx.db.product_pricelist_item().id().delete(&iid);
     }
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "delete_pricelist",
+        AuditLogParams {
+            company_id: pl.company_id,
+            table_name: "product_pricelist",
+            record_id: pricelist_id,
+            action: "DELETE",
+            old_values: Some(native_row_snapshot(&pl)?),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -285,7 +328,8 @@ pub fn create_pricelist_item(
     if pl.organization_id != organization_id {
         return Err("Pricelist belongs to a different organization".to_string());
     }
-    ctx.db
+    let history_created = ctx
+        .db
         .product_pricelist_item()
         .insert(ProductPricelistItem {
             id: 0,
@@ -307,6 +351,22 @@ pub fn create_pricelist_item(
             price_max_margin: params.price_max_margin,
             sequence: params.sequence,
         });
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "create_pricelist_item",
+        AuditLogParams {
+            company_id: pl.company_id,
+            table_name: "product_pricelist_item",
+            record_id: history_created.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(native_row_snapshot(&history_created)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -333,5 +393,21 @@ pub fn delete_pricelist_item(
         return Err("Pricelist belongs to a different organization".to_string());
     }
     ctx.db.product_pricelist_item().id().delete(&item_id);
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "delete_pricelist_item",
+        AuditLogParams {
+            company_id: pl.company_id,
+            table_name: "product_pricelist_item",
+            record_id: item_id,
+            action: "DELETE",
+            old_values: Some(native_row_snapshot(&item)?),
+            new_values: None,
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }

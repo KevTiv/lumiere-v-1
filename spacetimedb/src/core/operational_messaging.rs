@@ -3,6 +3,7 @@
 /// v1 records template-controlled copy actions and queued intents. It does not
 /// claim direct WhatsApp/SMS delivery; delivery attempts are appended later by
 /// provider adapters.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
@@ -10,7 +11,7 @@ use crate::core::business_changes::{capture_business_change, BusinessChangeInput
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contact_identities::contact_phone_identity;
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{
     AccountMoveState, ContactVerificationState, MessageBatchStatus, MessageChannel, MoveType,
     OperationalMessageStatus,
@@ -636,9 +637,10 @@ pub fn create_message_template(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_message_template",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "message_template",
@@ -649,7 +651,7 @@ pub fn create_message_template(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -690,9 +692,10 @@ pub fn update_message_template(
         ..template
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_message_template",
         AuditLogParams {
             company_id: template.company_id,
             table_name: "message_template",
@@ -703,7 +706,7 @@ pub fn update_message_template(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -797,9 +800,10 @@ pub fn create_operational_message(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_operational_message",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "operational_message",
@@ -810,7 +814,7 @@ pub fn create_operational_message(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -861,9 +865,10 @@ pub fn record_message_copied(
             ..message
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_message_copied",
         AuditLogParams {
             company_id: message.company_id,
             table_name: "operational_message",
@@ -874,7 +879,7 @@ pub fn record_message_copied(
             changed_fields: vec!["status".to_string(), "copied_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1065,9 +1070,10 @@ pub fn create_invoice_reminder_batch(
 
     capture_invoice_reminder_batch_creation(ctx, &batch)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_invoice_reminder_batch",
         AuditLogParams {
             company_id: batch.company_id,
             table_name: "message_batch",
@@ -1081,7 +1087,7 @@ pub fn create_invoice_reminder_batch(
             changed_fields: vec!["status".to_string(), "recipient_count".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1201,9 +1207,10 @@ pub fn create_message_batch(
 
     capture_message_batch_creation(ctx, &batch)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_message_batch",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "message_batch",
@@ -1214,7 +1221,7 @@ pub fn create_message_batch(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1358,9 +1365,10 @@ pub fn review_message_batch(
         ..batch
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "review_message_batch",
         AuditLogParams {
             company_id: batch.company_id,
             table_name: "message_batch",
@@ -1371,7 +1379,7 @@ pub fn review_message_batch(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1424,9 +1432,10 @@ pub fn cancel_message_batch(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_message_batch",
         AuditLogParams {
             company_id: batch.company_id,
             table_name: "message_batch",
@@ -1437,7 +1446,7 @@ pub fn cancel_message_batch(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1508,9 +1517,10 @@ pub fn set_contact_communication_preference(
             });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_contact_communication_preference",
         AuditLogParams {
             company_id,
             table_name: "contact_communication_preference",
@@ -1521,6 +1531,6 @@ pub fn set_contact_communication_preference(
             changed_fields: vec!["opted_in".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

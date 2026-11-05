@@ -9,12 +9,13 @@
 /// - `CrossoveredBudget` — Budget header with date range and state
 /// - `CrossoveredBudgetLines` — Budget line items with planned vs actual amounts
 /// - `BudgetPost` — Budget positions for categorization
+use crate::core::business_changes::write_business_audit;
 use std::collections::HashSet;
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::{require_active_account, require_explicit_company_id};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::projects::projects::project_project;
 use crate::types::BudgetState;
 
@@ -247,9 +248,10 @@ pub fn create_crossovered_budget(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_crossovered_budget",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "crossovered_budget",
@@ -271,7 +273,7 @@ pub fn create_crossovered_budget(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -360,9 +362,10 @@ pub fn update_crossovered_budget(
 
     ctx.db.crossovered_budget().id().update(budget.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_crossovered_budget",
         AuditLogParams {
             company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
@@ -373,7 +376,7 @@ pub fn update_crossovered_budget(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -463,9 +466,10 @@ pub fn create_budget_line(
 
     ctx.db.crossovered_budget().id().update(budget);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_budget_line",
         AuditLogParams {
             company_id: Some(budget_company_id),
             table_name: "crossovered_budget_lines",
@@ -479,7 +483,7 @@ pub fn create_budget_line(
             changed_fields: vec!["budget_id".to_string(), "planned_amount".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -593,9 +597,10 @@ pub fn update_budget_line(
 
     ctx.db.crossovered_budget().id().update(budget);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_budget_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "crossovered_budget_lines",
@@ -608,7 +613,7 @@ pub fn update_budget_line(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -717,9 +722,10 @@ pub fn confirm_budget(
         ..budget.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_budget",
         AuditLogParams {
             company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
@@ -730,7 +736,7 @@ pub fn confirm_budget(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -766,9 +772,10 @@ pub fn validate_budget(
         ..budget.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "validate_budget",
         AuditLogParams {
             company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
@@ -779,7 +786,7 @@ pub fn validate_budget(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -815,9 +822,10 @@ pub fn done_budget(
         ..budget.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "done_budget",
         AuditLogParams {
             company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
@@ -828,7 +836,7 @@ pub fn done_budget(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -864,9 +872,10 @@ pub fn cancel_budget(
         ..budget.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_budget",
         AuditLogParams {
             company_id: Some(budget.company_id),
             table_name: "crossovered_budget",
@@ -877,7 +886,7 @@ pub fn cancel_budget(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -920,9 +929,10 @@ pub fn create_budget_post(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_budget_post",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "budget_post",
@@ -933,7 +943,7 @@ pub fn create_budget_post(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1011,9 +1021,10 @@ pub fn update_budget_post(
 
     ctx.db.budget_post().id().update(post.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_budget_post",
         AuditLogParams {
             company_id: Some(post.company_id),
             table_name: "budget_post",
@@ -1024,7 +1035,7 @@ pub fn update_budget_post(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1070,9 +1081,10 @@ pub fn delete_budget_line(
     ctx.db.crossovered_budget().id().update(budget);
     ctx.db.crossovered_budget_lines().id().delete(&line_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_budget_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "crossovered_budget_lines",
@@ -1085,7 +1097,7 @@ pub fn delete_budget_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

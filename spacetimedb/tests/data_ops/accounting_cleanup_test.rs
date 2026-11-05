@@ -155,7 +155,7 @@ fn seed_abandoned_parent(
             write_date: Some(job.started_at),
             metadata: Some(metadata),
         });
-        record_import_created_id(ctx, job.id, "account_move", created.id, row as u32 + 2);
+        record_import_created_id(ctx, job.id, "account_move", created.id, row as u32 + 2)?;
         move_ids.push(created.id);
     }
     job = stamp_account_move_bundle_job(job, "parent", &token, None)?;

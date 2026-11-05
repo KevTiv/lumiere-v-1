@@ -111,7 +111,7 @@ fn require_exact_row(row: &Value, org: u64, company: u64, id: u64) -> Result<(),
     Ok(())
 }
 
-pub(super) async fn read(
+pub(crate) async fn read(
     owner: &StdbClient,
     context: &TrustedOperationContext,
     requested_company: u64,

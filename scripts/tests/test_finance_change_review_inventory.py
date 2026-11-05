@@ -65,6 +65,15 @@ pub fn capture_thing(ctx: &ReducerContext) -> Result<(), String> {
         self.assertFalse(signal["trusted_capture_call"])
         self.assertEqual(signal["parameter_products"], [])
 
+    def test_new_native_audit_adapters_are_trusted_but_material_coverage_stays_partial(self):
+        for helper in ("write_business_audit", "write_private_business_audit"):
+            signal = inventory.source_signals({"body": f"{helper}(ctx, org, operation, params)?;", "signature": ""}, {})
+            self.assertTrue(signal["audit_call"])
+            self.assertTrue(signal["trusted_capture_call"])
+            self.assertEqual(signal["capture_coverage"], "partial-control-flow-owner-review-required")
+            self.assertFalse(signal["old_values_recorded"])
+            self.assertFalse(signal["new_values_recorded"])
+
     def test_pos_is_not_admitted_just_because_sales_is_visible(self):
         contract = {"evidence": "sales/pos_config.rs: mutation", "client_facing": True}
         self.assertEqual(inventory.modules_for("create_pos_config", contract, self.census), [])

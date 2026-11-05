@@ -1,4 +1,5 @@
 /// FX revaluation — post unrealized currency adjustments (A10).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{account_journal, AccountAccount, AccountJournal};
@@ -11,7 +12,7 @@ use crate::accounting::payments::account_payment;
 use crate::accounting::relations::require_active_account;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::reference::require_currency_by_id;
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountMoveState, JournalType, PaymentState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -529,9 +530,10 @@ fn run_fx_revaluation_impl(
         metadata: params.metadata.clone(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "run_fx_revaluation",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fx_revaluation_run",
@@ -565,7 +567,7 @@ fn run_fx_revaluation_impl(
             ],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     Ok(run.id)
 }
@@ -950,9 +952,10 @@ pub fn post_realized_fx_gain_loss(
         );
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_realized_fx_gain_loss",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -970,7 +973,7 @@ pub fn post_realized_fx_gain_loss(
             changed_fields: vec!["difference".to_string()],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     record_result(
         ctx,

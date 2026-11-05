@@ -6,6 +6,8 @@
 **Scope authority:** [Finance alpha navigation](../plan/finance-alpha-navigation-status.md), confirmed by `PRODUCT_SURFACES` in `frontend/packages/ui/src/lib/product-surface-catalog.ts`.
 **Related:** [ChangeSet architecture](offline-changeset-sync.md), [Finance work boards](../plan/module-work-boards-alpha.md), [Accounting alpha contracts](../ACCOUNTING_ALPHA_GAPS.md), [trusted operation context](audit-auth-operation-context-plan.md).
 
+**Alpha-wide history scope:** [ERP history and source tracing across the current alpha](alpha-erp-history-and-sources.md) expands committed history and provenance coverage to all current alpha modules and supporting surfaces. The proposal, review and application work described here remains a separate implementation track.
+
 ## Product outcome
 
 Finance alpha users can inspect who changed a record, compare before and after values, propose an update, review its consequences, and follow its approval and actual result. The seven included modules are **Accounting, Sales, CRM, Purchasing, Reports, Subscriptions and Expenses**. Documents, Approvals, Tasks and the existing Finance workspace provide supporting entry points.

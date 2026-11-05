@@ -6,19 +6,20 @@
 ///   - QualityAlertReason
 ///   - QualityPoint
 ///   - QualityTeam
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::stock::{
     ensure_lot_for_product, quarantine_quantity, require_picking_in_company,
     require_product_in_org, stock_picking, stock_quant,
 };
 use crate::inventory::warehouse::warehouse;
+use crate::manufacturing::effects::ManufacturingEffectSnapshot;
 use crate::manufacturing::manufacturing_orders::{
     mrp_workorder, require_workorder_execution_scope, MrpWorkorder,
 };
-use crate::manufacturing::effects::ManufacturingEffectSnapshot;
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -377,9 +378,10 @@ pub fn create_quality_check(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_quality_check",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_check",
@@ -397,7 +399,7 @@ pub fn create_quality_check(
             changed_fields: vec!["name".to_string(), "test_type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -416,15 +418,18 @@ pub fn create_workorder_quality_check(
     if name.trim().is_empty() {
         return Err("Check name cannot be empty".to_string());
     }
-    let (wo, mo) = require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
+    let (wo, mo) =
+        require_workorder_execution_scope(ctx, organization_id, company_id, workorder_id)?;
     if wo.state != crate::types::WorkorderState::Progress {
         return Err("Work order must be in Progress to require quality".to_string());
     }
-    if !wo.check_ids.is_empty() || ctx.db.quality_check().iter().any(|check| {
-        check.organization_id == organization_id
-            && check.company_id == company_id
-            && check.workorder_id == Some(workorder_id)
-    }) {
+    if !wo.check_ids.is_empty()
+        || ctx.db.quality_check().iter().any(|check| {
+            check.organization_id == organization_id
+                && check.company_id == company_id
+                && check.workorder_id == Some(workorder_id)
+        })
+    {
         return Err("Work order already has a quality check".to_string());
     }
     let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
@@ -477,12 +482,24 @@ pub fn create_workorder_quality_check(
         write_date: ctx.timestamp,
         ..wo
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id), table_name: "quality_check", record_id: row.id,
-        action: "CREATE", old_values: None,
-        new_values: Some(serde_json::json!({"workorder_id": workorder_id, "production_id": mo.id}).to_string()),
-        changed_fields: vec!["workorder_id".to_string(), "production_id".to_string()], metadata: None,
-    });
+    write_business_audit(
+        ctx,
+        organization_id,
+        "create_workorder_quality_check",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "quality_check",
+            record_id: row.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({"workorder_id": workorder_id, "production_id": mo.id})
+                    .to_string(),
+            ),
+            changed_fields: vec!["workorder_id".to_string(), "production_id".to_string()],
+            metadata: None,
+        },
+    )?;
     effects.record(ctx, "erp.create_workorder_quality_check")?;
     Ok(())
 }
@@ -491,9 +508,14 @@ fn manufacturing_quality_effects(
     ctx: &ReducerContext,
     check: &QualityCheck,
 ) -> Result<Option<ManufacturingEffectSnapshot>, String> {
-    let Some(workorder_id) = check.workorder_id else { return Ok(None); };
+    let Some(workorder_id) = check.workorder_id else {
+        return Ok(None);
+    };
     let (wo, mo) = require_workorder_execution_scope(
-        ctx, check.organization_id, check.company_id, workorder_id,
+        ctx,
+        check.organization_id,
+        check.company_id,
+        workorder_id,
     )?;
     if check.production_id != Some(mo.id) || !wo.check_ids.contains(&check.id) {
         return Err("Quality check does not match workorder ownership".to_string());
@@ -501,9 +523,20 @@ fn manufacturing_quality_effects(
     Ok(Some(ManufacturingEffectSnapshot::capture(ctx, &mo)?))
 }
 
-fn sync_workorder_quality(ctx: &ReducerContext, check: &QualityCheck, state: &str) -> Result<(), String> {
-    let Some(workorder_id) = check.workorder_id else { return Ok(()); };
-    let (wo, mo) = require_workorder_execution_scope(ctx, check.organization_id, check.company_id, workorder_id)?;
+fn sync_workorder_quality(
+    ctx: &ReducerContext,
+    check: &QualityCheck,
+    state: &str,
+) -> Result<(), String> {
+    let Some(workorder_id) = check.workorder_id else {
+        return Ok(());
+    };
+    let (wo, mo) = require_workorder_execution_scope(
+        ctx,
+        check.organization_id,
+        check.company_id,
+        workorder_id,
+    )?;
     if wo.state != crate::types::WorkorderState::Progress {
         return Err("Work order must be in Progress for quality disposition".to_string());
     }
@@ -530,7 +563,12 @@ pub fn fail_workorder_quality_check(
     note: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "quality_check", "write")?;
-    let check = ctx.db.quality_check().id().find(&check_id).ok_or("Quality check not found")?;
+    let check = ctx
+        .db
+        .quality_check()
+        .id()
+        .find(&check_id)
+        .ok_or("Quality check not found")?;
     if check.organization_id != organization_id || check.company_id != company_id {
         return Err("Quality check does not belong to this company".to_string());
     }
@@ -546,16 +584,31 @@ pub fn fail_workorder_quality_check(
     let effects = manufacturing_quality_effects(ctx, &check)?;
     sync_workorder_quality(ctx, &check, "fail")?;
     ctx.db.quality_check().id().update(QualityCheck {
-        quality_state: "fail".to_string(), status: "completed".to_string(),
-        is_failed: true, note: Some(note), check_date: Some(ctx.timestamp),
-        write_date: ctx.timestamp, ..check
+        quality_state: "fail".to_string(),
+        status: "completed".to_string(),
+        is_failed: true,
+        note: Some(note),
+        check_date: Some(ctx.timestamp),
+        write_date: ctx.timestamp,
+        ..check
     });
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
-        company_id: Some(company_id), table_name: "quality_check", record_id: check_id,
-        action: "UPDATE", old_values: None,
-        new_values: Some(serde_json::json!({"quality_state": "fail", "status": "completed"}).to_string()),
-        changed_fields: vec!["quality_state".to_string(), "status".to_string()], metadata: None,
-    });
+    write_business_audit(
+        ctx,
+        organization_id,
+        "fail_workorder_quality_check",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "quality_check",
+            record_id: check_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({"quality_state": "fail", "status": "completed"}).to_string(),
+            ),
+            changed_fields: vec!["quality_state".to_string(), "status".to_string()],
+            metadata: None,
+        },
+    )?;
     if let Some(effects) = effects {
         effects.record(ctx, "erp.fail_workorder_quality_check")?;
     }
@@ -595,9 +648,10 @@ pub fn start_quality_check(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "start_quality_check",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_check",
@@ -608,7 +662,7 @@ pub fn start_quality_check(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -674,9 +728,10 @@ pub fn pass_quality_check(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "pass_quality_check",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_check",
@@ -698,7 +753,7 @@ pub fn pass_quality_check(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     if let Some(effects) = effects {
         effects.record(ctx, "erp.pass_quality_check")?;
@@ -792,9 +847,10 @@ pub fn fail_quality_check(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "fail_quality_check",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_check",
@@ -819,7 +875,7 @@ pub fn fail_quality_check(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     crate::inventory::exceptions::record_open_qc_exception(
         ctx,
@@ -993,9 +1049,10 @@ pub fn create_quality_alert(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_quality_alert",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_alert",
@@ -1013,7 +1070,7 @@ pub fn create_quality_alert(
             changed_fields: vec!["title".to_string(), "priority".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1051,9 +1108,10 @@ pub fn open_quality_alert(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "open_quality_alert",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_alert",
@@ -1064,7 +1122,7 @@ pub fn open_quality_alert(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1101,9 +1159,10 @@ pub fn assign_quality_alert(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "assign_quality_alert",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_alert",
@@ -1114,7 +1173,7 @@ pub fn assign_quality_alert(
             changed_fields: vec!["state".to_string(), "user_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1155,9 +1214,10 @@ pub fn solve_quality_alert(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "solve_quality_alert",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_alert",
@@ -1168,7 +1228,7 @@ pub fn solve_quality_alert(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1209,9 +1269,10 @@ pub fn cancel_quality_alert(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_quality_alert",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_alert",
@@ -1222,7 +1283,7 @@ pub fn cancel_quality_alert(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1253,9 +1314,10 @@ pub fn create_quality_alert_reason(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_quality_alert_reason",
         AuditLogParams {
             company_id: None, // QualityAlertReason has no company_id
             table_name: "quality_alert_reason",
@@ -1266,7 +1328,7 @@ pub fn create_quality_alert_reason(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1301,9 +1363,10 @@ pub fn update_quality_alert_reason(
             ..record
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_quality_alert_reason",
         AuditLogParams {
             company_id: None,
             table_name: "quality_alert_reason",
@@ -1314,7 +1377,7 @@ pub fn update_quality_alert_reason(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1340,9 +1403,10 @@ pub fn delete_quality_alert_reason(
 
     ctx.db.quality_alert_reason().id().delete(&reason_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_quality_alert_reason",
         AuditLogParams {
             company_id: None,
             table_name: "quality_alert_reason",
@@ -1353,7 +1417,7 @@ pub fn delete_quality_alert_reason(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1402,9 +1466,10 @@ pub fn create_quality_point(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_quality_point",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_point",
@@ -1421,7 +1486,7 @@ pub fn create_quality_point(
             changed_fields: vec!["name".to_string(), "test_type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1465,9 +1530,10 @@ pub fn update_quality_point(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_quality_point",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_point",
@@ -1478,7 +1544,7 @@ pub fn update_quality_point(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1513,9 +1579,10 @@ pub fn delete_quality_point(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_quality_point",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "quality_point",
@@ -1526,7 +1593,7 @@ pub fn delete_quality_point(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1562,9 +1629,10 @@ pub fn create_quality_team(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_quality_team",
         AuditLogParams {
             company_id: None, // QualityTeam has no company_id
             table_name: "quality_team",
@@ -1575,7 +1643,7 @@ pub fn create_quality_team(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1610,9 +1678,10 @@ pub fn update_quality_team(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_quality_team",
         AuditLogParams {
             company_id: None,
             table_name: "quality_team",
@@ -1623,7 +1692,7 @@ pub fn update_quality_team(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1661,9 +1730,10 @@ pub fn add_member_to_quality_team(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_member_to_quality_team",
         AuditLogParams {
             company_id: None,
             table_name: "quality_team",
@@ -1674,7 +1744,7 @@ pub fn add_member_to_quality_team(
             changed_fields: vec!["member_ids".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1708,9 +1778,10 @@ pub fn remove_member_from_quality_team(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "remove_member_from_quality_team",
         AuditLogParams {
             company_id: None,
             table_name: "quality_team",
@@ -1721,7 +1792,7 @@ pub fn remove_member_from_quality_team(
             changed_fields: vec!["member_ids".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1752,9 +1823,10 @@ pub fn delete_quality_team(
         ..record
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_quality_team",
         AuditLogParams {
             company_id: None,
             table_name: "quality_team",
@@ -1765,7 +1837,7 @@ pub fn delete_quality_team(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

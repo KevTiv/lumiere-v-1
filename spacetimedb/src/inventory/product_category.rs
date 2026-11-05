@@ -4,10 +4,11 @@
 /// | Table | Description |
 /// |-------|-------------|
 /// | **ProductCategory** | Product classification hierarchy with parent-child relationships |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::product;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -111,9 +112,10 @@ pub fn create_product_category(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_product_category",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "product_category",
@@ -130,7 +132,7 @@ pub fn create_product_category(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Product category created: id={}, name='{}', parent_id={:?}",
@@ -199,9 +201,10 @@ pub fn update_product_category(
         ..category
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_product_category",
         AuditLogParams {
             company_id: category.company_id,
             table_name: "product_category",
@@ -212,7 +215,7 @@ pub fn update_product_category(
             changed_fields: vec!["name".to_string(), "parent_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Product category updated: id={}", category_id);
     Ok(())
@@ -264,9 +267,10 @@ pub fn delete_product_category(
         ..category
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_product_category",
         AuditLogParams {
             company_id: category_company_id,
             table_name: "product_category",
@@ -277,7 +281,7 @@ pub fn delete_product_category(
             changed_fields: vec!["deleted_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Product category deleted: id={}", category_id);
     Ok(())
@@ -314,9 +318,10 @@ pub fn restore_product_category(
         ..category
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "restore_product_category",
         AuditLogParams {
             company_id: category.company_id,
             table_name: "product_category",
@@ -327,7 +332,7 @@ pub fn restore_product_category(
             changed_fields: vec!["deleted_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Product category restored: id={}", category_id);
     Ok(())

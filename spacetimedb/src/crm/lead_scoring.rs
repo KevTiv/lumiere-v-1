@@ -6,10 +6,11 @@
 ///
 /// External ML models can later append factors via workers; this reducer only
 /// computes a bounded, deterministic baseline (`formula_version`).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::crm::leads::lead;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 pub const LEAD_SCORE_FORMULA_VERSION: &str = "v1-deterministic";
 
@@ -264,9 +265,10 @@ pub fn recompute_lead_score(
         });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "recompute_lead_score",
         AuditLogParams {
             company_id: None,
             table_name: "lead_score",
@@ -285,7 +287,7 @@ pub fn recompute_lead_score(
             changed_fields: vec!["total_score".to_string(), "formula_version".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

@@ -11,6 +11,11 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use crate::core::audit::AuditLog;
 use crate::helpers::{write_audit_log_v2_returning, AuditLogParams};
 
+mod audit_adapter;
+pub(crate) use audit_adapter::{
+    native_row_snapshot, write_business_audit, write_private_business_audit,
+};
+
 pub(crate) const BUSINESS_CHANGE_SCHEMA_VERSION: u32 = 1;
 const MAX_EVIDENCE_BYTES: usize = 65_536;
 const MAX_CHANGED_FIELDS: usize = 64;
@@ -41,6 +46,34 @@ pub struct BusinessChange {
     pub after_fingerprint: String,
     /// Schema v1: JSON array of {field, before, after}. Values are strings or
     /// null, preserving full-width identifiers and decimal representations.
+    pub changes_json: String,
+    pub audit_log_id: u64,
+}
+
+/// Explicit organization-wide evidence for shared masters and configuration.
+/// This separate relation preserves the released company-owned schema without
+/// inventing a company ID for organization-wide records.
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = organization_business_change,
+    index(accessor = organization_business_change_by_organization, btree(columns = [organization_id])),
+    index(accessor = organization_business_change_by_record, btree(columns = [organization_id, resource, record_id]))
+)]
+pub struct OrganizationBusinessChange {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub resource: String,
+    pub record_id: u64,
+    pub subject_resource: String,
+    pub subject_record_id: u64,
+    pub operation: String,
+    pub actor_identity: Identity,
+    pub occurred_at: Timestamp,
+    pub schema_version: u32,
+    pub before_fingerprint: String,
+    pub after_fingerprint: String,
     pub changes_json: String,
     pub audit_log_id: u64,
 }

@@ -5,10 +5,11 @@
 /// |-------|-------------|
 /// | **KnowledgeArticleCategory** | Article categories |
 /// | **KnowledgeArticle** | Wiki articles with hierarchy and access control |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ============================================================================
 // TABLES
@@ -201,9 +202,10 @@ pub fn create_knowledge_category(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_knowledge_category",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article_category",
@@ -214,7 +216,7 @@ pub fn create_knowledge_category(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge category created: id={}", cat.id);
     Ok(())
@@ -270,9 +272,10 @@ pub fn update_knowledge_category(
 
     ctx.db.kb_category().id().update(new_cat);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_knowledge_category",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article_category",
@@ -283,7 +286,7 @@ pub fn update_knowledge_category(
             changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge category updated: id={}", category_id);
     Ok(())
@@ -388,9 +391,10 @@ pub fn create_knowledge_article(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_knowledge_article",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -401,7 +405,7 @@ pub fn create_knowledge_article(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge article created: id={}", article.id);
     Ok(())
@@ -493,9 +497,10 @@ pub fn update_knowledge_article(
 
     ctx.db.knowledge_article().id().update(new_article);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_knowledge_article",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -506,7 +511,7 @@ pub fn update_knowledge_article(
             changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge article updated: id={}", article_id);
     Ok(())
@@ -549,9 +554,10 @@ pub fn lock_knowledge_article(
         ..article
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "lock_knowledge_article",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -562,7 +568,7 @@ pub fn lock_knowledge_article(
             changed_fields: vec!["locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge article locked: id={}", article_id);
     Ok(())
@@ -605,9 +611,10 @@ pub fn unlock_knowledge_article(
         ..article
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unlock_knowledge_article",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -618,7 +625,7 @@ pub fn unlock_knowledge_article(
             changed_fields: vec!["unlocked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge article unlocked: id={}", article_id);
     Ok(())
@@ -659,9 +666,10 @@ pub fn set_article_published(
         ..article
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_article_published",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -676,7 +684,7 @@ pub fn set_article_published(
             }],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Knowledge article publish state: id={}, published={}",
@@ -727,9 +735,10 @@ pub fn add_article_member(
         ..article
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_article_member",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -740,7 +749,7 @@ pub fn add_article_member(
             changed_fields: vec!["member_added".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Member added to article: article={}, member={:?}",
@@ -795,9 +804,10 @@ pub fn remove_article_member(
         ..article
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "remove_article_member",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -808,7 +818,7 @@ pub fn remove_article_member(
             changed_fields: vec!["member_removed".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Member removed from article: article={}, member={:?}",
@@ -889,9 +899,10 @@ pub fn delete_knowledge_article(
     // Actually delete the article (not soft delete)
     ctx.db.knowledge_article().id().delete(&article_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_knowledge_article",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article",
@@ -902,7 +913,7 @@ pub fn delete_knowledge_article(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge article deleted: id={}", article_id);
     Ok(())
@@ -937,9 +948,10 @@ pub fn delete_knowledge_category(
 
     ctx.db.kb_category().id().delete(&category_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_knowledge_category",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_article_category",
@@ -950,7 +962,7 @@ pub fn delete_knowledge_category(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Knowledge category deleted: id={}", category_id);
     Ok(())

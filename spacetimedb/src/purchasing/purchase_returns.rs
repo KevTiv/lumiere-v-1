@@ -1,4 +1,5 @@
 /// Purchase returns (vendor RMA) — create → confirm (OUT picking) → AP credit stub.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{
@@ -11,7 +12,7 @@ use crate::accounting::relations::{
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::reference::uom;
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
     create_stock_move, create_stock_picking, stock_picking, CreateStockMoveParams,
@@ -543,9 +544,10 @@ pub fn create_purchase_return(
         ..purchase_return
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchase_return",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_return",
@@ -568,7 +570,7 @@ pub fn create_purchase_return(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -606,9 +608,10 @@ pub fn confirm_purchase_return(
         ..purchase_return
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_purchase_return",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_return",
@@ -625,7 +628,7 @@ pub fn confirm_purchase_return(
             changed_fields: vec!["state".to_string(), "picking_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -834,9 +837,10 @@ pub fn create_vendor_credit_from_purchase_return(
         ..purchase_return
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_vendor_credit_from_purchase_return",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_return",
@@ -853,7 +857,7 @@ pub fn create_vendor_credit_from_purchase_return(
             changed_fields: vec!["state".to_string(), "credit_move_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

@@ -6,6 +6,7 @@
 ///
 /// Stores inbox state and message intents. Delivery is performed by API
 /// workers / WhatsApp Business adapters (never HTTP inside reducers).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::operational_messaging::{operational_message, OperationalMessage};
@@ -13,7 +14,7 @@ use crate::core::reconstruction::require_writes_unfenced;
 use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::contact_identities::contact_phone_identity;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::integrations::whatsapp_business::{whatsapp_business_account, WhatsAppBusinessAccount};
 use crate::types::{
     ContactIdentityKind, ContactVerificationState, MessageChannel, OperationalMessageStatus,
@@ -562,9 +563,10 @@ pub fn register_crm_provider_principal(
             retired_at: None,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "register_crm_provider_principal",
         AuditLogParams {
             company_id: None,
             table_name: "crm_provider_principal",
@@ -581,7 +583,7 @@ pub fn register_crm_provider_principal(
             changed_fields: vec!["executor_identity".to_string(), "is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -749,9 +751,10 @@ pub fn receive_crm_provider_message(
             received_at: ctx.timestamp,
             received_by: ctx.sender(),
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "receive_crm_provider_message",
         AuditLogParams {
             company_id: contact.company_id,
             table_name: "crm_conversation_message",
@@ -766,7 +769,7 @@ pub fn receive_crm_provider_message(
             ],
             metadata: Some(r#"{"authority":"provider_principal"}"#.to_string()),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -872,8 +875,8 @@ pub fn record_crm_provider_delivery(
             "conversation message is not an outbound message for this conversation".to_string(),
         );
     }
-    let stale_sent = params.status == "sent"
-        && matches!(message.status.as_str(), "delivered" | "failed");
+    let stale_sent =
+        params.status == "sent" && matches!(message.status.as_str(), "delivered" | "failed");
     let transition_allowed = match params.status.as_str() {
         "sent" => message.status == "queued" || message.status == "sent",
         "delivered" => {
@@ -979,9 +982,10 @@ pub fn record_crm_provider_delivery(
             ..operational
         });
     record_provider_delivery_receipt(ctx, organization_id, conversation.id, &params);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_crm_provider_delivery",
         AuditLogParams {
             company_id: contact.company_id,
             table_name: "crm_conversation_message",
@@ -996,7 +1000,7 @@ pub fn record_crm_provider_delivery(
             ],
             metadata: Some(r#"{"authority":"provider_principal"}"#.to_string()),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1046,9 +1050,10 @@ pub fn open_crm_conversation(
                 && c.assigned_user_id == params.assigned_user_id
         })
     {
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "open_crm_conversation",
             AuditLogParams {
                 company_id: None,
                 table_name: "crm_conversation",
@@ -1062,7 +1067,7 @@ pub fn open_crm_conversation(
                 changed_fields: vec![],
                 metadata: Some(r#"{"note":"open_reused_existing"}"#.to_string()),
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -1088,9 +1093,10 @@ pub fn open_crm_conversation(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "open_crm_conversation",
         AuditLogParams {
             company_id: None,
             table_name: "crm_conversation",
@@ -1108,7 +1114,7 @@ pub fn open_crm_conversation(
             changed_fields: vec!["contact_id".to_string(), "channel".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1178,9 +1184,10 @@ pub fn append_crm_conversation_message(
         ..conversation
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "append_crm_conversation_message",
         AuditLogParams {
             company_id: None,
             table_name: "crm_conversation_message",
@@ -1198,7 +1205,7 @@ pub fn append_crm_conversation_message(
             changed_fields: vec!["body".to_string(), "direction".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1270,9 +1277,10 @@ pub fn update_crm_conversation(
         ..conversation
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_crm_conversation",
         AuditLogParams {
             company_id: None,
             table_name: "crm_conversation",
@@ -1283,7 +1291,7 @@ pub fn update_crm_conversation(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

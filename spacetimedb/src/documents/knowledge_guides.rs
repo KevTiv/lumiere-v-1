@@ -3,6 +3,7 @@
 //! Bodies stay in private tables. The public article is only a library entry;
 //! its generic body/update path never becomes a second revision authority.
 
+use crate::core::business_changes::write_business_audit;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
@@ -16,7 +17,7 @@ use crate::core::organization::{
 use crate::core::permissions::effective_roles;
 use crate::core::users::user_organization;
 use crate::documents::knowledge::{knowledge_article, KnowledgeArticle};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -601,9 +602,10 @@ pub(crate) fn save_knowledge_guide_inner(
             ..article
         });
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "save_knowledge_guide",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "knowledge_guide",
@@ -618,7 +620,7 @@ pub(crate) fn save_knowledge_guide_inner(
             changed_fields: vec!["revision".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

@@ -981,7 +981,7 @@ function InvoicePageLoaded({
           },
           {
             id: 'audit',
-            label: t('common.audit', { defaultValue: 'Audit' }),
+            label: t('businessHistory.title', { defaultValue: 'History & sources' }),
             content: <RecordAuditTab tableName="account_move" recordId={moveId} />,
           },
         ]}

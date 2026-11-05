@@ -1,11 +1,12 @@
 //! Immutable vehicle service and inspection history.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::journal_entries::{
-    account_move, account_move_line, add_account_move_line, create_account_move,
-    post_account_move, CreateAccountMoveParams,
+    account_move, account_move_line, add_account_move_line, create_account_move, post_account_move,
+    CreateAccountMoveParams,
 };
 use crate::accounting::line_params::journal_line_params;
 use crate::core::organization::require_company_in_organization;
@@ -14,7 +15,7 @@ use crate::fleet::fleet::{
     fleet_vehicle, require_fleet_driver_in_org_and_company,
     require_fleet_service_type_in_org_and_company, require_fleet_vehicle_company, FleetVehicle,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{AccountMoveState, MoveType};
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -186,12 +187,18 @@ fn service_payload_matches_existing(
                 && params.offset_account_id.is_none()
         }
         Some(amount) => {
-            let (Some(move_id), Some(journal_id), Some(expense_account_id), Some(offset_account_id)) = (
+            let (
+                Some(move_id),
+                Some(journal_id),
+                Some(expense_account_id),
+                Some(offset_account_id),
+            ) = (
                 existing.account_move_id,
                 params.journal_id,
                 params.expense_account_id,
                 params.offset_account_id,
-            ) else {
+            )
+            else {
                 return false;
             };
             let Some(move_record) = ctx.db.account_move().id().find(&move_id) else {
@@ -388,9 +395,7 @@ pub fn record_fleet_service(
             || params.expense_account_id.is_some()
             || params.offset_account_id.is_some()
         {
-            return Err(
-                "fleet service accounting fields require cost_amount".to_string(),
-            );
+            return Err("fleet service accounting fields require cost_amount".to_string());
         }
         (None, None)
     };
@@ -420,9 +425,10 @@ pub fn record_fleet_service(
         ..vehicle
     };
     ctx.db.fleet_vehicle().id().update(vehicle.clone());
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_fleet_service",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fleet_service_record",
@@ -449,7 +455,7 @@ pub fn record_fleet_service(
             ],
             metadata: None,
         },
-    );
+    )?;
     record_organization_commit(
         ctx,
         OrganizationCommitInput {
@@ -536,9 +542,10 @@ pub fn record_fleet_inspection(
         ..vehicle
     };
     ctx.db.fleet_vehicle().id().update(vehicle.clone());
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_fleet_inspection",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fleet_inspection",
@@ -556,7 +563,7 @@ pub fn record_fleet_inspection(
             changed_fields: vec!["vehicle_id".into(), "outcome".into()],
             metadata: None,
         },
-    );
+    )?;
     record_organization_commit(
         ctx,
         OrganizationCommitInput {

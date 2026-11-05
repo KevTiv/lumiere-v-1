@@ -3,10 +3,11 @@
 /// Tables:
 ///   - StockCycleCount
 ///   - StockCountSheet
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::stock::stock_quant;
 use crate::inventory::stock_correction::{
@@ -214,9 +215,10 @@ pub fn create_cycle_count_plan(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_cycle_count_plan",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_cycle_count",
@@ -235,7 +237,7 @@ pub fn create_cycle_count_plan(
             changed_fields: vec!["state".to_string(), "location_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -273,9 +275,10 @@ pub fn start_cycle_count_session(
         ..cycle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "start_cycle_count_session",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_cycle_count",
@@ -286,7 +289,7 @@ pub fn start_cycle_count_session(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -389,9 +392,10 @@ pub fn record_cycle_count_line(
         ..cycle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_cycle_count_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_count_sheet",
@@ -409,7 +413,7 @@ pub fn record_cycle_count_line(
             changed_fields: vec!["counted_qty".to_string(), "variance".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -458,9 +462,10 @@ pub fn validate_cycle_count(
         ..cycle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "validate_cycle_count",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_cycle_count",
@@ -471,7 +476,7 @@ pub fn validate_cycle_count(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -560,9 +565,10 @@ pub fn post_cycle_count_adjustments(
         ..cycle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_cycle_count_adjustments",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_cycle_count",
@@ -573,7 +579,7 @@ pub fn post_cycle_count_adjustments(
             changed_fields: vec!["state".to_string(), "last_count_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     // Capture the exact quant outcomes this post produced. Every id here was
     // resolved by the shared exact correction identity or is a fresh insert

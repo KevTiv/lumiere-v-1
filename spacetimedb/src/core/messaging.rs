@@ -5,10 +5,11 @@
 /// Design: polymorphic association via `model` + `res_id`.
 /// Clients query messages by model+res_id rather than through the Vec<u64> fields.
 /// The Vec<u64> fields on parent tables remain for backwards-compat but are not maintained.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::MailMessageType;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -226,9 +227,10 @@ pub fn post_message(
         msg.id,
     );
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_message",
         AuditLogParams {
             company_id: None,
             table_name: "mail_message",
@@ -239,7 +241,7 @@ pub fn post_message(
             changed_fields: vec!["body".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -412,9 +414,10 @@ pub fn mark_mail_message_delivered(
         },
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "mark_mail_message_delivered",
         AuditLogParams {
             company_id: None,
             table_name: "mail_message",
@@ -425,7 +428,7 @@ pub fn mark_mail_message_delivered(
             changed_fields: vec!["metadata".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

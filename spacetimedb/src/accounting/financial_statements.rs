@@ -9,6 +9,7 @@
 /// ## Tables
 /// - `FinancialReport` — Report configurations and generated data
 /// - `TrialBalance` — Trial balance entries per account
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::analytic_accounting::account_analytic_account;
@@ -18,7 +19,7 @@ use crate::accounting::journal_entries::{account_move, account_move_line};
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::require_currency_by_id;
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountMoveState, MoveType, ReportState, ReportType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -504,9 +505,10 @@ pub fn create_financial_report(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_financial_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -530,7 +532,7 @@ pub fn create_financial_report(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -696,9 +698,10 @@ pub fn update_financial_report(
 
     ctx.db.financial_report().id().update(report.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_financial_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -709,7 +712,7 @@ pub fn update_financial_report(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1004,9 +1007,10 @@ pub fn generate_financial_report(
 
     ctx.db.financial_report().id().update(report.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "generate_financial_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -1017,7 +1021,7 @@ pub fn generate_financial_report(
             changed_fields: vec!["state".to_string()],
             metadata: report.metadata.clone(),
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -1421,9 +1425,10 @@ pub fn export_financial_report(
 
     ctx.db.financial_report().id().update(report.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "export_financial_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -1434,7 +1439,7 @@ pub fn export_financial_report(
             changed_fields: vec!["export_format".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -1485,9 +1490,10 @@ pub fn archive_financial_report(
 
     ctx.db.financial_report().id().update(report.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "archive_financial_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -1498,7 +1504,7 @@ pub fn archive_financial_report(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1604,9 +1610,10 @@ pub fn create_trial_balance_entry(
         metadata: None,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_trial_balance_entry",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "trial_balance",
@@ -1630,7 +1637,7 @@ pub fn create_trial_balance_entry(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1678,9 +1685,10 @@ pub fn delete_financial_report(
 
     ctx.db.financial_report().id().delete(&report_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_financial_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -1691,7 +1699,7 @@ pub fn delete_financial_report(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1814,9 +1822,10 @@ pub fn generate_eu_vat_report(
     updated.write_date = Some(ctx.timestamp);
     ctx.db.financial_report().id().update(updated);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "generate_eu_vat_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "financial_report",
@@ -1829,7 +1838,7 @@ pub fn generate_eu_vat_report(
             changed_fields: vec!["state".to_string(), "report_data".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

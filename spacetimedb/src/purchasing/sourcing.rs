@@ -1,10 +1,11 @@
 /// RFQ / multi-vendor tender MVP — quote lines, vendor bids, award → PO.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::{require_active_currency_by_id, uom};
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::product::product;
 use crate::purchasing::purchase_orders::{
     add_purchase_order_line, create_purchase_order, purchase_order, purchase_requisition,
@@ -341,9 +342,10 @@ pub fn create_purchase_rfq(
         .id()
         .update(PurchaseRfq { line_ids, ..rfq });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchase_rfq",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_rfq",
@@ -365,7 +367,7 @@ pub fn create_purchase_rfq(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -425,9 +427,10 @@ pub fn add_purchase_rfq_line(
         ..rfq
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_purchase_rfq_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_rfq_line",
@@ -445,7 +448,7 @@ pub fn add_purchase_rfq_line(
             changed_fields: vec!["product_id".to_string(), "product_uom_qty".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -513,9 +516,10 @@ pub fn add_purchase_rfq_bid(
         ..rfq
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_purchase_rfq_bid",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_rfq_bid",
@@ -538,7 +542,7 @@ pub fn add_purchase_rfq_bid(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -690,9 +694,10 @@ pub fn award_purchase_rfq_bid(
         ..rfq
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "award_purchase_rfq_bid",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_rfq",
@@ -714,7 +719,7 @@ pub fn award_purchase_rfq_bid(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("RFQ {} awarded bid {} → PO {}", rfq_id, bid_id, po_id);
     Ok(())

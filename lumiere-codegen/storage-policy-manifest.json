@@ -10148,6 +10148,35 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "organization_business_change",
+      "module": "core",
+      "rationale": "Private append-only reducer-authored before/after evidence for organization-owned records; current business owners remain authoritative for history and source access.",
+      "authoritative_resources": [],
+      "durability_class": "durable_history",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "none",
+      "company_column_path": null,
+      "company_column_nullable": null,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "append-history",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:alpha/history/always-hot/until-exact-durable-finalization-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "append_only",
+      "postgres_access_path": "organization_partition"
+    },
+    {
       "table": "organization_commit",
       "module": "core",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",

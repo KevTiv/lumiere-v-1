@@ -4,6 +4,7 @@
 /// It extends but does not replace `accounting::payments::AccountPayment`, which
 /// remains the ledger authority. A posted `PaymentTransaction` links to one
 /// `AccountPayment` and its `AccountMove`.
+use crate::core::business_changes::write_business_audit;
 use std::collections::HashSet;
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -662,9 +663,10 @@ pub fn create_payment_account(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_payment_account",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "payment_account",
@@ -675,7 +677,7 @@ pub fn create_payment_account(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -757,9 +759,10 @@ pub fn update_payment_account(
         ..account
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_payment_account",
         AuditLogParams {
             company_id: Some(account.company_id),
             table_name: "payment_account",
@@ -770,7 +773,7 @@ pub fn update_payment_account(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -803,9 +806,10 @@ pub fn archive_payment_account(
         ..account
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "archive_payment_account",
         AuditLogParams {
             company_id: Some(account.company_id),
             table_name: "payment_account",
@@ -816,7 +820,7 @@ pub fn archive_payment_account(
             changed_fields: vec!["active".to_string(), "archived_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -942,9 +946,10 @@ pub fn create_payment_transaction(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_payment_transaction",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "payment_transaction",
@@ -955,7 +960,7 @@ pub fn create_payment_transaction(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1050,9 +1055,10 @@ pub fn update_payment_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_payment_transaction",
         AuditLogParams {
             company_id: Some(transaction.company_id),
             table_name: "payment_transaction",
@@ -1063,7 +1069,7 @@ pub fn update_payment_transaction(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1160,9 +1166,10 @@ pub fn post_payment_transaction_impl(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_payment_transaction",
         AuditLogParams {
             company_id: Some(transaction.company_id),
             table_name: "payment_transaction",
@@ -1173,7 +1180,7 @@ pub fn post_payment_transaction_impl(
             changed_fields: vec!["status".to_string(), "account_payment_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1209,9 +1216,10 @@ pub fn void_payment_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "void_payment_transaction",
         AuditLogParams {
             company_id: Some(transaction.company_id),
             table_name: "payment_transaction",
@@ -1222,7 +1230,7 @@ pub fn void_payment_transaction(
             changed_fields: vec!["status".to_string(), "voided_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1311,9 +1319,10 @@ pub fn create_payment_fee(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_payment_fee",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "payment_fee",
@@ -1324,7 +1333,7 @@ pub fn create_payment_fee(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -2102,9 +2111,10 @@ pub fn allocate_payment_transaction(
     }
     ctx.db.account_payment().id().update(ledger_payment);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "allocate_payment_transaction",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "payment_reconciliation",
@@ -2124,7 +2134,7 @@ pub fn allocate_payment_transaction(
             changed_fields: vec!["amount_residual".to_string(), "payment_state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -2369,9 +2379,10 @@ pub fn reverse_payment_transaction_impl(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reverse_payment_transaction",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "payment_reversal",
@@ -2382,6 +2393,6 @@ pub fn reverse_payment_transaction_impl(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

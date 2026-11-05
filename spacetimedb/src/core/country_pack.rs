@@ -9,11 +9,12 @@
 /// Enabling a pack materializes active pack tax rules into company `AccountTax` rows
 /// (upsert by exact pack/version/rule metadata) so invoice posting uses live configurable
 /// tax — not hard-coded legislation inside reducers.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::tax_management::{account_tax, AccountTax};
 use crate::core::organization::{company, organization, require_company_in_organization};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{TaxAmountType, TaxTypeUse};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -1210,9 +1211,10 @@ pub fn set_company_country_pack(
         ctx.timestamp,
     );
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_company_country_pack",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "company_country_pack",
@@ -1242,7 +1244,7 @@ pub fn set_company_country_pack(
             ],
             metadata: params.configuration.clone(),
         },
-    );
+    )?;
 
     Ok(())
 }

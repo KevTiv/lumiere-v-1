@@ -3,6 +3,7 @@
 /// `Contact` remains the party master. This module stores phone/WhatsApp/mobile-money
 /// identities as child records. The legacy `phone` and `mobile` columns on `Contact` are
 /// kept as read-compatible projections until all consumers migrate.
+use crate::core::business_changes::write_business_audit;
 use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -11,10 +12,8 @@ use crate::core::organization::require_company_in_organization;
 use crate::core::users::find_user_profile_for_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::crm::require_single_company_crm_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{
-    ContactIdentityKind, ContactVerificationState, OperationalMessageStatus,
-};
+use crate::helpers::{check_permission, AuditLogParams};
+use crate::types::{ContactIdentityKind, ContactVerificationState, OperationalMessageStatus};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -467,9 +466,10 @@ pub fn create_contact_identity(
 
     ensure_unique_preferred(ctx, &identity)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_contact_identity",
         AuditLogParams {
             company_id: contact.company_id,
             table_name: "contact_phone_identity",
@@ -494,7 +494,7 @@ pub fn create_contact_identity(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -603,9 +603,10 @@ pub fn update_contact_identity(
     ctx.db.contact_phone_identity().id().update(updated.clone());
     ensure_unique_preferred(ctx, &updated)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact_identity",
         AuditLogParams {
             company_id: updated.company_id,
             table_name: "contact_phone_identity",
@@ -630,7 +631,7 @@ pub fn update_contact_identity(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -830,9 +831,10 @@ pub fn record_contact_identity_verification_proof(
             ..identity.clone()
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_contact_identity_verification_proof",
         AuditLogParams {
             company_id: identity.company_id,
             table_name: "contact_phone_identity",
@@ -862,7 +864,7 @@ pub fn record_contact_identity_verification_proof(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -903,9 +905,10 @@ pub fn archive_contact_identity(
             ..identity.clone()
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "archive_contact_identity",
         AuditLogParams {
             company_id: identity.company_id,
             table_name: "contact_phone_identity",
@@ -918,7 +921,7 @@ pub fn archive_contact_identity(
             changed_fields: vec!["archived_at".to_string(), "is_preferred".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

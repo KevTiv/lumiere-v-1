@@ -6,11 +6,12 @@
 /// | **FleetVehicle** | Vehicle with GPS lat/lng, driver, status |
 /// | **PosTerminal** | POS terminal with lat/lng, status, revenue |
 /// | **WarehouseGeo** | Lat/lng enrichment for warehouse records |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::warehouse::warehouse;
 
@@ -359,9 +360,10 @@ pub fn create_fleet_vehicle(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_fleet_vehicle",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fleet_vehicle",
@@ -383,7 +385,7 @@ pub fn create_fleet_vehicle(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -419,9 +421,10 @@ pub fn create_fleet_vehicle_service_type(
             write_date: ctx.timestamp,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_fleet_vehicle_service_type",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "fleet_vehicle_service_type",
@@ -432,7 +435,7 @@ pub fn create_fleet_vehicle_service_type(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -488,9 +491,10 @@ pub fn update_fleet_vehicle(
         ..vehicle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_fleet_vehicle",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fleet_vehicle",
@@ -507,7 +511,7 @@ pub fn update_fleet_vehicle(
             changed_fields: vec!["driver_id".to_string(), "service_type_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -596,9 +600,10 @@ pub fn update_fleet_vehicle_details(
         ..vehicle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_fleet_vehicle_details",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fleet_vehicle",
@@ -627,7 +632,7 @@ pub fn update_fleet_vehicle_details(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -670,9 +675,10 @@ pub fn update_vehicle_position(
         ..vehicle
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_vehicle_position",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "fleet_vehicle",
@@ -694,7 +700,7 @@ pub fn update_vehicle_position(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -736,9 +742,10 @@ pub fn create_pos_terminal(
         metadata: None,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_pos_terminal",
         AuditLogParams {
             company_id,
             table_name: "pos_terminal",
@@ -751,7 +758,7 @@ pub fn create_pos_terminal(
             changed_fields: vec!["name".to_string(), "company_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -784,9 +791,10 @@ pub fn update_pos_terminal(
         ..terminal
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         terminal.organization_id,
+        "update_pos_terminal",
         AuditLogParams {
             company_id: terminal.company_id,
             table_name: "pos_terminal",
@@ -799,7 +807,7 @@ pub fn update_pos_terminal(
             changed_fields: vec!["status".to_string(), "daily_revenue".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -852,9 +860,10 @@ pub fn upsert_warehouse_geo(
             write_date: ctx.timestamp,
             ..geo
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_warehouse_geo",
             AuditLogParams {
                 company_id: None,
                 table_name: "warehouse_geo",
@@ -872,7 +881,7 @@ pub fn upsert_warehouse_geo(
                 changed_fields: vec!["latitude".to_string(), "longitude".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     } else {
         let row = ctx.db.warehouse_geo().insert(WarehouseGeo {
             id: 0,
@@ -889,9 +898,10 @@ pub fn upsert_warehouse_geo(
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_warehouse_geo",
             AuditLogParams {
                 company_id: None,
                 table_name: "warehouse_geo",
@@ -902,7 +912,7 @@ pub fn upsert_warehouse_geo(
                 changed_fields: vec!["warehouse_id".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     }
 
     let committed_geo = ctx

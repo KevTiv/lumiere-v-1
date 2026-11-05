@@ -5,6 +5,7 @@
 ///   - StockLocation
 ///   - StockRoute
 ///   - StockRule
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
@@ -488,9 +489,10 @@ pub fn create_warehouse(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_warehouse",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse",
@@ -503,7 +505,7 @@ pub fn create_warehouse(
             changed_fields: vec!["name".to_string(), "code".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -570,9 +572,10 @@ pub fn update_warehouse(
         ..warehouse
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_warehouse",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse",
@@ -583,7 +586,7 @@ pub fn update_warehouse(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -615,9 +618,10 @@ pub fn delete_warehouse(
         ..warehouse.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_warehouse",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse",
@@ -628,7 +632,7 @@ pub fn delete_warehouse(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -801,9 +805,10 @@ pub fn update_stock_location(
         ..location
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_location",
         AuditLogParams {
             company_id: None,
             table_name: "stock_location",
@@ -814,7 +819,7 @@ pub fn update_stock_location(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -852,9 +857,10 @@ pub fn delete_stock_location(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_stock_location",
         AuditLogParams {
             company_id: None,
             table_name: "stock_location",
@@ -865,7 +871,7 @@ pub fn delete_stock_location(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -908,9 +914,10 @@ pub fn create_stock_route(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_route",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "stock_route",
@@ -921,7 +928,7 @@ pub fn create_stock_route(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -961,9 +968,10 @@ pub fn update_stock_route(
         ..route
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_route",
         AuditLogParams {
             company_id: None,
             table_name: "stock_route",
@@ -974,7 +982,7 @@ pub fn update_stock_route(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1005,9 +1013,10 @@ pub fn delete_stock_route(
         ..route.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_stock_route",
         AuditLogParams {
             company_id: None,
             table_name: "stock_route",
@@ -1018,7 +1027,7 @@ pub fn delete_stock_route(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1075,9 +1084,10 @@ pub fn create_stock_rule(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_rule",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "stock_rule",
@@ -1090,7 +1100,7 @@ pub fn create_stock_rule(
             changed_fields: vec!["name".to_string(), "action".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1124,9 +1134,10 @@ pub fn update_stock_rule(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_rule",
         AuditLogParams {
             company_id: None,
             table_name: "stock_rule",
@@ -1137,7 +1148,7 @@ pub fn update_stock_rule(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1171,9 +1182,10 @@ pub fn delete_stock_rule(
         ..rule.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_stock_rule",
         AuditLogParams {
             company_id: None,
             table_name: "stock_rule",
@@ -1184,7 +1196,7 @@ pub fn delete_stock_rule(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

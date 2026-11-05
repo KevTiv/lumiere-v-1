@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent } from "../components/tabs"
 import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import { useErpSession } from "@lumiere/erp-session"
+import { useTranslation } from "@lumiere/i18n"
 import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
 import { RecordAuditTab } from "./record-audit-tab"
@@ -43,6 +44,7 @@ export function EntityRecordSheet({
   config,
   record,
 }: EntityRecordSheetProps) {
+  const { t } = useTranslation()
   const title = record ? String(record[config.titleKey] ?? "") : ""
   const statusRaw =
     record && config.statusKey ? resolveStatusValue(record, config.statusKey) : ""
@@ -54,6 +56,7 @@ export function EntityRecordSheet({
   const { organizationId } = useErpSession()
   const discussionModel = config.discussion ? (config.discussion.resModel ?? config.auditTableName) : undefined
   const recordId = record ? String(record.id ?? record.Id ?? "") : ""
+  const historyRecordId = record ? record.id ?? record.Id : undefined
   const showDiscussion = Boolean(discussionModel && organizationId && /^\d+$/.test(recordId))
   const openHref = record ? config.openHref?.(record) : undefined
   const actions = record ? (typeof config.actions === "function" ? config.actions(record) : config.actions) : null
@@ -110,7 +113,7 @@ export function EntityRecordSheet({
                       Discussion
                     </ContextTabsTrigger>
                   )}
-                  <ContextTabsTrigger value="audit">Audit</ContextTabsTrigger>
+                  <ContextTabsTrigger value="audit">{t("businessHistory.title")}</ContextTabsTrigger>
                 </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
@@ -139,11 +142,12 @@ export function EntityRecordSheet({
                   {config.auditTableName ? (
                     <RecordAuditTab
                       tableName={config.auditTableName}
-                      recordId={String(record.id ?? record.Id ?? "")}
+                      recordId={typeof historyRecordId === "string" || typeof historyRecordId === "number" || typeof historyRecordId === "bigint" ? historyRecordId : ""}
+                      companyId={typeof record.companyId === "string" || typeof record.companyId === "number" || typeof record.companyId === "bigint" ? record.companyId : typeof record.company_id === "string" || typeof record.company_id === "number" || typeof record.company_id === "bigint" ? record.company_id : undefined}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Audit history is not configured for this record type.
+                      {t("businessHistory.notConfigured")}
                     </p>
                   )}
                 </TabsContent>

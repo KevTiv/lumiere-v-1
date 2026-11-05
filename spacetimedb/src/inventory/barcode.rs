@@ -4,9 +4,10 @@
 ///   - BarcodeRule
 ///   - BarcodeScan
 ///   - BarcodeNomenclature
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::{product, product_packaging, product_variant};
 use crate::inventory::tracking::stock_production_lot;
 use crate::inventory::warehouse::stock_location;
@@ -202,9 +203,10 @@ pub fn create_barcode_rule(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_barcode_rule",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_rule",
@@ -217,7 +219,7 @@ pub fn create_barcode_rule(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -258,9 +260,10 @@ pub fn update_barcode_rule(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_barcode_rule",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_rule",
@@ -271,7 +274,7 @@ pub fn update_barcode_rule(
             changed_fields: vec!["name".to_string(), "type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -298,9 +301,10 @@ pub fn delete_barcode_rule(
     let rule_name = rule.name.clone();
     ctx.db.barcode_rule().id().delete(&rule_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_barcode_rule",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_rule",
@@ -311,7 +315,7 @@ pub fn delete_barcode_rule(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -362,9 +366,10 @@ pub fn record_barcode_scan(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_barcode_scan",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_scan",
@@ -375,7 +380,7 @@ pub fn record_barcode_scan(
             changed_fields: vec!["barcode".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -521,9 +526,10 @@ pub fn create_barcode_nomenclature(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_barcode_nomenclature",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_nomenclature",
@@ -534,7 +540,7 @@ pub fn create_barcode_nomenclature(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -592,9 +598,10 @@ pub fn update_barcode_nomenclature(
             ..nomenclature
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_barcode_nomenclature",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_nomenclature",
@@ -605,7 +612,7 @@ pub fn update_barcode_nomenclature(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -720,9 +727,10 @@ pub fn delete_barcode_nomenclature(
     let nom_name = nomenclature.name.clone();
     ctx.db.barcode_nomenclature().id().delete(&nomenclature_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_barcode_nomenclature",
         AuditLogParams {
             company_id: None,
             table_name: "barcode_nomenclature",
@@ -733,7 +741,7 @@ pub fn delete_barcode_nomenclature(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

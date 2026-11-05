@@ -4,6 +4,7 @@
 ///   - Lead
 ///   - LeadSource
 ///   - LeadLostReason
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{
@@ -14,7 +15,7 @@ use crate::crm::contacts::{contact, contact_tag, Contact};
 use crate::crm::lead_scoring::mark_lead_score_stale;
 use crate::crm::opportunities::{opp_stage, opportunity, Opportunity};
 use crate::crm::require_single_company_crm_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PARAMS TYPES
@@ -557,9 +558,10 @@ pub fn create_lead(
         creation,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_lead",
         AuditLogParams {
             company_id: None,
             table_name: "lead",
@@ -572,7 +574,7 @@ pub fn create_lead(
             changed_fields: vec!["name".to_string(), "email".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     if let Some(receipt) = creation_receipt {
         crate::forms::record_creation_persistence::record_lead_creation(
@@ -748,9 +750,10 @@ pub fn update_lead(
         ..lead
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_lead",
         AuditLogParams {
             company_id: None,
             table_name: "lead",
@@ -761,7 +764,7 @@ pub fn update_lead(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     // CRM-RI-016: this reducer mutates fields consumed by `compute_factors`,
     // so the stored score no longer reflects the lead.
@@ -850,9 +853,10 @@ pub fn update_lead_revenue(
         ..lead
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_lead_revenue",
         AuditLogParams {
             company_id: None,
             table_name: "lead",
@@ -867,7 +871,7 @@ pub fn update_lead_revenue(
             changed_fields: vec!["expected_revenue".to_string(), "probability".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     // CRM-RI-016: expected_revenue/probability are direct scoring factors.
     mark_lead_score_stale(ctx, organization_id, lead_id);
@@ -890,9 +894,10 @@ pub fn delete_lead(ctx: &ReducerContext, organization_id: u64, lead_id: u64) -> 
         ..lead
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_lead",
         AuditLogParams {
             company_id: None,
             table_name: "lead",
@@ -908,7 +913,7 @@ pub fn delete_lead(ctx: &ReducerContext, organization_id: u64, lead_id: u64) -> 
             changed_fields: vec!["deleted_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1059,9 +1064,10 @@ pub fn convert_lead_to_customer(
         ..lead
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "convert_lead_to_customer",
         AuditLogParams {
             company_id: None,
             table_name: "lead",
@@ -1072,7 +1078,7 @@ pub fn convert_lead_to_customer(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1103,9 +1109,10 @@ pub fn create_lead_source(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_lead_source",
         AuditLogParams {
             company_id: None,
             table_name: "lead_source",
@@ -1116,7 +1123,7 @@ pub fn create_lead_source(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1179,9 +1186,10 @@ pub fn update_lead_source(
         ..source
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_lead_source",
         AuditLogParams {
             company_id: None,
             table_name: "lead_source",
@@ -1192,7 +1200,7 @@ pub fn update_lead_source(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1222,9 +1230,10 @@ pub fn create_lead_lost_reason(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_lead_lost_reason",
         AuditLogParams {
             company_id: None,
             table_name: "lead_lost_reason",
@@ -1235,7 +1244,7 @@ pub fn create_lead_lost_reason(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1293,9 +1302,10 @@ pub fn update_lead_lost_reason(
         ..reason
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_lead_lost_reason",
         AuditLogParams {
             company_id: None,
             table_name: "lead_lost_reason",
@@ -1306,7 +1316,7 @@ pub fn update_lead_lost_reason(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

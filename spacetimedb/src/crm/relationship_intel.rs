@@ -5,10 +5,11 @@
 ///
 /// Computes strength from active relationships + org hierarchy depth.
 /// Does not invent enrichment from external providers.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::crm::contacts::{contact, contact_relationship};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 const MAX_RELATED_IDS: usize = 32;
 const MAX_HIERARCHY_WALK: usize = 16;
@@ -185,9 +186,10 @@ pub fn recompute_relationship_insights(
             stale_since: None,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "recompute_relationship_insights",
         AuditLogParams {
             company_id: None,
             table_name: "contact_relationship_insight",
@@ -206,7 +208,7 @@ pub fn recompute_relationship_insights(
             changed_fields: vec!["strength_score".to_string(), "summary".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

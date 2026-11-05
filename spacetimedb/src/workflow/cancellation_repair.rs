@@ -3,11 +3,12 @@
 //! Runtime cancellation history and receipts remain immutable. This operation only
 //! closes stale Open/Claimed task projections and records a separate repair receipt.
 
+use crate::core::business_changes::write_business_audit;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 use super::approvals::{
     cancel_active_workflow_human_tasks, workflow_human_task, WorkflowHumanTaskStatus,
@@ -237,7 +238,8 @@ pub fn repair_cancelled_workflow_tasks(
         &params.correlation_id,
         company_membership_bypass,
     )?;
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+    write_business_audit(ctx, organization_id,
+        "repair_cancelled_workflow_tasks", AuditLogParams {
         company_id: Some(params.company_id),
         table_name: "workflow_instance",
         record_id: instance.id,
@@ -256,7 +258,7 @@ pub fn repair_cancelled_workflow_tasks(
             "repaired_task_ids": repaired_tasks.iter().map(|task| task.task_id).collect::<Vec<_>>(),
             "company_membership_bypass": company_membership_bypass,
         }).to_string()),
-    });
+    })?;
     let receipt =
         ctx.db
             .workflow_cancellation_repair_receipt()

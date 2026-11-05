@@ -1,4 +1,5 @@
 /// Sales Return Orders (RMA) — customer return workflow
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
@@ -7,9 +8,7 @@ use crate::accounting::journal_entries::{
 };
 use crate::core::organization::company;
 use crate::crm::contacts::contact;
-use crate::helpers::{
-    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
-};
+use crate::helpers::{calculate_tax, check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{
     create_stock_move, create_stock_picking, stock_picking, CreateStockMoveParams,
@@ -542,9 +541,10 @@ pub fn create_return_order(
         ..return_order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_return_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "return_order",
@@ -567,7 +567,7 @@ pub fn create_return_order(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -620,9 +620,10 @@ pub fn confirm_return_order(
         ..return_order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_return_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "return_order",
@@ -639,7 +640,7 @@ pub fn confirm_return_order(
             changed_fields: vec!["state".to_string(), "picking_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -670,9 +671,10 @@ pub fn cancel_return_order(
         ..return_order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_return_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "return_order",
@@ -683,7 +685,7 @@ pub fn cancel_return_order(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -903,9 +905,10 @@ pub fn create_credit_note_from_return_order(
         ..return_order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_credit_note_from_return_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -927,11 +930,12 @@ pub fn create_credit_note_from_return_order(
             ],
             metadata: None,
         },
-    );
+    )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_credit_note_from_return_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "return_order",
@@ -954,7 +958,7 @@ pub fn create_credit_note_from_return_order(
             changed_fields: vec!["state".to_string(), "credit_move_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     if let Some(sale_order_id) = clawback_sale_order_id {
         crate::sales::oms_extensions::cancel_accrued_commissions_for_sale_order(

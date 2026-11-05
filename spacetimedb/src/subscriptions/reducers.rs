@@ -9,6 +9,7 @@
 //! - `recognize_deferred_revenue` – post revenue recognition entry
 //! - `create_revenue_recognition_rule` – configure auto-deferral rules
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -21,7 +22,7 @@ use crate::accounting::relations::{
 };
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::stock::require_product_in_org;
 use crate::sales::sales_core::{sale_order, sale_order_line};
 use crate::subscriptions::billing_helpers::{
@@ -424,9 +425,10 @@ pub fn create_subscription_plan(
 
     let inserted = ctx.db.subscription_plan().insert(plan);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_subscription_plan",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_plan",
@@ -449,7 +451,7 @@ pub fn create_subscription_plan(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Created subscription plan {} (ID: {})",
@@ -691,9 +693,10 @@ pub fn create_subscription_from_sale_order(
         },
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_subscription_from_sale_order",
         AuditLogParams {
             company_id: Some(resolved_company_id),
             table_name: "subscription",
@@ -721,7 +724,7 @@ pub fn create_subscription_from_sale_order(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Created subscription {} from sale order {} with {} lines",
@@ -778,9 +781,10 @@ pub fn activate_subscription(
         &activated,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "activate_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -793,7 +797,7 @@ pub fn activate_subscription(
             changed_fields: vec!["state".to_string(), "is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Activated subscription {}", subscription_id);
     Ok(())
@@ -856,9 +860,10 @@ pub fn close_subscription(
         ..subscription
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "close_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -882,7 +887,7 @@ pub fn close_subscription(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     log::info!("Closed subscription {}", subscription_id);
     Ok(())
@@ -1005,9 +1010,10 @@ pub fn generate_subscription_invoice(
         .find(&subscription_id)
         .ok_or("Subscription not found after billing run")?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "generate_subscription_invoice",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -1041,7 +1047,7 @@ pub fn generate_subscription_invoice(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     log::info!(
         "Subscription {} billing run key={} invoice_move={} idempotent={} usage_added={}",
@@ -1105,9 +1111,10 @@ pub fn pay_subscription_invoice(
     )?;
 
     if result.pending_approval {
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "pay_subscription_invoice",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "subscription",
@@ -1135,7 +1142,7 @@ pub fn pay_subscription_invoice(
                     .to_string(),
                 ),
             },
-        );
+        )?;
         log::info!(
             "Subscription {} payment {} pending PostPayment approval for invoice {}",
             subscription_id,
@@ -1158,9 +1165,10 @@ pub fn pay_subscription_invoice(
         &refreshed,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "pay_subscription_invoice",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -1187,7 +1195,7 @@ pub fn pay_subscription_invoice(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     log::info!(
         "Subscription {} payment {} applied to invoice {} amount={}",
@@ -1267,9 +1275,10 @@ pub fn create_deferred_revenue_schedule(
         params.metadata.as_deref().unwrap_or(""),
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_deferred_revenue_schedule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "deferred_revenue_schedule",
@@ -1291,7 +1300,7 @@ pub fn create_deferred_revenue_schedule(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Created deferred revenue schedule {} for amount {}",
@@ -1577,9 +1586,10 @@ pub fn recognize_deferred_revenue(
             ..schedule
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "recognize_deferred_revenue",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "deferred_revenue_line",
@@ -1601,7 +1611,7 @@ pub fn recognize_deferred_revenue(
             ],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     log::info!(
         "Recognized deferred revenue line {} for amount {} via move {}",
@@ -1676,9 +1686,10 @@ pub fn create_revenue_recognition_rule(
 
     let inserted = ctx.db.revenue_recognition_rule().insert(rule);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_revenue_recognition_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "revenue_recognition_rule",
@@ -1700,7 +1711,7 @@ pub fn create_revenue_recognition_rule(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Created revenue recognition rule {}", inserted.id);
     Ok(())
@@ -1735,9 +1746,10 @@ pub fn deactivate_revenue_recognition_rule(
             ..rule
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "deactivate_revenue_recognition_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "revenue_recognition_rule",
@@ -1748,7 +1760,7 @@ pub fn deactivate_revenue_recognition_rule(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Deactivated revenue recognition rule {}", rule_id);
     Ok(())
@@ -1783,9 +1795,10 @@ pub fn activate_revenue_recognition_rule(
             ..rule
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "activate_revenue_recognition_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "revenue_recognition_rule",
@@ -1796,7 +1809,7 @@ pub fn activate_revenue_recognition_rule(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Activated revenue recognition rule {}", rule_id);
     Ok(())

@@ -6,6 +6,7 @@
 /// | **DocumentFolder** | Folder hierarchy for organizing documents |
 /// | **Document** | File documents with metadata and access control |
 /// | **DocumentVersion** | Version history for documents |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
@@ -18,7 +19,7 @@ use crate::documents::pack_locale::{
 };
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::helpdesk::tickets::helpdesk_ticket;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::product::product;
 use crate::projects::tasks::project_task;
@@ -637,9 +638,10 @@ pub fn create_document_folder(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_document_folder",
         AuditLogParams {
             company_id,
             table_name: "document_folder",
@@ -650,7 +652,7 @@ pub fn create_document_folder(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document folder created: id={}", folder.id);
     Ok(())
@@ -811,9 +813,10 @@ pub fn create_document(
 
     adjust_folder_document_count(ctx, folder_id, 1);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_document",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -824,7 +827,7 @@ pub fn create_document(
             changed_fields: vec!["uploaded".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     if let Some(company_id) = company_id {
         if let Some(receipt_id) = crate::forms::record_creation::finish_creation(
@@ -955,9 +958,10 @@ pub fn add_document_version(
         ..doc
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_document_version",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -968,7 +972,7 @@ pub fn add_document_version(
             changed_fields: vec!["new_version".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     let committed_document = ctx
         .db
@@ -1072,9 +1076,10 @@ pub fn lock_document(
         ..doc
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "lock_document",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -1085,7 +1090,7 @@ pub fn lock_document(
             changed_fields: vec!["locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document locked: id={}", document_id);
     Ok(())
@@ -1134,9 +1139,10 @@ pub fn unlock_document(
         ..doc
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unlock_document",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -1147,7 +1153,7 @@ pub fn unlock_document(
             changed_fields: vec!["unlocked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document unlocked: id={}", document_id);
     Ok(())
@@ -1232,9 +1238,10 @@ pub fn delete_document(
         ..doc
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_document",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -1245,7 +1252,7 @@ pub fn delete_document(
             changed_fields: vec!["soft_deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document soft-deleted: id={}", document_id);
     Ok(())
@@ -1309,9 +1316,10 @@ pub fn restore_document(
 
     adjust_folder_document_count(ctx, folder_id, 1);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "restore_document",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -1322,7 +1330,7 @@ pub fn restore_document(
             changed_fields: vec!["restored".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document restored: id={}", document_id);
     Ok(())
@@ -1449,9 +1457,10 @@ pub fn update_document(
 
     ctx.db.document().id().update(new_doc);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_document",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -1462,7 +1471,7 @@ pub fn update_document(
             changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document updated: id={}", document_id);
     Ok(())
@@ -1565,9 +1574,10 @@ pub fn update_document_folder(
 
     ctx.db.doc_folder().id().update(updated);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_document_folder",
         AuditLogParams {
             company_id,
             table_name: "document_folder",
@@ -1578,7 +1588,7 @@ pub fn update_document_folder(
             changed_fields: changed_fields.into_iter().map(|s| s.to_string()).collect(),
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document folder updated: id={}", folder_id);
     Ok(())
@@ -1623,9 +1633,10 @@ pub fn delete_document_folder(
     let name = folder.name.clone();
     ctx.db.doc_folder().id().delete(&folder_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_document_folder",
         AuditLogParams {
             company_id,
             table_name: "document_folder",
@@ -1636,7 +1647,7 @@ pub fn delete_document_folder(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Document folder deleted: id={}", folder_id);
     Ok(())

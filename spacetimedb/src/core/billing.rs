@@ -1,8 +1,9 @@
 /// Platform billing and entitlements (Lumiere SaaS plans — not customer subscription billing).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{organization_settings, OrganizationSettings};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -144,9 +145,10 @@ pub fn create_billing_account(
 
     sync_org_feature_flags(ctx, organization_id, &params.plan_tier)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_billing_account",
         AuditLogParams {
             company_id: None,
             table_name: "billing_account",
@@ -168,7 +170,7 @@ pub fn create_billing_account(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -223,9 +225,10 @@ pub fn update_billing_account(
         changed_fields.push("status".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_billing_account",
         AuditLogParams {
             company_id: None,
             table_name: "billing_account",
@@ -243,7 +246,7 @@ pub fn update_billing_account(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

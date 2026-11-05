@@ -1,8 +1,9 @@
 //! Subscription collections and dunning reducers.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::ReducerContext;
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::tables::{subscription, subscription_plan, Subscription};
 
@@ -59,9 +60,10 @@ pub fn record_subscription_payment_failure(
         ..sub
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_subscription_payment_failure",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_collection",
@@ -82,7 +84,7 @@ pub fn record_subscription_payment_failure(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -164,9 +166,10 @@ pub fn advance_subscription_dunning(
             ..coll
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "advance_subscription_dunning",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -185,6 +188,6 @@ pub fn advance_subscription_dunning(
             changed_fields: vec!["dunning".to_string(), "health".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

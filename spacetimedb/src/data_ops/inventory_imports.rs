@@ -181,7 +181,7 @@ pub fn import_product_csv(
             write_date: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
-        record_import_created_id(ctx, job.id, "product", created.id, row_num);
+        record_import_created_id(ctx, job.id, "product", created.id, row_num)?;
         imported += 1;
     }
 
@@ -434,7 +434,7 @@ pub fn import_stock_location_csv(
             updated_at: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
-        record_import_created_id(ctx, job.id, "stock_location", created.id, row_num);
+        record_import_created_id(ctx, job.id, "stock_location", created.id, row_num)?;
         imported += 1;
     }
 

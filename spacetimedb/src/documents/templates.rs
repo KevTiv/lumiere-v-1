@@ -1,5 +1,6 @@
 //! Document and mail templates for PDF generation and outbound email.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
@@ -11,7 +12,7 @@ use crate::documents::invoice_profile::{
     ensure_invoice_profile_update_allowed, validate_invoice_profile_metadata,
     INVOICE_PROFILE_REPORT_TYPE,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::MailMessageType;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -441,9 +442,10 @@ pub fn create_document_template(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_document_template",
         AuditLogParams {
             company_id,
             table_name: "document_template",
@@ -456,7 +458,7 @@ pub fn create_document_template(
             changed_fields: vec!["name".to_string(), "model".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -604,9 +606,10 @@ pub fn update_document_template(
 
     ctx.db.document_template().id().update(updated.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_document_template",
         AuditLogParams {
             company_id,
             table_name: "document_template",
@@ -625,7 +628,7 @@ pub fn update_document_template(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -671,9 +674,10 @@ pub fn create_mail_template(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_mail_template",
         AuditLogParams {
             company_id,
             table_name: "mail_template",
@@ -686,7 +690,7 @@ pub fn create_mail_template(
             changed_fields: vec!["name".to_string(), "model".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -733,9 +737,10 @@ pub fn update_mail_template(
 
     ctx.db.mail_template().id().update(updated.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_mail_template",
         AuditLogParams {
             company_id,
             table_name: "mail_template",
@@ -746,7 +751,7 @@ pub fn update_mail_template(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -945,9 +950,10 @@ pub fn queue_mail_from_template(
             )?],
         },
     )?;
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "queue_mail_from_template",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "mail_message",
@@ -966,7 +972,7 @@ pub fn queue_mail_from_template(
             changed_fields: vec!["body".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1086,9 +1092,10 @@ pub fn claim_reviewed_mail_delivery(
             )?],
         },
     )?;
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "claim_reviewed_mail_delivery",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "mail_message",
@@ -1099,7 +1106,7 @@ pub fn claim_reviewed_mail_delivery(
             changed_fields: vec!["metadata".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

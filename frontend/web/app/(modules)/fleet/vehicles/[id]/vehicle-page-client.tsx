@@ -288,7 +288,7 @@ function VehiclePageLoaded({
           },
           {
             id: 'audit',
-            label: t('common.audit', { defaultValue: 'Audit' }),
+            label: t('businessHistory.title', { defaultValue: 'History & sources' }),
             content: <RecordAuditTab tableName="fleet_vehicle" recordId={vehicleId} />,
           },
         ]}

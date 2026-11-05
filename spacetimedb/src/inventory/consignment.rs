@@ -1,7 +1,8 @@
 //! Consignment ownership — vendor-owned quants excluded from company ATP.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::stock::increase_quant_at_location_owned;
 use crate::inventory::warehouse::warehouse;
@@ -54,9 +55,10 @@ pub fn activate_consignment_agreement(
             write_date: ctx.timestamp,
             ..row
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "activate_consignment_agreement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "consignment_agreement",
@@ -67,7 +69,7 @@ pub fn activate_consignment_agreement(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -125,9 +127,10 @@ pub fn receive_consignment_stock(
         &method,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "receive_consignment_stock",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "consignment_agreement",
@@ -145,6 +148,6 @@ pub fn receive_consignment_stock(
             changed_fields: vec!["stock".to_string()],
             metadata: params.metadata,
         },
-    );
+    )?;
     Ok(())
 }

@@ -32,6 +32,8 @@ use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::OrgSession;
 use crate::workflow_reads::bounded_windows::{BoundedIdReader, ID_WINDOW};
 
+mod general;
+mod sources;
 #[cfg(test)]
 mod tests;
 
@@ -470,6 +472,12 @@ async fn account_move_history_get(
 pub(super) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/history/account-moves/:id", get(account_move_history_get))
+        .route("/history/records/:resource/:id", get(general::record_get))
+        .route("/history/activity/:module", get(general::activity_get))
+        .route(
+            "/history/records/:resource/:id/sources",
+            get(sources::record_sources_get),
+        )
         .route_layer(middleware::from_fn(no_store))
 }
 

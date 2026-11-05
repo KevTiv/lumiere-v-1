@@ -140,6 +140,7 @@
     "./stock-3d/*": "./src/stock-3d/*.tsx",
     "./native/*": "./src/native/**/*.ts",
     "./native/primitives/*": "./src/native/primitives/*.tsx",
-    "./native/lib/*": "./src/native/lib/*.ts"
+    "./native/lib/*": "./src/native/lib/*.ts",
+    "./entity-views/record-business-history": "./src/entity-views/record-business-history.tsx"
   }
 }

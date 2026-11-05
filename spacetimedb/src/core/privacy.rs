@@ -4,10 +4,11 @@
 /// Pattern: Classifications label sensitivity level (1–4).
 ///          Rules bind classifications to specific tables/columns.
 ///          PrivacyConsent tracks GDPR/CCPA opt-in/opt-out per contact.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -139,9 +140,10 @@ pub fn create_data_classification(
         metadata: params.metadata.clone(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_data_classification",
         AuditLogParams {
             company_id: None,
             table_name: "data_classification",
@@ -163,7 +165,7 @@ pub fn create_data_classification(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -197,9 +199,10 @@ pub fn create_data_classification_rule(
             metadata: params.metadata.clone(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_data_classification_rule",
         AuditLogParams {
             company_id: None,
             table_name: "data_classification_rule",
@@ -222,7 +225,7 @@ pub fn create_data_classification_rule(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -271,9 +274,10 @@ pub fn record_privacy_consent(
         metadata: params.metadata.clone(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_privacy_consent",
         AuditLogParams {
             company_id: None,
             table_name: "privacy_consent",
@@ -295,7 +299,7 @@ pub fn record_privacy_consent(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -357,9 +361,10 @@ pub fn execute_retention_purge(ctx: &ReducerContext, organization_id: u64) -> Re
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "execute_retention_purge",
         AuditLogParams {
             company_id: None,
             table_name: "data_classification",
@@ -370,7 +375,7 @@ pub fn execute_retention_purge(ctx: &ReducerContext, organization_id: u64) -> Re
             changed_fields: vec!["purged_count".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

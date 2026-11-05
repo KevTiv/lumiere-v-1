@@ -353,7 +353,7 @@ pub fn import_contact_csv(
             merge_target_id: None,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
-        record_import_created_id(ctx, job.id, "contact", created.id, row_num);
+        record_import_created_id(ctx, job.id, "contact", created.id, row_num)?;
         imported += 1;
     }
 

@@ -144,15 +144,16 @@ def source_signals(row: dict[str, Any] | None, structs: dict[str, Any]) -> dict[
                 "new_values_recorded": False, "guarded_action_gate": False, "tables_accessed": [],
                 "parameter_products": []}
     body = row["body"]
+    trusted_capture = bool(re.search(r"\b(?:capture_business_change|write_business_audit|write_private_business_audit)\s*\(", body))
     products = []
     for product in re.findall(r"\bparams\s*:\s*(\w+)", row["signature"]):
         definitions = structs.get(product, [])
         products.append({"type": product, "definitions": definitions})
     return {
         "status": "structural-only",
-        "audit_call": bool(re.search(r"\bwrite_audit_log(?:_v2)?\s*\(", body)),
-        "trusted_capture_call": bool(re.search(r"\bcapture_business_change\s*\(", body)),
-        "capture_coverage": "partial-control-flow-owner-review-required" if re.search(r"\bcapture_business_change\s*\(", body) else "not-observed",
+        "audit_call": bool(re.search(r"\b(?:write_audit_log(?:_v2(?:_returning)?)?|write_business_audit|write_private_business_audit)\s*\(", body)),
+        "trusted_capture_call": trusted_capture,
+        "capture_coverage": "partial-control-flow-owner-review-required" if trusted_capture else "not-observed",
         "old_values_recorded": bool(re.search(r"\bold_values\s*:\s*Some\s*\(", body)),
         "new_values_recorded": bool(re.search(r"\bnew_values\s*:\s*Some\s*\(", body)),
         "guarded_action_gate": bool(re.search(r"\brequest_guarded_action\s*\(", body)),

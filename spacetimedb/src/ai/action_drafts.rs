@@ -1,5 +1,6 @@
 //! AI action drafts — human-approved ERP mutations proposed by the harness.
 
+use crate::core::business_changes::write_business_audit;
 use std::collections::BTreeSet;
 
 use serde_json::Value;
@@ -381,9 +382,10 @@ pub fn update_ai_action_draft_params(
 
     ctx.db.ai_action_draft().id().update(updated.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_ai_action_draft_params",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "ai_action_draft",
@@ -400,7 +402,7 @@ pub fn update_ai_action_draft_params(
             changed_fields: vec!["params_json".to_string(), "summary".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -487,9 +489,10 @@ pub fn approve_ai_action_draft_core(
 
             on_draft_approved(ctx, &updated, record_id);
 
-            write_audit_log_v2(
+            write_business_audit(
                 ctx,
                 organization_id,
+                "approve_ai_action_draft",
                 AuditLogParams {
                     company_id: Some(company_id),
                     table_name: "ai_action_draft",
@@ -507,7 +510,7 @@ pub fn approve_ai_action_draft_core(
                     changed_fields: vec!["status".to_string(), "executed_record_id".to_string()],
                     metadata: Some(updated.params_json.clone()),
                 },
-            );
+            )?;
             Ok(())
         }
         Err(err) => {
@@ -521,9 +524,10 @@ pub fn approve_ai_action_draft_core(
             };
             ctx.db.ai_action_draft().id().update(updated);
 
-            write_audit_log_v2(
+            write_business_audit(
                 ctx,
                 organization_id,
+                "approve_ai_action_draft",
                 AuditLogParams {
                     company_id: Some(company_id),
                     table_name: "ai_action_draft",
@@ -537,7 +541,7 @@ pub fn approve_ai_action_draft_core(
                     changed_fields: vec!["status".to_string(), "execution_error".to_string()],
                     metadata: None,
                 },
-            );
+            )?;
 
             Err(err)
         }
@@ -639,9 +643,10 @@ pub fn expire_ai_action_drafts(
     for draft in &expired {
         mark_expired(ctx, draft);
         on_draft_expired(ctx, draft);
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "expire_ai_action_drafts",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "ai_action_draft",
@@ -652,7 +657,7 @@ pub fn expire_ai_action_drafts(
                 changed_fields: vec!["status".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     }
 
     Ok(())

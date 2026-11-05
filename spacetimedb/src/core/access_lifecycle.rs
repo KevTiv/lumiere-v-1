@@ -1,11 +1,12 @@
 //! Transactional membership access changes and invitation completion.
 use crate::core::audit::audit_log;
+use crate::core::business_changes::write_business_audit;
 use crate::core::permissions::{
     effective_roles, ensure_delegated_admin_may_assign_role, role, touch_policy_snapshot_for_user,
     user_role_assignment, validate_sod_for_effective_roles, Role, UserRoleAssignment,
 };
 use crate::core::users::{find_user_profile_for_organization, user_organization, UserOrganization};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table};
 
 /// Optimistic access precondition plus the complete desired role set.
@@ -285,9 +286,10 @@ pub fn set_member_access(
         job_title,
         ..membership.clone()
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_member_access",
         AuditLogParams {
             company_id: membership.company_id,
             table_name: "user_organization",
@@ -309,7 +311,7 @@ pub fn set_member_access(
             ],
             metadata: None,
         },
-    );
+    )?;
     touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
     Ok(())
 }
