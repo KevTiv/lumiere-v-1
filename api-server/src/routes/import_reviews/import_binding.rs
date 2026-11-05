@@ -153,6 +153,12 @@ pub(crate) async fn record_review_binding(
     else {
         return Ok(());
     };
+    let authority = TrustedOperationContext::for_resource_read(state, session)?;
+    if !full_administrator(authority.field_access()) {
+        // Ordinary importers may retain untrusted provenance-looking columns.
+        // They cannot turn those columns into a verified source-review link.
+        return Ok(());
+    }
     let revision_column = inspected
         .headers
         .iter()

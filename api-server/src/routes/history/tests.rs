@@ -342,6 +342,9 @@ pub(super) async fn server(
             "user_organization" => vec![
                 json!({"id":1,"organization_id":42,"company_id":7,"role_id":2,"is_active":true}),
             ],
+            "company" => {
+                vec![json!({"id":7,"organization_id":42,"name":"Company","currency_id":1})]
+            }
             "role" => vec![
                 json!({"id":2,"organization_id":42,"is_active":true,"name":"Reader","permissions":if fixture.review_administrator.load(Ordering::SeqCst) {vec!["*:*"]} else if (fixture.revoke_after_read&&fixture.evidence_read.load(Ordering::SeqCst)) || (fixture.revoke_on_line.load(Ordering::SeqCst)&&fixture.line_read.load(Ordering::SeqCst)) { vec!["account_move:read","account_move_line:read"] } else { GRANTS.iter().copied().chain(["product:read", "expense_sheet:read"]).collect::<Vec<_>>() }}),
             ],

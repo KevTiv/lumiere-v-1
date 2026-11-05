@@ -48,6 +48,7 @@ fn read_columns(
 ) -> Result<HashSet<String>, ApiError> {
     if !permission_allowed(access, "business_history", "read")
         || !source_read_allowed(access, adapter)
+        || stdb_auth::resource_read_denied(access, "import-jobs")
     {
         return Err(ApiError::Forbidden(
             "Import source read permission denied".into(),
@@ -56,10 +57,18 @@ fn read_columns(
     // As in the existing exact-import-receipt owner, source read permission
     // supplies authority; import-jobs supplies the field projection, not an
     // organization-wide import administration grant.
-    let columns: HashSet<String> = resolve_http_sql_columns("import-jobs", Some(access))
+    let mut columns: HashSet<String> = resolve_http_sql_columns("import-jobs", Some(access))
         .map_err(ApiError::Internal)?
         .into_iter()
         .collect();
+    // The list transport omits metadata by default. This dedicated owner emits
+    // only validated hashes/references, and applies the same explicit field
+    // projection before exposing them.
+    for field in ["file_name", "metadata"] {
+        if stdb_auth::has_resource_field_projection_permission(Some(access), "import-jobs", field) {
+            columns.insert(field.into());
+        }
+    }
     if !columns.contains("status") || !columns.contains("table_name") {
         return Err(ApiError::Forbidden(
             "Import source fields are restricted".into(),
@@ -196,7 +205,8 @@ async fn native_mapping_receipt(
                 || (company_scope && number(&event, "company_id", "companyId") != Some(company))
                 || event["resource"] != table
                 || number(&event, "record_id", "recordId") != Some(record)
-                || event["subject_resource"] != table
+                || cell(&event, "subject_resource", "subjectResource").and_then(Value::as_str)
+                    != Some(table)
                 || number(&event, "subject_record_id", "subjectRecordId") != Some(record)
                 || event["operation"] != operation
                 || number(&event, "schema_version", "schemaVersion") != Some(1)
@@ -214,7 +224,8 @@ async fn native_mapping_receipt(
             match audits.as_slice() {
                 [audit] => {
                     if number(audit, "organization_id", "organizationId") != Some(org)
-                        || audit["table_name"] != table
+                        || cell(audit, "table_name", "tableName").and_then(Value::as_str)
+                            != Some(table)
                         || number(audit, "record_id", "recordId") != Some(record)
                         || audit["action"] != "CREATE"
                     {

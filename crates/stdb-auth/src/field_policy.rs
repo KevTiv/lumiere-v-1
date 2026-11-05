@@ -679,6 +679,17 @@ pub fn has_resource_field_read_permission(
     if !has_resource_read_permission(field_access, resource_key) {
         return false;
     }
+    has_resource_field_projection_permission(field_access, resource_key, field)
+}
+
+/// Check field projection after a dedicated owner has established narrower
+/// read authority, such as an exact import receipt for an authorized ERP row.
+/// This supplies no resource or row authority by itself.
+pub fn has_resource_field_projection_permission(
+    field_access: Option<&FieldAccessContext>,
+    resource_key: &str,
+    field: &str,
+) -> bool {
     let Some(access) = field_access else {
         return false;
     };
