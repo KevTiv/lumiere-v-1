@@ -1,3 +1,4 @@
+use crate::core::business_changes::write_business_audit;
 /// Stock Management — Tables and Reducers
 ///
 /// Tables:
@@ -5,7 +6,7 @@
 ///   - StockMove
 ///   - StockMoveLine
 ///   - StockPicking
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
@@ -2247,6 +2248,7 @@ pub fn move_stock_quant(
     quant_id: u64,
     params: MoveStockQuantParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "stock_quant", "write")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -2443,7 +2445,7 @@ pub fn move_stock_quant(
         }
     }
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "move_stock_quant",
@@ -2469,7 +2471,7 @@ pub fn move_stock_quant(
             changed_fields: vec!["location_id".to_string(), "quantity".to_string()],
             metadata: None,
         },
-    )?;
+    )?);
 
     // Capture the exact quant outcomes after the move. The source tombstone
     // is retained when the move empties it; all upserts use the generated SATS
@@ -2515,10 +2517,13 @@ pub fn move_stock_quant(
             organization_id,
             operation_id: "erp.move_stock_quant".to_string(),
             correlation_id: format!("stock-quant:{quant_id}:move-to:{}", params.dest_location_id),
-            changes: changed_quants
-                .into_iter()
-                .map(|(_, change)| change)
-                .collect(),
+            changes: merge_business_audit_changes(
+                changed_quants
+                    .into_iter()
+                    .map(|(_, change)| change)
+                    .collect(),
+                business_audit_changes,
+            )?,
         },
     )?;
 

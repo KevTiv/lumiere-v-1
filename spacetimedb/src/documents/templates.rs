@@ -1,6 +1,7 @@
 //! Document and mail templates for PDF generation and outbound email.
 
 use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
@@ -764,6 +765,7 @@ pub fn queue_mail_from_template(
     company_id: u64,
     params: QueueMailFromTemplateParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "mail_template", "write")?;
 
     let template = ctx
@@ -937,20 +939,7 @@ pub fn queue_mail_from_template(
         metadata: Some(delivery_metadata),
     });
 
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: "erp.queue_mail_from_template".into(),
-            correlation_id: format!("mail:{}:queue", msg.id),
-            changes: vec![RowChange::upsert_stdb_row(
-                "mail_message",
-                serde_json::json!({"id":msg.id}),
-                &msg,
-            )?],
-        },
-    )?;
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "queue_mail_from_template",
@@ -972,6 +961,23 @@ pub fn queue_mail_from_template(
             changed_fields: vec!["body".to_string()],
             metadata: None,
         },
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.queue_mail_from_template".into(),
+            correlation_id: format!("mail:{}:queue", msg.id),
+            changes: merge_business_audit_changes(
+                vec![RowChange::upsert_stdb_row(
+                    "mail_message",
+                    serde_json::json!({"id":msg.id}),
+                    &msg,
+                )?],
+                business_audit_changes,
+            )?,
+        },
     )?;
 
     Ok(())
@@ -988,6 +994,7 @@ pub fn claim_reviewed_mail_delivery(
     review_id: String,
     request_digest: String,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "mail_message", "write")?;
     check_permission(ctx, organization_id, "mail_template", "read")?;
     check_permission(ctx, organization_id, "mail_template", "write")?;
@@ -1079,20 +1086,7 @@ pub fn claim_reviewed_mail_delivery(
         metadata: Some(metadata.to_string()),
         ..message
     });
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: "erp.claim_reviewed_mail_delivery".into(),
-            correlation_id: format!("mail:{message_id}:claim:{}", review.review_id),
-            changes: vec![RowChange::upsert_stdb_row(
-                "mail_message",
-                serde_json::json!({"id": message_id}),
-                &updated,
-            )?],
-        },
-    )?;
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "claim_reviewed_mail_delivery",
@@ -1106,7 +1100,25 @@ pub fn claim_reviewed_mail_delivery(
             changed_fields: vec!["metadata".into()],
             metadata: None,
         },
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.claim_reviewed_mail_delivery".into(),
+            correlation_id: format!("mail:{message_id}:claim:{}", review.review_id),
+            changes: merge_business_audit_changes(
+                vec![RowChange::upsert_stdb_row(
+                    "mail_message",
+                    serde_json::json!({"id": message_id}),
+                    &updated,
+                )?],
+                business_audit_changes,
+            )?,
+        },
     )?;
+
     Ok(())
 }
 

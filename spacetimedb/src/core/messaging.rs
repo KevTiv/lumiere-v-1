@@ -1,3 +1,4 @@
+use crate::core::business_changes::write_business_audit;
 /// Messaging (Chatter) — MailMessage & MailFollower
 ///
 /// Backs the `message_ids` and `message_follower_ids` Vec<u64> fields on 30+ tables.
@@ -5,7 +6,7 @@
 /// Design: polymorphic association via `model` + `res_id`.
 /// Clients query messages by model+res_id rather than through the Vec<u64> fields.
 /// The Vec<u64> fields on parent tables remain for backwards-compat but are not maintained.
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
@@ -364,6 +365,7 @@ pub fn mark_mail_message_delivered(
     message_id: u64,
     delivery_metadata: Option<String>,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     let message = ctx
         .db
         .mail_message()
@@ -400,21 +402,7 @@ pub fn mark_mail_message_delivered(
         metadata,
         ..message
     });
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: "erp.mark_mail_message_delivered".into(),
-            correlation_id: format!("mail:{message_id}:provider-accepted"),
-            changes: vec![RowChange::upsert_stdb_row(
-                "mail_message",
-                serde_json::json!({"id":message_id}),
-                &updated,
-            )?],
-        },
-    )?;
-
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "mark_mail_message_delivered",
@@ -427,6 +415,23 @@ pub fn mark_mail_message_delivered(
             new_values: Some(r#"{"delivery":"sent"}"#.to_string()),
             changed_fields: vec!["metadata".to_string()],
             metadata: None,
+        },
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.mark_mail_message_delivered".into(),
+            correlation_id: format!("mail:{message_id}:provider-accepted"),
+            changes: merge_business_audit_changes(
+                vec![RowChange::upsert_stdb_row(
+                    "mail_message",
+                    serde_json::json!({"id":message_id}),
+                    &updated,
+                )?],
+                business_audit_changes,
+            )?,
         },
     )?;
 

@@ -1,10 +1,11 @@
+use crate::core::business_changes::write_business_audit;
 /// Opportunities Module — Opportunity Management
 ///
 /// Tables:
 ///   - Opportunity
 ///   - OpportunityStage
 ///   - OpportunityLine
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::tax_management::account_tax;
@@ -1302,6 +1303,7 @@ pub fn convert_opportunity_to_sale_order(
     opportunity_id: u64,
     params: ConvertOpportunityParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "opportunity", "write")?;
 
     let opp = ctx
@@ -1498,7 +1500,7 @@ pub fn convert_opportunity_to_sale_order(
         ..opp
     });
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "convert_opportunity_to_sale_order",
@@ -1527,7 +1529,7 @@ pub fn convert_opportunity_to_sale_order(
             ],
             metadata: None,
         },
-    )?;
+    )?);
 
     let opportunity = ctx
         .db
@@ -1601,7 +1603,7 @@ pub fn convert_opportunity_to_sale_order(
             organization_id,
             operation_id: "erp.convert_opportunity_to_sale_order".to_string(),
             correlation_id: format!("opportunity:{opportunity_id}:sale-order:{}", sale_order.id),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

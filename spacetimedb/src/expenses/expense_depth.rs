@@ -1,5 +1,6 @@
 //! Wave C — mileage/per diem rates, split allocations, project rebill.
 use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::analytic_accounting::account_analytic_account;
@@ -797,6 +798,7 @@ pub fn create_expense_project_rebill(
     sheet_id: u64,
     params: CreateExpenseProjectRebillParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "hr_expense_sheet", "post")?;
     check_permission(ctx, organization_id, "account_move", "create")?;
 
@@ -1095,7 +1097,7 @@ pub fn create_expense_project_rebill(
         ..sheet
     });
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "create_expense_project_rebill",
@@ -1117,7 +1119,7 @@ pub fn create_expense_project_rebill(
             changed_fields: vec!["rebill_move_id".into()],
             metadata: None,
         },
-    )?;
+    )?);
 
     let rebill_project_set: std::collections::BTreeSet<u64> =
         rebill_project_ids.iter().copied().collect();
@@ -1148,11 +1150,7 @@ pub fn create_expense_project_rebill(
         .find(&move_record.id)
         .ok_or("Rebill move not found after posting")?;
     let mut changes = vec![
-        RowChange::upsert_stdb_row(
-            "hr_expense_sheet",
-            serde_json::json!({"id": sheet.id}),
-            &sheet,
-        )?,
+        RowChange::upsert_stdb_row("expense_sheet", serde_json::json!({"id": sheet.id}), &sheet)?,
         RowChange::upsert_stdb_row(
             "account_move",
             serde_json::json!({"id": move_record.id}),
@@ -1203,7 +1201,7 @@ pub fn create_expense_project_rebill(
             organization_id,
             operation_id: "erp.create_expense_project_rebill".to_string(),
             correlation_id: format!("expense-sheet:{sheet_id}:rebill:{}", move_record.id),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

@@ -189,6 +189,44 @@ pub(crate) fn write_private_business_audit(
     write_business_audit_inner(ctx, organization_id, operation, params, true)
 }
 
+/// Capture into the caller's existing complete organization outcome.
+pub(crate) fn capture_business_audit(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    operation: &'static str,
+    params: AuditLogParams,
+) -> Result<Vec<RowChange>, String> {
+    capture_business_audit_inner(ctx, organization_id, operation, params, false)
+}
+
+pub(crate) fn capture_private_business_audit(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    operation: &'static str,
+    params: AuditLogParams,
+) -> Result<Vec<RowChange>, String> {
+    capture_business_audit_inner(ctx, organization_id, operation, params, true)
+}
+
+fn standalone_journal_blocked(operation: &str) -> Result<bool, String> {
+    static POLICY: std::sync::OnceLock<Result<BTreeSet<String>, String>> =
+        std::sync::OnceLock::new();
+    let policy = POLICY
+        .get_or_init(|| {
+            let policy: Value = serde_json::from_str(include_str!(
+                "../../../../lumiere-codegen/business-history-owner-policy.json"
+            ))
+            .map_err(|e| format!("invalid history owner policy: {e}"))?;
+            let operations = policy["standalone_blocked_operations"]
+                .as_object()
+                .ok_or("history owner policy has no operation dispositions")?;
+            Ok(operations.keys().cloned().collect())
+        })
+        .as_ref()
+        .map_err(Clone::clone)?;
+    Ok(policy.contains(operation))
+}
+
 fn write_business_audit_inner(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -196,6 +234,131 @@ fn write_business_audit_inner(
     mut params: AuditLogParams,
     private_values: bool,
 ) -> Result<(), String> {
+    if standalone_journal_blocked(operation)? {
+        // A native owner already commits the complete business outcome. Until
+        // its explicit capture vector is integrated, retain legacy audit only
+        // instead of inserting an evidence-only prefix before that outcome.
+        if private_values {
+            params.old_values = None;
+            params.new_values = None;
+        }
+        write_audit_log_v2_returning(ctx, organization_id, params);
+        return Ok(());
+    }
+    let rows =
+        capture_business_audit_inner(ctx, organization_id, operation, params, private_values)?;
+    let Some(evidence) = rows.iter().find(|row| {
+        matches!(
+            row.table_name.as_str(),
+            "business_change" | "organization_business_change"
+        )
+    }) else {
+        return Ok(());
+    };
+    let id = evidence
+        .row_identity
+        .get("id")
+        .ok_or("private history identity missing")?;
+    let prefix = if evidence.table_name == "organization_business_change" {
+        "organization-business-change"
+    } else {
+        "business-change"
+    };
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: format!("erp.{operation}"),
+            correlation_id: format!("{prefix}:{id}"),
+            changes: rows,
+        },
+    )?;
+    Ok(())
+}
+
+fn canonical_source_table(table: &str) -> &str {
+    match table {
+        "hr_expense_sheet" => "expense_sheet",
+        "document_folder" => "doc_folder",
+        "knowledge_article_category" => "kb_category",
+        other => other,
+    }
+}
+
+fn identity_number(value: &Value) -> Option<u64> {
+    value.as_u64().or_else(|| value.as_str()?.parse().ok())
+}
+
+/// Merge only exact audit/evidence identities; unrelated business rows retain
+/// the owner's original ordering and duplicate validation behavior.
+pub(crate) fn merge_business_audit_changes(
+    mut changes: Vec<RowChange>,
+    evidence: Vec<RowChange>,
+) -> Result<Vec<RowChange>, String> {
+    use crate::core::persistence::RowChangeKind;
+    for row in &evidence {
+        if !matches!(
+            row.table_name.as_str(),
+            "audit_log" | "business_change" | "organization_business_change"
+        ) {
+            return Err("history capture returned a non-evidence row".into());
+        }
+        if row.table_name != "audit_log" {
+            let RowChangeKind::Upsert(value) = &row.kind else {
+                return Err("private history must append an immutable row".into());
+            };
+            let resource = value["resource"]
+                .as_str()
+                .ok_or("private history source resource missing")?;
+            let record = identity_number(&value["record_id"])
+                .ok_or("private history source record missing")?;
+            if !changes.iter().any(|source| {
+                canonical_source_table(&source.table_name) == canonical_source_table(resource)
+                    && (identity_number(&source.row_identity["id"]) == Some(record)
+                        || (resource == "organization_settings"
+                            && identity_number(&source.row_identity["organization_id"])
+                                == Some(record)))
+            }) {
+                return Err(format!(
+                    "history source {resource}:{record} is absent from its complete owner outcome"
+                ));
+            }
+            let audit_id = identity_number(&value["audit_log_id"])
+                .ok_or("private history audit identity missing")?;
+            if !changes.iter().chain(evidence.iter()).any(|audit| {
+                audit.table_name == "audit_log"
+                    && identity_number(&audit.row_identity["id"]) == Some(audit_id)
+            }) {
+                return Err("private history audit is absent from its owner outcome".into());
+            }
+        }
+    }
+    for row in evidence {
+        if let Some(existing) = changes.iter().find(|existing| {
+            existing.table_name == row.table_name && existing.row_identity == row.row_identity
+        }) {
+            let equal = match (&existing.kind, &row.kind) {
+                (RowChangeKind::Upsert(a), RowChangeKind::Upsert(b)) => a == b,
+                (RowChangeKind::Delete, RowChangeKind::Delete) => true,
+                _ => false,
+            };
+            if !equal {
+                return Err("conflicting audit/evidence row identity in owner outcome".into());
+            }
+        } else {
+            changes.push(row);
+        }
+    }
+    Ok(changes)
+}
+
+fn capture_business_audit_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    operation: &'static str,
+    mut params: AuditLogParams,
+    private_values: bool,
+) -> Result<Vec<RowChange>, String> {
     let company_id = params.company_id;
     if organization_id == 0 || company_id == Some(0) || params.record_id == 0 {
         // Authentication and aggregate-wide administrative producers can have
@@ -206,7 +369,7 @@ fn write_business_audit_inner(
             params.new_values = None;
         }
         write_audit_log_v2_returning(ctx, organization_id, params);
-        return Ok(());
+        return Ok(Vec::new());
     }
     let captured = evidence(&params);
     if private_values {
@@ -223,7 +386,7 @@ fn write_business_audit_inner(
     );
     let audit = write_audit_log_v2_returning(ctx, organization_id, params);
     if captured.unchanged {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let audit_change =
         RowChange::upsert_stdb_row("audit_log", serde_json::json!({"id":audit.id}), &audit)?;
@@ -247,23 +410,14 @@ fn write_business_audit_inner(
                 changes_json: captured.deltas.to_string(),
                 audit_log_id: audit.id,
             });
-        record_organization_commit(
-            ctx,
-            OrganizationCommitInput {
-                organization_id,
-                operation_id: format!("erp.{operation}"),
-                correlation_id: format!("organization-business-change:{}", change.id),
-                changes: vec![
-                    audit_change,
-                    RowChange::upsert_stdb_row(
-                        "organization_business_change",
-                        serde_json::json!({"id":change.id}),
-                        &change,
-                    )?,
-                ],
-            },
-        )?;
-        return Ok(());
+        return Ok(vec![
+            audit_change,
+            RowChange::upsert_stdb_row(
+                "organization_business_change",
+                serde_json::json!({"id":change.id}),
+                &change,
+            )?,
+        ]);
     };
     let change = ctx.db.business_change().insert(BusinessChange {
         id: 0,
@@ -282,23 +436,14 @@ fn write_business_audit_inner(
         changes_json: captured.deltas.to_string(),
         audit_log_id: audit.id,
     });
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: format!("erp.{operation}"),
-            correlation_id: format!("business-change:{}", change.id),
-            changes: vec![
-                audit_change,
-                RowChange::upsert_stdb_row(
-                    "business_change",
-                    serde_json::json!({"id":change.id}),
-                    &change,
-                )?,
-            ],
-        },
-    )?;
-    Ok(())
+    Ok(vec![
+        audit_change,
+        RowChange::upsert_stdb_row(
+            "business_change",
+            serde_json::json!({"id":change.id}),
+            &change,
+        )?,
+    ])
 }
 
 #[cfg(test)]
@@ -439,5 +584,73 @@ mod tests {
             ))
             .unchanged
         );
+    }
+
+    fn row(table: &str, id: u64, value: Value) -> RowChange {
+        RowChange {
+            table_name: table.into(),
+            row_identity: serde_json::json!({"id":id}),
+            kind: crate::core::persistence::RowChangeKind::Upsert(value),
+        }
+    }
+
+    fn private_row(source: &str, id: u64) -> RowChange {
+        row(
+            "business_change",
+            3,
+            serde_json::json!({"resource":source,"record_id":id,"audit_log_id":2}),
+        )
+    }
+
+    #[test]
+    fn owned_merge_deduplicates_only_equal_evidence_and_retains_real_source() {
+        let original = vec![
+            row("product", 1, serde_json::json!({"name":"saved"})),
+            row("audit_log", 2, serde_json::json!({"action":"UPDATE"})),
+        ];
+        let evidence = vec![
+            row("audit_log", 2, serde_json::json!({"action":"UPDATE"})),
+            private_row("product", 1),
+        ];
+        let result =
+            merge_business_audit_changes(original, evidence).expect("same exact audit row");
+        assert_eq!(result.len(), 3);
+        assert!(merge_business_audit_changes(
+            vec![
+                row("product", 1, serde_json::json!({})),
+                row("audit_log", 2, serde_json::json!({"action":"UPDATE"}))
+            ],
+            vec![row("audit_log", 2, serde_json::json!({"action":"DELETE"}))]
+        )
+        .is_err());
+        assert!(merge_business_audit_changes(
+            vec![],
+            vec![
+                row("audit_log", 2, serde_json::json!({})),
+                private_row("product", 1)
+            ]
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn owned_merge_accepts_exact_deleted_sources_and_reviewed_aliases() {
+        for (legacy, actual) in [
+            ("hr_expense_sheet", "expense_sheet"),
+            ("document_folder", "doc_folder"),
+            ("knowledge_article_category", "kb_category"),
+        ] {
+            let result = merge_business_audit_changes(
+                vec![RowChange::delete(actual, serde_json::json!({"id":7}))],
+                vec![
+                    row("audit_log", 2, serde_json::json!({})),
+                    private_row(legacy, 7),
+                ],
+            )
+            .expect("exact deleted source identity");
+            assert_eq!(result.len(), 3);
+        }
+        assert!(standalone_journal_blocked("post_account_move").expect("valid owner policy"));
+        assert!(!standalone_journal_blocked("update_product").expect("valid owner policy"));
     }
 }

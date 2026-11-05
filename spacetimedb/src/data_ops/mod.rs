@@ -17,6 +17,7 @@ pub mod expenses_imports;
 pub mod helpdesk_imports;
 pub mod helpers;
 pub mod hr_imports;
+mod import_history;
 pub mod import_mapping_templates;
 pub mod import_tracker;
 pub mod inventory_imports;

@@ -1,6 +1,6 @@
 //! Immutable vehicle service and inspection history.
 
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -240,6 +240,7 @@ pub fn record_fleet_service(
     company_id: u64,
     params: RecordFleetServiceParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "fleet_vehicle", "write")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     let request_id = request_id(params.client_request_id.clone())?;
@@ -425,7 +426,7 @@ pub fn record_fleet_service(
         ..vehicle
     };
     ctx.db.fleet_vehicle().id().update(vehicle.clone());
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "record_fleet_service",
@@ -455,25 +456,28 @@ pub fn record_fleet_service(
             ],
             metadata: None,
         },
-    )?;
+    )?);
     record_organization_commit(
         ctx,
         OrganizationCommitInput {
             organization_id,
             operation_id: "erp.record_fleet_service".into(),
             correlation_id: request_id.unwrap_or_else(|| format!("fleet-service:{}", row.id)),
-            changes: vec![
-                RowChange::upsert_stdb_row(
-                    "fleet_service_record",
-                    serde_json::json!({"id": row.id}),
-                    &row,
-                )?,
-                RowChange::upsert_stdb_row(
-                    "fleet_vehicle",
-                    serde_json::json!({"id": vehicle.id}),
-                    &vehicle,
-                )?,
-            ],
+            changes: merge_business_audit_changes(
+                vec![
+                    RowChange::upsert_stdb_row(
+                        "fleet_service_record",
+                        serde_json::json!({"id": row.id}),
+                        &row,
+                    )?,
+                    RowChange::upsert_stdb_row(
+                        "fleet_vehicle",
+                        serde_json::json!({"id": vehicle.id}),
+                        &vehicle,
+                    )?,
+                ],
+                business_audit_changes,
+            )?,
         },
     )?;
     Ok(())
@@ -486,6 +490,7 @@ pub fn record_fleet_inspection(
     company_id: u64,
     params: RecordFleetInspectionParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "fleet_vehicle", "write")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     let outcome = FleetInspectionOutcome::parse(&params.outcome)?;
@@ -542,7 +547,7 @@ pub fn record_fleet_inspection(
         ..vehicle
     };
     ctx.db.fleet_vehicle().id().update(vehicle.clone());
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "record_fleet_inspection",
@@ -563,25 +568,28 @@ pub fn record_fleet_inspection(
             changed_fields: vec!["vehicle_id".into(), "outcome".into()],
             metadata: None,
         },
-    )?;
+    )?);
     record_organization_commit(
         ctx,
         OrganizationCommitInput {
             organization_id,
             operation_id: "erp.record_fleet_inspection".into(),
             correlation_id: request_id.unwrap_or_else(|| format!("fleet-inspection:{}", row.id)),
-            changes: vec![
-                RowChange::upsert_stdb_row(
-                    "fleet_inspection",
-                    serde_json::json!({"id": row.id}),
-                    &row,
-                )?,
-                RowChange::upsert_stdb_row(
-                    "fleet_vehicle",
-                    serde_json::json!({"id": vehicle.id}),
-                    &vehicle,
-                )?,
-            ],
+            changes: merge_business_audit_changes(
+                vec![
+                    RowChange::upsert_stdb_row(
+                        "fleet_inspection",
+                        serde_json::json!({"id": row.id}),
+                        &row,
+                    )?,
+                    RowChange::upsert_stdb_row(
+                        "fleet_vehicle",
+                        serde_json::json!({"id": vehicle.id}),
+                        &vehicle,
+                    )?,
+                ],
+                business_audit_changes,
+            )?,
         },
     )?;
     Ok(())

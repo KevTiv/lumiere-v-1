@@ -8,11 +8,13 @@ use std::collections::HashSet;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
+use crate::core::business_changes::{capture_private_business_audit, native_row_snapshot};
 use crate::core::organization::require_company_in_organization;
 use crate::core::users::user_organization;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{
+    check_permission, write_audit_log_v2, write_audit_log_v2_returning, AuditLogParams,
+};
 use crate::inventory::product::{product, Product};
 use crate::inventory::warehouse::stock_location;
 use crate::{
@@ -381,7 +383,7 @@ pub fn record_import_created_id(
         row_number,
         create_date: ctx.timestamp,
     });
-    write_private_business_audit(
+    let _staged_history = capture_private_business_audit(
         ctx,
         job.organization_id,
         operation,
@@ -1373,7 +1375,7 @@ pub fn import_csv_tracked(
         });
         job_id
     };
-    write_audit_log_v2(
+    let submission_audit = write_audit_log_v2_returning(
         ctx,
         organization_id,
         AuditLogParams {
@@ -1395,6 +1397,14 @@ pub fn import_csv_tracked(
             metadata: Some(expected.to_string()),
         },
     );
+    if retry.is_none() {
+        super::import_history::persist_tracked_import_history(
+            ctx,
+            organization_id,
+            job_id,
+            &submission_audit,
+        )?;
+    }
     Ok(())
 }
 

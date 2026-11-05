@@ -3,6 +3,7 @@
 //! consignment agreements, approval delegates, commodity index hooks,
 //! and customs / e-invoice integration intent/result tracking.
 use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::{require_active_currency_id, require_contact_in_scope};
@@ -614,6 +615,7 @@ pub fn release_blanket_to_po(
     blanket_order_id: u64,
     params: ReleaseBlanketToPoParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "purchase_order", "create")?;
     require_purchasing_ri_phase0_unsafe_actions_enabled(ctx, organization_id)?;
     require_advanced_company(ctx, organization_id, company_id)?;
@@ -794,7 +796,7 @@ pub fn release_blanket_to_po(
             ..blanket
         });
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "release_blanket_to_po",
@@ -817,7 +819,7 @@ pub fn release_blanket_to_po(
             ],
             metadata: None,
         },
-    )?;
+    )?);
 
     let committed_blanket = ctx
         .db
@@ -880,7 +882,7 @@ pub fn release_blanket_to_po(
             organization_id,
             operation_id: "erp.release_blanket_to_po".to_string(),
             correlation_id: format!("blanket-order:{blanket_order_id}:release:{idempotency_key}"),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
     Ok(())

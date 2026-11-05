@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "policy": "standalone-journal-blocked-until-exact-owner-envelope-integration",
+  "standalone_blocked_operations": {
+    "add_document_version": [
+      "add_document_version"
+    ],
+    "add_form_field": [
+      "apply_org_migrations",
+      "bootstrap_new_tenant"
+    ],
+    "add_purchase_order_line": [
+      "decide_workflow_human_task",
+      "release_blanket_to_po"
+    ],
+    "approve_ai_action_draft": [
+      "decide_workflow_human_task"
+    ],
+    "approve_expense_sheet": [
+      "decide_workflow_human_task"
+    ],
+    "bootstrap_new_tenant": [
+      "bootstrap_new_tenant"
+    ],
+    "claim_reviewed_mail_delivery": [
+      "claim_reviewed_mail_delivery"
+    ],
+    "confirm_purchase_order": [
+      "decide_workflow_human_task"
+    ],
+    "confirm_sales_order": [
+      "decide_workflow_human_task"
+    ],
+    "convert_opportunity_to_sale_order": [
+      "convert_opportunity_to_sale_order"
+    ],
+    "create_account_move": [
+      "finish_manufacturing_order",
+      "finish_manufacturing_order_with_tracking",
+      "record_fleet_service"
+    ],
+    "create_contact": [
+      "create_contact"
+    ],
+    "create_document": [
+      "create_document"
+    ],
+    "create_expense_project_rebill": [
+      "create_expense_project_rebill"
+    ],
+    "create_form_configuration": [
+      "apply_org_migrations",
+      "bootstrap_new_tenant"
+    ],
+    "create_invoice_from_sale_order": [
+      "create_invoice_from_sale_order"
+    ],
+    "create_lead": [
+      "create_lead"
+    ],
+    "create_manual_account_invoice": [
+      "create_manual_account_invoice"
+    ],
+    "create_opportunity": [
+      "create_opportunity"
+    ],
+    "create_payment": [
+      "reconcile_account_bank_statement_line",
+      "resubmit_bank_statement_settlement"
+    ],
+    "create_purchase_order": [
+      "create_purchase_order_once",
+      "decide_workflow_human_task",
+      "release_blanket_to_po"
+    ],
+    "create_sale_order": [
+      "convert_opportunity_to_sale_order",
+      "convert_proposal_to_sale_order",
+      "create_sale_order",
+      "decide_workflow_human_task"
+    ],
+    "create_stock_move": [
+      "consume_mo_materials",
+      "decide_workflow_human_task",
+      "finish_manufacturing_order",
+      "finish_manufacturing_order_with_tracking",
+      "scrap_finished_manufacturing_output",
+      "scrap_manufacturing_material",
+      "scrap_tracked_manufacturing_output"
+    ],
+    "create_stock_picking": [
+      "decide_workflow_human_task"
+    ],
+    "create_subscription_from_sale_order": [
+      "create_subscription_from_sale_order"
+    ],
+    "create_workorder_quality_check": [
+      "create_workorder_quality_check"
+    ],
+    "done_stock_move": [
+      "consume_mo_materials",
+      "finish_manufacturing_order",
+      "finish_manufacturing_order_with_tracking",
+      "scrap_finished_manufacturing_output",
+      "scrap_manufacturing_material",
+      "scrap_tracked_manufacturing_output"
+    ],
+    "fail_quality_check": [
+      "fail_quality_check"
+    ],
+    "fail_workorder_quality_check": [
+      "fail_workorder_quality_check"
+    ],
+    "mark_mail_message_delivered": [
+      "mark_mail_message_delivered"
+    ],
+    "move_stock_quant": [
+      "move_stock_quant",
+      "scrap_finished_manufacturing_output",
+      "scrap_manufacturing_material",
+      "scrap_tracked_manufacturing_output"
+    ],
+    "pass_quality_check": [
+      "pass_quality_check"
+    ],
+    "post_account_move": [
+      "decide_workflow_human_task",
+      "finish_manufacturing_order",
+      "finish_manufacturing_order_with_tracking",
+      "record_fleet_service"
+    ],
+    "post_cycle_count_adjustments": [
+      "post_cycle_count_adjustments"
+    ],
+    "post_payment": [
+      "decide_workflow_human_task",
+      "post_payment",
+      "reconcile_account_bank_statement_line",
+      "resubmit_bank_statement_settlement"
+    ],
+    "post_payment_transaction": [
+      "decide_workflow_human_task"
+    ],
+    "publish_form_configuration": [
+      "apply_org_migrations",
+      "bootstrap_new_tenant",
+      "publish_form_configuration"
+    ],
+    "queue_mail_from_template": [
+      "queue_mail_from_template"
+    ],
+    "reconcile_account_bank_statement_line": [
+      "reconcile_account_bank_statement_line",
+      "resubmit_bank_statement_settlement"
+    ],
+    "reconcile_payment_with_invoice": [
+      "reconcile_account_bank_statement_line",
+      "resubmit_bank_statement_settlement"
+    ],
+    "record_fleet_inspection": [
+      "record_fleet_inspection"
+    ],
+    "record_fleet_service": [
+      "record_fleet_service"
+    ],
+    "record_generated_owner_report": [
+      "record_generated_owner_report"
+    ],
+    "register_payment_on_invoice": [
+      "reconcile_account_bank_statement_line",
+      "resubmit_bank_statement_settlement"
+    ],
+    "release_blanket_to_po": [
+      "release_blanket_to_po"
+    ],
+    "repair_cancelled_workflow_tasks": [
+      "repair_cancelled_workflow_tasks"
+    ],
+    "resubmit_workflow_human_task": [
+      "resubmit_workflow_human_task"
+    ],
+    "reverse_bank_statement_settlement": [
+      "decide_workflow_human_task",
+      "reverse_bank_statement_settlement"
+    ],
+    "reverse_payment_transaction": [
+      "decide_workflow_human_task"
+    ],
+    "send_purchase_order": [
+      "decide_workflow_human_task"
+    ],
+    "set_form_role_config": [
+      "apply_org_migrations",
+      "bootstrap_new_tenant"
+    ],
+    "update_account_move_line": [
+      "update_account_move_line"
+    ],
+    "upsert_warehouse_geo": [
+      "upsert_warehouse_geo"
+    ]
+  }
+}

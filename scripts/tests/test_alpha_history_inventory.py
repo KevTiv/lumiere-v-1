@@ -75,6 +75,32 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(observation["private_providers"], inventory.PRIVATE_PROVIDERS)
         self.assertFalse(observation["legacy_audit_signal"])
 
+    def test_guarded_standalone_path_is_excluded_from_private_provider_count(self):
+        start = {"source": "owner.rs", "line": 10, "body": "create_record(ctx);"}
+        target = {"source": "helper.rs", "line": 20,
+                  "body": 'write_private_business_audit(ctx, org, "create_thing", params)?;'}
+        result = inventory.capture_observation(start, {"create_record": [target]}, blocked_operations={"create_thing"})
+        self.assertFalse(result["private_providers"])
+        self.assertEqual(result["guarded_legacy_operations"], ["create_thing"])
+
+    def test_unmerged_capture_vector_does_not_count_as_private_history(self):
+        row = {"source": "owner.rs", "line": 20, "function": "owner",
+               "body": 'capture_private_business_audit(ctx, org, "create_thing", params)?;'}
+        result = inventory.capture_observation(row, {}, complete_owners={("owner.rs", "owner")})
+        self.assertFalse(result["private_providers"])
+        self.assertTrue(result["unmerged_capture_only"])
+        row["body"] += 'record_organization_commit(ctx, OrganizationCommitInput { changes: merge_business_audit_changes(rows, evidence)? })?;'
+        result = inventory.capture_observation(row, {}, complete_owners={("owner.rs", "owner")})
+        self.assertTrue(result["private_providers"])
+        self.assertTrue(result["paths"][0]["owner_merged_capture_signal"])
+
+    def test_dynamic_capture_policy_is_not_guessed_from_helper_name(self):
+        row = {"source": "helper.rs", "line": 20, "function": "helper",
+               "body": "write_business_audit(ctx, org, operation, params)?;"}
+        result = inventory.capture_observation(row, {})
+        self.assertFalse(result["private_providers"])
+        self.assertTrue(result["unresolved_policy"])
+
     def test_missing_service_owner_cannot_disappear_silently(self):
         with tempfile.TemporaryDirectory() as directory, \
                 mock.patch.object(inventory, "SERVICE_PATHS", [("example", "route.rs", "missing", "settings")]):
@@ -185,9 +211,27 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(producers["import_contact_csv"]["private_provider_candidates"], inventory.PRIVATE_PROVIDERS)
         for operation in producers:
             row = self.rows[operation]
-            self.assertTrue(row["capture_observation"]["private_providers"])
+            self.assertFalse(row["capture_observation"]["private_providers"])
             self.assertTrue(row["capture_observation"]["import_receipt_signal"])
-            self.assertEqual(row["history_status"], "delegated-helper-observed-branch-and-fields-unverified")
+            self.assertEqual(row["history_status"], "capture-not-merged-no-private-history")
+
+    def test_tracked_import_scope_is_conditional_and_never_a_universal_provider_count(self):
+        row = self.rows["import_csv_tracked"]
+        self.assertEqual(row["history_status"], "conditional-typed-import-owner-not-universal-history")
+        self.assertFalse(row["capture_observation"]["private_providers"])
+        targets = row["capture_observation"]["conditional_provider_targets"]
+        self.assertEqual(set(targets), {"product", "contact", "stock_location", "account_move", "account_move_line"})
+        self.assertNotIn("budget", targets)
+        self.assertEqual(targets["product"], ["organization_business_change"])
+        self.assertEqual(targets["account_move"], ["business_change"])
+
+    def test_guarded_legacy_roots_do_not_enter_private_capture_counts(self):
+        guarded = [row for row in self.rows.values() if row["history_status"] == "guarded-owner-fallback-no-private-capture"]
+        self.assertTrue(guarded)
+        for row in guarded:
+            self.assertTrue(row["capture_observation"]["guarded_legacy_operations"])
+            self.assertFalse(row["capture_observation"]["private_providers"])
+        self.assertTrue(self.rows["add_document_version"]["owner_merged_capture_signal"])
 
     def test_module_counts_classify_every_candidate_without_double_counting_shared_events(self):
         summary = self.payload["summary"]

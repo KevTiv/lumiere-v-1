@@ -1,3 +1,4 @@
+use crate::core::business_changes::write_business_audit;
 /// Document Management Module — Files, versions, and folder hierarchy
 ///
 /// # Tables
@@ -6,7 +7,7 @@
 /// | **DocumentFolder** | Folder hierarchy for organizing documents |
 /// | **Document** | File documents with metadata and access control |
 /// | **DocumentVersion** | Version history for documents |
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
@@ -860,6 +861,7 @@ pub fn add_document_version(
     document_id: u64,
     params: AddDocumentVersionParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "document", "write")?;
     validate_blob_registration(
         &params.url,
@@ -958,7 +960,7 @@ pub fn add_document_version(
         ..doc
     });
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "add_document_version",
@@ -972,7 +974,7 @@ pub fn add_document_version(
             changed_fields: vec!["new_version".to_string()],
             metadata: None,
         },
-    )?;
+    )?);
 
     let committed_document = ctx
         .db
@@ -1012,7 +1014,7 @@ pub fn add_document_version(
             organization_id,
             operation_id: "erp.add_document_version".to_string(),
             correlation_id: format!("document:{document_id}:version:{new_version_number}"),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

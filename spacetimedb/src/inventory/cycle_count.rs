@@ -1,9 +1,10 @@
+use crate::core::business_changes::write_business_audit;
 /// Cycle Counting — Tables and Reducers
 ///
 /// Tables:
 ///   - StockCycleCount
 ///   - StockCountSheet
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
@@ -492,6 +493,7 @@ pub fn post_cycle_count_adjustments(
     company_id: u64,
     cycle_count_id: u64,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "stock_cycle_count", "write")?;
 
     let cycle = ctx
@@ -549,23 +551,25 @@ pub fn post_cycle_count_adjustments(
         return Err("cannot post cycle count without lines".to_string());
     }
     let mut adjusted_quant_ids = Vec::with_capacity(prepared_lines.len());
+    let mut processed_sheets = Vec::with_capacity(prepared_lines.len());
     for (sheet, prepared) in prepared_lines {
         adjusted_quant_ids.push(apply_correction(ctx, prepared));
-        ctx.db.stock_count_sheet().id().update(StockCountSheet {
+        let processed = ctx.db.stock_count_sheet().id().update(StockCountSheet {
             is_processed: true,
             processed_at: Some(ctx.timestamp),
             ..sheet
         });
+        processed_sheets.push(processed);
     }
 
-    ctx.db.stock_cycle_count().id().update(StockCycleCount {
+    let posted_cycle = ctx.db.stock_cycle_count().id().update(StockCycleCount {
         state: "posted".to_string(),
         last_count_date: Some(ctx.timestamp),
         updated_at: ctx.timestamp,
         ..cycle
     });
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "post_cycle_count_adjustments",
@@ -579,7 +583,7 @@ pub fn post_cycle_count_adjustments(
             changed_fields: vec!["state".to_string(), "last_count_date".to_string()],
             metadata: None,
         },
-    )?;
+    )?);
 
     // Capture the exact quant outcomes this post produced. Every id here was
     // resolved by the shared exact correction identity or is a fresh insert
@@ -600,13 +604,26 @@ pub fn post_cycle_count_adjustments(
             &quant_after,
         )?);
     }
+    changed_quants.push(RowChange::upsert_stdb_row(
+        "stock_cycle_count",
+        serde_json::json!({"id": posted_cycle.id}),
+        &posted_cycle,
+    )?);
+    processed_sheets.sort_by_key(|sheet| sheet.id);
+    for sheet in &processed_sheets {
+        changed_quants.push(RowChange::upsert_stdb_row(
+            "stock_count_sheet",
+            serde_json::json!({"id": sheet.id}),
+            sheet,
+        )?);
+    }
     record_organization_commit(
         ctx,
         OrganizationCommitInput {
             organization_id,
             operation_id: "erp.post_cycle_count_adjustments".to_string(),
             correlation_id: format!("cycle-count:{cycle_count_id}:post"),
-            changes: changed_quants,
+            changes: merge_business_audit_changes(changed_quants, business_audit_changes)?,
         },
     )?;
 

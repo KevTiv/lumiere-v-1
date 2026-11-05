@@ -17,6 +17,7 @@
 //! Custom fields use the `custom:` prefix convention (e.g., "custom:deals_touched").
 
 use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{account_move, account_move_line};
@@ -1693,6 +1694,7 @@ pub fn publish_form_configuration(
     organization_id: u64,
     params: PublishFormConfigurationParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     let existing = ctx.db.form_config().iter().find(|c| {
         c.organization_id == organization_id
             && c.module_id == params.module_id
@@ -1843,7 +1845,7 @@ pub fn publish_form_configuration(
         });
     }
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "publish_form_configuration",
@@ -1869,7 +1871,7 @@ pub fn publish_form_configuration(
             ],
             metadata: Some("publish_form_configuration".to_string()),
         },
-    )?;
+    )?);
 
     let committed_config = ctx
         .db
@@ -1955,7 +1957,7 @@ pub fn publish_form_configuration(
                 "form:{}/{}:config:{}",
                 params.module_id, params.form_id, configuration_id
             ),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

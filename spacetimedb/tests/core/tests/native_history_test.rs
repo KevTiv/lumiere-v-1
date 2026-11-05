@@ -1,11 +1,17 @@
 //! Persisted native coverage for explicit company and organization-wide history.
 
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
 use crate::core::audit::{log_audit_event, LogAuditEventParams};
 use crate::core::business_changes::{business_change, organization_business_change};
 use crate::core::persistence::{organization_commit, organization_row_change};
-use crate::fleet::fleet::{create_fleet_vehicle, fleet_vehicle, CreateFleetVehicleParams};
+use crate::fleet::fleet::{
+    create_fleet_vehicle, fleet_vehicle, upsert_warehouse_geo, warehouse_geo,
+    CreateFleetVehicleParams,
+};
+use crate::fleet::lifecycle::{
+    fleet_inspection, record_fleet_inspection, RecordFleetInspectionParams,
+};
 use crate::inventory::product::{product, update_product, UpdateProductParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
@@ -119,6 +125,80 @@ pub(super) fn test_native_audit_capture(ctx: &ReducerContext) -> Result<(), Stri
         return Err("company-owned native history lost scope or creation values".into());
     }
 
+    let before = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&org)
+        .map(|row| row.sequence)
+        .max()
+        .unwrap_or(0);
+    upsert_warehouse_geo(
+        ctx,
+        org,
+        fixture.warehouse_id,
+        1.0,
+        2.0,
+        None,
+        None,
+        None,
+        None,
+    )?;
+    let geo = ctx
+        .db
+        .warehouse_geo()
+        .warehouse_geo_by_warehouse()
+        .filter(&fixture.warehouse_id)
+        .next()
+        .ok_or("Warehouse geo history fixture missing")?;
+    assert_one_owner_envelope(
+        ctx,
+        org,
+        before,
+        "erp.upsert_warehouse_geo",
+        "warehouse_geo",
+        geo.id,
+        "organization_business_change",
+    )?;
+    let before = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&org)
+        .map(|row| row.sequence)
+        .max()
+        .unwrap_or(0);
+    record_fleet_inspection(
+        ctx,
+        org,
+        fixture.company_id,
+        RecordFleetInspectionParams {
+            vehicle_id: vehicle.id,
+            inspector_id: None,
+            inspected_at: None,
+            outcome: "passed".into(),
+            odometer_km: Some(10.0),
+            notes: None,
+            client_request_id: None,
+        },
+    )?;
+    let inspection = ctx
+        .db
+        .fleet_inspection()
+        .fleet_inspection_by_vehicle()
+        .filter(&vehicle.id)
+        .next()
+        .ok_or("Inspection history fixture missing")?;
+    assert_one_owner_envelope(
+        ctx,
+        org,
+        before,
+        "erp.record_fleet_inspection",
+        "fleet_inspection",
+        inspection.id,
+        "business_change",
+    )?;
+
     let count = ctx
         .db
         .organization_business_change()
@@ -153,6 +233,51 @@ pub(super) fn test_native_audit_capture(ctx: &ReducerContext) -> Result<(), Stri
         != count
     {
         return Err("caller-authored audit minted trusted organization-wide history".into());
+    }
+    Ok(())
+}
+
+fn assert_one_owner_envelope(
+    ctx: &ReducerContext,
+    org: u64,
+    before: u64,
+    operation: &str,
+    source: &str,
+    record: u64,
+    private_table: &str,
+) -> Result<(), String> {
+    let commits = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_organization()
+        .filter(&org)
+        .filter(|row| row.sequence > before)
+        .collect::<Vec<_>>();
+    let [commit] = commits.as_slice() else {
+        return Err(
+            "history split an authoritative native outcome into multiple organization commits"
+                .into(),
+        );
+    };
+    if commit.operation_id != operation {
+        return Err("native history replaced the owner operation identity".into());
+    }
+    let rows = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_organization()
+        .filter(&org)
+        .filter(|row| row.commit_sequence == commit.sequence)
+        .collect::<Vec<_>>();
+    if !rows.iter().any(|row| {
+        row.table_name == source
+            && serde_json::from_str::<serde_json::Value>(&row.row_identity_json)
+                .ok()
+                .is_some_and(|id| id["id"].as_u64() == Some(record))
+    }) || !rows.iter().any(|row| row.table_name == private_table)
+        || !rows.iter().any(|row| row.table_name == "audit_log")
+    {
+        return Err("native owner outcome omitted its source row, audit or private history".into());
     }
     Ok(())
 }

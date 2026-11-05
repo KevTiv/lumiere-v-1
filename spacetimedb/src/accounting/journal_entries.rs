@@ -1,9 +1,10 @@
+use crate::core::business_changes::write_business_audit;
 /// Journal Entries — AccountMove, AccountMoveLine
 ///
 /// # 7.2 Journal Entries
 ///
 /// Tables for accounting journal entries and move lines.
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::budgeting::{
@@ -3648,6 +3649,7 @@ pub fn create_invoice_from_sale_order(
     sale_order_id: u64,
     params: CreateInvoiceFromSaleOrderParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "account_move", "create")?;
 
     let order = ctx
@@ -3921,7 +3923,7 @@ pub fn create_invoice_from_sale_order(
             ..order
         });
 
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "create_invoice_from_sale_order",
@@ -3946,7 +3948,7 @@ pub fn create_invoice_from_sale_order(
             ],
             metadata: None,
         },
-    )?;
+    )?);
 
     let committed_order = ctx
         .db
@@ -4006,7 +4008,7 @@ pub fn create_invoice_from_sale_order(
             organization_id,
             operation_id: "erp.create_invoice_from_sale_order".to_string(),
             correlation_id: format!("sale-order:{sale_order_id}:invoice:{}", move_record.id),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

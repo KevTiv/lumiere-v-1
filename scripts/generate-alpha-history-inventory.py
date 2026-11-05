@@ -164,20 +164,27 @@ def history_status(signal: dict[str, Any]) -> str:
         return "source-unresolved"
     if signal["trusted_capture_call"]:
         return "trusted-helper-observed-branch-and-fields-unverified"
+    if signal.get("guarded_legacy_operations"):
+        return "guarded-owner-fallback-no-private-capture"
+    if signal.get("unmerged_capture_only_call"):
+        return "capture-not-merged-no-private-history"
+    if signal.get("standalone_policy_unresolved"):
+        return "capture-policy-unresolved-no-private-history"
     if signal["audit_call"]:
         return "audit-only-completeness-and-trust-unverified"
     return "no-direct-history-signal"
 
 
-def source_signals(finance: Any, definition: dict[str, Any] | None, structs: dict[str, Any]) -> dict[str, Any]:
-    signals = finance.source_signals(definition, structs)
+def source_signals(finance: Any, definition: dict[str, Any] | None, structs: dict[str, Any],
+                   blocked_operations: set[str] | None = None,
+                   complete_owners: set[tuple[str, str]] | None = None) -> dict[str, Any]:
+    signals = finance.source_signals(definition, structs, blocked_operations, complete_owners)
     adapted = definition is not None and bool(re.search(r"\b(?:write_business_audit|write_private_business_audit)\s*\(", definition["body"]))
     # The adapter records trusted evidence but can only preserve fields supplied
     # by the domain producer. Its presence never upgrades material completeness.
     signals["business_audit_adapter_call"] = adapted
     signals["private_values_adapter_call"] = definition is not None and bool(
         re.search(r"\bwrite_private_business_audit\s*\(", definition["body"]))
-    signals["trusted_capture_call"] = signals["trusted_capture_call"] or adapted
     signals["audit_call"] = signals["audit_call"] or adapted or (definition is not None and bool(
         re.search(r"\bwrite_audit_log_v2_returning\s*\(", definition["body"])))
     return signals
@@ -190,11 +197,21 @@ def call_names(body: str) -> list[str]:
     return sorted(set(re.findall(r"(?<![.\w])(?:[A-Za-z_]\w*::)*([A-Za-z_]\w*)\s*\(", body)))
 
 
-def capture_observation(definition: dict[str, Any] | None, functions: dict[str, Any]) -> dict[str, Any]:
+def capture_observation(definition: dict[str, Any] | None, functions: dict[str, Any],
+                        finance: Any | None = None, blocked_operations: set[str] | None = None,
+                        complete_owners: set[tuple[str, str]] | None = None,
+                        dynamic_producers: dict[tuple[str, str], list[str]] | None = None,
+                        conditional_owners: dict[tuple[str, str], Any] | None = None,
+                        import_scopes: dict[str, list[str]] | None = None) -> dict[str, Any]:
     """Follow bounded, unambiguous source calls, never certify their execution."""
     if definition is None:
         return {"private_providers": [], "import_receipt_signal": False, "legacy_audit_signal": False,
-                "domain_evidence_tables": [], "paths": [], "scan_limited": False}
+                "domain_evidence_tables": [], "guarded_legacy_operations": [],
+                "unmerged_capture_only": False, "unresolved_policy": False,
+                "conditional_provider_targets": {},
+                "paths": [], "scan_limited": False}
+    finance = finance or load_finance(ROOT)
+    blocked_operations = blocked_operations or set()
     queue = [(definition, [])]
     visited: set[tuple[str, int]] = set()
     paths = []
@@ -203,6 +220,10 @@ def capture_observation(definition: dict[str, Any] | None, functions: dict[str, 
     legacy = False
     domain_evidence: set[str] = set()
     limited = False
+    guarded: set[str] = set()
+    unmerged = False
+    unresolved = False
+    conditional_targets = {}
     while queue:
         row, previous = queue.pop(0)
         identity = (row["source"], row["line"])
@@ -211,26 +232,45 @@ def capture_observation(definition: dict[str, Any] | None, functions: dict[str, 
         visited.add(identity)
         path = [*previous, f"{row['source']}:{row['line']}"]
         calls = call_names(row["body"])
+        signal = finance.source_signals(row, {}, blocked_operations, complete_owners)
+        allowed_dynamic = (dynamic_producers or {}).get((row["source"], row.get("function", "")))
+        dynamic_safe = allowed_dynamic and not set(allowed_dynamic).intersection(blocked_operations)
+        guarded.update(signal["guarded_legacy_operations"])
+        unmerged = unmerged or signal["unmerged_capture_only_call"]
+        unresolved = unresolved or (signal["standalone_policy_unresolved"] and not dynamic_safe)
+        conditional = (conditional_owners or {}).get((row["source"], row.get("function", "")))
+        conditional_merged = bool(conditional and finance.merged_evidence_vector(row["body"])
+                                  and "record_organization_commit" in calls
+                                  and {"source_changes", "audit_matches"}.issubset(calls)
+                                  and '"correlation_version"' in row["body"])
+        if conditional_merged:
+            for table in conditional["targets"]:
+                conditional_targets[table] = (import_scopes or {}).get(table, []).copy()
         captured = []
-        if {"write_business_audit", "write_private_business_audit"}.intersection(calls):
+        if signal["trusted_capture_call"] or (signal["standalone_policy_unresolved"] and dynamic_safe):
             captured = PRIVATE_PROVIDERS.copy()
-        elif "capture_business_change" in calls:
-            captured = ["business_change"]
+            if "capture_business_change" in calls and not signal["owner_merged_capture_call"] and not {
+                "write_business_audit", "write_private_business_audit"}.intersection(calls):
+                captured = ["business_change"]
         imported = bool(re.search(r"\.\s*import_job_record\s*\(\s*\)\s*\.\s*insert\s*\(", row["body"]))
         legacy_audit = bool(set(calls).intersection({"write_audit_log", "write_audit_log_v2", "write_audit_log_v2_returning"}))
         domain_tables = sorted(set(DOMAIN_EVIDENCE).intersection(re.findall(
             r"\.\s*(\w+)\s*\(\s*\)\s*\.\s*insert\s*\(", row["body"])))
         legacy = legacy or legacy_audit
         domain_evidence.update(domain_tables)
-        if captured or imported or legacy_audit or domain_tables:
+        if captured or imported or legacy_audit or domain_tables or signal["guarded_legacy_operations"] or signal["unmerged_capture_only_call"] or signal["standalone_policy_unresolved"] or conditional_merged:
             providers.update(captured)
             receipts = receipts or imported
             paths.append({"source_path": path, "private_provider_candidates": captured,
                           "import_receipt_signal": imported, "legacy_audit_signal": legacy_audit,
-                          "domain_evidence_tables": domain_tables})
+                          "domain_evidence_tables": domain_tables,
+                          "guarded_legacy_operations": signal["guarded_legacy_operations"],
+                          "owner_merged_capture_signal": signal["owner_merged_capture_call"],
+                          "conditional_owner_targets": conditional["targets"] if conditional_merged else [],
+                          "unmerged_capture_only": signal["unmerged_capture_only_call"]})
             # Capturing functions are the boundary: traversing their audit and
             # persistence internals could misattribute unrelated provider calls.
-            if captured or imported:
+            if captured or imported or signal["guarded_legacy_operations"] or signal["unmerged_capture_only_call"] or signal["standalone_policy_unresolved"] or conditional_merged:
                 continue
         if len(path) >= MAX_CALL_DEPTH or len(visited) >= MAX_CALL_NODES:
             limited = True
@@ -245,6 +285,9 @@ def capture_observation(definition: dict[str, Any] | None, functions: dict[str, 
                 queue.append((targets[0], path))
     return {"private_providers": sorted(providers), "import_receipt_signal": receipts,
             "legacy_audit_signal": legacy, "domain_evidence_tables": sorted(domain_evidence),
+            "guarded_legacy_operations": sorted(guarded), "unmerged_capture_only": unmerged,
+            "unresolved_policy": unresolved,
+            "conditional_provider_targets": conditional_targets,
             "paths": paths, "scan_limited": limited}
 
 
@@ -254,7 +297,7 @@ def import_capture_producers(functions: dict[str, Any], parser: Any) -> list[dic
     if len(rows) != 1:
         raise ValueError("typed import capture owner is missing or ambiguous")
     owner = rows[0]
-    if "write_private_business_audit" not in call_names(owner["body"]):
+    if not {"write_private_business_audit", "capture_private_business_audit"}.intersection(call_names(owner["body"])):
         return []
     result = []
     for match in re.finditer(r'^\s*"([^"\n]+)"\s*=>\s*\{', owner["body"], re.M):
@@ -276,6 +319,7 @@ def import_capture_producers(functions: dict[str, Any], parser: Any) -> list[dic
             "source": owner["source"], "helper": "record_import_created_id",
             "mapping_basis": "validated-native-source-ownership-and-exact-created-record-id",
             "source_provenance_limit": "submitted-import-row-not-original-file-or-review-proof",
+            "durability": "staged-private-rows-require-sealed-tracked-import-owner-envelope",
             "certification": "not-certified-by-static-inventory",
         })
     return result
@@ -346,11 +390,21 @@ def build_inventory(root: Path) -> dict[str, Any]:
     functions, structs = finance.source_inventory(root, parser)
     typed_imports = import_capture_producers(functions, parser)
     typed_imports_by_operation = {row["operation"]: row for row in typed_imports}
+    dynamic_producers = {}
+    for row in typed_imports:
+        dynamic_producers.setdefault((row["source"], row["helper"]), []).append(row["operation"])
     visible = profile_surfaces((root / PROFILE).read_text(encoding="utf-8"))
     identities = finance.read_json(root, "lumiere-codegen/contract-operation-ids.json")["operations"]
     exposure = {row["name"]: row["exposure"] for row in
                 finance.read_json(root, "lumiere-codegen/reducer-exposure.json")["reducers"]}
     commits = finance.commit_registrations(finance.read_json(root, "lumiere-codegen/c2-commit-coverage.json"))
+    owner_policy = finance.read_json(root, "lumiere-codegen/business-history-owner-policy.json")
+    blocked = finance.validate_history_policy(owner_policy, identities, commits)
+    c2 = finance.read_json(root, "lumiere-codegen/c2-commit-coverage.json")
+    complete_owners = {(row["source"], row["function"]) for row in c2.get("reducers", [])}
+    conditional_owners = {(row["source"], row["function"]): row for row in c2.get("conditional_outcomes", [])}
+    import_scopes = {row["source_table"]: row["private_provider_candidates"] for row in typed_imports}
+    finance.validate_direct_owner_boundaries(functions, complete_owners, blocked)
     # Apply the census owner's explicit native/canonical spelling bridges.
     native: dict[str, list[dict[str, Any]]] = {}
     for name, definitions in functions.items():
@@ -373,15 +427,30 @@ def build_inventory(root: Path) -> dict[str, Any]:
             continue
         if contract and not identities.get(name):
             raise ValueError(f"missing canonical operation identity: {name}")
-        signals = source_signals(finance, definition, structs)
-        observation = capture_observation(definition, functions)
+        signals = source_signals(finance, definition, structs, blocked, complete_owners)
+        observation = capture_observation(definition, functions, finance, blocked, complete_owners, dynamic_producers,
+                                          conditional_owners, import_scopes)
+        if name in {row["operation"] for row in conditional_owners.values()} and observation["conditional_provider_targets"]:
+            # A tracked command has other admitted entity branches. Its exact
+            # five-target history contract is never a universal producer grant.
+            observation["private_providers"] = []
         typed_import = typed_imports_by_operation.get(name)
         if typed_import and observation["import_receipt_signal"] and observation["private_providers"]:
             observation["private_providers"] = typed_import["private_provider_candidates"].copy()
         status = history_status(signals)
-        if status == "no-direct-history-signal":
-            if observation["private_providers"]:
+        if not signals["trusted_capture_call"]:
+            if observation["conditional_provider_targets"]:
+                status = "conditional-typed-import-owner-not-universal-history"
+            elif observation["private_providers"]:
                 status = "delegated-helper-observed-branch-and-fields-unverified"
+            elif observation["guarded_legacy_operations"]:
+                status = "guarded-owner-fallback-no-private-capture"
+            elif observation["unmerged_capture_only"]:
+                status = "capture-not-merged-no-private-history"
+            elif observation["unresolved_policy"]:
+                status = "capture-policy-unresolved-no-private-history"
+            elif status != "no-direct-history-signal":
+                pass
             elif observation["import_receipt_signal"]:
                 status = "import-receipt-only-no-material-change-evidence"
             elif observation["domain_evidence_tables"]:
@@ -404,6 +473,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
             "audit_signal": signals["audit_call"],
             "business_audit_adapter_signal": signals["business_audit_adapter_call"],
             "private_values_adapter_signal": signals["private_values_adapter_call"],
+            "owner_merged_capture_signal": signals["owner_merged_capture_call"],
             "before_signal": signals["old_values_recorded"],
             "after_signal": signals["new_values_recorded"],
             "tables_referenced": signals["tables_accessed"],
@@ -420,6 +490,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
              "scripts/generate-alpha-history-inventory.py", "scripts/generate-finance-change-review-inventory.py",
              "lumiere-codegen/contract-operation-ids.json", "lumiere-codegen/reducer-exposure.json",
              "lumiere-codegen/c2-commit-coverage.json"}
+    paths.add("lumiere-codegen/business-history-owner-policy.json")
     paths.update(path.relative_to(root).as_posix() for path in (root / "lumiere-codegen/operation-contracts").glob("*.json"))
     paths.update(row["source"] for row in operations if row["source"])
     paths.update(location.rsplit(":", 1)[0] for row in operations
@@ -441,6 +512,9 @@ def build_inventory(root: Path) -> dict[str, Any]:
             "Module source candidates include operations whose exact alpha entry path still needs review.",
             "Session exposure, source ownership and legacy audit calls never establish alpha admission or complete history.",
             "Direct helper calls do not prove all branches, fields, delegated helpers or persisted runtime effects.",
+            "Guarded standalone writers retain legacy audit until their exact complete owner merges evidence; they are not private capture.",
+            "Capture-only vectors and direct CSV staging are not durable history until an exact source outcome includes them.",
+            "Conditional tracked import evidence covers only its five declared targets, never every import_csv_tracked branch or universal C2 admission.",
             "Table references include validation reads and do not establish the actual write set.",
             "capture_start stays null and runtime_evidence empty until deployed proof is recorded by the owner.",
             "Standalone hidden modules are not admitted by linked reference or workflow evidence.",
@@ -449,6 +523,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
                       "role": "authorized-aggregate-reader" if module == "overview" else "history-owner-or-adapter",
                       "operation_candidates": sum(module in row["modules"] for row in operations)} for module in visible],
         "provider_contracts": provider_contracts(root),
+        "complete_owner_policy": owner_policy,
         "typed_import_capture_producers": typed_imports,
         "inputs": [{"path": path, "sha256": hashlib.sha256((root / path).read_bytes()).hexdigest()} for path in sorted(paths)],
         "summary": {
@@ -460,6 +535,8 @@ def build_inventory(root: Path) -> dict[str, Any]:
             "private_provider_candidates": {provider: sum(provider in row["capture_observation"]["private_providers"]
                                              for row in operations) for provider in PRIVATE_PROVIDERS},
             "import_receipt_candidates": sum(row["capture_observation"]["import_receipt_signal"] for row in operations),
+            "conditional_owner_candidates": sum(bool(row["capture_observation"]["conditional_provider_targets"]) for row in operations),
+            "direct_registered_owner_merge_candidates": sum(row["owner_merged_capture_signal"] for row in operations),
             "domain_evidence_candidates": {table: sum(table in row["capture_observation"]["domain_evidence_tables"]
                                             for row in operations) for table in DOMAIN_EVIDENCE},
             "without_observed_private_capture_by_surface": {module: [row["operation"] for row in operations

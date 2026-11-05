@@ -1,4 +1,5 @@
 use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 /// Reports Module — Report templates, scheduling, and analytics metrics
 ///
 /// # Tables
@@ -661,6 +662,7 @@ pub fn record_generated_owner_report(
     company_id: u64,
     params: RecordGeneratedOwnerReportParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "report", "read")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     if params.report_key.trim().is_empty()
@@ -782,7 +784,7 @@ pub fn record_generated_owner_report(
         });
     document.res_id = Some(row.id);
     ctx.db.document().id().update(document);
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "record_generated_owner_report",
@@ -804,7 +806,7 @@ pub fn record_generated_owner_report(
             changed_fields: vec!["generated".to_string()],
             metadata: None,
         },
-    )?;
+    )?);
     let committed_document = ctx
         .db
         .document()
@@ -832,23 +834,26 @@ pub fn record_generated_owner_report(
             organization_id,
             operation_id: "erp.record_generated_owner_report".to_string(),
             correlation_id: committed_report.correlation_id.clone(),
-            changes: vec![
-                RowChange::upsert_stdb_row(
-                    "document",
-                    serde_json::json!({"id": committed_document.id}),
-                    &committed_document,
-                )?,
-                RowChange::upsert_stdb_row(
-                    "document_version",
-                    serde_json::json!({"id": committed_version.id}),
-                    &committed_version,
-                )?,
-                RowChange::upsert_stdb_row(
-                    "generated_owner_report",
-                    serde_json::json!({"id": committed_report.id}),
-                    &committed_report,
-                )?,
-            ],
+            changes: merge_business_audit_changes(
+                vec![
+                    RowChange::upsert_stdb_row(
+                        "document",
+                        serde_json::json!({"id": committed_document.id}),
+                        &committed_document,
+                    )?,
+                    RowChange::upsert_stdb_row(
+                        "document_version",
+                        serde_json::json!({"id": committed_version.id}),
+                        &committed_version,
+                    )?,
+                    RowChange::upsert_stdb_row(
+                        "generated_owner_report",
+                        serde_json::json!({"id": committed_report.id}),
+                        &committed_report,
+                    )?,
+                ],
+                business_audit_changes,
+            )?,
         },
     )?;
     Ok(())

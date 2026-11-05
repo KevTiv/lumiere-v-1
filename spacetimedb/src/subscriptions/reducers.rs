@@ -10,6 +10,7 @@
 //! - `create_revenue_recognition_rule` – configure auto-deferral rules
 
 use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -472,6 +473,7 @@ pub fn create_subscription_from_sale_order(
     organization_id: u64,
     params: CreateSubscriptionFromSaleOrderParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "subscription", "create")?;
 
     // Fetch sale order to derive authoritative partner, company, currency, pricelist
@@ -680,20 +682,7 @@ pub fn create_subscription_from_sale_order(
             line,
         )?);
     }
-    record_organization_commit(
-        ctx,
-        OrganizationCommitInput {
-            organization_id,
-            operation_id: "erp.create_subscription_from_sale_order".to_string(),
-            correlation_id: format!(
-                "subscription-from-sale-order:{}:{}",
-                params.sale_order_id, params.plan_id
-            ),
-            changes,
-        },
-    )?;
-
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "create_subscription_from_sale_order",
@@ -723,6 +712,19 @@ pub fn create_subscription_from_sale_order(
                 "recurring_mrr".to_string(),
             ],
             metadata: None,
+        },
+    )?);
+
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_subscription_from_sale_order".to_string(),
+            correlation_id: format!(
+                "subscription-from-sale-order:{}:{}",
+                params.sale_order_id, params.plan_id
+            ),
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

@@ -13,6 +13,7 @@ use crate::helpers::{write_audit_log_v2_returning, AuditLogParams};
 
 mod audit_adapter;
 pub(crate) use audit_adapter::{
+    capture_business_audit, capture_private_business_audit, merge_business_audit_changes,
     native_row_snapshot, write_business_audit, write_private_business_audit,
 };
 

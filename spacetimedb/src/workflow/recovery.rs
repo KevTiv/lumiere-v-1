@@ -4,7 +4,7 @@
 //! predecessor stays cancelled, with its original votes and claimant intact.
 //! One immutable link per predecessor serializes competing recovery commands.
 
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use std::collections::{BTreeMap, BTreeSet};
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -92,6 +92,7 @@ pub fn resubmit_workflow_human_task(
     organization_id: u64,
     params: ResubmitWorkflowHumanTaskParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "workflow_instance", "create")?;
     check_permission(ctx, organization_id, "workflow_task", "write")?;
     let company_membership_bypass =
@@ -335,7 +336,7 @@ pub fn resubmit_workflow_human_task(
                 created_by: ctx.sender(),
                 created_at: ctx.timestamp,
             });
-    write_business_audit(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
         "resubmit_workflow_human_task",
@@ -364,7 +365,7 @@ pub fn resubmit_workflow_human_task(
                 .to_string(),
             ),
         },
-    )?;
+    )?);
     let mut changes = super::recovery_persistence::snapshot_instances(
         ctx,
         organization_id,
@@ -384,7 +385,7 @@ pub fn resubmit_workflow_human_task(
             organization_id,
             operation_id: "erp.resubmit_workflow_human_task".to_string(),
             correlation_id: params.correlation_id,
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
     Ok(())

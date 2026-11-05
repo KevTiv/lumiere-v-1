@@ -1,3 +1,4 @@
+use crate::core::business_changes::write_business_audit;
 /// Fleet & Geo Module — Vehicle tracking, POS terminals, warehouse geo
 ///
 /// # Tables
@@ -6,7 +7,7 @@
 /// | **FleetVehicle** | Vehicle with GPS lat/lng, driver, status |
 /// | **PosTerminal** | POS terminal with lat/lng, status, revenue |
 /// | **WarehouseGeo** | Lat/lng enrichment for warehouse records |
-use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
@@ -824,6 +825,7 @@ pub fn upsert_warehouse_geo(
     country_code: Option<String>,
     manager_name: Option<String>,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "warehouse_geo", "write")?;
 
     // FLT-002: validate warehouse exists and belongs to this organization
@@ -860,7 +862,7 @@ pub fn upsert_warehouse_geo(
             write_date: ctx.timestamp,
             ..geo
         });
-        write_business_audit(
+        business_audit_changes.extend(capture_business_audit(
             ctx,
             organization_id,
             "upsert_warehouse_geo",
@@ -881,7 +883,7 @@ pub fn upsert_warehouse_geo(
                 changed_fields: vec!["latitude".to_string(), "longitude".to_string()],
                 metadata: None,
             },
-        )?;
+        )?);
     } else {
         let row = ctx.db.warehouse_geo().insert(WarehouseGeo {
             id: 0,
@@ -898,7 +900,7 @@ pub fn upsert_warehouse_geo(
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
         });
-        write_business_audit(
+        business_audit_changes.extend(capture_business_audit(
             ctx,
             organization_id,
             "upsert_warehouse_geo",
@@ -912,7 +914,7 @@ pub fn upsert_warehouse_geo(
                 changed_fields: vec!["warehouse_id".to_string()],
                 metadata: None,
             },
-        )?;
+        )?);
     }
 
     let committed_geo = ctx
@@ -928,11 +930,14 @@ pub fn upsert_warehouse_geo(
             organization_id,
             operation_id: "erp.upsert_warehouse_geo".to_string(),
             correlation_id: format!("warehouse-geo:{}", warehouse_id),
-            changes: vec![RowChange::upsert_stdb_row(
-                "warehouse_geo",
-                serde_json::json!({"id": committed_geo.id}),
-                &committed_geo,
-            )?],
+            changes: merge_business_audit_changes(
+                vec![RowChange::upsert_stdb_row(
+                    "warehouse_geo",
+                    serde_json::json!({"id": committed_geo.id}),
+                    &committed_geo,
+                )?],
+                business_audit_changes,
+            )?,
         },
     )?;
 
