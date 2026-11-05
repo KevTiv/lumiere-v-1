@@ -126,7 +126,12 @@ function source(id = "11"): ReviewRow {
 async function mockReview(
   page: Page,
   initial: ReviewRow[],
-  options: { stale?: boolean; loseBulkReply?: boolean } = {},
+  options: {
+    stale?: boolean
+    loseBulkReply?: boolean
+    targetEntity?: string
+    incompleteBulkReceipt?: boolean
+  } = {},
 ) {
   const items = new Map(initial.map((item) => [item.id, item]))
   const history: ReviewHistory[] = []
@@ -134,12 +139,13 @@ async function mockReview(
   const receipts = new Map<string, string>()
   let writes = 0
   let bulkReplies = 0
+  let productReferencesDenied = false
   let readGate: Promise<void> | undefined
   let readsDenied = false
   const detail = (): ReviewDetail => ({
     id: "1",
     title: "Historic source review",
-    targetEntity: "product",
+    targetEntity: options.targetEntity ?? "product",
     sourceFile: "farm-review.json",
     items: [...items.values()],
     history: history.slice().reverse().slice(0, 100),
@@ -186,6 +192,11 @@ async function mockReview(
   }
   await page.route("**/api/query/**", (route) => {
     const path = new URL(route.request().url()).pathname
+    if (productReferencesDenied && /\/(?:product-categories|uoms)$/.test(path))
+      return route.fulfill({
+        status: 503,
+        json: { error: "Product references are temporarily unavailable." },
+      })
     const data = path.endsWith("product-categories")
       ? [{ id: 12, organizationId: 8001, name: "Historic products" }]
       : path.endsWith("uoms")
@@ -216,7 +227,8 @@ async function mockReview(
     return route.fulfill({ json: { data } })
   })
   await page.route("**/api/import-reviews**", async (route) => {
-    const path = new URL(route.request().url()).pathname
+    const requestUrl = new URL(route.request().url())
+    const path = requestUrl.pathname
     if (route.request().method() === "GET") {
       if (readGate) await readGate
       if (readsDenied)
@@ -225,6 +237,13 @@ async function mockReview(
           json: {
             error: "Full administrative access is required for source review.",
           },
+        })
+      if (requestUrl.searchParams.get("companyId") === "9002")
+        return route.fulfill({
+          status: path.endsWith("/1") ? 404 : 200,
+          json: path.endsWith("/1")
+            ? { error: "Source review is not in the current company." }
+            : { data: [] },
         })
     }
     if (path.endsWith("/history"))
@@ -266,11 +285,14 @@ async function mockReview(
         for (const decision of body.decisions) apply(decision)
         receipts.set(body.requestKey, raw)
       }
-      if (options.loseBulkReply && bulkReplies++ === 0)
+      const firstReply = bulkReplies++ === 0
+      if (options.loseBulkReply && firstReply)
         return route.abort("failed")
       return route.fulfill({
         json: {
-          results: body.decisions.map((decision) => ({
+          results: body.decisions
+            .slice(0, options.incompleteBulkReceipt && firstReply ? -1 : undefined)
+            .map((decision) => ({
             item: items.get(decision.itemId),
             replayed: !!receipt,
           })),
@@ -285,7 +307,7 @@ async function mockReview(
           {
             id: "1",
             title: "Historic source review",
-            targetEntity: "product",
+            targetEntity: options.targetEntity ?? "product",
             sourceFile: "farm-review.json",
             total: rows.length,
             pending: rows.filter((item) => item.state === "needs_review")
@@ -302,6 +324,7 @@ async function mockReview(
     history,
     requests,
     writes: () => writes,
+    denyProductReferences: () => { productReferencesDenied = true },
     holdReadsUntilDenied: () => {
       let release!: () => void
       readGate = new Promise<void>((resolve) => {
@@ -615,6 +638,267 @@ test("838 rows support bulk preview exceptions, safe retry, refresh and per-row 
   expect(server.items.get("3")?.source.source.file).toBe("farm-03.csv")
   expect(server.items.get("3")?.source.source.row).toBe(4)
   expect(server.items.get("3")?.source.fields[1].sourceValue).toBe("600")
+})
+
+function volumeSource(index: number): ReviewRow {
+  const id = String(index + 1)
+  const values: Record<string, string | null> = {
+    product: "BREAST",
+    quantity: `${index + 1}.125000`,
+    unit_price: `${8000 + index}.000000`,
+    amount: String((index + 1.125) * (8000 + index)),
+    source_unit: "kg",
+    period_start: "2022-06-13",
+    period_end: "2022-06-18",
+    interpretation: "Historical sales volume; included in the report subtotal",
+  }
+  const fields = [
+    ["product", "Original product label", "text"],
+    ["quantity", "Recorded sold quantity (kg)", "decimal"],
+    ["unit_price", "Recorded sales unit price (RWF/kg)", "decimal"],
+    ["amount", "Recorded sales amount (RWF)", "decimal"],
+    ["source_unit", "Source quantity unit", "text"],
+    ["period_start", "Report period start", "date"],
+    ["period_end", "Report period end", "date"],
+    ["interpretation", "Historical scope", "text"],
+  ] as const
+  return {
+    id,
+    source: {
+      key: `volume-${id}`,
+      label: `Historical breast volume ${id}`,
+      source: {
+        file: `source-${(index % 3) + 1}.csv`,
+        row: index + 10,
+        sha256: "b".repeat(64),
+      },
+      issue: "Confirm the reported historical values only.",
+      fields: fields.map(([key, label, kind]) => ({
+        key,
+        label,
+        kind,
+        sourceValue: key === "interpretation" ? null : values[key] ?? null,
+        required: key !== "interpretation",
+        export: false,
+      })),
+      proposed: { ...values },
+    },
+    values,
+    confirmedFields: [],
+    state: "needs_review",
+    revision: 1,
+    reason: null,
+    reviewedAt: null,
+    reviewedBy: null,
+  }
+}
+
+async function openBatchConfirmation(
+  page: Page,
+  count: number,
+  action: "Confirm existing values" | "Confirm selected fields",
+) {
+  await page.goto("/import-review")
+  await page
+    .getByRole("button", {
+      name: `Select all ${count} matching rows`,
+      exact: true,
+    })
+    .click()
+  const bulk = page.getByRole("region", { name: "Bulk corrections", exact: true })
+  await bulk.getByRole("button", { name: action, exact: true }).click()
+  await bulk
+    .getByLabel("Bulk correction reason", { exact: true })
+    .fill("Checked original rows, explicit units, report dates and source trace")
+  return bulk
+}
+
+test("133 distinct historical volumes use one confirmation preview and one bulk save", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000)
+  const rows = Array.from({ length: 133 }, (_, index) => volumeSource(index))
+  const originals = structuredClone(rows)
+  const server = await mockReview(page, rows, {
+    targetEntity: "source_observation",
+  })
+  const bulk = await openBatchConfirmation(page, 133, "Confirm existing values")
+  await bulk
+    .getByRole("button", { name: "Preview affected rows", exact: true })
+    .click()
+  await expect(bulk).toContainText("1.125000")
+  await expect(bulk).toContainText("8000.000000")
+  expect(server.writes()).toBe(0)
+  await bulk
+    .getByRole("button", { name: "Save review for 133 rows", exact: true })
+    .click()
+  await expect
+    .poll(() => [...server.items.values()].filter((row) => row.state === "confirmed").length)
+    .toBe(133)
+  await expect(page.getByRole("region", { name: "Saved review results", exact: true }))
+    .toContainText("Saved")
+  expect(server.requests).toHaveLength(1)
+  expect(JSON.parse(server.requests[0]!).decisions).toHaveLength(133)
+  for (const original of originals) {
+    const saved = server.items.get(original.id)!
+    expect(saved.values).toEqual(original.values)
+    expect(saved.source).toEqual(original.source)
+    expect(saved.confirmedFields?.slice().sort())
+      .toEqual(original.source.fields.map((field) => field.key).sort())
+    expect(saved.revision).toBe(2)
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("multi-entry-saved-results.png"),
+    fullPage: true,
+  })
+  await page.reload()
+  await expect(page.getByRole("button", {
+    name: "Continue import (133 confirmed)", exact: true,
+  })).toBeVisible()
+  expect(server.writes()).toBe(133)
+})
+
+test("confirmation skips an unknown row and a held row stays unchanged", async ({ page }) => {
+  const rows = [volumeSource(0), volumeSource(1), volumeSource(2)]
+  rows[1].values.period_end = null
+  const originals = structuredClone(rows)
+  const server = await mockReview(page, rows, { targetEntity: "source_observation" })
+  const bulk = await openBatchConfirmation(page, 3, "Confirm existing values")
+  await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+  await expect(bulk).toContainText("Report period end")
+  await bulk.getByRole("button", { name: "Hold Historical breast volume 3", exact: true }).click()
+  await bulk.getByRole("button", { name: "Save review for 1 rows", exact: true }).click()
+  await expect.poll(() => server.writes()).toBe(1)
+  expect(server.items.get("1")?.state).toBe("confirmed")
+  expect(server.items.get("2")).toEqual(originals[1])
+  expect(server.items.get("3")).toEqual(originals[2])
+  expect(JSON.parse(server.requests[0]!).decisions.map((row: ReviewDecision) => row.itemId))
+    .toEqual(["1"])
+})
+
+test("confirm selected fields retains different prices and keeps unknown quantities unresolved", async ({ page }) => {
+  const rows = [volumeSource(0), volumeSource(1)]
+  rows[0].values.quantity = null
+  rows[0].confirmedFields = ["source_unit"]
+  const originals = structuredClone(rows)
+  const server = await mockReview(page, rows, { targetEntity: "source_observation" })
+  const bulk = await openBatchConfirmation(page, 2, "Confirm selected fields")
+  await bulk.getByRole("checkbox", {
+    name: "Confirm existing Recorded sales unit price (RWF/kg)", exact: true,
+  }).check()
+  await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+  await expect(bulk).toContainText("8000.000000")
+  await expect(bulk).toContainText("8001.000000")
+  await bulk.getByRole("button", { name: "Save review for 2 rows", exact: true }).click()
+  await expect.poll(() => server.writes()).toBe(2)
+  for (const original of originals) {
+    const saved = server.items.get(original.id)!
+    expect(saved.values).toEqual(original.values)
+    expect(saved.state).toBe("needs_review")
+    expect(saved.confirmedFields?.slice().sort())
+      .toEqual([...original.confirmedFields!, "unit_price"].sort())
+  }
+  expect(server.items.get("1")?.values.quantity).toBeNull()
+  expect(server.items.get("1")?.values.source_unit).toBe("kg")
+})
+
+test("a stale confirmation preview saves no rows", async ({ page }) => {
+  const rows = [volumeSource(0), volumeSource(1)]
+  const originals = structuredClone(rows)
+  const server = await mockReview(page, rows, { stale: true, targetEntity: "source_observation" })
+  const bulk = await openBatchConfirmation(page, 2, "Confirm existing values")
+  await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+  await bulk.getByRole("button", { name: "Save review for 2 rows", exact: true }).click()
+  await expect(bulk.getByRole("alert")).toContainText("This item changed")
+  expect(server.writes()).toBe(0)
+  expect([...server.items.values()]).toEqual(originals)
+  await expect(page.getByRole("region", { name: "Saved review results", exact: true })).toHaveCount(0)
+})
+
+test("bulk row confirmation cannot bypass named product-reference validation", async ({ page }) => {
+  const item = source()
+  Object.assign(item.values, {
+    quantity: "1",
+    cost_price: "3000",
+    source_unit: "pack",
+    category_id: "999",
+  })
+  const server = await mockReview(page, [item])
+  const bulk = await openBatchConfirmation(page, 1, "Confirm existing values")
+  await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+  await bulk.getByRole("button", { name: "Save review for 1 rows", exact: true }).click()
+  await expect(bulk.getByRole("alert")).toContainText(/category|reference/i)
+  expect(server.writes()).toBe(0)
+  expect(server.requests).toEqual([])
+  expect(server.items.get(item.id)?.state).toBe("needs_review")
+})
+
+test("a committed product confirmation retries without requiring a new reference lookup", async ({ page }) => {
+  const item = source()
+  Object.assign(item.values, {
+    quantity: "1",
+    cost_price: "3000",
+    source_unit: "pack",
+  })
+  const server = await mockReview(page, [item], { loseBulkReply: true })
+  const bulk = await openBatchConfirmation(page, 1, "Confirm existing values")
+  await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+  await bulk.getByRole("button", { name: "Save review for 1 rows", exact: true }).click()
+  await expect(bulk.getByRole("button", {
+    name: "Retry same review submission", exact: true,
+  })).toBeVisible()
+  expect(server.writes()).toBe(1)
+  server.denyProductReferences()
+  await bulk.getByRole("button", {
+    name: "Retry same review submission", exact: true,
+  }).click()
+  await expect(page.getByRole("region", { name: "Saved review results", exact: true }))
+    .toContainText("Saved")
+  expect(server.requests).toHaveLength(2)
+  expect(server.requests[1]).toBe(server.requests[0])
+  expect(server.writes()).toBe(1)
+  expect(server.items.get(item.id)?.revision).toBe(2)
+})
+
+for (const receipt of ["lost", "incomplete"] as const) {
+  test(`${receipt} confirmation receipt retries the exact submission without duplicate decisions`, async ({ page }) => {
+    const rows = [volumeSource(0), volumeSource(1)]
+    const server = await mockReview(page, rows, {
+      targetEntity: "source_observation",
+      loseBulkReply: receipt === "lost",
+      incompleteBulkReceipt: receipt === "incomplete",
+    })
+    const bulk = await openBatchConfirmation(page, 2, "Confirm existing values")
+    await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+    await bulk.getByRole("button", { name: "Save review for 2 rows", exact: true }).click()
+    await expect(bulk.getByRole("button", {
+      name: "Retry same review submission", exact: true,
+    })).toBeVisible()
+    await expect(bulk.getByRole("button", { name: "Edit correction", exact: true })).toBeDisabled()
+    await bulk.getByRole("button", {
+      name: "Retry same review submission", exact: true,
+    }).click()
+    await expect(page.getByRole("region", { name: "Saved review results", exact: true }))
+      .toContainText("Saved")
+    expect(server.requests).toHaveLength(2)
+    expect(server.requests[1]).toBe(server.requests[0])
+    expect(server.writes()).toBe(2)
+    expect(server.items.get("1")?.revision).toBe(2)
+    expect(server.items.get("2")?.revision).toBe(2)
+  })
+}
+
+test("changing company discards the confirmation preview before any save", async ({ page }) => {
+  const server = await mockReview(page, [volumeSource(0), volumeSource(1)], {
+    targetEntity: "source_observation",
+  })
+  const bulk = await openBatchConfirmation(page, 2, "Confirm existing values")
+  await bulk.getByRole("button", { name: "Preview affected rows", exact: true }).click()
+  await page.getByRole("button", { name: "Change review company", exact: true }).click()
+  await expect(bulk).not.toBeVisible()
+  await expect(page.getByRole("cell", { name: "Historical breast volume 1", exact: true })).toHaveCount(0)
+  expect(server.requests).toEqual([])
+  expect(server.writes()).toBe(0)
 })
 
 async function importHandoffFixture(

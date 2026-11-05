@@ -92,6 +92,25 @@ export type BulkReviewPreview = {
   skipped: { item: ReviewRow; reason: string }[]
 }
 
+export type BulkConfirmationMode = "complete_rows" | "confirm_fields"
+export type BulkConfirmationPreview = {
+  mode: BulkConfirmationMode
+  decisions: ReviewDecision[]
+  rows: {
+    item: ReviewRow
+    beforeState: ReviewRow["state"]
+    afterState: ReviewRow["state"]
+    fields: {
+      field: ReviewField
+      value: string | null
+      sourceValue: string | null
+      beforeConfirmed: boolean
+      afterConfirmed: boolean
+    }[]
+  }[]
+  skipped: { item: ReviewRow; reason: string }[]
+}
+
 export function confirmedReviewFields(item: ReviewRow): string[] {
   return (
     item.confirmedFields ??
@@ -143,7 +162,8 @@ export function reviewValueError(
   value: string | null,
 ): string | null {
   if (value == null || value === "") return null
-  if (value.length > 2000) return "A correction value is too long."
+  if (new TextEncoder().encode(value).length > 2000)
+    return "A correction value is too long."
   if (field.kind === "decimal" && !/^-?\d{1,12}(?:\.\d{1,6})?$/.test(value))
     return `${field.label} needs an exact decimal value.`
   if (field.kind === "choice" && !field.options?.includes(value))
@@ -246,6 +266,128 @@ export function buildBulkReviewPreview(args: {
     throw new Error(
       "No rows can receive this correction. Review the row exceptions.",
     )
+  return result
+}
+
+const exactReviewDecimal = (value: string | null | undefined): bigint | null => {
+  if (!value || !/^-?\d{1,12}(?:\.\d{1,6})?$/.test(value)) return null
+  const negative = value.startsWith("-")
+  const [whole, fraction = ""] = (negative ? value.slice(1) : value).split(".")
+  const result = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"))
+  return negative ? -result : result
+}
+
+/** Confirm each row's own values. Source cells and proposals never fill unknowns. */
+export function buildBulkConfirmationPreview(args: {
+  items: ReviewRow[]
+  selectedIds: Set<string>
+  mode: BulkConfirmationMode
+  fieldKeys?: string[]
+  reason: string
+}): BulkConfirmationPreview {
+  if (
+    args.reason.trim().length < 3 ||
+    new TextEncoder().encode(args.reason).length > 2000
+  )
+    throw new Error("Enter supporting evidence for these confirmations.")
+  if (!args.selectedIds.size)
+    throw new Error("Select at least one row to preview.")
+  if (args.selectedIds.size > 1000)
+    throw new Error("Select no more than 1,000 rows for one save.")
+  const selected = args.items.filter((item) => args.selectedIds.has(item.id))
+  if (
+    selected.length !== args.selectedIds.size ||
+    new Set(selected.map((item) => item.id)).size !== selected.length
+  )
+    throw new Error("Reload the selected rows before preparing a confirmation.")
+  const fieldKeys = [...new Set(args.fieldKeys ?? [])]
+  if (args.mode === "confirm_fields" && !fieldKeys.length)
+    throw new Error("Select at least one field to confirm.")
+  const result: BulkConfirmationPreview = {
+    mode: args.mode,
+    decisions: [],
+    rows: [],
+    skipped: [],
+  }
+  for (const item of selected) {
+    if (item.state !== "needs_review") {
+      result.skipped.push({
+        item,
+        reason: item.state === "excluded" ? "Excluded row" : "Row already confirmed",
+      })
+      continue
+    }
+    const fields =
+      args.mode === "complete_rows"
+        ? item.source.fields
+        : fieldKeys.flatMap((key) =>
+            item.source.fields.filter((field) => field.key === key),
+          )
+    let error: string | null =
+      args.mode === "confirm_fields" && fields.length !== fieldKeys.length
+        ? "Selected field is not present"
+        : null
+    // The server validates all current values, including on partial saves.
+    for (const field of item.source.fields) {
+      error ??= reviewValueError(field, item.values[field.key] ?? null)
+      if (
+        args.mode === "complete_rows" &&
+        field.required &&
+        !item.values[field.key]?.trim()
+      )
+        error ??= `${field.label} is required before confirmation.`
+    }
+    if (args.mode === "confirm_fields") {
+      for (const field of fields)
+        if (!item.values[field.key]?.trim())
+          error ??= `${field.label} is unknown and remains unconfirmed.`
+    } else {
+      if (!fields.some((field) => item.values[field.key]?.trim()))
+        error ??= "There are no known values to confirm."
+      const quantity = exactReviewDecimal(item.values.quantity)
+      const price = exactReviewDecimal(item.values.unit_price)
+      const amount = exactReviewDecimal(item.values.amount)
+      if (
+        quantity !== null &&
+        price !== null &&
+        amount !== null &&
+        quantity * price !== amount * 1_000_000n
+      )
+        error ??= "Quantity multiplied by unit price must equal the recorded amount."
+    }
+    if (error) {
+      result.skipped.push({ item, reason: error })
+      continue
+    }
+    const beforeConfirmed = new Set(confirmedReviewFields(item))
+    const afterConfirmed = new Set(beforeConfirmed)
+    for (const field of fields)
+      if (item.values[field.key]?.trim()) afterConfirmed.add(field.key)
+    if (
+      args.mode === "confirm_fields" &&
+      afterConfirmed.size === beforeConfirmed.size
+    ) {
+      result.skipped.push({ item, reason: "Selected fields are already confirmed" })
+      continue
+    }
+    const decision = reviewDecision(item)
+    decision.reason = args.reason
+    decision.confirmedFields = [...afterConfirmed]
+    decision.state = args.mode === "complete_rows" ? "confirmed" : "needs_review"
+    result.decisions.push(decision)
+    result.rows.push({
+      item,
+      beforeState: item.state,
+      afterState: decision.state,
+      fields: fields.map((field) => ({
+        field,
+        value: item.values[field.key] ?? null,
+        sourceValue: field.sourceValue,
+        beforeConfirmed: beforeConfirmed.has(field.key),
+        afterConfirmed: afterConfirmed.has(field.key),
+      })),
+    })
+  }
   return result
 }
 

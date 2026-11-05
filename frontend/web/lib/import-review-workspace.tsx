@@ -181,6 +181,7 @@ function ReviewWorkspace({
   const [historyId, setHistoryId] = useState("")
   const [busy, setBusy] = useState(false)
   const [locked, setLocked] = useState(false)
+  const validatedBulkRequest = useRef<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState("needs_review")
   const [group, setGroup] = useState("all")
@@ -401,6 +402,37 @@ function ReviewWorkspace({
       )
   }
   const saveBulk = async (decisions: ReviewDecision[], requestKey: string) => {
+    requireCurrentScope()
+    if (
+      productReview &&
+      validatedBulkRequest.current !== requestKey &&
+      decisions.some((decision) => decision.state === "confirmed")
+    ) {
+      try {
+        const references = await cache.fetchQuery(productReferenceQuery)
+        requireCurrentScope()
+        for (const decision of decisions) {
+          if (decision.state !== "confirmed") continue
+          const item = detail.data?.items.find((item) => item.id === decision.itemId)
+          if (!item)
+            throw new Error("Reload the saved review before confirming these rows.")
+          validateProductReviewReferences(
+            item,
+            decision.values,
+            references,
+            organizationId,
+          )
+        }
+        // A retry reconciles the exact prior submission. Changed lookup data
+        // must not discard its request key after an unknown write outcome.
+        validatedBulkRequest.current = requestKey
+      } catch (failure) {
+        throw new ReviewRequestError(
+          failure instanceof Error ? failure.message : String(failure),
+          true,
+        )
+      }
+    }
     requireCurrentScope()
     const receipt = await request<unknown>(
       `/api/import-reviews/${selectedId}/decisions`,
