@@ -44,4 +44,8 @@ Normal domain approval, posting, correction and reversal owners continue to dete
 
 ## Verification
 
-The implementation includes native persisted company/organization capture and forged-audit exclusion cases, source-aware API HTTP/SATS tests, import binding tests, PostgreSQL upgrade/recovery tests, UI permission/pagination cases, locale checks and deterministic source inventory tests. Current execution results and the exact published contract revision belong in the pull request. A fixture, static inventory or successful typecheck does not substitute for the integrated module acceptance gates above.
+Validation against contracts `0.3.167` passed all 103 API/PostgreSQL cases: 43 history/source, 15 import, two admission, 24 source-review, 18 migration compatibility, and one catalog binding test. The PostgreSQL cases include rollback of a failed complete source/history projection, idempotent retry, and exact migration table ordering.
+
+The final production WASM passed ten native suite entry points, including core, tracked imports, five operation-owner suites, Accounting history, Fleet and Subscriptions. These exercise company/organization capture, raw-audit forgery exclusion, batch deduplication and complete outcome envelopes. Broader Sales, Expenses and Purchasing found stale test expectations; the corrected exact row/link and tenant-currency fixtures pass native test compilation and are selected for isolated CI execution.
+
+Focused UI/model and navigation suites, package typechecks, locale/type-debt checks, ownership/storage checks, codegen tests, C2 boundary checks and both inventory checks passed. Matching-head CI and deployed module acceptance remain separate gates. A fixture, static inventory or successful typecheck does not certify the unresolved operation dispositions above.

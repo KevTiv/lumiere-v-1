@@ -100,7 +100,7 @@ pub fn seed_vendor_po(
         CreatePurchaseOrderParams {
             company_id: Some(company_id),
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             origin: Some(partner_ref.to_string()),
             partner_ref: Some(partner_ref.to_string()),
             notes: None,
@@ -346,7 +346,7 @@ pub fn test_rfq_award_and_purchase_return_smoke(ctx: &ReducerContext) -> Result<
         company_id,
         CreatePurchaseRfqParams {
             requisition_id: None,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             notes: Some("Wave C RFQ smoke".to_string()),
             lines: vec![CreatePurchaseRfqLineParams {
                 product_id: fixture.product_id,
@@ -373,7 +373,7 @@ pub fn test_rfq_award_and_purchase_return_smoke(ctx: &ReducerContext) -> Result<
         rfq.id,
         CreatePurchaseRfqBidParams {
             partner_id: vendor_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             price_unit: 12.5,
             notes: Some("bid".to_string()),
         },
@@ -493,7 +493,7 @@ fn create_lot_tracked_product(
             uom_po_id: base.uom_po_id,
             standard_price: 10.0,
             list_price: 20.0,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             default_code: Some(code.to_string()),
             barcode: None,
             description: None,

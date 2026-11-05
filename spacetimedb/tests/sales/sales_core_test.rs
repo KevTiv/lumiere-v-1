@@ -11,6 +11,8 @@ use crate::accounting::journal_entries::{
     account_move, account_move_line, create_invoice_from_sale_order, AddAccountMoveLineParams,
     CreateInvoiceFromSaleOrderParams,
 };
+use crate::core::audit::audit_log;
+use crate::core::business_changes::business_change;
 use crate::core::organization::{company, CompanyScopeParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::product::product;
@@ -358,9 +360,9 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
                 && commit.operation_id == "erp.create_invoice_from_sale_order"
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 5 {
+    if commits.len() != 1 || commits[0].row_change_count != 7 {
         return Err(format!(
-            "invoice should emit one five-row organization commit, got {} commits / {:?}",
+            "invoice should emit one seven-row organization commit, got {} commits / {:?}",
             commits.len(),
             commits.first().map(|commit| commit.row_change_count)
         ));
@@ -386,6 +388,8 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
             "account_move_line",
             "account_move_line",
             "sale_order_line",
+            "audit_log",
+            "business_change",
         ]
     {
         return Err(format!("invoice commit row order mismatch: {tables:?}"));
@@ -405,6 +409,46 @@ pub fn test_order_confirm_to_invoice(ctx: &ReducerContext) -> Result<(), String>
     }
 
     let invoice_move_id = invoiced_order.invoice_ids[0];
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[5].row_identity_json)
+        .map_err(|error| format!("invoice audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("invoice audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[6].row_identity_json)
+        .map_err(|error| format!("invoice private history identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("invoice private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("invoice audit row missing")?;
+    let history = ctx
+        .db
+        .business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("invoice private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != org_id
+        || audit.organization_id != org_id
+        || history.company_id != company_id
+        || audit.company_id != Some(company_id)
+        || history.record_id != invoice_move_id
+        || history.resource != "account_move"
+        || history.subject_record_id != invoice_move_id
+        || history.subject_resource != "account_move"
+        || audit.table_name != "account_move"
+        || audit.record_id != invoice_move_id
+        || history.operation != "create_invoice_from_sale_order"
+    {
+        return Err(
+            "invoice owner commit did not preserve exact audit/private history linkage and scope"
+                .into(),
+        );
+    }
     let invoice = ctx
         .db
         .account_move()
