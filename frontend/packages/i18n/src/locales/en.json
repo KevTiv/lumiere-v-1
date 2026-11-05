@@ -13526,6 +13526,14 @@
     }
   },
   "aiChat": {
+    "workspace": {
+      "context": "Workspace context",
+      "modules": "Modules",
+      "files": "Files",
+      "addFiles": "Add CSV or XLSX files",
+      "noFiles": "No files attached.",
+      "noSkills": "No skills selected."
+    },
     "deck": {
       "hint": "Type / to find skills",
       "previous": "Previous skill",
