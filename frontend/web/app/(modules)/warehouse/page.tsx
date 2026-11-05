@@ -1,7 +1,7 @@
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
 import { InventoryClient } from "../inventory/inventory-client";
-import { SourceHistoryLink } from "@/components/source-history-link";
+import { SourceHistoryLink } from "../../../components/source-history-link";
 
 const WAREHOUSE_RESOURCES = [
   "products", "stock-quants", "stock-pickings", "warehouses",

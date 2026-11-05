@@ -1,7 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ExpensesClient } from "./expenses-client"
-import { SourceHistoryLink } from "@/components/source-history-link"
+import { SourceHistoryLink } from "../../../components/source-history-link"
 
 const SSR_RESOURCES = ["expenses", "expense-sheets", "pricelists", "employees"] as const
 

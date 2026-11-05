@@ -1,7 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { SalesClient } from "./sales-client"
-import { SourceHistoryLink } from "@/components/source-history-link"
+import { SourceHistoryLink } from "../../../components/source-history-link"
 
 const SSR_RESOURCES = [
   "sale-orders",

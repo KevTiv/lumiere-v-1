@@ -438,15 +438,15 @@ async fn exercise_confirmed_facts(
 ) -> Result<()> {
     let mut expected = vec![oldest.to_string()];
     for key in ["as_of", "count_date", "source_count_date", "balance_date"] {
-        let id = add_item(client, batch, key, None, None, "confirmed").await?;
         let source = json!({"key":key,"label":"Dated snapshot","source":{"file":"historic.csv","row":7},
             "fields":[{"key":key,"label":"Snapshot date","kind":"date","sourceValue":"2022-10-05","required":false}]});
-        client
-            .execute(
-                "UPDATE lumiere_platform.import_review_item SET source_json=$1 WHERE id=$2",
-                &[&source, &id],
+        let id: i64 = client
+            .query_one(
+                "INSERT INTO lumiere_platform.import_review_item (organization_id,company_id,batch_id,source_key,source_json,proposed_json,state) VALUES (8001,9001,$1,$2,$3,'{}','confirmed') RETURNING id",
+                &[&batch, &key, &source],
             )
-            .await?;
+            .await?
+            .get(0);
         expected.push(id.to_string());
     }
     let partial = add_item(client, batch, "partial", None, None, "needs_review").await?;

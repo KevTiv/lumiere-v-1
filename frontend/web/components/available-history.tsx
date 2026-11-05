@@ -158,7 +158,7 @@ function ScopedAvailableHistory({ organizationId, companyId, actorIdentity, time
 
       {!coverageError ? <div className="grid min-w-0 gap-3 rounded-lg border p-3 sm:grid-cols-2 xl:grid-cols-3">
         <label className="flex items-center gap-2 text-sm sm:col-span-2 xl:col-span-3" htmlFor={`${controlId}-verified`}>
-          <Checkbox id={`${controlId}-verified`} checked={filters.verifiedOnly === true} onCheckedChange={(value) => setFilter("verifiedOnly", value === true)} />
+          <Checkbox id={`${controlId}-verified`} aria-label={t("availableHistory.verifiedOnly", { defaultValue: "Only rows with confirmed facts" })} checked={filters.verifiedOnly === true} onCheckedChange={(value) => setFilter("verifiedOnly", value === true)} />
           {t("availableHistory.verifiedOnly", { defaultValue: "Only rows with confirmed facts" })}
         </label>
         {filters.verifiedOnly ? <p className="text-xs text-muted-foreground sm:col-span-2 xl:col-span-3">{t("availableHistory.verifiedHint", { defaultValue: "Includes partially reviewed rows with confirmed fields. Unconfirmed interpretations remain hidden; original text, dates and row labels remain source context. These observations do not change posted documents or current balances." })}</p> : null}
