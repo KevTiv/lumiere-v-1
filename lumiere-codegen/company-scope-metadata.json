@@ -315,6 +315,44 @@
           "meaning": "current legal entity owning the private reusable-work draft, source output or recipe"
         }
       ]
+    },
+    {
+      "name": "reserve_ai_metered_spend",
+      "company_paths": [
+        {
+          "path": [
+            "params",
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "Exact legal entity for the native agent/run/reservation binding; validated by the native spend owner before a provider dispatch can be claimed."
+        }
+      ]
+    },
+    {
+      "name": "configure_ai_metered_price",
+      "company_paths": [],
+      "asserts_no_company_parameter": true,
+      "notes": "Immutable model price is organization/agent scoped; no caller-selected company is accepted. Native spend ownership validates agent organization before price creation."
+    },
+    {
+      "name": "claim_ai_metered_dispatch",
+      "company_paths": [],
+      "asserts_no_company_parameter": true,
+      "notes": "Company is derived from the already bound private metered reservation and provider attempt; no caller-selected company is accepted."
+    },
+    {
+      "name": "settle_ai_metered_spend",
+      "company_paths": [],
+      "asserts_no_company_parameter": true,
+      "notes": "Company is derived from the exact private reservation, usage and provider attempt binding; no caller-selected company is accepted."
+    },
+    {
+      "name": "reconcile_ai_metered_spend",
+      "company_paths": [],
+      "asserts_no_company_parameter": true,
+      "notes": "Company is derived from the exact private reservation, usage and provider attempt binding with audited recovery attribution; no caller-selected company is accepted."
     }
   ]
 }

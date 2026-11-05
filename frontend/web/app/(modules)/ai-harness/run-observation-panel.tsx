@@ -84,6 +84,11 @@ export function RunObservation({ observation }: { observation: ObservationState 
       <CardContent>
         {run.economics?.outcomeUnknown ? <p role="status" className="mb-3 text-sm font-medium">{t("aiHarness.ux.observation.unknown", { defaultValue: "The result of a provider request is unknown. Inspect the history before starting another request." })}</p> : null}
         {run.economics?.settledUnits != null ? <p className="mb-3 text-sm">{t("aiHarness.ux.observation.settled", { defaultValue: "Settled usage: {{amount}} {{currency}}", amount: (run.economics.settledUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }), currency: run.economics.currency ?? "units" })}</p> : null}
+        {run.economics?.meteredUsage ? (
+          <p className="mb-3 text-sm">{run.economics.meteredUsage.complete
+            ? run.economics.meteredUsage.totals.map((total) => `${total.actualUnits?.toLocaleString()} ${total.unit}`).join(" · ")
+            : t("aiHarness.ux.observation.meteredUnavailable", { defaultValue: "Metered usage is pending or unavailable." })}</p>
+        ) : null}
         {run.transcript.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.noToolSteps")}</p>
         ) : (
@@ -114,6 +119,7 @@ export function RunObservation({ observation }: { observation: ObservationState 
             {run.economics.providerModelsTruncated ? <Badge variant="outline">Provider list truncated</Badge> : null}
             {run.economics.attemptCount !== null ? <span>{run.economics.attemptCount} provider attempt{run.economics.attemptCount === 1 ? "" : "s"}</span> : null}
             {run.economics.inputTokens !== null && run.economics.outputTokens !== null ? <span>{run.economics.inputTokens.toLocaleString()} input / {run.economics.outputTokens.toLocaleString()} output tokens</span> : null}
+            {run.economics.meteredUsage?.totals.map((total) => total.allowance !== null ? <span key={total.unit}>{total.allowance.toLocaleString()} {total.unit} allowance</span> : null)}
             {run.economics.reservedUnits !== null ? <span>{(run.economics.reservedUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} {run.economics.currency ?? "units"} reserved</span> : null}
             {run.economics.settledUnits !== null ? <span>{(run.economics.settledUnits / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} {run.economics.currency ?? "units"} settled</span> : null}
             {run.economics.attemptStatuses.map((status) => <Badge key={`attempt:${status}`} variant="outline">attempt {status}</Badge>)}

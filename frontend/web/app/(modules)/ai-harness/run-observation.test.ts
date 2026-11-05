@@ -95,3 +95,57 @@ test('unknown, in-flight, malformed or truncated provider usage is not a zero or
 test('terminal legacy run retains its recorded counter when no provider summary is present', () => {
   assert.equal(mapRunObservation({ ...waitingRun, status: 'completed', tokensUsed: 321 })?.tokensUsed, 321)
 })
+
+const nativeEconomics = {
+  ...settledEconomics,
+  attemptCount: 1, inputTokens: 0, outputTokens: 0,
+  providerModels: [{ provider: 'mistral', model: 'mistral-ocr-2505' }],
+  currency: 'USD', settledUnits: 30,
+  meteredUsage: {
+    totals: [{ unit: 'pages', allowance: 5, actualUnits: 3 }],
+    complete: true, truncated: false,
+    resultJson: 'private extracted text', actorIdentity: 'private actor',
+  },
+}
+
+test('OCR pages and embedding tokens remain native usage, with no generation token placeholder', () => {
+  for (const unit of ['pages', 'tokens']) {
+    const economics = { ...nativeEconomics, meteredUsage: {
+      ...nativeEconomics.meteredUsage,
+      totals: [{ unit, allowance: 5, actualUnits: 3 }],
+    } }
+    const view = mapRunObservation({ ...waitingRun, status: 'completed', tokensUsed: null, economics })
+    assert.ok(view)
+    assert.equal(view.tokensUsed, null)
+    assert.equal(view.economics?.inputTokens, null)
+    assert.equal(view.economics?.outputTokens, null)
+    assert.equal(view.economics?.settledUnits, 30)
+    assert.deepEqual(view.economics?.meteredUsage, {
+      totals: [{ unit, allowance: 5, actualUnits: 3 }], complete: true, truncated: false,
+    })
+    assert.ok(!JSON.stringify(view).includes('private'))
+  }
+})
+
+test('missing native metadata and incomplete or malformed native usage never become zero tokens', () => {
+  for (const meteredUsage of [
+    undefined,
+    { totals: [], complete: false, truncated: false },
+    { totals: [{ unit: 'pages', allowance: 5, actualUnits: null }], complete: false, truncated: false },
+    { totals: [{ unit: 'pages', allowance: 5, actualUnits: 6 }], complete: true, truncated: false },
+    { totals: [{ unit: 'pages', allowance: 5, actualUnits: 3 }], complete: false, truncated: false },
+    { totals: [{ unit: 'pages', allowance: null, actualUnits: null }], complete: false, truncated: true },
+    { totals: [{ unit: 'requests', allowance: 5, actualUnits: 3 }], complete: true, truncated: false },
+  ]) {
+    const view = mapRunObservation({
+      ...waitingRun, status: 'completed', economics: { ...nativeEconomics, meteredUsage },
+    })
+    assert.ok(view)
+    assert.equal(view.tokensUsed, null)
+    assert.equal(view.economics?.inputTokens, null)
+    assert.equal(view.economics?.settledUnits, 30)
+    assert.equal(view.economics?.meteredUsage?.complete, false)
+  }
+  // A byte-bounded response may omit optional economics but retains null usage.
+  assert.equal(mapRunObservation({ ...waitingRun, status: 'completed', tokensUsed: null })?.tokensUsed, null)
+})

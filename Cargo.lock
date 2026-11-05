@@ -68,7 +68,6 @@ dependencies = [
 name = "ai-gateway"
 version = "0.1.0"
 dependencies = [
- "lumiere-file-inspection",
  "anyhow",
  "async-trait",
  "axum",
@@ -79,6 +78,7 @@ dependencies = [
  "futures",
  "lumiere-auth-context",
  "lumiere-contracts",
+ "lumiere-file-inspection",
  "lumiere-finance-review-core",
  "qdrant-client",
  "reqwest",
@@ -149,7 +149,6 @@ checksum = "fb5dfbc6d8d2675589ccbe4d0fd61df2419075625f8c1a62325e718e2b0049f9"
 name = "api-server"
 version = "0.1.0"
 dependencies = [
- "lumiere-file-inspection",
  "aes-gcm",
  "ammonia",
  "anyhow",
@@ -166,6 +165,7 @@ dependencies = [
  "jsonwebtoken",
  "lumiere-auth-context",
  "lumiere-contracts",
+ "lumiere-file-inspection",
  "lumiere-finance-review-core",
  "lumiere-presentation-core",
  "openssl",
@@ -2156,7 +2156,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.165"
+version = "0.3.166"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",

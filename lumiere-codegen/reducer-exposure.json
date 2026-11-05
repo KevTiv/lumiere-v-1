@@ -5119,6 +5119,31 @@
       "name": "revoke_ai_work_program_recipe",
       "exposure": "denied",
       "reason": "new reusable-work foundation; source-only until immutable generated contracts, typed API transport and reviewed admission are released"
+    },
+    {
+      "name": "configure_ai_metered_price",
+      "exposure": "denied",
+      "reason": "Private metered Mistral operator operation; no generic session dispatch. Exact service grants, company and immutable usage bindings remain native-owned."
+    },
+    {
+      "name": "reserve_ai_metered_spend",
+      "exposure": "denied",
+      "reason": "Private metered Mistral operator operation; no generic session dispatch. Exact service grants, company and immutable usage bindings remain native-owned."
+    },
+    {
+      "name": "settle_ai_metered_spend",
+      "exposure": "denied",
+      "reason": "Private metered Mistral operator operation; no generic session dispatch. Exact service grants, company and immutable usage bindings remain native-owned."
+    },
+    {
+      "name": "reconcile_ai_metered_spend",
+      "exposure": "denied",
+      "reason": "Private metered Mistral operator operation; no generic session dispatch. Exact service grants, company and immutable usage bindings remain native-owned."
+    },
+    {
+      "name": "claim_ai_metered_dispatch",
+      "exposure": "denied",
+      "reason": "Private atomic metered provider dispatch claim; exact service grant and durable reservation ownership, never generic session dispatch."
     }
   ]
 }

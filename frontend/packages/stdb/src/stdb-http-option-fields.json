@@ -600,6 +600,11 @@
   "AiKnowledgeVersionContent": [
     "nomination_signal"
   ],
+  "AiMeteredUsage": [
+    "dispatch_claim",
+    "actual_units",
+    "result_json"
+  ],
   "AiModelProfile": [
     "temperature",
     "top_p",

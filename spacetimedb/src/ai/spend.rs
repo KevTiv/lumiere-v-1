@@ -546,6 +546,9 @@ pub fn settle_ai_spend(
     if reservation.organization_id != organization_id {
         return Err("reservation is outside the tenant".into());
     }
+    if reservation.price_snapshot_id == 0 {
+        return Err("metered spend requires typed usage settlement".into());
+    }
     let run = ctx
         .db
         .ai_agent_run()
@@ -631,6 +634,15 @@ pub fn accept_ai_provider_attempt(
     if params.request_key.trim().is_empty() || params.request_key.len() > MAX_REQUEST_KEY_LEN {
         return Err("invalid request key".into());
     }
+    if ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&params.reservation_id)
+        .is_some_and(|row| row.price_snapshot_id == 0 && row.reserved_by != ctx.sender())
+    {
+        return Err("metered attempt acceptance requires its original reservation writer".into());
+    }
     if let Some(existing) = ctx
         .db
         .ai_provider_attempt()
@@ -714,6 +726,15 @@ pub fn mark_ai_provider_attempt_dispatched(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_spend", "reserve")?;
     let attempt = load_attempt(ctx, organization_id, attempt_id)?;
+    if ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&attempt.reservation_id)
+        .is_some_and(|row| row.price_snapshot_id == 0)
+    {
+        return Err("metered dispatch requires a unique invocation claim".into());
+    }
     match attempt_transition(&attempt.status, AttemptCommand::Dispatch)? {
         AttemptTransition::Replay => Ok(()),
         AttemptTransition::Apply(next) => {
@@ -749,6 +770,18 @@ pub fn record_ai_provider_attempt_result(
     check_permission(ctx, organization_id, "ai_spend", "reserve")?;
     let attempt = load_attempt(ctx, organization_id, params.attempt_id)?;
     validate_note(params.failure_reason.as_deref())?;
+    if ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&attempt.reservation_id)
+        .is_some_and(|row| row.price_snapshot_id == 0)
+        && (params.status != ATTEMPT_OUTCOME_UNKNOWN
+            || params.input_tokens != 0
+            || params.output_tokens != 0)
+    {
+        return Err("metered results require typed usage settlement".into());
+    }
     let command = AttemptCommand::Result(params.status.trim());
     let usage = (params.input_tokens, params.output_tokens);
     let replayed = attempt.input_tokens == params.input_tokens
@@ -855,6 +888,15 @@ pub fn reconcile_ai_provider_attempt(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_spend", "reconcile")?;
     let attempt = load_attempt(ctx, organization_id, params.attempt_id)?;
+    if ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&attempt.reservation_id)
+        .is_some_and(|row| row.price_snapshot_id == 0)
+    {
+        return Err("metered attempts require typed usage reconciliation".into());
+    }
     validate_recovery_attribution(
         &params.actor_identity,
         &params.approval_id,
@@ -1018,7 +1060,7 @@ fn validate_note(note: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_recovery_attribution(
+pub(super) fn validate_recovery_attribution(
     actor_identity: &str,
     approval_id: &str,
     resolution: &str,
@@ -1166,15 +1208,15 @@ fn valid_period(value: &str) -> bool {
         && bytes[5..].iter().all(u8::is_ascii_digit)
         && (1..=12).contains(&value[5..].parse::<u32>().unwrap_or(0))
 }
-fn current_period(timestamp: Timestamp) -> Result<String, String> {
+pub(super) fn current_period(timestamp: Timestamp) -> Result<String, String> {
     let date = chrono::DateTime::from_timestamp_micros(timestamp.to_micros_since_unix_epoch())
         .ok_or("timestamp is outside the supported calendar")?;
     Ok(date.format("%Y-%m").to_string())
 }
-fn model_allowed(allowed: &[String], model: &str) -> bool {
+pub(super) fn model_allowed(allowed: &[String], model: &str) -> bool {
     !allowed.is_empty() && allowed.iter().any(|candidate| candidate == model)
 }
-fn provider_eq(left: &str, right: &str) -> bool {
+pub(super) fn provider_eq(left: &str, right: &str) -> bool {
     left.eq_ignore_ascii_case(right)
 }
 fn allowance_cost(snapshot: &AiPriceSnapshot, input: u32, output: u32) -> Result<u64, String> {
@@ -1216,7 +1258,12 @@ fn settlement_replay(status: &str, stored: (u32, u32), actual: (u32, u32)) -> Re
     }
 }
 
-fn reserve_units(limit: u64, settled: u64, outstanding: u64, amount: u64) -> Result<u64, String> {
+pub(super) fn reserve_units(
+    limit: u64,
+    settled: u64,
+    outstanding: u64,
+    amount: u64,
+) -> Result<u64, String> {
     let next = outstanding
         .checked_add(amount)
         .ok_or("outstanding spend overflow")?;
@@ -1226,7 +1273,7 @@ fn reserve_units(limit: u64, settled: u64, outstanding: u64, amount: u64) -> Res
     Ok(next)
 }
 
-fn settle_units(
+pub(super) fn settle_units(
     limit: u64,
     settled: u64,
     outstanding: u64,
@@ -1246,7 +1293,7 @@ fn settle_units(
     Ok((settled, remaining))
 }
 
-fn validate_run(
+pub(super) fn validate_run(
     ctx: &ReducerContext,
     organization_id: u64,
     run: &crate::ai::skills::AiAgentRun,

@@ -42,7 +42,7 @@ jobs:
       - name: Test external readiness probe
         run: node scripts/tests/test-compose-readiness.mjs
       - name: Test operational Node scripts
-        run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/inventory-workflow-cancellations.test.mjs scripts/tests/test_mistral_alpha_preflight.mjs scripts/tests/test-provision-ai-harness.mjs
+        run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/inventory-workflow-cancellations.test.mjs scripts/tests/test_mistral_alpha_preflight.mjs scripts/tests/test-provision-ai-harness.mjs scripts/tests/test-provision-mistral-capabilities.mjs
       - name: Test ordered Railway release orchestration
         run: |
           bash scripts/tests/test-railway-stack-release.sh
