@@ -5,17 +5,18 @@ import importlib.util
 import io
 import json
 from pathlib import Path
-import sys
 import tempfile
 import unittest
 
 SCRIPTS = Path(__file__).parents[1]
-sys.path.insert(0, str(SCRIPTS))
-from farm_history_source import alias_proposals, interpret_note, payment_note, supplemental_review_datasets
 
 spec = importlib.util.spec_from_file_location("farm_source_preflight", SCRIPTS / "farm-history-preflight.py")
 preflight = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(preflight)
+alias_proposals = preflight.source_notes.alias_proposals
+interpret_note = preflight.source_notes.interpret_note
+payment_note = preflight.source_notes.payment_note
+supplemental_review_datasets = preflight.source_notes.supplemental_review_datasets
 
 HEADER = ["N/S", "DESCRIPTION", "S I", "ENTRE", "TOTAL", "SF", "QTES S", "PU", "TOTAL", "QTES S", "PU", "TOTAL"]
 PRODUCT = ["1", "CHICKEN", "10", "2", "12", "4", "8", "100", "800", "8", "150", "1200"]

@@ -129,14 +129,17 @@ fn row_and_column_limits_reject_instead_of_truncating() {
 
 #[test]
 fn report_layout_preserves_blank_records_and_scans_every_section() {
-    let text = "\u{feff}\r\nUMUNOPFU CHICKEN LTD\r\nDESCRIPTION,KG,AMOUNT\r\nInkoko,2,8000\r\n\r\nDEPENSES\r\nTransport,500\r\nMOMO HQ,7500\r\n";
+    let text = "\u{feff}\r\nSYNTHETIC COMPANY\r\nDESCRIPTION,KG,AMOUNT\r\nInkoko,2,8000\r\n\r\nDEPENSES\r\nTransport,500\r\nMOMO HQ,7500\r\n";
     let inspected = inspect_csv_records(text).unwrap();
     assert_eq!(inspected.records[0], [""]);
     assert_eq!(inspected.records[2], ["DESCRIPTION", "KG", "AMOUNT"]);
     assert_eq!(inspected.records[6], ["Transport", "500"]);
     assert_eq!(inspected.report.inspected_rows, 8);
     assert!(inspected.report.ai_allowed);
-    assert!(parse_csv(text).is_err(), "report admission cannot relax native import shape");
+    assert!(
+        parse_csv(text).is_err(),
+        "report admission cannot relax native import shape"
+    );
     let changed = inspect_csv_records(&text.replace("7500", "7501")).unwrap();
     assert_ne!(inspected.content_sha256, changed.content_sha256);
     assert_ne!(inspected.dataset_sha256, changed.dataset_sha256);

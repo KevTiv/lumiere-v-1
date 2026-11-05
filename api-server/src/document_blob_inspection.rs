@@ -395,9 +395,11 @@ fn receipt_is_current(receipt: &BlobInspectionReceipt) -> bool {
                 | "bounded_pdf_structure"
                 | "restricted_xlsx"
         )
-        && (!matches!(receipt.profile.as_str(), "bounded_text" | "bounded_csv_records")
-            || receipt.content_policy_version.as_deref()
-                == Some(lumiere_file_inspection::INSPECTION_POLICY_VERSION))
+        && (!matches!(
+            receipt.profile.as_str(),
+            "bounded_text" | "bounded_csv_records"
+        ) || receipt.content_policy_version.as_deref()
+            == Some(lumiere_file_inspection::INSPECTION_POLICY_VERSION))
         && (receipt.profile != "restricted_xlsx"
             || receipt.content_policy_version.as_deref()
                 == Some(
@@ -520,7 +522,8 @@ mod tests {
 
     #[tokio::test]
     async fn report_csv_admission_retains_sections_without_granting_import_or_ai_authority() {
-        let bytes = b"\nSHOP REPORT\nDESCRIPTION,KG,AMOUNT\nChicken,2,8000\nDEPENSES\nTransport,500\n";
+        let bytes =
+            b"\nSHOP REPORT\nDESCRIPTION,KG,AMOUNT\nChicken,2,8000\nDEPENSES\nTransport,500\n";
         let receipt = inspect_blob(&meta("report.csv", "text/csv", bytes), bytes)
             .await
             .unwrap();

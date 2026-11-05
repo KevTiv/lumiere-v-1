@@ -428,7 +428,6 @@ async fn exercise_history(pool: &deadpool_postgres::Pool) -> Result<()> {
     Ok(())
 }
 
-
 /// Confirmation is filtered before pagination, including after long unreviewed runs.
 async fn exercise_confirmed_facts(
     client: &tokio_postgres::Client,
@@ -442,7 +441,12 @@ async fn exercise_confirmed_facts(
         let id = add_item(client, batch, key, None, None, "confirmed").await?;
         let source = json!({"key":key,"label":"Dated snapshot","source":{"file":"historic.csv","row":7},
             "fields":[{"key":key,"label":"Snapshot date","kind":"date","sourceValue":"2022-10-05","required":false}]});
-        client.execute("UPDATE lumiere_platform.import_review_item SET source_json=$1 WHERE id=$2", &[&source,&id]).await?;
+        client
+            .execute(
+                "UPDATE lumiere_platform.import_review_item SET source_json=$1 WHERE id=$2",
+                &[&source, &id],
+            )
+            .await?;
         expected.push(id.to_string());
     }
     let partial = add_item(client, batch, "partial", None, None, "needs_review").await?;

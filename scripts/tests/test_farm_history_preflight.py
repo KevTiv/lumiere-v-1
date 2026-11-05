@@ -6,9 +6,6 @@ from pathlib import Path
 import tempfile
 import unittest
 import csv
-import sys
-
-sys.path.insert(0, str(Path(__file__).parents[1]))
 
 spec = importlib.util.spec_from_file_location("farm_preflight", Path(__file__).parents[1] / "farm-history-preflight.py")
 module = importlib.util.module_from_spec(spec)
