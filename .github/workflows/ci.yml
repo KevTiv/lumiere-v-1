@@ -472,7 +472,11 @@ jobs:
 
       - name: Install Playwright Chromium
         working-directory: frontend/web
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: |
+          # Use Ubuntu's HTTPS archive when the runner's Azure HTTP mirror stalls.
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          pnpm exec playwright install --with-deps chromium
 
       - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
