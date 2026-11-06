@@ -1856,7 +1856,19 @@ fn assert_durable_recovery(
         serde_json::json!({"previous_task_id": params.task_id}),
         link,
     )?;
-    if changes.last().map(|row| row.table_name.as_str()) != Some("workflow_human_task_resubmission")
+    // Audit/history evidence follows the complete business outcome. The link
+    // must still follow every task/history parent in that business outcome.
+    if changes
+        .iter()
+        .rev()
+        .find(|row| {
+            !matches!(
+                row.table_name.as_str(),
+                "audit_log" | "business_change" | "organization_business_change"
+            )
+        })
+        .map(|row| row.table_name.as_str())
+        != Some("workflow_human_task_resubmission")
     {
         return Err("recovery link was recorded before its task/history parents".to_string());
     }
