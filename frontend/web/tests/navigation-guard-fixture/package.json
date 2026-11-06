@@ -1,1 +1,7 @@
-{ "name": "lumiere-navigation-guard-fixture", "private": true }
+{
+  "name": "lumiere-navigation-guard-fixture",
+  "private": true,
+  "engines": {
+    "node": "26.x"
+  }
+}

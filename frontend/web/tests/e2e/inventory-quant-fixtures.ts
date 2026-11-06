@@ -995,10 +995,13 @@ export async function setWarehouseQcLocationViaUi(
   warehouseId: number,
   locationName: string | undefined,
 ): Promise<void> {
-  await gotoModule(page, "/warehouse", "warehouse")
+  await gotoModule(page, `/warehouse?tab=warehouses&filter=id:${warehouseId}`, "warehouse")
   await selectModuleTab(page, "warehouse", "warehouses")
-  await selectEntityRowById(page, warehouseId)
-  await page.getByTestId("entity-action-edit-warehouse").click()
+  const checkbox = activeTabEntityTable(page).getByTestId(`entity-select-row-${warehouseId}`)
+  await checkbox.check({ timeout: 30_000 })
+  const edit = page.getByTestId("entity-action-edit-warehouse")
+  await expect(edit).toBeEnabled({ timeout: 15_000 })
+  await edit.click()
   await expect(page.getByTestId("form-modal-edit-warehouse")).toBeVisible({
     timeout: 15_000,
   })
@@ -1023,14 +1026,14 @@ export async function fetchWarehouseQcLocationId(
   warehouseId: number,
 ): Promise<number | undefined> {
   const response = await page.request.get("/api/query/warehouses")
-  if (!response.ok()) return undefined
+  expect(response.ok()).toBe(true)
   const payload = (await response.json()) as {
     data?: Array<Record<string, unknown>>
   }
   const row = (payload.data ?? []).find(
     (candidate) => scalarQueryId(candidate.id) === warehouseId,
   )
-  if (!row) return undefined
+  if (!row) throw new Error(`Warehouse ${warehouseId} is missing from readback`)
   return (
     scalarQueryId(row.whQcStockLocId ?? row.wh_qc_stock_loc_id) ?? undefined
   )

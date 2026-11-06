@@ -156,6 +156,10 @@ jobs:
           ref: ${{ inputs.release_sha }}
           fetch-depth: 1
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
       - name: Verify production ancestry
         shell: bash
         run: |

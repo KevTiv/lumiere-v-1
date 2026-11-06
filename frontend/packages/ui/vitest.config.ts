@@ -22,6 +22,9 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // jsdom owns browser storage; Node 26's host storage must not replace it.
+    pool: "forks",
+    poolOptions: { forks: { execArgv: ["--no-experimental-webstorage"] } },
     setupFiles: ["./src/test-setup-dom.ts", "./src/test-setup-storage.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },

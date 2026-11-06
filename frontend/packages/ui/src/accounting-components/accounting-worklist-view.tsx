@@ -593,7 +593,7 @@ function AccountingWorklistTable({
                 if (anchor) commitRecordListFor(anchor.getAttribute("href") ?? undefined, ids, snapshot)
               }}
             >
-              <Table className="min-w-[860px]">
+              <Table pagination={false} className="min-w-[860px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12">

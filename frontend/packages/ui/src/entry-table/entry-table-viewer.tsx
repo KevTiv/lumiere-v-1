@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { TABLE_PAGE_SIZE } from "../components/table-pager"
 import { cn } from "@/lib/utils"
 import type { EntryTableConfig, EntryData, TableColumn } from "@/lib/entry-table-types"
 import { downloadCsv } from "@/lib/export-csv"
@@ -59,7 +60,7 @@ export function EntryTableViewer({
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(config.pageSize || 10)
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE)
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<"view" | "edit">("view")
@@ -97,10 +98,11 @@ export function EntryTableViewer({
   }, [filteredData, sortKey, sortDir, features.sort])
 
   // Pagination
-  const totalPages = Math.ceil(sortedData.length / pageSize)
-  const paginatedData = features.pagination
-    ? sortedData.slice((page - 1) * pageSize, page * pageSize)
-    : sortedData
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedData = sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  useEffect(() => { setPage(1) }, [search, sortKey, sortDir])
+  useEffect(() => { setPage((value) => Math.min(value, totalPages)) }, [totalPages])
 
   const handleSort = (key: string) => {
     if (!features.sort) return
@@ -347,9 +349,9 @@ export function EntryTableViewer({
           </table>
         </div>
 
-        {features.pagination && totalPages > 0 && (
-          <div className="flex items-center justify-between p-4 border-t border-border/50">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        {sortedData.length > Math.min(pageSize, TABLE_PAGE_SIZE) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-t border-border/50">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>Rows per page:</span>
               <Select
                 value={String(pageSize)}
@@ -362,7 +364,7 @@ export function EntryTableViewer({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(config.pageSizeOptions || [5, 10, 20, 50]).map((size) => (
+                  {[10, 25, 50, 100].map((size) => (
                     <SelectItem key={size} value={String(size)}>
                       {size}
                     </SelectItem>
@@ -370,7 +372,7 @@ export function EntryTableViewer({
                 </SelectContent>
               </Select>
               <span className="ml-4">
-                {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, sortedData.length)} of {sortedData.length}
+                {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -378,7 +380,8 @@ export function EntryTableViewer({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                disabled={page === 1}
+                aria-label="Go to first page"
+                disabled={currentPage === 1}
                 onClick={() => setPage(1)}
               >
                 <ChevronsLeft className="h-4 w-4" />
@@ -387,20 +390,22 @@ export function EntryTableViewer({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
+                aria-label="Go to previous page"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="px-3 text-sm">
-                Page {page} of {totalPages}
+                Page {currentPage} of {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                disabled={page === totalPages}
-                onClick={() => setPage(page + 1)}
+                aria-label="Go to next page"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(currentPage + 1)}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -408,7 +413,8 @@ export function EntryTableViewer({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                disabled={page === totalPages}
+                aria-label="Go to last page"
+                disabled={currentPage === totalPages}
                 onClick={() => setPage(totalPages)}
               >
                 <ChevronsRight className="h-4 w-4" />

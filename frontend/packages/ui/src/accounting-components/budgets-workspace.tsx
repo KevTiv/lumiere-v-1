@@ -569,7 +569,7 @@ export function BudgetsWorkspace({
                     )}
                   </div>
                   <div className="rounded-md border border-border/50">
-                    <Table>
+                    <Table pagination={false}>
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-20">ID</TableHead>

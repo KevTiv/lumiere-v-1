@@ -217,7 +217,7 @@ export function GeneralLedgerView({
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table pagination={false}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t("accounting.journalEntries.entryNumber")}</TableHead>
@@ -284,7 +284,7 @@ export function GeneralLedgerView({
                   <div><Label className="text-muted-foreground">{t("accounting.journalEntries.type")}</Label><p className="font-medium">{stbEnumTag(selectedMove.moveType)}</p></div>
                 </div>
                 <div className="border rounded-lg">
-                  <Table>
+                  <Table pagination={false}>
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t("accounting.journalEntries.partner")}</TableHead>

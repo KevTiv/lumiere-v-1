@@ -78,5 +78,8 @@
     "spacetimedb": "2.8.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": "26.x"
   }
 }

@@ -57,6 +57,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        if: matrix.service == 'web'
+        with:
+          node-version-file: .nvmrc
       - name: Validate pinned frontend contracts
         if: matrix.service == 'web'
         run: |

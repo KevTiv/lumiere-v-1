@@ -38,7 +38,6 @@ export function ProjectGanttPanel({
     return (tasks as Record<string, unknown>[])
       .filter((tk) => !tk.isClosed && String(tk.kanbanState) !== "Cancelled")
       .sort((a, b) => Number(a.dateDeadline ?? 0) - Number(b.dateDeadline ?? 0))
-      .slice(0, 50)
       .map((tk) => ({
         id: String(tk.id),
         task: String(tk.name ?? ""),
@@ -191,7 +190,6 @@ export function ResourceAllocationPanel({
         from: microsToDateLabel(a.dateFrom),
         to: microsToDateLabel(a.dateTo),
       }))
-      .slice(0, 40)
   }, [allocations, employees])
   const bookingPager = usePagedRows(bookingRows)
   const capacityPager = usePagedRows(capacityRows)

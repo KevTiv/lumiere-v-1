@@ -42,7 +42,10 @@ export function usePagedRows<T>(rows: readonly T[], resetKey?: unknown, pageSize
   }, [resetKey])
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
+  const currentPage = Math.max(1, Math.min(page, totalPages))
+  useEffect(() => {
+    setPage((value) => Math.max(1, Math.min(value, totalPages)))
+  }, [totalPages])
   const pageRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return rows.slice(start, start + pageSize)
@@ -72,12 +75,14 @@ export function TablePager({
 }: TablePagerProps) {
   if (total <= pageSize) return null
   return (
-    <div className="flex flex-col items-end gap-1 pt-2" data-testid="table-pager">
+    <div className="flex min-w-0 flex-col items-end gap-1 pt-2" data-testid="table-pager">
       <Pagination className="justify-end">
-        <PaginationContent>
+        <PaginationContent className="flex-wrap justify-end">
           <PaginationItem>
             <PaginationPrevious
               href="#"
+              aria-disabled={currentPage === 1}
+              tabIndex={currentPage === 1 ? -1 : undefined}
               onClick={(event) => {
                 event.preventDefault()
                 if (currentPage > 1) setPage(currentPage - 1)
@@ -95,6 +100,7 @@ export function TablePager({
                 <PaginationLink
                   href="#"
                   isActive={item === currentPage}
+                  aria-label={`Page ${item}`}
                   onClick={(event) => {
                     event.preventDefault()
                     setPage(item)
@@ -108,6 +114,8 @@ export function TablePager({
           <PaginationItem>
             <PaginationNext
               href="#"
+              aria-disabled={currentPage === totalPages}
+              tabIndex={currentPage === totalPages ? -1 : undefined}
               onClick={(event) => {
                 event.preventDefault()
                 if (currentPage < totalPages) setPage(currentPage + 1)

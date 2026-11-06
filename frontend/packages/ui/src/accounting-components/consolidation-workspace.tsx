@@ -219,7 +219,7 @@ export function ConsolidationWorkspace({
             </p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
-              <Table>
+              <Table pagination={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t("accounting.consolidation.accounts.colCode")}</TableHead>
@@ -294,7 +294,7 @@ export function ConsolidationWorkspace({
             </p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
-              <Table>
+              <Table pagination={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t("accounting.consolidation.journals.colName")}</TableHead>
@@ -406,7 +406,7 @@ export function ConsolidationWorkspace({
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-md border">
-                  <Table>
+                  <Table pagination={false}>
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t("accounting.consolidation.elimination.colName")}</TableHead>
