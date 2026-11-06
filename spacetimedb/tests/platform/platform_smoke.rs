@@ -1748,7 +1748,11 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
             "document_version",
             "document_version",
             "audit_log",
-            "organization_business_change",
+            if doc.company_id.is_some() {
+                "business_change"
+            } else {
+                "organization_business_change"
+            },
         ]
     {
         return Err(format!(
