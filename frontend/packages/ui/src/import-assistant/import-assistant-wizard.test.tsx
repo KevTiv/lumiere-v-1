@@ -20,6 +20,7 @@ vi.mock("@lumiere/query-hooks/hooks/ai-import-mapping", () => ({
   usePreviewImportMapping: () => hooks.preview,
 }))
 vi.mock("@lumiere/query-hooks/hooks/import-mapping-templates", () => ({
+  importMappingTemplateMatchesHeaders: () => false,
   templatesForEntity: () => [],
   useImportMappingTemplates: () => hooks.templates,
   useSaveImportMappingTemplate: () => hooks.save,

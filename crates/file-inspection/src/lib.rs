@@ -2,9 +2,10 @@
 
 mod csv;
 
-pub use csv::{parse_csv, parse_csv_records};
+pub use csv::{parse_csv, parse_csv_records, CsvDelimiter};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::borrow::Cow;
 
 /// Reinspection is required when this policy changes.
 pub const INSPECTION_POLICY_VERSION: &str = "file-inspection-v1";
@@ -20,6 +21,17 @@ pub const MAX_FINDINGS: usize = 100;
 pub enum InspectionError {
     #[error("csv {0}")]
     InvalidCsv(&'static str),
+    #[error("csv record {record} {reason}")]
+    CsvRecord { record: usize, reason: &'static str },
+    #[error("csv record {record}, column {column}, UTF-8 byte offset {byte}: {reason}")]
+    CsvLocation {
+        record: usize,
+        column: usize,
+        byte: usize,
+        reason: &'static str,
+    },
+    #[error("csv has invalid UTF-8 at byte {byte}; use UTF-8 or UTF-16 with a byte order mark")]
+    CsvEncoding { byte: usize },
     #[error("content exceeds {0}")]
     LimitExceeded(&'static str),
     #[error("content contains unsupported control characters")]
@@ -93,6 +105,79 @@ pub struct InspectedCsv {
     pub content_sha256: String,
     pub dataset_sha256: String,
     pub report: InspectionReport,
+}
+
+/// Source preparation separates exact uploaded bytes from the native comma payload.
+#[derive(Debug)]
+pub struct PreparedCsvSource<'a> {
+    pub csv_text: Cow<'a, str>,
+    pub delimiter: CsvDelimiter,
+    pub encoding: &'static str,
+    pub source_sha256: String,
+    pub inspected: InspectedCsv,
+}
+
+/// Prepare a flat source export for preview and the existing native comma import.
+///
+/// # Errors
+/// Rejects invalid encoding, ambiguous dialect, malformed records, and files or
+/// resulting comma payloads that exceed the inspection budgets.
+pub fn prepare_csv_source(
+    bytes: &[u8],
+    selected_delimiter: Option<CsvDelimiter>,
+) -> Result<PreparedCsvSource<'_>, InspectionError> {
+    validate_content_bytes(bytes.len())?;
+    let (text, encoding) = decode_csv_source(bytes)?;
+    let (delimiter, headers, rows) = csv::parse_csv_source(&text, selected_delimiter)?;
+    let csv_text = if delimiter == CsvDelimiter::Comma {
+        text
+    } else {
+        Cow::Owned(csv::write_comma_csv(&headers, &rows))
+    };
+    validate_content_bytes(csv_text.len())?;
+    let report = inspect_matrix(&headers, &rows)?;
+    let dataset_sha256 = matrix_sha256(&headers, &rows);
+    let inspected = InspectedCsv {
+        headers,
+        rows,
+        content_sha256: format!("{:x}", Sha256::digest(csv_text.as_bytes())),
+        dataset_sha256,
+        report,
+    };
+    Ok(PreparedCsvSource {
+        csv_text,
+        delimiter,
+        encoding,
+        source_sha256: format!("{:x}", Sha256::digest(bytes)),
+        inspected,
+    })
+}
+
+fn decode_csv_source(bytes: &[u8]) -> Result<(Cow<'_, str>, &'static str), InspectionError> {
+    let utf16 = bytes
+        .strip_prefix(&[0xff, 0xfe])
+        .map(|body| (body, u16::from_le_bytes as fn([u8; 2]) -> u16, "utf-16le"))
+        .or_else(|| {
+            bytes
+                .strip_prefix(&[0xfe, 0xff])
+                .map(|body| (body, u16::from_be_bytes as fn([u8; 2]) -> u16, "utf-16be"))
+        });
+    if let Some((body, read_unit, encoding)) = utf16 {
+        let (units, remainder) = body.as_chunks::<2>();
+        if !remainder.is_empty() {
+            return Err(InspectionError::InvalidCsv(
+                "contains a truncated UTF-16 code unit",
+            ));
+        }
+        let text = char::decode_utf16(units.iter().copied().map(read_unit))
+            .collect::<Result<String, _>>()
+            .map_err(|_| InspectionError::InvalidCsv("contains invalid UTF-16 text"))?;
+        return Ok((Cow::Owned(text), encoding));
+    }
+    let text = std::str::from_utf8(bytes).map_err(|error| InspectionError::CsvEncoding {
+        byte: error.valid_up_to(),
+    })?;
+    Ok((Cow::Borrowed(text), "utf-8"))
 }
 
 /// A report is a record matrix, not an assertion about importable column names.

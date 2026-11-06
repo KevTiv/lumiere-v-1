@@ -264,8 +264,8 @@ class PreparationTests(unittest.TestCase):
                               csv_source("ZINIA-conflict.csv", [rows[0], header, conflict]),
                               csv_source("ZINIA-overlap.csv", [["AUDIT ZINIA 7/1/2022-10/1/2022"], header, row]))
         self.assertEqual(len(result["datasets"]), 4)
-        self.assertEqual(result["warnings"], sorted(module.AUDIT_ISSUES[key] for key in
-                         ["conflicting_same_title_audits", "duplicate_audit_dataset", "overlapping_shop_periods"]))
+        for key in ["conflicting_same_title_audits", "duplicate_audit_dataset", "overlapping_shop_periods"]:
+            self.assertIn(module.AUDIT_ISSUES[key], result["warnings"])
 
     def test_xlsx_preserves_sparse_worksheet_rows_and_shared_strings(self):
         data = workbook('<row r="3"><c r="A3" t="s"><v>0</v></c><c r="B3" t="inlineStr"><is><t>email</t></is></c></row>'
@@ -292,6 +292,56 @@ class PreparationTests(unittest.TestCase):
         batch = self.prepare(source("contacts.csv", "\nname;email\nAlice;alice@example.test\n"))["datasets"][0]
         self.assertEqual(batch["targetEntity"], "contact")
         self.assertEqual(batch["items"][0]["source"]["row"], 3)
+
+    def test_csv_utf16_pipe_keeps_original_bytes_and_unresolved_decimal_locale(self):
+        contents = "name|sale_price\r\nCafé|1,250\r\n".encode("utf-16")
+        batch = self.prepare(source("products.csv", contents))["datasets"][0]
+        item = batch["items"][0]
+        self.assertEqual(item["source"]["sha256"], hashlib.sha256(contents).hexdigest())
+        self.assertEqual(item["proposed"]["name"], "Café")
+        self.assertIsNone(item["proposed"]["sale_price"])
+        self.assertEqual(item["fields"][1]["sourceValue"], "1,250")
+
+    def test_malformed_file_is_held_without_discarding_a_ready_file(self):
+        result = self.prepare(
+            source("broken.csv", 'name,email\n"unfinished\n'),
+            source("contacts.csv", "name,email\nAlice,alice@example.test\n"),
+        )
+        self.assertEqual([batch["sourceFile"] for batch in result["datasets"]], ["contacts.csv"])
+        self.assertTrue(any("broken.csv — held" in line and "line 2" in line for line in result["warnings"]))
+        self.assertIn("contacts.csv — 2 source records: 1 for review, 0 blank, 1 headers.", result["warnings"])
+
+    def test_repeated_headers_are_counted_and_never_become_contacts(self):
+        result = self.prepare(source("contacts.csv", "\nname,email\nAlice,a@example.test\nname,email\nBob,b@example.test\n"))
+        items = result["datasets"][0]["items"]
+        self.assertEqual([item["source"]["row"] for item in items], [3, 5])
+        self.assertIn("contacts.csv — 5 source records: 2 for review, 1 blank, 2 headers.", result["warnings"])
+
+    def test_single_column_value_equal_to_header_stays_in_review(self):
+        result = self.prepare(source("products.csv", "name\nname\nTea\n"))
+        self.assertEqual([item["label"] for item in result["datasets"][0]["items"]], ["name", "Tea"])
+
+    def test_ragged_semicolon_file_retains_decimal_cells_and_missing_values(self):
+        result = self.prepare(source("products.csv", "name;sale_price;cost_price\nTea;1,23;2,34\nTea 2;3,12\n"))
+        tea, second = result["datasets"][0]["items"]
+        self.assertEqual(tea["fields"][1]["sourceValue"], "1,23")
+        self.assertIsNone(tea["proposed"]["sale_price"])
+        self.assertEqual(second["fields"][1]["sourceValue"], "3,12")
+        self.assertIsNone(second["proposed"]["cost_price"])
+
+    def test_recognized_sequential_tables_keep_separate_targets_and_source_rows(self):
+        result = self.prepare(source("mixed.csv", "name,email\nAlice,a@example.test\n\nname,usage\nMain,internal\n"))
+        self.assertEqual([batch["targetEntity"] for batch in result["datasets"]], ["contact", "stock_location"])
+        self.assertEqual([batch["items"][0]["source"]["row"] for batch in result["datasets"]], [2, 5])
+        self.assertIn("mixed.csv — 5 source records: 2 for review, 1 blank, 2 headers.", result["warnings"])
+
+    def test_different_sections_and_exact_copies_stay_as_evidence(self):
+        contents = "name,email\nAlice,a@example.test\n"
+        result = self.prepare(source("contacts.csv", contents), source("contacts-copy.csv", contents),
+                              source("other-contacts.csv", contents + "SALES SUMMARY\nGrand total,100\n"))
+        self.assertEqual([batch["targetEntity"] for batch in result["datasets"]], ["source_observation"] * 3)
+        self.assertTrue(any("same bytes" in line for line in result["warnings"]))
+        self.assertTrue(any("Line 3" in line for line in result["warnings"]))
 
     def test_datasets_are_chunked_without_losing_rows(self):
         batch = self.prepare(source("contacts.csv", "name,email\n" + "Alice,alice@example.test\n" * 1001))["datasets"]

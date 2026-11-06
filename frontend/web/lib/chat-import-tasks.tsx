@@ -183,7 +183,17 @@ export function useChatImportTasks(args: {
           : task.decision.selectedOptionId === "inspect_only" ? t("aiChat.import.inspectionSaved", { defaultValue: "Files saved · inspection can be resumed" })
             : t("aiChat.import.saved", { defaultValue: "Files saved · preparation can be resumed" })}</p>
       <p className="text-xs text-muted-foreground">{t("aiChat.import.noRecords", { defaultValue: "Preparation creates no business records. Review the source before importing." })}</p>
-      <ul className="space-y-1">{task.files.map(file => <li key={file.ordinal} className="break-words"><a className="underline" href={`/api/import-tasks/${task.requestId}/files/${file.ordinal}?companyId=${scope.companyId}`} download={file.fileName}>{file.fileName}</a></li>)}</ul>
+      <ul className="space-y-1">{task.files.map(file => <li key={file.ordinal} className="break-words">
+        <a className="underline" href={`/api/import-tasks/${task.requestId}/files/${file.ordinal}?companyId=${scope.companyId}`} download={file.fileName}>{file.fileName}</a>
+        {file.previousMatch ? <div className="text-muted-foreground">
+          <p>{file.previousMatch.kind === "identical"
+            ? t("aiChat.import.identicalEarlierSource")
+            : t("aiChat.import.changedEarlierSource")}</p>
+          <a className="underline" href={`/api/import-tasks/${file.previousMatch.requestId}/files/${file.previousMatch.ordinal}?companyId=${scope.companyId}`} download={file.previousMatch.fileName}>
+            {t("aiChat.import.downloadEarlierSource", { fileName: file.previousMatch.fileName })}
+          </a>
+        </div> : null}
+      </li>)}</ul>
       {task.warnings.map((warning, i) => <p key={i} className="text-muted-foreground">{warning}</p>)}
       {task.error ? <p role="alert" className="text-destructive">{task.error}</p> : null}
       {task.decision.status === "approved" ? <p className="text-muted-foreground">{task.decision.selectedOptionId === "inspect_only"

@@ -5,6 +5,39 @@ use crate::{
     MAX_MATRIX_CELLS, MAX_ROWS,
 };
 
+use serde::{Deserialize, Serialize};
+
+/// Source delimiters supported by the preparation path. Native reducers use commas.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CsvDelimiter {
+    #[default]
+    Comma,
+    Semicolon,
+    Tab,
+    Pipe,
+}
+
+impl CsvDelimiter {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Comma => "comma",
+            Self::Semicolon => "semicolon",
+            Self::Tab => "tab",
+            Self::Pipe => "pipe",
+        }
+    }
+
+    fn character(self) -> char {
+        match self {
+            Self::Comma => ',',
+            Self::Semicolon => ';',
+            Self::Tab => '\t',
+            Self::Pipe => '|',
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum FieldState {
     Start,
@@ -19,7 +52,13 @@ enum FieldState {
 /// # Errors
 /// Rejects invalid quote placement, controls and exceeded byte/shape/cell budgets.
 pub fn parse_csv(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), InspectionError> {
-    let mut records = parse_csv_records(text)?.into_iter();
+    flat_records(parse_csv_records(text)?)
+}
+
+fn flat_records(
+    records: Vec<Vec<String>>,
+) -> Result<(Vec<String>, Vec<Vec<String>>), InspectionError> {
+    let mut records = records.into_iter();
     let headers = records
         .next()
         .ok_or(InspectionError::InvalidCsv("is empty"))?;
@@ -27,8 +66,11 @@ pub fn parse_csv(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Inspecti
         return Err(InspectionError::InvalidCsv("header row is empty"));
     }
     let rows: Vec<Vec<String>> = records.collect();
-    if rows.iter().any(|row| row.len() > headers.len()) {
-        return Err(InspectionError::InvalidCsv("row is wider than its header"));
+    if let Some(index) = rows.iter().position(|row| row.len() > headers.len()) {
+        return Err(InspectionError::CsvRecord {
+            record: index + 2,
+            reason: "has more fields than the header",
+        });
     }
     Ok((headers, rows))
 }
@@ -40,26 +82,81 @@ pub fn parse_csv(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), Inspecti
 /// # Errors
 /// Rejects the same malformed quoting, controls and resource limits as flat CSV.
 pub fn parse_csv_records(text: &str) -> Result<Vec<Vec<String>>, InspectionError> {
+    let offset = validate_input(text)?;
+    parse_records(&text[offset..], offset, ',', false)
+}
+
+/// Resolve the delimiter from the first logical record, then parse the whole input.
+/// Ambiguous headers require explicit selection. This does not classify report layouts.
+pub(crate) fn parse_csv_source(
+    text: &str,
+    selected: Option<CsvDelimiter>,
+) -> Result<(CsvDelimiter, Vec<String>, Vec<Vec<String>>), InspectionError> {
+    let offset = validate_input(text)?;
+    let text = &text[offset..];
+    let delimiter = if let Some(delimiter) = selected {
+        delimiter
+    } else {
+        let candidates = [
+            CsvDelimiter::Comma,
+            CsvDelimiter::Semicolon,
+            CsvDelimiter::Tab,
+            CsvDelimiter::Pipe,
+        ];
+        let mut matching = candidates.into_iter().filter(|delimiter| {
+            match parse_records(text, offset, delimiter.character(), true) {
+                Ok(records) => records.first().is_some_and(|header| header.len() > 1),
+                // An oversized header still identifies its delimiter.
+                Err(InspectionError::LimitExceeded("200 columns")) => true,
+                Err(_) => false,
+            }
+        });
+        let inferred = matching.next().unwrap_or_default();
+        if matching.next().is_some() {
+            return Err(InspectionError::InvalidCsv(
+                "delimiter is ambiguous; select comma, semicolon, tab, or pipe",
+            ));
+        }
+        inferred
+    };
+    let (headers, rows) = flat_records(parse_records(text, offset, delimiter.character(), false)?)?;
+    Ok((delimiter, headers, rows))
+}
+
+fn validate_input(text: &str) -> Result<usize, InspectionError> {
     validate_content_bytes(text.len())?;
     validate_controls(text)?;
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    if text.is_empty() {
+    let offset = if text.starts_with('\u{feff}') {
+        '\u{feff}'.len_utf8()
+    } else {
+        0
+    };
+    if text.len() == offset {
         return Err(InspectionError::InvalidCsv("is empty"));
     }
+    Ok(offset)
+}
+
+fn parse_records(
+    text: &str,
+    offset: usize,
+    delimiter: char,
+    header_only: bool,
+) -> Result<Vec<Vec<String>>, InspectionError> {
     let mut records = Vec::new();
     let mut row = Vec::new();
     let mut field = String::new();
     let mut state = FieldState::Start;
-    let mut chars = text.chars().peekable();
+    let mut chars = text.char_indices().peekable();
     let mut cell_chars = 0usize;
     let mut total_cells = 0usize;
     let mut record_terminated = false;
 
-    while let Some(ch) = chars.next() {
+    while let Some((byte_index, ch)) = chars.next() {
         record_terminated = false;
         if state == FieldState::Quoted {
             if ch == '"' {
-                if chars.peek() == Some(&'"') {
+                if chars.peek().is_some_and(|(_, next)| *next == '"') {
                     chars.next();
                     push_char(&mut field, '"', &mut cell_chars)?;
                 } else {
@@ -71,29 +168,38 @@ pub fn parse_csv_records(text: &str) -> Result<Vec<Vec<String>>, InspectionError
             continue;
         }
         match ch {
-            ',' | '\r' | '\n' => {
+            ch if ch == delimiter || matches!(ch, '\r' | '\n') => {
                 push_field(&mut row, &mut field, &mut total_cells)?;
                 cell_chars = 0;
                 state = FieldState::Start;
-                if ch != ',' {
-                    if ch == '\r' && chars.peek() == Some(&'\n') {
+                if ch != delimiter {
+                    if ch == '\r' && chars.peek().is_some_and(|(_, next)| *next == '\n') {
                         chars.next();
                     }
                     push_record(&mut records, &mut row)?;
+                    if header_only {
+                        return Ok(records);
+                    }
                     record_terminated = true;
                 }
             }
             '"' if state == FieldState::Start => state = FieldState::Quoted,
             '"' => {
-                return Err(InspectionError::InvalidCsv(
-                    "has a quote in an unquoted field",
-                ))
+                return Err(InspectionError::CsvLocation {
+                    record: records.len() + 1,
+                    column: row.len() + 1,
+                    byte: offset + byte_index,
+                    reason: "has a quote in an unquoted field",
+                });
             }
             ' ' | '\t' if state == FieldState::Closed => {}
             _ if state == FieldState::Closed => {
-                return Err(InspectionError::InvalidCsv(
-                    "has data after a closing quote",
-                ));
+                return Err(InspectionError::CsvLocation {
+                    record: records.len() + 1,
+                    column: row.len() + 1,
+                    byte: offset + byte_index,
+                    reason: "has data after a closing quote",
+                });
             }
             _ => {
                 state = FieldState::Unquoted;
@@ -102,15 +208,43 @@ pub fn parse_csv_records(text: &str) -> Result<Vec<Vec<String>>, InspectionError
         }
     }
     if state == FieldState::Quoted {
-        return Err(InspectionError::InvalidCsv(
-            "has an unterminated quoted field",
-        ));
+        return Err(InspectionError::CsvLocation {
+            record: records.len() + 1,
+            column: row.len() + 1,
+            byte: offset + text.len(),
+            reason: "has an unterminated quoted field at end of input",
+        });
     }
     if !record_terminated {
         push_field(&mut row, &mut field, &mut total_cells)?;
         push_record(&mut records, &mut row)?;
     }
     Ok(records)
+}
+
+pub(crate) fn write_comma_csv(headers: &[String], rows: &[Vec<String>]) -> String {
+    let mut csv = String::new();
+    for row in std::iter::once(headers).chain(rows.iter().map(Vec::as_slice)) {
+        for (index, field) in row.iter().enumerate() {
+            if index > 0 {
+                csv.push(',');
+            }
+            if field.contains([',', '"', '\r', '\n']) || field.starts_with('\u{feff}') {
+                csv.push('"');
+                for character in field.chars() {
+                    if character == '"' {
+                        csv.push('"');
+                    }
+                    csv.push(character);
+                }
+                csv.push('"');
+            } else {
+                csv.push_str(field);
+            }
+        }
+        csv.push('\n');
+    }
+    csv
 }
 
 fn push_char(field: &mut String, ch: char, count: &mut usize) -> Result<(), InspectionError> {

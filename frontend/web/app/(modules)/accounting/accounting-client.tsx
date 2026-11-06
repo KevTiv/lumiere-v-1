@@ -188,12 +188,8 @@ import {
   ACCOUNT_MOVE_IMPORT_BUNDLE,
   accountMoveBundleMappings,
   accountMoveBundleToken,
-  accountMoveReference,
-  buildAccountMoveLineCsv,
   buildBundleParentCsv,
-  buildMoveIdMapFromAccountMoves,
   markAccountMoveBundleParentCsv,
-  markAccountMoveBundleLineCsv,
   parseCsvText,
   splitAccountMoveImportCsv,
   type ColumnMappingMap,
@@ -206,9 +202,10 @@ import {
   prepareOutstandingDocumentImport,
   type OutstandingDocumentImportMode,
 } from "@lumiere/erp-shared/outstanding-document-import"
-import { createCsvImportRequest, type CsvImportReceipt } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { lookupCsvImportReceipt } from "@lumiere/query-hooks/hooks/csv-import-request"
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { useCleanupAbandonedAccountMoveImport } from "@lumiere/query-hooks/hooks/import-jobs"
+import { runAccountMoveBundleImport } from "./account-move-bundle-import"
 import { toAddAccountMoveLineParamsFromForm } from "./account-move-line-forms"
 import { accountMoveLineCanBeDeleted } from "./account-move-line-gates"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
@@ -623,17 +620,6 @@ type AccountingCsvImportKind =
   | "analytic"
 
 const HISTORICAL_PAYMENT_REPLAY_CALLABLE = historicalPaymentReplayIsCallable()
-
-function assertBundleImportSucceeded(
-  stage: string,
-  receipt: CsvImportReceipt,
-): void {
-  if (receipt.status === "success" && receipt.errorRows === 0) return
-  const firstError = receipt.errors[0]?.errorMessage
-  throw new Error(
-    `${stage} import job #${receipt.jobId} finished ${receipt.status} with ${receipt.errorRows} rejected row${receipt.errorRows === 1 ? "" : "s"}.${firstError ? ` ${firstError}` : " Review the import job before retrying."}`,
-  )
-}
 
 interface AccountingClientProps {
   initialBudgets?: CrossoveredBudget[]
@@ -4473,67 +4459,22 @@ function AccountingClientReady({
       if (resume?.phase === "complete") {
         return { bundleToken, moveIdByRef: resume.moveIdByReference }
       }
-      const parentCsv = markAccountMoveBundleParentCsv(canonicalParentCsv)
-      let moveIdByRef =
-        resume?.phase === "lines_pending" ? resume.moveIdByReference : undefined
-      if (!moveIdByRef) {
-        const parentReceipt = await trackedBundleImport.mutateAsync(
-          createCsvImportRequest(
-            orgId,
-            "account_move",
-            parentCsv,
-            `${fileNamePrefix}-headers.csv`,
-            { companyId: operatingCompanyId },
-          ),
-        )
-        assertBundleImportSucceeded("Journal entry header", parentReceipt)
-
-        let importedMoves = await fetchQueryList<"account-moves">(
-          `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
-          "Failed to resolve imported journal entries",
-        )
-        for (let attempt = 0; attempt < 4; attempt += 1) {
-          const availableRefs = new Set(
-            importedMoves
-              .filter((move) => String(move.companyId) === String(operatingCompanyId))
-              .map((move) => accountMoveReference({ id: move.id, ref: move.ref }))
-              .filter(Boolean),
-          )
-          if (split.parentLinkValues.every((reference) => availableRefs.has(reference))) break
-          await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
-          importedMoves = await fetchQueryList<"account-moves">(
-            `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
-            "Failed to resolve imported journal entries",
-          )
-        }
-
-        const afterMoveLinks = importedMoves
-          .filter((move) => String(move.companyId) === String(operatingCompanyId))
-          .map((move) => ({ id: move.id, ref: move.ref }))
-        moveIdByRef = buildMoveIdMapFromAccountMoves(
-          afterMoveLinks,
-          split.parentLinkValues,
-        )
-      }
-      const lineCsv = markAccountMoveBundleLineCsv(
-        buildAccountMoveLineCsv(
-          headers,
-          split.lineRows,
-          lineMapping,
-          moveIdByRef,
-        ),
+      const company = encodeURIComponent(String(operatingCompanyId))
+      const moveIdByRef = await runAccountMoveBundleImport({
+        organizationId: orgId,
+        companyId: operatingCompanyId,
+        fileNamePrefix,
         bundleToken,
-      )
-      const lineReceipt = await trackedBundleImport.mutateAsync(
-        createCsvImportRequest(
-          orgId,
-          "account_move_line",
-          lineCsv,
-          `${fileNamePrefix}-lines.csv`,
-          { companyId: operatingCompanyId },
-        ),
-      )
-      assertBundleImportSucceeded("Journal entry line", lineReceipt)
+        markedParentCsv: markAccountMoveBundleParentCsv(canonicalParentCsv),
+        headers,
+        lineRows: split.lineRows,
+        lineMapping,
+        resumeIds: resume?.phase === "lines_pending" ? resume.moveIdByReference : undefined,
+        lookup: (request, hash) => lookupCsvImportReceipt(request, apiFetch, hash),
+        submit: trackedBundleImport.mutateAsync,
+        readMoves: () => fetchQueryList(`/api/query/account-moves?companyId=${company}`, "Failed to verify saved journal entries"),
+        readLines: () => fetchQueryList(`/api/query/account-move-lines?companyId=${company}`, "Failed to verify saved journal lines"),
+      })
       return { bundleToken, moveIdByRef }
     },
     [operatingCompanyId, orgId, trackedBundleImport],
@@ -4870,6 +4811,7 @@ function AccountingClientReady({
                 customContent: (
                   <GeneralLedgerView
                     moves={allMoves}
+                    moveLines={canUseModuleData(accountMoveLinesRead.state) ? accountMoveLines : undefined}
                     onImportMovesCsv={canImportCsv("accountMove") ? openAccountingMoveImport : undefined}
                     onImportOutstandingDocumentsCsv={
                       canImportCsv("accountMove") && canImportCsv("accountMoveLine")
@@ -5422,6 +5364,7 @@ function AccountingClientReady({
       accountTypes,
       accounts,
       allMoves,
+      accountMoveLines,
       bankStatements,
       bankStatementsActionsConfig,
       bankStatementRecordSheetWithEdit,

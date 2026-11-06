@@ -346,6 +346,72 @@ function editor(page: Page) {
   })
 }
 
+test("review progress distinguishes confirmed source evidence from importable records", async ({
+  page,
+}) => {
+  const confirmed = source("11")
+  confirmed.state = "confirmed"
+  confirmed.source.businessDate = {
+    precision: "month",
+    from: "2024-04-01",
+    toExclusive: "2024-05-01",
+  }
+  const partial = source("12")
+  partial.confirmedFields = ["unit_price"]
+  const excluded = source("13")
+  excluded.state = "excluded"
+  excluded.source.source.sha256 = "b".repeat(64)
+  await mockReview(page, [confirmed, partial, excluded], {
+    targetEntity: "source_observation",
+  })
+  await page.goto("/import-review")
+  const summary = page.getByRole("region", { name: "Review progress and scope" })
+  await expect(summary.getByText("Company 9001")).toBeVisible()
+  await expect(summary.getByText("2024-04-01 to 2024-04-30")).toBeVisible()
+  await expect(summary.getByText("Rows without a usable date (2)")).toBeVisible()
+  await expect(summary.getByRole("status")).toContainText(
+    "Source rows (3) · 1 in review · 1 confirmed · 1 excluded",
+  )
+  await expect(summary.getByText("Rows still in review with some fields confirmed (1)")).toBeVisible()
+  await summary.getByText("Source file versions (2)").click()
+  await expect(summary.getByText("aaaaaaaaaaaa")).toBeVisible()
+  await expect(summary.getByText("bbbbbbbbbbbb")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Continue import (1 confirmed)" })).toBeDisabled()
+  await expect(page.getByRole("link", { name: "View confirmed historical facts" })).toBeVisible()
+  await page.getByRole("button", { name: "Select all 1 matching rows", exact: true }).click()
+  const bulk = page.getByRole("region", { name: "Bulk corrections" })
+  await expect(bulk).toBeVisible()
+  await page.getByRole("button", { name: "Confirmed", exact: true }).click()
+  await expect(bulk).toHaveCount(0)
+})
+
+test("continuing a review checks the exact confirmed revisions before opening import", async ({
+  page,
+}) => {
+  const item = source()
+  item.state = "confirmed"
+  item.values = { ...item.values, cost_price: "3000", quantity: "1", source_unit: "kg" }
+  const server = await mockReview(page, [item])
+  await page.goto("/import-review")
+  const continueButton = page.getByRole("button", { name: "Continue import (1 confirmed)" })
+  await expect(continueButton).toBeEnabled()
+  server.items.set(item.id, {
+    ...item,
+    values: { ...item.values, cost_price: "3500" },
+    revision: item.revision + 1,
+  })
+  await continueButton.click()
+  const review = page.getByRole("region", { name: "Source data review" })
+  await expect(review.getByRole("alert")).toContainText(
+    "The confirmed rows changed. Review the latest decisions before continuing the import.",
+  )
+  await expect(page.getByTestId("reviewed-csv")).toBeEmpty()
+  await review.getByRole("button", { name: "Confirmed", exact: true }).click()
+  await continueButton.click()
+  await expect(page.getByTestId("reviewed-csv")).toContainText("3500")
+  expect(server.writes()).toBe(0)
+})
+
 test("confirming a proposed price preserves unknown weight, original unit and cost after refresh", async ({
   page,
 }, testInfo) => {

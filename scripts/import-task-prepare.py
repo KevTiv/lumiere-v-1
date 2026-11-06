@@ -7,6 +7,7 @@ Only bounded, deterministic parsing runs here; cell contents are always data.
 import base64
 import binascii
 import csv
+from collections import Counter
 from datetime import date, timedelta
 from decimal import DecimalException
 import hashlib
@@ -58,20 +59,43 @@ def clipped(value, maximum):
     return value.encode("utf-8")[:maximum].decode("utf-8", errors="ignore")
 
 
-def csv_rows(data):
+def csv_reader(text, delimiter):
+    return csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True)
+
+
+def csv_delimiter(sample):
+    possible = {}
+    for delimiter in ",;\t|":
+        try:
+            header = next((row for row in csv_reader(sample, delimiter) if any(cell.strip() for cell in row)), [])
+        except csv.Error:
+            continue
+        if len(header) > 1:
+            possible[delimiter] = header
+    recognized = [delimiter for delimiter, header in possible.items()
+                  if structured_target("", header_keys(header))]
+    if len(recognized) == 1:
+        return recognized[0]
     try:
-        text = data.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        fail("CSV files must use UTF-8 encoding. Save the source as UTF-8 CSV and retry.")
+        return csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+    except csv.Error:
+        if len(possible) == 1:
+            return next(iter(possible))
+        if possible:
+            fail("Several CSV delimiters fit the header. Save the source with a comma delimiter and retry.")
+        return ","
+
+
+def csv_rows(data):
+    encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+    try:
+        text = data.decode(encoding)
+    except UnicodeDecodeError as error:
+        fail(f"CSV encoding is invalid at byte {error.start + 1}. Save the source as UTF-8 CSV and retry.")
     if "\x00" in text:
         fail("The CSV contains unsupported null characters.")
     try:
-        sample = text[:8192]
-        try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
-        except csv.Error:
-            dialect = csv.excel
-        reader = csv.reader(io.StringIO(text, newline=""), dialect, strict=True)
+        reader = csv_reader(text, csv_delimiter(text[:8192]))
         rows = []
         while True:
             start = reader.line_num + 1
@@ -84,7 +108,7 @@ def csv_rows(data):
                 fail("The source exceeds the 25,000-row preparation limit. Split the source and retry.")
         return rows
     except csv.Error:
-        fail("The CSV is malformed. Check its quoting and save it again.")
+        fail(f"CSV record starting at line {start} is malformed. Check its quoting and save it again.")
 
 
 def xml_document(archive, name):
@@ -189,6 +213,10 @@ def proposed_value(value, kind):
     if not value.strip():
         return None
     if kind == "decimal":
+        # Generic uploads have no established locale. A comma can mark a
+        # fractional value or group thousands. Keep it for explicit review.
+        if "," in value:
+            return None
         number = farm.number(value)
         return number if number is not None and re.fullmatch(r"-?\d{1,12}(?:\.\d{1,6})?", number) else None
     return value
@@ -264,13 +292,9 @@ def source_ref(file, row):
             "rowBasis": "import_row" if file["sheet"] else "source_line"}
 
 
-def standard_items(file, headers, target):
+def standard_items(file, headers, target, data_rows):
     items = []
-    for row_number, cells in file["rows"][1:]:
-        if not any(value.strip() for value in cells):
-            continue
-        if len(cells) > len(headers):
-            fail("A structured table row has more values than its header. Correct its columns and retry.")
+    for row_number, cells in data_rows:
         fields = []
         issues = ["Review the detected mapping and values before creating records."]
         for index, key in enumerate(headers):
@@ -316,6 +340,66 @@ def standard_items(file, headers, target):
                       "source": source_ref(file, row_number), "issue": clipped(" ".join(issues), 2000),
                       "fields": fields, "proposed": proposed})
     return items
+
+
+def header_keys(cells):
+    return [re.sub(r"[\s-]+", "_", value.strip().lower()) for value in cells]
+
+
+def structured_sections(rows, headers, target):
+    sections = []
+    data_rows = []
+    for number, cells in rows:
+        keys = header_keys(cells)
+        if len(headers) > 1 and keys == headers:
+            continue
+        next_target = structured_target("", keys)
+        if next_target and data_rows:
+            sections.append((target, headers, data_rows))
+            target, headers, data_rows = next_target, keys, []
+            continue
+        if (len(cells) > len(headers)
+                or (len(cells) == 1 and len(headers) > 1)
+                or next_target
+                or keys[0] in {"total", "subtotal", "grand_total"}):
+            return [], f"Line {number} may start a different section or control row. Review this source before importing."
+        data_rows.append((number, cells))
+    if not data_rows:
+        return [], None
+    sections.append((target, headers, data_rows))
+    for target, headers, _ in sections:
+        if target == "stock_location" and set(headers) & {"parent_id", "location_id", "warehouse_id"}:
+            return [], "Linked location columns require reference review; their rows are retained as source observations."
+        if target == "contact" and "parent_id" in headers:
+            return [], "Parent contact links require reference review; their rows are retained as source observations."
+    return sections, None
+
+
+def prepare_file(file, mode, duplicate):
+    visible = [(number, cells) for number, cells in file["rows"] if any(value.strip() for value in cells)]
+    if not visible:
+        fail("A selected source has no nonempty rows to review.")
+    headers = header_keys(visible[0][1])
+    target = None if mode == "inspect_only" or file["blocks"] or duplicate else structured_target(file["name"], headers)
+    notes = []
+    if duplicate:
+        notes.append("Another selected file contains the same bytes. Both originals are retained for evidence review.")
+    if target:
+        sections, issue = structured_sections(visible[1:], headers, target)
+        if sections:
+            batches = [(entity, standard_items(file, keys, entity, rows)) for entity, keys, rows in sections]
+        elif issue:
+            notes.append(issue)
+            batches = [("source_observation", observation_items(file, file["blocks"]))]
+        else:
+            fail("A selected structured table has no data rows to review.")
+    else:
+        batches = [("source_observation", observation_items(file, file["blocks"], inspection_only=mode == "inspect_only"))]
+    if file["sheet"]:
+        notes.append("XLSX source rows refer to original worksheet row numbers.")
+    blank_count = len(file["rows"]) - len(visible)
+    header_count = len(visible) - sum(len(items) for _, items in batches)
+    return batches, notes, blank_count, header_count
 
 
 def business_date(block):
@@ -481,6 +565,26 @@ def observation_items(file, blocks, *, inspection_only=False):
     return items
 
 
+def source_rows(name, data):
+    suffix = Path(name).suffix.lower()
+    sheet = None
+    if suffix == ".csv":
+        rows = csv_rows(data)
+    elif suffix == ".xlsx":
+        try:
+            rows, sheet = xlsx_rows(data)
+        except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OverflowError, EOFError, zlib.error):
+            fail("The XLSX workbook could not be read safely. Save it as CSV and retry.")
+    else:
+        fail("Only CSV and single-sheet XLSX sources are supported.")
+    for number, cells in rows:
+        if len(cells) > MAX_COLUMNS:
+            fail(f"Source row {number} exceeds the 200-column preparation limit.")
+        for value in cells:
+            checked_value(value)
+    return rows, sheet
+
+
 def prepare(payload):
     mode = payload.get("mode") if isinstance(payload, dict) else None
     if mode not in {"prepare_import", "inspect_only"}:
@@ -488,7 +592,7 @@ def prepare(payload):
     files = payload.get("files") if isinstance(payload, dict) else None
     if not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES:
         fail("Choose between 1 and 20 source files.")
-    decoded, names = [], set()
+    decoded, names, errors = [], set(), {}
     total_bytes = total_rows = total_cells = 0
     for file in files:
         if not isinstance(file, dict) or set(file) != {"fileName", "contentBase64"}:
@@ -508,34 +612,23 @@ def prepare(payload):
         total_bytes += len(data)
         if total_bytes > MAX_TOTAL_BYTES:
             fail("The source selection exceeds the 20 MB total limit.")
-        suffix = Path(name).suffix.lower()
-        sheet = None
-        if suffix == ".csv":
-            rows = csv_rows(data)
-        elif suffix == ".xlsx":
-            try:
-                rows, sheet = xlsx_rows(data)
-            except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OverflowError, EOFError, zlib.error):
-                fail("The XLSX workbook could not be read safely. Save it as CSV and retry.")
-        else:
-            fail("Only CSV and single-sheet XLSX sources are supported.")
-        for _, cells in rows:
-            if len(cells) > MAX_COLUMNS:
-                fail("A source exceeds the 200-column preparation limit.")
-            for value in cells:
-                checked_value(value)
+        names.add(name)
+        try:
+            rows, sheet = source_rows(name, data)
+        except PreparationError as error:
+            errors[name] = str(error)
+            continue
         total_rows += sum(any(value.strip() for value in cells) for _, cells in rows)
         total_cells += sum(len(cells) for _, cells in rows)
         if total_rows > MAX_ROWS or total_cells > MAX_CELLS:
             fail("The source selection exceeds 25,000 rows or 100,000 cells. Split the selection and retry.")
-        names.add(name)
         decoded.append({"name": name, "sha256": hashlib.sha256(data).hexdigest(), "rows": rows, "sheet": sheet})
 
     all_blocks = []
     for file in decoded:
         file["blocks"] = farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]])
         all_blocks.extend(file["blocks"])
-    warnings = []
+    warnings = set()
     for index, block in enumerate(all_blocks):
         for other in all_blocks[:index]:
             issue = None
@@ -550,38 +643,32 @@ def prepare(payload):
             if issue:
                 block["issues"].append(issue)
                 other["issues"].append(issue)
-                warnings.append(AUDIT_ISSUES[issue])
+                warnings.add(AUDIT_ISSUES[issue])
     datasets = []
+    hashes = Counter(file["sha256"] for file in decoded)
     for file in decoded:
-        # Leading blank CSV rows remain in provenance but do not prevent table detection.
-        visible = [(number, cells) for number, cells in file["rows"] if any(value.strip() for value in cells)]
-        if not visible:
-            fail("A selected source has no nonempty rows to review.")
-        headers = [re.sub(r"[\s-]+", "_", value.strip().lower()) for value in visible[0][1]]
-        target = None if mode == "inspect_only" or file["blocks"] else structured_target(file["name"], headers)
-        if target == "stock_location" and set(headers) & {"parent_id", "location_id", "warehouse_id"}:
-            # The prepared-location path deliberately supports only unlinked locations.
-            # Preserve linked inputs for review instead of dropping or inventing parents.
-            target = None
-            warnings.append("Linked location columns require reference review; their rows are retained as source observations.")
-        if target == "contact" and "parent_id" in headers:
-            target = None
-            warnings.append("Parent contact links require reference review; their rows are retained as source observations.")
-        if target:
-            file["rows"] = visible
-            items = standard_items(file, headers, target)
-        else:
-            target = "source_observation"
-            items = observation_items(file, file["blocks"], inspection_only=mode == "inspect_only")
-        if not items:
-            fail("A selected structured table has no data rows to review.")
-        if file["sheet"]:
-            warnings.append("XLSX source rows refer to original worksheet row numbers; worksheet names are retained in source fields.")
-        for offset in range(0, len(items), 1000):
-            title = clipped(file["name"], 160) + (f" · rows {offset + 1}–{min(offset + 1000, len(items))}" if len(items) > 1000 else "")
-            datasets.append({"format": "lumiere-import-review/v1", "title": title, "targetEntity": target,
-                             "sourceFile": file["name"], "items": items[offset:offset + 1000]})
-    result = {"datasets": datasets, "warnings": sorted(set(warnings))}
+        try:
+            batches, notes, blanks, headers = prepare_file(file, mode, hashes[file["sha256"]] > 1)
+        except PreparationError as error:
+            errors[file["name"]] = str(error)
+            continue
+        for note in notes:
+            warnings.add(f'{file["name"]} — {note}')
+        warnings.add(f'{file["name"]} — {len(file["rows"])} source records: '
+                     f'{sum(len(items) for _, items in batches)} for review, {blanks} blank, {headers} headers.')
+        for section, (target, items) in enumerate(batches, 1):
+            for offset in range(0, len(items), 1000):
+                title = clipped(file["name"], 130 if len(batches) > 1 else 160)
+                if len(batches) > 1:
+                    title += f" · table {section}"
+                if len(items) > 1000:
+                    title += f" · rows {offset + 1}–{min(offset + 1000, len(items))}"
+                datasets.append({"format": "lumiere-import-review/v1", "title": title, "targetEntity": target,
+                                 "sourceFile": file["name"], "items": items[offset:offset + 1000]})
+    if not datasets:
+        fail("; ".join(f"{name} — {error}" for name, error in errors.items())[:1000])
+    warnings.update(f"{name} — held. {error}" for name, error in errors.items())
+    result = {"datasets": datasets, "warnings": sorted(warnings)}
     if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > MAX_OUTPUT_BYTES:
         fail("Prepared review exceeds the response limit. Import a smaller selection of files.")
     return result

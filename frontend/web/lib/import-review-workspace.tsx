@@ -62,6 +62,7 @@ import {
 } from "./import-review-uncertainty"
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
+import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
 
@@ -478,18 +479,34 @@ function ReviewWorkspace({
       if (mounted.current) setBusy(false)
     }
   }
-  const confirmed =
-    detail.data?.items.filter((item) => item.state === "confirmed").length ?? 0
+  const confirmedRows =
+    detail.data?.items.filter((item) => item.state === "confirmed") ?? []
+  const confirmed = confirmedRows.length
+  const canPrepareImport = ["product", "stock_location", "contact"].includes(
+    detail.data?.targetEntity ?? "",
+  )
   const continueImport = async () => {
-    if (!allowImport || !detail.data || continuationBlock) return
+    if (!allowImport || !canPrepareImport || !confirmed || continuationBlock)
+      return
+    const confirmedRevisions = new Map(
+      confirmedRows.map((item) => [item.id, item.revision]),
+    )
     setBusy(true)
     setError(null)
     try {
+      const fresh = (await detail.refetch({ throwOnError: true })).data
+      requireCurrentScope()
+      const rows = fresh?.items.filter((item) => item.state === "confirmed")
+      if (
+        !fresh ||
+        !rows ||
+        rows.length !== confirmedRevisions.size ||
+        rows.some((item) => confirmedRevisions.get(item.id) !== item.revision)
+      )
+        throw new Error(t("settings.importReview.decisionSummary.changed"))
       if (productReview) {
         const references = await cache.fetchQuery(productReferenceQuery)
-        for (const item of detail.data.items.filter(
-          (item) => item.state === "confirmed",
-        ))
+        for (const item of rows)
           validateProductReviewReferences(
             item,
             item.values,
@@ -498,7 +515,7 @@ function ReviewWorkspace({
           )
       }
       requireCurrentScope()
-      onContinue(reviewedImportSource(detail.data))
+      onContinue(reviewedImportSource(fresh))
     } catch (failure) {
       if (mounted.current)
         setError(failure instanceof Error ? failure.message : String(failure))
@@ -590,9 +607,7 @@ function ReviewWorkspace({
                   unavailable ||
                   !!selected ||
                   !!continuationBlock ||
-                  !["product", "stock_location", "contact"].includes(
-                    detail.data.targetEntity,
-                  )
+                  !canPrepareImport
                 }
                 onClick={() => void continueImport()}
               >
@@ -620,28 +635,21 @@ function ReviewWorkspace({
                   })}
             </p>
           ) : null}
-          {allowImport && !["product", "stock_location", "contact"].includes(detail.data.targetEntity) ? (
-            <div className="space-y-2 text-sm">
-              <p className="text-muted-foreground">
-                {t("settings.importReview.historicalFacts", { defaultValue: "Confirm the source values you know, even when other facts remain unresolved. Confirmed facts are available in source history. Business documents and current balances require their own complete import." })}
-              </p>
-              {!selected && !unavailable ? <a className="font-medium underline underline-offset-4" href={sourceHistoryLink(companyId, detail.data.id)}>
-                {t("settings.importReview.viewHistoricalFacts", { defaultValue: "View confirmed historical facts" })}
-              </a> : null}
-            </div>
+          <ImportReviewDecisionSummary
+            detail={detail.data}
+            organizationId={organizationId}
+            companyId={companyId}
+            canPrepareImport={canPrepareImport}
+            allowImport={allowImport}
+          />
+          {allowImport && !canPrepareImport && !selected && !unavailable ? (
+            <a
+              className="text-sm font-medium underline underline-offset-4"
+              href={sourceHistoryLink(companyId, detail.data.id)}
+            >
+              {t("settings.importReview.viewHistoricalFacts", { defaultValue: "View confirmed historical facts" })}
+            </a>
           ) : null}
-          <p className="text-sm" role="status">
-            {t("settings.importReview.grouped.summary", {
-              rows: detail.data.items.length,
-              unresolved: detail.data.items.filter(
-                (item) => item.state === "needs_review",
-              ).length,
-              confirmed,
-              excluded: detail.data.items.filter(
-                (item) => item.state === "excluded",
-              ).length,
-            })}
-          </p>
           <div
             className="flex flex-wrap gap-2"
             aria-label={t("settings.importReview.filterLabel")}
@@ -658,6 +666,7 @@ function ReviewWorkspace({
                     setFilter(state)
                     setGroup("all")
                     setPage(0)
+                    setChecked(new Set())
                   }}
                 >
                   {t(`settings.importReview.filter.${state}`)}
@@ -678,6 +687,7 @@ function ReviewWorkspace({
                 onChange={(event) => {
                   setSearch(event.target.value)
                   setPage(0)
+                  setChecked(new Set())
                 }}
               />
             </Field>
@@ -712,6 +722,11 @@ function ReviewWorkspace({
               </Select>
             </Field>
           </div>
+          {!matching.length ? (
+            <p className="text-sm text-muted-foreground">
+              {t("settings.importReview.decisionSummary.noMatches")}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"

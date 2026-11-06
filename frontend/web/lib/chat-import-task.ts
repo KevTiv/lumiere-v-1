@@ -24,7 +24,14 @@ const taskSchema = z.object({
   }),
   decisionReceipt: decisionReceiptSchema.nullable(),
   decisionHistory: z.array(decisionReceiptSchema).max(100),
-  files: z.array(sourceSchema.extend({ ordinal: z.number().int().nonnegative() })).min(1).max(20),
+  files: z.array(sourceSchema.extend({
+    ordinal: z.number().int().nonnegative(),
+    previousMatch: sourceSchema.pick({ fileName: true, sha256: true }).extend({
+      kind: z.enum(["identical", "same_name"]),
+      requestId,
+      ordinal: z.number().int().nonnegative().max(19),
+    }).nullish(),
+  })).min(1).max(20),
   reviews: z.array(z.object({
     id: positiveId, title: z.string(), targetEntity: z.string(),
     total: z.number().int().nonnegative(), pending: z.number().int().nonnegative(),

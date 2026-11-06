@@ -429,6 +429,30 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     let mut inspection_body = submission();
     inspection_body.request_id = "e".repeat(32);
     accept(pool, scoped, &inspection_body, &sources, &hash).await?;
+    let repeated = read_task(pool, scoped, &inspection_body.request_id).await?;
+    ensure!(repeated["files"][0]["previousMatch"]["kind"] == "identical");
+    ensure!(repeated["files"][0]["previousMatch"]["requestId"] == body.request_id);
+
+    changed.request_id = "f".repeat(32);
+    accept(pool, scoped, &changed, &different_sources, &different_hash).await?;
+    let revision = read_task(pool, scoped, &changed.request_id).await?;
+    ensure!(revision["files"][0]["previousMatch"]["kind"] == "same_name");
+    ensure!(revision["files"][0]["previousMatch"]["sha256"] == sources[0].sha256);
+
+    let unrelated_scope = StorageScope {
+        actor: "actor-two",
+        ..scoped
+    };
+    accept(
+        pool,
+        unrelated_scope,
+        &changed,
+        &different_sources,
+        &different_hash,
+    )
+    .await?;
+    let unrelated = read_task(pool, unrelated_scope, &changed.request_id).await?;
+    ensure!(unrelated["files"][0]["previousMatch"].is_null());
     // The same decision identity cannot authorize another task, even when its
     // uploaded bytes are identical.
     ensure!(matches!(

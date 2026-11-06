@@ -98,6 +98,29 @@ function amountMatches(left: number, right: number): boolean {
   return Number.isFinite(left) && Math.abs(left - right) <= 0.000_001;
 }
 
+function metadataExtra(row: AccountingRow): object | null {
+  const metadata = jsonObject(objectField(row, "metadata"));
+  const extra = metadata && objectField(metadata, "extra");
+  return extra && typeof extra === "object" ? extra : null;
+}
+
+function historicalDocumentMetadata(extra: object | null): object | null {
+  const history = extra && objectField(extra, HISTORICAL_DOCUMENT_METADATA_KEY);
+  return history && typeof history === "object" ? history : null;
+}
+
+function matchesHistoricalReference(
+  move: AccountingRow,
+  check: HistoricalDocumentResumeCheck,
+): boolean {
+  const reference = String(rowValue(move, "ref", "ref_") ?? "").trim();
+  if (reference) return reference === check.reference;
+  // The account-moves projection may omit ref_. This identity was saved as
+  // part of the original import and must still pass every exact resume check.
+  const history = historicalDocumentMetadata(metadataExtra(move));
+  return history != null && objectField(history, "import_identity") === check.importIdentity;
+}
+
 /** Reject deployed API/contract skew before the import creates any documents. */
 export function validateHistoricalPaymentReplayCapability(
   payload: unknown,
@@ -137,14 +160,11 @@ export function resolveHistoricalImportResume(args: {
   markedParentCsv: string;
   importBatchIdentity: string;
 }): HistoricalImportResume {
-  const references = new Set(args.checks.map((check) => check.reference));
   const matching = args.existingMoves.filter(
     (move) =>
       String(rowValue(move, "companyId", "company_id")) ===
         String(args.companyId) &&
-      references.has(
-        String(objectField(move, "ref") ?? objectField(move, "ref_") ?? ""),
-      ),
+      args.checks.some((check) => matchesHistoricalReference(move, check)),
   );
   if (matching.length === 0) {
     return { phase: "new", moveIdByReference: new Map() };
@@ -178,9 +198,7 @@ export function resolveHistoricalImportResume(args: {
   const completion: Array<"empty" | "complete"> = [];
   for (const check of args.checks) {
     const candidates = matching.filter(
-      (move) =>
-        String(objectField(move, "ref") ?? objectField(move, "ref_") ?? "") ===
-        check.reference,
+      (move) => matchesHistoricalReference(move, check),
     );
     if (candidates.length !== 1) {
       throw new Error(
@@ -189,14 +207,8 @@ export function resolveHistoricalImportResume(args: {
     }
     const move = candidates[0]!;
     const moveId = String(unwrapSats(objectField(move, "id")) ?? "");
-    const metadata = jsonObject(objectField(move, "metadata"));
-    const extraValue = metadata && objectField(metadata, "extra");
-    const extra =
-      extraValue && typeof extraValue === "object" ? extraValue : null;
-    const historyValue =
-      extra && objectField(extra, HISTORICAL_DOCUMENT_METADATA_KEY);
-    const history =
-      historyValue && typeof historyValue === "object" ? historyValue : null;
+    const extra = metadataExtra(move);
+    const history = historicalDocumentMetadata(extra);
     if (
       !history ||
       objectField(history, "mode") !== "original_total" ||

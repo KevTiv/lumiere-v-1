@@ -31,6 +31,29 @@ function templateMappingJson(row: ImportMappingTemplateRow): string {
   return String(row.mappingJson ?? row.mapping_json ?? "{}")
 }
 
+const layoutKey = "_lumiere_layout"
+
+export function importMappingTemplateMatchesHeaders(
+  row: ImportMappingTemplateRow | undefined,
+  headers: readonly string[],
+): boolean {
+  if (!row || !headers.length || new Set(headers).size !== headers.length) return false
+  try {
+    const parsed = JSON.parse(templateMappingJson(row))
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false
+    const layout = parsed[layoutKey]
+    if (layout && typeof layout === "object") {
+      return layout.version === 1 && Array.isArray(layout.headers)
+        && layout.headers.length === headers.length
+        && headers.every((header, index) => header === layout.headers[index])
+    }
+    const mapped = Object.keys(parseImportMappingTemplateJson(row))
+    return mapped.length > 0 && mapped.every(header => headers.includes(header))
+  } catch {
+    return false
+  }
+}
+
 export function parseImportMappingTemplateJson(
   row: ImportMappingTemplateRow,
 ): Record<string, string> {
@@ -47,10 +70,13 @@ export function parseImportMappingTemplateJson(
   }
 }
 
-export function mappingJsonForTemplate(mapping: Record<string, string>): string {
+export function mappingJsonForTemplate(mapping: Record<string, string>, headers?: readonly string[]): string {
   const filtered = Object.fromEntries(
     Object.entries(mapping).filter(([, value]) => value.trim() && value !== "__skip__"),
   )
+  if (headers?.length && !headers.includes(layoutKey)) {
+    return JSON.stringify({ ...filtered, [layoutKey]: { version: 1, headers } })
+  }
   return JSON.stringify(filtered)
 }
 
@@ -83,13 +109,14 @@ export function useSaveImportMappingTemplate(organizationId: bigint) {
       name: string
       tableName: string
       mapping: Record<string, string>
+      headers?: readonly string[]
     }) => {
       const { urlPath, init } = stdbBffCommandPost("save_import_mapping_template", {
         templateId: args.templateId != null ? BigInt(args.templateId) : null,
         params: {
           name: args.name,
           table_name: args.tableName,
-          mapping_json: mappingJsonForTemplate(args.mapping),
+          mapping_json: mappingJsonForTemplate(args.mapping, args.headers),
         },
       })
       const r = await apiFetch(urlPath, init)

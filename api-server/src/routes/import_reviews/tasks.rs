@@ -529,15 +529,73 @@ async fn read_task(
     let company = scope.company.to_string();
     let task = tx.query_opt("SELECT request_id,company_id::text,conversation_key,state,warnings,error,created_at::text,decision_request FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?
         .ok_or_else(||ApiError::NotFound("import task not found".into()))?;
-    let sources = tx.query("SELECT ordinal,file_name,source_sha256,octet_length(original_bytes) AS size FROM lumiere_platform.import_task_source WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 ORDER BY ordinal", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
+    let sources = tx
+        .query(
+            "SELECT source.ordinal,source.file_name,source.source_sha256,
+                    octet_length(source.original_bytes) AS size,
+                    previous.request_id AS previous_request_id,
+                    previous.ordinal AS previous_ordinal,
+                    previous.file_name AS previous_file_name,
+                    previous.source_sha256 AS previous_sha256
+             FROM lumiere_platform.import_task_source source
+             JOIN lumiere_platform.import_task current_task USING
+                 (organization_id,company_id,actor_identity,request_id)
+             LEFT JOIN LATERAL (
+                 SELECT prior.request_id,prior.ordinal,prior.file_name,prior.source_sha256
+                 FROM lumiere_platform.import_task_source prior
+                 JOIN lumiere_platform.import_task prior_task USING
+                     (organization_id,company_id,actor_identity,request_id)
+                 WHERE prior.organization_id=source.organization_id
+                   AND prior.company_id=source.company_id
+                   AND prior.actor_identity=source.actor_identity
+                   AND (prior_task.created_at,prior.request_id) <
+                       (current_task.created_at,current_task.request_id)
+                   AND prior_task.state IN ('needs_review','inspection_ready')
+                   AND (prior.source_sha256=source.source_sha256 OR prior.file_name=source.file_name)
+                 ORDER BY (prior.source_sha256=source.source_sha256) DESC,
+                          prior_task.created_at DESC,prior.request_id DESC,prior.ordinal
+                 LIMIT 1
+             ) previous ON true
+             WHERE source.organization_id=$1::text::numeric AND source.company_id=$2::text::numeric
+               AND source.actor_identity=$3 AND source.request_id=$4
+             ORDER BY source.ordinal",
+            &[&org, &company, &scope.actor, &request],
+        )
+        .await
+        .map_err(ApiError::internal)?;
     let reviews = tx.query("SELECT batch.id::text,batch.title,batch.target_entity,count(item.id)::int AS total,count(item.id) FILTER (WHERE item.state='needs_review')::int AS pending,count(item.id) FILTER (WHERE item.state='confirmed')::int AS confirmed,count(item.id) FILTER (WHERE item.state='excluded')::int AS excluded FROM lumiere_platform.import_task_review link JOIN lumiere_platform.import_review_batch batch ON batch.organization_id=link.organization_id AND batch.company_id=link.company_id AND batch.id=link.batch_id LEFT JOIN lumiere_platform.import_review_item item ON item.organization_id=batch.organization_id AND item.company_id=batch.company_id AND item.batch_id=batch.id WHERE link.organization_id=$1::text::numeric AND link.company_id=$2::text::numeric AND link.actor_identity=$3 AND link.request_id=$4 GROUP BY batch.id ORDER BY batch.id", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
     let decisions=tx.query("SELECT decision_id,option_id,other_text,revision,created_at::text FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 ORDER BY revision DESC LIMIT 100",&[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
     tx.commit().await.map_err(ApiError::internal)?;
     let history = decisions.iter().map(decision_receipt).collect::<Vec<_>>();
     let latest = history.first().cloned().unwrap_or(Value::Null);
     let decision: Value = task.get("decision_request");
+    let files = sources
+        .iter()
+        .map(|source| {
+            let sha256: String = source.get("source_sha256");
+            let previous = source
+                .get::<_, Option<String>>("previous_request_id")
+                .map(|request| {
+                    let previous_sha256: String = source.get("previous_sha256");
+                    json!({
+                        "kind": if previous_sha256 == sha256 { "identical" } else { "same_name" },
+                        "requestId": request,
+                "ordinal": source.get::<_, i32>("previous_ordinal"),
+                        "fileName": source.get::<_, String>("previous_file_name"),
+                        "sha256": previous_sha256
+                    })
+                });
+            json!({
+                "ordinal": source.get::<_, i32>("ordinal"),
+                "fileName": source.get::<_, String>("file_name"),
+                "sha256": sha256,
+                "size": source.get::<_, i32>("size"),
+                "previousMatch": previous
+            })
+        })
+        .collect::<Vec<_>>();
     Ok(
-        json!({"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":sources.iter().map(|s|json!({"ordinal":s.get::<_,i32>("ordinal"),"fileName":s.get::<_,String>("file_name"),"sha256":s.get::<_,String>("source_sha256"),"size":s.get::<_,i32>("size")})).collect::<Vec<_>>(),"reviews":reviews.iter().map(|r|json!({"id":r.get::<_,String>("id"),"title":r.get::<_,String>("title"),"targetEntity":r.get::<_,String>("target_entity"),"total":r.get::<_,i32>("total"),"pending":r.get::<_,i32>("pending"),"confirmed":r.get::<_,i32>("confirmed"),"excluded":r.get::<_,i32>("excluded")})).collect::<Vec<_>>()}),
+        json!({"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":files,"reviews":reviews.iter().map(|r|json!({"id":r.get::<_,String>("id"),"title":r.get::<_,String>("title"),"targetEntity":r.get::<_,String>("target_entity"),"total":r.get::<_,i32>("total"),"pending":r.get::<_,i32>("pending"),"confirmed":r.get::<_,i32>("confirmed"),"excluded":r.get::<_,i32>("excluded")})).collect::<Vec<_>>()}),
     )
 }
 

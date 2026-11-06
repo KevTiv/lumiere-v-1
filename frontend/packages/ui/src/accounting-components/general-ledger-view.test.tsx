@@ -14,6 +14,13 @@ vi.mock("../lib/module-url-filters", () => ({
   useClearModuleUrlFilter: () => vi.fn(),
 }))
 
+vi.mock("../lib/currency-context", () => ({
+  useCurrencyFormat: () => ({
+    money: (amount: number, currencyId?: number) => `${currencyId}: ${amount}`,
+    date: (value: number) => String(value),
+  }),
+}))
+
 afterEach(cleanup)
 
 describe("GeneralLedgerView accounting migration actions", () => {
@@ -77,4 +84,25 @@ describe("GeneralLedgerView enum display", () => {
     expect(detail.getByText("accounting.states.posted")).toBeTruthy()
     expect(screen.queryByText("[object Object]")).toBeNull()
   })
+})
+
+it("shows a balanced journal amount from its company lines and leaves missing lines unknown", () => {
+  const move = { id: 7, companyId: 2, companyCurrencyId: 4, name: "Electricity", date: { microsSinceUnixEpoch: 1_716_000_000_000_000n }, state: "Draft", moveType: "Entry", amountTotal: 0 }
+  const { rerender } = render(<GeneralLedgerView moves={[move]} />)
+  const row = () => within(screen.getByTestId("entity-row-7"))
+  expect(row().getByText("—")).toBeTruthy()
+  rerender(<GeneralLedgerView moves={[move]} moveLines={[]} />)
+  expect(row().getByText("—")).toBeTruthy()
+
+  const moveLines = [
+    { id: 8, companyId: 2, companyCurrencyId: 4, moveId: 7, debit: 6100, credit: 0 },
+    { id: 9, companyId: 2, companyCurrencyId: 4, moveId: 7, debit: 0, credit: 6100 },
+    { id: 10, companyId: 3, companyCurrencyId: 4, moveId: 7, debit: 99, credit: 0 },
+  ]
+  rerender(<GeneralLedgerView moves={[move]} moveLines={moveLines} />)
+  expect(row().getByText("4: 6100")).toBeTruthy()
+  fireEvent.click(screen.getByTestId("entity-row-7"))
+  expect(within(screen.getByRole("dialog")).getByText("4: 6100")).toBeTruthy()
+  rerender(<GeneralLedgerView moves={[move]} moveLines={[{ ...moveLines[0]!, debit: 0 }]} />)
+  expect(row().getByText("4: 0")).toBeTruthy()
 })

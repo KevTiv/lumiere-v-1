@@ -4,6 +4,8 @@
 **Tracks:** `historical-import`, `csv`, `excel`, `sandbox-analysis`, `import-recipes`, `data-mapping`, `validation`, `preview`, `staged-ingestion`
 **Related:** [agent-sandbox-data-analysis-plan.md](./agent-sandbox-data-analysis-plan.md) · [agent-generated-erp-tool-surface-plan.md](./agent-generated-erp-tool-surface-plan.md) · [agent-ir-codegen-extension-plan.md](./agent-ir-codegen-extension-plan.md) · [agent-control-plane-model-routing-plan.md](./agent-control-plane-model-routing-plan.md)
 
+[CSV onboarding delivery plan](./csv-onboarding-delivery-plan.md) defines the supported cases, decision workspace, and release checks for the CSV path.
+
 ---
 
 ## 1. Objective

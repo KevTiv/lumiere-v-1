@@ -31,6 +31,8 @@ export type CsvImportReceipt = {
   errorRows: number
   errors: { id: string; jobId: string; rowNumber: number; fieldName?: string | null; errorMessage: string }[]
   errorsRedacted: boolean
+  /** Native records saved or resumed by this exact accounting job, in source-row order. */
+  records?: { recordId: string; rowNumber: number }[]
 }
 
 /** These tables lack a governed read projection; never claim an exact result for them. */
@@ -98,7 +100,37 @@ export function parseCsvImportReceipt(value: unknown, request: CsvImportRequest)
       (error.fieldName != null && typeof error.fieldName !== "string")) throw new Error("Invalid job-scoped import error")
     decimalId(error.id)
   }
+  if (row.records !== undefined) {
+    if (row.status !== "success" || !["account_move", "account_move_line"].includes(row.entity) ||
+      !Array.isArray(row.records) || row.records.length > Number(row.rowsImported)) {
+      throw new Error("Invalid accounting import receipt records")
+    }
+    const recordIds = new Set<string>()
+    const rowNumbers = new Set<number>()
+    for (const record of row.records) {
+      if (!record || typeof record.recordId !== "string" || !Number.isSafeInteger(record.rowNumber) ||
+        record.rowNumber < 2 || record.rowNumber > Number(row.totalRows) + 1 ||
+        recordIds.has(record.recordId) || rowNumbers.has(record.rowNumber)) {
+        throw new Error("Invalid accounting import receipt record")
+      }
+      recordIds.add(decimalId(record.recordId))
+      rowNumbers.add(record.rowNumber)
+    }
+  }
   return row as CsvImportReceipt
+}
+
+/** A missing exact request can be submitted with the same ID. Other failures must stop the caller. */
+export async function lookupCsvImportReceipt(
+  request: CsvImportRequest,
+  fetcher: (path: string, init?: RequestInit) => Promise<Response>,
+  contentSha256: string,
+): Promise<CsvImportReceipt | null> {
+  if (!/^[a-f0-9]{64}$/.test(contentSha256)) throw new Error("Invalid import content hash")
+  const response = await fetcher(`${csvImportRequestPath(request, true)}&contentSha256=${contentSha256}`)
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`Import receipt lookup failed (${response.status})`)
+  return parseCsvImportReceipt(await response.json(), request)
 }
 
 /** No fallback to an untracked reducer: an uncertain response must retain its request ID. */

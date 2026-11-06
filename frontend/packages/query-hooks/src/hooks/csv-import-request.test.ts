@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { createCsvImportRequest, csvImportInvalidatesQuery, csvImportRequestBody, csvImportRequestPath, fetchCsvImportReceipt, parseCsvImportReceipt } from "./csv-import-request"
+import { createCsvImportRequest, csvImportInvalidatesQuery, csvImportRequestBody, csvImportRequestPath, fetchCsvImportReceipt, lookupCsvImportReceipt, parseCsvImportReceipt } from "./csv-import-request"
 
 const request = createCsvImportRequest(1n, "account_move", "name\nAda\n", "moves.csv", { companyId: 9007199254740993n }, "a".repeat(32))
 const receipt = {
@@ -23,6 +23,21 @@ test("rejects receipts from another submission or entity", () => {
 })
 test("rejects numeric job IDs even if a response would otherwise look valid", () => {
   assert.throws(() => parseCsvImportReceipt({ ...receipt, jobId: 9007199254740993 }, request))
+})
+test("validates exact accounting record rows and IDs without losing precision", () => {
+  const records = [{ rowNumber: 2, recordId: "9007199254740993" }, { rowNumber: 3, recordId: "19" }]
+  const success = { ...receipt, status: "success", rowsImported: 2, errorRows: 0, errors: [], records }
+  assert.deepEqual(parseCsvImportReceipt(success, request).records, records)
+  assert.throws(() => parseCsvImportReceipt({ ...success, records: [records[0], records[0]] }, request))
+  assert.throws(() => parseCsvImportReceipt({ ...success, records: [{ rowNumber: 4, recordId: "2" }] }, request))
+})
+test("binds a durable accounting receipt lookup to the exact content hash", async () => {
+  const hash = "b".repeat(64)
+  assert.equal(await lookupCsvImportReceipt(request, async (url) => {
+    assert.equal(url, `${csvImportRequestPath(request, true)}&contentSha256=${hash}`)
+    return new Response(null, { status: 404 })
+  }, hash), null)
+  await assert.rejects(lookupCsvImportReceipt(request, async () => new Response(null, { status: 409 }), hash), /409/)
 })
 test("rejects errors from a different job and invalid counts", () => {
   assert.throws(() => parseCsvImportReceipt({ ...receipt, errors: [{ ...receipt.errors[0], jobId: "2" }] }, request))
