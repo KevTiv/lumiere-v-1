@@ -144,7 +144,7 @@ export function AccountGlDrilldownPanel({
           </div>
 
           <div className="flex-1 overflow-auto border rounded-lg">
-            <Table>
+            <Table pagination={false}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("accounting.glDrilldown.columns.date")}</TableHead>

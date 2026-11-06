@@ -9,7 +9,7 @@ import { formatEntityFieldValue, resolveCurrencyCode } from "../lib/entity-row-u
 import { downloadCsv, rowsToCsv } from "../lib/export-csv"
 import { Button } from "../components/button"
 import { humanizeEnumValue } from "../lib/entity-row-values"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "../components/table"
 import {
   Select,
   SelectContent,
@@ -248,12 +248,14 @@ export function EntityPivotView({
                   {cellContent(row.total)}
                 </TableRow>
               ))}
+            </TableBody>
+            <TableFooter>
               <TableRow className="font-semibold" data-testid="entity-pivot-total">
                 <TableCell>{labels.total}</TableCell>
                 {result.columns.flatMap((column) => cellContent(result.columnTotals[column.value]))}
                 {cellContent(result.total)}
               </TableRow>
-            </TableBody>
+            </TableFooter>
           </Table>
 
           {firstMeasure ? (

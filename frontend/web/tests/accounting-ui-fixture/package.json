@@ -1,1 +1,7 @@
-{ "name": "lumiere-accounting-ui-fixture", "private": true }
+{
+  "name": "lumiere-accounting-ui-fixture",
+  "private": true,
+  "engines": {
+    "node": "26.x"
+  }
+}

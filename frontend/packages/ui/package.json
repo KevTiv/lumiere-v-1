@@ -142,5 +142,8 @@
     "./native/primitives/*": "./src/native/primitives/*.tsx",
     "./native/lib/*": "./src/native/lib/*.ts",
     "./entity-views/record-business-history": "./src/entity-views/record-business-history.tsx"
+  },
+  "engines": {
+    "node": "26.x"
   }
 }

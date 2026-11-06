@@ -1,5 +1,7 @@
 "use client"
 
+import { Table, TableBody } from "../components/table"
+
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -509,7 +511,7 @@ export function FileBrowser({
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-card" data-testid="file-browser-list">
-            <table className="w-full min-w-[36rem] text-sm">
+            <Table className="w-full min-w-[36rem] text-sm">
               <thead className="bg-muted/25 text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">{t("documents.browser.name")}</th>
@@ -518,7 +520,7 @@ export function FileBrowser({
                   <th className="px-3 py-2 font-medium">{t("documents.browser.date", { defaultValue: "Date" })}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <TableBody className="divide-y divide-border">
                 {visibleFiles.map((file) => (
                   <tr
                     key={file.id}
@@ -544,8 +546,8 @@ export function FileBrowser({
                     <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{fileDateLabel(file)}</td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>

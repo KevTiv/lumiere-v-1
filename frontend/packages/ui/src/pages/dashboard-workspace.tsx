@@ -135,7 +135,7 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
     <DashboardWorkspaceContext value={true}>
       <SidebarProvider resizable open={forceCollapsed ? false : sidebarOpen} onOpenChange={setSidebarOpen}
         className="h-svh min-h-0 overflow-hidden bg-muted/20 text-foreground md:gap-3 md:p-3"
-        style={{ "--sidebar-width-icon": "4rem" } as React.CSSProperties}>
+        style={{ "--sidebar-width-icon": "3rem" } as React.CSSProperties}>
         <div data-testid="erp-workspace-stack" className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-2xl md:border md:border-border/70 md:shadow-sm [&_[data-slot=sidebar-container]]:absolute [&_[data-slot=sidebar-container]]:h-full">
           {sidebar}
           <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-background">

@@ -189,7 +189,7 @@ jobs:
     name: Build exact-commit E2E artifacts
     needs: scope
     if: needs.scope.outputs.run_e2e == 'true'
-    # Playwright 1.59.1 supports Ubuntu 24.04; keep native build and browser hosts aligned.
+    # Keep Playwright browser hosts and native builds on Ubuntu 24.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     # Fingerprints and compilation must see the same build-time configuration.
@@ -417,9 +417,9 @@ jobs:
             frontend/web/.next/cache/webpack
             frontend/web/.next/cache/turbopack
             frontend/web/.next/cache/swc
-          key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
+          key: next-compiler-v1-${{ runner.os }}-node26-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
-            next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+            next-compiler-v1-${{ runner.os }}-node26-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
 
       - name: Build exact-commit E2E artifacts
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
@@ -445,7 +445,7 @@ jobs:
     name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || matrix.config.slot && format(' {0}', matrix.config.slot) || '' }})
     needs: [scope, plan, build-e2e]
     if: needs.plan.result == 'success' && needs.build-e2e.result == 'success' && needs.scope.outputs.run_e2e == 'true'
-    # Playwright 1.59.1 supports Ubuntu 24.04; keep native build and browser hosts aligned.
+    # Keep Playwright browser hosts and native builds on Ubuntu 24.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     services:
@@ -511,7 +511,11 @@ jobs:
 
       - name: Install Playwright Chromium
         working-directory: frontend/web
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: |
+          # Use Ubuntu's HTTPS archive when the runner's Azure HTTP mirror stalls.
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          pnpm exec playwright install --with-deps chromium
 
       - name: Start the quotation PDF renderer
         env:

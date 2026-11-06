@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
-import { fetchDefaultCompanyId, fetchFirstWarehouseId, signIn, smokeName } from "./helpers"
+import { fetchDefaultCompanyId, scalarQueryId, signIn, smokeName } from "./helpers"
 import {
   createInternalLocation,
   fetchWarehouseQcLocationId,
@@ -12,6 +12,37 @@ import {
 
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
+
+async function createWarehouseFixture(page: Page, companyId: number): Promise<number> {
+  const name = smokeName("cov06k-warehouse")
+  const lotStockId = await createInternalLocation(page, `${name}-stock`, companyId)
+  const { urlPath, init } = stdbBffCommandPost("create_warehouse", {
+    companyId,
+    params: stdbParamsToJson({
+      name, code: name, lotStockId,
+      inTypeId: 1, outTypeId: 1, intTypeId: 1, packTypeId: 1, pickTypeId: 1,
+      receptionSteps: "one_step", deliverySteps: "ship_only", manufactureSteps: "mrp_one_step",
+      active: true, crossdock: false, buyToResupply: false, manufactureToResupply: false,
+      resupplySubcontractorOnOrder: false, subcontractingToResupply: false, sequence: 10,
+      resupplyWhIds: [], resupplyFromIds: [], pbhDpmIds: [],
+    }, "CreateWarehouseParams"),
+  })
+  const response = await page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
+  expect(response.ok()).toBe(true)
+
+  let warehouseId = 0
+  await expect.poll(async () => {
+    const query = await page.request.get(`/api/query/warehouses?companyId=${companyId}`)
+    expect(query.ok()).toBe(true)
+    const { data } = (await query.json()) as { data?: Array<{ id: unknown; name: string }> }
+    warehouseId = scalarQueryId(data?.find((row) => row.name === name)?.id) ?? 0
+    return warehouseId
+  }, { timeout: 30_000 }).toBeGreaterThan(0)
+  return warehouseId
+}
 
 async function updateWarehouseRequest(
   page: Page,
@@ -44,7 +75,8 @@ test.describe(
 
       await signIn(page, "test@email.com", PERSONA_PASSWORD)
       const companyId = await fetchDefaultCompanyId(page)
-      const warehouseId = await fetchFirstWarehouseId(page)
+      // A retry must start with its own warehouse, even if the first attempt saved the QC location.
+      const warehouseId = await createWarehouseFixture(page, companyId)
       const locationName = smokeName("cov06k-qc-loc")
       const locationId = await createInternalLocation(page, locationName)
 

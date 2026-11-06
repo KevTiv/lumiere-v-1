@@ -31,6 +31,21 @@ const nestedFolders: FileBrowserFolder[] = [
 ]
 
 describe("FileBrowser", () => {
+  it("pages all list records at 25 and resets after filtering", () => {
+    const many = Array.from({ length: 61 }, (_, index) => ({ ...files[0]!, id: String(index + 1), name: `File ${index + 1}`, folderId: null, updatedAt: 100 - index }))
+    render(<FileBrowser folders={[]} files={many} />)
+    fireEvent.click(screen.getByTestId("file-browser-layout-list"))
+    expect(shownFileIds()).toHaveLength(25)
+    fireEvent.click(screen.getByLabelText("Go to next page"))
+    expect(shownFileIds()[0]).toBe("26")
+    fireEvent.click(screen.getByLabelText("Page 3"))
+    expect(shownFileIds()).toHaveLength(11)
+    expect(shownFileIds().at(-1)).toBe("61")
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "File 61" } })
+    expect(shownFileIds()).toEqual(["61"])
+    expect(screen.queryByTestId("table-pager")).toBeNull()
+  })
+
   it("lists every file newest first and narrows to an opened folder", () => {
     render(<FileBrowser folders={folders} files={files} />)
     expect(shownFileIds()).toEqual(["1", "2", "3"])

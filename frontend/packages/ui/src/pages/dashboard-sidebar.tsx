@@ -22,6 +22,8 @@ import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 import { Sidebar, SidebarProvider, SidebarResizeHandle, useSidebar } from "../components/sidebar"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/hover-card"
+import { NavigationPagePreview } from "./navigation-page-preview"
 import { DashboardWorkspaceContext } from "./dashboard-workspace"
 import { readPreference, writePreference } from "../lib/theme-storage"
 
@@ -40,7 +42,7 @@ interface DashboardSidebarProps {
 export function DashboardSidebar(props: DashboardSidebarProps) {
   const inWorkspace = useContext(DashboardWorkspaceContext)
   return inWorkspace ? <DashboardSidebarContent {...props} /> : (
-    <SidebarProvider resizable style={{ "--sidebar-width-icon": "4rem" } as React.CSSProperties}><DashboardSidebarContent {...props} /></SidebarProvider>
+    <SidebarProvider resizable defaultOpen={!props.forceCollapsed} style={{ "--sidebar-width-icon": "3rem" } as React.CSSProperties}><DashboardSidebarContent {...props} /></SidebarProvider>
   )
 }
 
@@ -111,11 +113,11 @@ function DashboardSidebarContent({
         </Button>
       </div>
 
-      <div className="px-2 py-3">
-        <CompanySwitcher collapsed={isCollapsed} />
+      <div className={cn("px-2 py-2", isCollapsed && "px-1 py-1.5")}>
+        <CompanySwitcher collapsed={isCollapsed} className={isCollapsed ? "mx-auto size-9 justify-center p-0" : undefined} />
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-2">
+      <nav className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2 py-2", isCollapsed && "gap-1 px-1")}>
         {navGroups.map((group, groupIndex) => {
           const groupKey = group.items[0]!.surfaceId
           const expanded = !group.label || isCollapsed || !collapsedGroups.includes(groupKey)
@@ -130,7 +132,7 @@ function DashboardSidebarContent({
                 <ChevronDown aria-hidden="true" className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
               </button>
             )}
-            <div id={groupId} hidden={!expanded} className="space-y-0.5">
+            <div id={groupId} hidden={!expanded} className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href)
@@ -139,19 +141,18 @@ function DashboardSidebarContent({
                 const badgeCount = navBadges?.[item.href] ?? 0
 
                 if (hasAccess) {
-                  return (
+                  const link = (
                     <Link
                       key={item.href}
                       href={item.href}
                       data-testid={`sidebar-link-${item.href.replace(/^\//, "")}`}
-                      title={isCollapsed ? item.label : undefined}
                       aria-label={isCollapsed ? item.label : undefined}
                       aria-current={active ? "page" : undefined}
                       onClick={() => setOpenMobile(false)}
                       onMouseEnter={() => router.prefetch(item.href)}
                       className={cn(
                         "relative flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        isCollapsed && "mx-auto size-10 w-10 justify-center p-0",
+                        isCollapsed && "h-9 justify-center px-0 py-0",
                         active
                           ? "bg-muted text-foreground"
                           : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -173,6 +174,19 @@ function DashboardSidebarContent({
                       ) : null}
                     </Link>
                   )
+                  return isCollapsed ? (
+                    <HoverCard key={item.href}>
+                      <HoverCardTrigger render={link} delay={250} closeDelay={100} />
+                      <HoverCardContent side="right" align="start" alignOffset={0} sideOffset={8}
+                        className="w-80 overflow-hidden p-0" data-testid="sidebar-page-preview">
+                        <div className="flex items-center gap-2 px-3 py-2.5">
+                          <Icon className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate font-medium">{item.label}</span>
+                        </div>
+                        <NavigationPagePreview item={item} />
+                      </HoverCardContent>
+                    </HoverCard>
+                  ) : link
                 }
 
                 return (
@@ -183,7 +197,7 @@ function DashboardSidebarContent({
                     className={cn(
                       "flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm",
                       "cursor-not-allowed text-muted-foreground opacity-40",
-                      isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
+                      isCollapsed && "h-9 justify-center px-0 py-0"
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -201,7 +215,7 @@ function DashboardSidebarContent({
         )})}
       </nav>
 
-      <div className="flex flex-col gap-1.5 border-t border-border/70 px-2 py-3">
+      <div className={cn("flex flex-col gap-1 border-t border-border/70 px-2 py-2", isCollapsed && "px-1 py-1.5")}>
         {onOpenJournal && quickActionIsVisible("journal") && (
           <button
             type="button"
@@ -211,7 +225,7 @@ function DashboardSidebarContent({
             className={cn(
               "flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-              isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
+              isCollapsed && "h-9 justify-center px-0 py-0"
             )}
           >
             <BookMarked className="h-4 w-4 shrink-0" />
@@ -230,7 +244,7 @@ function DashboardSidebarContent({
             className={cn(
               "flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-              isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
+              isCollapsed && "h-9 justify-center px-0 py-0"
             )}
           >
             <BookOpen className="h-4 w-4 shrink-0" />
@@ -251,7 +265,7 @@ function DashboardSidebarContent({
             className={cn(
               "flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               aiChatOpen ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-              isCollapsed && "mx-auto size-10 w-10 justify-center p-0"
+              isCollapsed && "h-9 justify-center px-0 py-0"
             )}
           >
             <Sparkles className="h-4 w-4 shrink-0" />

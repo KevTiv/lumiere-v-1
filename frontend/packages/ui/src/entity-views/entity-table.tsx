@@ -894,7 +894,7 @@ export function EntityTable({
         )}
 
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-          <Table>
+          <Table pagination={false}>
             <TableHeader className="bg-muted/25">
               <TableRow>
                 {showSelectColumn && (
