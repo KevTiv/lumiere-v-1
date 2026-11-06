@@ -359,7 +359,11 @@ async fn read_account_move_history(
     )
     .await?;
 
-    let predicate = format!("organization_id = {org} AND company_id = {company} AND resource = 'account_move' AND record_id = {record}");
+    // The shared journal also captures invoice creation and other lifecycle
+    // operations. This legacy view admits only explicit draft-line changes.
+    // Apply the same selector to both ID probes and page windows so unrelated
+    // evidence cannot poison validation or consume the pagination budget.
+    let predicate = format!("organization_id = {org} AND company_id = {company} AND resource = 'account_move' AND record_id = {record} AND subject_resource = 'account_move_line' AND (operation = '{OPERATION}' OR operation = '{ADD_OPERATION}')");
     let reader = BoundedIdReader::new(owner, "business_change", &predicate);
     let mut data = Vec::new();
     let mut probes = 0;

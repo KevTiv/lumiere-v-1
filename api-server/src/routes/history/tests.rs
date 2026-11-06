@@ -482,6 +482,11 @@ pub(super) async fn server(
                             && id <= end
                             && (row.get("company_id").is_none()
                                 == (table == "organization_business_change"))
+                            && (!sql.contains("subject_resource = 'account_move_line'")
+                                || (row["subject_resource"] == "account_move_line"
+                                    && row["operation"]
+                                        .as_str()
+                                        .is_some_and(|operation| OPERATIONS.contains(&operation))))
                     })
                     .cloned()
                     .collect::<Vec<_>>();
@@ -598,6 +603,41 @@ async fn exact_record_history_uses_current_fields_and_native_sats_without_precis
     assert!(!json.to_string().contains("secret"));
     assert!(!json["data"].to_string().contains("metadata"));
     assert!(page.next_cursor.is_none());
+}
+
+#[tokio::test]
+async fn legacy_line_history_excludes_other_invoice_events_before_pagination() {
+    let delta = json!([{"field":"name","before":"draft","after":"edited"}]);
+    let mut created = evidence(1, json!([{"field":"state","before":null,"after":"draft"}]));
+    created["operation"] = json!("create_invoice");
+    created["subject_resource"] = json!("account_move");
+    let mut lifecycle = evidence(10_000, delta.clone());
+    lifecycle["operation"] = json!("post_invoice");
+    let mut other_subject = evidence(10_001, delta.clone());
+    other_subject["subject_resource"] = json!("account_move");
+    let server = server(
+        vec![created, evidence(5_000, delta), lifecycle, other_subject],
+        None,
+        true,
+        true,
+        false,
+    )
+    .await;
+    let context = context(&server, access(GRANTS, None));
+    let page = read_account_move_history(&server.owner, &context, 9, &request(None, 1))
+        .await
+        .unwrap();
+    assert_eq!(page.data.len(), 1);
+    assert_eq!(page.data[0].id, "5000");
+    assert!(page.next_cursor.is_none());
+    for (_, sql) in server.fixture.requests.lock().unwrap().iter() {
+        if sql.contains(" FROM business_change ") {
+            assert!(sql.contains("subject_resource = 'account_move_line'"));
+            assert!(sql.contains(
+                "operation = 'update_account_move_line' OR operation = 'add_account_move_line'"
+            ));
+        }
+    }
 }
 
 #[tokio::test]
