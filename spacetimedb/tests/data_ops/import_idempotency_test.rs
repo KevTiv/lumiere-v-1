@@ -239,7 +239,7 @@ pub fn test_payslip_import_replay_is_rejected_by_file_hash(
     let structural_error = import_hr_payslip_csv(ctx, org, unquoted_locale)
         .err()
         .ok_or("unquoted locale money must reject the structurally invalid file")?;
-    if !structural_error.contains("row is wider than its header") {
+    if structural_error != "csv record 2 has more fields than the header" {
         return Err(format!(
             "unquoted locale row lost its structural rejection: {structural_error}"
         ));
