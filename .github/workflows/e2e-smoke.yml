@@ -189,7 +189,7 @@ jobs:
     name: Build exact-commit E2E artifacts
     needs: scope
     if: needs.scope.outputs.run_e2e == 'true'
-    # Playwright 1.59.1 supports Ubuntu 24.04; keep native build and browser hosts aligned.
+    # Keep Playwright browser hosts and native builds on Ubuntu 24.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     # Fingerprints and compilation must see the same build-time configuration.
@@ -445,7 +445,7 @@ jobs:
     name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || matrix.config.slot && format(' {0}', matrix.config.slot) || '' }})
     needs: [scope, plan, build-e2e]
     if: needs.plan.result == 'success' && needs.build-e2e.result == 'success' && needs.scope.outputs.run_e2e == 'true'
-    # Playwright 1.59.1 supports Ubuntu 24.04; keep native build and browser hosts aligned.
+    # Keep Playwright browser hosts and native builds on Ubuntu 24.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     services:

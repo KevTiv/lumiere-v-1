@@ -2,7 +2,7 @@
 
 FROM node:26-bookworm-slim AS node-runtime
 
-FROM mcr.microsoft.com/playwright:v1.59.1-noble
+FROM mcr.microsoft.com/playwright:v1.60.0-noble
 
 # Keep Playwright's browser libraries while using the same Node major as CI.
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
