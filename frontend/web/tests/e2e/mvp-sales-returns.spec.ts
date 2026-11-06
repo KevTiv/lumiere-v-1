@@ -286,13 +286,14 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
 
     await selectEntityRowById(page, returnOrderId)
     await waitForEntityActionEnabled(page, "entity-action-create-exchange-order")
-    await Promise.all([
+    const [exchangeResponse] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesOperationResponse(res, "create_exchange_order_from_return") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_exchange_order_from_return"),
         { timeout: 30_000 },
       ),
       page.getByTestId("entity-action-create-exchange-order").click(),
     ])
+    expect(exchangeResponse.ok(), await exchangeResponse.text()).toBe(true)
     const exchangeOrderId = await fetchExactExchangeOrderId(page, returnOrderId)
     await expect(page).toHaveURL((url) =>
       url.pathname === "/sales" &&

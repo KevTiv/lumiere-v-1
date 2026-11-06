@@ -201,7 +201,7 @@ export async function openEntityCreate(
   await gotoModule(page, route, moduleId)
   await selectModuleTab(page, moduleId, tabId)
   const createBtn = (await currentModuleView(page, moduleId)).getByTestId(`module-create-${moduleId}-${tabId}`)
-  await createBtn.scrollIntoViewIfNeeded()
+  // click scrolls and retries if a streamed render replaces the button.
   await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
 }
