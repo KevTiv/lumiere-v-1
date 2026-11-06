@@ -141,5 +141,8 @@
     "./native/*": "./src/native/**/*.ts",
     "./native/primitives/*": "./src/native/primitives/*.tsx",
     "./native/lib/*": "./src/native/lib/*.ts"
+  },
+  "engines": {
+    "node": "26.x"
   }
 }

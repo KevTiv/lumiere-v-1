@@ -248,7 +248,7 @@ an operator or sibling container on the Compose network; slim production images
 do not guarantee that `curl` is installed.
 
 ```bash
-# Run from the host, or from a sibling container with Node 18+ on the Compose network.
+# Run from the host, or from a sibling container with Node 26 on the Compose network.
 node scripts/check-compose-readiness.mjs \
   --api http://<api-host>:8082/health/ready \
   --ai http://<ai-gateway-host>:8080/health/ready \

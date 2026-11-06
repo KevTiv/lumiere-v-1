@@ -45,6 +45,17 @@ function setup(overrides: Partial<SaleOrderLineGridProps> = {}) {
 const text = (id: string) => screen.getByTestId(`sale-order-lines-${id}`).textContent
 
 describe("SaleOrderLineGrid", () => {
+  it("pages line items while keeping totals for the complete order", () => {
+    const many = Array.from({ length: 61 }, (_, index) => ({ id: index + 1, sequence: index, productId: 10, name: `Line ${index + 1}`, productUomQty: 1, priceUnit: 5, discount: 0, priceSubtotal: 5, priceTax: 0 }))
+    setup({ lines: many, editable: false })
+    expect(screen.getAllByTestId(/^sale-order-lines-row-/)).toHaveLength(25)
+    expect(text("untaxed")).toBe("305.00")
+    fireEvent.click(screen.getByLabelText("Page 3"))
+    expect(screen.getAllByTestId(/^sale-order-lines-row-/)).toHaveLength(11)
+    expect(screen.getByTestId("sale-order-lines-row-61")).toBeTruthy()
+    expect(text("untaxed")).toBe("305.00")
+  })
+
   it("lists lines in the order they were entered, with their totals", () => {
     setup()
 

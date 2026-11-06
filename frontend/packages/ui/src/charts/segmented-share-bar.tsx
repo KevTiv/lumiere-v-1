@@ -1,5 +1,7 @@
 "use client"
 
+import { Table, TableBody } from "../components/table"
+
 import { useCurrencyFormat } from "../lib/currency-context"
 import { Bar, BarChart, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart"
@@ -118,7 +120,7 @@ export function SegmentedShareBar({
 
       {showTable ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <Table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground">
                 <th className="py-1.5 text-left font-medium">Segment</th>
@@ -129,7 +131,7 @@ export function SegmentedShareBar({
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <TableBody>
               {segments.map((segment, index) => (
                 <tr key={segment.key} className="border-t border-border/60">
                   <td className="py-1.5">
@@ -162,8 +164,8 @@ export function SegmentedShareBar({
                   })}
                 </tr>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">

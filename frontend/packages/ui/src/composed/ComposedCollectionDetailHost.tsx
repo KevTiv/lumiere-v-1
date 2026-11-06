@@ -59,7 +59,7 @@ function CollectionPreview({
         ) : collection.rows.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid={`composed-empty-${node.id}`}>No records.</p>
         ) : (
-          <Table>
+          <Table pagination={false}>
             <TableHeader><TableRow>{fields.map((field) => <TableHead key={field}>{field}</TableHead>)}</TableRow></TableHeader>
             <TableBody>
               {rowsPager.pageRows.map((row) => {

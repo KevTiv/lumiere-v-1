@@ -1,5 +1,7 @@
 "use client"
 
+import { Table, TableBody } from "@lumiere/ui/components/table"
+
 import { Button } from "@lumiere/ui"
 
 type Row = Record<string, unknown>
@@ -22,7 +24,7 @@ function MetricTable({
         <p className="text-sm text-muted-foreground">No rows yet.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-left text-sm">
+          <Table className="w-full text-left text-sm">
             <thead className="border-b bg-muted/40">
               <tr>
                 {columns.map((c) => (
@@ -32,8 +34,8 @@ function MetricTable({
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {rows.slice(0, 12).map((row, i) => (
+            <TableBody>
+              {rows.map((row, i) => (
                 <tr key={i} className="border-b last:border-0">
                   {columns.map((c) => (
                     <td key={c.key} className="px-3 py-2">
@@ -42,8 +44,8 @@ function MetricTable({
                   ))}
                 </tr>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import type { FormField } from "@/lib/form-types"
 import type { EntryData } from "@/lib/entry-table-types"
-import { FormFieldRenderer } from "@/components/forms/forms-field-render"
+import { FormFieldRenderer } from "../forms/forms-field-render"
 import {
   Dialog,
   DialogContent,

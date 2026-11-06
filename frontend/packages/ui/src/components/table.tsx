@@ -3,19 +3,54 @@
 import * as React from "react"
 
 import { cn } from "@lumiere/ui/lib/utils"
+import { TablePager, usePagedRows } from "./table-pager"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function tableChildren(children: React.ReactNode, prefix = ""): React.ReactNode[] {
+  return React.Children.toArray(children).flatMap((child) =>
+    React.isValidElement<{ children?: React.ReactNode }>(child) && child.type === React.Fragment
+      ? tableChildren(child.props.children, `${prefix}${child.key}/`)
+      : [React.isValidElement(child) && prefix ? React.cloneElement(child, { key: `${prefix}${child.key}` }) : child],
+  )
+}
+
+/** Tables page at 25 rows unless their owner supplies its own pagination. */
+function Table({ className, children, pagination = true, ...props }: React.ComponentProps<"table"> & {
+  pagination?: boolean
+}) {
+  const parts = tableChildren(children)
+  const bodies = parts.filter((part): part is React.ReactElement<React.ComponentProps<typeof TableBody>> =>
+    React.isValidElement(part) && part.type === TableBody,
+  )
+  const rows = bodies.flatMap((body) => tableChildren(body.props.children))
+  // Keep the current page when cell values change; reset when row membership/order changes.
+  const rowKey = JSON.stringify(rows.map((row) => React.isValidElement(row) ? row.key : ""))
+  const pager = usePagedRows(rows, rowKey)
+  const paged = pagination && pager.total > pager.pageSize
+  let offset = 0
+  const content = paged ? parts.map((part) => {
+    if (!React.isValidElement<React.ComponentProps<typeof TableBody>>(part) || part.type !== TableBody) return part
+    const bodyRows = tableChildren(part.props.children)
+    const start = (pager.currentPage - 1) * pager.pageSize
+    const visibleRows = bodyRows.filter((_, index) => offset + index >= start && offset + index < start + pager.pageSize)
+    offset += bodyRows.length
+    return React.cloneElement(part, {}, visibleRows)
+  }) : children
   return (
-    <div
-      data-slot="table-container"
-      className="relative min-w-0 w-full max-w-full overflow-x-auto"
-    >
-      <table
-        data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      />
-    </div>
+    <>
+      <div
+        data-slot="table-container"
+        className="relative min-w-0 w-full max-w-full overflow-x-auto"
+      >
+        <table
+          data-slot="table"
+          className={cn("w-full caption-bottom text-sm", className)}
+          {...props}
+        >
+          {content}
+        </table>
+      </div>
+      {paged && <TablePager {...pager} />}
+    </>
   )
 }
 
@@ -83,7 +118,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "px-3 py-[var(--table-cell-y,0.625rem)] align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "px-3 py-[var(--table-cell-y,0.625rem)] align-top whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
