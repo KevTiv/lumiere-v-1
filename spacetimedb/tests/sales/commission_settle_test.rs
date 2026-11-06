@@ -20,14 +20,15 @@ use crate::sales::sales_core::{
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, DiscountPolicy, JournalType};
 
-fn seed_pricelist(ctx: &ReducerContext, org_id: u64, name: &str) -> Result<u64, String> {
+fn seed_pricelist(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
+    let org_id = fixture.organization_id;
     create_pricelist(
         ctx,
         org_id,
         CreatePricelistParams {
             company_id: None,
             name: name.to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -51,7 +52,7 @@ fn create_draft_so_with_commission_meta(
         .id()
         .find(&fixture.product_id)
         .ok_or("product")?;
-    let pricelist_id = seed_pricelist(ctx, org_id, &format!("Comm PL {client_ref}"))?;
+    let pricelist_id = seed_pricelist(ctx, fixture, &format!("Comm PL {client_ref}"))?;
     create_sale_order(
         ctx,
         org_id,
@@ -61,7 +62,7 @@ fn create_draft_so_with_commission_meta(
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,

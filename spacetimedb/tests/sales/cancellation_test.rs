@@ -32,7 +32,7 @@ fn seed_so(
         CreatePricelistParams {
             company_id: None,
             name: pricelist_name.to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -53,7 +53,7 @@ fn seed_so(
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,

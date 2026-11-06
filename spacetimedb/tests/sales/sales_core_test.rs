@@ -783,7 +783,7 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
         CreatePricelistParams {
             company_id: None,
             name: "Harness Cancel Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -805,7 +805,7 @@ pub fn test_order_confirm_cancel_releases_reservation(ctx: &ReducerContext) -> R
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -938,7 +938,7 @@ pub(super) fn minimal_so_params(
         partner_invoice_id: fixture.partner_id,
         partner_shipping_id: fixture.partner_id,
         pricelist_id,
-        currency_id: 1,
+        currency_id: fixture.currency_id,
         warehouse_id: fixture.warehouse_id,
         order_lines: vec![CreateSaleOrderLineParams {
             product_id: fixture.product_id,
@@ -1012,7 +1012,7 @@ pub fn test_confirm_fails_on_atp_shortfall(ctx: &ReducerContext) -> Result<(), S
         CreatePricelistParams {
             company_id: None,
             name: "ATP Fail Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -1086,7 +1086,7 @@ pub fn test_confirm_blocked_by_partner_credit_hold(ctx: &ReducerContext) -> Resu
         CreatePricelistParams {
             company_id: None,
             name: "Credit Hold Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -1147,7 +1147,7 @@ pub fn test_pricelist_applied_on_line_create(ctx: &ReducerContext) -> Result<(),
         CreatePricelistParams {
             company_id: None,
             name: "Fixed Price Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -1239,7 +1239,7 @@ pub fn test_send_quotation_then_confirm(ctx: &ReducerContext) -> Result<(), Stri
         CreatePricelistParams {
             company_id: None,
             name: "Send Quote Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -1324,7 +1324,7 @@ pub fn test_partial_validate_creates_backorder(ctx: &ReducerContext) -> Result<(
         CreatePricelistParams {
             company_id: None,
             name: "Backorder Pricelist".to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;

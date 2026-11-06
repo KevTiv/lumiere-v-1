@@ -19,14 +19,15 @@ use crate::sales::sales_core::{
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{DiscountPolicy, TaxAmountType, TaxTypeUse};
 
-fn seed_pricelist(ctx: &ReducerContext, org_id: u64, name: &str) -> Result<u64, String> {
+fn seed_pricelist(ctx: &ReducerContext, fixture: &OrgFixture, name: &str) -> Result<u64, String> {
+    let org_id = fixture.organization_id;
     create_pricelist(
         ctx,
         org_id,
         CreatePricelistParams {
             company_id: None,
             name: name.to_string(),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             discount_policy: DiscountPolicy::WithDiscount,
         },
     )?;
@@ -158,7 +159,7 @@ pub fn test_fiscal_position_tax_remap(ctx: &ReducerContext) -> Result<(), String
         .next()
         .ok_or("tax map not found")?;
 
-    let pricelist_id = seed_pricelist(ctx, org_id, "FP Pricelist")?;
+    let pricelist_id = seed_pricelist(ctx, &fixture, "FP Pricelist")?;
     create_sale_order(
         ctx,
         org_id,
@@ -168,7 +169,7 @@ pub fn test_fiscal_position_tax_remap(ctx: &ReducerContext) -> Result<(), String
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
@@ -282,7 +283,7 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
         .map(|i| i.id)
         .ok_or("incoterm")?;
 
-    let pricelist_id = seed_pricelist(ctx, org_id, "Promo Pricelist")?;
+    let pricelist_id = seed_pricelist(ctx, &fixture, "Promo Pricelist")?;
     create_sale_order(
         ctx,
         org_id,
@@ -292,7 +293,7 @@ pub fn test_incoterm_id_and_promotion_and_options(ctx: &ReducerContext) -> Resul
             partner_invoice_id: fixture.partner_id,
             partner_shipping_id: fixture.partner_id,
             pricelist_id,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             warehouse_id: fixture.warehouse_id,
             order_lines: vec![CreateSaleOrderLineParams {
                 product_id: fixture.product_id,
