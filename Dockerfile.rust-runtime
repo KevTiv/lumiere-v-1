@@ -105,7 +105,7 @@ RUN apt-get update \
 
 COPY --from=builder /out/ /usr/local/bin/
 COPY --from=builder /app/erp-skills/ /app/erp-skills/
-COPY scripts/import-task-prepare.py scripts/farm-history-preflight.py scripts/farm_history_source.py scripts/workbook-extract.py /app/scripts/
+COPY scripts/import-task-prepare.py scripts/import_preparation.py scripts/farm-history-preflight.py scripts/farm_history_source.py scripts/workbook-extract.py /app/scripts/
 RUN /usr/bin/python3 -I -S /app/scripts/workbook-extract.py --probe
 COPY --chmod=0755 scripts/lumiere-runtime-entrypoint.sh /usr/local/bin/lumiere-runtime-entrypoint
 

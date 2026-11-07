@@ -7,7 +7,7 @@ Only bounded, deterministic parsing runs here; cell contents are always data.
 import base64
 import binascii
 import csv
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import date, timedelta
 from decimal import DecimalException
 import hashlib
@@ -40,9 +40,14 @@ _spec = importlib.util.spec_from_file_location(
 farm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(farm)
 
+_rule_spec = importlib.util.spec_from_file_location(
+    "import_preparation_rules", Path(__file__).with_name("import_preparation.py")
+)
+rules = importlib.util.module_from_spec(_rule_spec)
+sys.modules[_rule_spec.name] = rules
+_rule_spec.loader.exec_module(rules)
 
-class PreparationError(ValueError):
-    """A bounded, user-actionable source problem without source contents."""
+PreparationError = rules.PreparationError
 
 
 def fail(message):
@@ -86,7 +91,7 @@ def csv_delimiter(sample):
         return ","
 
 
-def csv_rows(data):
+def csv_rows(data, delimiter=None):
     encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
     try:
         text = data.decode(encoding)
@@ -95,8 +100,9 @@ def csv_rows(data):
     if "\x00" in text:
         fail("The CSV contains unsupported null characters.")
     try:
-        reader = csv_reader(text, csv_delimiter(text[:8192]))
+        reader = csv_reader(text, delimiter or csv_delimiter(text[:8192]))
         rows = []
+        coordinates = []
         while True:
             start = reader.line_num + 1
             try:
@@ -104,9 +110,10 @@ def csv_rows(data):
             except StopIteration:
                 break
             rows.append((start, cells))
+            coordinates.append((start, reader.line_num))
             if len(rows) > MAX_ROWS:
                 fail("The source exceeds the 25,000-row preparation limit. Split the source and retry.")
-        return rows
+        return rows, coordinates
     except csv.Error:
         fail(f"CSV record starting at line {start} is malformed. Check its quoting and save it again.")
 
@@ -209,16 +216,11 @@ def field(key, value, *, kind="text", required=False, export=False, label=None):
             "sourceValue": value, "required": required, "export": export}
 
 
-def proposed_value(value, kind):
+def proposed_value(value, kind, options=None):
     if not value.strip():
         return None
     if kind == "decimal":
-        # Generic uploads have no established locale. A comma can mark a
-        # fractional value or group thousands. Keep it for explicit review.
-        if "," in value:
-            return None
-        number = farm.number(value)
-        return number if number is not None and re.fullmatch(r"-?\d{1,12}(?:\.\d{1,6})?", number) else None
+        return rules.parse_decimal(value, options)
     return value
 
 
@@ -264,8 +266,8 @@ def mapped_field(key, value, required=False):
     return result
 
 
-def field_proposal(value):
-    proposal = proposed_value(value["sourceValue"] or "", value["kind"])
+def field_proposal(value, options=None):
+    proposal = proposed_value(value["sourceValue"] or "", value["kind"], options)
     if value["kind"] == "choice" and proposal not in value["options"]:
         return None
     return proposal
@@ -292,7 +294,7 @@ def source_ref(file, row):
             "rowBasis": "import_row" if file["sheet"] else "source_line"}
 
 
-def standard_items(file, headers, target, data_rows):
+def standard_items(file, headers, target, data_rows, section=None):
     items = []
     for row_number, cells in data_rows:
         fields = []
@@ -324,7 +326,10 @@ def standard_items(file, headers, target, data_rows):
             fields.append(field("source_worksheet", file["sheet"]))
         if len(fields) > 32:
             fail("A structured table exceeds the 32-field review limit. Split its columns and retry.")
-        proposed = {value["key"]: field_proposal(value) for value in fields}
+        proposed = {value["key"]: field_proposal(value, file.get("options")) for value in fields}
+        if section is not None:
+            proposed = {key: rules.apply_text_rules(value, key, section) for key, value in proposed.items()}
+            issues.append("The selected preparation recipe proposes these changes; original source values are retained.")
         for value in fields:
             if value["export"] and any(character in (value["sourceValue"] or "") for character in "\r\n"):
                 # The prepared and native importers parse one record per line.
@@ -375,7 +380,226 @@ def structured_sections(rows, headers, target):
     return sections, None
 
 
+def raw_observation(file, number, cells, *, key=None, issue=None):
+    raw = json.dumps(cells, ensure_ascii=False, separators=(",", ":"))
+    if len(raw.encode("utf-8")) > MAX_VALUE:
+        fail("A source section exceeds the 2,000-byte review limit. Select fewer source columns.")
+    return {"key": key or f"row-{number}",
+            "label": clipped(next((value for value in cells if value.strip()), f"Row {number}"), 300),
+            "source": source_ref(file, number),
+            "issue": issue or "Review this source evidence before proposing business records.",
+            "fields": [field("source_cells", raw, required=True)],
+            "proposed": {"source_cells": raw}}
+
+
+def mapped_observation_items(file, headers, rows, section):
+    items = []
+    for number, cells in rows:
+        item = raw_observation(file, number, cells)
+        dates = []
+        for column, key in enumerate(headers):
+            original = cells[column] if column < len(cells) else ""
+            known = key in rules.OBSERVATION_FIELDS
+            safe_key = key if known else f"source_column_{section.first_column + column}"
+            kind = ("decimal" if key in rules.OBSERVATION_DECIMALS else
+                    "date" if key in rules.OBSERVATION_DATES else "text")
+            value = field(safe_key, original, kind=kind, required=bool(original.strip()) and kind != "text")
+            item["fields"].append(value)
+            if kind == "date":
+                evidence = source_day(original, order=file["options"].date_order)
+                dates.append(evidence)
+                candidate = evidence.get("from")
+            else:
+                candidate = field_proposal(value, file["options"])
+            item["proposed"][safe_key] = rules.apply_text_rules(candidate, safe_key, section)
+        if file["sheet"]:
+            item["fields"].append(field("source_worksheet", file["sheet"]))
+            item["proposed"]["source_worksheet"] = file["sheet"]
+        if len(item["fields"]) > 32:
+            fail("A source section exceeds the 32-field review limit. Select fewer source columns.")
+        if dates:
+            known_dates = {value.get("from") for value in dates if value["precision"] == "day"}
+            if any(value["precision"] == "invalid" for value in dates) or len(known_dates) > 1:
+                item["businessDate"] = {"precision": "invalid", "raw": clipped("; ".join(value["raw"] for value in dates), MAX_VALUE)}
+                item["issue"] = "Source dates are invalid or conflict; confirm the relevant business date."
+            else:
+                item["businessDate"] = next((value for value in dates if value["precision"] == "day"), dates[0])
+        item["issue"] += " These are historical source facts, not verified settlement, current stock, or posted transactions."
+        items.append(item)
+    return items
+
+
+def section_metadata(section, target=None):
+    return {"key": section.key, "targetEntity": target or section.target_entity,
+            "headerRecord": section.header_record, "firstRecord": section.first_record,
+            "lastRecord": section.last_record, "firstColumn": section.first_column,
+            "lastColumn": section.last_column, "headerSha256": rules.fingerprint(section.expected_headers)}
+
+
+def prepare_sections(file, mode, duplicate):
+    """Apply only exact, source-bound sections; unselected cells stay in review."""
+    options = file["options"]
+    batches = []
+    claimed = defaultdict(set)
+    file["sections"] = []
+    for section in options.sections:
+        if section.last_record > len(file["rows"]):
+            fail("A prepared section exceeds this source. Review the changed layout.")
+        header = file["rows"][section.header_record - 1][1]
+        actual = header[section.first_column - 1:section.last_column]
+        if actual != list(section.expected_headers):
+            fail("A section header differs from the approved layout. Review its mapping before reusing the recipe.")
+        normalized = header_keys(actual)
+        headers = [section.header_map.get(original, normalized[index]) for index, original in enumerate(actual)]
+        if len(set(headers)) != len(headers):
+            fail("A section has duplicate mapped headers. Select distinct columns before continuing.")
+        known_fields = rules.OBSERVATION_FIELDS if section.target_entity == "source_observation" else TARGET_FIELDS[section.target_entity]
+        if any(target not in known_fields for target in section.header_map.values()):
+            fail("A header mapping uses a field outside the selected preparation contract.")
+        if any(rule["field"] not in headers for rule in (*section.aliases, *section.transforms)):
+            fail("A text rule refers to a field outside its selected source section.")
+        if any(key not in headers or key not in known_fields for key in section.identity_fields):
+            fail("Business identity fields must be explicitly mapped in the source section.")
+        if section.target_entity != "source_observation" and "name" not in headers:
+            fail("The selected master-data section needs an explicit name column.")
+        if ((section.target_entity == "stock_location" and set(headers) & {"parent_id", "location_id", "warehouse_id"})
+                or (section.target_entity == "contact" and "parent_id" in headers)):
+            fail("Linked master-data columns need a registered reference resolver before native preparation.")
+        target = "source_observation" if mode == "inspect_only" or duplicate else section.target_entity
+        file["sections"].append(section_metadata(section, target))
+        claimed[section.header_record].update(range(section.first_column, section.last_column + 1))
+        rows = []
+        for record in range(section.first_record, section.last_record + 1):
+            number, full_cells = file["rows"][record - 1]
+            cells = full_cells[section.first_column - 1:section.last_column]
+            if len(section.expected_headers) > 1 and cells == list(section.expected_headers):
+                claimed[record].update(range(section.first_column, section.last_column + 1))
+                continue
+            if not any(value.strip() for value in cells):
+                continue
+            # Control totals remain evidence. They must never become an extra
+            # product/contact or another financial transaction.
+            if header_keys(cells)[0] in {"total", "subtotal", "grand_total"}:
+                continue
+            claimed[record].update(range(section.first_column, section.last_column + 1))
+            rows.append((number, cells))
+        if mode == "inspect_only" or duplicate:
+            items = [raw_observation(file, number, cells) for number, cells in rows]
+        elif target == "source_observation":
+            items = mapped_observation_items(file, headers, rows, section)
+        else:
+            items = standard_items(file, headers, target, rows, section)
+        for item in items:
+            item["key"] = f"{section.key}-{item['key']}"
+            if section.identity_fields and mode != "inspect_only" and not duplicate:
+                record = file["record_numbers"][item["source"]["row"]]
+                start, end = file["coordinates"][record - 1]
+                file["identities"].append({
+                    "namespace": section.identity_namespace, "targetEntity": target,
+                    "identityFields": list(section.identity_fields),
+                    "identityValues": [item["proposed"].get(key) for key in section.identity_fields],
+                    "facts": {key: value for key, value in item["proposed"].items()
+                              if key not in {"source_cells", "source_worksheet"}},
+                    "source": {"fileName": file["name"], "sourceSha256": file["sha256"],
+                               "record": record, "rowStart": start, "rowEnd": end,
+                               "sectionKey": section.key, "itemKey": item["key"]},
+                })
+        if items:
+            batches.append((target, items))
+    remaining = []
+    for record, (number, cells) in enumerate(file["rows"], 1):
+        unselected = [value if column not in claimed[record] else "" for column, value in enumerate(cells, 1)]
+        if any(value.strip() for value in unselected):
+            remaining.append(raw_observation(file, number, unselected, key=f"unselected-row-{number}",
+                                             issue="These cells are outside the selected data sections or contain control totals. They remain source evidence for review."))
+    if remaining:
+        batches.append(("source_observation", remaining))
+    notes = ["Prepared sections preserve all unselected source cells as evidence. No business records were created."]
+    if duplicate:
+        notes.append("Another selected file contains the same bytes. Both originals are retained for evidence review.")
+    if not batches:
+        fail("The selected sections contain no data records to review.")
+    blank_count = sum(not any(value.strip() for value in cells) for _, cells in file["rows"])
+    reviewed_rows = {item["source"]["row"] for _, items in batches for item in items}
+    header_count = sum(any(value.strip() for value in cells) and number not in reviewed_rows for number, cells in file["rows"])
+    return batches, notes, blank_count, header_count
+
+
+def automatic_section(file, key, target, items, headers=None):
+    records = [file["record_numbers"][item["source"]["row"]] for item in items]
+    first = min(records)
+    last = max(records)
+    matching_headers = [record for record, (_, cells) in enumerate(file["rows"][:first - 1], 1)
+                        if headers is not None and header_keys(cells) == headers]
+    return {"key": key, "targetEntity": target, "headerRecord": matching_headers[-1] if matching_headers else None,
+            "firstRecord": first, "lastRecord": last, "firstColumn": 1,
+            "lastColumn": max((len(file["rows"][record - 1][1]) for record in records), default=0),
+            "headerSha256": rules.fingerprint(file["rows"][matching_headers[-1] - 1][1]) if matching_headers else None}
+
+
+def layout_fingerprint(file):
+    """Pin original headers and section starts, allowing an export to grow in rows."""
+    sections = []
+    for section in file["sections"]:
+        sections.append({key: section[key] for key in (
+            "key", "targetEntity", "headerRecord", "firstRecord", "firstColumn", "lastColumn", "headerSha256")})
+    return rules.fingerprint({"worksheet": file["sheet"], "sections": sections})
+
+
+def file_coverage(file, batches):
+    item_keys = defaultdict(list)
+    for _, items in batches:
+        for item in items:
+            item_keys[item["source"]["row"]].append(item["key"])
+    records = []
+    for index, ((number, cells), (start, end)) in enumerate(zip(file["rows"], file["coordinates"]), 1):
+        disposition = "review" if item_keys[number] else "header" if any(value.strip() for value in cells) else "blank"
+        sections = [section["key"] for section in file["sections"]
+                    if section["headerRecord"] == index or section["firstRecord"] <= index <= section["lastRecord"]]
+        records.append({"record": index, "rowStart": start, "rowEnd": end, "columns": len(cells),
+                        "sectionKeys": sections, "disposition": disposition, "itemKeys": item_keys[number]})
+    counts = Counter(record["disposition"] for record in records)
+    return {"fileName": file["name"], "sourceSha256": file["sha256"], "byteCount": file["byte_count"],
+            "status": "prepared", "worksheet": file["sheet"], "recordCount": len(records),
+            "reviewRecords": counts["review"], "blankRecords": counts["blank"], "headerRecords": counts["header"],
+            "records": records, "sections": file["sections"], "layoutSha256": layout_fingerprint(file), "error": None}
+
+
+def reconcile_report_periods(files):
+    """Compare report versions/coverage without treating summary rows as transactions."""
+    reports = [(file, block) for file in files for block in file["blocks"]]
+    result = []
+    for index, (file, block) in enumerate(reports):
+        for other_file, other in reports[:index]:
+            status = None
+            if block["content_hash"] == other["content_hash"]:
+                status = "same_record"
+            elif block["shop"] is not None and block["shop"] == other["shop"]:
+                if block["title"] == other["title"]:
+                    status = "conflicting_version"
+                elif (block["period"] and other["period"]
+                      and max(block["period"]["start"], other["period"]["start"]) <= min(block["period"]["end"], other["period"]["end"])):
+                    status = "overlapping_period"
+            if status is None:
+                continue
+            sources = []
+            for selected_file, selected_block in ((other_file, other), (file, block)):
+                record = selected_block["source"]["row"]
+                start, end = selected_file["coordinates"][record - 1]
+                sources.append({"fileName": selected_file["name"], "sourceSha256": selected_file["sha256"],
+                                "record": record, "rowStart": start, "rowEnd": end,
+                                "sectionKey": "table-1", "itemKey": f"row-{start}"})
+            result.append({"status": status,
+                           "identitySha256": rules.fingerprint({"kind": "report_coverage", "shop": block["shop"],
+                                                                "sources": sources}), "sources": sources})
+            if len(result) > 5000:
+                fail("Too many overlapping report versions were selected. Review a smaller group of source versions.")
+    return result
+
+
 def prepare_file(file, mode, duplicate):
+    if file.get("options") and file["options"].sections:
+        return prepare_sections(file, mode, duplicate)
     visible = [(number, cells) for number, cells in file["rows"] if any(value.strip() for value in cells)]
     if not visible:
         fail("A selected source has no nonempty rows to review.")
@@ -388,6 +612,8 @@ def prepare_file(file, mode, duplicate):
         sections, issue = structured_sections(visible[1:], headers, target)
         if sections:
             batches = [(entity, standard_items(file, keys, entity, rows)) for entity, keys, rows in sections]
+            file["sections"] = [automatic_section(file, f"table-{index}", entity, items, keys)
+                                for index, ((entity, keys, _), (_, items)) in enumerate(zip(sections, batches), 1)]
         elif issue:
             notes.append(issue)
             batches = [("source_observation", observation_items(file, file["blocks"]))]
@@ -395,6 +621,9 @@ def prepare_file(file, mode, duplicate):
             fail("A selected structured table has no data rows to review.")
     else:
         batches = [("source_observation", observation_items(file, file["blocks"], inspection_only=mode == "inspect_only"))]
+    if not file["sections"]:
+        file["sections"] = [automatic_section(file, f"table-{index}", target, items)
+                            for index, (target, items) in enumerate(batches, 1) if items]
     if file["sheet"]:
         notes.append("XLSX source rows refer to original worksheet row numbers.")
     blank_count = len(file["rows"]) - len(visible)
@@ -418,25 +647,9 @@ def business_date(block):
 DATE_HEADERS = {"date", "as_of", "invoice_date", "business_date", "count_date", "balance_date", "source_count_date"}
 
 
-def source_day(raw, *, day_first=False):
-    """Interpret exact ISO dates; locale dates require a verified farm layout."""
-    value = raw.strip()
-    if not value:
-        return {"precision": "undated", "raw": raw}
-    try:
-        if day_first:
-            match = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})", value)
-            if not match:
-                raise ValueError("date format")
-            parsed = date(int(match[3]), int(match[2]), int(match[1]))
-        else:
-            if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
-                raise ValueError("date format")
-            parsed = date.fromisoformat(value)
-        return {"precision": "day", "from": parsed.isoformat(),
-                "toExclusive": (parsed + timedelta(days=1)).isoformat(), "raw": raw}
-    except (ValueError, OverflowError):
-        return {"precision": "invalid", "raw": raw}
+def source_day(raw, *, day_first=False, order="iso"):
+    """Locale dates require a reviewed option or an already verified farm layout."""
+    return rules.parse_date(raw, "dmy" if day_first else order)
 
 
 def supplementary_date_facts(file):
@@ -524,7 +737,8 @@ def observation_items(file, blocks, *, inspection_only=False):
                 item["businessDate"] = {"precision": "invalid", "raw": clipped("; ".join(raw_dates), MAX_VALUE)}
                 issues.append("The row contains conflicting date fields; choose its supported historical date.")
             else:
-                item["businessDate"] = source_day(next(iter(known_dates), ""))
+                options = file.get("options")
+                item["businessDate"] = source_day(next(iter(known_dates), ""), order=options.date_order if options else "iso")
             if item["businessDate"]["precision"] == "invalid":
                 issues.append("The source date is invalid or ambiguous and remains unresolved; use ISO YYYY-MM-DD.")
         if record_index in supplementary:
@@ -565,14 +779,15 @@ def observation_items(file, blocks, *, inspection_only=False):
     return items
 
 
-def source_rows(name, data):
+def source_rows(name, data, options=None):
     suffix = Path(name).suffix.lower()
     sheet = None
     if suffix == ".csv":
-        rows = csv_rows(data)
+        rows, coordinates = csv_rows(data, options.delimiter if options else None)
     elif suffix == ".xlsx":
         try:
             rows, sheet = xlsx_rows(data)
+            coordinates = [(number, number) for number, _ in rows]
         except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OverflowError, EOFError, zlib.error):
             fail("The XLSX workbook could not be read safely. Save it as CSV and retry.")
     else:
@@ -582,17 +797,21 @@ def source_rows(name, data):
             fail(f"Source row {number} exceeds the 200-column preparation limit.")
         for value in cells:
             checked_value(value)
-    return rows, sheet
+    return rows, sheet, coordinates
 
 
 def prepare(payload):
     mode = payload.get("mode") if isinstance(payload, dict) else None
-    if mode not in {"prepare_import", "inspect_only"}:
+    if not isinstance(mode, str) or mode not in {"prepare_import", "inspect_only"}:
         fail("Choose an approved preparation or inspection action before processing source files.")
     files = payload.get("files") if isinstance(payload, dict) else None
     if not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES:
         fail("Choose between 1 and 20 source files.")
+    rules.object_keys(payload, {"mode", "files", "preparation"}, {"mode", "files"}, "Preparation request")
+    preparation = payload.get("preparation")
+    file_options = rules.parse_preparation(preparation)
     decoded, names, errors = [], set(), {}
+    originals = []
     total_bytes = total_rows = total_cells = 0
     for file in files:
         if not isinstance(file, dict) or set(file) != {"fileName", "contentBase64"}:
@@ -613,8 +832,13 @@ def prepare(payload):
         if total_bytes > MAX_TOTAL_BYTES:
             fail("The source selection exceeds the 20 MB total limit.")
         names.add(name)
+        digest = hashlib.sha256(data).hexdigest()
+        options = file_options.get(name)
+        if options is not None and options.source_sha256 != digest:
+            fail("Preparation options refer to different source bytes. Review this version before continuing.")
+        originals.append({"fileName": name, "sourceSha256": digest, "byteCount": len(data)})
         try:
-            rows, sheet = source_rows(name, data)
+            rows, sheet, coordinates = source_rows(name, data, options)
         except PreparationError as error:
             errors[name] = str(error)
             continue
@@ -622,7 +846,12 @@ def prepare(payload):
         total_cells += sum(len(cells) for _, cells in rows)
         if total_rows > MAX_ROWS or total_cells > MAX_CELLS:
             fail("The source selection exceeds 25,000 rows or 100,000 cells. Split the selection and retry.")
-        decoded.append({"name": name, "sha256": hashlib.sha256(data).hexdigest(), "rows": rows, "sheet": sheet})
+        decoded.append({"name": name, "sha256": digest, "byte_count": len(data), "rows": rows,
+                        "sheet": sheet, "coordinates": coordinates, "options": options,
+                        "record_numbers": {number: index for index, (number, _) in enumerate(rows, 1)},
+                        "sections": [], "identities": []})
+    if set(file_options) - names:
+        fail("Preparation options refer to a source outside this selection.")
 
     all_blocks = []
     for file in decoded:
@@ -644,11 +873,14 @@ def prepare(payload):
                 block["issues"].append(issue)
                 other["issues"].append(issue)
                 warnings.add(AUDIT_ISSUES[issue])
-    datasets = []
+    prepared_files = []
     hashes = Counter(file["sha256"] for file in decoded)
     for file in decoded:
         try:
             batches, notes, blanks, headers = prepare_file(file, mode, hashes[file["sha256"]] > 1)
+            expected_layout = file["options"].expected_layout_sha256 if file["options"] else None
+            if expected_layout is not None and layout_fingerprint(file) != expected_layout:
+                fail("The source headers or section layout differ from this recipe. Review the changed layout before reusing its rules.")
         except PreparationError as error:
             errors[file["name"]] = str(error)
             continue
@@ -656,6 +888,35 @@ def prepare(payload):
             warnings.add(f'{file["name"]} — {note}')
         warnings.add(f'{file["name"]} — {len(file["rows"])} source records: '
                      f'{sum(len(items) for _, items in batches)} for review, {blanks} blank, {headers} headers.')
+        prepared_files.append((file, batches))
+
+    reconciliation = rules.reconcile_identities([record for file, _ in prepared_files for record in file["identities"]])
+    if mode != "inspect_only":
+        reconciliation.extend(reconcile_report_periods([file for file, _ in prepared_files if not (file.get("options") and file["options"].sections)]))
+    uncertain_identities = {(source["fileName"], source["itemKey"])
+                            for decision in reconciliation for source in decision["sources"]}
+    if reconciliation:
+        counts = Counter(decision["status"] for decision in reconciliation)
+        for status, count in sorted(counts.items()):
+            warnings.add(f"Business identity review: {count} {status.replace('_', ' ')} group(s). Affected rows remain evidence until their identity is resolved.")
+    datasets, coverage_files = [], {}
+    for file, prepared_batches in prepared_files:
+        batches = []
+        for target, items in prepared_batches:
+            ready, held = [], []
+            for item in items:
+                if (file["name"], item["key"]) in uncertain_identities:
+                    item["issue"] = clipped("Resolve the repeated, conflicting or missing business identity before creating records. " + item["issue"], 2000)
+                    for value in item["fields"]:
+                        value["export"] = False
+                    (ready if target == "source_observation" else held).append(item)
+                else:
+                    ready.append(item)
+            if ready:
+                batches.append((target, ready))
+            if held:
+                batches.append(("source_observation", held))
+        coverage_files[file["name"]] = file_coverage(file, batches)
         for section, (target, items) in enumerate(batches, 1):
             for offset in range(0, len(items), 1000):
                 title = clipped(file["name"], 130 if len(batches) > 1 else 160)
@@ -665,10 +926,24 @@ def prepare(payload):
                     title += f" · rows {offset + 1}–{min(offset + 1000, len(items))}"
                 datasets.append({"format": "lumiere-import-review/v1", "title": title, "targetEntity": target,
                                  "sourceFile": file["name"], "items": items[offset:offset + 1000]})
-    if not datasets:
+    if not datasets and not decoded:
         fail("; ".join(f"{name} — {error}" for name, error in errors.items())[:1000])
     warnings.update(f"{name} — held. {error}" for name, error in errors.items())
-    result = {"datasets": datasets, "warnings": sorted(warnings)}
+    coverage = {"version": 1, "complete": not errors, "files": [], "reconciliation": reconciliation}
+    for original in originals:
+        name = original["fileName"]
+        coverage["files"].append(coverage_files.get(name) or {
+            **original, "status": "held", "worksheet": None, "recordCount": None,
+            "reviewRecords": 0, "blankRecords": 0, "headerRecords": 0,
+            "records": [], "sections": [], "layoutSha256": None, "error": errors[name],
+        })
+    receipt = {"version": 1, "engineVersion": "lumiere-import-preparation/2",
+               "sourceFingerprint": rules.fingerprint([{key: source[key] for key in ("fileName", "sourceSha256")} for source in originals]),
+               "optionsSha256": rules.fingerprint(preparation),
+               "outputSha256": rules.fingerprint({"datasets": datasets, "coverage": coverage}),
+               "recipe": preparation.get("recipe") if preparation else None,
+               "semantics": "deterministic_review_proposals"}
+    result = {"datasets": datasets, "warnings": sorted(warnings), "coverage": coverage, "preparationReceipt": receipt}
     if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > MAX_OUTPUT_BYTES:
         fail("Prepared review exceeds the response limit. Import a smaller selection of files.")
     return result

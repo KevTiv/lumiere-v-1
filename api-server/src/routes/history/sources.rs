@@ -389,6 +389,24 @@ async fn read_sources(
                                     )
                                     .await?
                                     .unwrap_or(Value::Null);
+                                if projected["review"].is_null() {
+                                    projected["review"] =
+                                        super::super::import_reviews::read_workflow_binding(
+                                            org,
+                                            company,
+                                            &importing_actor,
+                                            request,
+                                            adapter.table,
+                                            content_hash,
+                                            number(job, "id", "id")
+                                                .ok_or_else(malformed_evidence)?,
+                                            record,
+                                            number(&mapping, "row_number", "rowNumber")
+                                                .ok_or_else(malformed_evidence)?,
+                                        )
+                                        .await?
+                                        .unwrap_or(Value::Null);
+                                }
                             }
                         }
                         data.push(projected)

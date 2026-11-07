@@ -10,6 +10,7 @@ fn submission() -> Submission {
             file_name: "products.csv".into(),
             content_base64: STANDARD.encode(b"name,sale_price,cost_price\nEggs,600,400\n"),
         }],
+        preparation: None,
     }
 }
 
@@ -48,6 +49,62 @@ fn upload_validation_rejects_paths_invalid_encoding_and_limits() {
     assert!(decode_submission(&body).is_err());
 }
 
+#[test]
+fn saved_task_pagination_binds_actor_company_organization_and_conversation() -> Result<()> {
+    let secret = b"bounded-import-test-cursor-secret";
+    let scoped = StorageScope {
+        organization: 42,
+        company: 5,
+        actor: "actor-one",
+    };
+    let claims = TaskCursor {
+        aud: TASK_CURSOR_AUDIENCE.into(),
+        exp: (chrono::Utc::now().timestamp() + 3600) as u64,
+        organization: "42".into(),
+        company: "5".into(),
+        actor: "actor-one".into(),
+        conversation: None,
+        created_at: "2026-11-07 12:00:00+00".into(),
+        request_id: "a".repeat(32),
+    };
+    let mut query = TaskQuery {
+        company_id: 5,
+        conversation_key: None,
+        decision_id: None,
+        cursor: Some(encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(secret),
+        )?),
+    };
+    ensure!(task_cursor(secret, scoped, &query)?.is_some());
+    for changed in [
+        StorageScope {
+            organization: 43,
+            ..scoped
+        },
+        StorageScope {
+            company: 6,
+            ..scoped
+        },
+        StorageScope {
+            actor: "actor-two",
+            ..scoped
+        },
+    ] {
+        ensure!(task_cursor(secret, changed, &query).is_err());
+    }
+    query.conversation_key = Some("different-conversation".into());
+    ensure!(task_cursor(secret, scoped, &query).is_err());
+    query.conversation_key = None;
+    ensure!(task_cursor(b"different-signing-key", scoped, &query).is_err());
+    query.cursor = Some("invalid-token".into());
+    ensure!(task_cursor(secret, scoped, &query).is_err());
+    query.cursor = None;
+    ensure!(task_cursor(secret, scoped, &query)?.is_none());
+    Ok(())
+}
+
 fn prepared(source: &Original) -> Result<Preparation> {
     Ok(serde_json::from_value(json!({"datasets":[{
         "format":"lumiere-import-review/v1","title":"Uploaded products","targetEntity":"product","sourceFile":source.file_name,
@@ -63,6 +120,25 @@ fn prepared_reviews_must_reference_saved_original_hashes() -> Result<()> {
     ensure!(validate_preparation(&output, &sources, ProcessingMode::InspectOnly).is_err());
     output.datasets[0].items[0].source.sha256 = "b".repeat(64);
     ensure!(validate_preparation(&output, &sources, ProcessingMode::PrepareImport).is_err());
+    Ok(())
+}
+
+#[test]
+fn held_sources_preserve_the_manifest_without_inventing_review_rows() -> Result<()> {
+    let (sources, _) = decode_submission(&submission())?;
+    let mut held: Preparation = serde_json::from_value(json!({
+        "datasets":[],"warnings":["The saved section headers changed."],
+        "coverage":{"version":1,"complete":false,"files":[{"fileName":sources[0].file_name,"sourceSha256":sources[0].sha256,"byteCount":sources[0].bytes.len(),"status":"held","recordCount":null,"records":[],"error":"The saved section headers changed."}]},
+        "preparationReceipt":{"version":1,"engineVersion":"lumiere-import-preparation/2","semantics":"deterministic_review_proposals","sourceFingerprint":"a".repeat(64),"optionsSha256":"b".repeat(64),"outputSha256":"c".repeat(64),"recipe":null}
+    }))?;
+    validate_preparation(&held, &sources, ProcessingMode::PrepareImport)?;
+    if let Some(coverage) = held.coverage.as_mut() {
+        coverage["files"][0]["sourceSha256"] = json!("d".repeat(64));
+    }
+    ensure!(validate_preparation(&held, &sources, ProcessingMode::PrepareImport).is_err());
+    held.coverage = None;
+    held.preparation_receipt = None;
+    ensure!(validate_preparation(&held, &sources, ProcessingMode::PrepareImport).is_err());
     Ok(())
 }
 
@@ -179,6 +255,11 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
             .await?;
         client
             .batch_execute(include_str!("../../../cold_tier/import_tasks_expand.sql"))
+            .await?;
+        client
+            .batch_execute(include_str!(
+                "../../../cold_tier/import_workflow_expand.sql"
+            ))
             .await?;
     }
     let scoped = StorageScope {
@@ -485,5 +566,34 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         inspected["status"] == "inspection_ready"
             && inspected["reviews"][0]["targetEntity"] == "source_observation"
     );
+    // New tasks have new review decisions even when their bytes and preparation
+    // match a previous task. Exact retries of that task keep its existing rows.
+    let original_batch = task["reviews"][0]["id"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("review id missing"))?
+        .parse::<i64>()?;
+    pool.get().await?.execute("UPDATE lumiere_platform.import_review_item SET state='confirmed',confirmed_fields='[\"name\"]'::jsonb WHERE batch_id=$1",&[&original_batch]).await?;
+    let mut fresh = submission();
+    fresh.request_id = "9".repeat(32);
+    accept(pool, scoped, &fresh, &sources, &hash).await?;
+    save_decision(
+        pool,
+        scoped,
+        &fresh.request_id,
+        &decision('9', 1, "prepare_import", None),
+    )
+    .await?;
+    finish(
+        pool,
+        scoped,
+        &fresh.request_id,
+        &output,
+        ProcessingMode::PrepareImport,
+    )
+    .await?;
+    let fresh_task = read_task(pool, scoped, &fresh.request_id).await?;
+    ensure!(fresh_task["reviews"][0]["id"] != task["reviews"][0]["id"]);
+    ensure!(fresh_task["reviews"][0]["pending"] == 1 && fresh_task["reviews"][0]["confirmed"] == 0);
+    ensure!(read_task(pool, scoped, &body.request_id).await?["reviews"][0]["confirmed"] == 1);
     Ok(())
 }

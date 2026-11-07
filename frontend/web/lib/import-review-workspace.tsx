@@ -100,12 +100,22 @@ export function ImportReviewWorkspace({
   onContinue,
   continuationBlock,
   allowImport = true,
+  allowedReviewIds,
+  allowUpload = true,
+  syncUrl = true,
+  onSelectedIdChange,
+  onChanged,
 }: {
   organizationId: number
   selectedId?: string
   onContinue: (source: ReviewedImportSource) => void
   continuationBlock?: "busy" | "unresolved" | null
   allowImport?: boolean
+  allowedReviewIds?: readonly string[]
+  allowUpload?: boolean
+  syncUrl?: boolean
+  onSelectedIdChange?: (id: string) => void
+  onChanged?: () => void
 }) {
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
@@ -118,6 +128,11 @@ export function ImportReviewWorkspace({
       onContinue={onContinue}
       continuationBlock={continuationBlock}
       allowImport={allowImport}
+      allowedReviewIds={allowedReviewIds}
+      allowUpload={allowUpload}
+      syncUrl={syncUrl}
+      onSelectedIdChange={onSelectedIdChange}
+      onChanged={onChanged}
     />
   )
 }
@@ -129,6 +144,11 @@ export function ImportReviewPanel(props: {
   onContinue: (source: ReviewedImportSource) => void
   continuationBlock?: "busy" | "unresolved" | null
   allowImport?: boolean
+  allowedReviewIds?: readonly string[]
+  allowUpload?: boolean
+  syncUrl?: boolean
+  onSelectedIdChange?: (id: string) => void
+  onChanged?: () => void
 }) {
   const { identity } = useErpSession()
   const { t } = useTranslation()
@@ -151,6 +171,11 @@ function ReviewWorkspace({
   onContinue,
   continuationBlock,
   allowImport = true,
+  allowedReviewIds,
+  allowUpload = true,
+  syncUrl = true,
+  onSelectedIdChange,
+  onChanged,
 }: {
   actor: string
   organizationId: number
@@ -159,6 +184,11 @@ function ReviewWorkspace({
   onContinue: (source: ReviewedImportSource) => void
   continuationBlock?: "busy" | "unresolved" | null
   allowImport?: boolean
+  allowedReviewIds?: readonly string[]
+  allowUpload?: boolean
+  syncUrl?: boolean
+  onSelectedIdChange?: (id: string) => void
+  onChanged?: () => void
 }) {
   const { t } = useTranslation()
   const mounted = useRef(true)
@@ -177,7 +207,7 @@ function ReviewWorkspace({
   }
   const cache = useQueryClient()
   const identityLabels = useIdentityLabelMap(organizationId)
-  const [selectedId, setSelectedId] = useState(initialId ?? "")
+  const [selectedId, setSelectedId] = useState(initialId && (!allowedReviewIds || allowedReviewIds.includes(initialId)) ? initialId : "")
   const [selected, setSelected] = useState<ReviewRow | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [historyId, setHistoryId] = useState("")
@@ -196,18 +226,20 @@ function ReviewWorkspace({
   } | null>(null)
   const [uncertainUndo, setUncertainUndo] = useState(false)
   useEffect(() => {
+    if (!syncUrl) return
     const url = new URL(window.location.href)
     const pinned = pinnedSourceReview(url.search, String(companyId))
-    if (pinned && (!initialId || initialId === pinned.batchId)) {
+    if (pinned && (!initialId || initialId === pinned.batchId) && (!allowedReviewIds || allowedReviewIds.includes(pinned.batchId))) {
       setSelectedId(pinned.batchId)
       setHistoryId(pinned.itemId)
       setPinnedReview(pinned)
       return
     }
     if (initialId) return
-    if (url.searchParams.get("sourceReviewCompany") === String(companyId))
-      setSelectedId(url.searchParams.get("sourceReview") ?? "")
-  }, [initialId, companyId])
+    const linkedId = url.searchParams.get("sourceReview") ?? ""
+    if (url.searchParams.get("sourceReviewCompany") === String(companyId) && (!allowedReviewIds || allowedReviewIds.includes(linkedId)))
+      setSelectedId(linkedId)
+  }, [initialId, companyId, allowedReviewIds, syncUrl])
   const listKey = ["import-reviews", organizationId, companyId, actor]
   const detailKey = [
     "import-review",
@@ -230,7 +262,7 @@ function ReviewWorkspace({
       request<ReviewDetail>(
         `/api/import-reviews/${selectedId}?companyId=${companyId}`,
       ),
-    enabled: !!selectedId,
+    enabled: !!selectedId && (!allowedReviewIds || allowedReviewIds.includes(selectedId)),
     retry: false,
   })
   const productReview = detail.data?.targetEntity === "product"
@@ -295,7 +327,9 @@ function ReviewWorkspace({
     `${item.source.source.file} · ${t(item.source.source.rowBasis === "import_row" ? "settings.importReview.importRow" : "settings.importReview.sourceLine", { row: item.source.source.row })}`
   const chooseBatch = (id: string) => {
     requireCurrentScope()
+    if (allowedReviewIds && !allowedReviewIds.includes(id)) return
     setSelectedId(id)
+    onSelectedIdChange?.(id)
     setSelected(null)
     setChecked(new Set())
     setHistoryId("")
@@ -303,6 +337,7 @@ function ReviewWorkspace({
     setError(null)
     setPage(0)
     setGroup("all")
+    if (!syncUrl) return
     const url = new URL(window.location.href)
     url.searchParams.set("sourceReview", id)
     url.searchParams.set("sourceReviewCompany", String(companyId))
@@ -324,10 +359,11 @@ function ReviewWorkspace({
           selectedId,
         ],
       }),
-    ])
+    ]).then(() => { requireCurrentScope(); onChanged?.() })
   }
   const upload = async (file: File) => {
     requireCurrentScope()
+    if (!allowUpload) return
     setBusy(true)
     setError(null)
     try {
@@ -556,7 +592,7 @@ function ReviewWorkspace({
             {t("settings.importReview.description")}
           </p>
         </div>
-        <FieldGroup className="max-w-xs">
+        {allowUpload ? <FieldGroup className="max-w-xs">
           <Field>
             <FieldLabel htmlFor="source-review-upload">
               {t("settings.importReview.upload")}
@@ -573,7 +609,7 @@ function ReviewWorkspace({
               }}
             />
           </Field>
-        </FieldGroup>
+        </FieldGroup> : null}
       </div>
       {error || list.error || detail.error ? (
         <Alert variant="destructive">
@@ -593,7 +629,7 @@ function ReviewWorkspace({
       ) : null}
       {list.isPending ? <p>{t("common.loading")}</p> : null}
       <div className="flex flex-wrap gap-2">
-        {list.data?.data.map((batch) => (
+        {list.data?.data.filter(batch => !allowedReviewIds || allowedReviewIds.includes(batch.id)).map((batch) => (
           <Button
             key={batch.id}
             variant={selectedId === batch.id ? "secondary" : "outline"}
@@ -606,7 +642,7 @@ function ReviewWorkspace({
           </Button>
         ))}
       </div>
-      {list.data?.data.length === 0 ? (
+      {list.data?.data.filter(batch => !allowedReviewIds || allowedReviewIds.includes(batch.id)).length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t("settings.importReview.empty")}
         </p>

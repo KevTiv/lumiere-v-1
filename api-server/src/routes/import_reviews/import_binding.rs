@@ -144,6 +144,7 @@ pub(crate) async fn record_review_binding(
     company: u64,
     entity: &str,
     request: &str,
+    file_name: Option<&str>,
     inspected: &InspectedCsv,
 ) -> Result<(), ApiError> {
     let Some(item_column) = inspected
@@ -199,6 +200,20 @@ pub(crate) async fn record_review_binding(
         &key,
         &bytes,
         "application/json",
+    )
+    .await?;
+    super::native_requests::record(
+        &pool,
+        StorageScope {
+            organization: org,
+            company,
+            actor,
+        },
+        entity,
+        request,
+        &inspected.content_sha256,
+        file_name,
+        &bindings,
     )
     .await
 }

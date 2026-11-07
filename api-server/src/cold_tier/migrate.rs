@@ -374,6 +374,27 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0037_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 38,
+        name: "unified_import_workflow",
+        change_set: 27,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_workflow_expand.sql"),
+    },
+    Migration {
+        version: 39,
+        name: "reusable_import_recipes",
+        change_set: 28,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_recipes_expand.sql"),
+    },
+    Migration {
+        version: 40,
+        name: "saved_task_native_import_requests",
+        change_set: 29,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_native_requests_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

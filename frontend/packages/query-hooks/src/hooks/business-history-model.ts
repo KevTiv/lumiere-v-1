@@ -68,7 +68,15 @@ export interface BusinessHistorySource {
   sourceSha256: string | null;
   sourceRelationship: "user_prepared_derivative" | null;
   verification: "tracked-import";
-  review: { batchId: string; itemId: string; revision: number } | null;
+  review: ({ batchId: string; itemId: string; revision: number } & Partial<WorkflowSourceReview>) | null;
+}
+
+interface WorkflowSourceReview {
+  taskRequestId: string;
+  proposalId: string;
+  proposalDigest: string;
+  source: { file: string; row: number; sha256: string };
+  role: "journal_header" | "journal_debit" | "journal_credit";
 }
 
 export interface BusinessHistorySourcesPage extends Omit<BusinessHistoryPage, "data"> {
@@ -86,7 +94,7 @@ interface WireEntry {
   resource?: unknown; recordId?: unknown;
 }
 interface WireDelta { field?: unknown; before?: unknown; after?: unknown }
-interface WireReview { batchId?: unknown; itemId?: unknown; revision?: unknown }
+interface WireReview { batchId?: unknown; itemId?: unknown; revision?: unknown; taskRequestId?: unknown; proposalId?: unknown; proposalDigest?: unknown; source?: unknown; role?: unknown }
 interface WireSource {
   id?: unknown; kind?: unknown; jobId?: unknown; rowNumber?: unknown; tableName?: unknown;
   status?: unknown; importedAt?: unknown; fileName?: unknown; contentSha256?: unknown;
@@ -259,10 +267,24 @@ export function parseBusinessHistorySourcesPage(value: unknown, scope: BusinessH
       sourceRelationship: source.sourceRelationship === "user_prepared_derivative" ? source.sourceRelationship : null,
       verification: "tracked-import", review: source.review === null ? null : {
         batchId: source.review.batchId as string, itemId: source.review.itemId as string, revision: source.review.revision as number,
+        ...parseWorkflowSourceReview(source.review),
       } };
   });
   if (new Set(data.map((entry) => entry.id)).size !== data.length) throw new Error("Duplicate source identity");
   return { ...page, data };
+}
+
+/** Workflow links are accepted only as a complete server-verified source binding. */
+function parseWorkflowSourceReview(review: WireReview): Partial<WorkflowSourceReview> {
+  if ([review.taskRequestId, review.proposalId, review.proposalDigest, review.source, review.role].every(value => value === undefined)) return {};
+  if (typeof review.taskRequestId !== "string" || !/^[a-f0-9]{32}$/.test(review.taskRequestId)
+    || !validHistoryId(review.proposalId) || typeof review.proposalDigest !== "string" || !/^[a-f0-9]{64}$/.test(review.proposalDigest)
+    || !object(review.source) || !("file" in review.source) || !text(review.source.file, 1024)
+    || !("row" in review.source) || typeof review.source.row !== "number" || !Number.isSafeInteger(review.source.row) || review.source.row < 1
+    || !("sha256" in review.source) || typeof review.source.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(review.source.sha256)
+    || (review.role !== "journal_header" && review.role !== "journal_debit" && review.role !== "journal_credit")) throw new Error("Invalid workflow source binding");
+  return { taskRequestId: review.taskRequestId, proposalId: review.proposalId, proposalDigest: review.proposalDigest,
+    source: { file: review.source.file, row: review.source.row, sha256: review.source.sha256 }, role: review.role };
 }
 
 /** Repeated immutable identities must agree, including across sparse pages. */

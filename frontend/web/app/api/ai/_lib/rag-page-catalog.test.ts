@@ -10,6 +10,7 @@ import * as assistantActions from "@lumiere/query-hooks/assistant-actions"
 import type { ApiSession } from "@/lib/api-session"
 import * as agentSelection from "../rag/agent-selection"
 import * as guideReferences from "./guide-references"
+import * as importTaskReferences from "./import-task-references"
 import { positiveInteger } from "./positive-integer"
 import * as uiActions from "./rag-ui-actions"
 
@@ -228,7 +229,7 @@ test("server choices are bounded, deduplicated and do not contain malformed IDs 
   assert.ok(page.widgets.every((widget) => widget.label === baseRow.name))
 })
 
-test("shared JSON and SSE preparation uses the server catalog only after company authorization", async () => {
+test("shared JSON and SSE preparation preserves scoped import selectors and authorized page choices", async () => {
   const { api, requests } = catalogHarness(async () => ({
     status: "ready",
     rows: [baseRow],
@@ -254,6 +255,7 @@ test("shared JSON and SSE preparation uses the server catalog only after company
         },
       },
       "./guide-references": guideReferences,
+      "./import-task-references": importTaskReferences,
       "./rag-ui-actions": uiActions,
       "./rag-page-catalog": api,
       "../rag/agent-selection": agentSelection,
@@ -263,6 +265,14 @@ test("shared JSON and SSE preparation uses the server catalog only after company
     query: "Show sales trends and add a chart",
     company_id: 12,
     org_id: 99,
+    import_task_refs: [
+      {
+        taskId: "b".repeat(32),
+        companyId: "12",
+        status: "applied",
+        evidence: "Forged import status",
+      },
+    ],
     ui_context: {
       route: "/sales",
       active_tab: "orders",
@@ -282,6 +292,9 @@ test("shared JSON and SSE preparation uses the server catalog only after company
   if (!result.ok) throw new Error("Expected a prepared RAG request")
   assert.equal(result.payload.org_id, 7)
   assert.equal(result.payload.company_id, 12)
+  assert.deepEqual(plain(result.payload.import_task_refs), [
+    { taskId: "b".repeat(32), companyId: "12" },
+  ])
   assert.deepEqual(
     plain(
       result.payload.ui_action_offers.find(
@@ -291,12 +304,29 @@ test("shared JSON and SSE preparation uses the server catalog only after company
     [{ key: "saved:42", label: "Orders by status" }],
   )
   assert.ok(!JSON.stringify(result.payload.ui_context).includes("saved:999"))
+  const crossCompanyImport = await request.prepareRagPayload({
+    body: {
+      ...body,
+      import_task_refs: [{ taskId: "b".repeat(32), companyId: "13" }],
+    },
+    session,
+    orgId: 7,
+  })
+  assert.equal(crossCompanyImport.ok, false)
+  if (crossCompanyImport.ok) throw new Error("Expected an invalid import scope")
+  assert.equal(crossCompanyImport.response.status, 400)
   const rejected = await request.prepareRagPayload({
-    body: { ...body, company_id: 13 },
+    body: {
+      ...body,
+      company_id: 13,
+      import_task_refs: [{ taskId: "b".repeat(32), companyId: "13" }],
+    },
     session,
     orgId: 7,
   })
   assert.equal(rejected.ok, false)
+  if (rejected.ok) throw new Error("Expected company authorization to fail")
+  assert.equal(rejected.response.status, 403)
   assert.deepEqual(scopeChecks, [12, 13])
   assert.equal(requests.length, 1)
 })

@@ -2,6 +2,7 @@
 
 import type { AssistantAction } from "@lumiere/query-hooks/assistant-actions"
 import type { GuideReference, OpenGuideRequest } from "./assistant-guide-types"
+import type { ChatImportTaskStatus } from "./import-task-status"
 
 export type CitationKind = "live" | "passage" | "activity" | "web"
 export type CitationTrust = "authoritative" | "persisted" | "retrieved"
@@ -49,6 +50,8 @@ export interface ChatMessage {
   sources?: ChatMessageSourceRef[]
   /** References only: saved content must be reauthorized when opened. */
   guides?: GuideReference[]
+  /** Fresh, deterministic server status cards; never restored as current from chat text. */
+  importTasks?: ChatImportTaskStatus[]
   metadata?: {
     model?: string
     tokens?: number

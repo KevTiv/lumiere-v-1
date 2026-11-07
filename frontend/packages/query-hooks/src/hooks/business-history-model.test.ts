@@ -109,6 +109,12 @@ test("import mappings do not invent original rows or review decisions", () => {
   assert.throws(() => parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), sourceRelationship: "user_prepared_derivative" }] }, scope));
   const reviewed = parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review: { batchId: "24", itemId: "9007199254740993", revision: 3 } }] }, scope);
   assert.deepEqual(reviewed.data[0]?.review, { batchId: "24", itemId: "9007199254740993", revision: 3 });
+  const workflow = { batchId: "24", itemId: "9007199254740993", revision: 3, taskRequestId: "a".repeat(32), proposalId: "100", proposalDigest: "b".repeat(64), source: { file: "original.csv", row: 7, sha256: "c".repeat(64) }, role: "journal_header" };
+  const linked = parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review: workflow }] }, scope);
+  assert.equal(linked.data[0]?.review?.taskRequestId, workflow.taskRequestId);
+  assert.equal(linked.data[0]?.review?.source?.row, 7);
+  for (const invalid of [{ ...workflow, proposalDigest: undefined }, { ...workflow, source: { ...workflow.source, row: 0 } }, { ...workflow, taskRequestId: "https://example.test" }])
+    assert.throws(() => parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review: invalid }] }, scope));
   for (const review of [{ batchId: "24", itemId: "700", revision: 0 }, { batchId: 24, itemId: "700", revision: 3 }])
     assert.throws(() => parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review }] }, scope));
 });

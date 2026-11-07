@@ -17,6 +17,10 @@ import {
   type RagGuideReference,
 } from "./guide-references"
 import {
+  parseRagImportTaskReferences,
+  type RagImportTaskReference,
+} from "./import-task-references"
+import {
   serverRagUiActionOffers,
   type RagUiActionOffer,
 } from "./rag-ui-actions"
@@ -60,6 +64,7 @@ export interface RagPayload extends RagAgentSelection {
   include_types?: string[]
   ui_context?: unknown
   guide_refs?: RagGuideReference[]
+  import_task_refs?: RagImportTaskReference[]
   ui_action_offers: RagUiActionOffer[]
 }
 
@@ -92,10 +97,13 @@ export async function prepareRagPayload(params: {
     }
   }
 
+  const companyId = positiveInteger(body.companyId ?? body.company_id)
   let guideRefs: RagGuideReference[] | undefined
+  let importTaskRefs: RagImportTaskReference[] | undefined
   let agentSelection: RagAgentSelection
   try {
     guideRefs = parseRagGuideReferences(body.guide_refs)
+    importTaskRefs = parseRagImportTaskReferences(body.import_task_refs, companyId)
     agentSelection = parseRagAgentSelection(body)
   } catch (error) {
     return {
@@ -110,7 +118,6 @@ export async function prepareRagPayload(params: {
     }
   }
 
-  const companyId = positiveInteger(body.companyId ?? body.company_id)
   const scopeError = await validateCompanyScope(session, companyId)
   if (scopeError) return { ok: false, response: scopeError }
 
@@ -137,6 +144,7 @@ export async function prepareRagPayload(params: {
   if (include_types?.length) payload.include_types = include_types
   if (ui_context) payload.ui_context = ui_context
   if (guideRefs) payload.guide_refs = guideRefs
+  if (importTaskRefs) payload.import_task_refs = importTaskRefs
 
   return { ok: true, payload }
 }

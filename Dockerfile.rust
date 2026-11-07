@@ -44,7 +44,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=builder "/app/target/release/${BIN}" /usr/local/bin/lumiere-service
 COPY --from=builder /app/erp-skills/ /app/erp-skills/
-COPY scripts/import-task-prepare.py scripts/farm-history-preflight.py scripts/farm_history_source.py scripts/workbook-extract.py /app/scripts/
+COPY scripts/import-task-prepare.py scripts/import_preparation.py scripts/farm-history-preflight.py scripts/farm_history_source.py scripts/workbook-extract.py /app/scripts/
 RUN /usr/bin/python3 -I -S /app/scripts/workbook-extract.py --probe
 COPY --from=doppler /bin/doppler /usr/local/bin/doppler
 COPY infra/doppler/entrypoint.sh /usr/local/bin/lumiere-with-secrets

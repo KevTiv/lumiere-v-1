@@ -75,6 +75,7 @@ import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
 import { useChatImportTasks } from "@/lib/chat-import-tasks"
 import { recordPageHref } from "@/lib/record-page-href"
+import { scopedImportTaskStatuses } from "@/lib/import-task-status"
 import { assistantPresentationReply, modelNativeChatActions, parseNativeChatActions, withNativeActionsMetadata } from "@/lib/assistant-native-actions"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
@@ -475,6 +476,10 @@ function ErpAiChatPanel({
       const isCurrent = () => currentHistoryScope.current === requestScope
       const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
       const turnPage = !questionGuide && workspaceScope.usesCurrentPage && pageComposition?.page?.moduleId === module ? pageComposition.page : undefined
+      const focusedImport = importTasks.focusedTask
+      const importTaskRefs = focusedImport?.companyId === String(operatingCompanyId)
+        ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
+        : undefined
       let presentationResolution = !questionGuide && !isAssistantErrorQuestion(userText) && actionScope
         ? resolveAssistantActionRequest(userText, {
           scope: actionScope,
@@ -500,7 +505,7 @@ function ErpAiChatPanel({
         answer: async () => {
           if (!stream) return assistantAnswer(await rag.mutateAsync({
             query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
-            include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs,
+            include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
           }))
           const response = await fetch("/api/ai/rag/stream", {
             method: "POST",
@@ -510,6 +515,7 @@ function ErpAiChatPanel({
               ...(includeTypes.length ? { include_types: includeTypes } : {}),
               ...(uiContext ? { ui_context: uiContext } : {}),
               ...(guideRefs?.length ? { guide_refs: guideRefs } : {}),
+              ...(importTaskRefs?.length ? { import_task_refs: importTaskRefs } : {}),
             }),
           })
           // Never fall back after dispatch: a missing reply does not prove no run occurred.
@@ -521,6 +527,7 @@ function ErpAiChatPanel({
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
       const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
       const guides = out?.guides
+      const taskStatuses = scopedImportTaskStatuses(out?.importTasks, { organizationId: orgId, companyId: operatingCompanyId, taskIds: importTaskRefs?.map(reference => reference.taskId) ?? [] })
       const draftActions = turn.drafts.kind === "ready" ? turn.drafts.value : []
       const nativeActions = actionScope ? modelNativeChatActions(out?.ui_actions ?? [], actionScope, userText, turnPage)
         .filter(action => {
@@ -539,9 +546,9 @@ function ErpAiChatPanel({
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
         actions: actions.length ? actions : undefined, runId: out?.run_id,
       })
-      return { content, runId: out?.run_id, sources, guides, actions: actions.length ? actions : undefined }
+      return { content, runId: out?.run_id, sources, guides, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
-    [orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page],
+    [orgId, orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(

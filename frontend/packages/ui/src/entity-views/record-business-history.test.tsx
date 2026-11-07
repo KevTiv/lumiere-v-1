@@ -179,4 +179,16 @@ describe("shared business history authority and evidence", () => {
     expect(link.getAttribute("href")).toBe("/settings?section=imports&sourceReview=24&sourceReviewCompany=11&sourceReviewItem=700&sourceReviewRevision=3#source-review-history");
     expect(screen.getByText("Review item 700 · saved revision 3")).toBeTruthy();
   });
+
+  it("opens the authorized saved workflow from a journal's trusted source binding", () => {
+    controls.sources.data.pages[0]!.data = [{ ...source(), review: { batchId: "24", itemId: "700", revision: 3,
+      taskRequestId: "a".repeat(32), proposalId: "100", proposalDigest: "b".repeat(64),
+      source: { file: "original.csv", row: 7, sha256: "c".repeat(64) }, role: "journal_header" } }];
+    open();
+    const href = screen.getByRole("link", { name: "Open saved import and ERP results" }).getAttribute("href");
+    expect(href).toContain("importTask=" + "a".repeat(32));
+    expect(href).toContain("importCompany=11");
+    expect(href).toContain("sourceReview=24");
+    expect(screen.getByText("original.csv:7")).toBeTruthy();
+  });
 });

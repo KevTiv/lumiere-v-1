@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { importCoverageSchema, importPreparationIdentity, importPreparationReceiptSchema, importPreparationSchema, type ImportPreparation } from "./import-preparation"
 
 const requestId = z.string().regex(/^[0-9a-f]{32}$/)
 const positiveId = z.string().regex(/^[1-9]\d*$/)
@@ -40,6 +41,9 @@ const taskSchema = z.object({
   warnings: z.array(z.string()),
   error: z.string().nullable(),
   createdAt: z.string(),
+  preparation: importPreparationSchema.nullish(),
+  coverage: importCoverageSchema.nullish(),
+  preparationReceipt: importPreparationReceiptSchema.nullish(),
 })
 export type ChatImportTask = z.infer<typeof taskSchema>
 export interface ChatImportScope {
@@ -48,7 +52,7 @@ export interface ChatImportScope {
   companyId: number
   conversationKey: string
 }
-const pointerSchema = z.object({ requestId, files: z.array(sourceSchema).min(1).max(20) }).strict()
+const pointerSchema = z.object({ requestId, files: z.array(sourceSchema).min(1).max(20), preparationSha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict()
 export type ChatImportPointer = z.infer<typeof pointerSchema>
 const decisionPointerSchema = z.object({
   taskRequestId: requestId, questionId: z.string().min(1).max(200), decisionId: requestId,
@@ -71,16 +75,48 @@ export function readChatImportPointer(storage: ReceiptStorage, scope: ChatImport
   return raw ? pointerSchema.parse(JSON.parse(raw)) : null
 }
 
-export function parseChatImportTask(value: unknown, scope: ChatImportScope, expectedRequest?: string): ChatImportTask {
+/** Saved tasks may be reopened outside their original conversation, in the same authorized company. */
+export function parseSavedImportTask(value: unknown, companyId: number, expectedRequest?: string): ChatImportTask {
   const task = taskSchema.parse(value)
-  if (task.companyId !== String(scope.companyId) || task.conversationKey !== scope.conversationKey
+  if (task.companyId !== positiveId.parse(String(companyId))
     || (expectedRequest && task.requestId !== expectedRequest)
-    || task.files.some((source, index) => source.ordinal !== index)) throw new Error("The saved import does not match this company or conversation.")
+    || task.files.some((source, index) => source.ordinal !== index)) throw new Error("The saved import does not match this company or request.")
   if (task.decision.id !== `${task.requestId}:purpose`
     || new Set(task.decision.options.map(option => option.id)).size !== task.decision.options.length
     || (task.status === "awaiting_decision") !== (task.decision.status === "pending")
     || (task.decision.status === "pending" && task.reviews.length > 0)) throw new Error("The saved file decision is inconsistent. Check the original task before continuing.")
+  if (task.preparation?.files.some(rule => task.files.filter(file => file.fileName === rule.fileName && file.sha256 === rule.sourceSha256).length !== 1)
+    || (task.coverage && (task.coverage.files.length !== task.files.length || task.coverage.files.some((file, index) => file.fileName !== task.files[index]?.fileName || file.sourceSha256 !== task.files[index]?.sha256)))) {
+    throw new Error("The preparation rules or coverage do not match the saved source files.")
+  }
   return task
+}
+
+export function parseChatImportTask(value: unknown, scope: ChatImportScope, expectedRequest?: string): ChatImportTask {
+  const task = parseSavedImportTask(value, scope.companyId, expectedRequest)
+  if (task.conversationKey !== scope.conversationKey) throw new Error("The saved import does not match this company or conversation.")
+  return task
+}
+
+export async function readSavedImportTask(fetcher: ImportTaskFetch, companyId: number, id: string): Promise<ChatImportTask | null> {
+  requestId.parse(id)
+  positiveId.parse(String(companyId))
+  const response = await fetcher("/api/import-tasks/" + id + "?companyId=" + companyId, { cache: "no-store" })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error("The saved import could not be checked. Reopen it in its original company or check your access.")
+  return parseSavedImportTask(await response.json(), companyId, id)
+}
+
+export async function listSavedImportTasks(fetcher: ImportTaskFetch, companyId: number, cursor?: string): Promise<{ tasks: ChatImportTask[]; nextCursor: string | null }> {
+  positiveId.parse(String(companyId))
+  const query = new URLSearchParams({ companyId: String(companyId) })
+  if (cursor) query.set("cursor", cursor)
+  const response = await fetcher("/api/import-tasks?" + query, { cache: "no-store" })
+  if (!response.ok) throw new Error(response.status === 403
+    ? "File imports require an unrestricted company administrator."
+    : "Saved imports could not be checked. Try again to restore your work.")
+  const body = z.object({ tasks: z.array(z.unknown()).max(100), nextCursor: z.string().min(1).max(2048).nullable().optional() }).parse(await response.json())
+  return { tasks: body.tasks.map(task => parseSavedImportTask(task, companyId)), nextCursor: body.nextCursor ?? null }
 }
 
 export async function readChatImportTask(fetcher: ImportTaskFetch, scope: ChatImportScope, id: string): Promise<ChatImportTask | null> {
@@ -101,10 +137,17 @@ export async function listChatImportTasks(fetcher: ImportTaskFetch, scope: ChatI
   return body.tasks.map(task => parseChatImportTask(task, scope))
 }
 
-export function verifyImportSources(task: ChatImportTask, pointer: ChatImportPointer): void {
+async function preparationHash(preparation?: ImportPreparation | null): Promise<string | undefined> {
+  if (preparation == null) return undefined
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(importPreparationIdentity(preparation)))
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("")
+}
+
+export async function verifyImportSources(task: ChatImportTask, pointer: ChatImportPointer): Promise<void> {
   if (task.requestId !== pointer.requestId || task.files.length !== pointer.files.length
     || task.files.some((source, i) => source.fileName !== pointer.files[i].fileName
-      || source.size !== pointer.files[i].size || source.sha256 !== pointer.files[i].sha256)) {
+      || source.size !== pointer.files[i].size || source.sha256 !== pointer.files[i].sha256)
+    || await preparationHash(task.preparation) !== pointer.preparationSha256) {
     throw new Error("The saved import does not match the original files. Your submission receipt is retained.")
   }
 }
@@ -119,6 +162,7 @@ function base64(bytes: Uint8Array): string {
 export async function submitChatImportFiles(args: {
   files: File[]; scope: ChatImportScope; storage: ReceiptStorage; fetcher: ImportTaskFetch;
   isCurrent: () => boolean; createRequestId?: () => string; knownTasks?: ChatImportTask[];
+  preparation?: ImportPreparation;
 }): Promise<ChatImportTask> {
   const assertCurrent = () => { if (!args.isCurrent()) throw new Error("The active company or conversation changed. Reopen the import in its original company.") }
   assertCurrent()
@@ -139,22 +183,30 @@ export async function submitChatImportFiles(args: {
     encoded.push({ fileName: file.name, contentBase64: base64(new Uint8Array(bytes)) })
   }
   assertCurrent()
+  const preparation = args.preparation === undefined ? undefined : importPreparationSchema.parse(args.preparation)
+  if (preparation?.files.some(rule => fingerprints.filter(file => file.fileName === rule.fileName && file.sha256 === rule.sourceSha256).length !== 1)) {
+    throw new Error("Preparation rules must match the exact selected source files.")
+  }
+  const preparationSha256 = await preparationHash(preparation)
+  assertCurrent()
   const previous = readChatImportPointer(args.storage, args.scope)
   if (!previous) {
-    const existing = args.knownTasks?.find(task => JSON.stringify(task.files.map(({ fileName, size, sha256 }) => ({ fileName, size, sha256 }))) === JSON.stringify(fingerprints))
+    const existing = args.knownTasks?.find(task => importPreparationIdentity(task.preparation) === importPreparationIdentity(preparation)
+      && JSON.stringify(task.files.map(({ fileName, size, sha256 }) => ({ fileName, size, sha256 }))) === JSON.stringify(fingerprints))
     if (existing) {
       const saved = await readChatImportTask(args.fetcher, args.scope, existing.requestId)
       assertCurrent()
       if (!saved) throw new Error("The matching saved import is unavailable. Check saved imports before starting another submission.")
-      verifyImportSources(saved, { requestId: existing.requestId, files: fingerprints })
+      await verifyImportSources(saved, { requestId: existing.requestId, files: fingerprints, preparationSha256 })
+      assertCurrent()
       return saved
     }
   }
-  if (previous && JSON.stringify(previous.files) !== JSON.stringify(fingerprints)) throw new Error("Check the previous submission before adding different files. To retry it, select the same original files in the same order.")
-  const pointer = pointerSchema.parse({ requestId: previous?.requestId ?? (args.createRequestId?.() ?? crypto.randomUUID().replaceAll("-", "")), files: fingerprints })
+  if (previous && (JSON.stringify(previous.files) !== JSON.stringify(fingerprints) || previous.preparationSha256 !== preparationSha256)) throw new Error("Check the previous submission before changing files or preparation rules. To retry it, select the same original files in the same order with the same rules.")
+  const pointer = pointerSchema.parse({ requestId: previous?.requestId ?? (args.createRequestId?.() ?? crypto.randomUUID().replaceAll("-", "")), files: fingerprints, ...(preparationSha256 ? { preparationSha256 } : {}) })
   args.storage.setItem(key, JSON.stringify(pointer))
   assertCurrent()
-  const body = JSON.stringify({ companyId: args.scope.companyId, requestId: pointer.requestId, conversationKey: args.scope.conversationKey, files: encoded })
+  const body = JSON.stringify({ companyId: args.scope.companyId, requestId: pointer.requestId, conversationKey: args.scope.conversationKey, files: encoded, ...(preparation ? { preparation } : {}) })
   let task: ChatImportTask
   let rejected: string | null = null
   try {
@@ -183,7 +235,8 @@ export async function submitChatImportFiles(args: {
     task = saved
   }
   assertCurrent()
-  verifyImportSources(task, pointer)
+  await verifyImportSources(task, pointer)
+  assertCurrent()
   args.storage.removeItem(key)
   return task
 }
@@ -198,7 +251,8 @@ export async function recoverChatImportPointer(args: {
   const task = await readChatImportTask(args.fetcher, args.scope, pointer.requestId)
   if (!args.isCurrent()) throw new Error("The active import company changed.")
   if (task) {
-    verifyImportSources(task, pointer)
+    await verifyImportSources(task, pointer)
+    if (!args.isCurrent()) throw new Error("The active import company changed.")
     args.storage.removeItem(chatImportScopeKey(args.scope))
     return { pointer: null, task }
   }
