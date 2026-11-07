@@ -22,11 +22,11 @@
   "inputs": [
     {
       "path": "lumiere-codegen/contract-operation-ids.json",
-      "sha256": "3a3e32cf4fefde97187ff6624142cfb66e3b9ad4b5fc1ef41fb380daa9219aa0"
+      "sha256": "437351a3633fe94ff60fcaef3b478884def663ba44b7269bd261baab83114eed"
     },
     {
       "path": "lumiere-codegen/reducer-exposure.json",
-      "sha256": "f865aee628b0aeaf9345b00c403ca4fcca14f9a582de53a64e76f78be0069fa7"
+      "sha256": "d86e2eec247f6d704cfac0f44d2c8a6a93a910c8e34f683860815753d981e73d"
     },
     {
       "path": "lumiere-codegen/business-history-owner-policy.json",
@@ -34,7 +34,7 @@
     },
     {
       "path": "lumiere-codegen/c2-commit-coverage.json",
-      "sha256": "0a27c6e35d06ddcaf10bd4f78ae048c360b48de156799f524f19655e5398533e"
+      "sha256": "a5c6090566bb46f059b98de6f44edf8db97a0b54439a6574588e946dddc66da9"
     },
     {
       "path": "docs/evidence/cov-00a-operation-census.json",
@@ -54,7 +54,7 @@
     },
     {
       "path": "lumiere-codegen/operation-contracts/presentation.json",
-      "sha256": "56a3aac79c9d423b7071daa096ee5775d02da9db97c6458e2793260eefba43c2"
+      "sha256": "29589212733e384fbc6de3d57bc0ca492f59cfc4f3c05d74f65f7e88f2998902"
     }
   ],
   "limits": [

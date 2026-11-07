@@ -1,0 +1,208 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PersonalPageLayoutContract",
+  "description": "Export catalog for generated clients, not an HTTP envelope.",
+  "type": "object",
+  "properties": {
+    "request": {
+      "$ref": "#/definitions/SavePersonalPageLayoutRequest"
+    },
+    "saved": {
+      "$ref": "#/definitions/PersonalPageLayoutResponse"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "request",
+    "saved"
+  ],
+  "definitions": {
+    "PersonalPageLayout": {
+      "description": "Complete personal layout for one existing page.",
+      "type": "object",
+      "properties": {
+        "moduleId": {
+          "$ref": "#/definitions/PersonalPageModule"
+        },
+        "pageId": {
+          "type": "string",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "const": 1
+        },
+        "widgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PersonalPageWidgetPlacement"
+          },
+          "maxItems": 64
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "moduleId",
+        "pageId",
+        "widgets"
+      ]
+    },
+    "PersonalPageLayoutResponse": {
+      "description": "Exact saved revision, or an unsaved page's builtin default.",
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string"
+        },
+        "layout": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PersonalPageLayout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "moduleId": {
+          "$ref": "#/definitions/PersonalPageModule"
+        },
+        "pageId": {
+          "type": "string",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "companyId",
+        "moduleId",
+        "pageId",
+        "revision",
+        "layout"
+      ]
+    },
+    "PersonalPageModule": {
+      "description": "Existing business page hosts. Administration and AI debugger routes are excluded.",
+      "type": "string",
+      "enum": [
+        "overview",
+        "accounting",
+        "sales",
+        "crm",
+        "inventory",
+        "products",
+        "warehouse",
+        "purchasing",
+        "hr",
+        "manufacturing",
+        "projects",
+        "iot",
+        "documents",
+        "calendar",
+        "reports",
+        "subscriptions",
+        "expenses",
+        "helpdesk",
+        "workflows",
+        "messages",
+        "proposals",
+        "pos",
+        "fleet",
+        "tasks",
+        "approvals",
+        "distributor",
+        "map",
+        "trackers"
+      ]
+    },
+    "PersonalPageWidgetPlacement": {
+      "description": "One independently sized placement. Array order is its visual order.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Stable instance identifier, independent of the reusable widget identifier.",
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$"
+        },
+        "source": {
+          "$ref": "#/definitions/PersonalPageWidgetSource"
+        },
+        "widgetId": {
+          "description": "Host-owned builtin key (once per page), or reusable canonical positive decimal saved-widget ID.",
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$"
+        },
+        "width": {
+          "description": "Span in the host's twelve-column grid.",
+          "type": "integer",
+          "enum": [
+            3,
+            4,
+            6,
+            8,
+            12
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source",
+        "widgetId",
+        "width"
+      ]
+    },
+    "PersonalPageWidgetSource": {
+      "description": "Source of an inert widget reference; a reference never grants data access.",
+      "type": "string",
+      "enum": [
+        "builtin",
+        "saved"
+      ]
+    },
+    "SavePersonalPageLayoutRequest": {
+      "description": "Save or reset intent. Actor, organization and company are not body authority.",
+      "type": "object",
+      "properties": {
+        "expectedRevision": {
+          "description": "Null only when this personal page has never been saved.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "layout": {
+          "description": "Null appends a reset snapshot; it never erases revision history.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PersonalPageLayout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "expectedRevision",
+        "layout"
+      ]
+    }
+  }
+}

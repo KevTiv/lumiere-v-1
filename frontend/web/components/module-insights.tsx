@@ -12,8 +12,10 @@ import { Button } from "@lumiere/ui/components/button"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import type { DashboardSection, AreaChartWidget, BarChartWidget } from "@lumiere/ui/lib/dashboard-types"
+import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { reportExportSourceProvenance } from "@lumiere/ui/lib/report-export-provenance"
 import { DashboardGrid } from "../../packages/ui/src/pages/dashboard-grid"
+import { ModulePageComposition } from "@lumiere/ui/pages/page-composition-host"
 import { DashboardWidgetRenderer } from "../../packages/ui/src/pages/dashboard-widget-renderer"
 import { buildModuleInsights, insightDefinitions, insightRecordHref, type ModuleInsightInput } from "../lib/module-insights-model"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
@@ -64,7 +66,7 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
   const trend: AreaChartWidget = { id: sectionId("trend"), title: `${label("trend")} · ${unit}`, type: "area-chart", width: "full", useCard: false, data: { xAxisKey: "month", allowDecimals: model.monetary ? undefined : false, series: [{ name: label("measure"), color: "hsl(var(--chart-1))" }], values: (model.period.value?.months ?? []).map((point) => ({ month: point.label, [label("measure")]: point.value })) } }
   const breakdown: BarChartWidget = { id: sectionId("states"), title: label("distribution"), type: "bar-chart", width: "full", useCard: false, data: { categoryKey: "state", layout: "horizontal", allowDecimals: false, series: [{ name: t("moduleInsights.records"), color: "hsl(var(--chart-2))" }], values: (model.counts.value?.states ?? []).map((point) => ({ state: status(point.status), [t("moduleInsights.records")]: point.count })) } }
   const previous = (value: number | null | undefined) => value == null ? null : <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.previous")}: {new Intl.NumberFormat().format(value)}</p>
-  const metric = (key: string, state: ModuleDataState, value: number | undefined, hint: ReactNode, monetary = false) => <div className="min-w-0 space-y-3 p-4 sm:p-5" data-testid={sectionId(key)}>
+  const metric = (key: string, state: ModuleDataState, value: number | undefined, hint: ReactNode, monetary = false) => <div key={key} className="min-w-0 space-y-3 p-4 sm:p-5" data-testid={sectionId(key)}>
     <h3 className="text-xs font-medium leading-5 text-muted-foreground">{label(key)}</h3>
     {state.status === "ready" && value !== undefined ? <><p className={`${workspaceStyles.metricValue} break-words text-xl sm:text-2xl`}>{monetary ? formatValue(value) : new Intl.NumberFormat().format(value)}</p>{hint}</> : <SourceNotice state={state} />}
   </div>
@@ -78,8 +80,35 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
   </section>
   const browseHref = `/${input.module}?tab=${insightDefinitions[input.module].tab}&period=${encodeURIComponent(serializeHistoryPeriod(period))}&periodTimeZone=${encodeURIComponent(model.timeZone)}&filter=${encodeURIComponent(`companyId:${String(input.companyId)}`)}${model.monetary && model.selectedId ? `&filter=${encodeURIComponent(`${input.module === "crm" ? "companyCurrencyId" : "currencyId"}:${model.selectedId}`)}` : ""}`
   const linkClass = "inline-flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+  const metricCards = [
+    { key: "currentValue", content: metric("currentValue", model.totals.state, model.totals.value?.amount, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>, true) },
+    { key: "currentCount", content: metric("currentCount", model.counts.state, model.counts.value?.current, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>) },
+    { key: "periodValue", content: metric("periodValue", model.period.state, model.period.value?.current, model.period.value && model.period.value.previous != null && <div className="space-y-1 text-xs leading-5 text-muted-foreground"><p>{model.period.value.percent === null ? t("moduleInsights.noBaseline") : `${model.period.value.percent > 0 ? "+" : ""}${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(model.period.value.percent)}% ${t("moduleInsights.vsPrevious")}`}</p><p>{t("moduleInsights.previous")}: {formatValue(model.period.value.previous)}</p></div>, true) },
+    { key: "periodCount", content: metric("periodCount", model.periodCounts.state, model.periodCounts.value?.current, previous(model.periodCounts.value?.previous)) },
+  ]
+  const trendContent = chart(trend, model.period.state, label("trendHint"), <>{tableHead(t("common.historyPeriod.label", { defaultValue: "Date range" }), label("measure"))}<tbody>{model.period.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{point.label}</th><td className="py-3 text-right">{formatValue(point.value)}</td></tr>)}</tbody></>)
+  const breakdownContent = chart(breakdown, model.counts.state, t("moduleInsights.distributionHint"), <>{tableHead(t("moduleInsights.state"), t("moduleInsights.records"))}<tbody>{model.counts.value?.states.map((point) => <tr key={point.status} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{status(point.status)}</th><td className="py-3 text-right">{point.count}</td></tr>)}</tbody></>, true)
+  const actionsContent = <section aria-labelledby={sectionId("actions")} className="space-y-4"><h2 id={sectionId("actions")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.actions")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.queueHint")}</p>
+      {model.queues.value ? <><div className="grid gap-3 sm:grid-cols-3">{model.queues.value.map((queue) => <button key={queue.key} type="button" aria-pressed={shownQueue?.key === queue.key} className={`${workspaceStyles.surface} flex min-w-0 items-center justify-between gap-3 p-4 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring ${shownQueue?.key === queue.key ? "ring-1 ring-primary" : ""}`} data-testid={sectionId(`queue-${queue.key}`)} onClick={() => setQueueKey(queue.key)}><span className="text-sm">{status(queue.key)}</span><span className="text-xl font-semibold tabular-nums">{queue.records.length}</span></button>)}</div>
+        <div className={`${workspaceStyles.surface} space-y-2 p-4`} aria-label={shownQueue ? status(shownQueue.key) : t("moduleInsights.actions")} data-testid={sectionId("queue-records")}><p className="text-xs text-muted-foreground">{t("moduleInsights.firstFive")}</p>{shownQueue?.records.length ? shownQueue.records.slice(0, 5).map((record) => <Link key={record.id} className={`${linkClass} w-full`} href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><ArrowUpRight className="size-4 shrink-0" aria-hidden="true" /></Link>) : <p className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</p>}</div>
+      </> : <SourceNotice state={model.queues.state} />}
+      <div className="flex flex-wrap gap-2"><Link className={linkClass} href={browseHref}>{model.monetary && !model.selectedId ? t("moduleInsights.browseRecords") : label("browse")}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>{model.definition.more.map((tab) => <Link key={tab} className={linkClass} href={`/${input.module}?tab=${tab}`}>{t(`moduleInsights.workspaces.${tab === "operations" && input.module === "expenses" ? "captureReceipt" : tab}`)}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>)}</div>
+      {input.module === "sales" && <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.moreQueues")}</summary><nav aria-label={t("moduleInsights.moreQueues")} className="flex flex-wrap gap-2 pt-2">{[
+        ["credit_holds", "creditHolds"], ["returns_receive", "returnsToReceive"], ["open_deliveries", "openDeliveries"],
+        ["commissions_to_accrue", "commissionsToAccrue"], ["commissions_accrued", "commissionsAccrued"], ["commissions_settled", "commissionsSettled"],
+      ].map(([queue, key]) => <Link key={queue} className={linkClass} href={`/sales?tab=ops&queue=${queue}`}>{t(`sales.dashboard.queues.${key}`)}<ArrowUpRight aria-hidden="true" className="size-4" /></Link>)}</nav></details>}
+      {hasCompanyForecast && <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.forecastHint")}</p>}
+      {quickSections.length > 0 && <DashboardGrid sections={quickSections} />}
+    </section>
+  const recentContent = <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? <ul className="divide-y">{model.recent.value.length ? model.recent.value.map((record) => <li key={record.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>) : <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>}</ul> : <SourceNotice state={model.recent.state} />}</section>
+  const compositionSections: DashboardSection[] = [
+    ...metricCards.map(({ key, content }) => createPageContentSection({ id: sectionId(key), title: label(key), content: <div className={workspaceStyles.surface}>{content}</div>, width: "1/4" })),
+    createPageContentSection({ id: sectionId("trend"), title: trend.title, content: trendContent, width: "1/2" }),
+    createPageContentSection({ id: sectionId("states"), title: breakdown.title, content: breakdownContent, width: "1/2" }),
+    createPageContentSection({ id: sectionId("actions"), title: t("moduleInsights.actions"), content: actionsContent }),
+    createPageContentSection({ id: sectionId("recent"), title: t("moduleInsights.recent"), content: recentContent }),
+  ]
   return <div className="min-w-0 space-y-6 [&_button]:min-h-11 [&_button]:min-w-11" data-testid={`module-insights-${input.module}`}>
-    <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "insights", "actions"].map((key) => <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>)}</nav>
     <section aria-labelledby={sectionId("overview")} className="space-y-4">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div className="space-y-1"><h2 id={sectionId("overview")} className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined aria-hidden="true" className="size-5 text-primary" />{label("title")}</h2><p className={workspaceStyles.sectionDescription}>{label("description")}</p></div>
         <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><Select
@@ -120,32 +149,23 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
         {` · ${model.timeZone}`}
       </p>
       <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status." })} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link></p>
-      <div className={`${workspaceStyles.surface} grid min-w-0 divide-y sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 [&>div]:sm:border-b [&>div]:xl:border-b-0 [&>div:nth-child(even)]:sm:border-l [&>div:nth-child(3)]:xl:border-l`}>
-        {metric("currentValue", model.totals.state, model.totals.value?.amount, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>, true)}
-        {metric("currentCount", model.counts.state, model.counts.value?.current, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>)}
-        {metric("periodValue", model.period.state, model.period.value?.current, model.period.value && model.period.value.previous != null && <div className="space-y-1 text-xs leading-5 text-muted-foreground"><p>{model.period.value.percent === null ? t("moduleInsights.noBaseline") : `${model.period.value.percent > 0 ? "+" : ""}${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(model.period.value.percent)}% ${t("moduleInsights.vsPrevious")}`}</p><p>{t("moduleInsights.previous")}: {formatValue(model.period.value.previous)}</p></div>, true)}
-        {metric("periodCount", model.periodCounts.state, model.periodCounts.value?.current, previous(model.periodCounts.value?.previous))}
-      </div>
       <p className="text-xs leading-5 text-muted-foreground">{label("basis")}</p>
     </section>
-    <section aria-labelledby={sectionId("insights")} className="space-y-4"><h2 id={sectionId("insights")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.insights")}</h2>
-      <div className="grid min-w-0 gap-5 xl:grid-cols-2">
-        {chart(trend, model.period.state, label("trendHint"), <>{tableHead(t("common.historyPeriod.label", { defaultValue: "Date range" }), label("measure"))}<tbody>{model.period.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{point.label}</th><td className="py-3 text-right">{formatValue(point.value)}</td></tr>)}</tbody></>)}
-        {chart(breakdown, model.counts.state, t("moduleInsights.distributionHint"), <>{tableHead(t("moduleInsights.state"), t("moduleInsights.records"))}<tbody>{model.counts.value?.states.map((point) => <tr key={point.status} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{status(point.status)}</th><td className="py-3 text-right">{point.count}</td></tr>)}</tbody></>, true)}
+    <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}>
+      <div className="space-y-6">
+        <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "insights", "actions"].map((key) => <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>)}</nav>
+        <div className="space-y-4">
+          <div className={`${workspaceStyles.surface} grid min-w-0 divide-y sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 [&>div]:sm:border-b [&>div]:xl:border-b-0 [&>div:nth-child(even)]:sm:border-l [&>div:nth-child(3)]:xl:border-l`}>
+            {metricCards.map(({ content }) => content)}
+          </div>
+        </div>
+        <section aria-labelledby={sectionId("insights")} className="space-y-4">
+          <h2 id={sectionId("insights")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.insights")}</h2>
+          <div className="grid min-w-0 gap-5 xl:grid-cols-2">{trendContent}{breakdownContent}</div>
+        </section>
+        {actionsContent}
+        {recentContent}
       </div>
-    </section>
-    <section aria-labelledby={sectionId("actions")} className="space-y-4"><h2 id={sectionId("actions")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.actions")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.queueHint")}</p>
-      {model.queues.value ? <><div className="grid gap-3 sm:grid-cols-3">{model.queues.value.map((queue) => <button key={queue.key} type="button" aria-pressed={shownQueue?.key === queue.key} className={`${workspaceStyles.surface} flex min-w-0 items-center justify-between gap-3 p-4 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring ${shownQueue?.key === queue.key ? "ring-1 ring-primary" : ""}`} data-testid={sectionId(`queue-${queue.key}`)} onClick={() => setQueueKey(queue.key)}><span className="text-sm">{status(queue.key)}</span><span className="text-xl font-semibold tabular-nums">{queue.records.length}</span></button>)}</div>
-        <div className={`${workspaceStyles.surface} space-y-2 p-4`} aria-label={shownQueue ? status(shownQueue.key) : t("moduleInsights.actions")} data-testid={sectionId("queue-records")}><p className="text-xs text-muted-foreground">{t("moduleInsights.firstFive")}</p>{shownQueue?.records.length ? shownQueue.records.slice(0, 5).map((record) => <Link key={record.id} className={`${linkClass} w-full`} href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><ArrowUpRight className="size-4 shrink-0" aria-hidden="true" /></Link>) : <p className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</p>}</div>
-      </> : <SourceNotice state={model.queues.state} />}
-      <div className="flex flex-wrap gap-2"><Link className={linkClass} href={browseHref}>{model.monetary && !model.selectedId ? t("moduleInsights.browseRecords") : label("browse")}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>{model.definition.more.map((tab) => <Link key={tab} className={linkClass} href={`/${input.module}?tab=${tab}`}>{t(`moduleInsights.workspaces.${tab === "operations" && input.module === "expenses" ? "captureReceipt" : tab}`)}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>)}</div>
-      {input.module === "sales" && <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.moreQueues")}</summary><nav aria-label={t("moduleInsights.moreQueues")} className="flex flex-wrap gap-2 pt-2">{[
-        ["credit_holds", "creditHolds"], ["returns_receive", "returnsToReceive"], ["open_deliveries", "openDeliveries"],
-        ["commissions_to_accrue", "commissionsToAccrue"], ["commissions_accrued", "commissionsAccrued"], ["commissions_settled", "commissionsSettled"],
-      ].map(([queue, key]) => <Link key={queue} className={linkClass} href={`/sales?tab=ops&queue=${queue}`}>{t(`sales.dashboard.queues.${key}`)}<ArrowUpRight aria-hidden="true" className="size-4" /></Link>)}</nav></details>}
-      {hasCompanyForecast && <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.forecastHint")}</p>}
-      {quickSections.length > 0 && <DashboardGrid sections={quickSections} />}
-    </section>
-    <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? <ul className="divide-y">{model.recent.value.length ? model.recent.value.map((record) => <li key={record.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>) : <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>}</ul> : <SourceNotice state={model.recent.state} />}</section>
+    </ModulePageComposition>
   </div>
 }

@@ -435,6 +435,7 @@ jobs:
           PY
           pnpm --dir frontend install --frozen-lockfile
           pnpm --dir frontend contracts:generate-browser-operations
+          pnpm --dir frontend contracts:generate-dashboard-scope
           if grep -q 'github.com/KevTiv/lumiere-contracts' frontend/pnpm-lock.yaml; then
             echo "pnpm-lock.yaml still requires private GitHub access" >&2
             exit 1
@@ -497,6 +498,7 @@ jobs:
           git add Cargo.lock frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json frontend/packages/stdb/package.json \
             frontend/packages/stdb/src/generated/browser-operation-ids.ts \
+            frontend/web/hooks/stored-dashboard-resource-scope.generated.ts \
             frontend/pnpm-lock.yaml frontend/vendor \
             api-server/src/presentation_dictionary.rs \
             release-compatibility-manifest.json vendor

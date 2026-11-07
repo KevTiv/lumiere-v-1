@@ -19,6 +19,7 @@ import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardGrid } from "./dashboard-grid"
+import { ModulePageComposition } from "./page-composition-host"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
@@ -99,6 +100,8 @@ interface ModuleViewProps {
   historyTimeZone?: string
   /** Scoped overview composition owns its controls/exports; other module tabs are unchanged. */
   dashboardContent?: ReactNode
+  /** Rich overview components register their own individually editable blocks. */
+  dashboardCompositionOwned?: boolean
   /**
    * Filters applied to the active entity tab. Defaults to the URL's `?filter=key:value` entries,
    * so chart drill-downs and record links work in every module without per-client wiring.
@@ -152,6 +155,7 @@ export function ModuleView({
   onDashboardTimeRangeChange,
   historyTimeZone,
   dashboardContent,
+  dashboardCompositionOwned = false,
   urlFilters: urlFiltersProp,
   runtimeForms,
   kpiStrips,
@@ -408,14 +412,24 @@ export function ModuleView({
           >
             <ModuleDataNotice state={dataState?.[tab.id]} />
             {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
-            {tab.type === "dashboard" && dashboardContent != null && dashboardContent}
-            {tab.type === "dashboard" && dashboardContent == null && tab.sections && (
-              <DashboardGrid
-                ref={dashboardGridRef}
-                sections={tab.sections}
-                // Dashboard figures derive from the module's collections.
+            {tab.type === "dashboard" && dashboardCompositionOwned && dashboardContent}
+            {tab.type === "dashboard" && !dashboardCompositionOwned && (
+              <ModulePageComposition
+                moduleId={config.id}
+                pageId={tab.id}
+                title={`${config.title} · ${tab.label}`}
+                sections={dashboardContent == null ? tab.sections : undefined}
                 isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
-              />
+              >
+                {dashboardContent ?? (tab.sections && <DashboardGrid
+                  ref={dashboardGridRef}
+                  sections={tab.sections}
+                  isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
+                />)}
+              </ModulePageComposition>
+            )}
+            {tab.type !== "dashboard" && activeTab === tab.id && (
+              <ModulePageComposition moduleId={config.id} pageId={tab.id} title={`${config.title} · ${tab.label}`} />
             )}
 
             {tab.type === "custom" && tab.customContent}

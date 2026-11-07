@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import { Button, Input, Label, DashboardWidgetRenderer, resolveStoredDashboard } from "@lumiere/ui"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
 import {
@@ -29,6 +30,7 @@ import {
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import { Plus, Save, Trash2 } from "lucide-react"
 import { queryBuilderSourceState } from "./query-builder-source-state"
+import type { QueryBuilderDraft } from "./query-builder-definition"
 import {
   buildQueryBuilderDomain,
   discoverQueryBuilderFields,
@@ -43,12 +45,17 @@ export type QueryBuilderStatus = {
   href?: string
 }
 
-type QueryBuilderProps = {
+export type QueryBuilderProps = {
   organizationId: bigint
   companyId?: bigint
   dashboards: Record<string, unknown>[]
   status: QueryBuilderStatus | null
   onStatusChange: (status: QueryBuilderStatus | null) => void
+  /** Remount the editor for a new request; initial settings never replace dirty edits. */
+  initialDraft?: QueryBuilderDraft
+  initialModel?: string
+  pageTitle?: string
+  onCreated?: (widgetId: string) => void | Promise<void>
 }
 
 type WidgetKind = "kpi" | "chart" | "table"
@@ -80,24 +87,31 @@ export function QueryBuilder({
   dashboards,
   status,
   onStatusChange,
+  initialDraft,
+  initialModel,
+  pageTitle,
+  onCreated,
 }: QueryBuilderProps) {
   const { t } = useTranslation()
+  const { identity } = useErpSession()
 
-  const [model, setModel] = useState("")
-  const [widgetKind, setWidgetKind] = useState<WidgetKind>("chart")
-  const [aggregation, setAggregation] = useState<string>("count")
-  const [aggField, setAggField] = useState("")
-  const [groupBy, setGroupBy] = useState("")
-  const [chartType, setChartType] = useState<string>("bar")
-  const [displayFields, setDisplayFields] = useState<string[]>([])
-  const [filters, setFilters] = useState<QueryBuilderFilterRow[]>([])
-  const [timeField, setTimeField] = useState("")
-  const [sortField, setSortField] = useState("")
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
-  const [limit, setLimit] = useState("10")
-  const [name, setName] = useState("")
+  const [model, setModel] = useState(initialDraft?.model ?? initialModel ?? "")
+  const [widgetKind, setWidgetKind] = useState<WidgetKind>(initialDraft?.kind ?? "chart")
+  const [aggregation, setAggregation] = useState<string>(initialDraft?.aggregation ?? "count")
+  const [aggField, setAggField] = useState(initialDraft?.measureField ?? "")
+  const [groupBy, setGroupBy] = useState(initialDraft?.groupBy ?? "")
+  const [chartType, setChartType] = useState<string>(initialDraft?.chartType ?? "bar")
+  const [displayFields, setDisplayFields] = useState<string[]>(initialDraft?.fields ?? [])
+  const [filters, setFilters] = useState<QueryBuilderFilterRow[]>(initialDraft?.filters ?? [])
+  const [timeField, setTimeField] = useState(initialDraft?.timeField ?? "")
+  const [sortField, setSortField] = useState(initialDraft?.sortField ?? "")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(initialDraft?.sortDirection ?? "desc")
+  const [limit, setLimit] = useState(initialDraft?.limit ?? "10")
+  const [name, setName] = useState(initialDraft?.name ?? "")
   const [attachDashboardId, setAttachDashboardId] = useState("")
   const saveAttemptRef = useRef<{ fingerprint: string; requestId: string } | null>(null)
+  const savingRef = useRef(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const createWidget = useCreateDashboardWidget(organizationId)
   const addWidgetToDashboard = useAddWidgetToDashboard(organizationId)
@@ -116,7 +130,7 @@ export function QueryBuilder({
   const models = useMemo(() => (model ? [model] : []), [model])
   const modelTriggerRef = useRef<HTMLButtonElement>(null)
   const { dataSources, sourceStates, isRefreshing, retry } =
-    useStoredDashboardDataSources(organizationId, models)
+    useStoredDashboardDataSources(organizationId, models, { companyId: companyId?.toString(), identity: identity ?? undefined })
   const rows = useMemo(() => (model ? dataSources[model] ?? [] : []), [dataSources, model])
   const sourceState = queryBuilderSourceState(
     model,
@@ -201,7 +215,7 @@ export function QueryBuilder({
     (aggregation === "count" || Boolean(aggField)) &&
     (sourceState === "ready" || sourceState === "empty") &&
     (previewResolution?.state === "ready" || previewResolution?.state === "empty") &&
-    !createWidget.isPending,
+    !createWidget.isPending && !isSaving,
   )
 
   const handleModelChange = (next: string) => {
@@ -227,6 +241,9 @@ export function QueryBuilder({
   }
 
   const handleSave = async () => {
+    if (!canSave || savingRef.current) return
+    savingRef.current = true
+    setIsSaving(true)
     onStatusChange(null)
     const widgetInput = {
       name: name.trim(),
@@ -258,6 +275,12 @@ export function QueryBuilder({
         creationRequestId: requestId,
       })
 
+      if (onCreated) {
+        await onCreated(String(created.ref.id))
+        saveAttemptRef.current = null
+        return
+      }
+
       if (attachDashboardId) {
         const attached = await addWidgetToDashboard.mutateAsync({
           dashboardId: attachDashboardId,
@@ -279,6 +302,9 @@ export function QueryBuilder({
       })
     } catch (e) {
       onStatusChange({ kind: "error", message: e instanceof Error ? e.message : String(e) })
+    } finally {
+      savingRef.current = false
+      setIsSaving(false)
     }
   }
 
@@ -630,7 +656,7 @@ export function QueryBuilder({
                   data-testid="qb-name"
                 />
               </div>
-              <div className="space-y-1.5">
+              {!onCreated && <div className="space-y-1.5">
                 <Label>{t("reports.queryBuilder.attachDashboard")}</Label>
                 <Select
                   value={attachDashboardId || "__none__"}
@@ -648,7 +674,7 @@ export function QueryBuilder({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
             </div>
             <Button
               type="button"
@@ -658,8 +684,9 @@ export function QueryBuilder({
               data-testid="qb-save"
             >
               <Save className="h-4 w-4" />
-              {t("reports.queryBuilder.save")}
+              {onCreated ? t("pageComposition.saveAndAdd", { defaultValue: "Save and add to page" }) : t("reports.queryBuilder.save")}
             </Button>
+            {pageTitle && <p className="text-xs text-muted-foreground">{t("pageComposition.addingTo", { defaultValue: "Adding to {{page}}", page: pageTitle })}</p>}
             {status ? (
               <p
                 role={status.kind === "ok" ? "status" : "alert"}

@@ -1,4 +1,4 @@
-import type { StoredDashboardSourceState } from "@lumiere/ui"
+import type { StoredDashboardSourceState } from "@lumiere/ui/lib/stored-dashboard-resolver"
 
 export interface StoredDashboardQueryStateInput {
   isLoading: boolean

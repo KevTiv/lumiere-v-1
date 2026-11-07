@@ -4806,6 +4806,10 @@
       "name": "save_knowledge_guide",
       "shape_fingerprint": "sha256:e03c08a3bbb0b3a5f92d13e30b1f5b5de73da8376f240d008dc509a82b0cf9ef"
     },
+    "erp.save_personal_page_layout": {
+      "name": "save_personal_page_layout",
+      "shape_fingerprint": "sha256:ce6f98ea3b2f3a0d5a7c056d665eecc607a19ffb554e70632a6099078f478546"
+    },
     "erp.save_presentation_module": {
       "name": "save_presentation_module",
       "shape_fingerprint": "sha256:5d51c2a7956b6645b03791d7fd714df24887efaa20543f1acb0250dacec316d1"
@@ -6416,6 +6420,14 @@
       "current_operations_fingerprint": "sha256:aea82dc1b1ff0a524189824a7fd32e6cdaad0837f9fcc541f4e3f5c7eb2ae8d9",
       "operation_count": 1516,
       "reason": "release on top of v0.3.165: add ai_metered_price_read, ai_metered_usage_read, claim_ai_metered_dispatch, configure_ai_metered_price, reconcile_ai_metered_spend, reserve_ai_metered_spend, settle_ai_metered_spend; change the shape of ai_owner_configuration_read, ai_owner_configuration_receipt_read, ai_provider_attempt_read, ai_run_budget_park_read, ai_run_lifecycle_event_read, ai_run_lifecycle_state_read, ai_run_question_read, ai_run_queued_input_read, ai_spend_budget_read, ai_spend_price_snapshot_read, ai_spend_reservation_read, helpdesk_related_record_read, knowledge_guide_actor_profile_read, knowledge_guide_authority_read"
+    },
+    {
+      "previous_release": "v0.3.167",
+      "previous_ir_sha256": "sha256:540be4b6f5092af9bf9ed83c212c4bdc52550d79b03ff65040ece6832fa1c175",
+      "previous_operations_fingerprint": "sha256:aea82dc1b1ff0a524189824a7fd32e6cdaad0837f9fcc541f4e3f5c7eb2ae8d9",
+      "current_operations_fingerprint": "sha256:1d322b3f40b1c544b97c9417a796396e8201f1da581baf4de9024b91363be8d0",
+      "operation_count": 1517,
+      "reason": "release on top of v0.3.167: add save_personal_page_layout; change the shape of none"
     }
   ]
 }

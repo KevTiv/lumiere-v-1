@@ -2705,6 +2705,7 @@ function CrmClientLoaded({
       <ModuleView
         assistantFormBlocked={quickActionForm !== null || workflowModal !== null || focusedRecord !== null}
         config={config}
+        dashboardCompositionOwned
         dashboardContent={<CompanyModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
         data={data}
         dataLoading={dataLoading}

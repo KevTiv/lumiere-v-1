@@ -5,7 +5,7 @@ import type { ShareBarRow } from "../charts/segmented-share-bar"
 import type { RadialGaugeStat, RadialGaugeTone } from "../charts/radial-gauge"
 import type { EntityColumn, EntityRow } from "./entity-view-types"
 
-export type GridWidth = "full" | "2/3" | "1/2" | "1/3"
+export type GridWidth = "full" | "2/3" | "1/2" | "1/3" | "1/4"
 
 export type WidgetType =
   | "kpi"
@@ -397,4 +397,5 @@ export const gridWidthClasses: Record<GridWidth, string> = {
   "2/3": "col-span-12 lg:col-span-8",
   "1/2": "col-span-12 md:col-span-6",
   "1/3": "col-span-12 md:col-span-6 lg:col-span-4",
+  "1/4": "col-span-12 md:col-span-6 xl:col-span-3",
 }

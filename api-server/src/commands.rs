@@ -513,6 +513,62 @@ pub(crate) async fn dispatch_presentation_save(
     Ok(context)
 }
 
+/// Dispatch only the released, denied personal-page preference command.
+/// The session token is retained so the native owner remains `ctx.sender()`.
+pub(crate) async fn dispatch_personal_page_layout_save(
+    state: &AppState,
+    session: &ApiSession,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    const REDUCER: &str = "save_personal_page_layout";
+    let contract = stdb_client::reducer_contract(REDUCER).ok_or_else(|| {
+        ApiError::Unavailable(
+            "personal page layouts require the released native layout contract".into(),
+        )
+    })?;
+    let expected = [
+        ("organization_id", ScalarKind::UnsignedInteger),
+        ("company_id", ScalarKind::UnsignedInteger),
+        ("module_id", ScalarKind::String),
+        ("page_id", ScalarKind::String),
+        ("expected_revision", ScalarKind::OptionalUnsignedInteger),
+        ("layout_json", ScalarKind::String),
+    ];
+    if contract.name != REDUCER
+        || contract.contract_operation_id != "erp.save_personal_page_layout"
+        || contract.exposure != Exposure::Denied
+        || contract.organization_position != Some(0)
+        || contract.company_position != Some(1)
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind))| {
+                actual.name == name && actual.kind == kind && actual.ref_target.is_none()
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "personal page layout save must retain its fixed API-only contract".into(),
+        ));
+    }
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("personal page layout arguments must be an array".into())
+    })?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        state.client_with_token(&session.stdb_token),
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let companies = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let companies = authorize_reducer_company_scope(&context, companies).await?;
+    let context = context.with_company_scope(companies)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
 /// Dispatch the user evidence-contribution reducer through one explicit API
 /// boundary while it remains denied to generic session operations.
 pub(crate) async fn dispatch_user_evidence_contribution(
