@@ -34,6 +34,7 @@ mod run_review;
 pub(crate) mod security_envelope;
 pub mod skill_loader;
 pub(crate) mod spend_admission;
+pub(crate) mod surface_provisioning;
 pub mod text_answer_gate;
 pub(crate) mod work_program;
 pub(crate) mod work_program_learning;

@@ -2,7 +2,7 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   AiTeamMember,
@@ -219,14 +219,73 @@ export function useUpsertAiSkillConfig() {
   })
 }
 
-export function useSyncAiSkills() {
+export function useSyncAiSkills(organizationId: number) {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
       const r = await apiFetch("/api/ai/skills/sync", { method: "POST" })
       if (!r.ok) throw new Error(await parseAiError(r))
       return (await r.json()) as { synced: string[]; skills_dir: string }
     },
+    onSettled: () => invalidateAiSkillCatalogs(qc, organizationId),
   })
+}
+
+const AI_SURFACE_SKILL_KEYS = ["rag_generation", "form_suggestion", "action_draft_generation"] as const
+type AiSurfaceSkillKey = (typeof AI_SURFACE_SKILL_KEYS)[number]
+
+export type AiSurfaceProvisioningResult = {
+  skills: {
+    skill_key: AiSurfaceSkillKey
+    skill_id: number
+    status: "created" | "existing" | "inactive"
+  }[]
+}
+
+export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvisioningResult {
+  const skills = value && typeof value === "object" && "skills" in value ? value.skills : undefined
+  const invalid = () => new Error("AI feature setup could not be verified. Refresh the skills list and try again.")
+  if (!Array.isArray(skills) || skills.length !== AI_SURFACE_SKILL_KEYS.length) throw invalid()
+
+  const seen = new Set<string>()
+  const result = skills.map((value: unknown): AiSurfaceProvisioningResult["skills"][number] => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid()
+    const skill = value as Record<string, unknown>
+    if (typeof skill.skill_key !== "string"
+      || !AI_SURFACE_SKILL_KEYS.some((key) => key === skill.skill_key)
+      || typeof skill.skill_id !== "number" || !Number.isSafeInteger(skill.skill_id) || skill.skill_id <= 0
+      || (skill.status !== "created" && skill.status !== "existing" && skill.status !== "inactive")
+      || seen.has(skill.skill_key)) throw invalid()
+    seen.add(skill.skill_key)
+    return { skill_key: skill.skill_key as AiSurfaceSkillKey, skill_id: skill.skill_id, status: skill.status }
+  })
+  return { skills: result }
+}
+
+export function useProvisionAiSurfaces(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationKey: ["ai-surface-provisioning", String(organizationId)],
+    retry: false,
+    mutationFn: async (): Promise<AiSurfaceProvisioningResult> => {
+      if (!Number.isSafeInteger(organizationId) || organizationId <= 0) {
+        throw new Error("An organization is required to set up AI features")
+      }
+      const response = await apiFetch("/api/ai/skills/provision-surfaces", { method: "POST" })
+      if (!response.ok) throw new Error(await parseAiError(response))
+      return parseAiSurfaceProvisioningResult(await response.json())
+    },
+    // A lost or failed reply may follow a partial setup. Refresh the saved
+    // catalog in both cases instead of assuming that no records changed.
+    onSettled: () => invalidateAiSkillCatalogs(qc, organizationId),
+  })
+}
+
+function invalidateAiSkillCatalogs(queryClient: QueryClient, organizationId: number) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: aiSkillsQueryKey(organizationId) }),
+    queryClient.invalidateQueries({ queryKey: ["ai-skills"] }),
+  ])
 }
 
 function aiSkillsQueryKey(organizationId: number) {

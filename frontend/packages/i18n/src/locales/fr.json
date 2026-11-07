@@ -1,4 +1,25 @@
 {
+  "aiSkills": {
+    "setup": {
+      "title": "Configuration des fonctions d’IA",
+      "action": "Configurer les fonctions d’IA",
+      "settingUp": "Configuration…",
+      "description": "Enregistrez les compétences manquantes pour les réponses du chat, les suggestions de formulaire et les brouillons d’action. Les paramètres et versions publiées existants sont conservés.",
+      "prerequisites": "Cette étape prépare les définitions des compétences. Les contrôles du fournisseur, de la société, du budget et des versions publiées restent nécessaires lors de l’utilisation de l’IA.",
+      "permissionRequired": "L’autorisation de créer des compétences est nécessaire pour lancer la configuration.",
+      "checked": "Définitions des compétences vérifiées.",
+      "skills": {
+        "rag_generation": "Réponses du chat",
+        "form_suggestion": "Suggestions de formulaire",
+        "action_draft_generation": "Brouillons d’action"
+      },
+      "status": {
+        "created": "Ajoutée",
+        "existing": "Déjà enregistrée",
+        "inactive": "Inactive (inchangée)"
+      }
+    }
+  },
   "recordChanges": {
     "fields": {
       "name": "Description",

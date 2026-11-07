@@ -4,7 +4,11 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use stdb_client::StdbClient;
 
-use crate::{error::AppError, providers::llm::normalize_provider, rate_limit::AgentRateLimiter};
+use crate::{
+    error::{AppError, SurfaceSkillNotProvisioned},
+    providers::llm::normalize_provider,
+    rate_limit::AgentRateLimiter,
+};
 
 const BASE_ERP_RULES: &str = "You are an intelligent ERP assistant for Lumiere. Answer using only the provided context. Be concise and factual. If the context is insufficient, say so. Never invent data or claim to have performed mutations.";
 
@@ -82,7 +86,10 @@ pub async fn resolve_surface_agent(
     }
     let skill = load_skill(stdb, org_id, company_id, skill_key).await?;
     if skill.id == 0 {
-        anyhow::bail!("AI surface skill '{skill_key}' is not provisioned");
+        return Err(SurfaceSkillNotProvisioned {
+            skill_key: skill_key.to_string(),
+        }
+        .into());
     }
     if !skill.enabled {
         anyhow::bail!("AI surface is disabled for this company");
@@ -566,7 +573,11 @@ mod tests {
                 false,
             )
             .await;
-            if matches!(case, "wrong-company" | "disabled" | "unprovisioned") {
+            if case == "unprovisioned" {
+                let error = result.unwrap_err();
+                let setup = error.downcast_ref::<SurfaceSkillNotProvisioned>().unwrap();
+                assert_eq!(setup.skill_key, "rag_generation");
+            } else if matches!(case, "wrong-company" | "disabled") {
                 assert!(result.is_err(), "{case}");
             } else {
                 assert_eq!(

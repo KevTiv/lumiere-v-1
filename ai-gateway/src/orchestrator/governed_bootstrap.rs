@@ -13,6 +13,7 @@ use stdb_client::{ReducerCall, StdbClient};
 use super::{
     decision_type::{register_builtin_decision_types, StdbDecisionTypeRegistry},
     model_configuration::{ModelConfigurationStore, StdbModelConfigurationStore},
+    surface_provisioning::{ensure_bundled_generation_surfaces, ProvisionedSurface},
 };
 
 #[derive(Clone, Debug, Serialize)]
@@ -22,6 +23,7 @@ pub(crate) struct GovernedBootstrapResult {
     pub intelligence_policy_ref: String,
     pub calibration_profiles: Vec<String>,
     pub decision_types_registered: bool,
+    pub generation_skills: Vec<ProvisionedSurface>,
 }
 
 #[derive(Debug, Serialize)]
@@ -325,6 +327,10 @@ pub(crate) async fn bootstrap_governed_intelligence(
             )
         })?;
 
+    let generation_skills = ensure_bundled_generation_surfaces(writer, reader, organization_id)
+        .await
+        .context("provision bundled generation surface catalog")?;
+
     let decision_types = StdbDecisionTypeRegistry {
         writer,
         reader,
@@ -355,6 +361,7 @@ pub(crate) async fn bootstrap_governed_intelligence(
         intelligence_policy_ref: format!("{}@{}", policy.key, policy.version),
         calibration_profiles: vec!["report-attention@1".to_string()],
         decision_types_registered: true,
+        generation_skills,
     })
 }
 

@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::{AppError, AppResult},
     harness::legacy_fence::governed_skill_replacement,
-    orchestrator::skill_loader::{list_skills, sync_bundled_skills},
+    orchestrator::{
+        skill_loader::{list_skills, sync_bundled_skills},
+        surface_provisioning::{ensure_bundled_generation_surfaces, ProvisionedSurface},
+    },
     state::AppState,
 };
 
@@ -136,6 +139,39 @@ pub async fn post_sync(
             .to_string_lossy()
             .to_string(),
     }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GatewayProvisionSurfacesRequest {
+    pub org_id: u64,
+    pub stdb_token: String,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ProvisionSurfacesResponse {
+    pub skills: Vec<ProvisionedSurface>,
+}
+
+/// Explicit catalog repair under the administrator's own database identity.
+/// No service-token fallback and no agent, grant, or release changes.
+pub async fn post_provision_surfaces(
+    State(state): State<AppState>,
+    Json(req): Json<GatewayProvisionSurfacesRequest>,
+) -> AppResult<Json<ProvisionSurfacesResponse>> {
+    if req.org_id == 0 {
+        return Err(AppError::BadRequest("org_id is required".into()));
+    }
+    if req.stdb_token.trim().is_empty() {
+        return Err(AppError::Forbidden(
+            "an authenticated administrator token is required".into(),
+        ));
+    }
+    let actor = state.stdb.with_token(req.stdb_token);
+    let skills = ensure_bundled_generation_surfaces(&actor, &actor, req.org_id)
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    Ok(Json(ProvisionSurfacesResponse { skills }))
 }
 
 #[derive(Debug, Serialize)]

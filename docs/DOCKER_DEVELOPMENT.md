@@ -48,7 +48,7 @@ The API, AI gateway, IoT gateway, Qdrant, Redis, and MQTT ports are also
 published for direct debugging: `8082`, `8080`, `8081`, `6333`, `6379`, and
 `1883` respectively.
 
-## Governed action-draft prerequisites
+## Governed AI generation prerequisites
 
 The H5b spend and draft-request tables stay private. Five public views expose
 only the fields required for admission and replay, and only to the active
@@ -61,14 +61,26 @@ Complete these configuration steps:
 1. Run `make register-stack-identities`. The spend-reader token must differ
    from `STDB_TOKEN` and `AI_CERTIFICATION_STDB_TOKEN`.
 2. Open **AI Skills** as an authorized organization administrator and select
-   **Sync bundled skills → STDB**. The route fails closed when the bundled
-   `action_draft_generation` skill is not provisioned.
+   **Set up AI features**. This registers missing `rag_generation`,
+   `form_suggestion`, and `action_draft_generation` catalog entries. Existing
+   organization and system skills, including inactive entries, keep their IDs
+   and settings. The explicit governed bootstrap also performs this setup
+   after validating the intelligence policy. Chat and suggestion routes fail
+   closed when their catalog entry is missing; they never create it during a
+   user request.
 3. Start Ollama and make the configured model available. The development seed
    selects the local `gemma4:e2b-mlx` model and `embeddinggemma:latest` for
    embeddings. It allows `action_draft`. Set `OLLAMA_LLM_MODEL` to another installed model only when the tenant-owned
    default `AiAgent` row uses the same model. Keep
    `OLLAMA_SUPPORTS_TOOL_CALLING=true` only for a model that supports the
    required structured tool calls.
+
+Catalog registration does not activate a skill release, select an agent or
+provider, grant permissions, or increase a budget. Complete the normal company
+bindings and execution prerequisites separately. An existing deployment that
+reports `ai_surface_skill_not_provisioned` can use the same **Set up AI features**
+action; it is safe to repeat. **Sync bundled skills → STDB** remains the broader
+operation for deliberately updating all bundled definitions.
 
 Cloud providers remain optional. An organization administrator can
 intentionally select a Mistral, Gemini, or Kong-backed agent and then configure

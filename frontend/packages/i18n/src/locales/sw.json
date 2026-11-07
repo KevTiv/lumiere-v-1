@@ -1,4 +1,25 @@
 {
+  "aiSkills": {
+    "setup": {
+      "title": "Maandalizi ya vipengele vya AI",
+      "action": "Sanidi vipengele vya AI",
+      "settingUp": "Inaandaa…",
+      "description": "Sajili ujuzi unaokosekana wa majibu ya gumzo, mapendekezo ya fomu na rasimu za hatua. Mipangilio na matoleo yaliyopo huhifadhiwa.",
+      "prerequisites": "Hii inaandaa maelezo ya ujuzi. Ukaguzi wa mtoa huduma, kampuni, bajeti na toleo bado hutumika unapotumia AI.",
+      "permissionRequired": "Ruhusa ya kuunda ujuzi inahitajika kufanya maandalizi.",
+      "checked": "Maelezo ya ujuzi yamekaguliwa.",
+      "skills": {
+        "rag_generation": "Majibu ya gumzo",
+        "form_suggestion": "Mapendekezo ya fomu",
+        "action_draft_generation": "Rasimu za hatua"
+      },
+      "status": {
+        "created": "Imeongezwa",
+        "existing": "Imesajiliwa tayari",
+        "inactive": "Haijawashwa (haijabadilishwa)"
+      }
+    }
+  },
   "recordChanges": {
     "fields": {
       "name": "Maelezo",

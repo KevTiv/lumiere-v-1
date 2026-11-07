@@ -1,4 +1,25 @@
 {
+  "aiSkills": {
+    "setup": {
+      "title": "Gutegura ibikorwa bya AI",
+      "action": "Tegura ibikorwa bya AI",
+      "settingUp": "Birategurwa…",
+      "description": "Andikisha ubushobozi bubura bwo gusubiza mu biganiro, gutanga inama zo kuzuza amafishi no gutegura ibikorwa. Igenamiterere na verisiyo zisanzwe biragumaho.",
+      "prerequisites": "Ibi bitegura ibisobanuro by’ubushobozi. Igenzura ry’utanga AI, sosiyete, ingengo y’imari na verisiyo ikora rikomeza gukurikizwa mu gukoresha AI.",
+      "permissionRequired": "Ukeneye uburenganzira bwo kwandika ubushobozi bwa AI kugira ngo ubitegure.",
+      "checked": "Ibisobanuro by’ubushobozi byagenzuwe.",
+      "skills": {
+        "rag_generation": "Ibisubizo mu biganiro",
+        "form_suggestion": "Inama zo kuzuza amafishi",
+        "action_draft_generation": "Imishinga y’ibikorwa"
+      },
+      "status": {
+        "created": "Byongeweho",
+        "existing": "Byari byaranditswe",
+        "inactive": "Ntibikora (ntibyahinduwe)"
+      }
+    }
+  },
   "recordChanges": {
     "fields": {
       "name": "Ibisobanuro",
