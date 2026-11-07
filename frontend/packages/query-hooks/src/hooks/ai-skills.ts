@@ -242,6 +242,12 @@ export type AiSurfaceProvisioningResult = {
   }[]
 }
 
+type AiSurfaceProvisioningSkillInput = {
+  skill_key?: unknown
+  skill_id?: unknown
+  status?: unknown
+}
+
 export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvisioningResult {
   const skills = value && typeof value === "object" && "skills" in value ? value.skills : undefined
   const invalid = () => new Error("AI feature setup could not be verified. Refresh the skills list and try again.")
@@ -250,7 +256,7 @@ export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvi
   const seen = new Set<string>()
   const result = skills.map((value: unknown): AiSurfaceProvisioningResult["skills"][number] => {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid()
-    const skill = value as Record<string, unknown>
+    const skill = value as AiSurfaceProvisioningSkillInput
     if (typeof skill.skill_key !== "string"
       || !AI_SURFACE_SKILL_KEYS.some((key) => key === skill.skill_key)
       || typeof skill.skill_id !== "number" || !Number.isSafeInteger(skill.skill_id) || skill.skill_id <= 0
