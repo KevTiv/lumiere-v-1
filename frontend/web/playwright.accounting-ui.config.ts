@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test"
 // not authenticate, dispatch accounting operations, or prove backend behavior.
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["sidebar-workspace-ui.spec.ts", "sidebar-tables-ui.spec.ts", "accounting-guided-actions.spec.ts", "accounting-ui.spec.ts", "alpha-authoring-refinement.spec.ts", "harness-inspector-ui.spec.ts", "list-toolbar-ui.spec.ts", "style-templates-ui.spec.ts", "invoice-personalization-ui.spec.ts", "accounting-workflow-ui.spec.ts", "accounting-insights-ui.spec.ts", "module-insights-ui.spec.ts", "workspace-navigation-ui.spec.ts", "accounting-operations-ui.spec.ts", "field-helper-ui.spec.ts"],
+  testMatch: ["sidebar-workspace-ui.spec.ts", "sidebar-tables-ui.spec.ts", "accounting-guided-actions.spec.ts", "accounting-ui.spec.ts", "alpha-authoring-refinement.spec.ts", "harness-inspector-ui.spec.ts", "list-toolbar-ui.spec.ts", "style-templates-ui.spec.ts", "invoice-personalization-ui.spec.ts", "accounting-workflow-ui.spec.ts", "accounting-insights-ui.spec.ts", "module-insights-ui.spec.ts", "workspace-navigation-ui.spec.ts", "accounting-operations-ui.spec.ts", "field-helper-ui.spec.ts", "page-composition-ui.spec.ts"],
   globalSetup: "./tests/accounting-ui-warmup.ts",
   workers: 1,
   use: {

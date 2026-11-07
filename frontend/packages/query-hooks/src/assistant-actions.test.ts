@@ -3,13 +3,17 @@ import test from "node:test"
 import {
   ALPHA_ASSISTANT_CAPABILITIES,
   ALPHA_ASSISTANT_MODULES,
+  ASSISTANT_CAPABILITIES,
+  ASSISTANT_PAGE_MODULES,
   ASSISTANT_PROMPT_LIMIT,
   assistantActionHref,
   decodeAssistantAction,
   getAssistantCapability,
+  parseAssistantWidgetKey,
   resolveAssistantActionRequest,
   type AssistantAction,
   type AssistantActionScope,
+  type AssistantPageCatalog,
 } from "./assistant-actions"
 import { looksLikeActionDraftRequest } from "./action-draft-intent"
 
@@ -300,4 +304,233 @@ test("catalog covers all ten Alpha modules without hidden family discovery", () 
     "ai-harness",
   ])
     assert.equal(getAssistantCapability(`${hidden}.navigate`), undefined)
+})
+
+const page: AssistantPageCatalog = {
+  moduleId: "sales",
+  pageId: "dashboard",
+  widgets: [
+    { key: "builtin:orders-by-state", label: "Orders by status" },
+    { key: "saved:9007199254740993", label: "Monthly revenue" },
+  ],
+}
+
+test("page commands open the native editor across modules without broadening business actions", () => {
+  for (const module of ASSISTANT_PAGE_MODULES) {
+    const edit = action(`Edit the ${module} page`)
+    assert.equal(edit.kind, "edit_page")
+    assert.equal(edit.capabilityKey, `${module}.page.edit`)
+    assert.equal(assistantActionHref(edit), `/${module}`)
+    const add = action(`Add a chart to ${module}`)
+    assert.equal(add.kind, "add_widget")
+    assert.equal(add.capabilityKey, `${module}.widget.add`)
+    assert.equal(add.prompt, `Add a chart to ${module}`)
+    assert.equal(add.widgetKey, undefined)
+  }
+  assert.equal(
+    new Set(ASSISTANT_CAPABILITIES.map((item) => item.key)).size,
+    ASSISTANT_CAPABILITIES.length,
+  )
+  assert.equal(getAssistantCapability("projects.task.create"), undefined)
+  assert.equal(
+    getAssistantCapability("distributor.page.edit")?.permission.resource,
+    "module:inventory",
+  )
+  assert.equal(
+    getAssistantCapability("trackers.page.edit")?.permission.resource,
+    "dashboard:analytics",
+  )
+})
+
+test("page discovery has its own module scope without expanding business action visibility", () => {
+  const options = {
+    allowedModules: ["sales"],
+    allowedPageModules: ASSISTANT_PAGE_MODULES,
+  }
+  for (const moduleId of ["hr", "projects"] as const) {
+    for (const text of ["Edit this page", "Add a chart"]) {
+      const resolution = resolveAssistantActionRequest(text, {
+        scope,
+        module: moduleId,
+        page: { moduleId, pageId: "dashboard", widgets: [] },
+        ...options,
+      })
+      assert.equal(resolution.kind, "action")
+      if (resolution.kind !== "action")
+        throw new Error("Expected a page action")
+      assert.deepEqual(
+        decodeAssistantAction(resolution.action, scope, options),
+        resolution.action,
+      )
+      assert.equal(
+        decodeAssistantAction(resolution.action, scope, {
+          allowedModules: ["sales"],
+        }),
+        undefined,
+      )
+      assert.equal(
+        decodeAssistantAction(resolution.action, scope, {
+          allowedModules: [moduleId],
+          allowedPageModules: [],
+        }),
+        undefined,
+      )
+    }
+  }
+  assert.equal(
+    decodeAssistantAction(action("Create an invoice"), scope, options),
+    undefined,
+  )
+  const hiddenForm = resolveAssistantActionRequest("Create an invoice", {
+    scope,
+    ...options,
+  })
+  assert.notEqual(hiddenForm.kind, "action")
+  assert.equal(getAssistantCapability("hr.employee.create"), undefined)
+  assert.equal(getAssistantCapability("projects.task.create"), undefined)
+})
+
+test("current-page requests preserve intent and select only an unambiguous offered widget", () => {
+  const edit = resolveAssistantActionRequest("Edit this page", {
+    scope,
+    module: "sales",
+    page,
+  })
+  assert.equal(edit.kind, "action")
+  if (edit.kind === "action") assert.equal(edit.action.pageId, "dashboard")
+  const add = resolveAssistantActionRequest("Add a chart for Monthly revenue", {
+    scope,
+    module: "sales",
+    page,
+  })
+  assert.equal(add.kind, "action")
+  if (add.kind !== "action") throw new Error("Expected a page action")
+  assert.equal(add.action.widgetKey, "saved:9007199254740993")
+  assert.equal(add.action.prompt, "Add a chart for Monthly revenue")
+  assert.equal(add.action.recordId, undefined)
+  const ambiguous = resolveAssistantActionRequest(
+    "Add a chart for Monthly revenue",
+    {
+      scope,
+      module: "sales",
+      page: {
+        ...page,
+        widgets: [
+          ...page.widgets,
+          { key: "saved:42", label: "Monthly revenue" },
+        ],
+      },
+    },
+  )
+  assert.equal(ambiguous.kind, "action")
+  if (ambiguous.kind === "action")
+    assert.equal(ambiguous.action.widgetKey, undefined)
+  assert.equal(request("Edit this page").kind, "clarify")
+  assert.equal(request("How can I add a chart?", "sales").kind, "none")
+  assert.equal(
+    request("Add an invoice with a chart", "accounting").kind,
+    "action",
+  )
+  assert.equal(
+    action("Add an invoice with a chart", "accounting").kind,
+    "open_form",
+  )
+})
+
+test("page actions return to the captured module tab", () => {
+  for (const prompt of ["Edit this page", "Add a chart"] as const) {
+    const resolution = resolveAssistantActionRequest(prompt, {
+      scope,
+      module: "sales",
+      page: { ...page, pageId: "orders" },
+    })
+    assert.equal(resolution.kind, "action")
+    if (resolution.kind !== "action") throw new Error("Expected a page action")
+    assert.equal(assistantActionHref(resolution.action), "/sales?tab=orders")
+    assert.equal(
+      assistantActionHref({
+        ...resolution.action,
+        pageId: "../other",
+      } as AssistantAction),
+      undefined,
+    )
+  }
+})
+
+test("widget proposals reject malformed selectors, stale scope, foreign views and injected definitions", () => {
+  const selected: AssistantAction = {
+    version: 1,
+    kind: "add_widget",
+    capabilityKey: "sales.widget.add",
+    scope,
+    pageId: "dashboard",
+    widgetKey: "saved:9007199254740993",
+    prompt: "Add monthly revenue",
+  }
+  assert.deepEqual(decodeAssistantAction(selected, scope, { page }), selected)
+  assert.equal(
+    decodeAssistantAction(selected, { ...scope, actorId: "other" }, { page }),
+    undefined,
+  )
+  assert.equal(
+    decodeAssistantAction(selected, scope, { page: { ...page, widgets: [] } }),
+    undefined,
+  )
+  assert.equal(
+    decodeAssistantAction(selected, scope, {
+      page: { ...page, moduleId: "purchasing" },
+    }),
+    undefined,
+  )
+  assert.equal(
+    decodeAssistantAction(selected, scope, {
+      page: { ...page, pageId: "orders" },
+    }),
+    undefined,
+  )
+  assert.equal(
+    decodeAssistantAction(selected, scope, { allowedModules: ["crm"], page }),
+    undefined,
+  )
+  for (const widgetKey of [
+    "saved:0",
+    "saved:01",
+    "saved:18446744073709551616",
+    "builtin:",
+    "builtin:../admin",
+    "https://example.com",
+    42,
+  ]) {
+    assert.equal(parseAssistantWidgetKey(widgetKey), undefined)
+    assert.equal(
+      decodeAssistantAction({ ...selected, widgetKey }, scope),
+      undefined,
+    )
+  }
+  for (const extra of [
+    { query: "SELECT * FROM account_move" },
+    { component: "<div />" },
+    { params: {} },
+    { recordId: "42" },
+    { pageId: "/admin" },
+  ]) {
+    assert.equal(
+      decodeAssistantAction({ ...selected, ...extra }, scope),
+      undefined,
+    )
+  }
+  assert.equal(
+    decodeAssistantAction(
+      { ...selected, kind: "edit_page", capabilityKey: "sales.page.edit" },
+      scope,
+    ),
+    undefined,
+  )
+  assert.equal(
+    decodeAssistantAction(
+      { ...action("Open invoice 42"), widgetKey: "saved:42" },
+      scope,
+    ),
+    undefined,
+  )
 })

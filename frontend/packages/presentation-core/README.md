@@ -43,3 +43,47 @@ format, not persistence conflicts. `pageSize` is a planned rendering/acquisition
 constraint; the existing account-moves query is not paginated by this work.
 The future runtime must translate SQL column bindings through canonical DTO
 metadata and provide bounded reads before enabling the collection host.
+
+## Personal layouts for existing pages
+
+`@lumiere/presentation-core/personal-page-layout` exports the Rust-generated
+`PersonalPageLayout` model and request/response validators. Its module enum is
+the shared inventory for business page hosts and assistant page actions.
+
+A layout is a complete ordered list of placements. Each placement has its own
+`id`, a `builtin` or `saved` source, a reusable `widgetId`, and a twelve-column
+width of `3`, `4`, `6`, `8`, or `12`. Moving or resizing a saved chart changes
+only its placement on this page. Saved dashboard widget definitions retain
+their existing metric configuration and read authorization. A builtin appears
+once per page; a saved chart can have multiple independent placements.
+
+The authenticated API exposes `GET` and `PUT`
+`/v1/presentation/pages/:moduleId/:pageId?companyId=<decimal>`. A PUT contains
+`{ expectedRevision: string | null, layout: PersonalPageLayout | null }`.
+Both fields must be present. The response includes `companyId`, `moduleId`,
+`pageId`, `revision`, and `layout`; identities and revisions retain exact decimal
+strings. A null layout appends a reset revision that uses the host's defaults.
+An unsaved page has both a null revision and a null layout.
+
+Each save uses the authenticated organization and actor plus the validated
+company, module and page. Native persistence reuses the immutable presentation
+head/version tables under the reserved `personal-page:` namespace. Expected
+revisions prevent lost edits; an immediate identical retry returns the same
+revision without duplicate audit or commit rows. A conflicting edit returns
+HTTP 409 and must be reloaded before saving again. Limits are 64 widgets per
+page, 512 personal pages per owner, and 1,024 immutable versions per page.
+
+Personalization requires current module read access and a unique active
+membership. Company selection follows the existing API policy: bound members
+use their company, while organization-wide members and current explicit
+wildcard roles may select another active company in the organization. Module
+deny rules still apply to wildcard roles. Saved references also require read
+access to the active widget and its source model. GET returns the owner's inert
+references so an unavailable widget can be removed; the live renderer authorizes
+data reads independently.
+
+The dedicated `save_personal_page_layout` reducer remains denied to generic
+operation dispatch. The API admits only its fixed released signature. Release
+and pin the generated contracts, then deploy the matching native module and
+API, before enabling saves; an older contract pin returns HTTP 503. Generic
+module publication and activation retain their existing disabled gate.

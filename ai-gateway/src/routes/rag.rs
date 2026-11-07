@@ -2094,14 +2094,30 @@ mod tests {
         for (verdict, claim) in scenarios {
             let checker = ScriptedChecker::new(Ok(verdict));
             let sink = MemorySink::ok();
-            let offers = vec![UiActionOffer {
-                capability_key: "sales.navigate".into(),
-                kind: crate::routes::rag_ui_actions::UiActionKind::Navigate,
-                label: "Open sales".into(),
-                entity_type: None,
-            }];
+            let offers = vec![
+                UiActionOffer {
+                    capability_key: "sales.navigate".into(),
+                    kind: crate::routes::rag_ui_actions::UiActionKind::Navigate,
+                    label: "Open sales".into(),
+                    entity_type: None,
+                    widgets: Vec::new(),
+                },
+                UiActionOffer {
+                    capability_key: "sales.widget.add".into(),
+                    kind: crate::routes::rag_ui_actions::UiActionKind::AddWidget,
+                    label: "Add widget to sales".into(),
+                    entity_type: None,
+                    widgets: vec![crate::routes::rag_ui_actions::UiWidgetOffer {
+                        key: "saved:9007199254740993".into(),
+                        label: "Orders by status".into(),
+                    }],
+                },
+            ];
             let mut candidate: Value = serde_json::from_str(&passage_candidate(claim)).unwrap();
-            candidate["ui_actions"] = json!([{ "capability_key": "sales.navigate" }]);
+            candidate["ui_actions"] = json!([
+                { "capability_key": "sales.navigate" },
+                { "capability_key": "sales.widget.add", "widget_key": "saved:9007199254740993" },
+            ]);
             let (answer_candidate, proposals) = split_candidate(&candidate.to_string());
             let released = release(
                 &answer_candidate,
@@ -2121,7 +2137,7 @@ mod tests {
             );
             assert_eq!(
                 response.ui_actions.len(),
-                usize::from(verdict == ClaimSupport::Supported)
+                2 * usize::from(verdict == ClaimSupport::Supported)
             );
             let json_value = serde_json::to_value(&response).unwrap();
 

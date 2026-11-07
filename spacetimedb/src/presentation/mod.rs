@@ -1,4 +1,4 @@
-//! Personal, revisioned presentation-module drafts.
+//! Personal, revisioned presentation-module drafts and existing-page preferences.
 //!
 //! Versions are immutable snapshots.  This module deliberately stops at
 //! saving drafts: publication and activation are separate contracts.
@@ -21,6 +21,11 @@ const PERMISSION_RESOURCE: &str = "presentation_module";
 const MAX_DEFINITION_BYTES: usize = 64 * 1024;
 const MAX_MODULES_PER_OWNER: usize = 100;
 const MAX_VERSIONS_PER_MODULE: usize = 256;
+const MAX_PAGE_LAYOUTS_PER_OWNER: usize = 512;
+const MAX_VERSIONS_PER_PAGE_LAYOUT: usize = 1024;
+
+mod personal_pages;
+pub use personal_pages::save_personal_page_layout;
 
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -67,6 +72,178 @@ pub struct PresentationModuleVersion {
     pub created_by: Identity,
 }
 
+/// Stored metadata shared by inert personal preferences and generic draft snapshots.
+struct SnapshotDefinition<'a> {
+    module_key: &'a str,
+    definition_json: &'a str,
+    schema_version: u32,
+    application_contract: &'a str,
+    component_catalog_version: u32,
+}
+
+struct WrittenSnapshot {
+    head: PresentationModule,
+    version: PresentationModuleVersion,
+}
+
+/// Append one immutable snapshot after the caller has authorized its exact content.
+/// `None` reconciles only the immediately preceding identical personal-layout save.
+fn append_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    expected_revision: Option<u64>,
+    definition: SnapshotDefinition<'_>,
+    reconcile_retry: bool,
+) -> Result<Option<WrittenSnapshot>, String> {
+    let owner = ctx.sender();
+    let scope_key = format!(
+        "{organization_id}:{}:{}",
+        owner.to_hex(),
+        definition.module_key
+    );
+    let heads = ctx.db.presentation_module();
+    let existing = heads.scope_key().find(&scope_key);
+    let is_page_layout = definition
+        .module_key
+        .starts_with(lumiere_presentation_core::PERSONAL_PAGE_NAMESPACE);
+    let hash = hex::encode(Sha256::digest(definition.definition_json.as_bytes()));
+    let (revision, old_head) = match existing {
+        Some(head) => {
+            if head.organization_id != organization_id
+                || head.owner_identity != owner
+                || head.module_key != definition.module_key
+                || head.current_revision == 0
+            {
+                return Err("presentation module is outside the caller scope".to_string());
+            }
+            if reconcile_retry
+                && expected_revision.unwrap_or(0).checked_add(1) == Some(head.current_revision)
+            {
+                let matching: Vec<_> = ctx
+                    .db
+                    .presentation_module_version()
+                    .presentation_module_version_by_module()
+                    .filter(&head.id)
+                    .filter(|version| version.revision == head.current_revision)
+                    .take(2)
+                    .collect();
+                if let [version] = matching.as_slice() {
+                    if version.organization_id == organization_id
+                        && version.owner_identity == owner
+                        && version.created_by == owner
+                        && version.module_key == definition.module_key
+                        && version.definition_hash == hash
+                        && version.definition_json == definition.definition_json
+                        && version.schema_version == definition.schema_version
+                        && version.application_contract == definition.application_contract
+                        && version.component_catalog_version == definition.component_catalog_version
+                    {
+                        return Ok(None);
+                    }
+                }
+            }
+            let expected = expected_revision.ok_or_else(|| {
+                "expected revision is required when updating a presentation module".to_string()
+            })?;
+            if head.current_revision != expected {
+                return Err(format!(
+                    "stale presentation module revision: expected {expected}, current {}",
+                    head.current_revision
+                ));
+            }
+            (
+                head.current_revision
+                    .checked_add(1)
+                    .ok_or_else(|| "presentation module revision overflow".to_string())?,
+                Some(head),
+            )
+        }
+        None => {
+            if expected_revision.is_some() {
+                return Err("presentation module does not exist".to_string());
+            }
+            (1, None)
+        }
+    };
+    let head_limit = if is_page_layout {
+        MAX_PAGE_LAYOUTS_PER_OWNER
+    } else {
+        MAX_MODULES_PER_OWNER
+    };
+    if old_head.is_none()
+        && heads
+            .presentation_module_by_owner()
+            .filter((&organization_id, &owner))
+            .filter(|head| {
+                head.module_key
+                    .starts_with(lumiere_presentation_core::PERSONAL_PAGE_NAMESPACE)
+                    == is_page_layout
+            })
+            .take(head_limit)
+            .count()
+            >= head_limit
+    {
+        return Err("presentation module owner limit reached".to_string());
+    }
+    let version_limit = if is_page_layout {
+        MAX_VERSIONS_PER_PAGE_LAYOUT
+    } else {
+        MAX_VERSIONS_PER_MODULE
+    };
+    if let Some(existing) = old_head.as_ref() {
+        if ctx
+            .db
+            .presentation_module_version()
+            .presentation_module_version_by_module()
+            .filter(&existing.id)
+            .take(version_limit)
+            .count()
+            >= version_limit
+        {
+            return Err("presentation module version limit reached".to_string());
+        }
+    }
+    let head = if let Some(head) = old_head {
+        let updated = PresentationModule {
+            current_revision: revision,
+            updated_at: ctx.timestamp,
+            ..head
+        };
+        heads.id().update(updated.clone());
+        updated
+    } else {
+        heads.insert(PresentationModule {
+            id: 0,
+            scope_key,
+            organization_id,
+            owner_identity: owner,
+            module_key: definition.module_key.to_owned(),
+            current_revision: revision,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+        })
+    };
+    let version = ctx
+        .db
+        .presentation_module_version()
+        .insert(PresentationModuleVersion {
+            id: 0,
+            organization_id,
+            owner_identity: owner,
+            module_id: head.id,
+            module_key: definition.module_key.to_owned(),
+            revision,
+            definition_json: definition.definition_json.to_owned(),
+            definition_hash: hash,
+            schema_version: definition.schema_version,
+            application_contract: definition.application_contract.to_owned(),
+            component_catalog_version: definition.component_catalog_version,
+            created_at: ctx.timestamp,
+            created_by: owner,
+        });
+    Ok(Some(WrittenSnapshot { head, version }))
+}
+
 /// Save one personal draft snapshot, guarded by an optional expected head revision.
 #[reducer]
 pub fn save_presentation_module(
@@ -99,102 +276,24 @@ pub fn save_presentation_module(
             &binding.claim_ids,
         )?;
     }
-    let scope_key = format!(
-        "{organization_id}:{}:{}",
-        owner.to_hex(),
-        prepared.module_key
-    );
-    let heads = ctx.db.presentation_module();
-    let (revision, old_head) = match heads.scope_key().find(&scope_key) {
-        Some(head) => {
-            if head.organization_id != organization_id || head.owner_identity != owner {
-                return Err("presentation module is outside the caller scope".to_string());
-            }
-            let expected = expected_revision.ok_or_else(|| {
-                "expected revision is required when updating a presentation module".to_string()
-            })?;
-            if head.current_revision != expected {
-                return Err(format!(
-                    "stale presentation module revision: expected {expected}, current {}",
-                    head.current_revision
-                ));
-            }
-            (
-                head.current_revision
-                    .checked_add(1)
-                    .ok_or_else(|| "presentation module revision overflow".to_string())?,
-                Some(head),
-            )
-        }
-        None => {
-            if expected_revision.is_some() {
-                return Err("presentation module does not exist".to_string());
-            }
-            (1, None)
-        }
-    };
-    if old_head.is_none()
-        && heads
-            .presentation_module_by_owner()
-            .filter((&organization_id, &owner))
-            .take(MAX_MODULES_PER_OWNER)
-            .count()
-            >= MAX_MODULES_PER_OWNER
-    {
-        return Err("presentation module owner limit reached".to_string());
-    }
-    if let Some(existing) = old_head.as_ref() {
-        if ctx
-            .db
-            .presentation_module_version()
-            .presentation_module_version_by_module()
-            .filter(&existing.id)
-            .take(MAX_VERSIONS_PER_MODULE)
-            .count()
-            >= MAX_VERSIONS_PER_MODULE
-        {
-            return Err("presentation module version limit reached".to_string());
-        }
-    }
-    let head = if let Some(head) = old_head {
-        let updated = PresentationModule {
-            current_revision: revision,
-            updated_at: ctx.timestamp,
-            ..head
-        };
-        heads.id().update(updated.clone());
-        updated
-    } else {
-        heads.insert(PresentationModule {
-            scope_key: scope_key.clone(),
-            id: 0,
-            organization_id,
-            owner_identity: owner,
-            module_key: prepared.module_key.clone(),
-            current_revision: revision,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-        })
-    };
-    let hash = hex::encode(Sha256::digest(prepared.definition_json.as_bytes()));
-    let version = ctx
-        .db
-        .presentation_module_version()
-        .insert(PresentationModuleVersion {
-            id: 0,
-            organization_id,
-            owner_identity: owner,
-            module_id: head.id,
-            module_key: prepared.module_key.clone(),
-            revision,
-            definition_json: prepared.definition_json.clone(),
-            definition_hash: hash.clone(),
+    let Some(WrittenSnapshot { head, version }) = append_snapshot(
+        ctx,
+        organization_id,
+        expected_revision,
+        SnapshotDefinition {
+            module_key: &prepared.module_key,
+            definition_json: &prepared.definition_json,
             schema_version: prepared.schema_version,
-            application_contract: prepared.application_contract.clone(),
+            application_contract: &prepared.application_contract,
             component_catalog_version: prepared.component_catalog_version,
-            created_at: ctx.timestamp,
-            created_by: owner,
-        });
+        },
+        false,
+    )?
+    else {
+        return Err("draft save unexpectedly reconciled a layout retry".into());
+    };
+    let revision = version.revision;
+    let hash = version.definition_hash.clone();
     if let Some(binding) = prepared.evidence_binding {
         if require_workflow_company_access(ctx, organization_id, binding.company_id, owner)? {
             return Err(
@@ -237,7 +336,7 @@ pub fn save_presentation_module(
         OrganizationCommitInput {
             organization_id,
             operation_id: "erp.save_presentation_module".to_string(),
-            correlation_id: scope_key,
+            correlation_id: head.scope_key.clone(),
             changes: vec![
                 RowChange::upsert_stdb_row(
                     "presentation_module",

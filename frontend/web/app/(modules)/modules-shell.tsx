@@ -9,7 +9,9 @@ import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { ModuleActivity } from "../../components/module-activity"
 import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-context"
 import { AssistantNativeFormProvider, useAssistantNativeFormController, useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
-import { ALPHA_ASSISTANT_CAPABILITIES, assistantActionHref, decodeAssistantAction, getAssistantCapability, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
+import { ALPHA_ASSISTANT_CAPABILITIES, ASSISTANT_PAGE_MODULES, assistantActionHref, decodeAssistantAction, getAssistantCapability, isAssistantPageAction, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
+import { ModulePageCompositionProvider, useModulePageComposition } from "@/lib/module-page-composition"
+import { OperationalPageComposition } from "../../components/operational-page-composition"
 import {
   DashboardSidebar,
   DashboardWorkspace,
@@ -148,6 +150,7 @@ function ErpAiChatPanel({
   const { checkPermission, permissionsReady } = useRBAC()
   const navigationGuard = useContext(NavigationEditorContext)
   const nativeForms = useAssistantNativeForms()
+  const pageComposition = useModulePageComposition()
   const actionScope = useMemo<AssistantActionScope | null>(() => identity && orgReady && operatingCompanyId
     ? { actorId: identity, organizationId: String(organizationId), companyId: String(operatingCompanyId) } : null,
   [identity, orgReady, organizationId, operatingCompanyId])
@@ -168,8 +171,8 @@ function ErpAiChatPanel({
   const errorQuestion = useErpAiErrorQuestion()
   const activeScope = useRef<string | null>(null)
   activeScope.current = actorHistoryScope
-  const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules })
-  currentActionContext.current = { actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules }
+  const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition })
+  currentActionContext.current = { actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition }
   const workspaceScope = useMemo(
     () => resolveAiWorkspaceScope(selectedScope, route, selection),
     [selectedScope, route, selection],
@@ -304,19 +307,22 @@ function ErpAiChatPanel({
     (userText: string, questionGuide?: GuideDraft) => {
       const guideContext = questionGuide ? guideQuestionContext(questionGuide) : undefined
       const atCommands = [...new Set([...parseAtCommands(userText), ...(guideContext?.commands ?? workspaceScope.commands)])]
+      const page = !guideContext && workspaceScope.usesCurrentPage && pageComposition?.page?.moduleId === module
+        ? pageComposition.page : undefined
+      const requestSelection = guideContext ? guideContext.selection : workspaceScope.selection
       return {
         atCommands,
         includeTypes: atCommandsToIncludeTypes(atCommands),
         uiContext: buildAiUiContext({
           pathname: guideContext?.pathname ?? workspaceScope.pathname,
           companyId: operatingCompanyId,
-          activeTab: guideContext ? guideContext.activeTab : workspaceScope.usesCurrentPage ? activeTab : null,
+          activeTab: guideContext ? guideContext.activeTab : page?.pageId ?? (workspaceScope.usesCurrentPage ? activeTab : null),
           atCommands,
-          selection: guideContext ? guideContext.selection : workspaceScope.selection,
+          selection: requestSelection && page?.pageId ? { ...requestSelection, activeTab: page.pageId } : requestSelection,
         }),
       }
     },
-    [activeTab, operatingCompanyId, workspaceScope],
+    [activeTab, operatingCompanyId, workspaceScope, pageComposition?.page, module],
   )
 
   const resolveActionDrafts = useCallback(
@@ -388,28 +394,37 @@ function ErpAiChatPanel({
       onNativeAction: (proposed: AssistantAction) => {
         const validate = () => {
           const current = currentActionContext.current
-          const action = current.actionScope && decodeAssistantAction(proposed, current.actionScope, { allowedModules: current.allowedActionModules })
+          const action = current.actionScope && decodeAssistantAction(proposed, current.actionScope, { allowedModules: current.allowedActionModules, allowedPageModules: ASSISTANT_PAGE_MODULES })
           const capability = action && getAssistantCapability(action.capabilityKey)
           if (!action || !capability || !current.actorHistoryScope) throw new Error(i18n.t("aiChat.native.scopeChanged"))
           if (!current.permissionsReady || !current.checkPermission(capability.permission.resource, capability.permission.action).allowed) throw new Error(i18n.t("aiChat.native.denied"))
           return { action, capability, scopeKey: current.actorHistoryScope }
         }
-        validate()
+        const initial = validate()
+        const currentPage = currentActionContext.current.pageComposition?.page
+        const changesPage = !isAssistantPageAction(initial.action) || currentPage?.moduleId !== initial.capability.module || Boolean(initial.action.pageId && currentPage?.pageId !== initial.action.pageId)
         const open = () => {
           try {
             const { action, capability, scopeKey } = validate()
             const href = assistantActionHref(action)
             if (!href) throw new Error(i18n.t("aiChat.native.formUnavailable"))
-            if (action.kind === "open_form") {
+            if (isAssistantPageAction(action)) {
+              const composer = currentActionContext.current.pageComposition
+              if (!composer) throw new Error(i18n.t("aiChat.native.pageUnavailable"))
+              const result = composer.requestPage({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, pageId: action.pageId, kind: action.kind, widgetKey: action.widgetKey, prompt: action.prompt })
+              if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.pageBusy" : "aiChat.native.scopeChanged"))
+              // Preserve the current date range and filters when opening this page's editor.
+              if (composer.page?.moduleId !== capability.module || (action.pageId && composer.page.pageId !== action.pageId)) router.push(href)
+            } else if (action.kind === "open_form") {
               if (!nativeForms || !capability.tab) throw new Error(i18n.t("aiChat.native.formUnavailable"))
               const result = nativeForms.requestForm({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, tabId: capability.tab, prompt: action.prompt })
               if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.formBusy" : "aiChat.native.scopeChanged"))
             }
-            router.push(href)
+            if (!isAssistantPageAction(action)) router.push(href)
             if (!props.docked) props.onDockToggle?.()
           } catch (error) { toast.error(error instanceof Error ? error.message : i18n.t("aiChat.native.openFailed")) }
         }
-        if (navigationGuard) navigationGuard.proceed(open)
+        if (changesPage && navigationGuard) navigationGuard.proceed(open)
         else open()
       },
       onCiteSource: async ({ messageId, source }: { messageId: string; source: ChatMessageSourceRef }) => {
@@ -460,6 +475,7 @@ function ErpAiChatPanel({
       const requestScope = historyScope
       const isCurrent = () => currentHistoryScope.current === requestScope
       const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
+      const turnPage = !questionGuide && workspaceScope.usesCurrentPage && pageComposition?.page?.moduleId === module ? pageComposition.page : undefined
       const focusedImport = importTasks.focusedTask
       const importTaskRefs = focusedImport?.companyId === String(operatingCompanyId)
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
@@ -470,6 +486,8 @@ function ErpAiChatPanel({
           module: workspaceScope.usesCurrentPage ? module : workspaceScope.pathname.split("/")[1],
           selection: workspaceScope.selection,
           allowedModules: allowedActionModules,
+          allowedPageModules: ASSISTANT_PAGE_MODULES,
+          page: turnPage,
         }) : undefined
       if (presentationResolution?.kind === "action") {
         const capability = getAssistantCapability(presentationResolution.action.capabilityKey)
@@ -511,10 +529,10 @@ function ErpAiChatPanel({
       const guides = out?.guides
       const taskStatuses = scopedImportTaskStatuses(out?.importTasks, { organizationId: orgId, companyId: operatingCompanyId, taskIds: importTaskRefs?.map(reference => reference.taskId) ?? [] })
       const draftActions = turn.drafts.kind === "ready" ? turn.drafts.value : []
-      const nativeActions = actionScope ? modelNativeChatActions(out?.ui_actions ?? [], actionScope, userText)
+      const nativeActions = actionScope ? modelNativeChatActions(out?.ui_actions ?? [], actionScope, userText, turnPage)
         .filter(action => {
           const capability = action.nativeAction && getAssistantCapability(action.nativeAction.capabilityKey)
-          return capability && allowedActionModules.includes(capability.module) && permissionsReady && checkPermission(capability.permission.resource, capability.permission.action).allowed
+          return capability && (isAssistantPageAction(action.nativeAction!) || allowedActionModules.includes(capability.module)) && permissionsReady && checkPermission(capability.permission.resource, capability.permission.action).allowed
         }) : []
       const actions = [...draftActions, ...nativeActions]
       const failureText = (phase: "answer" | "draft", failure: TurnFailure) => i18n.t(`aiChat.turn.${phase}.${failure}`)
@@ -530,7 +548,7 @@ function ErpAiChatPanel({
       })
       return { content, runId: out?.run_id, sources, guides, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
-    [orgId, orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, importTasks.focusedTask],
+    [orgId, orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
@@ -738,6 +756,7 @@ function ModulesContent({
         }
       >
         <ModuleActivity />
+        <OperationalPageComposition />
         {children}
       </DashboardWorkspace>
     </ErpAiChatControllerProvider>
@@ -759,7 +778,9 @@ export default function ModulesShell({
         <ErpAiRouteContextProvider>
           <ChatterUploaderProvider value={useWebChatterUploader}>
             <EntityCurrencyBoundary>
+              <ModulePageCompositionProvider>
               <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+              </ModulePageCompositionProvider>
             </EntityCurrencyBoundary>
           </ChatterUploaderProvider>
         </ErpAiRouteContextProvider>

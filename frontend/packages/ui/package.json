@@ -134,6 +134,8 @@
     "./kanban/*": "./src/kanban/*.tsx",
     "./pages/module-view": "./src/pages/module-view.tsx",
     "./pages/module-data-notice": "./src/pages/module-data-notice.tsx",
+    "./pages/page-composition": "./src/pages/page-composition.tsx",
+    "./pages/page-composition-host": "./src/pages/page-composition-host.tsx",
     "./hooks/*": "./src/hooks/*.ts",
     "./map-components/*": "./src/map-components/*.tsx",
     "./stock-3d/warehouse-viewer": "./src/stock-3d/warehouse-viewer.tsx",

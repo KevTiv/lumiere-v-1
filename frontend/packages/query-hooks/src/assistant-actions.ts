@@ -1,5 +1,10 @@
 import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 import { resolveAiSourceHref } from "@lumiere/erp-shared/ai-source-links"
+import {
+  PERSONAL_PAGE_MODULES,
+  isPersonalPageModule,
+  type PersonalPageModule,
+} from "@lumiere/presentation-core/personal-page-layout"
 
 /** Presentation intents only. The native destination owns authorization, inputs and effects. */
 export type AssistantActionKind =
@@ -7,6 +12,8 @@ export type AssistantActionKind =
   | "open_record"
   | "open_form"
   | "prepare_workflow"
+  | "edit_page"
+  | "add_widget"
 export interface AssistantActionScope {
   actorId: string
   organizationId: string
@@ -21,11 +28,70 @@ interface AssistantActionBase {
 /** User-authored prompts are staged instructions, never trusted field values. */
 export type AssistantAction = AssistantActionBase &
   (
-    | { kind: "navigate"; recordId?: never; prompt?: never }
-    | { kind: "open_record"; recordId: string; prompt?: never }
-    | { kind: "open_form"; recordId?: never; prompt?: string }
-    | { kind: "prepare_workflow"; recordId: string; prompt?: string }
+    | {
+        kind: "navigate"
+        recordId?: never
+        prompt?: never
+        widgetKey?: never
+        pageId?: never
+      }
+    | {
+        kind: "open_record"
+        recordId: string
+        prompt?: never
+        widgetKey?: never
+        pageId?: never
+      }
+    | {
+        kind: "open_form"
+        recordId?: never
+        prompt?: string
+        widgetKey?: never
+        pageId?: never
+      }
+    | {
+        kind: "prepare_workflow"
+        recordId: string
+        prompt?: string
+        widgetKey?: never
+        pageId?: never
+      }
+    | {
+        kind: "edit_page"
+        recordId?: never
+        prompt?: never
+        widgetKey?: never
+        pageId?: string
+      }
+    | {
+        kind: "add_widget"
+        recordId?: never
+        prompt?: string
+        widgetKey?: string
+        pageId?: string
+      }
   )
+
+export type AssistantPageAction = Extract<
+  AssistantAction,
+  { kind: "edit_page" | "add_widget" }
+>
+
+export interface AssistantPageWidget {
+  key: string
+  label: string
+}
+
+/** A native page supplies these choices; a model or stored card does not grant access. */
+export interface AssistantPageCatalog {
+  moduleId: string
+  pageId?: string
+  widgets: readonly AssistantPageWidget[]
+}
+
+export type AssistantPageContext = AssistantPageCatalog
+
+export const ASSISTANT_PAGE_WIDGET_LIMIT = 64
 
 export const ASSISTANT_PROMPT_LIMIT = 4000
 export const ALPHA_ASSISTANT_MODULES = [
@@ -51,6 +117,33 @@ export const ASSISTANT_SUPPORT_SURFACES = [
 export type AssistantSurface =
   | (typeof ALPHA_ASSISTANT_MODULES)[number]
   | (typeof ASSISTANT_SUPPORT_SURFACES)[number]
+
+/** All shared module pages may compose widgets; business-action discovery stays Alpha scoped. */
+export const ASSISTANT_PAGE_MODULES = PERSONAL_PAGE_MODULES
+export type AssistantPageModule = PersonalPageModule
+
+export function isAssistantPageModule(
+  value: unknown,
+): value is AssistantPageModule {
+  return typeof value === "string" && isPersonalPageModule(value)
+}
+
+export function isAssistantPageAction(
+  action: AssistantAction,
+): action is AssistantPageAction {
+  return action.kind === "edit_page" || action.kind === "add_widget"
+}
+
+function surfaceReadResource(
+  module: AssistantSurface | AssistantPageModule,
+): string {
+  if (["products", "warehouse", "distributor"].includes(module))
+    return "module:inventory"
+  if (module === "trackers") return "dashboard:analytics"
+  if (["overview", "tasks", "settings"].includes(module))
+    return `dashboard:${module}`
+  return module === "approvals" ? "module:workflows" : `module:${module}`
+}
 
 interface EntityBinding {
   key: string
@@ -281,7 +374,7 @@ const ENTITIES: readonly EntityBinding[] = [
 export interface AssistantCapability {
   key: string
   kind: AssistantActionKind
-  module: AssistantSurface
+  module: AssistantSurface | AssistantPageModule
   tab?: string
   entityType?: string
   label: string
@@ -298,14 +391,7 @@ const capabilities: AssistantCapability[] = SURFACES.map((module) => ({
   module,
   label: `Open ${module}`,
   permission: {
-    resource:
-      module === "products" || module === "warehouse"
-        ? "module:inventory"
-        : ["overview", "tasks", "settings"].includes(module)
-          ? `dashboard:${module}`
-          : module === "approvals"
-            ? "module:workflows"
-            : `module:${module}`,
+    resource: surfaceReadResource(module),
     action: "read",
   },
 }))
@@ -351,8 +437,35 @@ for (const entity of ENTITIES) {
 
 export const ALPHA_ASSISTANT_CAPABILITIES: readonly AssistantCapability[] =
   capabilities
+export const ASSISTANT_PAGE_CAPABILITIES: readonly AssistantCapability[] =
+  ASSISTANT_PAGE_MODULES.flatMap((module) => [
+    {
+      key: `${module}.page.edit`,
+      kind: "edit_page" as const,
+      module,
+      label: `Edit ${module} page`,
+      permission: {
+        resource: surfaceReadResource(module),
+        action: "read" as const,
+      },
+    },
+    {
+      key: `${module}.widget.add`,
+      kind: "add_widget" as const,
+      module,
+      label: `Add widget to ${module}`,
+      permission: {
+        resource: surfaceReadResource(module),
+        action: "read" as const,
+      },
+    },
+  ])
+export const ASSISTANT_CAPABILITIES: readonly AssistantCapability[] = [
+  ...ALPHA_ASSISTANT_CAPABILITIES,
+  ...ASSISTANT_PAGE_CAPABILITIES,
+]
 const byKey = new Map(
-  capabilities.map((capability) => [capability.key, capability]),
+  ASSISTANT_CAPABILITIES.map((capability) => [capability.key, capability]),
 )
 export function getAssistantCapability(
   key: string,
@@ -364,6 +477,34 @@ export function parseAssistantActionId(value: unknown): string | undefined {
   if (typeof value !== "string" || !/^[1-9][0-9]{0,19}$/.test(value))
     return undefined
   return BigInt(value) <= 18446744073709551615n ? value : undefined
+}
+
+export function parseAssistantWidgetKey(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  if (/^builtin:[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/.test(value)) return value
+  return value.startsWith("saved:") && parseAssistantActionId(value.slice(6))
+    ? value
+    : undefined
+}
+
+export function parseAssistantPageId(value: unknown): string | undefined {
+  return typeof value === "string" &&
+    /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value)
+    ? value
+    : undefined
+}
+
+export function assistantPageHasWidget(
+  page: AssistantPageCatalog | undefined,
+  moduleId: string,
+  widgetKey: unknown,
+): boolean {
+  return Boolean(
+    page &&
+    page.moduleId === moduleId &&
+    parseAssistantWidgetKey(widgetKey) &&
+    page.widgets.some((widget) => widget.key === widgetKey),
+  )
 }
 
 function validScope(value: unknown): value is AssistantActionScope {
@@ -397,7 +538,12 @@ export function sameAssistantScope(
 export function decodeAssistantAction(
   value: unknown,
   scope: AssistantActionScope,
-  options: { allowedModules?: readonly string[] } = {},
+  options: {
+    allowedModules?: readonly string[]
+    /** Page discovery is independent of the Alpha business-action catalog. */
+    allowedPageModules?: readonly string[]
+    page?: AssistantPageCatalog
+  } = {},
 ): AssistantAction | undefined {
   if (
     !validScope(scope) ||
@@ -417,6 +563,8 @@ export function decodeAssistantAction(
           "scope",
           "recordId",
           "prompt",
+          "widgetKey",
+          "pageId",
         ].includes(key),
     )
   )
@@ -428,11 +576,34 @@ export function decodeAssistantAction(
   )
     return undefined
   const capability = getAssistantCapability(raw.capabilityKey)
+  const allowedModules = isAssistantPageAction(raw)
+    ? (options.allowedPageModules ?? options.allowedModules)
+    : options.allowedModules
   if (
     !capability ||
     raw.kind !== capability.kind ||
-    (options.allowedModules &&
-      !options.allowedModules.includes(capability.module))
+    (allowedModules && !allowedModules.includes(capability.module))
+  )
+    return undefined
+  if (
+    raw.widgetKey !== undefined &&
+    (raw.kind !== "add_widget" ||
+      !parseAssistantWidgetKey(raw.widgetKey) ||
+      (options.page &&
+        !assistantPageHasWidget(
+          options.page,
+          capability.module,
+          raw.widgetKey,
+        )))
+  )
+    return undefined
+  if (
+    raw.pageId !== undefined &&
+    ((raw.kind !== "edit_page" && raw.kind !== "add_widget") ||
+      !parseAssistantPageId(raw.pageId) ||
+      (options.page &&
+        (options.page.moduleId !== capability.module ||
+          raw.pageId !== (options.page.pageId ?? "dashboard"))))
   )
     return undefined
   const needsRecord =
@@ -448,7 +619,9 @@ export function decodeAssistantAction(
     (typeof raw.prompt !== "string" ||
       !raw.prompt.trim() ||
       raw.prompt.length > ASSISTANT_PROMPT_LIMIT ||
-      (raw.kind !== "open_form" && raw.kind !== "prepare_workflow"))
+      (raw.kind !== "open_form" &&
+        raw.kind !== "prepare_workflow" &&
+        raw.kind !== "add_widget"))
   )
     return undefined
   const base = {
@@ -474,6 +647,20 @@ export function decodeAssistantAction(
         recordId: raw.recordId!,
         ...(raw.prompt ? { prompt: raw.prompt } : {}),
       }
+    case "edit_page":
+      return {
+        ...base,
+        kind: "edit_page",
+        ...(raw.pageId ? { pageId: raw.pageId } : {}),
+      }
+    case "add_widget":
+      return {
+        ...base,
+        kind: "add_widget",
+        ...(raw.prompt ? { prompt: raw.prompt } : {}),
+        ...(raw.widgetKey ? { widgetKey: raw.widgetKey } : {}),
+        ...(raw.pageId ? { pageId: raw.pageId } : {}),
+      }
   }
 }
 
@@ -494,7 +681,11 @@ export function assistantActionHref(
       })
     )
   }
-  return moduleTabHref(capability.module, capability.tab ?? "dashboard")
+  return moduleTabHref(
+    capability.module,
+    (isAssistantPageAction(action) ? action.pageId : capability.tab) ??
+      "dashboard",
+  )
 }
 
 export type AssistantActionResolution =
@@ -515,6 +706,74 @@ export interface AssistantRequestContext {
   module?: string | null
   selection?: { entityType: string; entityId?: string } | null
   allowedModules?: readonly string[]
+  allowedPageModules?: readonly string[]
+  page?: AssistantPageCatalog
+}
+
+/** Resolve explicit page editing separately from business-record creation. */
+function resolvePageActionRequest(
+  command: string,
+  prompt: string,
+  context: AssistantRequestContext,
+): AssistantActionResolution | undefined {
+  const edit =
+    /^(?:edit|customi[sz]e|rearrange|personali[sz]e)\s+(?:(?:the|this|current|my)\s+)?(?:(\w+)\s+)?(?:page|dashboard|layout)(?:\s+layout)?[.!?]*$/i.exec(
+      command,
+    )
+  const add =
+    /^(?:add|insert|pin|create)\s+(?:(?:a|an|the|new|this|existing)\s+)?(?:(?:bar|line|area|pie|donut|sales|revenue|monthly|weekly|daily)\s+){0,3}(?:widget|chart|kpi|metric|table)\b/i.test(
+      command,
+    )
+  if (!edit && !add) return undefined
+  if (!validScope(context.scope))
+    return { kind: "clarify", reason: "scope_required", candidates: [] }
+  const target =
+    edit?.[1]?.toLowerCase() ??
+    ASSISTANT_PAGE_MODULES.find((module) =>
+      new RegExp(
+        `\\b(?:to|on|in)\\s+(?:(?:the|my)\\s+)?${module}(?:\\s+(?:page|dashboard))?(?:\\s|[.!?]|$)`,
+        "i",
+      ).test(command),
+    ) ??
+    context.module
+  if (!target)
+    return { kind: "clarify", reason: "ambiguous_target", candidates: [] }
+  if (!isAssistantPageModule(target))
+    return { kind: "clarify", reason: "unsupported_action", candidates: [] }
+  const kind = edit ? "edit_page" : "add_widget"
+  const matches =
+    kind === "add_widget" && context.page?.moduleId === target
+      ? context.page.widgets.filter((widget) => {
+          const label = widget.label.trim().toLowerCase()
+          return (
+            parseAssistantWidgetKey(widget.key) &&
+            label.length >= 3 &&
+            command.toLowerCase().includes(label)
+          )
+        })
+      : []
+  const action = decodeAssistantAction(
+    {
+      version: 1,
+      kind,
+      capabilityKey: `${target}.${edit ? "page.edit" : "widget.add"}`,
+      scope: context.scope,
+      ...(context.page?.moduleId === target
+        ? { pageId: context.page.pageId ?? "dashboard" }
+        : {}),
+      ...(kind === "add_widget" ? { prompt } : {}),
+      ...(matches.length === 1 ? { widgetKey: matches[0]!.key } : {}),
+    },
+    context.scope,
+    {
+      allowedModules: context.allowedModules,
+      allowedPageModules: context.allowedPageModules,
+      page: context.page,
+    },
+  )
+  return action
+    ? { kind: "action", action }
+    : { kind: "clarify", reason: "unavailable", candidates: [] }
 }
 
 /** Bounded explicit-command fallback, not a semantic planner. Unrecognized prose stays in RAG. */
@@ -530,6 +789,8 @@ export function resolveAssistantActionRequest(
     )
   if (!command || command.length > ASSISTANT_PROMPT_LIMIT)
     return { kind: "none" }
+  const pageAction = resolvePageActionRequest(command, text.trim(), context)
+  if (pageAction) return pageAction
   const match =
     /^(?:(open|show(?: me)?|view|find|go to|take me to|navigate to)|(create|add|new|draft|prepare|generate|@create)|(submit|approve|confirm|post|pay|renew|amend|close|cancel|receive|validate|service|maintain|inspect|qualify|convert|review|reimburse))\s+(?:(?:a|an|the|new|existing)\s+)?(.+)$/i.exec(
       command,

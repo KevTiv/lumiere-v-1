@@ -4995,6 +4995,14 @@ const PARAMS_SAVE_KNOWLEDGE_GUIDE: &[ReducerParam] = &[
     ReducerParam { name: "origin_message_id", kind: ScalarKind::OptionalString, ref_target: None },
     ReducerParam { name: "origin_run_id", kind: ScalarKind::OptionalString, ref_target: None },
 ];
+const PARAMS_SAVE_PERSONAL_PAGE_LAYOUT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "module_id", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "page_id", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "expected_revision", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+    ReducerParam { name: "layout_json", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_SAVE_PRESENTATION_MODULE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "expected_revision", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
@@ -7786,6 +7794,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "save_ai_work_program_draft", contract_operation_id: "erp.save_ai_work_program_draft", params: PARAMS_SAVE_AI_WORK_PROGRAM_DRAFT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_import_mapping_template", contract_operation_id: "erp.save_import_mapping_template", params: PARAMS_SAVE_IMPORT_MAPPING_TEMPLATE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_knowledge_guide", contract_operation_id: "erp.save_knowledge_guide", params: PARAMS_SAVE_KNOWLEDGE_GUIDE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "save_personal_page_layout", contract_operation_id: "erp.save_personal_page_layout", params: PARAMS_SAVE_PERSONAL_PAGE_LAYOUT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "save_presentation_module", contract_operation_id: "erp.save_presentation_module", params: PARAMS_SAVE_PRESENTATION_MODULE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "save_proposal_version", contract_operation_id: "erp.save_proposal_version", params: PARAMS_SAVE_PROPOSAL_VERSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "schedule_document_retention_purge", contract_operation_id: "erp.schedule_document_retention_purge", params: PARAMS_SCHEDULE_DOCUMENT_RETENTION_PURGE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -9291,6 +9300,7 @@ pub mod reducer_names {
     pub const SAVE_AI_WORK_PROGRAM_DRAFT: ReducerName = ReducerName::new("save_ai_work_program_draft");
     pub const SAVE_IMPORT_MAPPING_TEMPLATE: ReducerName = ReducerName::new("save_import_mapping_template");
     pub const SAVE_KNOWLEDGE_GUIDE: ReducerName = ReducerName::new("save_knowledge_guide");
+    pub const SAVE_PERSONAL_PAGE_LAYOUT: ReducerName = ReducerName::new("save_personal_page_layout");
     pub const SAVE_PRESENTATION_MODULE: ReducerName = ReducerName::new("save_presentation_module");
     pub const SAVE_PROPOSAL_VERSION: ReducerName = ReducerName::new("save_proposal_version");
     pub const SCHEDULE_DOCUMENT_RETENTION_PURGE: ReducerName = ReducerName::new("schedule_document_retention_purge");
@@ -10781,6 +10791,7 @@ macro_rules! reducer_call {
     ("save_ai_work_program_draft", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_AI_WORK_PROGRAM_DRAFT, $args) };
     ("save_import_mapping_template", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_IMPORT_MAPPING_TEMPLATE, $args) };
     ("save_knowledge_guide", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_KNOWLEDGE_GUIDE, $args) };
+    ("save_personal_page_layout", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PERSONAL_PAGE_LAYOUT, $args) };
     ("save_presentation_module", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PRESENTATION_MODULE, $args) };
     ("save_proposal_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SAVE_PROPOSAL_VERSION, $args) };
     ("schedule_document_retention_purge", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SCHEDULE_DOCUMENT_RETENTION_PURGE, $args) };

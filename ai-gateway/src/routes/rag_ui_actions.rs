@@ -13,6 +13,7 @@ use crate::harness::LiveSnapshot;
 
 const MAX_OFFERS: usize = 128;
 const MAX_PROPOSALS: usize = 5;
+const MAX_WIDGET_OPTIONS: usize = 64;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -21,6 +22,8 @@ pub enum UiActionKind {
     OpenRecord,
     OpenForm,
     PrepareWorkflow,
+    EditPage,
+    AddWidget,
 }
 
 impl UiActionKind {
@@ -31,12 +34,21 @@ impl UiActionKind {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct UiWidgetOffer {
+    pub key: String,
+    pub label: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct UiActionOffer {
     pub capability_key: String,
     pub kind: UiActionKind,
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub widgets: Vec<UiWidgetOffer>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -45,6 +57,8 @@ pub struct UiActionProposal {
     pub capability_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub record_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub widget_key: Option<String>,
 }
 
 fn identifier(value: &str) -> bool {
@@ -54,6 +68,21 @@ fn identifier(value: &str) -> bool {
         && value.bytes().all(|byte| {
             byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'.')
         })
+}
+
+fn widget_key(value: &str) -> bool {
+    if let Some(id) = value.strip_prefix("saved:") {
+        return record_id(id).is_some();
+    }
+    let Some(id) = value.strip_prefix("builtin:") else {
+        return false;
+    };
+    !id.is_empty()
+        && id.len() <= 160
+        && id.as_bytes()[0].is_ascii_alphanumeric()
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b':' | b'-'))
 }
 
 pub fn validate_offers(offers: &[UiActionOffer]) -> Result<(), &'static str> {
@@ -75,6 +104,22 @@ pub fn validate_offers(offers: &[UiActionOffer]) -> Result<(), &'static str> {
         {
             return Err("invalid UI action offer");
         }
+        if offer.widgets.len() > MAX_WIDGET_OPTIONS
+            || (!matches!(offer.kind, UiActionKind::AddWidget) && !offer.widgets.is_empty())
+        {
+            return Err("invalid widget choices");
+        }
+        let mut widget_keys = HashSet::new();
+        for widget in &offer.widgets {
+            if !widget_key(&widget.key)
+                || !widget_keys.insert(widget.key.as_str())
+                || widget.label.trim().is_empty()
+                || widget.label.chars().count() > 120
+                || widget.label.chars().any(char::is_control)
+            {
+                return Err("invalid widget choice");
+            }
+        }
     }
     Ok(())
 }
@@ -86,7 +131,7 @@ pub fn offer_prompt(offers: &[UiActionOffer]) -> String {
     // All descriptors came from the BFF-owned catalog and were bounded above.
     let descriptors = serde_json::to_string(offers).unwrap_or_else(|_| "[]".to_string());
     format!(
-        "\n\nThe answer JSON may additionally contain an optional ui_actions array with at most five presentation suggestions shaped as {{\"capability_key\":\"an offered key\",\"record_id\":\"an authorized decimal record id, only for record/workflow suggestions\"}}. Use only these offered descriptors: {descriptors}. A suggestion does not execute anything. Do not include URLs, field values, prompts, scopes, permissions or execution parameters. Record suggestions must reference the exact matching entity type and id in an authorized live snapshot. Omit record_id for navigate and open_form. Omit ui_actions when no offered action helps. Preserve all existing answer evidence and claim requirements."
+        "\n\nThe answer JSON may additionally contain an optional ui_actions array with at most five presentation suggestions shaped as {{\"capability_key\":\"an offered key\",\"record_id\":\"an authorized decimal record id, only for record/workflow suggestions\"}}. Use only these offered descriptors: {descriptors}. A suggestion does not execute or save anything. Do not include URLs, field values, prompts, scopes, permissions or execution parameters. Record suggestions must reference the exact matching entity type and id in an authorized live snapshot. Omit record_id for navigate, open_form, edit_page and add_widget. Only add_widget may include widget_key, and only an exact key from that offer's widgets choices; omit widget_key to open the native widget composer. edit_page opens the current page editor, and add_widget stages a widget for review there. Never claim the page changed or a widget was saved before native confirmation and readback. Omit ui_actions when no offered action helps. Preserve all existing answer evidence and claim requirements."
     )
 }
 
@@ -202,7 +247,11 @@ pub fn release_proposals(
         else {
             return Vec::new();
         };
-        if !seen.insert((&proposal.capability_key, &proposal.record_id)) {
+        if !seen.insert((
+            &proposal.capability_key,
+            &proposal.record_id,
+            &proposal.widget_key,
+        )) {
             return Vec::new();
         }
         if offer.kind.needs_record() {
@@ -217,6 +266,14 @@ pub fn release_proposals(
             }
         } else if proposal.record_id.is_some() {
             return Vec::new();
+        }
+        if let Some(key) = &proposal.widget_key {
+            if !matches!(offer.kind, UiActionKind::AddWidget)
+                || !widget_key(key)
+                || !offer.widgets.iter().any(|widget| widget.key == *key)
+            {
+                return Vec::new();
+            }
         }
     }
     proposals
@@ -234,18 +291,21 @@ mod tests {
                 kind: UiActionKind::OpenRecord,
                 label: "Open sales order".into(),
                 entity_type: Some("sale_order".into()),
+                widgets: Vec::new(),
             },
             UiActionOffer {
                 capability_key: "sales.order.create".into(),
                 kind: UiActionKind::OpenForm,
                 label: "Create sales order".into(),
                 entity_type: Some("sale_order".into()),
+                widgets: Vec::new(),
             },
             UiActionOffer {
                 capability_key: "sales.navigate".into(),
                 kind: UiActionKind::Navigate,
                 label: "Open sales".into(),
                 entity_type: None,
+                widgets: Vec::new(),
             },
         ]
     }
@@ -265,6 +325,7 @@ mod tests {
         UiActionProposal {
             capability_key: key.into(),
             record_id: id.map(str::to_string),
+            widget_key: None,
         }
     }
 
@@ -394,5 +455,105 @@ mod tests {
             );
         }
         assert!(offer_prompt(&[]).is_empty());
+    }
+
+    fn page_offers() -> Vec<UiActionOffer> {
+        vec![
+            UiActionOffer {
+                capability_key: "sales.page.edit".into(),
+                kind: UiActionKind::EditPage,
+                label: "Edit sales page".into(),
+                entity_type: None,
+                widgets: Vec::new(),
+            },
+            UiActionOffer {
+                capability_key: "sales.widget.add".into(),
+                kind: UiActionKind::AddWidget,
+                label: "Add widget to sales".into(),
+                entity_type: None,
+                widgets: vec![
+                    UiWidgetOffer {
+                        key: "saved:9007199254740993".into(),
+                        label: "Orders by status".into(),
+                    },
+                    UiWidgetOffer {
+                        key: "builtin:orders-kpi".into(),
+                        label: "Order count".into(),
+                    },
+                ],
+            },
+        ]
+    }
+
+    #[test]
+    fn page_composition_releases_only_offered_widget_choices_without_execution_parameters() {
+        let (_, actions) = split_candidate(
+            &json!({
+                "content": "Review a widget for your page.",
+                "ui_actions": [
+                    { "capability_key": "sales.page.edit" },
+                    { "capability_key": "sales.widget.add" },
+                    { "capability_key": "sales.widget.add", "widget_key": "saved:9007199254740993" },
+                    { "capability_key": "sales.widget.add", "widget_key": "builtin:orders-kpi" },
+                ]
+            })
+            .to_string(),
+        );
+        assert_eq!(
+            release_proposals(actions.clone(), &page_offers(), &[], true),
+            actions
+        );
+        assert!(release_proposals(actions.clone(), &page_offers(), &[], false).is_empty());
+        assert!(release_proposals(actions, &offers(), &[], true).is_empty());
+        for raw in [
+            json!({ "capability_key": "sales.widget.add", "widget_key": "saved:99" }),
+            json!({ "capability_key": "sales.widget.add", "widget_key": "builtin:unoffered" }),
+            json!({ "capability_key": "sales.widget.add", "widget_key": "saved:01" }),
+            json!({ "capability_key": "sales.widget.add", "widget_key": "saved:18446744073709551616" }),
+            json!({ "capability_key": "sales.page.edit", "widget_key": "saved:9007199254740993" }),
+            json!({ "capability_key": "sales.widget.add", "record_id": "9007199254740993" }),
+            json!({ "capability_key": "sales.widget.add", "page_id": "other" }),
+            json!({ "capability_key": "sales.widget.add", "query": "SELECT * FROM account_move" }),
+            json!({ "capability_key": "sales.widget.add", "params": {} }),
+        ] {
+            let (_, actions) =
+                split_candidate(&json!({ "content": "Answer", "ui_actions": [raw] }).to_string());
+            assert!(release_proposals(actions, &page_offers(), &[], true).is_empty());
+        }
+    }
+
+    #[test]
+    fn widget_offers_are_bounded_unique_and_available_only_to_add_widget() {
+        assert!(validate_offers(&page_offers()).is_ok());
+        for key in [
+            "saved:0",
+            "saved:01",
+            "saved:18446744073709551616",
+            "builtin:",
+            "builtin:../admin",
+            "https://example.com",
+        ] {
+            let mut offered = page_offers();
+            offered[1].widgets[0].key = key.into();
+            assert!(validate_offers(&offered).is_err(), "{key}");
+        }
+        let mut duplicate = page_offers();
+        let repeated = duplicate[1].widgets[0].clone();
+        duplicate[1].widgets.push(repeated);
+        assert!(validate_offers(&duplicate).is_err());
+        let mut wrong_kind = page_offers();
+        wrong_kind[1].kind = UiActionKind::EditPage;
+        assert!(validate_offers(&wrong_kind).is_err());
+        let mut excessive = page_offers();
+        excessive[1].widgets = (1..=MAX_WIDGET_OPTIONS + 1)
+            .map(|id| UiWidgetOffer {
+                key: format!("saved:{id}"),
+                label: format!("Widget {id}"),
+            })
+            .collect();
+        assert!(validate_offers(&excessive).is_err());
+        let prompt = offer_prompt(&page_offers());
+        assert!(prompt.contains("only an exact key"));
+        assert!(prompt.contains("Never claim the page changed"));
     }
 }

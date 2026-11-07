@@ -1,7 +1,13 @@
 import {
   ALPHA_ASSISTANT_CAPABILITIES,
+  ASSISTANT_PAGE_CAPABILITIES,
+  ASSISTANT_PAGE_WIDGET_LIMIT,
   getAssistantCapability,
+  isAssistantPageModule,
+  parseAssistantWidgetKey,
   type AssistantActionKind,
+  type AssistantPageCatalog,
+  type AssistantPageWidget,
 } from "@lumiere/query-hooks/assistant-actions"
 import type { FieldAccessContext } from "@lumiere/stdb/server"
 import {
@@ -17,6 +23,7 @@ export interface RagUiActionOffer {
   kind: AssistantActionKind
   label: string
   entity_type?: string
+  widgets?: AssistantPageWidget[]
 }
 
 interface OfferAuthority {
@@ -56,6 +63,7 @@ function permits(
  */
 export function serverRagUiActionOffers(
   authority: OfferAuthority,
+  page?: AssistantPageCatalog,
 ): RagUiActionOffer[] {
   const access = authority.fieldAccess
   if (
@@ -64,23 +72,58 @@ export function serverRagUiActionOffers(
     identity(access.identityHex) !== identity(authority.identityHex)
   )
     return []
-  return ALPHA_ASSISTANT_CAPABILITIES.filter((capability) => {
-    if (!isWorkspaceSurfaceVisible("finance-alpha", capability.module))
-      return false
-    const surface = getAssistantCapability(`${capability.module}.navigate`)
-    return (
-      surface != null &&
-      permits(access, surface.permission.resource, "read") &&
-      permits(
-        access,
-        capability.permission.resource,
-        capability.permission.action,
+  const offers: RagUiActionOffer[] = ALPHA_ASSISTANT_CAPABILITIES.filter(
+    (capability) => {
+      if (!isWorkspaceSurfaceVisible("finance-alpha", capability.module))
+        return false
+      const surface = getAssistantCapability(`${capability.module}.navigate`)
+      return (
+        surface != null &&
+        permits(access, surface.permission.resource, "read") &&
+        permits(
+          access,
+          capability.permission.resource,
+          capability.permission.action,
+        )
       )
-    )
-  }).map((capability) => ({
+    },
+  ).map((capability) => ({
     capability_key: capability.key,
     kind: capability.kind,
     label: capability.label,
     ...(capability.entityType ? { entity_type: capability.entityType } : {}),
   }))
+  if (!page || !isAssistantPageModule(page.moduleId)) return offers
+  const seen = new Set<string>()
+  const widgets = page.widgets
+    .flatMap((widget) => {
+      const label = widget.label.trim()
+      if (
+        !parseAssistantWidgetKey(widget.key) ||
+        !label ||
+        label.length > 120 ||
+        /[\u0000-\u001f\u007f-\u009f]/.test(label) ||
+        seen.has(widget.key)
+      )
+        return []
+      seen.add(widget.key)
+      return [{ key: widget.key, label }]
+    })
+    .slice(0, ASSISTANT_PAGE_WIDGET_LIMIT)
+  for (const capability of ASSISTANT_PAGE_CAPABILITIES) {
+    if (
+      capability.module !== page.moduleId ||
+      !permits(access, capability.permission.resource, "read")
+    )
+      continue
+    offers.push({
+      capability_key: capability.key,
+      kind: capability.kind,
+      label: capability.label,
+      ...(capability.kind === "add_widget" && widgets.length
+        ? { widgets }
+        : {}),
+    })
+  }
+  return offers
 }

@@ -105,3 +105,68 @@ test("browser supplied offers and authority cannot change server-owned descripto
   })
   assert.deepEqual(offers, serverRagUiActionOffers(trusted))
 })
+
+test("trusted current page offers use native read permission and bounded approved widget choices", () => {
+  const page = {
+    moduleId: "sales",
+    pageId: "dashboard",
+    widgets: [
+      { key: "saved:9007199254740993", label: "Orders by status" },
+      { key: "saved:9007199254740993", label: "Duplicate" },
+      { key: "saved:01", label: "Invalid identity" },
+      { key: "builtin:orders-kpi", label: "Order count" },
+      { key: "builtin:../other", label: "Invalid key" },
+      { key: "saved:42", label: "control\ncharacter" },
+    ],
+  }
+  const offers = serverRagUiActionOffers(authority(), page)
+  const edit = offers.find(
+    (offer) => offer.capability_key === "sales.page.edit",
+  )!
+  const add = offers.find(
+    (offer) => offer.capability_key === "sales.widget.add",
+  )!
+  assert.equal(edit.kind, "edit_page")
+  assert.equal(edit.widgets, undefined)
+  assert.deepEqual(add.widgets, [page.widgets[0], page.widgets[3]])
+  assert.ok(
+    !offers.some((offer) => offer.capability_key === "sales.order.create"),
+  )
+  const denied = authority({
+    orgPermissions: [
+      { resource: "module:sales", action: "read", allow: false },
+    ],
+  })
+  assert.deepEqual(serverRagUiActionOffers(denied, page), [])
+  assert.deepEqual(
+    serverRagUiActionOffers({ identityHex: actor, organizationId: 7 }, page),
+    [],
+  )
+  assert.deepEqual(
+    serverRagUiActionOffers(authority({ identityHex: "b".repeat(64) }), page),
+    [],
+  )
+})
+
+test("shared module page editing does not expose that module's unsupported business actions", () => {
+  const offers = serverRagUiActionOffers(
+    authority({ rolePermissions: ["module:projects:read"] }),
+    {
+      moduleId: "projects",
+      widgets: [],
+    },
+  )
+  assert.deepEqual(
+    offers.map((offer) => offer.capability_key),
+    ["projects.page.edit", "projects.widget.add"],
+  )
+  assert.ok(!offers.some((offer) => offer.kind === "open_form"))
+  const bounded = serverRagUiActionOffers(authority(), {
+    moduleId: "sales",
+    widgets: Array.from({ length: 80 }, (_, index) => ({
+      key: `saved:${index + 1}`,
+      label: `Widget ${index + 1}`,
+    })),
+  }).find((offer) => offer.capability_key === "sales.widget.add")!
+  assert.equal(bounded.widgets?.length, 64)
+})

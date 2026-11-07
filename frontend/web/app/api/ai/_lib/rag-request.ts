@@ -1,17 +1,34 @@
 /**
  * Shared RAG-request preparation for the non-streaming and streaming RAG routes.
  */
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server"
 
-import { sanitizeRagUiContext } from '@lumiere/erp-shared/ai-ui-context'
-import type { ApiSession } from '@/lib/api-session'
+import { sanitizeRagUiContext } from "@lumiere/erp-shared/ai-ui-context"
+import type { ApiSession } from "@/lib/api-session"
 
-import type { JsonObject } from './route-helpers'
-import { boundedInteger, positiveInteger, validateCompanyScope } from './route-helpers'
-import { parseRagGuideReferences, type RagGuideReference } from './guide-references'
-import { parseRagImportTaskReferences, type RagImportTaskReference } from './import-task-references'
-import { serverRagUiActionOffers, type RagUiActionOffer } from './rag-ui-actions'
-import { parseRagAgentSelection, type RagAgentSelection } from '../rag/agent-selection'
+import type { JsonObject } from "./route-helpers"
+import {
+  boundedInteger,
+  positiveInteger,
+  validateCompanyScope,
+} from "./route-helpers"
+import {
+  parseRagGuideReferences,
+  type RagGuideReference,
+} from "./guide-references"
+import {
+  parseRagImportTaskReferences,
+  type RagImportTaskReference,
+} from "./import-task-references"
+import {
+  serverRagUiActionOffers,
+  type RagUiActionOffer,
+} from "./rag-ui-actions"
+import { serverRagPageCatalog } from "./rag-page-catalog"
+import {
+  parseRagAgentSelection,
+  type RagAgentSelection,
+} from "../rag/agent-selection"
 
 export const MAX_INCLUDE_TYPES = 8
 
@@ -26,8 +43,8 @@ export function sanitizeIncludeTypes(raw: unknown): string[] | undefined {
   const out: string[] = []
 
   for (const value of raw) {
-    if (typeof value !== 'string') continue
-    const normalized = value.trim().toLowerCase().replaceAll('-', '_')
+    if (typeof value !== "string") continue
+    const normalized = value.trim().toLowerCase().replaceAll("-", "_")
     if (!normalized || seen.has(normalized)) continue
     seen.add(normalized)
     out.push(normalized)
@@ -69,11 +86,14 @@ export async function prepareRagPayload(params: {
 }): Promise<RagPrepareResult> {
   const { body, session, orgId } = params
 
-  const query = typeof body.query === 'string' ? body.query.trim() : ''
+  const query = typeof body.query === "string" ? body.query.trim() : ""
   if (!query) {
     return {
       ok: false,
-      response: NextResponse.json({ error: 'query is required' }, { status: 400 }),
+      response: NextResponse.json(
+        { error: "query is required" },
+        { status: 400 },
+      ),
     }
   }
 
@@ -88,7 +108,13 @@ export async function prepareRagPayload(params: {
   } catch (error) {
     return {
       ok: false,
-      response: NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid guide references' }, { status: 400 }),
+      response: NextResponse.json(
+        {
+          error:
+            error instanceof Error ? error.message : "Invalid guide references",
+        },
+        { status: 400 },
+      ),
     }
   }
 
@@ -98,6 +124,12 @@ export async function prepareRagPayload(params: {
   const limit = boundedInteger(body.limit, 20, 1, 40)
   const include_types = sanitizeIncludeTypes(body.include_types)
   const ui_context = sanitizeRagUiContext(body.ui_context)
+  const page = await serverRagPageCatalog({
+    session,
+    orgId,
+    companyId,
+    uiContext: ui_context,
+  })
 
   const payload: RagPayload = {
     ...agentSelection,
@@ -107,7 +139,7 @@ export async function prepareRagPayload(params: {
     limit,
     stdb_token: session.stdbToken,
     identity_hex: session.identityHex,
-    ui_action_offers: serverRagUiActionOffers(session),
+    ui_action_offers: serverRagUiActionOffers(session, page),
   }
   if (include_types?.length) payload.include_types = include_types
   if (ui_context) payload.ui_context = ui_context

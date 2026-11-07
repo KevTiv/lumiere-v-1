@@ -174,20 +174,20 @@ export async function expectModuleTabSurface(page: Page, moduleId: string, tabId
   const panel = moduleView.getByTestId(`module-panel-${moduleId}-${tabId}`)
   await expect(panel).toHaveCount(1)
   const visiblePanels = moduleView.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
+  // Nested charts and unrelated workspaces can have their own active panels.
+  await expect(visiblePanels).toHaveCount(1)
+  await expect(panel).toBeVisible()
   if (moduleId === "accounting" && tabId === "payment-operations") {
-    // The payment controller stays outside the empty module panel so switching
-    // tabs cannot discard an in-flight allocation or its uncertain result.
-    await expect(visiblePanels).toHaveCount(0)
+    // Page composition makes this panel visible. The payment controller remains
+    // outside ModuleView so tab changes cannot discard an in-flight allocation.
+    await expect(panel.getByTestId("module-page-composition-accounting-payment-operations")).toBeVisible()
     const operations = page.getByRole("region", { name: "Payment operations", exact: true })
+    await expect(moduleView.getByRole("region", { name: "Payment operations", exact: true })).toHaveCount(0)
     await expect(operations).toHaveCount(1)
     await expect(operations).toBeVisible()
     await expect(operations.getByText("Payment accounts", { exact: true })).toBeVisible()
     await expect(operations.getByText("Transactions & reconciliation", { exact: true })).toBeVisible()
-    return
   }
-  // Nested charts and unrelated workspaces can have their own active panels.
-  await expect(visiblePanels).toHaveCount(1)
-  await expect(panel).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */

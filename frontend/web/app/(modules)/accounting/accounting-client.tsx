@@ -15,6 +15,7 @@ import { useModuleTab } from "@/hooks/use-module-tab"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { BillSourcePreview } from "../../../components/finance-source-preview"
 import { mapDashboardWidgets } from "@lumiere/ui/lib/dashboard-sections"
+import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { agingShareRows, agingTotals, collectionRate, singleCurrencyId, revenueVsExpensesByMonth, topCustomers, weeklyCashMovements } from "./accounting-dashboard-charts"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { formatChartValue, type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
@@ -44,7 +45,6 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
-  DashboardWidgetRenderer,
   FormModal,
   CsvImportModal,
   CSV_IMPORT_CONTRACTS,
@@ -4685,7 +4685,17 @@ function AccountingClientReady({
         tabs: (() => {
           const mapped = moduleConfigBase.tabs.map((tab) => {
             if (tab.id === "dashboard") {
-              return { ...tab, type: "custom" as const, customContent: <div className="space-y-8">{accountantOverview}<section aria-label="Financial charts" data-testid="accounting-finance-charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">{financeChartSections.flatMap((section) => section.widgets.map((widget) => <DashboardWidgetRenderer key={widget.id} widget={widget} widthClass={widget.width === "full" ? "lg:col-span-3" : widget.width === "2/3" ? "lg:col-span-2" : "lg:col-span-1"} />))}</section></div> }
+              return {
+                ...tab,
+                sections: [
+                  createPageContentSection({
+                    id: "accounting-overview",
+                    title: t("accounting.overview.deskTitle", { defaultValue: "Your accounting desk" }),
+                    content: accountantOverview,
+                  }),
+                  ...financeChartSections,
+                ],
+              }
             }
             if (tab.id === "analytic-lines") {
               return {
@@ -5667,7 +5677,7 @@ function AccountingClientReady({
         }}
         config={config}
         data={data}
-        dataLoading={dataLoading}
+        dataLoading={accountingActiveTab === "dashboard" ? undefined : dataLoading}
         dataState={dataState}
         onFormSubmit={handleFormSubmit}
         renderCreatePreview={(_tabId, values, form) => renderAccountingAuthoringPreview(values, form)}

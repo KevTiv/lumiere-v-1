@@ -27,6 +27,7 @@ use crate::{
     web_session::stdb_identity_hex_hint,
 };
 
+mod personal_pages;
 mod saved_drafts;
 
 pub(super) fn router() -> Router<Arc<AppState>> {
@@ -42,6 +43,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route(
             "/presentation/drafts/:module_key",
             get(saved_drafts::get_draft),
+        )
+        .route(
+            "/presentation/pages/:module_id/:page_id",
+            get(personal_pages::get_layout).put(personal_pages::save_layout),
         )
         .layer(DefaultBodyLimit::max(96 * 1024))
 }

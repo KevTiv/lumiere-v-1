@@ -11,6 +11,16 @@
       "idempotency": "not_applicable",
       "semantic_kind": "test"
     },
+    "save_personal_page_layout": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/presentation/personal_pages.rs: save_personal_page_layout authorizes the current module and company, validates scoped saved widget references, and atomically appends an owner-only immutable CAS snapshot; generic command admission remains denied.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "save_presentation_module": {
       "client_facing": false,
       "codec": {

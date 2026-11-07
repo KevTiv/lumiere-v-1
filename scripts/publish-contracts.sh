@@ -30,7 +30,7 @@ if [[ ! -d "$STAGING/ts/generated" ]]; then
   echo "error: $STAGING/ts/generated missing — run make generate-stdb-ts-sdk && make codegen first" >&2
   exit 1
 fi
-for presentation in module-draft preview-contract; do
+for presentation in module-draft preview-contract saved-draft-contract personal-page-layout; do
   if [[ ! -f "$STAGING/ts/presentation/$presentation.ts" \
     || ! -f "$STAGING/ts/presentation/$presentation.schema.json" \
     || ! -f "$STAGING/manifests/presentation/$presentation.schema.json" ]]; then

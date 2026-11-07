@@ -318,6 +318,13 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/presentation/personal_pages.rs",
+      "function": "save_personal_page_layout",
+      "operation": "save_personal_page_layout",
+      "operation_id": "erp.save_personal_page_layout",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/presentation/mod.rs",
       "function": "save_presentation_module",
       "operation": "save_presentation_module",

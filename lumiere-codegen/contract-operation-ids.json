@@ -1186,6 +1186,7 @@
     "run_workflow_subject_snapshot_tests": "erp.run_workflow_subject_snapshot_tests",
     "save_import_mapping_template": "erp.save_import_mapping_template",
     "save_knowledge_guide": "erp.save_knowledge_guide",
+    "save_personal_page_layout": "erp.save_personal_page_layout",
     "save_presentation_module": "erp.save_presentation_module",
     "save_proposal_version": "erp.save_proposal_version",
     "schedule_document_retention_purge": "erp.schedule_document_retention_purge",
