@@ -16,6 +16,11 @@ import {
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
+function isSaleOrdersQuery(url: URL): boolean {
+  // Dashboard source reads include company and cursor query parameters.
+  return url.pathname === "/api/query/sale-orders"
+}
+
 async function postNamedOperation(
   page: Page,
   command: { urlPath: string; init: RequestInit },
@@ -310,7 +315,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     const responseGate = new Promise<void>((resolve) => {
       releaseResponse = resolve
     })
-    await page.route("**/api/query/sale-orders", async (route) => {
+    await page.route(isSaleOrdersQuery, async (route) => {
       await responseGate
       await route.fulfill({ status: 200, contentType: "application/json", body: '{"data":[]}' })
     })
@@ -338,7 +343,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     const recoveryGate = new Promise<void>((resolve) => {
       releaseRecovery = resolve
     })
-    await page.route("**/api/query/sale-orders", async (route) => {
+    await page.route(isSaleOrdersQuery, async (route) => {
       if (response === "denied") {
         await route.fulfill({
           status: 403,
@@ -370,7 +375,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
   })
 
   test("renders dependency failure as an error instead of empty data", async ({ page }) => {
-    await page.route("**/api/query/sale-orders", async (route) => {
+    await page.route(isSaleOrdersQuery, async (route) => {
       await route.fulfill({
         status: 503,
         contentType: "application/json",
@@ -388,16 +393,22 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
   test("recovers after a disconnected source read without retaining stale success", async ({
     page,
   }) => {
+    const companyId = await fetchDefaultCompanyId(page)
     let connected = false
-    await page.route("**/api/query/sale-orders", async (route) => {
+    await page.route(isSaleOrdersQuery, async (route) => {
       if (!connected) {
         await route.abort("internetdisconnected")
         return
       }
+      expect(new URL(route.request().url()).searchParams.get("companyId")).toBe(
+        String(companyId),
+      )
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: [{ id: 17, state: { tag: "Sale" }, amountTotal: 125 }] }),
+        body: JSON.stringify({
+          data: [{ id: 17, companyId, state: { tag: "Sale" }, amountTotal: 125 }],
+        }),
       })
     })
 
