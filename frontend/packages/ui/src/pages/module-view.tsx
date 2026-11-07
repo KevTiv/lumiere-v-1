@@ -36,7 +36,9 @@ import { KpiStrip } from "../components/kpi-strip"
 import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
 import { WorkspaceNav } from "./workspace-nav"
 import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
-import { filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
+import { HistoryPeriodSelect } from "../components/history-period-select"
+import { serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { configuredModuleHistoryField, filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
 import { useAssistantNativeForms, type AssistantNativeFormStatus } from "../components/assistant-native-form-provider"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
@@ -184,9 +186,14 @@ export function ModuleView({
   const activeTab = activeTabProp ?? internalTab
   const rawHistoryPeriod = searchParams?.get("period") ?? null
   const periodTimeZone = historyTimeZone ?? searchParams?.get("periodTimeZone") ?? "UTC"
+  const activeEntityView = config.tabs.find((tab) => tab.id === activeTab)?.entityConfig?.view
+  const historyColumns = activeEntityView?.mode === "table" ? activeEntityView.columns
+    : activeEntityView?.mode === "table-or-board" ? activeEntityView.table.columns : []
+  const historyField = configuredModuleHistoryField(config.id, activeTab, historyColumns)
+  const historyFieldKey = historyField?.dateField
   const historyFilter = useMemo(
-    () => resolveModuleHistoryFilter(config.id, activeTab, rawHistoryPeriod, { timeZone: periodTimeZone }),
-    [config.id, activeTab, rawHistoryPeriod, periodTimeZone],
+    () => resolveModuleHistoryFilter(config.id, activeTab, rawHistoryPeriod, { timeZone: periodTimeZone, field: historyFieldKey ? { tabId: activeTab, dateField: historyFieldKey } : null }),
+    [config.id, activeTab, rawHistoryPeriod, periodTimeZone, historyFieldKey],
   )
   const activeRows = data[activeTab]
   const historyRows = useMemo(() => filterModuleHistoryRows(activeRows ?? [], historyFilter), [activeRows, historyFilter])
@@ -473,6 +480,21 @@ export function ModuleView({
                     }))}
                   />
                 ) : null}
+                {activeTab === tab.id && historyField && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <HistoryPeriodSelect
+                      value={historyFilter.status === "active" ? historyFilter.period : "all"}
+                      timeZone={historyFilter.status === "active" ? historyFilter.timeZone : "UTC"}
+                      onChange={(period) => {
+                        const params = new URLSearchParams(searchParams?.toString())
+                        params.set("period", serializeHistoryPeriod(period))
+                        params.set("periodTimeZone", historyTimeZone ?? "UTC")
+                        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">{historyColumns.find((column) => column.key === historyField.dateField)?.label ?? historyField.dateField}</span>
+                  </div>
+                )}
                 {activeTab === tab.id && historyFilter.status !== "inactive" && (
                   <div
                     className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"

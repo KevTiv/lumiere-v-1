@@ -93,6 +93,18 @@ describe("ModuleView history drilldown", () => {
     expect(next.searchParams.get("search")).toBe("keep")
   })
 
+  it("exposes date navigation for other modules using their configured date column", () => {
+    route.query = "tab=entries&period=custom:1990-01-01:1990-12-31"
+    const accounting: ModuleConfig = { id: "accounting", title: "Accounting", defaultTab: "entries", tabs: [{
+      id: "entries", label: "Entries", type: "entity",
+      entityConfig: { id: "entries", title: "Entries", view: { mode: "table", columns: [{ key: "date", label: "Accounting date", type: "relative-date" }] } },
+    }] }
+    render(<ModuleView config={accounting} data={{ entries: [{ id: "old", date: "1990-06-01" }, { id: "new", date: "2026-06-01" }] }} />)
+    expect(visibleIds()).toEqual(["old"])
+    expect(screen.getByRole("combobox", { name: "Date range" })).toBeTruthy()
+    expect(screen.getByText("Accounting date")).toBeTruthy()
+  })
+
   it("does not apply a business date from another tab to the active collection", () => {
     route.query = "tab=customers&period=custom:2024-03-10:2024-03-10&periodTimeZone=UTC"
     render(<ModuleView config={config} data={{ customers: [{ id: "customer", dateOrder: null }] }} />)
