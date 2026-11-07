@@ -146,12 +146,12 @@ function ExecutionPanel({
   const nativeResults = workflow.isError
     ? []
     : (workflow.data?.nativeResults ?? [])
+  // A blocked attempt may have released its rows after verified cleanup.
+  // Preparation rechecks unresolved earlier effects on the server.
   const consumedIds = new Set(
     proposals
-      .filter(
-        (proposal) =>
-          proposal.approvedAt != null ||
-          ["approved", "executing", "verified"].includes(proposal.status),
+      .filter((proposal) =>
+        ["approved", "executing", "verified"].includes(proposal.status),
       )
       .flatMap((proposal) => proposal.entries.map((entry) => entry.itemId)),
   )
@@ -1107,6 +1107,14 @@ function ProposalDetails({
         (proposal.status === "blocked" && proposal.approvedAt)) && (
         <div className="space-y-2">
           <p role="status">{t("settings.importWorkflow.pendingExplanation")}</p>
+          {proposal.status === "blocked" && (
+            <p className="text-sm text-muted-foreground">
+              {t("settings.importWorkflow.blockedReprepare", {
+                defaultValue:
+                  "You can prepare another preview with revised source rows or accounting choices. Rows whose earlier results remain unresolved will be held. A new preview requires its own approval.",
+              })}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button disabled={busy} onClick={() => action("execute")}>
               {t("settings.importWorkflow.resume")}

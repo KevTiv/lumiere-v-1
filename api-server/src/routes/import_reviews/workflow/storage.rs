@@ -260,7 +260,10 @@ pub(super) async fn validate_sources(
 
 /// Approval already reserved these source effects against the then-current
 /// candidate set. Later explicitly distinguished approvals do not revoke that
-/// proof; source facts and reference precision still must match before writing.
+/// proof. Recheck and lock only the executable entries: held rows remain
+/// independently reviewable after approval. The full preview and accepted
+/// distinction evidence stay immutable; executing source facts and reference
+/// precision still must match before writing.
 pub(super) async fn validate_approved_sources(
     tx: &Transaction<'_>,
     scope: StorageScope<'_>,
@@ -270,11 +273,11 @@ pub(super) async fn validate_approved_sources(
 ) -> Result<(), ApiError> {
     let selected = proposal
         .definition
-        .sources
+        .entries
         .iter()
-        .map(|source| RowSelection {
-            item_id: source.item_id.clone(),
-            expected_revision: source.revision,
+        .map(|entry| RowSelection {
+            item_id: entry.item_id.clone(),
+            expected_revision: entry.source_revision,
         })
         .collect::<Vec<_>>();
     let rows = reviews(tx, scope, task, &selected).await?;

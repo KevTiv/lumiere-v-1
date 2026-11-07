@@ -247,6 +247,83 @@ const review: ReviewDetail = {
   })),
 }
 
+async function chooseAccountingTreatment(reason: string) {
+  for (const [label, option] of [
+    ["journal", "HIST · Historical adjustments"],
+    ["debitAccount", "610 · Expense"],
+    ["creditAccount", "299 · Clearing"],
+  ]) {
+    const choice = await screen.findByRole("combobox", {
+      name: `settings.importWorkflow.${label}`,
+    })
+    fireEvent.keyDown(choice, { key: "ArrowDown" })
+    fireEvent.click(await screen.findByRole("option", { name: option }))
+  }
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "settings.importWorkflow.reason" }),
+    { target: { value: reason } },
+  )
+}
+
+it("can explicitly prepare the same rows after an approved blocked attempt is cleaned up without approving or executing again", async () => {
+  const blocked = { ...proposal(), lastError: "The previous request failed." }
+  let next: ImportProposal | null = null
+  const writes: string[] = []
+  controls.fetch.mockImplementation(
+    async (url: string, options?: RequestInit) => {
+      if (url.includes("/import-reviews/"))
+        return Response.json({ ...review, items: review.items.slice(0, 1) })
+      if (options?.method !== "POST")
+        return Response.json(workflow(next ? [next, blocked] : [blocked]))
+      writes.push(url)
+      expect(url).toMatch(/\/workflow\/proposals$/)
+      const body = JSON.parse(String(options.body))
+      expect(body.rows).toEqual([{ itemId: "11", expectedRevision: 2 }])
+      // The simulated server has verified the earlier attempt left no ERP rows.
+      // The new prepare response, not a client interpretation of lastError, admits them.
+      next = {
+        ...blocked,
+        id: "20",
+        requestKey: body.requestKey,
+        status: "prepared",
+        approvedAt: null,
+        configuration: { ...blocked.configuration, reason: body.reason },
+        lastError: null,
+        execution: {
+          phase: "not_started",
+          parentRequestId: null,
+          lineRequestId: null,
+          parentJobId: null,
+          lineJobId: null,
+        },
+      }
+      return Response.json(next)
+    },
+  )
+  mount({ view: "preview", reviewId: "71" })
+  await screen.findByText("The previous request failed.")
+  await chooseAccountingTreatment(
+    "Recheck accounting choices after empty failed attempt",
+  )
+  const prepare = screen.getByRole("button", {
+    name: "settings.importWorkflow.prepare",
+  })
+  await waitFor(() => expect(prepare).toHaveProperty("disabled", false))
+  expect(writes).toHaveLength(0)
+  fireEvent.click(prepare)
+  await screen.findByText("settings.importWorkflow.status.prepared")
+  expect(writes).toHaveLength(1)
+  expect(
+    screen.getByRole("button", { name: "settings.importWorkflow.approve" }),
+  ).toBeTruthy()
+  expect(
+    screen.queryByRole("button", { name: "settings.importWorkflow.execute" }),
+  ).toBeNull()
+  expect(
+    screen.queryByText("settings.importWorkflow.status.verified"),
+  ).toBeNull()
+})
+
 it.each([false, true])(
   "keeps source review, exact approval and verified ERP receipts separate (lost execution response: %s)",
   async (lostExecutionReply) => {
@@ -341,22 +418,8 @@ it.each([false, true])(
       },
     )
     const mounted = mount({ view: "preview", reviewId: "71" })
-    for (const [label, option] of [
-      ["journal", "HIST · Historical adjustments"],
-      ["debitAccount", "610 · Expense"],
-      ["creditAccount", "299 · Clearing"],
-    ]) {
-      const choice = await screen.findByRole("combobox", {
-        name: `settings.importWorkflow.${label}`,
-      })
-      fireEvent.keyDown(choice, { key: "ArrowDown" })
-      fireEvent.click(await screen.findByRole("option", { name: option }))
-    }
-    fireEvent.change(
-      screen.getByRole("textbox", { name: "settings.importWorkflow.reason" }),
-      {
-        target: { value: "Historical electricity; settlement remains unknown" },
-      },
+    await chooseAccountingTreatment(
+      "Historical electricity; settlement remains unknown",
     )
     const prepare = screen.getByRole("button", {
       name: "settings.importWorkflow.prepare",

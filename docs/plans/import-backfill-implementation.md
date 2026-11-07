@@ -162,6 +162,11 @@ Outstanding completion work from the broader feature plan:
 - Add operator-managed correction/supersession of already-created ERP effects.
   This delivery retains receipts and uses the owning module's existing correction
   workflow; changing a source decision does not rewrite prior ERP records.
+- Add explicit cancellation or replacement of an approved proposal when the native
+  owner can prove that no effects can still arrive. Changing an approved executable
+  source row currently holds its execution and retains its claims. A missing reply
+  or absent receipt alone must never release those claims. Edits to held rows that
+  were excluded from execution do not block the unchanged approved entries.
 - Add paged access to older proposal/receipt history and translated locale packs
   for the new interface strings. English fallback is available now.
 

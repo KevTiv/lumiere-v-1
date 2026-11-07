@@ -16044,7 +16044,8 @@
         "failed": "Failed",
         "rolled_back": "Rolled back"
       },
-      "openHeldSource": "Inspect source row #{{id}}, revision {{revision}}"
+      "openHeldSource": "Inspect source row #{{id}}, revision {{revision}}",
+      "blockedReprepare": "You can prepare another preview with revised source rows or accounting choices. Rows whose earlier results remain unresolved will be held. A new preview requires its own approval."
     },
     "importTask": {
       "loading": "Checking the saved import…",

@@ -384,6 +384,7 @@ async fn postgres_workflow_keeps_revisions_claims_and_receipts_durable() -> Resu
     let pool = pg_pool::build_pool(&config)?;
     let result = async {
         exercise_storage(&pool).await?;
+        approved_ready_rows_are_independent_from_held_rows(&pool).await?;
         competing_changed_exports_cannot_both_acquire_approval(&pool).await
     }
     .await;
@@ -708,6 +709,141 @@ async fn exercise_storage(pool: &deadpool_postgres::Pool) -> Result<()> {
         )
         .await
         .is_err());
+    Ok(())
+}
+
+async fn approved_ready_rows_are_independent_from_held_rows(
+    pool: &deadpool_postgres::Pool,
+) -> Result<()> {
+    let scope = StorageScope {
+        actor: "held-row-reviewer",
+        ..scoped()
+    };
+    let task = "3".repeat(32);
+    let source_hash = "3".repeat(64);
+    let mut client = pool.get().await?;
+    client.execute("INSERT INTO lumiere_platform.import_task (organization_id,company_id,actor_identity,request_id,conversation_key,request_sha256,state,approved_mode,decision_request) VALUES (42,5,$1,$2,'independent-source-review',$3,'needs_review','prepare_import','{}')",&[&scope.actor,&task,&source_hash]).await?;
+    let batch:i64=client.query_one("INSERT INTO lumiere_platform.import_review_batch (organization_id,company_id,title,target_entity,source_file,source_sha256,created_by) VALUES (42,5,'Independent expenses','source_observation','farm.csv',$1,$2) RETURNING id",&[&source_hash,&scope.actor]).await?.get(0);
+    client.execute("INSERT INTO lumiere_platform.import_task_review (organization_id,company_id,actor_identity,request_id,batch_id) VALUES (42,5,$1,$2,$3)",&[&scope.actor,&task,&batch]).await?;
+    let mut selected = Vec::new();
+    for source_row in [30, 31] {
+        let mut row = reviewed(1, source_row, "2222")?;
+        row.source.source.sha256.clone_from(&source_hash);
+        let item:i64=client.query_one("INSERT INTO lumiere_platform.import_review_item (organization_id,company_id,batch_id,source_key,source_json,proposed_json,confirmed_fields,revision) VALUES (42,5,$1,$2,$3,$4,$5,3) RETURNING id",&[&batch,&row.source.key,&serde_json::to_value(&row.source)?,&serde_json::to_value(&row.values)?,&serde_json::to_value(&row.confirmed)?]).await?.get(0);
+        selected.push(RowSelection {
+            item_id: item.to_string(),
+            expected_revision: 3,
+        });
+    }
+    let ready_id = selected[0].item_id.parse::<i64>()?;
+    let held_id = selected[1].item_id.parse::<i64>()?;
+    let tx = client.transaction().await?;
+    let rows = storage::reviews(&tx, scope, &task, &selected).await?;
+    let mut held = build_definition(&rows, &configuration(), 0)?;
+    overlap::hold_candidates(&tx, scope, &mut held, None).await?;
+    let resolution = held
+        .issues
+        .iter()
+        .find(|issue| issue.item_id.as_deref() == Some(selected[0].item_id.as_str()))
+        .and_then(|issue| issue.resolution.as_ref())
+        .ok_or_else(|| anyhow::anyhow!("ready row needs an explicit distinct-expense decision"))?;
+    let mut config = configuration();
+    config.distinct_expenses = vec![DistinctExpenseDecision {
+        item_id: selected[0].item_id.clone(),
+        source_revision: 3,
+        candidate_digest: resolution.candidate_digest.clone(),
+        reason: "The first reviewed document establishes a separate expense; hold the second for correction".into(),
+    }];
+    let body = PrepareBody {
+        company_id: scope.company,
+        request_key: "4".repeat(32),
+        rows: selected,
+        configuration: config,
+    };
+    let mut definition = build_definition(&rows, &body.configuration, 0)?;
+    overlap::hold_candidates(&tx, scope, &mut definition, None).await?;
+    ensure!(definition.sources.len() == 2 && definition.entries.len() == 1);
+    ensure!(definition.entries[0].item_id == ready_id.to_string());
+    ensure!(
+        definition.issues.len() == 1 && definition.issues[0].item_id == Some(held_id.to_string())
+    );
+    let original_definition = serde_json::to_value(&definition)?;
+    let proposal = storage::insert(
+        &tx,
+        scope,
+        &task,
+        &body,
+        &hash(&serde_json::to_vec(&body)?),
+        &definition,
+    )
+    .await?;
+    tx.commit().await?;
+
+    // Initial approval still depends on the complete preview, including B.
+    let tx = client.transaction().await?;
+    tx.execute(
+        "UPDATE lumiere_platform.import_review_item SET revision=revision+1 WHERE id=$1",
+        &[&held_id],
+    )
+    .await?;
+    let mut stale = storage::load(&tx, scope, &task, proposal.id).await?;
+    ensure!(storage::approve(&tx, scope, &task, &mut stale, 0)
+        .await
+        .is_err());
+    ensure!(storage::require_claims(&tx, scope, &stale).await.is_err());
+    tx.rollback().await?;
+
+    let tx = client.transaction().await?;
+    let mut approved = storage::load(&tx, scope, &task, proposal.id).await?;
+    storage::approve(&tx, scope, &task, &mut approved, 0).await?;
+    storage::require_claims(&tx, scope, &approved).await?;
+    tx.commit().await?;
+
+    // Correcting B after approval cannot revoke A's already reserved effect.
+    client.execute("UPDATE lumiere_platform.import_review_item SET revision=revision+1,proposed_json=jsonb_set(proposed_json,'{amount}','\"3333\"') WHERE id=$1", &[&held_id]).await?;
+    let tx = client.transaction().await?;
+    let stored = storage::load(&tx, scope, &task, proposal.id).await?;
+    storage::validate_approved_sources(&tx, scope, &task, &stored, 0).await?;
+    storage::require_claims(&tx, scope, &stored).await?;
+    ensure!(serde_json::to_value(&stored.definition)? == original_definition);
+    ensure!(stored.digest == proposal.digest);
+
+    // The execution check holds only A's review lock; B remains reviewable.
+    let mut reviewer = pool.get().await?;
+    let review_tx = reviewer.transaction().await?;
+    review_tx
+        .batch_execute("SET LOCAL lock_timeout='200ms'")
+        .await?;
+    review_tx
+        .execute(
+            "UPDATE lumiere_platform.import_review_item SET revision=revision+1 WHERE id=$1",
+            &[&held_id],
+        )
+        .await?;
+    review_tx.commit().await?;
+    // The initial whole-preview validator deliberately still rejects the
+    // same held-row change that approved-entry execution permits.
+    ensure!(storage::validate_sources(&tx, scope, &task, &stored, 0)
+        .await
+        .is_err());
+    tx.rollback().await?;
+
+    client
+        .execute(
+            "UPDATE lumiere_platform.import_review_item SET revision=revision+1 WHERE id=$1",
+            &[&ready_id],
+        )
+        .await?;
+    let tx = client.transaction().await?;
+    let changed = storage::load(&tx, scope, &task, proposal.id).await?;
+    ensure!(
+        storage::validate_approved_sources(&tx, scope, &task, &changed, 0)
+            .await
+            .is_err()
+    );
+    storage::require_claims(&tx, scope, &changed).await?;
+    ensure!(serde_json::to_value(&changed.definition)? == original_definition);
+    tx.rollback().await?;
     Ok(())
 }
 
