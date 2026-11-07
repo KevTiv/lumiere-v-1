@@ -19,24 +19,16 @@ export const MODULE_HISTORY_FIELDS = {
 } as const
 
 export type ModuleHistoryModule = keyof typeof MODULE_HISTORY_FIELDS
-export type ModuleHistoryField = (typeof MODULE_HISTORY_FIELDS)[ModuleHistoryModule]
+export interface ModuleHistoryField { tabId: string; dateField: string }
 
-/** The only source fields a period drilldown reads, in SDK and HTTP spellings. */
-export interface HistoryDatedRecord {
-  dateOrder?: unknown
-  date_order?: unknown
-  createdAt?: unknown
-  created_at?: unknown
-  createDate?: unknown
-  create_date?: unknown
-}
-
-const historyDateAliases = { dateOrder: "date_order", createdAt: "created_at", createDate: "create_date" } as const
-
-/** Preserve an explicitly unknown canonical date instead of falling back to a second field. */
-export function moduleHistoryDateValue(row: HistoryDatedRecord, key: ModuleHistoryField["dateField"]): unknown {
-  const alias = historyDateAliases[key]
-  return Object.hasOwn(row, key) ? row[key] : Object.hasOwn(row, alias) ? row[alias] : undefined
+/**
+ * Read only the configured own field; timestamp decoding validates its unknown value.
+ * Preserve an explicitly unknown canonical date instead of falling back to a second field.
+ */
+export function moduleHistoryDateValue(row: object, key: ModuleHistoryField["dateField"]): unknown {
+  if (Object.hasOwn(row, key)) return Reflect.get(row, key)
+  const alias = key.replace(/[A-Z]/g, (letter) => "_" + letter.toLowerCase())
+  return Object.hasOwn(row, alias) ? Reflect.get(row, alias) : undefined
 }
 
 interface HistoryMicrosTimestamp {
@@ -51,6 +43,18 @@ export function getModuleHistoryField(moduleId: string, tabId: string): ModuleHi
   if (!Object.hasOwn(MODULE_HISTORY_FIELDS, moduleId)) return null
   const field = MODULE_HISTORY_FIELDS[moduleId as ModuleHistoryModule]
   return field.tabId === tabId ? field : null
+}
+
+/** Date columns are declared by trusted entity configuration, never inferred from row values. */
+export function configuredModuleHistoryField(
+  moduleId: string,
+  tabId: string,
+  columns: readonly { key: string; type?: string }[],
+): ModuleHistoryField | null {
+  const admitted = getModuleHistoryField(moduleId, tabId)
+  if (admitted) return admitted
+  const column = columns.find((column) => column.type === "date" || column.type === "datetime" || column.type === "relative-date")
+  return column ? { tabId, dateField: column.key } : null
 }
 
 function validMillis(ms: number): number | null {
@@ -111,9 +115,9 @@ export function resolveModuleHistoryFilter(
   moduleId: string,
   tabId: string,
   rawPeriod: string | null | undefined,
-  options: { timeZone?: string; now?: Date } = {},
+  options: { timeZone?: string; now?: Date; field?: ModuleHistoryField | null } = {},
 ): ModuleHistoryFilter {
-  const field = getModuleHistoryField(moduleId, tabId)
+  const field = options.field ?? getModuleHistoryField(moduleId, tabId)
   if (!field || rawPeriod == null) return { status: "inactive" }
   const period = parseHistoryPeriod(rawPeriod)
   if (!period) return { status: "invalid", reason: "invalid-period" }
@@ -134,7 +138,7 @@ export function resolveModuleHistoryFilter(
 }
 
 /** Invalid links fail closed. An inactive filter preserves the original rows/reference. */
-export function filterModuleHistoryRows<T extends HistoryDatedRecord>(rows: T[], filter: ModuleHistoryFilter): T[] {
+export function filterModuleHistoryRows<T extends object>(rows: T[], filter: ModuleHistoryFilter): T[] {
   if (filter.status === "inactive") return rows
   if (filter.status === "invalid") return []
   return rows.filter((row) => isHistoryTimestampInRange(
