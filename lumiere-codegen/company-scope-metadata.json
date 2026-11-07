@@ -353,6 +353,19 @@
       "company_paths": [],
       "asserts_no_company_parameter": true,
       "notes": "Company is derived from the exact private reservation, usage and provider attempt binding with audited recovery attribution; no caller-selected company is accepted."
+    },
+    {
+      "name": "save_personal_page_layout",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "active membership company owning the caller personal module page preferences"
+        }
+      ]
     }
   ]
 }

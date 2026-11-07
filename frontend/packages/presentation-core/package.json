@@ -9,7 +9,8 @@
     "./module-contract": "./src/contract/module-draft.ts",
     "./preview-contract": "./src/contract/preview-contract.ts",
     "./preview-decoder": "./src/preview-decoder.ts",
-    "./saved-draft-decoder": "./src/saved-draft-decoder.ts"
+    "./saved-draft-decoder": "./src/saved-draft-decoder.ts",
+    "./personal-page-layout": "./src/personal-page-layout.ts"
   },
   "dependencies": {
     "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.167.tgz",

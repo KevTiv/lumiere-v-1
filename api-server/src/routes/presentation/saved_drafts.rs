@@ -61,7 +61,7 @@ fn module_key_path(value: &str) -> Result<&str, ApiError> {
     Ok(value)
 }
 
-fn owner_sql(context: &TrustedOperationContext) -> String {
+pub(super) fn owner_sql(context: &TrustedOperationContext) -> String {
     format!(
         "organization_id = {} AND owner_identity = 0x{}",
         context.organization_id(),
@@ -91,7 +91,7 @@ fn verify_head(context: &TrustedOperationContext, head: &DraftHeadRow) -> Result
     Ok(())
 }
 
-async fn read_versions(
+pub(super) async fn read_versions(
     client: &StdbClient,
     context: &TrustedOperationContext,
     selectors: &[(u64, u64)],
@@ -204,7 +204,7 @@ pub(super) async fn list_drafts(
 ) -> Result<Json<SavedDraftList>, ApiError> {
     let context = context(&state, &headers, &cookies).await?;
     let heads_sql = format!(
-        "SELECT * FROM presentation_module WHERE {} LIMIT 101",
+        "SELECT * FROM presentation_module WHERE {} AND (module_key < 'personal-page:' OR module_key >= 'personal-page;') LIMIT 101",
         owner_sql(&context)
     );
     let heads = state

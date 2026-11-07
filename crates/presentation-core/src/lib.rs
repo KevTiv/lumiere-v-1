@@ -17,3 +17,6 @@ pub use validation::*;
 
 pub mod saved_drafts;
 pub use saved_drafts::*;
+
+pub mod personal_page_layout;
+pub use personal_page_layout::*;

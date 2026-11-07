@@ -19,6 +19,8 @@ import {
   timeRangeToMs,
 } from "@lumiere/ui"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
+import { ModulePageComposition } from "@lumiere/ui/pages/page-composition-host"
+import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { toDashboardSections, overviewDashboardWebOptions } from "@lumiere/ui/lib/presentation-dashboard"
 import { overviewDashboardDefinition, type DashboardDefinition, type OverviewDashboardData } from "@lumiere/presentation-core"
 import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -335,6 +337,34 @@ function OverviewClientLoaded({
     await exportDashboardToPng(dashboardGridRef.current, "overview-dashboard")
   }, [])
 
+  const keyMetrics = liveSections.filter((section) => section.id === "overview-kpis")
+  const analysisSections = liveSections.filter((section) => section.id !== "overview-kpis")
+  const workSections = myWorkSections.map((section) => section.id === "overview-work-quick-actions" ? { ...section, title: undefined } : section)
+  const ownerContent = (
+    <OwnerControlLoop
+      companyReady={operatingCompanyId != null && operatingCompanyId > 0}
+      draftBills={movesState ?? ownerControlLoop.draftBills}
+      expenseApprovals={resourceStatusLabel(overviewResourceStatus(expenseApprovalsQuery))
+        ?? ((expenseApprovalsQuery.data ?? []).some((row) => !(Number(row.companyId ?? row.company_id) > 0))
+          ? "Scope unavailable"
+          : (expenseApprovalsQuery.data ?? []).filter((row) => matchesCompany(row, operatingCompanyId)).length)}
+      overdueInvoices={movesState ?? ownerControlLoop.overdueInvoices}
+      unreconciledPayments={paymentsState ?? ownerControlLoop.unreconciledPayments}
+      lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
+      pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
+    />
+  )
+  const activationContent = <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} collapseWhenReady />
+  const dailyWorkContent = workspaceProfile === "finance-alpha" ? <DailyWorkWorkspace organizationId={organizationId} summary /> : null
+  const compositionSections = [
+    ...keyMetrics,
+    createPageContentSection({ id: "overview-owner-control-loop", title: t("financeReview.queueTitle", { defaultValue: "Finance work queue" }), content: ownerContent }),
+    createPageContentSection({ id: "overview-activation", title: t("activation.title", { defaultValue: "Getting started" }), content: activationContent }),
+    ...analysisSections,
+    ...(dailyWorkContent ? [createPageContentSection({ id: "overview-daily-work", title: t("workspace.actions.openMyWork", { defaultValue: "My work" }), content: dailyWorkContent })] : []),
+    ...workSections,
+  ]
+
   return (
     <div className="space-y-6">
       <DashboardHeader
@@ -355,32 +385,17 @@ function OverviewClientLoaded({
               return label ? [<p key={resource} data-resource={resource} data-state={state}>{resource}: {label}</p>] : []
             })}
           </section>
-          <DashboardGrid
-            sections={liveSections.filter((section) => section.id === "overview-kpis")}
-            testId="overview-key-metrics"
-            widgetTestIdPrefix="overview-widget"
-          />
-          <OwnerControlLoop
-            companyReady={operatingCompanyId != null && operatingCompanyId > 0}
-            draftBills={movesState ?? ownerControlLoop.draftBills}
-            expenseApprovals={resourceStatusLabel(overviewResourceStatus(expenseApprovalsQuery))
-              ?? ((expenseApprovalsQuery.data ?? []).some((row) => !(Number(row.companyId ?? row.company_id) > 0))
-                ? "Scope unavailable"
-                : (expenseApprovalsQuery.data ?? []).filter((row) => matchesCompany(row, operatingCompanyId)).length)}
-            overdueInvoices={movesState ?? ownerControlLoop.overdueInvoices}
-            unreconciledPayments={paymentsState ?? ownerControlLoop.unreconciledPayments}
-            lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
-            pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
-          />
-          <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} collapseWhenReady />
           {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
-          <DashboardGrid
-            sections={liveSections.filter((section) => section.id !== "overview-kpis")}
-            testId="overview-analysis"
-            widgetTestIdPrefix="overview-widget"
-          />
-          {workspaceProfile === "finance-alpha" && <DailyWorkWorkspace organizationId={organizationId} summary />}
-          <DashboardGrid sections={myWorkSections.map((section) => section.id === "overview-work-quick-actions" ? { ...section, title: undefined } : section)} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
+          <ModulePageComposition moduleId="overview" pageId="dashboard" title={t(overviewDashboardDefinition.titleKey)} sections={compositionSections}>
+            <div className="flex flex-col gap-6">
+              <DashboardGrid sections={keyMetrics} testId="overview-key-metrics" widgetTestIdPrefix="overview-widget" />
+              {ownerContent}
+              {activationContent}
+              <DashboardGrid sections={analysisSections} testId="overview-analysis" widgetTestIdPrefix="overview-widget" />
+              {dailyWorkContent}
+              <DashboardGrid sections={workSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
+            </div>
+          </ModulePageComposition>
         </div>
       ) : (
         <OverviewDashboardSkeleton />

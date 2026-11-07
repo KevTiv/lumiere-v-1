@@ -248,3 +248,111 @@ test("model proposals produce presentation cards bound to captured current scope
   )
   assert.equal(oversized[0]!.nativeAction?.prompt, undefined)
 })
+
+test("page proposals require the current catalog and cannot invent widget selectors or configuration", () => {
+  const page = {
+    moduleId: "sales",
+    pageId: "dashboard",
+    widgets: [{ key: "saved:9007199254740993", label: "Orders by status" }],
+  }
+  const proposals = [
+    { capability_key: "sales.page.edit" },
+    { capability_key: "sales.widget.add" },
+    {
+      capability_key: "sales.widget.add",
+      widget_key: "saved:9007199254740993",
+    },
+  ]
+  const cards = modelNativeChatActions(
+    proposals,
+    scope,
+    "Add orders by status",
+    page,
+  )
+  assert.equal(cards.length, 3)
+  assert.deepEqual(
+    cards.map((card) => card.nativeAction?.kind),
+    ["edit_page", "add_widget", "add_widget"],
+  )
+  assert.equal(cards[0]!.nativeAction?.prompt, undefined)
+  assert.equal(cards[2]!.nativeAction?.widgetKey, "saved:9007199254740993")
+  assert.equal(cards[2]!.nativeAction?.pageId, "dashboard")
+  assert.equal(cards[2]!.nativeAction?.prompt, "Add orders by status")
+  assert.equal(new Set(cards.map((card) => card.id)).size, 3)
+  assert.deepEqual(modelNativeChatActions(proposals, scope, "Add chart"), [])
+  assert.deepEqual(
+    modelNativeChatActions(proposals, scope, "Add chart", {
+      ...page,
+      moduleId: "purchasing",
+    }),
+    [],
+  )
+  for (const raw of [
+    { capability_key: "sales.widget.add", widget_key: "saved:99" },
+    { capability_key: "sales.widget.add", widget_key: "builtin:unoffered" },
+    { capability_key: "sales.widget.add", widget_key: "saved:01" },
+    {
+      capability_key: "sales.widget.add",
+      widget_key: "saved:9007199254740993",
+      query: "SELECT *",
+    },
+    { capability_key: "sales.widget.add", page_id: "other" },
+    { capability_key: "sales.widget.add", record_id: "42" },
+    { capability_key: "sales.page.edit", widget_key: "saved:9007199254740993" },
+    {
+      capability_key: "sales.order.open",
+      record_id: "42",
+      widget_key: "saved:9007199254740993",
+    },
+  ])
+    assert.deepEqual(
+      modelNativeChatActions([raw], scope, "Add chart", page),
+      [],
+      JSON.stringify(raw),
+    )
+})
+
+test("page proposals persist as scoped review cards without claiming a completed page write", () => {
+  const page = {
+    moduleId: "purchasing",
+    pageId: "dashboard",
+    widgets: [{ key: "builtin:orders-by-state", label: "Orders by status" }],
+  }
+  const cards = modelNativeChatActions(
+    [
+      {
+        capability_key: "purchasing.widget.add",
+        widget_key: "builtin:orders-by-state",
+      },
+    ],
+    scope,
+    "Add this chart to my page",
+    page,
+  )
+  const metadata = withNativeActionsMetadata(null, cards)
+  assert.deepEqual(parseNativeChatActions(metadata, scope), cards)
+  assert.deepEqual(
+    parseNativeChatActions(metadata, { ...scope, companyId: "13" }),
+    [],
+  )
+  const reply = assistantPresentationReply(
+    { kind: "action", action: cards[0]!.nativeAction! },
+    t,
+  )!
+  assert.equal(reply.content, "aiChat.native.widgetReady")
+  assert.equal(reply.actions[0]?.draft, undefined)
+  assert.equal(reply.actions[0]?.onClick, undefined)
+  const edit = modelNativeChatActions(
+    [{ capability_key: "purchasing.page.edit" }],
+    scope,
+    "Edit this page",
+    page,
+  )
+  assert.equal(
+    assistantPresentationReply(
+      { kind: "action", action: edit[0]!.nativeAction! },
+      t,
+    )?.content,
+    "aiChat.native.pageReady",
+  )
+})

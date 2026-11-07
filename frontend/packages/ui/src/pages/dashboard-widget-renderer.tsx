@@ -238,16 +238,18 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
   if (!useCard) {
     return (
       <div className={widthClass} data-testid={testId}>
-        <div className="mb-3 flex items-center justify-between gap-2">
-          {widget.title ? (
-            <h3 className={workspaceStyles.sectionTitle}>{widget.title}</h3>
-          ) : (
-            <span />
-          )}
-          {isChart || canExportCsv ? (
-            <div className="flex items-center gap-1">{exportButtons}</div>
-          ) : null}
-        </div>
+        {widget.title || isChart || canExportCsv ? (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            {widget.title ? (
+              <h3 className={workspaceStyles.sectionTitle}>{widget.title}</h3>
+            ) : (
+              <span />
+            )}
+            {isChart || canExportCsv ? (
+              <div className="flex items-center gap-1">{exportButtons}</div>
+            ) : null}
+          </div>
+        ) : null}
         <div ref={isChart ? chartRef : undefined}>{renderContent()}</div>
       </div>
     )

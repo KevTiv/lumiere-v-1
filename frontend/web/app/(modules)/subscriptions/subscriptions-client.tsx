@@ -2,13 +2,14 @@
 
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Button } from "@lumiere/ui/components/button"
-import { useCurrencyFormat, useRBAC, DashboardGrid } from "@lumiere/ui"
+import { useCurrencyFormat, useRBAC } from "@lumiere/ui"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { SubscriptionOverview } from "./subscription-overview"
 import { SubscriptionCreateDialog } from "./subscription-create-dialog"
 import { eligibleSubscriptionOrders, eligibleSubscriptionPlans, inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, subscriptionActionPermissions } from "./subscription-workflow"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 
 import { canUseModuleData, moduleCollection, moduleQueryState, mergeModuleStates } from "@lumiere/ui/lib/module-data-state"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -762,7 +763,7 @@ function SubscriptionsClientLoaded({
     () =>
       ({
         ...moduleConfig,
-        tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+        tabs: moduleConfig.tabs.map((tab) => {
           if (tab.id === "subscriptions")
             return {
               ...tab,
@@ -839,7 +840,6 @@ function SubscriptionsClientLoaded({
         }),
       }) as ModuleConfig,
     [
-      liveSections,
       moduleConfig,
       subscriptionFormConfig,
       planFormConfig,
@@ -1003,24 +1003,33 @@ function SubscriptionsClientLoaded({
     [t, recognizeMoveSelectOptions, recognizeMoveLineSelectOptions],
   )
 
+  const dashboardSections = [
+    createPageContentSection({
+      id: "subscription-overview",
+      title: t("subscriptions.workflow.needsAttention"),
+      content: <SubscriptionOverview scope={{ organizationId: orgId, companyId: operatingCompanyId }} subscriptions={{ rows: subscriptions, state: dataState.subscriptions }} dueToBill={{ rows: dueToBill, state: dataState["due-to-bill"] }} pastDue={{ rows: pastDue, state: dataState["past-due"] }} canCreate={permissionsReady !== false && checkPermission("subscription", "create").allowed && dataState.subscriptions.status === "ready"} onCreate={() => setCreateOpen(true)} />,
+    }),
+    ...(dataState.subscriptions.status === "ready" ? liveSections.filter((section) => section.id === "sub-charts") : []),
+    createPageContentSection({
+      id: "subscription-imports",
+      title: t("subscriptions.workflow.imports"),
+      content: <details><summary className="flex min-h-11 w-fit cursor-pointer items-center text-sm font-medium">{t("subscriptions.workflow.imports")}</summary><div className="flex flex-wrap gap-3 pt-3">
+        {checkPermission("subscription_plan", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importPlanCsvFormConfig, action: "importPlanCsv" })}>{t("subscriptions.dashboard.importPlanCsv")}</Button>}
+        {checkPermission("subscription", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importSubscriptionCsvFormConfig, action: "importSubscriptionCsv" })}>{t("subscriptions.dashboard.importSubscriptionCsv")}</Button>}
+      </div></details>,
+    }),
+  ]
+
   return (
     <EntityLabelsProvider value={entityLabels}>
-      <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending}
+      <ModuleView config={withDashboardSections(config, dashboardSections)} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending}
         assistantFormBlocked={createOpen || quickActionForm !== null}
         onAssistantFormScopeChange={() => { setCreateOpen(false); setQuickActionForm(null); setAssistantPrompt(undefined) }}
         onOpenCreateForm={(tabId, assistant) => {
           setAssistantPrompt(assistant?.prompt)
           if (tabId === "subscriptions") setCreateOpen(true)
           else { const tab = config.tabs.find((candidate) => candidate.id === tabId); if (tab?.createForm && tab.createAction) setQuickActionForm({ form: tab.createForm, action: tab.createAction }) }
-        }}
-        dashboardContent={<div className="space-y-6">
-          <SubscriptionOverview scope={{ organizationId: orgId, companyId: operatingCompanyId }} subscriptions={{ rows: subscriptions, state: dataState.subscriptions }} dueToBill={{ rows: dueToBill, state: dataState["due-to-bill"] }} pastDue={{ rows: pastDue, state: dataState["past-due"] }} canCreate={permissionsReady !== false && checkPermission("subscription", "create").allowed && dataState.subscriptions.status === "ready"} onCreate={() => setCreateOpen(true)} />
-          {dataState.subscriptions.status === "ready" && <DashboardGrid sections={liveSections.filter((section) => section.id === "sub-charts")} />}
-          <details><summary className="flex min-h-11 w-fit cursor-pointer items-center text-sm font-medium">{t("subscriptions.workflow.imports")}</summary><div className="flex flex-wrap gap-3 pt-3">
-            {checkPermission("subscription_plan", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importPlanCsvFormConfig, action: "importPlanCsv" })}>{t("subscriptions.dashboard.importPlanCsv")}</Button>}
-            {checkPermission("subscription", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importSubscriptionCsvFormConfig, action: "importSubscriptionCsv" })}>{t("subscriptions.dashboard.importSubscriptionCsv")}</Button>}
-          </div></details>
-        </div>} />
+        }} />
       {createOpen && <SubscriptionCreateDialog key={`${orgId}:${operatingCompanyId}`} open={quickActionForm === null} onClose={() => { setCreateOpen(false); setAssistantPrompt(undefined) }} scope={{ organizationId: orgId, companyId: operatingCompanyId }} assistantPrompt={assistantPrompt} orders={saleOrders} plans={plans} currencies={currencies} customers={moduleQueryState(contactsQuery).status === "ready" ? contactsQuery.data ?? [] : []}
         sourceState={mergeModuleStates([dataState.subscriptions, moduleQueryState(saleOrdersQuery), dataState.plans])}
         onRetry={() => { void saleOrdersQuery.refetch(); void plansQuery.refetch(); void subscriptionsQuery.refetch() }}

@@ -3775,6 +3775,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "save_personal_page_layout",
+      "exposure": "denied",
+      "reason": "owner-scoped personal page preferences require explicit API admission, company membership and current widget read permissions"
+    },
+    {
       "name": "save_presentation_module",
       "exposure": "denied",
       "reason": "personal draft persistence awaits pinned contract and owner-scoped API admission"

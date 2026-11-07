@@ -5,6 +5,8 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { applyPeriodReportFormContext, periodReportContextState, periodReportFormDefaults, readPeriodReportContext, reportMatchesPeriodContext } from "@lumiere/ui/lib/period-report-context"
 import { ModuleInsights } from "../../../components/module-insights"
+import { useModulePageComposition } from "@/lib/module-page-composition"
+import { useErpSession } from "@lumiere/erp-session"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
@@ -208,6 +210,13 @@ function ReportsClientLoaded({
   useReportsModuleSubscription()
   const router = useRouter()
   const { t } = useTranslation()
+  const { identity } = useErpSession()
+  const pageComposition = useModulePageComposition()
+  const reportOverviewRef = useRef<HTMLDetailsElement>(null)
+  const pendingPageRequest = pageComposition?.pending
+  useEffect(() => {
+    if (pendingPageRequest?.moduleId === "reports" && (!pendingPageRequest.pageId || pendingPageRequest.pageId === "dashboard") && reportOverviewRef.current) reportOverviewRef.current.open = true
+  }, [pendingPageRequest])
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
   const { orgId } = orgBigInts(organizationId)
@@ -367,7 +376,7 @@ function ReportsClientLoaded({
     isRefreshing: storedDashboardRefreshing,
     issue: storedDashboardIssue,
     retry: retryStoredDashboard,
-  } = useStoredDashboardDataSources(orgId, viewDashboardModels)
+  } = useStoredDashboardDataSources(orgId, viewDashboardModels, { companyId: operatingCompanyId?.toString(), identity: identity ?? undefined, enabled: Boolean(identity && operatingCompanyId) })
 
   const viewDashboardTimeRange = useMemo(
     () => (viewDashboardRange === "all" ? undefined : timeRangeToMs(viewDashboardRange)),
@@ -1302,7 +1311,8 @@ function ReportsClientLoaded({
           },
         }}
         config={config}
-        dashboardContent={<ReportStart reportTypes={validPeriodContext ? ["trialBalance"] : undefined} canGenerate={Boolean(operatingCompanyId && currentUser?.id && checkPermission("financial_report", "create").allowed && checkPermission("financial_report", "write").allowed)} sourceState={moduleQueryState(reportsQuery)} onGenerate={(reportType) => setQuickActionForm({ form: financialReportFormConfig, action: "generateReport", reportType })}><details><summary className="cursor-pointer py-3 text-sm font-medium">{t("reports.workspace.overview")}</summary><ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reports, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections.filter((section) => section.id !== "rep-quick-actions-section")} /></details></ReportStart>}
+        dashboardCompositionOwned
+        dashboardContent={<ReportStart reportTypes={validPeriodContext ? ["trialBalance"] : undefined} canGenerate={Boolean(operatingCompanyId && currentUser?.id && checkPermission("financial_report", "create").allowed && checkPermission("financial_report", "write").allowed)} sourceState={moduleQueryState(reportsQuery)} onGenerate={(reportType) => setQuickActionForm({ form: financialReportFormConfig, action: "generateReport", reportType })}><details ref={reportOverviewRef} open><summary className="cursor-pointer py-3 text-sm font-medium">{t("reports.workspace.overview")}</summary><ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reports, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections.filter((section) => section.id !== "rep-quick-actions-section")} /></details></ReportStart>}
         data={data}
         dataState={{ reports: moduleQueryState(reportsQuery), "trial-balance": mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(trialBalancesQuery)]), "vat-report": moduleQueryState(reportsQuery), "report-templates": moduleQueryState(reportTemplatesQuery), "scheduled-reports": moduleQueryState(scheduledReportsQuery), "analytics-metrics": moduleQueryState(analyticsMetricsQuery), dashboards: moduleQueryState(dashboardsQuery), "dashboard-widgets": moduleQueryState(dashboardWidgetsQuery) }}
         onFormSubmit={handleFormSubmit}

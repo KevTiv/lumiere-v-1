@@ -31,6 +31,7 @@
     "@lumiere/erp-shared": "workspace:*",
     "@lumiere/erp-workflows": "workspace:*",
     "@lumiere/i18n": "workspace:*",
+    "@lumiere/presentation-core": "workspace:*",
     "@lumiere/stdb": "workspace:*",
     "@tanstack/react-query": "5.96.2",
     "react": "^19.2.4"

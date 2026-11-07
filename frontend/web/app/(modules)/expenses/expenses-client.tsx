@@ -1095,6 +1095,7 @@ function ExpensesClientLoaded({
         assistantFormBlocked={quickActionForm !== null || workflowForm !== null || rowAction !== null || expenseCreate.attempt !== null}
         onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined) }}
         config={config}
+        dashboardCompositionOwned
         dashboardContent={<CompanyModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataState={dataState}

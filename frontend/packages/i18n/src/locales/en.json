@@ -13781,7 +13781,11 @@
       "denied": "You do not currently have access to this action.",
       "formUnavailable": "The native form is unavailable. Check access, company setup and required reference data.",
       "formBusy": "Finish or close the current form before opening another.",
-      "formOpened": "The native form is open. Review its inputs before saving."
+      "formOpened": "The native form is open. Review its inputs before saving.",
+      "pageReady": "Open the page editor to arrange your widgets.",
+      "widgetReady": "Review the widget in the page editor, then save your layout.",
+      "pageUnavailable": "The page editor could not be opened. Check your current module, company and access, then try again.",
+      "pageBusy": "Finish opening the current page editor before requesting another."
     },
     "starters": {
       "pageHelp": {
@@ -18422,5 +18426,74 @@
     "pinnedReview": "Inspecting saved review revision {{revision}}. Current review values may differ from this saved revision.",
     "savedReviewLoading": "Loading the saved review revision…",
     "savedReviewUnavailable": "This exact saved review revision is unavailable. Current values have not been substituted."
+  },
+  "pageComposition": {
+    "capacity": "This page supports up to {{count}} widgets. Remove a widget before adding another.",
+    "added": "Added {{title}} to the page.",
+    "moved": "Moved {{title}} to position {{position}} of {{count}}.",
+    "createFailed": "Could not create the widget. Please try again.",
+    "configureFailed": "Could not configure the widget. Please try again.",
+    "saved": "Page layout saved.",
+    "saveFailed": "Could not save this page. Your changes are still here; please try again.",
+    "add": "Add widget",
+    "undo": "Undo",
+    "redo": "Redo",
+    "reset": "Reset to default",
+    "unsaved": "Unsaved changes",
+    "saving": "Saving…",
+    "done": "Done",
+    "instructions": "Drag widgets or use the move buttons. Choose a width, then select Done.",
+    "edit": "Edit page",
+    "conflict": "This page changed while you were editing. Cancel and reopen the editor to start from the latest layout.",
+    "waitingForWidget": "Finish configuring the widget to return to your page.",
+    "empty": "Add widgets to bring the metrics you need into this page.",
+    "addFirst": "Add your first widget",
+    "unavailable": {
+      "title": "Widget unavailable",
+      "description": "Data for this widget is unavailable. You can keep its place or edit the page to choose another widget."
+    },
+    "gallery": {
+      "loadPreview": "Live data loads when you add this widget to the page.",
+      "all": "All widgets",
+      "builtin": "Page widgets",
+      "saved": "Saved widgets",
+      "description": "Choose a page widget or a saved chart. Create a new widget to choose its data source and metrics.",
+      "request": "Requested widget: {{prompt}}",
+      "search": "Search widgets",
+      "create": "Create new widget",
+      "sources": "Widget sources",
+      "empty": "No widgets match your search. Try another name or create a new widget.",
+      "onPage": "On this page",
+      "preview": "Widget preview",
+      "width": "New widget width",
+      "addToPage": "Add to page",
+      "pageBlock": "This page block becomes available in the layout.",
+      "alreadyAdded": "This page widget is already on your page. Close the gallery to move or resize it."
+    },
+    "width": {
+      "quarter": "Quarter width",
+      "third": "Third width",
+      "half": "Half width",
+      "wide": "Wide",
+      "full": "Full width"
+    },
+    "savedWidgets": "Saved widgets",
+    "invalidPeriod": "Choose a valid page date range to display this widget.",
+    "widgetReadbackFailed": "The widget was saved, but it could not be read back. Retry to finish adding it.",
+    "scopeChanged": "The active company or user changed. Reopen the page before saving.",
+    "saveConflict": "This page was changed in another session. Your draft is still open; cancel and reopen the editor to use the latest saved layout.",
+    "serviceUnavailable": "Page customization is temporarily unavailable. Your module remains available.",
+    "buildWidget": "Build a widget",
+    "buildWidgetDescription": "Choose a metric, its filters and a display. Preview the result before adding it to this page.",
+    "saveAndAdd": "Save and add to page",
+    "addingTo": "Adding to {{page}}",
+    "controls": "{{title}} controls",
+    "drag": "Drag {{title}}",
+    "resize": "Width of {{title}}",
+    "moveEarlier": "Move {{title}} earlier",
+    "moveLater": "Move {{title}} later",
+    "configure": "Configure {{title}}",
+    "remove": "Remove {{title}}",
+    "alreadyAdded": "{{title}} is already on this page. You can move or resize it in the editor."
   }
 }

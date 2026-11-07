@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { RESOURCE_REGISTRY, type QueryResourceKey } from '@lumiere/stdb/generated/query-registry'
+import {
+  RESOURCE_REGISTRY,
+  type QueryResourceKey,
+} from '@lumiere/stdb/generated/query-registry'
 import {
   dashboardModelLookupKeys,
   resourceKeysForDashboardModels,
@@ -11,40 +14,20 @@ import {
 import { useModuleSubscription, useSubscriptionCache } from '@lumiere/stdb/live'
 import { apiFetch } from '@lumiere/query-hooks/http'
 import { stdbQueryKey } from '@lumiere/query-hooks/hooks/stdb'
-import type { StoredDashboardDataSources, StoredDashboardSourceStates } from '@lumiere/ui'
 import {
-  StoredDashboardSourceQueryError,
+  fetchStoredDashboardResource,
+  type StoredDashboardIncompleteReason,
+} from './stored-dashboard-resource'
+import type {
+  StoredDashboardDataSources,
+  StoredDashboardSourceStates,
+} from '@lumiere/ui'
+import {
   shouldRetryStoredDashboardSource,
   storedDashboardSourceIssue,
   storedDashboardSourceState,
   type StoredDashboardSourceIssue,
 } from './stored-dashboard-source-state'
-
-async function fetchResource(resource: string): Promise<Record<string, unknown>[]> {
-  const response = await apiFetch(`/api/query/${resource}`)
-  if (!response.ok) {
-    const json = (await response.json().catch(() => ({}))) as Record<string, unknown>
-    throw new StoredDashboardSourceQueryError(
-      resource,
-      response.status,
-      (json.error as string | undefined) ?? `Query ${resource} failed`,
-    )
-  }
-  const json = await response.json().catch(() => null)
-  if (
-    json == null
-    || typeof json !== 'object'
-    || !('data' in json)
-    || !Array.isArray(json.data)
-  ) {
-    throw new StoredDashboardSourceQueryError(
-      resource,
-      response.status,
-      `Query ${resource} returned invalid data`,
-    )
-  }
-  return json.data as Record<string, unknown>[]
-}
 
 function indexRowsForResource(
   sources: StoredDashboardDataSources,
@@ -62,6 +45,18 @@ function indexRowsForResource(
     sources[alias] = rows
     sources[alias.replace(/-/g, '_')] = rows
   }
+}
+
+const incompleteSourceMessages: Record<
+  StoredDashboardIncompleteReason,
+  string
+> = {
+  'company-scope':
+    'The company scope of this source could not be verified. Its complete total is unavailable.',
+  'read-limit':
+    'This source exceeds the widget read limit. Its complete total is unavailable.',
+  'source-incomplete':
+    'This source returned incomplete coverage. Its complete total is unavailable.',
 }
 
 function indexStateForResource(
@@ -89,6 +84,7 @@ function indexStateForResource(
 export function useStoredDashboardDataSources(
   organizationId: bigint,
   models: string[],
+  options?: { companyId?: string; identity?: string; enabled?: boolean },
 ): {
   dataSources: StoredDashboardDataSources
   sourceStates: StoredDashboardSourceStates
@@ -99,16 +95,32 @@ export function useStoredDashboardDataSources(
 } {
   const { subscriptionReady } = useSubscriptionCache()
   const [isManualRetrying, setIsManualRetrying] = useState(false)
-  const resourceKeys = useMemo(() => resourceKeysForDashboardModels(models), [models])
+  const resourceKeys = useMemo(
+    () => resourceKeysForDashboardModels(models),
+    [models],
+  )
+  const enabled = options?.enabled !== false && organizationId > 0n
 
-  useModuleSubscription(resourceKeys)
+  useModuleSubscription(enabled ? resourceKeys : [])
 
   const queries = useQueries({
     queries: resourceKeys.map((resource) => ({
-      queryKey: stdbQueryKey(resource, organizationId),
-      queryFn: () => fetchResource(resource),
-      staleTime: subscriptionReady ? Number.POSITIVE_INFINITY : 30_000,
-      enabled: organizationId > 0n && resourceKeys.length > 0,
+      queryKey: [
+        ...stdbQueryKey(resource, organizationId),
+        'dashboard-source-v2',
+        options?.identity ?? null,
+        options?.companyId ?? null,
+      ],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchStoredDashboardResource(apiFetch, resource, {
+          companyId: options?.companyId,
+          signal,
+        }),
+      // Scoped cursor envelopes cannot be populated by the legacy direct row cache.
+      // API invalidations share the resource-key prefix; direct-cache deployments poll.
+      staleTime: 30_000,
+      refetchInterval: subscriptionReady ? 30_000 : (false as const),
+      enabled: enabled && resourceKeys.length > 0,
       retry: shouldRetryStoredDashboardSource,
     })),
   })
@@ -117,7 +129,13 @@ export function useStoredDashboardDataSources(
     const sources: StoredDashboardDataSources = {}
 
     resourceKeys.forEach((resourceKey, index) => {
-      indexRowsForResource(sources, resourceKey, queries[index]?.data ?? [])
+      indexRowsForResource(
+        sources,
+        resourceKey,
+        !enabled || queries[index]?.error
+          ? []
+          : (queries[index]?.data?.rows ?? []),
+      )
     })
 
     for (const model of models) {
@@ -130,19 +148,40 @@ export function useStoredDashboardDataSources(
     }
 
     return sources
-  }, [resourceKeys, queries, models])
+  }, [enabled, resourceKeys, queries, models])
 
   const sourceStates = useMemo(() => {
     const states: StoredDashboardSourceStates = {}
 
     resourceKeys.forEach((resourceKey, index) => {
+      if (!enabled) {
+        indexStateForResource(states, resourceKey, {
+          status: 'unavailable',
+          rowCount: 0,
+          message: 'Widget data is unavailable in the current page context.',
+        })
+        return
+      }
       const query = queries[index]
       const state = storedDashboardSourceState({
         isLoading: query?.isLoading ?? false,
         error: query?.error,
-        rowCount: query?.data?.length ?? 0,
+        rowCount: query?.error ? 0 : (query?.data?.rows.length ?? 0),
       })
-      indexStateForResource(states, resourceKey, state)
+      indexStateForResource(
+        states,
+        resourceKey,
+        !query?.error && query?.data?.complete === false
+          ? {
+              status: 'partial',
+              rowCount: query.data.rows.length,
+              message:
+                incompleteSourceMessages[
+                  query.data.incompleteReason ?? 'source-incomplete'
+                ],
+            }
+          : state,
+      )
     })
 
     for (const model of models) {
@@ -161,13 +200,19 @@ export function useStoredDashboardDataSources(
     }
 
     return states
-  }, [resourceKeys, queries, models])
+  }, [enabled, resourceKeys, queries, models])
 
-  const isLoading = Object.values(sourceStates).some((state) => state.status === 'loading')
+  const isLoading = Object.values(sourceStates).some(
+    (state) => state.status === 'loading',
+  )
   const isRefreshing =
-    isManualRetrying || (!isLoading && queries.some((query) => query.isFetching))
-  const issue = storedDashboardSourceIssue(queries.find((query) => query.error != null)?.error)
+    isManualRetrying ||
+    (!isLoading && queries.some((query) => query.isFetching))
+  const issue = storedDashboardSourceIssue(
+    queries.find((query) => query.error != null)?.error,
+  )
   const retry = async () => {
+    if (!enabled) return
     setIsManualRetrying(true)
     try {
       await Promise.all(queries.map((query) => query.refetch()))

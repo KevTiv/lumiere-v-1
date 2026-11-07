@@ -1,11 +1,14 @@
 import {
+  assistantPageHasWidget,
   decodeAssistantAction,
   getAssistantCapability,
   parseAssistantActionId,
+  parseAssistantWidgetKey,
   ASSISTANT_PROMPT_LIMIT,
   type AssistantAction,
   type AssistantActionResolution,
   type AssistantActionScope,
+  type AssistantPageCatalog,
 } from "@lumiere/query-hooks/assistant-actions"
 import type {
   ChatAction,
@@ -14,6 +17,15 @@ import type {
 
 type Translate = (key: string) => string
 
+const PRESENTATION_REPLY_KEYS: Record<AssistantAction["kind"], string> = {
+  navigate: "aiChat.native.destinationReady",
+  open_record: "aiChat.native.destinationReady",
+  open_form: "aiChat.native.formReady",
+  prepare_workflow: "aiChat.native.workflowReady",
+  edit_page: "aiChat.native.pageReady",
+  add_widget: "aiChat.native.widgetReady",
+}
+
 export function nativeChatAction(action: AssistantAction): ChatAction {
   const validated = decodeAssistantAction(action, action.scope)
   const capability =
@@ -21,7 +33,7 @@ export function nativeChatAction(action: AssistantAction): ChatAction {
   if (!validated || !capability)
     throw new Error("Unknown assistant destination")
   return {
-    id: `native:${validated.capabilityKey}:${validated.recordId ?? "new"}`,
+    id: `native:${validated.capabilityKey}:${validated.recordId ?? validated.widgetKey ?? "new"}${validated.pageId ? `:${validated.pageId}` : ""}`,
     type: "native",
     label: validated.recordId
       ? `${capability.label} #${validated.recordId}`
@@ -41,13 +53,7 @@ export function assistantPresentationReply(
   return {
     content:
       resolution.kind === "action"
-        ? t(
-            resolution.action.kind === "open_form"
-              ? "aiChat.native.formReady"
-              : resolution.action.kind === "prepare_workflow"
-                ? "aiChat.native.workflowReady"
-                : "aiChat.native.destinationReady",
-          )
+        ? t(PRESENTATION_REPLY_KEYS[resolution.action.kind])
         : t(`aiChat.native.clarify.${resolution.reason}`),
     sources: [] as ChatMessageSourceRef[],
     actions,
@@ -57,6 +63,7 @@ export function assistantPresentationReply(
 export interface AssistantUiProposal {
   capability_key: string
   record_id?: string
+  widget_key?: string
 }
 
 /** Invalid optional UI metadata cannot turn a verified answer into an executable action. */
@@ -67,10 +74,14 @@ export function parseAssistantUiProposals(
   const seen = new Set<string>()
   return value.flatMap((item) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return []
-    const raw = item as { capability_key?: unknown; record_id?: unknown }
+    const raw = item as {
+      capability_key?: unknown
+      record_id?: unknown
+      widget_key?: unknown
+    }
     if (
       Object.keys(item).some(
-        (key) => !["capability_key", "record_id"].includes(key),
+        (key) => !["capability_key", "record_id", "widget_key"].includes(key),
       ) ||
       typeof raw.capability_key !== "string"
     )
@@ -86,7 +97,13 @@ export function parseAssistantUiProposals(
         : raw.record_id !== undefined
     )
       return []
-    const key = `${capability.key}:${raw.record_id ?? "new"}`
+    if (
+      raw.widget_key !== undefined &&
+      (capability.kind !== "add_widget" ||
+        !parseAssistantWidgetKey(raw.widget_key))
+    )
+      return []
+    const key = `${capability.key}:${raw.record_id ?? raw.widget_key ?? "new"}`
     if (seen.has(key)) return []
     seen.add(key)
     return [
@@ -94,6 +111,9 @@ export function parseAssistantUiProposals(
         capability_key: raw.capability_key,
         ...(typeof raw.record_id === "string"
           ? { record_id: raw.record_id }
+          : {}),
+        ...(typeof raw.widget_key === "string"
+          ? { widget_key: raw.widget_key }
           : {}),
       },
     ]
@@ -105,11 +125,22 @@ export function modelNativeChatActions(
   proposals: unknown,
   scope: AssistantActionScope,
   userText: string,
+  page?: AssistantPageCatalog,
 ): ChatAction[] {
   const seen = new Set<string>()
   return parseAssistantUiProposals(proposals).flatMap((proposal) => {
     const capability = getAssistantCapability(proposal.capability_key)
     if (!capability) return []
+    if (
+      (capability.kind === "edit_page" || capability.kind === "add_widget") &&
+      page?.moduleId !== capability.module
+    )
+      return []
+    if (
+      proposal.widget_key &&
+      !assistantPageHasWidget(page, capability.module, proposal.widget_key)
+    )
+      return []
     const action = decodeAssistantAction(
       {
         version: 1,
@@ -117,14 +148,22 @@ export function modelNativeChatActions(
         capabilityKey: capability.key,
         scope,
         ...(proposal.record_id ? { recordId: proposal.record_id } : {}),
+        ...(proposal.widget_key ? { widgetKey: proposal.widget_key } : {}),
+        ...((capability.kind === "edit_page" ||
+          capability.kind === "add_widget") &&
+        page
+          ? { pageId: page.pageId ?? "dashboard" }
+          : {}),
         ...((capability.kind === "open_form" ||
-          capability.kind === "prepare_workflow") &&
+          capability.kind === "prepare_workflow" ||
+          capability.kind === "add_widget") &&
         userText.trim() &&
         userText.trim().length <= ASSISTANT_PROMPT_LIMIT
           ? { prompt: userText.trim() }
           : {}),
       },
       scope,
+      { page },
     )
     if (!action) return []
     const card = nativeChatAction(action)

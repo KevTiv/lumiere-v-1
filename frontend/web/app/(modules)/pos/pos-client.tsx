@@ -31,6 +31,8 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { usePosLoyaltyPrograms } from "@lumiere/query-hooks/hooks/sales"
 import { usePOS } from "./use-pos"
 import { posSessionHref } from "./pos-session"
+import { useModuleTab } from "@/hooks/use-module-tab"
+import { ModulePageComposition } from "@lumiere/ui/pages/page-composition-host"
 import type { PosConfig, PosSession, PosTerminal, Product } from "@lumiere/stdb/types"
 
 interface PosClientProps {
@@ -65,7 +67,7 @@ function PosClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const moduleConfig = useMemo(() => posModuleConfig(t), [t])
-  const [activeTab, setActiveTab] = useState("register")
+  const { activeTab, setActiveTab } = useModuleTab("register", moduleConfig.tabs.map((tab) => tab.id))
   const [posAction, setPosAction] = useState<PosFormAction | null>(null)
   const pos = usePOS(
     orgId,
@@ -150,6 +152,8 @@ function PosClientLoaded({
             </TabsTrigger>
           ))}
         </TabsList>
+
+        <ModulePageComposition moduleId="pos" pageId={activeTab} title={`${moduleConfig.title} · ${moduleConfig.tabs.find((tab) => tab.id === activeTab)?.label ?? activeTab}`} />
 
         <TabsContent value="register" className="mt-4 min-h-0 flex-1">
           <POSPage {...pos} onOpenPosAction={(action) => setPosAction(action as PosFormAction)} />

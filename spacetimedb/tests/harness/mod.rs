@@ -26,6 +26,7 @@
 //! ```
 
 use std::collections::HashMap;
+mod personal_pages;
 mod presentation;
 
 /// Persisted presentation draft revision and tenant-isolation acceptance gate.
@@ -33,7 +34,7 @@ mod presentation;
 pub fn run_presentation_draft_tests(ctx: &spacetimedb::ReducerContext) -> Result<(), String> {
     // Every scenario runs and all failures are reported together; any failure
     // still fails (and rolls back) the whole reducer.
-    let scenarios: [(&str, fn(&spacetimedb::ReducerContext) -> Result<(), String>); 5] = [
+    let scenarios: [(&str, fn(&spacetimedb::ReducerContext) -> Result<(), String>); 10] = [
         (
             "revision_round_trip",
             presentation::test_presentation_module_revision_round_trip,
@@ -53,6 +54,26 @@ pub fn run_presentation_draft_tests(ctx: &spacetimedb::ReducerContext) -> Result
         (
             "rejects_inactive_cross_org_actor",
             presentation::test_presentation_module_rejects_inactive_cross_org_actor,
+        ),
+        (
+            "personal_page_revision_replay_and_reset",
+            personal_pages::test_personal_page_revision_replay_and_reset,
+        ),
+        (
+            "personal_page_saved_widget_scope",
+            personal_pages::test_personal_page_saved_widget_scope,
+        ),
+        (
+            "personal_page_current_read_permissions",
+            personal_pages::test_personal_page_current_read_permissions,
+        ),
+        (
+            "personal_page_owner_and_namespace_isolation",
+            personal_pages::test_personal_page_owner_and_namespace_isolation,
+        ),
+        (
+            "personal_page_company_policy_matches_api",
+            personal_pages::test_personal_page_company_policy_matches_api,
         ),
     ];
     let failures: Vec<String> = scenarios

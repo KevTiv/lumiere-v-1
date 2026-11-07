@@ -336,6 +336,9 @@ importers:
       '@lumiere/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@lumiere/presentation-core':
+        specifier: workspace:*
+        version: link:../presentation-core
       '@lumiere/stdb':
         specifier: workspace:*
         version: link:../stdb

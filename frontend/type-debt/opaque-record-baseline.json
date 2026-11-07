@@ -328,7 +328,7 @@
   "web/app/(modules)/workflows/workflows-client.tsx": 16,
   "web/app/(modules)/workflows/workflows-row-dialog.tsx": 6,
   "web/components/read-only-rows.tsx": 1,
-  "web/hooks/use-stored-dashboard-data-sources.ts": 4,
+  "web/hooks/use-stored-dashboard-data-sources.ts": 1,
   "web/lib/accounting-post-draft.ts": 6,
   "web/lib/ai-result-panel.tsx": 6,
   "web/lib/calendar-create-params.ts": 1,

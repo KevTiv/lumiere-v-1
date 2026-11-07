@@ -34,6 +34,7 @@ for (const [name, title, args] of [
   ['module-draft', 'ModuleDraft', []],
   ['preview-contract', 'PreviewContract', ['preview']],
   ['saved-draft-contract', 'SavedDraftContract', ['saved']],
+  ['personal-page-layout', 'PersonalPageLayoutContract', ['personal-pages']],
 ]) {
   const schemaText = execFileSync('cargo', ['run', '--locked', '--quiet', '-p', 'lumiere-presentation-core', '--bin', 'presentation-schema', '--', ...args], {
     cwd: fileURLToPath(root), encoding: 'utf8', maxBuffer: 4 * 1024 * 1024,

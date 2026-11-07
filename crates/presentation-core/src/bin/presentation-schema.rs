@@ -1,4 +1,6 @@
-use lumiere_presentation_core::{ModuleDraft, PreviewContract, SavedDraftContract};
+use lumiere_presentation_core::{
+    ModuleDraft, PersonalPageLayoutContract, PreviewContract, SavedDraftContract,
+};
 use schemars::generate::SchemaSettings;
 
 fn main() {
@@ -7,6 +9,8 @@ fn main() {
         generator.into_root_schema_for::<PreviewContract>()
     } else if std::env::args().nth(1).as_deref() == Some("saved") {
         generator.into_root_schema_for::<SavedDraftContract>()
+    } else if std::env::args().nth(1).as_deref() == Some("personal-pages") {
+        generator.into_root_schema_for::<PersonalPageLayoutContract>()
     } else {
         generator.into_root_schema_for::<ModuleDraft>()
     };

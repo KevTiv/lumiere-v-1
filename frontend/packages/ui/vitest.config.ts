@@ -8,6 +8,8 @@ export default defineConfig({
     // Mirrors the `@/…` paths in tsconfig.json that the components use.
     alias: [
       { find: /^@lumiere\/ui\/(.*)$/, replacement: src("$1") },
+      { find: /^@\/app\/(.*)$/, replacement: fileURLToPath(new URL("../../web/app/$1", import.meta.url)) },
+      { find: /^@\/hooks\/use-stored-dashboard-data-sources$/, replacement: fileURLToPath(new URL("../../web/hooks/use-stored-dashboard-data-sources.ts", import.meta.url)) },
       // Shared navigation tests exercise the web URL hook with its real helper.
       { find: /^@\/lib\/module-tab-navigation$/, replacement: fileURLToPath(new URL("../../web/lib/module-tab-navigation.ts", import.meta.url)) },
       { find: /^@\/lib\/api-fetch$/, replacement: fileURLToPath(new URL("../../web/lib/api-fetch.ts", import.meta.url)) },
