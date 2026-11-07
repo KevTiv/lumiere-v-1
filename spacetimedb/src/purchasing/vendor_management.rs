@@ -5,13 +5,14 @@
 /// |-------|-------------|
 /// | **ResPartnerBank** | Bank account details for partners/vendors |
 /// | **SupplierIntakeRequest** | Supplier onboarding requests |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::require_active_currency_by_id;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{IntakeState, JournalType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -319,9 +320,10 @@ pub fn create_partner_bank(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_partner_bank",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "res_partner_bank",
@@ -334,7 +336,7 @@ pub fn create_partner_bank(
             changed_fields: vec!["id".to_string(), "partner_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Bank account {} created for partner {}",
@@ -395,9 +397,10 @@ pub fn update_partner_bank(
         ..bank
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_partner_bank",
         AuditLogParams {
             company_id: bank.company_id,
             table_name: "res_partner_bank",
@@ -408,7 +411,7 @@ pub fn update_partner_bank(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Bank account {} updated", bank_id);
     Ok(())
@@ -464,9 +467,10 @@ pub fn delete_partner_bank(
 
     ctx.db.res_partner_bank().id().delete(&bank_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_partner_bank",
         AuditLogParams {
             company_id: bank.company_id,
             table_name: "res_partner_bank",
@@ -477,7 +481,7 @@ pub fn delete_partner_bank(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Bank account {} deleted", bank_id);
     Ok(())
@@ -551,9 +555,10 @@ pub fn submit_supplier_intake(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "submit_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -567,7 +572,7 @@ pub fn submit_supplier_intake(
             changed_fields: vec!["id".to_string(), "company_name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Supplier intake {} submitted for {}",
@@ -605,9 +610,10 @@ pub fn review_supplier_intake(
             ..intake
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "review_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -618,7 +624,7 @@ pub fn review_supplier_intake(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Supplier intake {} is now under review", intake_id);
     Ok(())
@@ -672,9 +678,10 @@ pub fn approve_supplier_intake(
             ..intake
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "approve_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -687,7 +694,7 @@ pub fn approve_supplier_intake(
             changed_fields: vec!["state".to_string(), "partner_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Supplier intake {} approved with partner {}",
@@ -725,9 +732,10 @@ pub fn reject_supplier_intake(
             ..intake
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reject_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -740,7 +748,7 @@ pub fn reject_supplier_intake(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Supplier intake {} rejected", intake_id);
     Ok(())
@@ -775,9 +783,10 @@ pub fn hold_supplier_intake(
             ..intake
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "hold_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -790,7 +799,7 @@ pub fn hold_supplier_intake(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Supplier intake {} put on hold", intake_id);
     Ok(())
@@ -936,9 +945,10 @@ pub fn update_supplier_intake(
 
     ctx.db.supplier_intake_request().id().update(updated);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -949,7 +959,7 @@ pub fn update_supplier_intake(
             changed_fields: vec!["updated_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1024,9 +1034,10 @@ pub fn delete_supplier_intake(
 
     ctx.db.supplier_intake_request().id().delete(&intake_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_supplier_intake",
         AuditLogParams {
             company_id: None,
             table_name: "supplier_intake_request",
@@ -1044,7 +1055,7 @@ pub fn delete_supplier_intake(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

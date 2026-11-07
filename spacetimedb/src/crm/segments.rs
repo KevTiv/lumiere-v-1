@@ -5,11 +5,12 @@
 ///   - SegmentMember
 ///   - AssignmentRule
 ///   - ContactSegmentRule (bounded dynamic-segment AST)
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use std::collections::HashSet;
 
 use crate::crm::contacts::{contact, contact_tag_assignment, Contact};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 /// Hard cap so dynamic evaluation stays bounded in-reducer.
 pub const MAX_SEGMENT_RULES: usize = 16;
@@ -216,9 +217,10 @@ pub fn create_contact_segment(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_contact_segment",
         AuditLogParams {
             company_id: None,
             table_name: "contact_segment",
@@ -236,7 +238,7 @@ pub fn create_contact_segment(
             changed_fields: vec!["name".to_string(), "is_dynamic".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -297,9 +299,10 @@ pub fn add_contact_to_segment(
         ..segment
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_contact_to_segment",
         AuditLogParams {
             company_id: None,
             table_name: "segment_member",
@@ -322,7 +325,7 @@ pub fn add_contact_to_segment(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -358,9 +361,10 @@ pub fn create_assignment_rule(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_assignment_rule",
         AuditLogParams {
             company_id: None,
             table_name: "assignment_rule",
@@ -371,7 +375,7 @@ pub fn create_assignment_rule(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -461,9 +465,10 @@ pub fn update_assignment_rule(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_assignment_rule",
         AuditLogParams {
             company_id: None,
             table_name: "assignment_rule",
@@ -474,7 +479,7 @@ pub fn update_assignment_rule(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -652,9 +657,10 @@ pub fn set_contact_segment_rules(
         });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_contact_segment_rules",
         AuditLogParams {
             company_id: None,
             table_name: "contact_segment_rule",
@@ -672,7 +678,7 @@ pub fn set_contact_segment_rules(
             changed_fields: vec!["rules".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -806,9 +812,10 @@ pub fn evaluate_dynamic_segment(
         ..segment
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "evaluate_dynamic_segment",
         AuditLogParams {
             company_id: None,
             table_name: "contact_segment",
@@ -826,7 +833,7 @@ pub fn evaluate_dynamic_segment(
             changed_fields: vec!["member_count".to_string()],
             metadata: Some(r#"{"action":"evaluate_dynamic_segment"}"#.to_string()),
         },
-    );
+    )?;
 
     Ok(())
 }

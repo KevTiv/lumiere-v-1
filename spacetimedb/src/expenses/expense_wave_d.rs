@@ -1,4 +1,5 @@
 //! Wave D — integration intents, advances, policy exceptions, fraud helpers.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
@@ -8,7 +9,7 @@ use crate::accounting::journal_entries::{
 };
 use crate::accounting::line_params::{journal_line_params, validate_company_account};
 use crate::core::organization::{company, company_id_from_scope};
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::types::{
     AccountMoveState, ExpenseAdvanceState, ExpenseLineKind, ExpensePaymentMode,
@@ -539,9 +540,10 @@ pub fn create_expense_integration_intent(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense_integration_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "expense_integration_intent",
@@ -552,7 +554,7 @@ pub fn create_expense_integration_intent(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -622,9 +624,10 @@ pub(super) fn apply_expense_integration_intent_inner(
                     write_date: ctx.timestamp,
                     ..intent
                 });
-            write_audit_log_v2(
+            write_business_audit(
                 ctx,
                 organization_id,
+                "apply_expense_integration_intent",
                 AuditLogParams {
                     company_id: Some(intent.company_id),
                     table_name: "expense_integration_intent",
@@ -635,7 +638,7 @@ pub(super) fn apply_expense_integration_intent_inner(
                     changed_fields: vec!["status".into()],
                     metadata: None,
                 },
-            );
+            )?;
             Ok(())
         }
         Err(e) => {
@@ -687,9 +690,10 @@ pub fn fail_expense_integration_intent(
             metadata: params.metadata.or(intent.metadata.clone()),
             ..intent
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "fail_expense_integration_intent",
         AuditLogParams {
             company_id: Some(intent.company_id),
             table_name: "expense_integration_intent",
@@ -700,7 +704,7 @@ pub fn fail_expense_integration_intent(
             changed_fields: vec!["status".into(), "last_error".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -909,9 +913,10 @@ pub fn create_expense_advance(
         metadata: params.metadata,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense_advance",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_advance",
@@ -937,7 +942,7 @@ pub fn create_expense_advance(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1017,9 +1022,10 @@ pub fn apply_expense_advance_to_sheet(
         state,
         ..advance
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_expense_advance_to_sheet",
         AuditLogParams {
             company_id: Some(sheet.company_id),
             table_name: "hr_expense_advance_application",
@@ -1033,7 +1039,7 @@ pub fn apply_expense_advance_to_sheet(
             changed_fields: vec!["amount".into()],
             metadata: params.metadata,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1087,9 +1093,10 @@ pub fn request_expense_policy_exception(
         policy_hold: true,
         ..expense
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "request_expense_policy_exception",
         AuditLogParams {
             company_id: Some(row.company_id),
             table_name: "hr_expense_policy_exception",
@@ -1100,7 +1107,7 @@ pub fn request_expense_policy_exception(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1141,9 +1148,10 @@ pub fn approve_expense_policy_exception(
             ..expense
         });
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "approve_expense_policy_exception",
         AuditLogParams {
             company_id: Some(exception.company_id),
             table_name: "hr_expense_policy_exception",
@@ -1154,7 +1162,7 @@ pub fn approve_expense_policy_exception(
             changed_fields: vec!["state".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1218,9 +1226,10 @@ pub fn reject_expense_policy_exception(
             metadata,
             ..exception
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reject_expense_policy_exception",
         AuditLogParams {
             company_id: Some(exception.company_id),
             table_name: "hr_expense_policy_exception",
@@ -1237,7 +1246,7 @@ pub fn reject_expense_policy_exception(
             changed_fields: vec!["state".into(), "metadata".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1272,9 +1281,10 @@ pub fn set_expense_fraud_hold(
         fraud_reason: fraud_reason.clone(),
         ..expense
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_expense_fraud_hold",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense",
@@ -1291,6 +1301,6 @@ pub fn set_expense_fraud_hold(
             changed_fields: vec!["fraud_hold".into(), "fraud_reason".into()],
             metadata: params.metadata,
         },
-    );
+    )?;
     Ok(())
 }

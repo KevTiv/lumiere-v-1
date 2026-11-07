@@ -2,9 +2,10 @@
 ///
 /// Backs the `campaign_id`, `medium_id`, `source_id` foreign key fields on:
 /// Lead, SaleOrder, Opportunity, AccountMove, Contact.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -107,9 +108,10 @@ pub fn create_utm_campaign(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_utm_campaign",
         AuditLogParams {
             company_id: None,
             table_name: "utm_campaign",
@@ -120,7 +122,7 @@ pub fn create_utm_campaign(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -146,9 +148,10 @@ pub fn update_utm_campaign(
         is_active: params.is_active.unwrap_or(campaign.is_active),
         ..campaign
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_utm_campaign",
         AuditLogParams {
             company_id: None,
             table_name: "utm_campaign",
@@ -159,7 +162,7 @@ pub fn update_utm_campaign(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -182,9 +185,10 @@ pub fn create_utm_medium(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_utm_medium",
         AuditLogParams {
             company_id: None,
             table_name: "utm_medium",
@@ -195,7 +199,7 @@ pub fn create_utm_medium(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -221,9 +225,10 @@ pub fn update_utm_medium(
         is_active: params.is_active.unwrap_or(medium.is_active),
         ..medium
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_utm_medium",
         AuditLogParams {
             company_id: None,
             table_name: "utm_medium",
@@ -234,7 +239,7 @@ pub fn update_utm_medium(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -257,9 +262,10 @@ pub fn create_utm_source(
         is_active: params.is_active,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_utm_source",
         AuditLogParams {
             company_id: None,
             table_name: "utm_source",
@@ -270,7 +276,7 @@ pub fn create_utm_source(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -296,9 +302,10 @@ pub fn update_utm_source(
         is_active: params.is_active.unwrap_or(source.is_active),
         ..source
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_utm_source",
         AuditLogParams {
             company_id: None,
             table_name: "utm_source",
@@ -309,6 +316,6 @@ pub fn update_utm_source(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

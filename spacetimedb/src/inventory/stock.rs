@@ -1,3 +1,4 @@
+use crate::core::business_changes::write_business_audit;
 /// Stock Management — Tables and Reducers
 ///
 /// Tables:
@@ -5,13 +6,14 @@
 ///   - StockMove
 ///   - StockMoveLine
 ///   - StockPicking
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company_id_from_scope, CompanyScopeParams};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{convert_uom_quantity, currency};
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::tracking::{
@@ -2009,9 +2011,10 @@ pub fn create_stock_quant(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_quant",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_quant",
@@ -2029,7 +2032,7 @@ pub fn create_stock_quant(
             changed_fields: vec!["quantity".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2078,9 +2081,10 @@ pub fn update_stock_quant_quantity(
         ..quant.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_quant_quantity",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_quant",
@@ -2091,7 +2095,7 @@ pub fn update_stock_quant_quantity(
             changed_fields: vec!["quantity".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2152,9 +2156,10 @@ pub fn reserve_stock_quant(
         ..quant.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reserve_stock_quant",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_quant",
@@ -2167,7 +2172,7 @@ pub fn reserve_stock_quant(
             changed_fields: vec!["reserved_quantity".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2215,9 +2220,10 @@ pub fn unreserve_stock_quant(
         ..quant.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unreserve_stock_quant",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_quant",
@@ -2230,7 +2236,7 @@ pub fn unreserve_stock_quant(
             changed_fields: vec!["reserved_quantity".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2242,6 +2248,7 @@ pub fn move_stock_quant(
     quant_id: u64,
     params: MoveStockQuantParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "stock_quant", "write")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -2426,18 +2433,22 @@ pub fn move_stock_quant(
     if is_emptying_src {
         if let Some(lot_id) = src.lot_id {
             if let Some(lot) = ctx.db.stock_production_lot().id().find(&lot_id) {
-                ctx.db.stock_production_lot().id().update(StockProductionLot {
-                    location_id: Some(params.dest_location_id),
-                    write_date: ctx.timestamp,
-                    ..lot
-                });
+                ctx.db
+                    .stock_production_lot()
+                    .id()
+                    .update(StockProductionLot {
+                        location_id: Some(params.dest_location_id),
+                        write_date: ctx.timestamp,
+                        ..lot
+                    });
             }
         }
     }
 
-    write_audit_log_v2(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
+        "move_stock_quant",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_quant",
@@ -2460,7 +2471,7 @@ pub fn move_stock_quant(
             changed_fields: vec!["location_id".to_string(), "quantity".to_string()],
             metadata: None,
         },
-    );
+    )?);
 
     // Capture the exact quant outcomes after the move. The source tombstone
     // is retained when the move empties it; all upserts use the generated SATS
@@ -2506,10 +2517,13 @@ pub fn move_stock_quant(
             organization_id,
             operation_id: "erp.move_stock_quant".to_string(),
             correlation_id: format!("stock-quant:{quant_id}:move-to:{}", params.dest_location_id),
-            changes: changed_quants
-                .into_iter()
-                .map(|(_, change)| change)
-                .collect(),
+            changes: merge_business_audit_changes(
+                changed_quants
+                    .into_iter()
+                    .map(|(_, change)| change)
+                    .collect(),
+                business_audit_changes,
+            )?,
         },
     )?;
 
@@ -2686,9 +2700,10 @@ fn create_stock_move_internal_impl(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_move",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_move",
@@ -2706,7 +2721,7 @@ fn create_stock_move_internal_impl(
             changed_fields: vec!["name".to_string(), "product_uom_qty".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(move_record)
 }
@@ -2745,9 +2760,10 @@ pub fn confirm_stock_move(
         ..move_record.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_stock_move",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_move",
@@ -2758,7 +2774,7 @@ pub fn confirm_stock_move(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2797,9 +2813,10 @@ pub fn assign_stock_move(
         ..move_record.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "assign_stock_move",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_move",
@@ -2810,7 +2827,7 @@ pub fn assign_stock_move(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2860,9 +2877,10 @@ pub fn done_stock_move(
         ..move_record.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "done_stock_move",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_move",
@@ -2875,7 +2893,7 @@ pub fn done_stock_move(
             changed_fields: vec!["quantity_done".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2914,9 +2932,10 @@ pub fn cancel_stock_move(
         ..move_record.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_stock_move",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_move",
@@ -2927,7 +2946,7 @@ pub fn cancel_stock_move(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3068,9 +3087,10 @@ fn create_stock_picking_internal(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -3081,7 +3101,7 @@ fn create_stock_picking_internal(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(picking)
 }
@@ -3137,9 +3157,10 @@ pub fn confirm_stock_picking(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -3150,7 +3171,7 @@ pub fn confirm_stock_picking(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3234,9 +3255,10 @@ pub fn assign_stock_picking(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "assign_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -3247,7 +3269,7 @@ pub fn assign_stock_picking(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3295,7 +3317,8 @@ pub fn unreserve_stock_picking(
     // nothing) and marks the move "assigned"; only those moves hold a reservation.
     if picking.picking_code.as_deref() != Some("incoming") {
         for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
-            if move_record.state == "assigned" && product_requires_stock(ctx, move_record.product_id)
+            if move_record.state == "assigned"
+                && product_requires_stock(ctx, move_record.product_id)
             {
                 unreserve_quantity_at_location(
                     ctx,
@@ -3326,9 +3349,10 @@ pub fn unreserve_stock_picking(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unreserve_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -3339,7 +3363,7 @@ pub fn unreserve_stock_picking(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3764,9 +3788,10 @@ fn validate_stock_picking_impl(
                 return_order.write_date = ctx.timestamp;
                 let ro_id = return_order.id;
                 ctx.db.return_order().id().update(return_order);
-                write_audit_log_v2(
+                write_business_audit(
                     ctx,
                     organization_id,
+                    "validate_stock_picking",
                     AuditLogParams {
                         company_id: Some(company_id),
                         table_name: "return_order",
@@ -3777,7 +3802,7 @@ fn validate_stock_picking_impl(
                         changed_fields: vec!["state".to_string()],
                         metadata: None,
                     },
-                );
+                )?;
             }
         }
     } else if let Some(so_id) = picking.sale_id {
@@ -3909,9 +3934,10 @@ fn validate_stock_picking_impl(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "validate_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -3922,7 +3948,7 @@ fn validate_stock_picking_impl(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3959,7 +3985,8 @@ pub fn cancel_stock_picking(
     // A move that was never assigned reserved nothing and must not release another picking's.
     if picking.picking_code.as_deref() != Some("incoming") {
         for move_record in ctx.db.stock_move().move_by_picking().filter(&picking_id) {
-            if move_record.state == "assigned" && product_requires_stock(ctx, move_record.product_id)
+            if move_record.state == "assigned"
+                && product_requires_stock(ctx, move_record.product_id)
             {
                 unreserve_quantity_at_location(
                     ctx,
@@ -3986,9 +4013,10 @@ pub fn cancel_stock_picking(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -3999,7 +4027,7 @@ pub fn cancel_stock_picking(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -4034,9 +4062,10 @@ pub fn assign_user_to_picking(
         ..picking.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "assign_user_to_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -4047,7 +4076,7 @@ pub fn assign_user_to_picking(
             changed_fields: vec!["user_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -4105,9 +4134,10 @@ pub fn update_stock_picking(
         ..picking.clone()
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_picking",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -4118,7 +4148,7 @@ pub fn update_stock_picking(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

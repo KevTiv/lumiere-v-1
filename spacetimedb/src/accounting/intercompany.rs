@@ -9,6 +9,7 @@
 /// ## Tables
 /// - `IntercompanyTransaction` — Records of intercompany transactions
 /// - `IntercompanyRule` — Configuration rules for intercompany processing
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::{
@@ -19,7 +20,7 @@ use crate::accounting::journal_entries::account_move;
 use crate::accounting::relations::{require_active_account, require_active_journal};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::users::find_user_profile_for_identity;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::sales::pricelists::product_pricelist;
 use crate::sales::sales_core::sale_order;
 use crate::types::{IntercompanyDocumentModel, IntercompanyState, RuleType};
@@ -338,9 +339,10 @@ pub fn create_intercompany_rule(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_intercompany_rule",
         AuditLogParams {
             company_id: Some(source_company_id),
             table_name: "intercompany_rule",
@@ -364,7 +366,7 @@ pub fn create_intercompany_rule(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -510,9 +512,10 @@ pub fn update_intercompany_rule(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_intercompany_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_rule",
@@ -523,7 +526,7 @@ pub fn update_intercompany_rule(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -541,9 +544,10 @@ pub fn delete_intercompany_rule(
 
     ctx.db.intercompany_rule().id().delete(&rule_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_intercompany_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_rule",
@@ -554,7 +558,7 @@ pub fn delete_intercompany_rule(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -668,9 +672,10 @@ pub fn create_intercompany_transaction(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_intercompany_transaction",
         AuditLogParams {
             company_id: Some(origin_company_id),
             table_name: "intercompany_transaction",
@@ -694,7 +699,7 @@ pub fn create_intercompany_transaction(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -730,9 +735,10 @@ pub fn approve_intercompany_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "approve_intercompany_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_transaction",
@@ -743,7 +749,7 @@ pub fn approve_intercompany_transaction(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -830,9 +836,10 @@ pub fn process_intercompany_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "process_intercompany_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_transaction",
@@ -852,7 +859,7 @@ pub fn process_intercompany_transaction(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -886,9 +893,10 @@ pub fn complete_intercompany_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "complete_intercompany_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_transaction",
@@ -899,7 +907,7 @@ pub fn complete_intercompany_transaction(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -926,9 +934,10 @@ pub fn error_intercompany_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "error_intercompany_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_transaction",
@@ -941,7 +950,7 @@ pub fn error_intercompany_transaction(
             changed_fields: vec!["state".to_string(), "error_message".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -982,9 +991,10 @@ pub fn cancel_intercompany_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_intercompany_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_transaction",
@@ -995,7 +1005,7 @@ pub fn cancel_intercompany_transaction(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1030,9 +1040,10 @@ pub fn retry_intercompany_transaction(
             ..transaction
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "retry_intercompany_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_transaction",
@@ -1043,7 +1054,7 @@ pub fn retry_intercompany_transaction(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1067,9 +1078,10 @@ pub fn set_intercompany_rule_active(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_intercompany_rule_active",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "intercompany_rule",
@@ -1080,7 +1092,7 @@ pub fn set_intercompany_rule_active(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

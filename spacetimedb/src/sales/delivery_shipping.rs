@@ -11,10 +11,11 @@
 ///   - Multi-carrier support
 ///   - Dynamic pricing rules
 ///   - Shipping cost calculation
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, company_id_from_scope};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::stock::{stock_picking, StockPicking};
 use crate::types::BatchState;
 
@@ -433,9 +434,10 @@ pub fn create_picking_batch(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_picking_batch",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking_batch",
@@ -457,7 +459,7 @@ pub fn create_picking_batch(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -523,9 +525,10 @@ pub fn create_delivery_carrier(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_delivery_carrier",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "delivery_carrier",
@@ -542,7 +545,7 @@ pub fn create_delivery_carrier(
             changed_fields: vec!["name".to_string(), "delivery_type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -575,9 +578,10 @@ pub fn create_delivery_price_rule(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_delivery_price_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "delivery_price_rule",
@@ -599,7 +603,7 @@ pub fn create_delivery_price_rule(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -636,9 +640,10 @@ pub fn create_shipping_method(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_shipping_method",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "shipping_method",
@@ -655,7 +660,7 @@ pub fn create_shipping_method(
             changed_fields: vec!["name".to_string(), "provider".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -690,9 +695,10 @@ pub fn start_picking_batch(
         ..batch
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "start_picking_batch",
         AuditLogParams {
             company_id: Some(batch.company_id),
             table_name: "stock_picking_batch",
@@ -703,7 +709,7 @@ pub fn start_picking_batch(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -738,9 +744,10 @@ pub fn complete_picking_batch(
         ..batch
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "complete_picking_batch",
         AuditLogParams {
             company_id: Some(batch.company_id),
             table_name: "stock_picking_batch",
@@ -751,7 +758,7 @@ pub fn complete_picking_batch(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -786,9 +793,10 @@ pub fn cancel_picking_batch(
         ..batch
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_picking_batch",
         AuditLogParams {
             company_id: Some(batch.company_id),
             table_name: "stock_picking_batch",
@@ -799,7 +807,7 @@ pub fn cancel_picking_batch(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

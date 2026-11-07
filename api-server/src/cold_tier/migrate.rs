@@ -365,6 +365,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0036_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 37,
+        name: "alpha_organization_business_history",
+        change_set: 26,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0037_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1644,6 +1653,27 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("phases are out of order"));
+    }
+
+    #[test]
+    fn organization_history_expand_preserves_released_metering_catalog() {
+        assert_eq!(
+            migration_catalog_checksum(&MIGRATIONS[..36]),
+            "sha256:b6cbf01ce1c022cf428f646e9b472258e9bedc8e291dd5391fa856d1a7406427"
+        );
+        let migration = MIGRATIONS[36];
+        assert_eq!(migration.version, 37);
+        assert_eq!(migration.name, "alpha_organization_business_history");
+        assert_eq!(migration.change_set, 26);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert_eq!(
+            migration_checksum(migration.sql),
+            "sha256:bdc1f484e7e48ff1876e603c65c659494d4dfcbe8b186dc02d5a888a0a23ee8e"
+        );
+        assert!(migration
+            .sql
+            .contains("PRIMARY KEY (\"organization_id\", \"id\")"));
+        assert!(!migration.sql.contains("\"company_id\""));
     }
 
     #[test]

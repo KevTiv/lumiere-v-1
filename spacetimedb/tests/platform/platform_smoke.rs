@@ -1721,9 +1721,9 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
                 && commit.correlation_id == format!("document:{}:version:2", doc.id)
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 3 {
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
         return Err(format!(
-            "document version should emit one three-row organization commit, got {} / {:?}",
+            "document version should emit one five-row organization commit, got {} / {:?}",
             commits.len(),
             commits.first().map(|commit| commit.row_change_count)
         ));
@@ -1742,7 +1742,19 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         .iter()
         .map(|change| change.table_name.as_str())
         .collect();
-    if tables != ["document", "document_version", "document_version"] {
+    if tables
+        != [
+            "document",
+            "document_version",
+            "document_version",
+            "audit_log",
+            if doc.company_id.is_some() {
+                "business_change"
+            } else {
+                "organization_business_change"
+            },
+        ]
+    {
         return Err(format!(
             "document version commit row order mismatch: {tables:?}"
         ));

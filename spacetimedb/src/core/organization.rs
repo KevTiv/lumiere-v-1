@@ -1,8 +1,10 @@
+use crate::core::business_changes::write_business_audit;
 /// Organization & Multi-Tenancy
 ///
 /// Tables:  Organization · OrganizationSettings · Company
 /// Pattern: every table row carries `organization_id` for tenant isolation.
 ///          Companies are sub-units within an Organization.
+use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
 use spacetimedb::rand::Rng;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -23,7 +25,7 @@ use crate::core::users::{
 use crate::crm::activities::{activity_type, ActivityType};
 use crate::forms::migrations::run_seed_organization_form_configs;
 use crate::forms::{form_config, form_config_field, form_field_label, form_role_config};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::hr::country_pack_hr::{
     hr_country_pack_leave_default, seed_hr_country_pack_leave_catalog_for_organization,
 };
@@ -426,9 +428,10 @@ pub fn create_organization(
     params: CreateOrganizationParams,
 ) -> Result<(), String> {
     let (org, _) = insert_organization_with_owner(ctx, params)?;
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         org.id,
+        "create_organization",
         AuditLogParams {
             company_id: None,
             table_name: "organization",
@@ -439,7 +442,7 @@ pub fn create_organization(
             changed_fields: vec!["name".to_string(), "code".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -563,9 +566,10 @@ pub fn bootstrap_new_tenant(
         run_seed_organization_form_configs(ctx, org.id)?;
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         org.id,
+        "bootstrap_new_tenant",
         AuditLogParams {
             company_id: Some(company.id),
             table_name: "organization",
@@ -580,7 +584,7 @@ pub fn bootstrap_new_tenant(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     seed_country_catalog_for_organization(ctx, org.id)?;
     record_bootstrap_organization_commit(ctx, org.id)?;
@@ -877,6 +881,7 @@ pub fn update_organization(
         require_active_currency_for_organization(ctx, organization_id, currency_id)?;
     }
 
+    let history_before = native_row_snapshot(&org)?;
     ctx.db.organization().id().update(Organization {
         name: params.name.unwrap_or(org.name),
         description: params.description.or(org.description),
@@ -892,6 +897,28 @@ pub fn update_organization(
         ..org
     });
 
+    let history_after = ctx
+        .db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "update_organization",
+        AuditLogParams {
+            company_id: None,
+            table_name: "organization",
+            record_id: organization_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -903,6 +930,14 @@ pub fn upsert_organization_settings(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "organization", "write")?;
 
+    let history_before = ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+        .as_ref()
+        .map(native_row_snapshot)
+        .transpose()?;
     match ctx
         .db
         .organization_settings()
@@ -934,6 +969,32 @@ pub fn upsert_organization_settings(
         }
     }
 
+    let history_after = ctx
+        .db
+        .organization_settings()
+        .organization_id()
+        .find(&organization_id)
+        .ok_or("Organization settings missing after save")?;
+    let history_action = if history_before.is_some() {
+        "UPDATE"
+    } else {
+        "CREATE"
+    };
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "upsert_organization_settings",
+        AuditLogParams {
+            company_id: None,
+            table_name: "organization_settings",
+            record_id: organization_id,
+            action: history_action,
+            old_values: history_before,
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -978,9 +1039,10 @@ pub fn create_company(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_company",
         AuditLogParams {
             company_id: Some(company.id),
             table_name: "company",
@@ -998,7 +1060,7 @@ pub fn create_company(
             changed_fields: vec!["name".to_string(), "code".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1018,6 +1080,7 @@ pub fn update_company(
 
     check_permission(ctx, company.organization_id, "company", "write")?;
 
+    let history_before = native_row_snapshot(&company)?;
     ctx.db.company().id().update(Company {
         name: params.name.unwrap_or(company.name),
         tax_id: params.tax_id.or(company.tax_id),
@@ -1029,6 +1092,28 @@ pub fn update_company(
         ..company
     });
 
+    let history_after = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        company.organization_id,
+        "update_company",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "company",
+            record_id: company_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1083,9 +1168,10 @@ pub fn set_company_vertical_pack(
             })
             .id
     };
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         company.organization_id,
+        "set_company_vertical_pack",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "company_vertical_pack",
@@ -1100,7 +1186,7 @@ pub fn set_company_vertical_pack(
             changed_fields: vec!["enabled".into(), "configuration".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1119,6 +1205,7 @@ pub fn update_company_address(
 
     check_permission(ctx, company.organization_id, "company", "write")?;
 
+    let history_before = native_row_snapshot(&company)?;
     ctx.db.company().id().update(Company {
         address_street: params.address_street,
         address_city: params.address_city,
@@ -1128,6 +1215,28 @@ pub fn update_company_address(
         ..company
     });
 
+    let history_after = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        company.organization_id,
+        "update_company_address",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "company",
+            record_id: company_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1146,6 +1255,7 @@ pub fn update_company_business(
 
     check_permission(ctx, company.organization_id, "company", "write")?;
 
+    let history_before = native_row_snapshot(&company)?;
     ctx.db.company().id().update(Company {
         tax_id: params.tax_id,
         company_registry: params.company_registry,
@@ -1153,6 +1263,28 @@ pub fn update_company_business(
         ..company
     });
 
+    let history_after = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        company.organization_id,
+        "update_company_business",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "company",
+            record_id: company_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1171,6 +1303,7 @@ pub fn update_company_hierarchy(
 
     check_permission(ctx, company.organization_id, "company", "write")?;
 
+    let history_before = native_row_snapshot(&company)?;
     ctx.db.company().id().update(Company {
         is_parent: params.is_parent,
         parent_id: params.parent_id,
@@ -1178,6 +1311,28 @@ pub fn update_company_hierarchy(
         ..company
     });
 
+    let history_after = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        company.organization_id,
+        "update_company_hierarchy",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "company",
+            record_id: company_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1193,12 +1348,35 @@ pub fn delete_company(ctx: &ReducerContext, company_id: u64) -> Result<(), Strin
 
     check_permission(ctx, company.organization_id, "company", "delete")?;
 
+    let history_before = native_row_snapshot(&company)?;
     ctx.db.company().id().update(Company {
         deleted_at: Some(ctx.timestamp),
         updated_at: ctx.timestamp,
         ..company
     });
 
+    let history_after = ctx
+        .db
+        .company()
+        .id()
+        .find(&company_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        company.organization_id,
+        "delete_company",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "company",
+            record_id: company_id,
+            action: "DELETE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 

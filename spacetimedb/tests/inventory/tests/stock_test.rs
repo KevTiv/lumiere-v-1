@@ -5,6 +5,8 @@
 /// and quantity updates directly until warehouse graph is seeded in harness.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::audit::audit_log;
+use crate::core::business_changes::business_change;
 use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::inventory::stock::{
@@ -141,9 +143,9 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
                     == format!("stock-quant:{}:move-to:{}", quant.id, destination_id)
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 2 {
+    if commits.len() != 1 || commits[0].row_change_count != 4 {
         return Err(format!(
-            "stock move should emit one two-row organization commit, got {} / {:?}",
+            "stock move should emit one four-row organization commit, got {} / {:?}",
             commits.len(),
             commits.first().map(|commit| commit.row_change_count)
         ));
@@ -158,15 +160,56 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
         })
         .collect();
     changes.sort_by_key(|change| change.ordinal);
-    if changes.len() != 2
-        || changes
-            .iter()
-            .any(|change| change.table_name != "stock_quant")
-    {
-        return Err("stock move commit should contain two ordered stock_quant rows".to_string());
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["stock_quant", "stock_quant", "audit_log", "business_change"] {
+        return Err(format!(
+            "stock move commit source/history row order mismatch: {tables:?}"
+        ));
     }
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[2].row_identity_json)
+        .map_err(|error| format!("stock move audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("stock move audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[3].row_identity_json)
+        .map_err(|error| format!("stock move private history identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("stock move private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("stock move audit row missing")?;
+    let history = ctx
+        .db
+        .business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("stock move private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != org_id
+        || audit.organization_id != org_id
+        || history.record_id != quant.id
+        || history.resource != "stock_quant"
+        || history.subject_resource != "stock_quant"
+        || history.subject_record_id != quant.id
+        || audit.table_name != "stock_quant"
+        || audit.record_id != quant.id
+        || history.operation != "move_stock_quant"
+        || history.company_id != fixture.company_id
+        || audit.company_id != Some(fixture.company_id)
+    {
+        return Err("stock move owner commit did not preserve exact audit/private history linkage and scope".into());
+    }
+
     let actual_ids: Vec<u64> = changes
         .iter()
+        .take(2)
         .map(|change| {
             serde_json::from_str::<serde_json::Value>(&change.row_identity_json)
                 .ok()
@@ -204,13 +247,15 @@ pub fn test_stock_quant_create(ctx: &ReducerContext) -> Result<(), String> {
 
     // Duplicate compatible destination quants must fail closed rather than being selected by
     // iterator order.
-    ctx.db.stock_quant().insert(crate::inventory::stock::StockQuant {
-        id: 0,
-        quantity: 1.0,
-        available_quantity: 1.0,
-        value: destination_quant.cost,
-        ..destination_quant.clone()
-    });
+    ctx.db
+        .stock_quant()
+        .insert(crate::inventory::stock::StockQuant {
+            id: 0,
+            quantity: 1.0,
+            available_quantity: 1.0,
+            value: destination_quant.cost,
+            ..destination_quant.clone()
+        });
     let source_before_ambiguous = ctx
         .db
         .stock_quant()

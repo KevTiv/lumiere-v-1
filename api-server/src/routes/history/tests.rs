@@ -48,7 +48,7 @@ async fn history_router_prevents_caching_for_auth_and_extractor_rejections() {
     }
 }
 
-fn access(grants: &[&str], fields: Option<&[&str]>) -> FieldAccessContext {
+pub(super) fn access(grants: &[&str], fields: Option<&[&str]>) -> FieldAccessContext {
     let mut access = FieldAccessContext {
         organization_id: 42,
         identity_hex: ACTOR.into(),
@@ -65,7 +65,7 @@ fn access(grants: &[&str], fields: Option<&[&str]>) -> FieldAccessContext {
     access
 }
 
-fn request(cursor: Option<String>, limit: u32) -> HistoryQuery {
+pub(super) fn request(cursor: Option<String>, limit: u32) -> HistoryQuery {
     HistoryQuery {
         company_id: 7,
         cursor,
@@ -73,7 +73,7 @@ fn request(cursor: Option<String>, limit: u32) -> HistoryQuery {
     }
 }
 
-fn evidence(id: u64, changes: Value) -> Value {
+pub(super) fn evidence(id: u64, changes: Value) -> Value {
     json!({"id":id,"organization_id":42,"company_id":7,"resource":"account_move","record_id":9,
         "subject_resource":"account_move_line","subject_record_id":10,"operation":OPERATION,
         "actor_identity":ACTOR,"occurred_at":1_762_000_000_123_456_i64,"schema_version":1,
@@ -227,12 +227,15 @@ struct Fixture {
     evidence_read: AtomicBool,
     revoke_on_line: AtomicBool,
     line_read: AtomicBool,
+    restrict_fields_after_read: AtomicBool,
+    review_administrator: AtomicBool,
+    native_import_receipt: AtomicBool,
     requests: Mutex<Vec<(String, String)>>,
 }
 
-struct Server {
-    owner: StdbClient,
-    actor: StdbClient,
+pub(super) struct Server {
+    pub(super) owner: StdbClient,
+    pub(super) actor: StdbClient,
     fixture: Arc<Fixture>,
     handle: tokio::task::JoinHandle<()>,
 }
@@ -260,10 +263,10 @@ fn sats_reply(sql: &str, rows: Vec<Value>) -> String {
     };
     let fields=columns.iter().map(|column| {
         let mut field=json!({"name":{"some":column}});
-        if table=="business_change" && column=="actor_identity" {
+        if matches!(table, "business_change" | "organization_business_change") && column=="actor_identity" {
             field["algebraic_type"]=json!({"Product":{"elements":[{"name":{"some":"__identity__"},"algebraic_type":{"U256":[]}}]}});
         }
-        if table=="business_change" && column=="occurred_at" {
+        if matches!(table, "business_change" | "organization_business_change") && column=="occurred_at" {
             field["algebraic_type"]=json!({"Product":{"elements":[{"name":{"some":"__timestamp_micros_since_unix_epoch__"},"algebraic_type":{"I64":[]}}]}});
         }
         field
@@ -275,9 +278,13 @@ fn sats_reply(sql: &str, rows: Vec<Value>) -> String {
                 .iter()
                 .map(|column| {
                     let value = row[column].clone();
-                    if table == "business_change" && column == "actor_identity" {
+                    if matches!(table, "business_change" | "organization_business_change")
+                        && column == "actor_identity"
+                    {
                         json!([format!("0x{}", value.as_str().unwrap())])
-                    } else if table == "business_change" && column == "occurred_at" {
+                    } else if matches!(table, "business_change" | "organization_business_change")
+                        && column == "occurred_at"
+                    {
                         json!([value])
                     } else {
                         value
@@ -298,7 +305,7 @@ fn bound(sql: &str, prefix: &str) -> Option<u64> {
         .ok()
 }
 
-async fn server(
+pub(super) async fn server(
     events: Vec<Value>,
     fields: Option<&[&str]>,
     source_exists: bool,
@@ -328,37 +335,174 @@ async fn server(
             .split_whitespace()
             .next()
             .unwrap();
-        let rows=match table {
-            "user_profile"=>vec![json!({"id":1,"organization_id":42,"is_active":true,"is_superuser":false,"name":"Reader","metadata":null})],
-            "user_organization"=>vec![json!({"id":1,"organization_id":42,"company_id":7,"role_id":2,"is_active":true})],
-            "role"=>vec![json!({"id":2,"organization_id":42,"is_active":true,"name":"Reader","permissions":if (fixture.revoke_after_read&&fixture.evidence_read.load(Ordering::SeqCst)) || (fixture.revoke_on_line.load(Ordering::SeqCst)&&fixture.line_read.load(Ordering::SeqCst)) { vec!["account_move:read","account_move_line:read"] } else { GRANTS.to_vec() }})],
-            "user_role_assignment"|"org_permission"=>vec![],
-            "field_permission"=>fixture.fields.as_ref().map(|fields|vec![json!({"id":1,"organization_id":42,"role_id":2,"resource":"account-move-lines","action":"read","allowed_fields":fields})]).unwrap_or_default(),
-            "account_move"=>{
-                assert_eq!(token,"Bearer actor-token");
+        let rows = match table {
+            "user_profile" => vec![
+                json!({"id":1,"organization_id":42,"is_active":true,"is_superuser":false,"name":"Reader","metadata":null}),
+            ],
+            "user_organization" => vec![
+                json!({"id":1,"organization_id":42,"company_id":7,"role_id":2,"is_active":true}),
+            ],
+            "company" => {
+                vec![json!({"id":7,"organization_id":42,"name":"Company","currency_id":1})]
+            }
+            "role" => vec![
+                json!({"id":2,"organization_id":42,"is_active":true,"name":"Reader","permissions":if fixture.review_administrator.load(Ordering::SeqCst) {vec!["*:*"]} else if (fixture.revoke_after_read&&fixture.evidence_read.load(Ordering::SeqCst)) || (fixture.revoke_on_line.load(Ordering::SeqCst)&&fixture.line_read.load(Ordering::SeqCst)) { vec!["account_move:read","account_move_line:read"] } else { GRANTS.iter().copied().chain(["product:read", "expense_sheet:read"]).collect::<Vec<_>>() }}),
+            ],
+            "user_role_assignment" | "org_permission" => vec![],
+            "field_permission" => {
+                if fixture.restrict_fields_after_read.load(Ordering::SeqCst)
+                    && fixture.evidence_read.load(Ordering::SeqCst)
+                {
+                    vec![
+                        json!({"id":1,"organization_id":42,"role_id":2,"resource":"account-moves","action":"read","allowed_fields":["id"]}),
+                    ]
+                } else {
+                    fixture.fields.as_ref().map(|fields|vec![json!({"id":1,"organization_id":42,"role_id":2,"resource":"account-move-lines","action":"read","allowed_fields":fields})]).unwrap_or_default()
+                }
+            }
+            "account_move" => {
+                assert_eq!(token, "Bearer actor-token");
                 assert!(sql.contains("organization_id = 42 AND company_id = 7 AND id = 9"));
-                if fixture.source_exists {vec![json!({"id":9,"organization_id":42,"company_id":7,"name":"Invoice"})]} else {vec![]}
-            },
-            "account_move_line"=>{
-                fixture.line_read.store(true,Ordering::SeqCst);
-                assert_eq!(token,"Bearer actor-token");
-                assert!(sql.contains("organization_id = 42 AND company_id = 7 AND move_id = 9 AND id = 10"));
-                if fixture.line_exists {vec![json!({"id":10,"organization_id":42,"company_id":7,"move_id":9})]} else {vec![]}
-            },
-            "business_change"=>{
-                assert_eq!(token,"Bearer owner-token");
-                assert!(sql.contains("organization_id = 42 AND company_id = 7 AND resource = 'account_move' AND record_id = 9"));
-                assert!(!sql.contains("audit_log"));
-                fixture.evidence_read.store(true,Ordering::SeqCst);
-                let after=bound(&sql," AND id > ").unwrap();
-                let end=bound(&sql," AND id <= ").unwrap_or(u64::MAX);
-                let mut rows=fixture.events.iter().rev().filter(|row| {
-                    let id=row["id"].as_u64().unwrap(); id>after&&id<=end
-                }).cloned().collect::<Vec<_>>();
-                if sql.ends_with("LIMIT 1") { rows.truncate(1); }
+                if fixture.source_exists {
+                    vec![json!({"id":9,"organization_id":42,"company_id":7,"name":"Invoice"})]
+                } else {
+                    vec![]
+                }
+            }
+            "account_move_line" => {
+                fixture.line_read.store(true, Ordering::SeqCst);
+                assert_eq!(token, "Bearer actor-token");
+                assert!(sql.contains(
+                    "organization_id = 42 AND company_id = 7 AND move_id = 9 AND id = 10"
+                ));
+                if fixture.line_exists {
+                    vec![json!({"id":10,"organization_id":42,"company_id":7,"move_id":9})]
+                } else {
+                    vec![]
+                }
+            }
+            "product" => {
+                assert_eq!(token, "Bearer actor-token");
+                assert!(sql.contains("organization_id = 42 AND id = 9"));
+                if fixture.source_exists {
+                    vec![json!({"id":9,"organization_id":42,"company_id":7,"name":"Product"})]
+                } else {
+                    vec![]
+                }
+            }
+            "expense_sheet" => {
+                assert_eq!(token, "Bearer actor-token");
+                assert!(sql.contains("organization_id = 42 AND company_id = 7 AND id = 9"));
+                if fixture.source_exists {
+                    vec![json!({"id":9,"organization_id":42,"company_id":7,"state":"submitted"})]
+                } else {
+                    vec![]
+                }
+            }
+            "import_job_record" => {
+                assert_eq!(token, "Bearer owner-token");
+                assert!(sql
+                    .contains("organization_id = 42 AND table_name = 'product' AND record_id = 9"));
+                fixture.evidence_read.store(true, Ordering::SeqCst);
+                let after = bound(&sql, " AND id > ").unwrap();
+                let end = bound(&sql, " AND id <= ").unwrap_or(u64::MAX);
+                let mut rows = fixture
+                    .events
+                    .iter()
+                    .rev()
+                    .filter(|row| {
+                        let id = row["id"].as_u64().unwrap();
+                        id > after && id <= end && row.get("table_name").is_some()
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if sql.ends_with("LIMIT 1") {
+                    rows.truncate(1);
+                }
                 rows
-            },
-            other=>panic!("unexpected history fixture table {other}: {sql}"),
+            }
+            "import_job" => {
+                assert_eq!(token, "Bearer owner-token");
+                assert!(sql.contains("organization_id = 42 AND id = "));
+                let id = bound(&sql, " AND id = ").unwrap();
+                vec![
+                    json!({"id":id,"organization_id":42,"table_name":"product","status":"success",
+                    "file_name":{"some":"reviewed.csv"},"create_uid":ACTOR,
+                    "metadata":{"some":json!({"correlation_version":1,"company_id":if id==12 {7} else {8},"request_id":"b".repeat(32),"sha256":"a".repeat(64)}).to_string()}}),
+                ]
+            }
+            "business_change" | "organization_business_change" => {
+                if sql.contains("operation = 'import_product_csv'") {
+                    assert_eq!(token, "Bearer owner-token");
+                    assert!(sql.contains("resource = 'product' AND record_id = 9"));
+                    return sats_reply(
+                        &sql,
+                        if table == "organization_business_change"
+                            && fixture.native_import_receipt.load(Ordering::SeqCst)
+                        {
+                            vec![
+                                json!({"id":31,"organization_id":42,"resource":"product","record_id":9,"subject_resource":"product","subject_record_id":9,"operation":"import_product_csv","actor_identity":ACTOR,"occurred_at":1_762_000_000_123_456_i64,"schema_version":1,"audit_log_id":40}),
+                            ]
+                        } else {
+                            vec![]
+                        },
+                    );
+                }
+                assert_eq!(token, "Bearer owner-token");
+                if table == "business_change" {
+                    assert!(sql.contains("organization_id = 42 AND company_id = 7"));
+                } else {
+                    assert!(sql.contains("organization_id = 42"));
+                    assert!(!sql.contains("company_id"));
+                }
+                assert!(
+                    sql.contains("resource = 'account_move'")
+                        || sql.contains("resource = 'product'")
+                        || sql.contains("resource = 'expense_sheet'")
+                );
+                if fixture
+                    .events
+                    .iter()
+                    .any(|row| row["resource"] == "hr_expense_sheet")
+                {
+                    assert!(sql.contains("resource = 'hr_expense_sheet'"));
+                }
+                assert!(sql.contains("record_id = 9"));
+                assert!(!sql.contains("audit_log"));
+                fixture.evidence_read.store(true, Ordering::SeqCst);
+                let after = bound(&sql, " AND id > ").unwrap();
+                let end = bound(&sql, " AND id <= ").unwrap_or(u64::MAX);
+                let mut rows = fixture
+                    .events
+                    .iter()
+                    .rev()
+                    .filter(|row| {
+                        let id = row["id"].as_u64().unwrap();
+                        id > after
+                            && id <= end
+                            && (row.get("company_id").is_none()
+                                == (table == "organization_business_change"))
+                            && (!sql.contains("subject_resource = 'account_move_line'")
+                                || (row["subject_resource"] == "account_move_line"
+                                    && row["operation"]
+                                        .as_str()
+                                        .is_some_and(|operation| OPERATIONS.contains(&operation))))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if sql.ends_with("LIMIT 1") {
+                    rows.truncate(1);
+                }
+                rows
+            }
+            "audit_log" => {
+                assert_eq!(token, "Bearer owner-token");
+                assert!(sql.contains("organization_id = 42 AND id = 40"));
+                vec![
+                    json!({"id":40,"organization_id":42,"table_name":"product","record_id":9,"action":"CREATE","metadata":{"some":json!({"import_job_id":"12","import_row":2}).to_string()}}),
+                ]
+            }
+            other => panic!("unexpected history fixture table {other}: {sql}"),
         };
         sats_reply(&sql, rows)
     }
@@ -371,6 +515,9 @@ async fn server(
         evidence_read: AtomicBool::new(false),
         revoke_on_line: AtomicBool::new(false),
         line_read: AtomicBool::new(false),
+        restrict_fields_after_read: AtomicBool::new(false),
+        review_administrator: AtomicBool::new(false),
+        native_import_receipt: AtomicBool::new(true),
         requests: Mutex::new(Vec::new()),
     });
     let router = Router::new()
@@ -395,7 +542,28 @@ async fn server(
     }
 }
 
-fn context(server: &Server, access: FieldAccessContext) -> TrustedOperationContext {
+pub(super) fn restrict_fields_after_evidence(server: &Server) {
+    server
+        .fixture
+        .restrict_fields_after_read
+        .store(true, Ordering::SeqCst);
+}
+
+pub(super) fn set_review_administrator(server: &Server, allowed: bool) {
+    server
+        .fixture
+        .review_administrator
+        .store(allowed, Ordering::SeqCst);
+}
+
+pub(super) fn hide_native_import_receipt(server: &Server) {
+    server
+        .fixture
+        .native_import_receipt
+        .store(false, Ordering::SeqCst);
+}
+
+pub(super) fn context(server: &Server, access: FieldAccessContext) -> TrustedOperationContext {
     let session = ApiSession {
         stdb_token: "actor-token".into(),
         identity_hex: ACTOR.into(),
@@ -435,6 +603,41 @@ async fn exact_record_history_uses_current_fields_and_native_sats_without_precis
     assert!(!json.to_string().contains("secret"));
     assert!(!json["data"].to_string().contains("metadata"));
     assert!(page.next_cursor.is_none());
+}
+
+#[tokio::test]
+async fn legacy_line_history_excludes_other_invoice_events_before_pagination() {
+    let delta = json!([{"field":"name","before":"draft","after":"edited"}]);
+    let mut created = evidence(1, json!([{"field":"state","before":null,"after":"draft"}]));
+    created["operation"] = json!("create_invoice");
+    created["subject_resource"] = json!("account_move");
+    let mut lifecycle = evidence(10_000, delta.clone());
+    lifecycle["operation"] = json!("post_invoice");
+    let mut other_subject = evidence(10_001, delta.clone());
+    other_subject["subject_resource"] = json!("account_move");
+    let server = server(
+        vec![created, evidence(5_000, delta), lifecycle, other_subject],
+        None,
+        true,
+        true,
+        false,
+    )
+    .await;
+    let context = context(&server, access(GRANTS, None));
+    let page = read_account_move_history(&server.owner, &context, 9, &request(None, 1))
+        .await
+        .unwrap();
+    assert_eq!(page.data.len(), 1);
+    assert_eq!(page.data[0].id, "5000");
+    assert!(page.next_cursor.is_none());
+    for (_, sql) in server.fixture.requests.lock().unwrap().iter() {
+        if sql.contains(" FROM business_change ") {
+            assert!(sql.contains("subject_resource = 'account_move_line'"));
+            assert!(sql.contains(
+                "operation = 'update_account_move_line' OR operation = 'add_account_move_line'"
+            ));
+        }
+    }
 }
 
 #[tokio::test]

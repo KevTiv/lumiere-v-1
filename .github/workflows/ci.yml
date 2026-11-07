@@ -32,6 +32,8 @@ jobs:
         run: python3 -B -m unittest discover -s scripts/tests
       - name: Verify finance change review inventory
         run: python3 -B scripts/generate-finance-change-review-inventory.py --check
+      - name: Verify alpha history coverage inventory
+        run: python3 -B scripts/generate-alpha-history-inventory.py --check
       - name: Validate ERP skill contracts and source-bound manifests
         run: |
           python3 -B scripts/erp_skill_catalog.py --check
@@ -178,6 +180,8 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::activity_work
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::task_assignees
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::history::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::history::general::
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::history::sources::
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::authoritative::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::private_workflow_reads
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib realtime::
@@ -378,6 +382,25 @@ jobs:
           spacetime call lumiere-ci-contracts run_documents_wave_c_tests --server local -y --no-config
           spacetime call lumiere-ci-contracts run_core_operational_messaging_test --server local -y --no-config
           spacetime call lumiere-ci-contracts run_knowledge_guide_tests --server local -y --no-config
+
+      - name: Native history and complete outcome regression suites
+        run: |
+          # Keep these fixtures isolated from the other module acceptance data.
+          spacetime publish lumiere-ci-history --bin-path .ci/contracts-module.wasm --server local --delete-data=always -y --no-config
+          trap 'spacetime delete lumiere-ci-history --server local -y --no-config >/dev/null 2>&1 || true' EXIT
+          spacetime call lumiere-ci-history run_all_core_tests --server local -y --no-config
+          spacetime call lumiere-ci-history run_data_ops_commit_test --server local -y --no-config
+          spacetime call lumiere-ci-history run_inventory_stock_quant_test --server local -y --no-config
+          spacetime call lumiere-ci-history run_all_analytics_tests --server local -y --no-config
+          spacetime call lumiere-ci-history run_crm_opportunity_convert_test --server local -y --no-config
+          spacetime call lumiere-ci-history run_fleet_gap_fixes_test --server local -y --no-config
+          spacetime call lumiere-ci-history run_subscriptions_wave_a_test --server local -y --no-config
+          spacetime call lumiere-ci-history run_accounting_post_invoice_test --server local -y --no-config
+          spacetime call lumiere-ci-history run_all_sales_tests --server local -y --no-config
+          spacetime call lumiere-ci-history run_all_purchasing_tests --server local -y --no-config
+          spacetime call lumiere-ci-history run_all_fleet_tests --server local -y --no-config
+          spacetime call lumiere-ci-history run_all_subscriptions_tests --server local -y --no-config
+          spacetime call lumiere-ci-history run_all_expenses_tests --server local -y --no-config
 
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.

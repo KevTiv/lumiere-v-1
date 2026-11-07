@@ -3,6 +3,7 @@
 /// Individual expense lines (receipts) grouped into expense reports (sheets).
 /// Sheets can be submitted for approval and then posted as an AccountMove Entry
 /// (Dr expense / Cr employee payable) with optional reimbursement clearing.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
@@ -26,7 +27,7 @@ use crate::expenses::expense_wave_d::{
     has_approved_policy_exception, has_pending_policy_exception, hr_expense_policy_exception,
 };
 use crate::expenses::expense_wave_e::sheet_matched_fx_fee_total;
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::product::product;
 use crate::projects::projects::project_project;
@@ -998,9 +999,10 @@ pub(super) fn create_expense_inner(
             },
         );
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense",
@@ -1011,7 +1013,7 @@ pub(super) fn create_expense_inner(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1259,9 +1261,10 @@ pub fn update_expense(
         has_receipt,
         ..expense
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_expense",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense",
@@ -1272,7 +1275,7 @@ pub fn update_expense(
             changed_fields: changed,
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1285,9 +1288,10 @@ pub fn create_expense_receipt(
     check_permission(ctx, organization_id, "hr_expense", "create")?;
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     let receipt_id = insert_expense_receipt(ctx, organization_id, company_id, &params)?;
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense_receipt",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_receipt",
@@ -1309,7 +1313,7 @@ pub fn create_expense_receipt(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1370,9 +1374,10 @@ pub fn submit_expense(
         state: ExpenseState::Submitted,
         ..expense
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "submit_expense",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense",
@@ -1383,7 +1388,7 @@ pub fn submit_expense(
             changed_fields: vec!["sheet_id".to_string(), "state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1440,9 +1445,10 @@ pub fn create_expense_sheet(
         metadata: None,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense_sheet",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -1453,7 +1459,7 @@ pub fn create_expense_sheet(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1571,9 +1577,10 @@ pub fn submit_expense_sheet(
         ..sheet
     });
     sync_line_states(ctx, sheet_id, ExpenseState::Submitted);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "submit_expense_sheet",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -1598,7 +1605,7 @@ pub fn submit_expense_sheet(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1673,9 +1680,10 @@ pub fn approve_expense_sheet_impl(
         ..sheet
     });
     sync_line_states(ctx, sheet_id, ExpenseState::Approved);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "approve_expense_sheet",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -1686,7 +1694,7 @@ pub fn approve_expense_sheet_impl(
             changed_fields: vec!["state".to_string(), "approver_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1760,9 +1768,10 @@ pub fn refuse_expense_sheet_impl(
             ..line
         });
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "refuse_expense_sheet",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -1773,7 +1782,7 @@ pub fn refuse_expense_sheet_impl(
             changed_fields: vec!["state".to_string(), "notes".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -2236,9 +2245,10 @@ pub fn post_expense_sheet(
     });
     sync_line_states(ctx, sheet_id, ExpenseState::Posted);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_expense_sheet",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -2260,7 +2270,7 @@ pub fn post_expense_sheet(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -2504,9 +2514,10 @@ pub fn create_expense_reimbursement_payment(
         sync_line_states(ctx, sheet_id, ExpenseState::Done);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense_reimbursement_payment",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -2525,7 +2536,7 @@ pub fn create_expense_reimbursement_payment(
             changed_fields: vec!["state".to_string(), "reimbursement_move_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -2563,9 +2574,10 @@ pub fn upsert_expense_policy(
             metadata: params.metadata.or(existing.metadata.clone()),
             ..existing
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_expense_policy",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "hr_expense_policy",
@@ -2580,7 +2592,7 @@ pub fn upsert_expense_policy(
                 ],
                 metadata: None,
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -2593,9 +2605,10 @@ pub fn upsert_expense_policy(
         active: params.active,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "upsert_expense_policy",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_policy",
@@ -2606,6 +2619,6 @@ pub fn upsert_expense_policy(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

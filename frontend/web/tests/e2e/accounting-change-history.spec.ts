@@ -73,7 +73,7 @@ function historyPath(moveId: number, companyId: number): string {
 
 async function history(page: Page, moveId: number, companyId: number): Promise<HistoryPage> {
   const response = await page.request.get(historyPath(moveId, companyId))
-  expect(response.ok(), `record history HTTP ${response.status()}`).toBe(true)
+  expect(response.ok(), `record history HTTP ${response.status()}: ${await response.text()}`).toBe(true)
   expect(response.headers()["cache-control"]).toContain("no-store")
   const result = (await response.json()) as HistoryPage
   expect(result.schemaVersion).toBe(1)

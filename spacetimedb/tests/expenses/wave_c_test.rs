@@ -16,6 +16,7 @@ use crate::accounting::tax_management::{
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
 };
 use crate::core::audit::audit_log;
+use crate::core::business_changes::business_change;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::expenses::expense_depth::{
     allocation_snapshot, allocations_for_expense, create_expense_project_rebill,
@@ -915,7 +916,7 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
                 && snapshot.company_id == fixture.company_id
         })
         .ok_or("project margin snapshot after rebill")?;
-    if commits.len() != 1 || commits[0].row_change_count != 5 {
+    if commits.len() != 1 || commits[0].row_change_count != 7 {
         return Err(format!("rebill commit mismatch: {}", commits.len()));
     }
     let mut changes: Vec<_> = ctx
@@ -934,11 +935,13 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
         .collect();
     if tables
         != [
-            "hr_expense_sheet",
+            "expense_sheet",
             "account_move",
             "account_move_line",
             "account_move_line",
             "project_margin_snapshot",
+            "audit_log",
+            "business_change",
         ]
         || changes
             .iter()
@@ -950,6 +953,46 @@ pub fn test_allocations_and_project_rebill(ctx: &ReducerContext) -> Result<(), S
             .any(|(ordinal, change)| change.ordinal as usize != ordinal)
     {
         return Err(format!("rebill row order/scope mismatch: {tables:?}"));
+    }
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[5].row_identity_json)
+        .map_err(|error| format!("rebill audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("rebill audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[6].row_identity_json)
+        .map_err(|error| format!("rebill private history identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("rebill private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("rebill audit row missing")?;
+    let history = ctx
+        .db
+        .business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("rebill private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != fixture.organization_id
+        || audit.organization_id != fixture.organization_id
+        || history.company_id != fixture.company_id
+        || audit.company_id != Some(fixture.company_id)
+        || history.record_id != sheet_id
+        || history.resource != "hr_expense_sheet"
+        || history.subject_record_id != sheet_id
+        || history.subject_resource != "hr_expense_sheet"
+        || audit.table_name != "hr_expense_sheet"
+        || audit.record_id != sheet_id
+        || history.operation != "create_expense_project_rebill"
+    {
+        return Err(
+            "rebill owner commit did not preserve exact audit/private history linkage and scope"
+                .into(),
+        );
     }
     Ok(())
 }

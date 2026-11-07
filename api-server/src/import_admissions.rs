@@ -173,9 +173,184 @@ pub(crate) async fn verify_import_source(
     Ok(audit)
 }
 
+/// Read the immutable source-to-submission binding after an exact native import
+/// receipt has been authorized. This does not authorize access to file bytes or
+/// establish an original row/review revision. `actor` is the importing principal
+/// retained by that receipt, not an identity supplied by the history caller.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn read_import_source_binding(
+    store: &DocumentBlobStoreConfig,
+    organization_id: u64,
+    company_id: u64,
+    actor: &str,
+    request_id: &str,
+    entity: &str,
+    final_content_sha256: &str,
+) -> Result<Option<Value>, ApiError> {
+    let hex = |value: &str, length: usize| {
+        value.len() == length
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    };
+    if organization_id == 0
+        || company_id == 0
+        || actor.is_empty()
+        || !hex(request_id, 32)
+        || !hex(final_content_sha256, 64)
+    {
+        return Err(ApiError::BadRequest(
+            "invalid recorded import source identity".into(),
+        ));
+    }
+    let digest = hex::encode(Sha256::digest(format!(
+        "import-preparation-v1:{organization_id}:{company_id}:{actor}:{request_id}"
+    )));
+    let key = format!(
+        "org-{organization_id}/import-preparations/{}.meta.json",
+        &digest[..32]
+    );
+    let Some(bytes) = storage::read(store, &key, 4096).await? else {
+        return Ok(None);
+    };
+    let binding: Value = serde_json::from_slice(&bytes)
+        .map_err(|_| ApiError::Conflict("recorded import source is invalid".into()))?;
+    if binding.get("organizationId").and_then(Value::as_str)
+        != Some(organization_id.to_string().as_str())
+        || binding.get("companyId").and_then(Value::as_str) != Some(company_id.to_string().as_str())
+        || binding.get("actor").and_then(Value::as_str) != Some(actor)
+        || binding.get("requestId").and_then(Value::as_str) != Some(request_id)
+        || binding.get("entity").and_then(Value::as_str) != Some(entity)
+        || binding.get("finalContentSha256").and_then(Value::as_str) != Some(final_content_sha256)
+        || binding.get("derivation").and_then(Value::as_str) != Some("user_prepared_derivative")
+    {
+        return Err(ApiError::Conflict(
+            "recorded import source does not match its native receipt".into(),
+        ));
+    }
+    let admission_id = binding
+        .get("sourceAdmissionId")
+        .and_then(Value::as_str)
+        .filter(|value| hex(value, 32))
+        .ok_or_else(|| ApiError::Conflict("recorded source admission is invalid".into()))?;
+    let (_, metadata_key) = keys(organization_id, admission_id)?;
+    let Some(metadata) = storage::read(store, &metadata_key, 4096).await? else {
+        return Ok(None);
+    };
+    let source: SourceAdmission = serde_json::from_slice(&metadata)
+        .map_err(|_| ApiError::Conflict("recorded source admission is invalid".into()))?;
+    // Historical inspection verifies the retained relationship, not today's
+    // re-import policy. It does not relabel a derivative's row as an original row.
+    if source.organization_id != organization_id
+        || source.company_id != company_id
+        || source.actor != actor
+        || !hex(&source.source_sha256, 64)
+        || binding.get("sourceSha256").and_then(Value::as_str)
+            != Some(source.source_sha256.as_str())
+        || binding.get("sourceDatasetSha256").and_then(Value::as_str)
+            != Some(source.dataset_sha256.as_str())
+        || binding.get("sourcePolicyVersion").and_then(Value::as_str)
+            != Some(source.policy_version.as_str())
+    {
+        return Err(ApiError::Conflict(
+            "recorded source admission scope or identity changed".into(),
+        ));
+    }
+    Ok(Some(
+        json!({"sourceAdmissionId":admission_id,"sourceSha256":source.source_sha256,
+        "sourceRelationship":"user_prepared_derivative"}),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn history_source_binding_requires_exact_native_submission_and_original_admission() {
+        let root =
+            std::env::temp_dir().join(format!("history-admission-test-{}", rand::random::<u64>()));
+        let store = DocumentBlobStoreConfig::Local { root: root.clone() };
+        let original = "Original source bytes";
+        let content = "name\nPrepared derivative\n";
+        let hash = hex::encode(Sha256::digest(content));
+        let actor = "ab".repeat(32);
+        let request = "cd".repeat(16);
+        let id = record_source_admission(
+            &store,
+            7,
+            42,
+            &actor,
+            original.as_bytes(),
+            "csv",
+            &"f".repeat(64),
+            lumiere_file_inspection::INSPECTION_POLICY_VERSION,
+        )
+        .await
+        .unwrap();
+        verify_import_source(&store, 7, 42, &actor, &id, &request, "product", &hash)
+            .await
+            .unwrap();
+        let source = read_import_source_binding(&store, 7, 42, &actor, &request, "product", &hash)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(source["sourceAdmissionId"], id);
+        assert_eq!(
+            source["sourceSha256"],
+            hex::encode(Sha256::digest(original))
+        );
+        assert_eq!(source["sourceRelationship"], "user_prepared_derivative");
+        assert!(
+            read_import_source_binding(&store, 7, 42, &actor, &request, "contact", &hash)
+                .await
+                .is_err()
+        );
+        assert!(read_import_source_binding(
+            &store,
+            7,
+            42,
+            &actor,
+            &request,
+            "product",
+            &"e".repeat(64)
+        )
+        .await
+        .is_err());
+        assert!(
+            read_import_source_binding(&store, 8, 42, &actor, &request, "product", &hash)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            read_import_source_binding(&store, 7, 43, &actor, &request, "product", &hash)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(read_import_source_binding(
+            &store,
+            7,
+            42,
+            &"de".repeat(32),
+            &request,
+            "product",
+            &hash
+        )
+        .await
+        .unwrap()
+        .is_none());
+        let (_, key) = keys(7, &id).unwrap();
+        tokio::fs::remove_file(root.join(key)).await.unwrap();
+        assert!(
+            read_import_source_binding(&store, 7, 42, &actor, &request, "product", &hash)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        tokio::fs::remove_dir_all(root).await.unwrap();
+    }
 
     #[tokio::test]
     async fn admission_binds_bytes_scope_policy_and_exact_preparation() {

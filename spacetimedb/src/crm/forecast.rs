@@ -2,11 +2,12 @@
 ///
 /// Tables:
 ///   - CrmForecastSnapshot
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
 use crate::crm::opportunities::opportunity;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -94,9 +95,10 @@ pub fn create_forecast_snapshot(
         metadata: params.metadata.clone(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_forecast_snapshot",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "crm_forecast_snapshot",
@@ -114,7 +116,7 @@ pub fn create_forecast_snapshot(
             changed_fields: vec!["weighted_pipeline".to_string(), "open_count".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

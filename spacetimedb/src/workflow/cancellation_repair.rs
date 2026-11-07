@@ -3,11 +3,12 @@
 //! Runtime cancellation history and receipts remain immutable. This operation only
 //! closes stale Open/Claimed task projections and records a separate repair receipt.
 
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 use super::approvals::{
     cancel_active_workflow_human_tasks, workflow_human_task, WorkflowHumanTaskStatus,
@@ -76,6 +77,7 @@ pub fn repair_cancelled_workflow_tasks(
     organization_id: u64,
     params: RepairCancelledWorkflowTasksParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "workflow_instance", "write")?;
     let company_membership_bypass =
         require_workflow_company_access(ctx, organization_id, params.company_id, ctx.sender())?;
@@ -237,7 +239,8 @@ pub fn repair_cancelled_workflow_tasks(
         &params.correlation_id,
         company_membership_bypass,
     )?;
-    write_audit_log_v2(ctx, organization_id, AuditLogParams {
+    business_audit_changes.extend(capture_business_audit(ctx, organization_id,
+        "repair_cancelled_workflow_tasks", AuditLogParams {
         company_id: Some(params.company_id),
         table_name: "workflow_instance",
         record_id: instance.id,
@@ -256,7 +259,7 @@ pub fn repair_cancelled_workflow_tasks(
             "repaired_task_ids": repaired_tasks.iter().map(|task| task.task_id).collect::<Vec<_>>(),
             "company_membership_bypass": company_membership_bypass,
         }).to_string()),
-    });
+    })?);
     let receipt =
         ctx.db
             .workflow_cancellation_repair_receipt()
@@ -293,7 +296,7 @@ pub fn repair_cancelled_workflow_tasks(
             organization_id,
             operation_id: "erp.repair_cancelled_workflow_tasks".to_string(),
             correlation_id: params.correlation_id,
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
     Ok(())

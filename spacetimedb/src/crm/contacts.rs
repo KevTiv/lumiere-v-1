@@ -7,6 +7,7 @@
 ///   - ContactRelationship
 ///   - ContactTag
 ///   - ContactTagAssignment
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use std::collections::HashSet;
 
@@ -18,7 +19,7 @@ use crate::core::permissions::role;
 use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::relationship_intel::mark_relationship_insight_stale;
 use crate::crm::require_single_company_crm_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -429,9 +430,10 @@ pub fn create_contact(
         creation,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_contact",
         AuditLogParams {
             company_id: Some(operating_company_id),
             table_name: "contact",
@@ -444,7 +446,7 @@ pub fn create_contact(
             changed_fields: vec!["name".to_string(), "email".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     if let Some(receipt) = creation_receipt {
         crate::forms::record_creation_persistence::record_contact_creation(
@@ -512,9 +514,10 @@ pub fn update_contact_address(
         ..contact
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact_address",
         AuditLogParams {
             company_id: None,
             table_name: "contact",
@@ -525,7 +528,7 @@ pub fn update_contact_address(
             changed_fields: vec!["street".to_string(), "city".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -572,9 +575,10 @@ pub fn update_contact_business(
         ..contact
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact_business",
         AuditLogParams {
             company_id: None,
             table_name: "contact",
@@ -585,7 +589,7 @@ pub fn update_contact_business(
             changed_fields: vec!["tax_id".to_string(), "industry".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -631,9 +635,10 @@ pub fn update_contact_details(
         ..contact
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact_details",
         AuditLogParams {
             company_id: None,
             table_name: "contact",
@@ -648,7 +653,7 @@ pub fn update_contact_details(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -757,9 +762,10 @@ pub fn update_contact(
         ..contact
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact",
         AuditLogParams {
             company_id: None,
             table_name: "contact",
@@ -774,7 +780,7 @@ pub fn update_contact(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -806,9 +812,10 @@ pub fn delete_contact(
         ..contact
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_contact",
         AuditLogParams {
             company_id: None,
             table_name: "contact",
@@ -819,7 +826,7 @@ pub fn delete_contact(
             changed_fields: vec!["deleted_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -846,9 +853,10 @@ pub fn create_contact_tag(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_contact_tag",
         AuditLogParams {
             company_id: None,
             table_name: "contact_tag",
@@ -859,7 +867,7 @@ pub fn create_contact_tag(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1030,9 +1038,10 @@ pub fn create_contact_relationship(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_contact_relationship",
         AuditLogParams {
             company_id: None,
             table_name: "contact_relationship",
@@ -1054,7 +1063,7 @@ pub fn create_contact_relationship(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     // CRM-RI-016: a new relationship changes both endpoints' insight inputs.
     mark_relationship_insight_stale(ctx, organization_id, params.left_contact_id);
@@ -1099,9 +1108,10 @@ pub fn end_contact_relationship(
             ..relationship
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "end_contact_relationship",
         AuditLogParams {
             company_id: None,
             table_name: "contact_relationship",
@@ -1112,7 +1122,7 @@ pub fn end_contact_relationship(
             changed_fields: vec!["is_active".to_string(), "end_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     // CRM-RI-016: ending a relationship changes both endpoints' insight inputs.
     mark_relationship_insight_stale(ctx, organization_id, left_contact_id);
@@ -1154,9 +1164,10 @@ pub fn update_contact_parent(
         ..target
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact_parent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact",
@@ -1167,7 +1178,7 @@ pub fn update_contact_parent(
             changed_fields: vec!["parent_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     // CRM-RI-016: reparenting changes this contact's `hierarchy_depth`, and the
     // relationship shape of both the old and the new parent.
@@ -1334,9 +1345,10 @@ pub fn create_contact_category(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_contact_category",
         AuditLogParams {
             company_id: None,
             table_name: "contact_category",
@@ -1350,7 +1362,7 @@ pub fn create_contact_category(
             changed_fields: vec!["name".to_string(), "is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1408,9 +1420,10 @@ pub fn update_contact_category(
         ..category
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_contact_category",
         AuditLogParams {
             company_id: None,
             table_name: "contact_category",
@@ -1421,7 +1434,7 @@ pub fn update_contact_category(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1450,9 +1463,10 @@ pub fn archive_contact_category(
         ..category
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "archive_contact_category",
         AuditLogParams {
             company_id: None,
             table_name: "contact_category",
@@ -1463,7 +1477,7 @@ pub fn archive_contact_category(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1532,9 +1546,10 @@ pub fn add_contact_categories(
             });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_contact_categories",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact_category_assignment",
@@ -1548,7 +1563,7 @@ pub fn add_contact_categories(
             changed_fields: vec!["category_id".to_string()],
             metadata: Some(serde_json::json!({ "op": "add" }).to_string()),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1602,9 +1617,10 @@ pub fn remove_contact_categories(
         ctx.db.contact_category_assignment().id().delete(id);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "remove_contact_categories",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact_category_assignment",
@@ -1618,7 +1634,7 @@ pub fn remove_contact_categories(
             changed_fields: vec!["category_id".to_string()],
             metadata: Some(serde_json::json!({ "op": "remove" }).to_string()),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1688,9 +1704,10 @@ pub fn replace_contact_categories(
             });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "replace_contact_categories",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact_category_assignment",
@@ -1706,7 +1723,7 @@ pub fn replace_contact_categories(
                     .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1744,9 +1761,10 @@ pub fn clear_contact_categories(
         ctx.db.contact_category_assignment().id().delete(id);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "clear_contact_categories",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact_category_assignment",
@@ -1760,7 +1778,7 @@ pub fn clear_contact_categories(
             changed_fields: vec!["category_id".to_string()],
             metadata: Some(serde_json::json!({ "op": "clear" }).to_string()),
         },
-    );
+    )?;
 
     Ok(())
 }

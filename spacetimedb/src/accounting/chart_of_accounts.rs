@@ -3,6 +3,7 @@
 /// # 7.1 Chart of Accounts
 ///
 /// Tables for managing the chart of accounts, account types, groups, and journals.
+use crate::core::business_changes::write_business_audit;
 use std::collections::HashSet;
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -12,7 +13,7 @@ use crate::accounting::relations::{
     require_active_tax_ids, require_explicit_company_id,
 };
 use crate::crm::activities::activity_type;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountTypeInternal, JournalType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -346,9 +347,10 @@ pub fn create_account_account_type(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_account_type",
         AuditLogParams {
             company_id,
             table_name: "account_account_type",
@@ -361,7 +363,7 @@ pub fn create_account_account_type(
             changed_fields: vec!["name".to_string(), "type_".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -412,9 +414,10 @@ pub fn update_account_account_type(
             ..account_type
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_account_type",
         AuditLogParams {
             company_id: account_type.company_id,
             table_name: "account_account_type",
@@ -425,7 +428,7 @@ pub fn update_account_account_type(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -463,9 +466,10 @@ pub fn create_account_group(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_group",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_group",
@@ -478,7 +482,7 @@ pub fn create_account_group(
             changed_fields: vec!["name".to_string(), "level".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -526,9 +530,10 @@ pub fn update_account_group(
         ..group
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_group",
         AuditLogParams {
             company_id: Some(group.company_id),
             table_name: "account_group",
@@ -539,7 +544,7 @@ pub fn update_account_group(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -736,9 +741,10 @@ pub fn create_account_account(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_account",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_account",
@@ -751,7 +757,7 @@ pub fn create_account_account(
             changed_fields: vec!["code".to_string(), "name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -819,9 +825,10 @@ pub fn update_account_account(
         ..account
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_account",
         AuditLogParams {
             company_id: Some(account.company_id),
             table_name: "account_account",
@@ -832,7 +839,7 @@ pub fn update_account_account(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -915,9 +922,10 @@ pub fn create_account_journal(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_journal",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_journal",
@@ -930,7 +938,7 @@ pub fn create_account_journal(
             changed_fields: vec!["name".to_string(), "code".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1014,9 +1022,10 @@ pub fn update_account_journal(
         ..journal
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_journal",
         AuditLogParams {
             company_id: Some(journal.company_id),
             table_name: "account_journal",
@@ -1027,7 +1036,7 @@ pub fn update_account_journal(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1066,9 +1075,10 @@ pub fn deprecate_account_account(
         ..account
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "deprecate_account_account",
         AuditLogParams {
             company_id: Some(account.company_id),
             table_name: "account_account",
@@ -1083,7 +1093,7 @@ pub fn deprecate_account_account(
             changed_fields: vec!["deprecated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

@@ -4,7 +4,8 @@ use super::{
     rate_quantity_progressive, tiers_for_plan_product, usage_idempotency_key,
     IngestSubscriptionUsageEventParams, RateSubscriptionUsageEventsParams,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::business_changes::write_business_audit;
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::subscription_wave_d::{
     subscription_usage_charge, subscription_usage_event, SubscriptionUsageCharge,
@@ -70,9 +71,10 @@ pub fn ingest_subscription_usage_event(
             metadata: params.metadata.unwrap_or_default(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "ingest_subscription_usage_event",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_usage_event",
@@ -94,7 +96,7 @@ pub fn ingest_subscription_usage_event(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -182,9 +184,10 @@ pub fn rate_subscription_usage_events(
         rated += 1;
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "rate_subscription_usage_events",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -197,6 +200,6 @@ pub fn rate_subscription_usage_events(
                 serde_json::json!({ "rated_events": rated, "limit": limit }).to_string(),
             ),
         },
-    );
+    )?;
     Ok(())
 }

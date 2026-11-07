@@ -1,16 +1,18 @@
+use crate::core::business_changes::write_business_audit;
 /// Tax Management — AccountTax, AccountTaxGroup, TaxJurisdiction, TaxSchedule, TaxDeadline
 ///
 /// # 7.3 Tax Management
 ///
 /// Tables for managing taxes, tax groups, jurisdictions, tax schedules, and tax deadlines.
 /// Includes a scheduled reducer for automatic deadline status updates.
+use crate::core::business_changes::write_private_business_audit;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::require_active_account;
 use crate::accounting::relations::require_active_tax_ids;
 use crate::core::organization::{organization, require_company_in_organization};
 use crate::core::reference::country;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{
     AccountInternalGroup, TaxAmountType, TaxDeadlineStatus, TaxDeadlineType, TaxTypeUse,
 };
@@ -517,9 +519,10 @@ pub fn create_account_tax_group(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_tax_group",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_tax_group",
@@ -532,7 +535,7 @@ pub fn create_account_tax_group(
             changed_fields: vec!["name".to_string(), "sequence".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -612,9 +615,10 @@ pub fn update_account_tax_group(
         ..group
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_tax_group",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_tax_group",
@@ -625,7 +629,7 @@ pub fn update_account_tax_group(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -687,9 +691,10 @@ pub fn create_account_tax(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_tax",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_tax",
@@ -702,7 +707,7 @@ pub fn create_account_tax(
             changed_fields: vec!["name".to_string(), "amount".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -806,9 +811,10 @@ pub fn update_account_tax(
         ..tax
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_tax",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_tax",
@@ -819,7 +825,7 @@ pub fn update_account_tax(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -852,9 +858,10 @@ pub fn create_tax_jurisdiction(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_tax_jurisdiction",
         AuditLogParams {
             company_id: None,
             table_name: "tax_jurisdiction",
@@ -867,7 +874,7 @@ pub fn create_tax_jurisdiction(
             changed_fields: vec!["name".to_string(), "code".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -935,9 +942,10 @@ pub fn update_tax_jurisdiction(
         ..jurisdiction
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_tax_jurisdiction",
         AuditLogParams {
             company_id: None,
             table_name: "tax_jurisdiction",
@@ -948,7 +956,7 @@ pub fn update_tax_jurisdiction(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -983,9 +991,10 @@ pub fn create_tax_schedule(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_tax_schedule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "tax_schedule",
@@ -998,7 +1007,7 @@ pub fn create_tax_schedule(
             changed_fields: vec!["name".to_string(), "tax_ids".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1075,9 +1084,10 @@ pub fn update_tax_schedule(
         ..schedule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_tax_schedule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "tax_schedule",
@@ -1088,7 +1098,7 @@ pub fn update_tax_schedule(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1249,9 +1259,10 @@ pub fn refresh_tax_deadline_statuses(
         due_soon_count += 1;
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "refresh_tax_deadline_statuses",
         AuditLogParams {
             company_id: None,
             table_name: "tax_deadline",
@@ -1268,7 +1279,7 @@ pub fn refresh_tax_deadline_statuses(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1385,9 +1396,10 @@ pub fn create_tax_deadline(
         deleted_at: None,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_tax_deadline",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "tax_deadline",
@@ -1398,7 +1410,7 @@ pub fn create_tax_deadline(
             changed_fields: vec!["title".to_string(), "due_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1483,16 +1495,23 @@ pub fn update_tax_deadline(
         ..deadline
     });
 
-    write_audit_log_v2(
+    let history_after = ctx
+        .db
+        .tax_deadline()
+        .id()
+        .find(&deadline_id)
+        .ok_or("Tax deadline missing after save")?;
+    write_private_business_audit(
         ctx,
         organization_id,
+        "update_tax_deadline",
         AuditLogParams {
             company_id: deadline.company_id,
             table_name: "tax_deadline",
             record_id: deadline_id,
             action: "UPDATE",
             old_values: Some(old_values),
-            new_values: None,
+            new_values: Some(serde_json::json!({"title":history_after.title,"due_date":history_after.due_date.to_string(),"status":format!("{:?}",history_after.status)}).to_string()),
             changed_fields: vec![
                 "title".to_string(),
                 "due_date".to_string(),
@@ -1500,7 +1519,7 @@ pub fn update_tax_deadline(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1544,9 +1563,10 @@ pub fn complete_tax_deadline(
         ..deadline
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "complete_tax_deadline",
         AuditLogParams {
             company_id: deadline.company_id,
             table_name: "tax_deadline",
@@ -1557,7 +1577,7 @@ pub fn complete_tax_deadline(
             changed_fields: vec!["status".to_string(), "completed_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1595,9 +1615,10 @@ pub fn waive_tax_deadline(
         ..deadline
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "waive_tax_deadline",
         AuditLogParams {
             company_id: deadline.company_id,
             table_name: "tax_deadline",
@@ -1608,7 +1629,7 @@ pub fn waive_tax_deadline(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1648,9 +1669,10 @@ pub fn delete_tax_deadline(
         ..deadline
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_tax_deadline",
         AuditLogParams {
             company_id: deadline_company_id,
             table_name: "tax_deadline",
@@ -1661,7 +1683,7 @@ pub fn delete_tax_deadline(
             changed_fields: vec!["deleted_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

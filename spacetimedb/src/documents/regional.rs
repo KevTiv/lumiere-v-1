@@ -1,5 +1,6 @@
 //! Wave C — document index/retention reducers and scheduled purge.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, ScheduleAt, SpacetimeType, Table};
 
 use crate::core::privacy::data_classification;
@@ -91,9 +92,10 @@ pub fn set_document_retention(
         ..doc
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_document_retention",
         AuditLogParams {
             company_id,
             table_name: "document",
@@ -114,7 +116,7 @@ pub fn set_document_retention(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

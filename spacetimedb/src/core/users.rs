@@ -5,11 +5,12 @@
 ///          row id, linked to an identity and an opaque platform key.
 ///          UserOrganization links a user to an org+role.
 ///          UserSession tracks active client connections.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::organization;
 use crate::core::permissions::{role, Role};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -431,9 +432,10 @@ pub fn update_user_profile(
     });
 
     let organization_id = audit_organization_for_identity(ctx, ctx.sender());
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_user_profile",
         AuditLogParams {
             company_id: None,
             table_name: "user_profile",
@@ -469,7 +471,7 @@ pub fn update_user_profile(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -547,9 +549,10 @@ pub fn add_user_to_organization(
     // been validated. The API server binds its opaque platform key separately.
     ensure_user_profile_for_organization(ctx, user_identity, organization_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_user_to_organization",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "user_organization",
@@ -572,7 +575,7 @@ pub fn add_user_to_organization(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -654,9 +657,10 @@ pub fn add_org_member(
     // Materialize the profile only after this validated membership exists.
     ensure_user_profile_for_organization(ctx, user_identity, organization_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_org_member",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "user_organization",
@@ -680,7 +684,7 @@ pub fn add_org_member(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -768,9 +772,10 @@ pub fn update_org_member_details(
         ..membership
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         membership.organization_id,
+        "update_org_member_details",
         AuditLogParams {
             company_id: membership.company_id,
             table_name: "user_organization",
@@ -799,7 +804,7 @@ pub fn update_org_member_details(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -865,9 +870,10 @@ pub fn update_user_organization_status(
         ..membership
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         membership.organization_id,
+        "update_user_organization_status",
         AuditLogParams {
             company_id: membership.company_id,
             table_name: "user_organization",
@@ -886,7 +892,7 @@ pub fn update_user_organization_status(
             changed_fields: vec!["is_active".to_string(), "is_default".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     crate::core::permissions::touch_policy_snapshot_for_user(
         ctx,
@@ -938,9 +944,10 @@ pub fn remove_user_from_organization(
         ..membership
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "remove_user_from_organization",
         AuditLogParams {
             company_id: membership.company_id,
             table_name: "user_organization",
@@ -956,7 +963,7 @@ pub fn remove_user_from_organization(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     crate::core::permissions::touch_policy_snapshot_for_user(
         ctx,
@@ -998,9 +1005,10 @@ pub fn create_user_session(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_user_session",
         AuditLogParams {
             company_id: None,
             table_name: "user_session",
@@ -1017,7 +1025,7 @@ pub fn create_user_session(
             changed_fields: vec!["user_identity".to_string(), "expires_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1041,9 +1049,10 @@ pub fn end_user_session(ctx: &ReducerContext, session_id: u64) -> Result<(), Str
         ..session
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         session.organization_id,
+        "end_user_session",
         AuditLogParams {
             company_id: None,
             table_name: "user_session",
@@ -1054,7 +1063,7 @@ pub fn end_user_session(ctx: &ReducerContext, session_id: u64) -> Result<(), Str
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

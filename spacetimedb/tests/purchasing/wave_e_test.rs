@@ -182,13 +182,32 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
     let self_approval = approve_purchase_requisition(ctx, org_id, requisition.id)
         .err()
         .ok_or("requester self-approved purchase requisition")?;
-    if !self_approval.contains("Requester cannot approve") {
+    if self_approval != "Purchase requisition requires an independent approver" {
         return Err(format!("unexpected self-approval error: {self_approval}"));
     }
     let independent_requester = Identity::from_byte_array([0x5a; 32]);
     ctx.db.purchase_requisition().id().update(
         crate::purchasing::purchase_orders::PurchaseRequisition {
             user_id: independent_requester,
+            ..ctx
+                .db
+                .purchase_requisition()
+                .id()
+                .find(&requisition.id)
+                .ok_or("submitted requisition missing")?
+        },
+    );
+    let creator_approval = approve_purchase_requisition(ctx, org_id, requisition.id)
+        .err()
+        .ok_or("creator self-approved purchase requisition for another requester")?;
+    if creator_approval != "Purchase requisition requires an independent approver" {
+        return Err(format!(
+            "unexpected creator approval error: {creator_approval}"
+        ));
+    }
+    ctx.db.purchase_requisition().id().update(
+        crate::purchasing::purchase_orders::PurchaseRequisition {
+            create_uid: independent_requester,
             ..ctx
                 .db
                 .purchase_requisition()
@@ -306,7 +325,7 @@ pub fn test_company_isolation_on_receive_and_bill(ctx: &ReducerContext) -> Resul
                 name: "Wave E Purchase Journal".to_string(),
                 code: journal_code.clone(),
                 type_: JournalType::Purchase,
-                currency_id: Some(1),
+                currency_id: Some(fixture_a.currency_id),
                 default_account_id: Some(expense_id),
                 suspense_account_id: None,
                 loss_account_id: None,
@@ -427,7 +446,7 @@ pub fn test_price_match_blocks_post_invoice(ctx: &ReducerContext) -> Result<(), 
                 name: "Price Match Journal".to_string(),
                 code: journal_code.clone(),
                 type_: JournalType::Purchase,
-                currency_id: Some(1),
+                currency_id: Some(fixture.currency_id),
                 default_account_id: Some(expense_id),
                 suspense_account_id: None,
                 loss_account_id: None,

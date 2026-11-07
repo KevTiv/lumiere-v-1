@@ -4,6 +4,7 @@
 //! predecessor stays cancelled, with its original votes and claimant intact.
 //! One immutable link per predecessor serializes competing recovery commands.
 
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use std::collections::{BTreeMap, BTreeSet};
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -12,7 +13,7 @@ use crate::core::persistence::{record_organization_commit, OrganizationCommitInp
 
 use crate::accounting::bank_reconciliation::require_payment_not_bank_linked;
 use crate::accounting::payments::account_payment;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::types::{PaymentState, PoState};
 
@@ -91,6 +92,7 @@ pub fn resubmit_workflow_human_task(
     organization_id: u64,
     params: ResubmitWorkflowHumanTaskParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "workflow_instance", "create")?;
     check_permission(ctx, organization_id, "workflow_task", "write")?;
     let company_membership_bypass =
@@ -334,9 +336,10 @@ pub fn resubmit_workflow_human_task(
                 created_by: ctx.sender(),
                 created_at: ctx.timestamp,
             });
-    write_audit_log_v2(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
+        "resubmit_workflow_human_task",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "workflow_human_task",
@@ -362,7 +365,7 @@ pub fn resubmit_workflow_human_task(
                 .to_string(),
             ),
         },
-    );
+    )?);
     let mut changes = super::recovery_persistence::snapshot_instances(
         ctx,
         organization_id,
@@ -382,7 +385,7 @@ pub fn resubmit_workflow_human_task(
             organization_id,
             operation_id: "erp.resubmit_workflow_human_task".to_string(),
             correlation_id: params.correlation_id,
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
     Ok(())

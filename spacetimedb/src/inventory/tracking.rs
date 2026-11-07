@@ -5,10 +5,11 @@
 ///   - StockProductionSerial
 ///   - SerialLotTraceability
 ///   - StockTraceabilityReport
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{require_product_in_org, stock_move, stock_quant};
 use serde_json;
@@ -349,9 +350,10 @@ pub fn create_stock_production_lot(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_production_lot",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_production_lot",
@@ -364,7 +366,7 @@ pub fn create_stock_production_lot(
             changed_fields: vec!["name".to_string(), "product_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -413,9 +415,10 @@ pub fn update_stock_production_lot(
             ..lot
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_production_lot",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_production_lot",
@@ -426,7 +429,7 @@ pub fn update_stock_production_lot(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -480,9 +483,10 @@ pub fn delete_stock_production_lot(
 
     ctx.db.stock_production_lot().id().delete(&lot_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_stock_production_lot",
         AuditLogParams {
             company_id: Some(lot.company_id),
             table_name: "stock_production_lot",
@@ -493,7 +497,7 @@ pub fn delete_stock_production_lot(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -581,9 +585,10 @@ pub fn create_stock_production_serial(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_production_serial",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_production_serial",
@@ -597,7 +602,7 @@ pub fn create_stock_production_serial(
             changed_fields: vec!["name".to_string(), "product_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -657,9 +662,10 @@ pub fn update_stock_production_serial(
             ..serial
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_production_serial",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_production_serial",
@@ -670,7 +676,7 @@ pub fn update_stock_production_serial(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -711,9 +717,10 @@ pub fn reserve_serial(
             ..serial
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reserve_serial",
         AuditLogParams {
             company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
@@ -724,7 +731,7 @@ pub fn reserve_serial(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -765,9 +772,10 @@ pub fn use_serial(
             ..serial
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "use_serial",
         AuditLogParams {
             company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
@@ -778,7 +786,7 @@ pub fn use_serial(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -817,9 +825,10 @@ pub fn block_serial(
             ..serial
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "block_serial",
         AuditLogParams {
             company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
@@ -832,7 +841,7 @@ pub fn block_serial(
             changed_fields: vec!["state".to_string(), "is_locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -875,9 +884,10 @@ pub fn delete_stock_production_serial(
 
     ctx.db.stock_production_serial().id().delete(&serial_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_stock_production_serial",
         AuditLogParams {
             company_id: Some(serial_company_id),
             table_name: "stock_production_serial",
@@ -888,7 +898,7 @@ pub fn delete_stock_production_serial(
             changed_fields: vec!["deleted".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -985,9 +995,10 @@ pub fn create_traceability_record(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_traceability_record",
         AuditLogParams {
             company_id: None,
             table_name: "serial_lot_traceability",
@@ -1005,7 +1016,7 @@ pub fn create_traceability_record(
             changed_fields: vec!["product_id".to_string(), "document_type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1048,9 +1059,10 @@ pub fn create_traceability_report(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_traceability_report",
         AuditLogParams {
             company_id: None,
             table_name: "stock_traceability_report",
@@ -1061,7 +1073,7 @@ pub fn create_traceability_report(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1093,9 +1105,10 @@ pub fn run_traceability_report(
             ..report
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "run_traceability_report",
         AuditLogParams {
             company_id: None,
             table_name: "stock_traceability_report",
@@ -1106,7 +1119,7 @@ pub fn run_traceability_report(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

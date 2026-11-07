@@ -1,5 +1,36 @@
 {
   "schema_version": 1,
+  "evidence_journals": [
+    {
+      "source": "spacetimedb/src/core/business_changes/audit_adapter.rs",
+      "function": "write_business_audit_inner",
+      "classification": "evidence-only-not-complete-business-outcome",
+      "owner_policy": "lumiere-codegen/business-history-owner-policy.json",
+      "entry_points": ["write_business_audit", "write_private_business_audit"],
+      "evidence_tables": ["audit_log", "business_change", "organization_business_change"],
+      "passthrough_helpers": [
+        {
+          "source": "spacetimedb/src/core/operational_messaging.rs",
+          "function": "write_batch_creation_summary",
+          "parameter": "operation",
+          "operations": ["create_message_batch", "create_invoice_reminder_batch"]
+        }
+      ]
+    }
+  ],
+  "conditional_outcomes": [
+    {
+      "source": "spacetimedb/src/data_ops/import_history.rs",
+      "function": "persist_tracked_import_history",
+      "operation": "import_csv_tracked",
+      "operation_id": "erp.import_csv_tracked",
+      "classification": "partial-control-flow-not-universal-C2-coverage",
+      "target_selector": "job.table_name",
+      "targets": ["product", "contact", "stock_location", "account_move", "account_move_line"],
+      "change_constructors": ["upsert_stdb_row"],
+      "change_helpers": ["source_changes"]
+    }
+  ],
   "reducers": [
     {
       "source": "spacetimedb/src/accounting/journal_entries.rs",

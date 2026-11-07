@@ -1,9 +1,11 @@
+use crate::core::business_changes::write_business_audit;
 /// Reference / Seed Data
 ///
 /// Tables:  Country · Currency · CurrencyRate · UOMCategory · UOM · UOMConversion
 /// Pattern: Country and Currency are organization-seeded reference rows.  The
 /// organization scope is persisted directly on every row; callers must resolve
 /// it from authenticated context rather than supplying a writable tenant field.
+use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, organization};
@@ -385,9 +387,10 @@ pub fn create_country(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_country",
         AuditLogParams {
             company_id: None,
             table_name: "country",
@@ -398,7 +401,7 @@ pub fn create_country(
             changed_fields: vec!["code".to_string(), "name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -431,7 +434,7 @@ pub fn create_currency(
         return Err("Position must be 'before' or 'after'".to_string());
     }
 
-    ctx.db.currency().insert(Currency {
+    let history_created = ctx.db.currency().insert(Currency {
         id: 0,
         code: normalized_code.clone(),
         organization_code_key,
@@ -446,6 +449,22 @@ pub fn create_currency(
         created_at: ctx.timestamp,
         metadata: params.metadata,
     });
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "create_currency",
+        AuditLogParams {
+            company_id: None,
+            table_name: "currency",
+            record_id: history_created.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(native_row_snapshot(&history_created)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -478,7 +497,7 @@ pub fn create_currency_rate(
         }
     }
 
-    ctx.db.currency_rate().insert(CurrencyRate {
+    let history_created = ctx.db.currency_rate().insert(CurrencyRate {
         id: 0,
         organization_id,
         from_currency_id: params.from_currency_id,
@@ -492,6 +511,21 @@ pub fn create_currency_rate(
         metadata: params.metadata,
     });
 
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "create_currency_rate",
+        AuditLogParams {
+            company_id,
+            table_name: "currency_rate",
+            record_id: history_created.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(native_row_snapshot(&history_created)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -503,7 +537,7 @@ pub fn create_uom_category(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "uom_category", "create")?;
 
-    ctx.db.uom_cat().insert(UOMCategory {
+    let history_created = ctx.db.uom_cat().insert(UOMCategory {
         id: 0,
         organization_id,
         name: params.name,
@@ -514,6 +548,21 @@ pub fn create_uom_category(
         metadata: params.metadata,
     });
 
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "create_uom_category",
+        AuditLogParams {
+            company_id: None,
+            table_name: "uom_cat",
+            record_id: history_created.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(native_row_snapshot(&history_created)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -536,7 +585,7 @@ pub fn create_uom(
         return Err("UOM category does not belong to this organization".to_string());
     }
 
-    ctx.db.uom().insert(UOM {
+    let history_created = ctx.db.uom().insert(UOM {
         id: 0,
         organization_id,
         category_id: params.category_id,
@@ -552,6 +601,21 @@ pub fn create_uom(
         metadata: params.metadata,
     });
 
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "create_uom",
+        AuditLogParams {
+            company_id: None,
+            table_name: "uom",
+            record_id: history_created.id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(native_row_snapshot(&history_created)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 

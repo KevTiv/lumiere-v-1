@@ -1,9 +1,10 @@
 /// Payment Terms — AccountPaymentTerm & AccountPaymentTermLine
 ///
 /// Backs the `payment_term_id` foreign key on SaleOrder, PurchaseOrder, and AccountMove.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::PaymentTermValue;
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -89,9 +90,10 @@ pub fn create_payment_term(
         is_active: true,
         created_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_payment_term",
         AuditLogParams {
             company_id: None,
             table_name: "account_payment_term",
@@ -102,7 +104,7 @@ pub fn create_payment_term(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -151,9 +153,10 @@ pub fn update_payment_term(
             ..term
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_payment_term",
         AuditLogParams {
             company_id: None,
             table_name: "account_payment_term",
@@ -178,7 +181,7 @@ pub fn update_payment_term(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -200,9 +203,10 @@ pub fn delete_payment_term(
         return Err("Payment term belongs to a different organization".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_payment_term",
         AuditLogParams {
             company_id: None,
             table_name: "account_payment_term",
@@ -220,7 +224,7 @@ pub fn delete_payment_term(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     ctx.db.account_payment_term().id().delete(&term_id);
     // Cascade: delete all lines
@@ -271,9 +275,10 @@ pub fn create_payment_term_line(
             sequence: params.sequence,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_payment_term_line",
         AuditLogParams {
             company_id: None,
             table_name: "account_payment_term_line",
@@ -299,7 +304,7 @@ pub fn create_payment_term_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -375,9 +380,10 @@ pub fn update_payment_term_line(
             ..line
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_payment_term_line",
         AuditLogParams {
             company_id: None,
             table_name: "account_payment_term_line",
@@ -408,7 +414,7 @@ pub fn update_payment_term_line(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -436,9 +442,10 @@ pub fn delete_payment_term_line(
         return Err("Payment term belongs to a different organization".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_payment_term_line",
         AuditLogParams {
             company_id: None,
             table_name: "account_payment_term_line",
@@ -458,7 +465,7 @@ pub fn delete_payment_term_line(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     ctx.db.account_payment_term_line().id().delete(&line_id);
     Ok(())

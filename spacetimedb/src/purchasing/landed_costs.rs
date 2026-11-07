@@ -5,13 +5,14 @@
 /// |-------|-------------|
 /// | **StockLandedCost** | Landed cost allocations |
 /// | **StockLandedCostLines** | Individual cost lines for landed costs |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_journal;
 use crate::accounting::journal_entries::account_move;
 use crate::core::organization::require_company_in_organization;
 use crate::core::reference::currency;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{stock_move, stock_picking, stock_quant, StockQuant};
 use crate::purchasing::require_purchasing_ri_phase0_unsafe_actions_enabled;
@@ -420,9 +421,10 @@ pub fn create_landed_cost(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_landed_cost",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_landed_cost",
@@ -433,7 +435,7 @@ pub fn create_landed_cost(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Landed cost {} created", landed_cost.id);
     Ok(())
@@ -491,9 +493,10 @@ pub fn add_landed_cost_line(
         ..landed_cost
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_landed_cost_line",
         AuditLogParams {
             company_id: Some(landed_cost.company_id),
             table_name: "stock_landed_cost_lines",
@@ -504,7 +507,7 @@ pub fn add_landed_cost_line(
             changed_fields: vec!["landed_cost_id".to_string(), "price_unit".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Landed cost line {} added", cost_line.id);
     Ok(())
@@ -547,9 +550,10 @@ pub fn compute_landed_costs(
         ..landed_cost
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "compute_landed_costs",
         AuditLogParams {
             company_id: Some(landed_cost.company_id),
             table_name: "stock_landed_cost",
@@ -560,7 +564,7 @@ pub fn compute_landed_costs(
             changed_fields: vec!["amount_total".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -587,9 +591,10 @@ pub fn post_landed_costs(
         ..landed_cost
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_landed_costs",
         AuditLogParams {
             company_id: Some(landed_cost.company_id),
             table_name: "stock_landed_cost",
@@ -600,7 +605,7 @@ pub fn post_landed_costs(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -628,9 +633,10 @@ pub fn cancel_landed_cost(
         ..landed_cost
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_landed_cost",
         AuditLogParams {
             company_id: Some(landed_cost.company_id),
             table_name: "stock_landed_cost",
@@ -643,7 +649,7 @@ pub fn cancel_landed_cost(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -701,9 +707,10 @@ pub fn update_landed_cost(
 
     ctx.db.stock_landed_cost().id().update(updated);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_landed_cost",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_landed_cost",
@@ -714,7 +721,7 @@ pub fn update_landed_cost(
             changed_fields: vec!["write_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -739,9 +746,10 @@ pub fn clear_landed_cost_field(
     landed_cost.write_uid = ctx.sender();
     landed_cost.write_date = ctx.timestamp;
     ctx.db.stock_landed_cost().id().update(landed_cost);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "clear_landed_cost_field",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_landed_cost",
@@ -752,7 +760,7 @@ pub fn clear_landed_cost_field(
             changed_fields: vec![format!("{field:?}")],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -782,9 +790,10 @@ pub fn delete_landed_cost(
 
     ctx.db.stock_landed_cost().id().delete(&landed_cost_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_landed_cost",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_landed_cost",
@@ -797,7 +806,7 @@ pub fn delete_landed_cost(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -838,9 +847,10 @@ pub fn remove_landed_cost_line(
 
     ctx.db.stock_landed_cost_lines().id().delete(&line_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "remove_landed_cost_line",
         AuditLogParams {
             company_id: Some(landed_cost.company_id),
             table_name: "stock_landed_cost_lines",
@@ -851,7 +861,7 @@ pub fn remove_landed_cost_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1082,9 +1092,10 @@ pub fn apply_landed_costs(
             });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_landed_costs",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_landed_cost",
@@ -1095,7 +1106,7 @@ pub fn apply_landed_costs(
             changed_fields: vec!["valuation_adjustment_lines".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Applied landed cost {} to {} moves across {} pickings",

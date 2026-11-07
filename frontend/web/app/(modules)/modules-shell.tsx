@@ -6,6 +6,7 @@ import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { ModuleActivity } from "../../components/module-activity"
 import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-context"
 import { AssistantNativeFormProvider, useAssistantNativeFormController, useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
 import { ALPHA_ASSISTANT_CAPABILITIES, assistantActionHref, decodeAssistantAction, getAssistantCapability, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
@@ -729,6 +730,7 @@ function ModulesContent({
           </>
         }
       >
+        <ModuleActivity />
         {children}
       </DashboardWorkspace>
     </ErpAiChatControllerProvider>

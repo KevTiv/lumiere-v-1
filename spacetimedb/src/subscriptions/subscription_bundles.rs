@@ -3,7 +3,8 @@
 use super::{
     AddSubscriptionBundleItemParams, ApplySubscriptionBundleParams, CreateSubscriptionBundleParams,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::business_changes::write_business_audit;
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::subscription_wave_d::{
     subscription_bundle, subscription_bundle_item, SubscriptionBundle, SubscriptionBundleItem,
@@ -49,9 +50,10 @@ pub fn create_subscription_bundle(
         metadata: params.metadata.unwrap_or_default(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_subscription_bundle",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_bundle",
@@ -64,7 +66,7 @@ pub fn create_subscription_bundle(
             changed_fields: vec!["plan_id".to_string(), "code".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -109,9 +111,10 @@ pub fn add_subscription_bundle_item(
             metadata: params.metadata.unwrap_or_default(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_subscription_bundle_item",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_bundle_item",
@@ -133,7 +136,7 @@ pub fn add_subscription_bundle_item(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -238,9 +241,10 @@ pub fn apply_subscription_bundle(
         ..sub
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_subscription_bundle",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -259,6 +263,6 @@ pub fn apply_subscription_bundle(
                 serde_json::json!({ "applied_bundle_id": params.bundle_id }).to_string(),
             ),
         },
-    );
+    )?;
     Ok(())
 }

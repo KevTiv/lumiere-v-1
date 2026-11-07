@@ -770,5 +770,10 @@
     "tabGroups": {
       "fulfillment": "Kuzuza order"
     }
+  },
+  "businessHistory": {
+    "fileUnavailable": "Izina rya file y’inkomoko ntiriboneka",
+    "sourceHash": "Ikimenyetso cya file y’umwimerere",
+    "sourceDerivative": "Amakuru yoherejwe yateguwe ahereye kuri iyi file. Iri sano ntirigaragaza umurongo wa file y’umwimerere."
   }
 }

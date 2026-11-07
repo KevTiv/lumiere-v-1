@@ -1,9 +1,10 @@
 //! Offline / intermittent remote warehouse sync — durable intents + apply.
 //!
 //! Clients queue ops with idempotency keys, flush when online, and apply once.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::barcode::{record_barcode_scan, RecordBarcodeScanParams};
 use crate::inventory::cycle_count::{record_cycle_count_line, RecordCycleCountLineParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
@@ -216,9 +217,10 @@ pub fn create_warehouse_sync_intent(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_warehouse_sync_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse_sync_intent",
@@ -236,7 +238,7 @@ pub fn create_warehouse_sync_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -288,9 +290,10 @@ pub fn apply_warehouse_sync_intent(
                     write_date: ctx.timestamp,
                     ..intent
                 });
-            write_audit_log_v2(
+            write_business_audit(
                 ctx,
                 organization_id,
+                "apply_warehouse_sync_intent",
                 AuditLogParams {
                     company_id: Some(company_id),
                     table_name: "warehouse_sync_intent",
@@ -301,7 +304,7 @@ pub fn apply_warehouse_sync_intent(
                     changed_fields: vec!["status".to_string()],
                     metadata: None,
                 },
-            );
+            )?;
             Ok(())
         }
         Err(e) => {
@@ -316,9 +319,10 @@ pub fn apply_warehouse_sync_intent(
                     write_date: ctx.timestamp,
                     ..intent
                 });
-            write_audit_log_v2(
+            write_business_audit(
                 ctx,
                 organization_id,
+                "apply_warehouse_sync_intent",
                 AuditLogParams {
                     company_id: Some(company_id),
                     table_name: "warehouse_sync_intent",
@@ -331,7 +335,7 @@ pub fn apply_warehouse_sync_intent(
                     changed_fields: vec!["status".to_string(), "last_error".to_string()],
                     metadata: None,
                 },
-            );
+            )?;
             Ok(())
         }
     }
@@ -372,9 +376,10 @@ pub fn fail_warehouse_sync_intent(
             ..intent
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "fail_warehouse_sync_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse_sync_intent",
@@ -391,6 +396,6 @@ pub fn fail_warehouse_sync_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

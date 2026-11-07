@@ -9,6 +9,7 @@
 /// ## Tables
 /// - `ConsolidationAccount` — Account mappings for consolidation
 /// - `ConsolidationJournal` — Consolidation journals with elimination entries
+use crate::core::business_changes::write_business_audit;
 use std::collections::HashSet;
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -21,7 +22,7 @@ use crate::accounting::fiscal_periods::{
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::users::find_user_profile_for_identity;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::ConsolidationState;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -401,9 +402,10 @@ pub fn create_consolidation_account(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_consolidation_account",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_account",
@@ -417,7 +419,7 @@ pub fn create_consolidation_account(
             changed_fields: vec!["name".to_string(), "code".to_string(), "account_type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -517,9 +519,10 @@ pub fn update_consolidation_account(
     let account_name = account.name.clone();
     ctx.db.consolidation_account().id().update(account);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_consolidation_account",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_account",
@@ -530,7 +533,7 @@ pub fn update_consolidation_account(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -602,9 +605,10 @@ pub fn create_consolidation_journal(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_consolidation_journal",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_journal",
@@ -622,7 +626,7 @@ pub fn create_consolidation_journal(
             changed_fields: vec!["name".to_string(), "period_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -734,9 +738,10 @@ pub fn create_elimination_entry(
 
     ctx.db.consolidation_journal().id().update(journal);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_elimination_entry",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_elimination_entry",
@@ -755,7 +760,7 @@ pub fn create_elimination_entry(
             changed_fields: vec!["name".to_string(), "account_code".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -799,9 +804,10 @@ pub fn process_consolidation(
 
     ctx.db.consolidation_journal().id().update(journal.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "process_consolidation",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_journal",
@@ -812,7 +818,7 @@ pub fn process_consolidation(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -856,9 +862,10 @@ pub fn validate_consolidation(
 
     ctx.db.consolidation_journal().id().update(journal.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "validate_consolidation",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_journal",
@@ -869,7 +876,7 @@ pub fn validate_consolidation(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -899,9 +906,10 @@ pub fn cancel_consolidation(
 
     ctx.db.consolidation_journal().id().update(journal.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_consolidation",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_journal",
@@ -912,7 +920,7 @@ pub fn cancel_consolidation(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -980,9 +988,10 @@ pub fn set_consolidation_company_rate(
             })
     };
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_consolidation_company_rate",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "consolidation_company_rate",
@@ -1001,7 +1010,7 @@ pub fn set_consolidation_company_rate(
             changed_fields: vec!["exchange_rate".to_string(), "rate_type".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1041,9 +1050,10 @@ pub fn match_elimination_entries(
         .id()
         .update(entry1.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "match_elimination_entries",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_elimination_entry",
@@ -1056,7 +1066,7 @@ pub fn match_elimination_entries(
             changed_fields: vec!["is_matched".to_string(), "matched_entry_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1090,9 +1100,10 @@ pub fn unmatch_elimination_entry(
         .id()
         .update(entry.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unmatch_elimination_entry",
         AuditLogParams {
             company_id: None,
             table_name: "consolidation_elimination_entry",
@@ -1103,7 +1114,7 @@ pub fn unmatch_elimination_entry(
             changed_fields: vec!["is_matched".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

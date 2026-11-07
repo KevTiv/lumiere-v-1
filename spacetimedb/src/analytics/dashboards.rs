@@ -13,10 +13,11 @@
 /// |-------|-------------|
 /// | **DashboardWidget** | Configurable chart/table/KPI widget |
 /// | **Dashboard** | Named collection of widgets |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::WidgetType;
 
 // ============================================================================
@@ -370,9 +371,10 @@ pub fn create_dashboard_widget(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_dashboard_widget",
         AuditLogParams {
             company_id,
             table_name: "dashboard_widget",
@@ -383,7 +385,7 @@ pub fn create_dashboard_widget(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Dashboard widget created: id={}", widget.id);
     Ok(())
@@ -434,9 +436,10 @@ pub fn update_widget_layout(
         ..widget
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_widget_layout",
         AuditLogParams {
             company_id: None,
             table_name: "dashboard_widget",
@@ -447,7 +450,7 @@ pub fn update_widget_layout(
             changed_fields: vec!["layout_updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Widget layout updated: id={}", widget_id);
     Ok(())
@@ -492,9 +495,10 @@ pub fn create_dashboard(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_dashboard",
         AuditLogParams {
             company_id,
             table_name: "dashboard",
@@ -505,7 +509,7 @@ pub fn create_dashboard(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Dashboard created: id={}", db.id);
     Ok(())
@@ -567,9 +571,10 @@ pub fn add_widget_to_dashboard(
         ..dash
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_widget_to_dashboard",
         AuditLogParams {
             company_id: None,
             table_name: "dashboard",
@@ -580,7 +585,7 @@ pub fn add_widget_to_dashboard(
             changed_fields: vec!["widget_added".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Widget {} added to dashboard {}", widget_id, dashboard_id);
     Ok(())
@@ -619,9 +624,10 @@ pub fn share_dashboard(
         ..dash
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "share_dashboard",
         AuditLogParams {
             company_id: None,
             table_name: "dashboard",
@@ -632,7 +638,7 @@ pub fn share_dashboard(
             changed_fields: vec!["shared".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Dashboard shared: id={}", dashboard_id);
     Ok(())

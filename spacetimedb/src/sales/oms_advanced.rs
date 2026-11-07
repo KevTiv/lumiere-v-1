@@ -2,9 +2,10 @@
 //! commission plans/splits, sales contracts, CPQ constraints,
 //! SLA escalation schedule, omnichannel allocation hints,
 //! and external integration intent/result tracking.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::sales::sales_core::{sale_order, SaleOrder};
 use crate::types::SaleState;
 
@@ -232,9 +233,10 @@ pub fn create_sale_commission_plan(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_commission_plan",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_commission_plan",
@@ -245,7 +247,7 @@ pub fn create_sale_commission_plan(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -284,9 +286,10 @@ pub fn create_sale_commission_plan_split(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_commission_plan_split",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_commission_plan_split",
@@ -308,7 +311,7 @@ pub fn create_sale_commission_plan_split(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -339,9 +342,10 @@ pub fn create_sale_contract(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_contract",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_contract",
@@ -352,7 +356,7 @@ pub fn create_sale_contract(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -380,9 +384,10 @@ pub fn create_sale_cpq_constraint(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_cpq_constraint",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_cpq_constraint",
@@ -393,7 +398,7 @@ pub fn create_sale_cpq_constraint(
             changed_fields: vec!["name".to_string(), "rule_json".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -436,9 +441,10 @@ pub fn create_sales_integration_intent(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sales_integration_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sales_integration_intent",
@@ -456,7 +462,7 @@ pub fn create_sales_integration_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -491,9 +497,10 @@ pub fn record_sales_integration_result(
             write_date: ctx.timestamp,
             ..intent
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_sales_integration_result",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sales_integration_intent",
@@ -504,7 +511,7 @@ pub fn record_sales_integration_result(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -548,9 +555,10 @@ pub fn apply_omnichannel_allocation(
         write_date: ctx.timestamp,
         ..order
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_omnichannel_allocation",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -561,7 +569,7 @@ pub fn apply_omnichannel_allocation(
             changed_fields: vec!["metadata".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -584,9 +592,10 @@ pub fn schedule_sales_sla_escalation(
             company_id,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "schedule_sales_sla_escalation",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sales_sla_escalation_job",
@@ -597,7 +606,7 @@ pub fn schedule_sales_sla_escalation(
             changed_fields: vec!["scheduled_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

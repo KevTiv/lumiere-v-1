@@ -1,4 +1,5 @@
 //! Inventory period close — snapshot quants, lock stock mutations, optional GL valuation.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -9,7 +10,7 @@ use crate::accounting::journal_entries::{
 use crate::accounting::relations::{require_active_account, require_active_journal};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::reference::require_active_currency_by_id;
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::stock::stock_quant;
 use crate::types::{AccountMoveState, PaymentState};
 use serde_json;
@@ -448,9 +449,10 @@ pub fn create_inventory_close(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_inventory_close",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_close",
@@ -463,7 +465,7 @@ pub fn create_inventory_close(
             changed_fields: vec!["name".to_string(), "state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -585,9 +587,10 @@ pub fn run_inventory_close(
         ..close
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "run_inventory_close",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_close",
@@ -612,7 +615,7 @@ pub fn run_inventory_close(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -657,9 +660,10 @@ pub fn reopen_inventory_close(
         ..close
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reopen_inventory_close",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_close",
@@ -670,6 +674,6 @@ pub fn reopen_inventory_close(
             changed_fields: vec!["locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

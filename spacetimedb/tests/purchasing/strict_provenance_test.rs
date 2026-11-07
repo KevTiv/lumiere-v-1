@@ -711,8 +711,8 @@ pub fn test_strict_po_provenance_rejections(ctx: &ReducerContext) -> Result<(), 
         ctx.db.account_move_line().id().update(original);
     }
 
-    // Real reducer path: delete product, then rebalance payable. The old
-    // invoice_lines edge remains, so every posting owner must fail closed.
+    // Deleting a product leaves its old invoice_lines edge. Ordinary amount
+    // edits must not rebalance a PO-owned bill around that missing source.
     let removed = ctx
         .db
         .account_move_line()
@@ -734,7 +734,7 @@ pub fn test_strict_po_provenance_rejections(ctx: &ReducerContext) -> Result<(), 
         .filter(&f.bill_id)
         .find(|line| line.account_id == f.scope.primary.payable_account_id)
         .ok_or("payable missing")?;
-    update_account_move_line(
+    let rebalance_error = update_account_move_line(
         ctx,
         f.scope.primary.organization_id,
         payable.id,
@@ -751,7 +751,39 @@ pub fn test_strict_po_provenance_rejections(ctx: &ReducerContext) -> Result<(), 
             analytic_account_id: None,
             metadata: None,
         },
-    )?;
+    )
+    .err()
+    .ok_or("ordinary amount edit rebalanced a PO-owned bill")?;
+    if !rebalance_error.contains("PO-owned bill amounts are derived") {
+        return Err(format!("unexpected PO bill edit error: {rebalance_error}"));
+    }
+    let unchanged = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&payable.id)
+        .ok_or("payable missing after rejected edit")?;
+    if unchanged.credit.to_bits() != payable.credit.to_bits()
+        || unchanged.balance.to_bits() != payable.balance.to_bits()
+        || unchanged.write_uid != payable.write_uid
+        || unchanged.write_date != payable.write_date
+    {
+        return Err("rejected PO bill amount edit changed the payable".into());
+    }
+
+    // Inject balanced legacy corruption directly, as with the other persisted
+    // graph mutations above, to exercise every posting owner's source checks.
+    let credit = payable.credit - removed.debit;
+    let balance = payable.debit - credit;
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        credit,
+        credit_currency: credit,
+        balance,
+        amount_currency: balance,
+        amount_residual: balance,
+        amount_residual_currency: balance,
+        ..payable
+    });
     let balance: f64 = ctx
         .db
         .account_move_line()

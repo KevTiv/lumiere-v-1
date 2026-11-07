@@ -10,11 +10,12 @@
 /// - `AccountAnalyticAccount` — Analytic accounts for cost tracking
 /// - `AccountAnalyticLine` — Analytic entries (timesheets, costs, revenues)
 /// - `AccountAnalyticDistributionModel` — Auto-distribution rules for analytic accounts
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 use std::collections::HashSet;
 
 use crate::accounting::relations::require_explicit_company_id;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -379,9 +380,10 @@ pub fn create_analytic_account(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_analytic_account",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_analytic_account",
@@ -392,7 +394,7 @@ pub fn create_analytic_account(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -487,9 +489,10 @@ pub fn update_analytic_account(
         .id()
         .update(account.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_analytic_account",
         AuditLogParams {
             company_id: Some(account.company_id),
             table_name: "account_analytic_account",
@@ -500,7 +503,7 @@ pub fn update_analytic_account(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -580,9 +583,10 @@ pub fn create_analytic_line(
 
     ctx.db.account_analytic_account().id().update(account);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_analytic_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "account_analytic_line",
@@ -604,7 +608,7 @@ pub fn create_analytic_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -717,9 +721,10 @@ pub fn update_analytic_line(
         ctx.db.account_analytic_account().id().update(account);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_analytic_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "account_analytic_line",
@@ -730,7 +735,7 @@ pub fn update_analytic_line(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -779,9 +784,10 @@ pub fn delete_analytic_line(
     ctx.db.account_analytic_account().id().update(account);
     ctx.db.account_analytic_line().id().delete(&line_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_analytic_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "account_analytic_line",
@@ -792,7 +798,7 @@ pub fn delete_analytic_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -846,9 +852,10 @@ pub fn create_analytic_distribution_model(
                 metadata: params.metadata,
             });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_analytic_distribution_model",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_analytic_distribution_model",
@@ -865,7 +872,7 @@ pub fn create_analytic_distribution_model(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -957,9 +964,10 @@ pub fn update_analytic_distribution_model(
         .id()
         .update(model.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_analytic_distribution_model",
         AuditLogParams {
             company_id: Some(model.company_id),
             table_name: "account_analytic_distribution_model",
@@ -970,7 +978,7 @@ pub fn update_analytic_distribution_model(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1005,9 +1013,10 @@ pub fn set_analytic_account_active(
         .id()
         .update(account.clone());
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_analytic_account_active",
         AuditLogParams {
             company_id: Some(account.company_id),
             table_name: "account_analytic_account",
@@ -1018,7 +1027,7 @@ pub fn set_analytic_account_active(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

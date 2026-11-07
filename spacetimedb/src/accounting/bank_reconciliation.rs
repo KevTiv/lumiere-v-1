@@ -1,8 +1,10 @@
+use crate::core::business_changes::write_business_audit;
 /// Bank & Reconciliation — AccountBankStatement, AccountBankStatementLine, AccountReconciliationWidget
 ///
 /// # 7.4 Bank & Reconciliation
 ///
 /// Tables for managing bank statements and account reconciliation.
+use crate::core::business_changes::write_private_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::{account_account, account_journal};
@@ -19,7 +21,7 @@ use crate::accounting::payments::{
 };
 use crate::accounting::relations::{require_active_currency_id, require_active_journal};
 use crate::core::organization::{company, require_company_in_organization};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{
     AccountMoveState, AccountTypeInternal, BankStatementState, JournalType, MoveType, PartnerType,
     PaymentState, PaymentType,
@@ -456,9 +458,10 @@ pub fn stage_bank_statement_import(
                 created_statement_line_id: None,
             });
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "stage_bank_statement_import",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "bank_statement_import",
@@ -472,7 +475,7 @@ pub fn stage_bank_statement_import(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     record_result(
         ctx,
         organization_id,
@@ -636,9 +639,10 @@ pub fn approve_bank_statement_import(
             approved_by: Some(ctx.sender()),
             ..import
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "approve_bank_statement_import",
         AuditLogParams {
             company_id: Some(import.company_id),
             table_name: "bank_statement_import",
@@ -649,7 +653,7 @@ pub fn approve_bank_statement_import(
             changed_fields: vec!["state".to_string(), "approved_statement_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -705,9 +709,10 @@ pub fn create_account_bank_statement(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_bank_statement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement",
@@ -726,7 +731,7 @@ pub fn create_account_bank_statement(
             changed_fields: vec!["name".to_string(), "balance_start".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -871,9 +876,10 @@ pub fn update_account_bank_statement(
             metadata: new_metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_bank_statement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement",
@@ -884,7 +890,7 @@ pub fn update_account_bank_statement(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -931,9 +937,10 @@ pub fn delete_account_bank_statement(
         );
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_account_bank_statement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement",
@@ -951,7 +958,7 @@ pub fn delete_account_bank_statement(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     ctx.db.account_bank_statement().id().delete(&statement_id);
 
@@ -1042,9 +1049,10 @@ pub fn create_account_bank_statement_line(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_bank_statement_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement_line",
@@ -1062,7 +1070,7 @@ pub fn create_account_bank_statement_line(
             changed_fields: vec!["amount".to_string(), "partner_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1219,9 +1227,10 @@ pub fn update_account_bank_statement_line(
             metadata: new_metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_bank_statement_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement_line",
@@ -1239,7 +1248,7 @@ pub fn update_account_bank_statement_line(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1292,9 +1301,10 @@ pub fn delete_account_bank_statement_line(
         return Err("Cannot delete lines from a posted statement".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_account_bank_statement_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement_line",
@@ -1312,7 +1322,7 @@ pub fn delete_account_bank_statement_line(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     ctx.db.account_bank_statement_line().id().delete(&line_id);
 
@@ -1372,9 +1382,10 @@ pub fn post_account_bank_statement(
             ..statement
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_account_bank_statement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement",
@@ -1387,7 +1398,7 @@ pub fn post_account_bank_statement(
             changed_fields: vec!["state".to_string(), "date_done".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2126,9 +2137,10 @@ pub fn reconcile_account_bank_statement_line(
                 .ok_or("settled bank line missing")?
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reconcile_account_bank_statement_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement_line",
@@ -2150,7 +2162,7 @@ pub fn reconcile_account_bank_statement_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     super::bank_settlement_lifecycle::settlement_finished(ctx, payment_id)?;
     Ok(())
@@ -2219,9 +2231,10 @@ pub fn unreconciled_account_bank_statement_line(
             ..line
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unreconciled_account_bank_statement_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_bank_statement_line",
@@ -2243,7 +2256,7 @@ pub fn unreconciled_account_bank_statement_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2297,9 +2310,10 @@ pub fn create_account_reconciliation_widget(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_reconciliation_widget",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_reconciliation_widget",
@@ -2317,7 +2331,7 @@ pub fn create_account_reconciliation_widget(
             changed_fields: vec!["account_id".to_string(), "move_line_ids".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2398,9 +2412,10 @@ pub fn update_account_reconciliation_widget(
             metadata: new_metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_reconciliation_widget",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_reconciliation_widget",
@@ -2418,7 +2433,7 @@ pub fn update_account_reconciliation_widget(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2448,9 +2463,10 @@ pub fn delete_account_reconciliation_widget(
         return Err("Record does not belong to this company".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_account_reconciliation_widget",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_reconciliation_widget",
@@ -2467,7 +2483,7 @@ pub fn delete_account_reconciliation_widget(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     ctx.db
         .account_reconciliation_widget()
@@ -2502,6 +2518,13 @@ pub fn apply_reconciliation_rules(
         .find(&line.statement_id)
         .ok_or("Parent statement not found")?;
 
+    let history_before = ctx
+        .db
+        .bank_match_candidate()
+        .candidate_by_statement_line()
+        .filter(&line_id)
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
     for existing in ctx
         .db
         .bank_match_candidate()
@@ -2544,6 +2567,18 @@ pub fn apply_reconciliation_rules(
         )?;
     }
 
+    let history_after = ctx
+        .db
+        .bank_match_candidate()
+        .candidate_by_statement_line()
+        .filter(&line_id)
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
+
+    write_private_business_audit(ctx,organization_id,"apply_reconciliation_rules",AuditLogParams {
+        company_id:Some(statement.company_id),table_name:"account_bank_statement_line",record_id:line_id,action:"UPDATE",
+        old_values:Some(serde_json::json!({"candidate_ids":serde_json::to_string(&history_before).map_err(|e|e.to_string())?}).to_string()),new_values:Some(serde_json::json!({"candidate_ids":serde_json::to_string(&history_after).map_err(|e|e.to_string())?}).to_string()),changed_fields:vec![],metadata:None,
+    })?;
     Ok(())
 }
 
@@ -2578,6 +2613,13 @@ pub fn match_bank_line(
         return Err("Line is already reconciled".to_string());
     }
 
+    let history_before = ctx
+        .db
+        .bank_match_candidate()
+        .candidate_by_statement_line()
+        .filter(&line_id)
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
     for existing in ctx
         .db
         .bank_match_candidate()
@@ -2621,6 +2663,18 @@ pub fn match_bank_line(
         }
     }
 
+    let history_after = ctx
+        .db
+        .bank_match_candidate()
+        .candidate_by_statement_line()
+        .filter(&line_id)
+        .map(|row| row.id)
+        .collect::<Vec<_>>();
+
+    write_private_business_audit(ctx,organization_id,"match_bank_line",AuditLogParams {
+        company_id:Some(statement.company_id),table_name:"account_bank_statement_line",record_id:line_id,action:"UPDATE",
+        old_values:Some(serde_json::json!({"candidate_ids":serde_json::to_string(&history_before).map_err(|e|e.to_string())?}).to_string()),new_values:Some(serde_json::json!({"candidate_ids":serde_json::to_string(&history_after).map_err(|e|e.to_string())?}).to_string()),changed_fields:vec![],metadata:None,
+    })?;
     Ok(())
 }
 

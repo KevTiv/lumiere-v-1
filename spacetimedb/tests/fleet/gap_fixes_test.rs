@@ -1,6 +1,8 @@
 //! FLT-005/FLT-006: PosTerminal org isolation and WarehouseGeo FK validation.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::audit::audit_log;
+use crate::core::business_changes::organization_business_change;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::fleet::fleet::{create_pos_terminal, pos_terminal, upsert_warehouse_geo, warehouse_geo};
 use crate::test_harness::OrgFixture;
@@ -136,12 +138,14 @@ pub fn test_warehouse_geo_rejects_invalid_warehouse(ctx: &ReducerContext) -> Res
         None,
         None,
     )?;
-    let persisted = ctx.db.warehouse_geo().iter().any(|g| {
-        g.organization_id == local.organization_id && g.warehouse_id == local.warehouse_id
-    });
-    if !persisted {
-        return Err("valid warehouse_geo upsert was not persisted".to_string());
-    }
+    let persisted = ctx
+        .db
+        .warehouse_geo()
+        .iter()
+        .find(|g| {
+            g.organization_id == local.organization_id && g.warehouse_id == local.warehouse_id
+        })
+        .ok_or("valid warehouse_geo upsert was not persisted")?;
 
     let correlation_id = format!("warehouse-geo:{}", local.warehouse_id);
     let commits: Vec<_> = ctx
@@ -154,15 +158,15 @@ pub fn test_warehouse_geo_rejects_invalid_warehouse(ctx: &ReducerContext) -> Res
                 && commit.correlation_id == correlation_id
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 1 {
+    if commits.len() != 1 || commits[0].row_change_count != 3 {
         return Err(format!(
-            "warehouse geo should emit one one-row organization commit, got {} / {:?}",
+            "warehouse geo should emit one three-row organization commit, got {} / {:?}",
             commits.len(),
             commits.first().map(|commit| commit.row_change_count)
         ));
     }
     let commit = &commits[0];
-    let changes: Vec<_> = ctx
+    let mut changes: Vec<_> = ctx
         .db
         .organization_row_change()
         .iter()
@@ -171,14 +175,56 @@ pub fn test_warehouse_geo_rejects_invalid_warehouse(ctx: &ReducerContext) -> Res
                 && change.commit_sequence == commit.sequence
         })
         .collect();
-    if changes.len() != 1 || changes[0].table_name != "warehouse_geo" {
+    changes.sort_by_key(|change| change.ordinal);
+    let tables: Vec<_> = changes
+        .iter()
+        .map(|change| change.table_name.as_str())
+        .collect();
+    if tables != ["warehouse_geo", "audit_log", "organization_business_change"] {
         return Err(format!(
-            "warehouse geo commit should contain one warehouse_geo row in local org, got {:?}",
+            "warehouse geo commit should contain the ordered warehouse_geo, audit and private history rows in local org, got {:?}",
             changes
                 .iter()
                 .map(|change| (&change.organization_id, &change.table_name))
                 .collect::<Vec<_>>()
         ));
+    }
+
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[1].row_identity_json)
+        .map_err(|error| format!("warehouse geo audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("warehouse geo audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[2].row_identity_json)
+        .map_err(|error| format!("warehouse geo private history identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("warehouse geo private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("warehouse geo audit row missing")?;
+    let history = ctx
+        .db
+        .organization_business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("warehouse geo private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != local.organization_id
+        || audit.organization_id != local.organization_id
+        || history.record_id != persisted.id
+        || history.resource != "warehouse_geo"
+        || history.subject_resource != "warehouse_geo"
+        || history.subject_record_id != persisted.id
+        || audit.table_name != "warehouse_geo"
+        || audit.record_id != persisted.id
+        || history.operation != "upsert_warehouse_geo"
+        || audit.company_id.is_some()
+    {
+        return Err("warehouse geo owner commit did not preserve exact audit/private history linkage and scope".into());
     }
 
     Ok(())

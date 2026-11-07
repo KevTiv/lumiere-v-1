@@ -8,18 +8,23 @@ use std::collections::HashSet;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::core::business_changes::{capture_private_business_audit, native_row_snapshot};
 use crate::core::organization::require_company_in_organization;
 use crate::core::users::user_organization;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{
+    check_permission, write_audit_log_v2, write_audit_log_v2_returning, AuditLogParams,
+};
 use crate::inventory::product::{product, Product};
+use crate::inventory::warehouse::stock_location;
 use crate::{
     accounting::journal_entries::{account_move, account_move_line},
     types::{AccountMoveState, PaymentState},
 };
 
 pub const ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: &str = "account_move_bundle_rollback";
-const ABANDONED_DRAFT_CLEANUP_METADATA_KEY: &str = "abandoned_account_move_draft_cleanup";
+pub(super) const ABANDONED_DRAFT_CLEANUP_METADATA_KEY: &str =
+    "abandoned_account_move_draft_cleanup";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AccountMoveBundleJobMetadata {
@@ -281,11 +286,94 @@ pub fn record_import_created_id(
     table_name: &str,
     record_id: u64,
     row_number: u32,
-) {
-    let Some(job) = ctx.db.import_job().id().find(&job_id) else {
-        log::error!("Cannot record import row for unknown job_id={}", job_id);
-        return;
+) -> Result<(), String> {
+    let job = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&job_id)
+        .ok_or("Cannot record import row for unknown job")?;
+    let (source_org, company_id, operation, table, snapshot) = match table_name {
+        "product" => {
+            let row = ctx
+                .db
+                .product()
+                .id()
+                .find(&record_id)
+                .ok_or("Imported product missing")?;
+            (
+                row.organization_id,
+                None,
+                "import_product_csv",
+                "product",
+                native_row_snapshot(&row)?,
+            )
+        }
+        "contact" => {
+            let row = ctx
+                .db
+                .contact()
+                .id()
+                .find(&record_id)
+                .ok_or("Imported contact missing")?;
+            (
+                row.organization_id,
+                row.company_id,
+                "import_contact_csv",
+                "contact",
+                native_row_snapshot(&row)?,
+            )
+        }
+        "stock_location" => {
+            let row = ctx
+                .db
+                .stock_location()
+                .id()
+                .find(&record_id)
+                .ok_or("Imported stock location missing")?;
+            (
+                row.organization_id,
+                row.company_id,
+                "import_stock_location_csv",
+                "stock_location",
+                native_row_snapshot(&row)?,
+            )
+        }
+        "account_move" => {
+            let row = ctx
+                .db
+                .account_move()
+                .id()
+                .find(&record_id)
+                .ok_or("Imported entry missing")?;
+            (
+                row.organization_id,
+                Some(row.company_id),
+                "import_account_move_csv",
+                "account_move",
+                native_row_snapshot(&row)?,
+            )
+        }
+        "account_move_line" => {
+            let row = ctx
+                .db
+                .account_move_line()
+                .id()
+                .find(&record_id)
+                .ok_or("Imported journal line missing")?;
+            (
+                row.organization_id,
+                Some(row.company_id),
+                "import_account_move_line_csv",
+                "account_move_line",
+                native_row_snapshot(&row)?,
+            )
+        }
+        _ => return Err("Unsupported tracked import history source".into()),
     };
+    if source_org != job.organization_id || job.table_name != table_name {
+        return Err("Import history source does not match its job".into());
+    }
     ctx.db.import_job_record().insert(ImportJobRecord {
         id: 0,
         organization_id: job.organization_id,
@@ -295,6 +383,25 @@ pub fn record_import_created_id(
         row_number,
         create_date: ctx.timestamp,
     });
+    let _staged_history = capture_private_business_audit(
+        ctx,
+        job.organization_id,
+        operation,
+        AuditLogParams {
+            company_id,
+            table_name: table,
+            record_id,
+            action: "CREATE",
+            old_values: None,
+            new_values: Some(snapshot),
+            changed_fields: vec![],
+            metadata: Some(
+                serde_json::json!({"import_job_id":job_id.to_string(),"import_row":row_number})
+                    .to_string(),
+            ),
+        },
+    )?;
+    Ok(())
 }
 
 /// Update the ImportJob with final counts after processing all rows.
@@ -1268,7 +1375,7 @@ pub fn import_csv_tracked(
         });
         job_id
     };
-    write_audit_log_v2(
+    let submission_audit = write_audit_log_v2_returning(
         ctx,
         organization_id,
         AuditLogParams {
@@ -1290,6 +1397,14 @@ pub fn import_csv_tracked(
             metadata: Some(expected.to_string()),
         },
     );
+    if retry.is_none() {
+        super::import_history::persist_tracked_import_history(
+            ctx,
+            organization_id,
+            job_id,
+            &submission_audit,
+        )?;
+    }
     Ok(())
 }
 

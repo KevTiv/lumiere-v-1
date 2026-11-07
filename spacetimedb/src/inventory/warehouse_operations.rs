@@ -5,10 +5,11 @@
 ///   - PickingWave
 ///   - PackagingMaterial
 ///   - CartonizationResult
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{require_company_in_organization, CompanyScopeParams};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::packing::stock_package;
 use crate::inventory::product::product;
@@ -279,9 +280,10 @@ pub fn create_picking_wave(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_picking_wave",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "picking_wave",
@@ -300,7 +302,7 @@ pub fn create_picking_wave(
             changed_fields: vec!["name".to_string(), "state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -348,9 +350,10 @@ pub fn create_warehouse_task(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_warehouse_task",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse_task",
@@ -373,7 +376,7 @@ pub fn create_warehouse_task(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -511,9 +514,10 @@ pub fn release_picking_wave(
         ..wave
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "release_picking_wave",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "picking_wave",
@@ -530,7 +534,7 @@ pub fn release_picking_wave(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -601,9 +605,10 @@ pub fn complete_picking_wave(
         ..wave
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "complete_picking_wave",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "picking_wave",
@@ -614,7 +619,7 @@ pub fn complete_picking_wave(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -667,9 +672,10 @@ pub fn update_warehouse_task_status(
         ..task
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_warehouse_task_status",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "warehouse_task",
@@ -680,7 +686,7 @@ pub fn update_warehouse_task_status(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -718,9 +724,10 @@ pub fn create_packaging_material(
         created_at: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_packaging_material",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "packaging_material",
@@ -738,7 +745,7 @@ pub fn create_packaging_material(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -958,9 +965,10 @@ pub fn run_cartonization(
             }
         }
 
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "run_cartonization",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "cartonization_result",
@@ -978,7 +986,7 @@ pub fn run_cartonization(
                 changed_fields: vec!["package_id".to_string()],
                 metadata: params.metadata.clone(),
             },
-        );
+        )?;
     }
 
     if results_created == 0 {

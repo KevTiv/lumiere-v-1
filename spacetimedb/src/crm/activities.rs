@@ -5,6 +5,7 @@
 ///   - Activity
 ///   - ActivityType
 ///   - CalendarEvent
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
@@ -12,7 +13,7 @@ use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::crm::opportunities::opportunity;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::stock::stock_picking;
 use crate::purchasing::purchase_orders::purchase_order;
@@ -544,9 +545,10 @@ pub fn create_activity(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_activity",
         AuditLogParams {
             company_id: finance_scope.map(|(company, _)| company),
             table_name: "activity",
@@ -566,7 +568,7 @@ pub fn create_activity(
                 serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
             }),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -613,9 +615,10 @@ pub fn complete_activity(
         ..activity
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "complete_activity",
         AuditLogParams {
             company_id: finance_scope.map(|(company, _)| company),
             table_name: "activity",
@@ -645,7 +648,7 @@ pub fn complete_activity(
                 serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
             }),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -704,9 +707,10 @@ pub fn create_calendar_event(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_calendar_event",
         AuditLogParams {
             company_id: None,
             table_name: "calendar_event",
@@ -725,7 +729,7 @@ pub fn create_calendar_event(
             changed_fields: vec!["name".to_string(), "start".to_string(), "stop".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -869,9 +873,10 @@ pub fn update_calendar_event(
         ..event
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_calendar_event",
         AuditLogParams {
             company_id: None,
             table_name: "calendar_event",
@@ -888,7 +893,7 @@ pub fn update_calendar_event(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -914,9 +919,10 @@ pub fn delete_calendar_event(
 
     ctx.db.calendar_event().id().delete(&event_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_calendar_event",
         AuditLogParams {
             company_id: None,
             table_name: "calendar_event",
@@ -933,7 +939,7 @@ pub fn delete_calendar_event(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

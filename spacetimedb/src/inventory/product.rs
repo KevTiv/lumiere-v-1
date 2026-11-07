@@ -1,3 +1,4 @@
+use crate::core::business_changes::write_business_audit;
 /// Product Management — Tables and Reducers
 ///
 /// Tables:
@@ -10,9 +11,10 @@
 ///   - ProductPackaging
 ///
 /// Note: ProductCategory is defined in product_category.rs
+use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product_category::product_category;
 use serde_json;
 
@@ -583,9 +585,10 @@ pub fn create_product(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_product",
         AuditLogParams {
             company_id: None,
             table_name: "product",
@@ -603,7 +606,7 @@ pub fn create_product(
             changed_fields: vec!["name".to_string(), "categ_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -646,6 +649,7 @@ pub fn update_product(
         product.categ_id
     };
 
+    let history_before = native_row_snapshot(&product)?;
     ctx.db.product().id().update(Product {
         name: new_name.clone(),
         display_name: Some(new_name),
@@ -665,24 +669,27 @@ pub fn update_product(
         ..product
     });
 
-    write_audit_log_v2(
+    let history_after = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Product missing after update")?;
+    write_private_business_audit(
         ctx,
         organization_id,
+        "update_product",
         AuditLogParams {
             company_id: None,
             table_name: "product",
             record_id: product_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: Some(serde_json::json!({ "product_id": product_id }).to_string()),
-            changed_fields: vec![
-                "name".to_string(),
-                "categ_id".to_string(),
-                "list_price".to_string(),
-            ],
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -724,6 +731,7 @@ pub fn update_product_pricing(
         product.cost_method.clone()
     };
 
+    let history_before = native_row_snapshot(&product)?;
     ctx.db.product().id().update(Product {
         standard_price: params.standard_price.unwrap_or(product.standard_price),
         list_price: new_list_price,
@@ -737,32 +745,27 @@ pub fn update_product_pricing(
         ..product
     });
 
-    write_audit_log_v2(
+    let history_after = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Product missing after update")?;
+    write_private_business_audit(
         ctx,
         organization_id,
+        "update_product_pricing",
         AuditLogParams {
             company_id: None,
             table_name: "product",
             record_id: product_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "product_id": product_id,
-                    "list_price": new_list_price,
-                    "cost_method": new_cost_method,
-                })
-                .to_string(),
-            ),
-            changed_fields: vec![
-                "standard_price".to_string(),
-                "list_price".to_string(),
-                "currency_id".to_string(),
-                "cost_method".to_string(),
-            ],
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -787,6 +790,7 @@ pub fn update_product_inventory_data(
 
     check_permission(ctx, organization_id, "product", "write")?;
 
+    let history_before = native_row_snapshot(&product)?;
     ctx.db.product().id().update(Product {
         qty_available: params.qty_available.unwrap_or(product.qty_available),
         virtual_available: params
@@ -799,25 +803,27 @@ pub fn update_product_inventory_data(
         ..product
     });
 
-    write_audit_log_v2(
+    let history_after = ctx
+        .db
+        .product()
+        .id()
+        .find(&product_id)
+        .ok_or("Product missing after update")?;
+    write_private_business_audit(
         ctx,
         organization_id,
+        "update_product_inventory_data",
         AuditLogParams {
             company_id: None,
             table_name: "product",
             record_id: product_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: Some(serde_json::json!({ "product_id": product_id }).to_string()),
-            changed_fields: vec![
-                "qty_available".to_string(),
-                "virtual_available".to_string(),
-                "incoming_qty".to_string(),
-                "outgoing_qty".to_string(),
-            ],
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -850,9 +856,10 @@ pub fn delete_product(
         ..product
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_product",
         AuditLogParams {
             company_id: None,
             table_name: "product",
@@ -863,7 +870,7 @@ pub fn delete_product(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -934,9 +941,10 @@ pub fn create_product_variant(
         ctx.db.product().id().update(p);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_product_variant",
         AuditLogParams {
             company_id: None,
             table_name: "product_variant",
@@ -953,7 +961,7 @@ pub fn create_product_variant(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -993,9 +1001,10 @@ pub fn update_product_variant(
         ..variant
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_product_variant",
         AuditLogParams {
             company_id: None,
             table_name: "product_variant",
@@ -1010,7 +1019,7 @@ pub fn update_product_variant(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1056,9 +1065,10 @@ pub fn create_product_supplier_info(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_product_supplier_info",
         AuditLogParams {
             company_id: None,
             table_name: "product_supplier_info",
@@ -1075,7 +1085,7 @@ pub fn create_product_supplier_info(
             changed_fields: vec!["partner_id".to_string(), "price".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1113,9 +1123,10 @@ pub fn update_product_supplier_info(
             ..supplier_info
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_product_supplier_info",
         AuditLogParams {
             company_id: None,
             table_name: "product_supplier_info",
@@ -1132,7 +1143,7 @@ pub fn update_product_supplier_info(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1188,9 +1199,10 @@ pub fn create_product_packaging(
         metadata: None,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_product_packaging",
         AuditLogParams {
             company_id: None,
             table_name: "product_packaging",
@@ -1208,7 +1220,7 @@ pub fn create_product_packaging(
             changed_fields: vec!["name".to_string(), "product_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1251,9 +1263,10 @@ pub fn update_product_packaging(
         ..packaging
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_product_packaging",
         AuditLogParams {
             company_id: None,
             table_name: "product_packaging",
@@ -1270,7 +1283,7 @@ pub fn update_product_packaging(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

@@ -3,9 +3,10 @@
 //! Scans inventory tables for known data integrity violations and records them.
 //! Call `run_inventory_preflight_audit` before enabling inventory in production.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::integration::inventory_integration_intent;
 use crate::inventory::inventory_adjustments::inventory_adjustment;
 use crate::inventory::inventory_close::inventory_close;
@@ -227,9 +228,10 @@ pub fn run_inventory_preflight_audit(
         ..run
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "run_inventory_preflight_audit",
         AuditLogParams {
             company_id,
             table_name: "inventory_audit_run",
@@ -243,7 +245,7 @@ pub fn run_inventory_preflight_audit(
             changed_fields: vec!["violation_count".to_string(), "completed_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -279,9 +281,10 @@ pub fn clear_inventory_audit_violations(
         ctx.db.inventory_audit_violation().id().delete(&vid);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "clear_inventory_audit_violations",
         AuditLogParams {
             company_id: None,
             table_name: "inventory_audit_violation",
@@ -292,7 +295,7 @@ pub fn clear_inventory_audit_violations(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -329,9 +332,10 @@ pub fn resolve_inventory_audit_violation(
             ..violation
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "resolve_inventory_audit_violation",
         AuditLogParams {
             company_id: None,
             table_name: "inventory_audit_violation",
@@ -342,7 +346,7 @@ pub fn resolve_inventory_audit_violation(
             changed_fields: vec!["resolved".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
