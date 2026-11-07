@@ -9,6 +9,9 @@ use axum::{
     routing::post,
     Json, Router,
 };
+use lumiere_file_inspection::{
+    inspect_csv, prepare_csv_source, CsvDelimiter, INSPECTION_POLICY_VERSION,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -61,33 +64,50 @@ async fn inspect_file(
     .await?;
     let file_name = file_name(&headers)?;
     let lower = file_name.to_ascii_lowercase();
-    let (csv_text, format, sheet_name, source_sha256, policy_version) = if lower.ends_with(".xlsx")
-    {
+    let (
+        csv_text,
+        format,
+        sheet_name,
+        source_sha256,
+        policy_version,
+        inspected,
+        delimiter,
+        encoding,
+    ) = if lower.ends_with(".xlsx") {
+        if query.csv_delimiter.is_some() {
+            return Err(ApiError::BadRequest(
+                "a CSV delimiter only applies to .csv files".into(),
+            ));
+        }
         let extracted = inspect_xlsx(&bytes).await?;
+        let inspected = inspect_csv(&extracted.csv_text)
+            .map_err(|error| ApiError::BadRequest(error.to_string()))?;
         (
             extracted.csv_text,
             "xlsx",
             Some(extracted.sheet_name),
             extracted.source_sha256,
             extracted.policy_version,
+            inspected,
+            None,
+            None,
         )
     } else if lower.ends_with(".csv") {
-        let text = std::str::from_utf8(&bytes)
-            .map_err(|_| ApiError::BadRequest("csv must be UTF-8 text".into()))?;
-        let inspected = lumiere_file_inspection::inspect_csv(text)
+        let prepared = prepare_csv_source(&bytes, query.csv_delimiter)
             .map_err(|error| ApiError::BadRequest(error.to_string()))?;
         (
-            text.to_owned(),
+            prepared.csv_text.into_owned(),
             "csv",
             None,
-            inspected.content_sha256,
-            lumiere_file_inspection::INSPECTION_POLICY_VERSION.to_owned(),
+            prepared.source_sha256,
+            INSPECTION_POLICY_VERSION.to_owned(),
+            prepared.inspected,
+            Some(prepared.delimiter),
+            Some(prepared.encoding),
         )
     } else {
         return Err(ApiError::BadRequest("choose a .csv or .xlsx file".into()));
     };
-    let inspected = lumiere_file_inspection::inspect_csv(&csv_text)
-        .map_err(|error| ApiError::BadRequest(error.to_string()))?;
     let admission_id = crate::import_admissions::record_source_admission(
         &state.config.document_blob_store,
         organization_id,
@@ -103,7 +123,8 @@ async fn inspect_file(
     // scope/permissions; this response cannot authorize different bytes or actions.
     Ok(Json(
         json!({"csvText":csv_text,"headers":inspected.headers,"rows":inspected.rows,
-        "format":format,"sheetName":sheet_name,"sourceSha256":source_sha256,"sourceAdmissionId":admission_id,
+        "format":format,"sheetName":sheet_name,"sourceDelimiter":delimiter,"sourceEncoding":encoding,
+        "sourceSha256":source_sha256,"sourceAdmissionId":admission_id,
         "policyVersion":policy_version,"datasetSha256":inspected.dataset_sha256,
         "inspection":inspected.report,"organizationId":organization_id.to_string(),
         "companyId":company_id.to_string()}),
@@ -120,6 +141,7 @@ pub fn router() -> Router<Arc<AppState>> {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct InspectionQuery {
     company_id: Option<String>,
+    csv_delimiter: Option<CsvDelimiter>,
 }
 
 impl InspectionQuery {
@@ -171,14 +193,16 @@ mod tests {
     fn requested_company_ids_are_canonical_and_bounded() {
         for value in ["0", "-1", "01", "18446744073709551616"] {
             assert!(InspectionQuery {
-                company_id: Some(value.into())
+                company_id: Some(value.into()),
+                ..InspectionQuery::default()
             }
             .company_id()
             .is_err());
         }
         assert_eq!(
             InspectionQuery {
-                company_id: Some("42".into())
+                company_id: Some("42".into()),
+                ..InspectionQuery::default()
             }
             .company_id()
             .unwrap(),

@@ -494,3 +494,39 @@ test("original admission uses the explicitly selected company and rejects a mism
     globalThis.fetch = originalFetch
   }
 })
+
+test("CSV admission sends a delimiter override without rewriting the uploaded file", async () => {
+  const file = new File(["name;code\nAcme;0007"], "source.csv")
+  const originalFetch = globalThis.fetch
+  const result = {
+    csvText: "name,code\nAcme,0007\n",
+    headers: ["name", "code"],
+    rows: [["Acme", "0007"]],
+    format: "csv",
+    policyVersion: "file-inspection-v1",
+    sourceSha256: "a".repeat(64),
+    sourceAdmissionId: "b".repeat(32),
+    sourceDelimiter: "semicolon",
+    sourceEncoding: "utf-8",
+    companyId: "42",
+  }
+  try {
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, "/api/import/inspect-file?companyId=42&csvDelimiter=semicolon")
+      assert.equal(init?.body, file)
+      return Response.json(result)
+    }
+    const admitted = await readImportFile(file, { companyId: 42, csvDelimiter: "semicolon" })
+    assert.equal(admitted.sourceDelimiter, "semicolon")
+    assert.equal(admitted.rows[0]?.[1], "0007")
+    assert.equal(admitted.sourceAdmissionId, result.sourceAdmissionId)
+
+    globalThis.fetch = async () => Response.json({ ...result, sourceDelimiter: "comma" })
+    await assert.rejects(
+      () => readImportFile(file, { companyId: 42, csvDelimiter: "semicolon" }),
+      /invalid result/,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

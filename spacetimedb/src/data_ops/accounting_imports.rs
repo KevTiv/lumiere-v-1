@@ -26,7 +26,7 @@ use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{
     account_move_bundle_job_metadata, begin_import_job, finish_import_job, import_job,
     import_job_record, record_import_created_id, record_import_error,
-    stamp_account_move_bundle_job, ImportJob,
+    stamp_account_move_bundle_job, ImportJob, ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY,
 };
 use crate::helpers::check_permission;
 use crate::inventory::product::product;
@@ -1557,6 +1557,7 @@ pub fn import_account_move_csv(
     let mut imported = 0u32;
     let mut errors = 0u32;
     let mut staged_moves: Vec<(u32, AccountMove, Option<AccountMoveBundleMarker>)> = Vec::new();
+    let mut reused_parent_records = Vec::new();
     let mut saw_bundle_marker = false;
     let mut unmarked_rows = Vec::new();
     let mut bundle_token: Option<String> = None;
@@ -2011,6 +2012,10 @@ pub fn import_account_move_csv(
                 }
                 if matching.len() == 1 && reusable.len() == 1 {
                     reusable_ids.insert(reusable[0].id);
+                    reused_parent_records.push(serde_json::json!({
+                        "record_id": reusable[0].id,
+                        "row_number": row_num,
+                    }));
                     continue;
                 }
                 if error_row_numbers.insert(*row_num) {
@@ -2083,6 +2088,20 @@ pub fn import_account_move_csv(
             .as_deref()
             .ok_or("validated account move bundle token is missing")?;
         job = stamp_account_move_bundle_job(job, "parent", token, None)?;
+        if !reused_parent_records.is_empty() {
+            // Reused parents still belong to the job that created them for
+            // rollback. The current receipt needs their IDs after line import
+            // consumes the draft markers.
+            let mut metadata: serde_json::Value = serde_json::from_str(
+                job.metadata
+                    .as_deref()
+                    .ok_or("missing bundle job metadata")?,
+            )
+            .map_err(|error| error.to_string())?;
+            metadata[ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY]["reused_records"] =
+                serde_json::Value::Array(reused_parent_records);
+            job.metadata = Some(metadata.to_string());
+        }
     }
 
     finish_import_job(ctx, job, imported, errors);

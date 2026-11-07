@@ -783,6 +783,7 @@ fn require_tracked_capability() -> Result<(), ApiError> {
 struct ImportRequestQuery {
     company_id: u64,
     currency_id: Option<u64>,
+    content_sha256: Option<String>,
 }
 
 async fn import_request_get(
@@ -794,6 +795,16 @@ async fn import_request_get(
     validate_request_id(&request_id)?;
     if query.company_id == 0 {
         return Err(ApiError::BadRequest("companyId must be positive".into()));
+    }
+    if query.content_sha256.as_ref().is_some_and(|hash| {
+        hash.len() != 64
+            || !hash
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    }) {
+        return Err(ApiError::BadRequest(
+            "contentSha256 must be 64 lowercase hexadecimal characters".into(),
+        ));
     }
     let spec = resolve_import_entity(&entity)
         .ok_or_else(|| ApiError::NotFound("Import request not found".into()))?;
@@ -807,7 +818,7 @@ async fn import_request_get(
             &request_id,
             query.company_id,
             query.currency_id,
-            None,
+            query.content_sha256.as_deref(),
         )
         .await?,
     ))
@@ -855,6 +866,11 @@ fn errors_sql(organization_id: u64, job_id: u64) -> String {
     // The receipt was already matched to organization, company and principal.
     // No organization-wide limit may hide errors belonging to this exact job.
     format!("SELECT id, organization_id, job_id, row_number, field_name, error_message FROM import_job_error WHERE organization_id = {organization_id} AND job_id = {job_id}")
+}
+
+fn accounting_records_sql(organization_id: u64, job_id: u64) -> String {
+    // The exact job has already been authorized for its company and actor.
+    format!("SELECT organization_id, job_id, table_name, record_id, row_number FROM import_job_record WHERE organization_id = {organization_id} AND job_id = {job_id}")
 }
 
 fn row_value<'a>(row: &'a Value, snake: &str, camel: &str) -> Option<&'a Value> {
@@ -978,6 +994,44 @@ fn project_errors(
     Ok(errors)
 }
 
+fn project_accounting_records(
+    rows: Vec<Value>,
+    organization_id: u64,
+    job_id: u64,
+    table_name: &str,
+    total_rows: u64,
+) -> Result<Vec<Value>, ApiError> {
+    let mut records = Vec::with_capacity(rows.len());
+    let mut row_numbers = std::collections::BTreeSet::new();
+    let mut record_ids = std::collections::BTreeSet::new();
+    for row in rows {
+        if row_number(&row, "organization_id", "organizationId") != Some(organization_id)
+            || row_number(&row, "job_id", "jobId") != Some(job_id)
+            || row_value(&row, "table_name", "tableName").and_then(Value::as_str)
+                != Some(table_name)
+        {
+            continue;
+        }
+        let record_id = row_number(&row, "record_id", "recordId")
+            .filter(|id| *id > 0)
+            .ok_or_else(|| ApiError::Internal("Invalid accounting import record ID".into()))?;
+        let row = row_number(&row, "row_number", "rowNumber")
+            .filter(|row| (2..=total_rows.saturating_add(1)).contains(row))
+            .ok_or_else(|| ApiError::Internal("Invalid accounting import record row".into()))?;
+        if !row_numbers.insert(row) || !record_ids.insert(record_id) {
+            return Err(ApiError::Conflict(
+                "Ambiguous accounting import records".into(),
+            ));
+        }
+        records.push((
+            row,
+            json!({"recordId":record_id.to_string(), "rowNumber":row}),
+        ));
+    }
+    records.sort_unstable_by_key(|(row, _)| *row);
+    Ok(records.into_iter().map(|(_, value)| value).collect())
+}
+
 async fn read_exact_outcome(
     context: &TrustedOperationContext,
     spec: &ImportEntity,
@@ -1050,11 +1104,48 @@ async fn read_exact_outcome(
         .get("status")
         .and_then(Value::as_str)
         .ok_or_else(|| ApiError::Internal("Invalid import status".into()))?;
-    Ok(
-        json!({"ok":true,"entity":spec.job_table,"requestId":request_id,"jobId":job_id.to_string(),
+    let mut outcome = json!({"ok":true,"entity":spec.job_table,"requestId":request_id,"jobId":job_id.to_string(),
         "status":status,"totalRows":total_rows,"rowsImported":imported_rows,"errorRows":error_rows,
-        "errors":errors,"errorsRedacted":!detailed}),
-    )
+        "errors":errors,"errorsRedacted":!detailed});
+    if status == "success" && matches!(spec.job_table, "account_move" | "account_move_line") {
+        let mut records = context
+            .client()
+            .query_sql(&accounting_records_sql(context.organization_id(), job_id))
+            .await
+            .map_err(ApiError::internal)?;
+        if spec.job_table == "account_move" {
+            let metadata = receipt
+                .get("metadata")
+                .and_then(option_string)
+                .and_then(|raw| serde_json::from_str::<Value>(raw).ok());
+            let marker = metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("account_move_bundle_rollback"));
+            if let Some(reused) = marker
+                .filter(|marker| marker["version"] == 1 && marker["role"] == "parent")
+                .and_then(|marker| marker.get("reused_records"))
+                .and_then(Value::as_array)
+            {
+                records.extend(reused.iter().map(|record| {
+                    json!({
+                        "organization_id": context.organization_id(),
+                        "job_id": job_id,
+                        "table_name": spec.job_table,
+                        "record_id": record["record_id"],
+                        "row_number": record["row_number"],
+                    })
+                }));
+            }
+        }
+        outcome["records"] = json!(project_accounting_records(
+            records,
+            context.organization_id(),
+            job_id,
+            spec.job_table,
+            total_rows,
+        )?);
+    }
+    Ok(outcome)
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -1497,6 +1588,33 @@ mod tests {
             Some(3)
         )
         .is_err());
+    }
+
+    #[test]
+    fn accounting_receipt_returns_only_exact_job_records_in_csv_row_order() {
+        let record = |org: u64, job: u64, table: &str, id: u64, row: u32| json!({"organizationId":org,"jobId":job,"tableName":table,"recordId":id,"rowNumber":row});
+        let first = record(7, 41, "account_move", 9_007_199_254_740_993, 2);
+        let second = record(7, 41, "account_move", 19, 3);
+        let rows = vec![
+            second.clone(),
+            record(8, 41, "account_move", 2, 2),
+            record(7, 42, "account_move", 3, 2),
+            record(7, 41, "account_move_line", 4, 2),
+            first.clone(),
+        ];
+        let records = project_accounting_records(rows, 7, 41, "account_move", 2).unwrap();
+        assert_eq!(
+            records,
+            vec![
+                json!({"recordId":"9007199254740993","rowNumber":2}),
+                json!({"recordId":"19","rowNumber":3})
+            ]
+        );
+        assert!(
+            project_accounting_records(vec![first.clone(), first], 7, 41, "account_move", 2)
+                .is_err()
+        );
+        assert!(project_accounting_records(vec![second], 7, 41, "account_move", 1).is_err());
     }
 
     #[test]

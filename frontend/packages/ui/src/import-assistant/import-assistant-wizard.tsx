@@ -38,6 +38,7 @@ import {
   type ImportJobRow,
 } from "@lumiere/query-hooks/hooks/import-jobs"
 import {
+  importMappingTemplateMatchesHeaders,
   templatesForEntity,
   useDeleteImportMappingTemplate,
   useFinalizeImportAssistantJob,
@@ -354,9 +355,10 @@ export function ImportAssistantWizard({
     const sourceEpoch = sourceEpochRef.current
     setError(null)
     setPreviewResult(null)
-    setAppliedTemplateId(selectedTemplateId)
+    setAppliedTemplateId(null)
     try {
-      const priorMappings = priorMappingsFromTemplate(selectedTemplate)
+      const templateMatches = importMappingTemplateMatchesHeaders(selectedTemplate, headers)
+      const priorMappings = templateMatches ? priorMappingsFromTemplate(selectedTemplate) : undefined
       const result = await analyze.mutateAsync({
         targetEntity,
         headers,
@@ -366,6 +368,8 @@ export function ImportAssistantWizard({
         ...(importBundle ? { bundleKey: importBundle.key } : {}),
       })
       if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) return
+      if (priorMappings) setAppliedTemplateId(selectedTemplateId)
+      if (selectedTemplate && !templateMatches) setError(t("settings.import.templateLayoutChanged"))
       setAnalysis(result)
       setMapping(mappingRecordFromAnalysis(result))
       setLineMapping(mappingRecordFromLineBundle(result))
@@ -383,6 +387,7 @@ export function ImportAssistantWizard({
         name: templateSaveName.trim(),
         tableName: targetEntity,
         mapping,
+        headers,
       })
       setTemplateSaveName("")
       void templatesQuery.refetch()

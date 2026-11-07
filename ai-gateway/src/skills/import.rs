@@ -103,6 +103,7 @@ pub struct ImportPreviewError {
     pub field: String,
     pub message: String,
     pub severity: String,
+    pub requires_correction: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -128,6 +129,7 @@ enum FieldType {
     String,
     Number,
     Integer,
+    Identifier,
     Bool,
 }
 
@@ -260,7 +262,7 @@ fn manifest(target_entity: &str) -> Option<&'static [FieldSpec]> {
             FieldSpec {
                 name: "partner_id",
                 required: false,
-                field_type: FieldType::Integer,
+                field_type: FieldType::Identifier,
                 aliases: &["partnerid", "customerid", "contactid"],
                 allowed_values: &[],
             },
@@ -320,7 +322,7 @@ fn manifest(target_entity: &str) -> Option<&'static [FieldSpec]> {
             FieldSpec {
                 name: "partner_id",
                 required: true,
-                field_type: FieldType::Integer,
+                field_type: FieldType::Identifier,
                 aliases: &["partnerid", "customerid", "customer"],
                 allowed_values: &[],
             },
@@ -356,7 +358,7 @@ fn manifest(target_entity: &str) -> Option<&'static [FieldSpec]> {
             FieldSpec {
                 name: "product_id",
                 required: true,
-                field_type: FieldType::Integer,
+                field_type: FieldType::Identifier,
                 aliases: &["productid", "product", "sku", "itemid", "item"],
                 allowed_values: &[],
             },
@@ -462,11 +464,6 @@ fn infer_mapping_for_header<'a>(
         }
     }
     None
-}
-
-/// Parse the same bounded CSV representation used by native import reducers.
-pub fn parse_csv_text(csv: &str) -> Result<(Vec<String>, Vec<Vec<String>>), String> {
-    lumiere_file_inspection::parse_csv(csv).map_err(|error| error.to_string())
 }
 
 fn summarize_structure(headers: &[String], sample_rows: &[Vec<String>]) -> CsvStructureSummary {
@@ -602,6 +599,7 @@ fn analyze_mapping(req: &ImportAnalyzeRequest) -> Result<ImportAnalyzeResponse, 
                         FieldType::String => "trim".to_string(),
                         FieldType::Number => "trim_parse_number".to_string(),
                         FieldType::Integer => "trim_parse_integer".to_string(),
+                        FieldType::Identifier => "trim_parse_id".to_string(),
                         FieldType::Bool => "trim_parse_bool".to_string(),
                     }),
                     required: spec.required,
@@ -629,6 +627,16 @@ fn analyze_mapping(req: &ImportAnalyzeRequest) -> Result<ImportAnalyzeResponse, 
     if req.sample_rows.len() > MAX_SAMPLE_ROWS {
         warnings.push(format!(
             "only the first {MAX_SAMPLE_ROWS} sample rows are considered by the MVP analyzer"
+        ));
+    }
+    let short_rows = req
+        .sample_rows
+        .iter()
+        .filter(|row| row.len() < req.headers.len())
+        .count();
+    if short_rows > 0 {
+        warnings.push(format!(
+            "{short_rows} supplied row(s) contain fewer fields than the header"
         ));
     }
 
@@ -701,6 +709,7 @@ fn detect_import_bundle(
                         FieldType::String => "trim".to_string(),
                         FieldType::Number => "trim_parse_number".to_string(),
                         FieldType::Integer => "trim_parse_integer".to_string(),
+                        FieldType::Identifier => "trim_parse_id".to_string(),
                         FieldType::Bool => "trim_parse_bool".to_string(),
                     }),
                     required: spec.required,
@@ -758,7 +767,8 @@ fn parse_mapping(mapping: &Map<String, Value>) -> HashMap<String, String> {
         .iter()
         .filter_map(|(source, target)| {
             let target = target.as_str()?.trim();
-            (!target.is_empty()).then(|| (source.clone(), target.to_string()))
+            (!target.is_empty() && target != "__skip__")
+                .then(|| (source.clone(), target.to_string()))
         })
         .collect()
 }
@@ -785,22 +795,31 @@ fn coerce_value(raw: &str, spec: &FieldSpec) -> Result<Value, String> {
             Ok(Value::String(trimmed.to_string()))
         }
         FieldType::Number => {
-            let parsed = trimmed
-                .replace(',', "")
-                .parse::<f64>()
-                .map_err(|_| "value must be a number".to_string())?;
+            let parsed = trimmed.parse::<f64>().map_err(|_| {
+                "use a decimal point and omit digit grouping, for example 1234.56".to_string()
+            })?;
             serde_json::Number::from_f64(parsed)
                 .map(Value::Number)
                 .ok_or_else(|| "value must be a finite number".to_string())
         }
         FieldType::Integer => trimmed
-            .parse::<u64>()
+            .parse::<u32>()
             .map(|n| Value::Number(n.into()))
-            .map_err(|_| "value must be an integer id".to_string()),
+            .map_err(|_| "value must be a whole number between 0 and 4294967295".to_string()),
+        FieldType::Identifier => {
+            if trimmed.bytes().all(|byte| byte.is_ascii_digit())
+                && trimmed.parse::<u64>().is_ok_and(|value| value > 0)
+            {
+                // Preserve the exact identifier, even above the browser's safe integer range.
+                Ok(Value::String(trimmed.to_string()))
+            } else {
+                Err("value must be a positive ERP record ID in decimal digits".to_string())
+            }
+        }
         FieldType::Bool => match trimmed.to_ascii_lowercase().as_str() {
-            "true" | "yes" | "1" | "y" => Ok(Value::Bool(true)),
-            "false" | "no" | "0" | "n" => Ok(Value::Bool(false)),
-            _ => Err("value must be true or false".to_string()),
+            "true" | "yes" | "1" => Ok(Value::Bool(true)),
+            "false" | "no" | "0" => Ok(Value::Bool(false)),
+            _ => Err("use true, false, yes, no, 1, or 0".to_string()),
         },
     }
 }
@@ -816,12 +835,18 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
         .map(|spec| (spec.name, spec))
         .collect::<HashMap<_, _>>();
     let mapping = parse_mapping(&req.mapping);
-    let header_index = req
-        .headers
-        .iter()
-        .enumerate()
-        .map(|(idx, header)| (header.as_str(), idx))
-        .collect::<HashMap<_, _>>();
+    let mut header_index = HashMap::new();
+    let mut duplicate_headers = HashSet::new();
+    for (index, header) in req.headers.iter().enumerate() {
+        if header_index.insert(header.as_str(), index).is_some() {
+            duplicate_headers.insert(header.as_str());
+        }
+    }
+    let mut mapped_targets = HashSet::new();
+    let duplicate_targets = mapping
+        .values()
+        .filter(|target| !mapped_targets.insert(target.as_str()))
+        .collect::<HashSet<_>>();
 
     let mut validation_errors = Vec::new();
     let mut normalized_rows = Vec::new();
@@ -831,12 +856,24 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
         let mut normalized = Map::new();
 
         for (source, target) in &mapping {
+            if duplicate_headers.contains(source.as_str()) || duplicate_targets.contains(target) {
+                validation_errors.push(ImportPreviewError {
+                    row_index,
+                    field: target.clone(),
+                    message: "each mapped column and target field must identify a single value"
+                        .to_string(),
+                    severity: "error".to_string(),
+                    requires_correction: true,
+                });
+                continue;
+            }
             let Some(spec) = spec_by_name.get(target.as_str()) else {
                 validation_errors.push(ImportPreviewError {
                     row_index,
                     field: target.clone(),
                     message: "target field is not supported for this entity".to_string(),
                     severity: "error".to_string(),
+                    requires_correction: false,
                 });
                 continue;
             };
@@ -846,13 +883,13 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
                     field: target.clone(),
                     message: "source column is missing from headers".to_string(),
                     severity: "error".to_string(),
+                    requires_correction: true,
                 });
                 continue;
             };
-            let raw = row
-                .get(source_index)
-                .map(String::as_str)
-                .unwrap_or_default();
+            let Some(raw) = row.get(source_index) else {
+                continue;
+            };
             match coerce_value(raw, spec) {
                 Ok(value) => {
                     normalized.insert(target.clone(), value);
@@ -862,6 +899,13 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
                     field: target.clone(),
                     message,
                     severity: "error".to_string(),
+                    requires_correction: matches!(
+                        spec.field_type,
+                        FieldType::Number
+                            | FieldType::Integer
+                            | FieldType::Identifier
+                            | FieldType::Bool
+                    ),
                 }),
             }
         }
@@ -876,6 +920,7 @@ fn preview_rows(req: &ImportPreviewRequest) -> Result<ImportPreviewResponse, Str
                     field: spec.name.to_string(),
                     message: "required field is missing".to_string(),
                     severity: "error".to_string(),
+                    requires_correction: false,
                 });
             }
         }
@@ -964,9 +1009,61 @@ mod tests {
     }
 
     #[test]
-    fn parse_csv_text_respects_quoted_commas() {
-        let (headers, rows) = parse_csv_text("Name,Notes\nAcme,\"Hello, world\"").expect("parse");
-        assert_eq!(headers, vec!["Name", "Notes"]);
-        assert_eq!(rows[0][1], "Hello, world");
+    fn preview_preserves_numeric_ambiguity_and_duplicate_columns() {
+        let response = preview_rows(&ImportPreviewRequest {
+            target_entity: "product".into(),
+            headers: vec!["Name".into(), "Name".into(), "Price".into()],
+            rows: vec![vec!["Acme".into(), "Beta".into(), "1,25".into()]],
+            mapping: Map::from_iter([
+                ("Name".into(), json!("name")),
+                ("Price".into(), json!("list_price")),
+            ]),
+            max_rows: None,
+        })
+        .unwrap();
+        assert!(response.rows[0].is_empty());
+        assert!(response
+            .validation_errors
+            .iter()
+            .any(|error| { error.field == "list_price" && error.requires_correction }));
+        assert!(response
+            .validation_errors
+            .iter()
+            .any(|error| { error.field == "name" && error.requires_correction }));
+    }
+
+    #[test]
+    fn preview_preserves_exact_record_ids_and_distinguishes_blank_from_missing() {
+        let response = preview_rows(&ImportPreviewRequest {
+            target_entity: "sale_order".into(),
+            headers: ["Partner", "Extra A", "Extra B", "Total"]
+                .map(str::to_owned)
+                .to_vec(),
+            rows: vec![
+                ["0009007199254740993", "", ""].map(str::to_owned).to_vec(),
+                ["7", "", "", ""].map(str::to_owned).to_vec(),
+                ["0", "", "", "0"].map(str::to_owned).to_vec(),
+            ],
+            mapping: Map::from_iter([
+                ("Partner".into(), json!("partner_id")),
+                ("Extra A".into(), json!("__skip__")),
+                ("Extra B".into(), json!("__skip__")),
+                ("Total".into(), json!("amount_total")),
+            ]),
+            max_rows: None,
+        })
+        .unwrap();
+        assert_eq!(response.rows[0]["partner_id"], json!("0009007199254740993"));
+        assert!(!response.rows[0].contains_key("amount_total"));
+        assert!(response.rows[1]["amount_total"].is_null());
+        assert_eq!(response.rows[2]["amount_total"], json!(0.0));
+        assert!(response
+            .validation_errors
+            .iter()
+            .all(|error| error.row_index == 2));
+        assert!(response
+            .validation_errors
+            .iter()
+            .any(|error| error.requires_correction));
     }
 }

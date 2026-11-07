@@ -196,6 +196,7 @@ pub struct GatewayImportMappingRequest {
     pub company_id: u64,
     pub target_entity: String,
     pub csv_text: Option<String>,
+    pub csv_delimiter: Option<lumiere_file_inspection::CsvDelimiter>,
     pub headers: Option<Vec<String>>,
     pub sample_rows: Option<Vec<Vec<String>>>,
     pub mapping: Option<Map<String, Value>>,
@@ -228,6 +229,7 @@ pub async fn post_import_mapping(
         ImportMappingInput {
             target_entity: req.target_entity,
             csv_text: req.csv_text,
+            csv_delimiter: req.csv_delimiter,
             headers: req.headers,
             sample_rows: req.sample_rows,
             mapping: req.mapping,
@@ -238,7 +240,7 @@ pub async fn post_import_mapping(
         req.company_id,
         policy,
     )
-    .map_err(AppError::Internal)?;
+    .map_err(AppError::BadRequest)?;
     Ok(Json(result))
 }
 

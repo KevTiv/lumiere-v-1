@@ -15,6 +15,9 @@ const MAX_XLSX_ROWS = 25_000
 const MAX_XLSX_COLUMNS = 200
 const MAX_XLSX_MATRIX_CELLS = 1_000_000
 
+const CSV_SOURCE_DELIMITERS = ["comma", "semicolon", "tab", "pipe"] as const
+export type CsvSourceDelimiter = (typeof CSV_SOURCE_DELIMITERS)[number]
+
 export type ParsedImportFile = {
   csvText: string
   headers: string[]
@@ -24,6 +27,8 @@ export type ParsedImportFile = {
   sourceSha256?: string
   sourceAdmissionId?: string
   policyVersion?: string
+  sourceDelimiter?: CsvSourceDelimiter
+  sourceEncoding?: string
 }
 
 /** Wire fields remain untrusted until the complete response is validated. */
@@ -37,6 +42,12 @@ type ImportInspectionPayload = {
   sourceSha256?: unknown
   policyVersion?: unknown
   sheetName?: unknown
+  sourceDelimiter?: unknown
+  sourceEncoding?: unknown
+}
+
+function isCsvSourceDelimiter(value: unknown): value is CsvSourceDelimiter {
+  return CSV_SOURCE_DELIMITERS.some((delimiter) => delimiter === value)
 }
 
 type ZipEntry = {
@@ -611,7 +622,7 @@ export async function parseXlsxWorkbook(
 /** Send the original bytes to server admission; no browser boolean proves inspection. */
 export async function readImportFile(
   file: File,
-  scope?: { companyId: number | bigint | string },
+  scope?: { companyId: number | bigint | string; csvDelimiter?: CsvSourceDelimiter },
 ): Promise<ParsedImportFile> {
   const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]
   if (extension === ".xls") {
@@ -637,8 +648,11 @@ export async function readImportFile(
       "Select a valid operating company before inspecting the file.",
     )
   }
-  const path =
-    "/api/import/inspect-file" + (companyId ? "?companyId=" + companyId : "")
+  const query = new URLSearchParams()
+  if (companyId) query.set("companyId", companyId)
+  if (extension === ".csv" && scope?.csvDelimiter)
+    query.set("csvDelimiter", scope.csvDelimiter)
+  const path = "/api/import/inspect-file" + (query.size > 0 ? "?" + query : "")
   const response = await fetch(path, {
     method: "POST",
     credentials: "same-origin",
@@ -676,6 +690,14 @@ export async function readImportFile(
     typeof result.policyVersion !== "string" ||
     result.policyVersion.length === 0 ||
     result.policyVersion.length > 128 ||
+    (result.sourceDelimiter != null &&
+      (extension !== ".csv" || !isCsvSourceDelimiter(result.sourceDelimiter))) ||
+    (extension === ".csv" && scope?.csvDelimiter != null &&
+      result.sourceDelimiter !== scope.csvDelimiter) ||
+    (result.sourceEncoding != null &&
+      result.sourceEncoding !== "utf-8" &&
+      result.sourceEncoding !== "utf-16le" &&
+      result.sourceEncoding !== "utf-16be") ||
     (result.sheetName !== undefined &&
       result.sheetName !== null &&
       (typeof result.sheetName !== "string" || result.sheetName.length > 255))
@@ -705,5 +727,11 @@ export async function readImportFile(
       ? { sourceAdmissionId: result.sourceAdmissionId }
       : {}),
     policyVersion: result.policyVersion,
+    ...(isCsvSourceDelimiter(result.sourceDelimiter)
+      ? { sourceDelimiter: result.sourceDelimiter }
+      : {}),
+    ...(typeof result.sourceEncoding === "string"
+      ? { sourceEncoding: result.sourceEncoding }
+      : {}),
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -52,8 +52,17 @@ function routeFilterValue(value: unknown): string {
   return String(value)
 }
 
+type LedgerMoveLine = {
+  moveId?: AccountMove["id"] | null
+  companyId?: AccountMove["companyId"] | null
+  companyCurrencyId?: AccountMove["currencyId"] | null
+  debit?: number | null
+  credit?: number | null
+}
+
 interface GeneralLedgerViewProps {
   moves: AccountMove[]
+  moveLines?: LedgerMoveLine[]
   onCreate?: (data: Record<string, unknown>) => void
   onImportMovesCsv?: () => void
   onImportOutstandingDocumentsCsv?: () => void
@@ -70,6 +79,7 @@ interface GeneralLedgerViewProps {
 
 export function GeneralLedgerView({
   moves,
+  moveLines,
   onCreate,
   onImportMovesCsv,
   onImportOutstandingDocumentsCsv,
@@ -92,6 +102,35 @@ export function GeneralLedgerView({
   const clearUrlFilter = useClearModuleUrlFilter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMove, setSelectedMove] = useState<AccountMove | null>(null)
+  const linesByMove = useMemo(() => {
+    const grouped = new Map<string, LedgerMoveLine[]>()
+    for (const line of moveLines ?? []) {
+      const key = `${line.companyId}:${line.moveId}`
+      const group = grouped.get(key)
+      if (group) group.push(line)
+      else grouped.set(key, [line])
+    }
+    return grouped
+  }, [moveLines])
+  const amountFor = (move: AccountMove) => {
+    if (stbEnumTag(move.moveType) !== "Entry") {
+      return { amount: move.amountTotal ?? 0, currencyId: move.currencyId }
+    }
+    const lines = linesByMove.get(`${move.companyId}:${move.id}`)
+    const companyCurrencyId = lines?.[0]?.companyCurrencyId
+    if (!lines?.length || move.companyId == null || companyCurrencyId == null ||
+      lines.some((line) => String(line.companyCurrencyId) !== String(companyCurrencyId) ||
+        !Number.isFinite(line.debit) || !Number.isFinite(line.credit))) {
+      return null
+    }
+    const debit = lines.reduce((total, line) => total + line.debit!, 0)
+    const credit = lines.reduce((total, line) => total + line.credit!, 0)
+    return Math.abs(debit - credit) <= 0.01 ? { amount: debit, currencyId: companyCurrencyId } : null
+  }
+  const formatMoveAmount = (move: AccountMove) => {
+    const value = amountFor(move)
+    return value ? formatCurrency(value.amount, value.currencyId) : "—"
+  }
 
   const activeUrlFilters = Object.entries(urlFilters).filter(
     ([, value]) => value && value !== "__all__",
@@ -109,11 +148,15 @@ export function GeneralLedgerView({
     return matchesSearch && matchesUrlFilters
   })
 
+  const amounts = moves.map(amountFor)
+  const movementCurrencies = new Set(amounts.map((value) => String(value?.currencyId ?? "")))
   const stats = {
     total: moves.length,
     posted: moves.filter((m) => stbEnumTag(m.state) === "Posted").length,
     pending: moves.filter((m) => stbEnumTag(m.state) === "Draft").length,
-    totalMovement: moves.reduce((s, m) => s + (m.amountTotal ?? 0), 0),
+    totalMovement: movementCurrencies.size <= 1 && amounts.every((value) => value != null)
+      ? formatCurrency(amounts.reduce((total, value) => total + (value?.amount ?? 0), 0), amounts[0]?.currencyId)
+      : "—",
   }
 
   const movesPager = usePagedRows(filtered)
@@ -142,7 +185,7 @@ export function GeneralLedgerView({
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-category-3/10"><ArrowUpRight className="h-5 w-5 text-category-3" /></div>
-            <div><p className="text-sm text-muted-foreground">{t("accounting.journalEntries.totalMovement")}</p><p className="text-2xl font-bold">{formatCurrency(stats.totalMovement)}</p></div>
+            <div><p className="text-sm text-muted-foreground">{t("accounting.journalEntries.totalMovement")}</p><p className="text-2xl font-bold">{stats.totalMovement}</p></div>
           </div>
         </CardContent></Card>
       </div>
@@ -242,7 +285,7 @@ export function GeneralLedgerView({
                       {move.ref && <Badge variant="outline" className="text-xs">{move.ref}</Badge>}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{stbEnumTag(move.moveType)}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(move.amountTotal ?? 0, move.currencyId)}</TableCell>
+                    <TableCell className="text-right font-medium">{formatMoveAmount(move)}</TableCell>
                     <TableCell>
                       <Badge variant={isPosted ? "default" : "secondary"} className="gap-1">
                         {isPosted
@@ -298,7 +341,7 @@ export function GeneralLedgerView({
                         <TableCell>{selectedMove.invoicePartnerDisplayName ?? `Partner #${selectedMove.partnerId}`}</TableCell>
                         <TableCell className="text-right">{formatCurrency(selectedMove.amountUntaxed ?? 0, selectedMove.currencyId)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(selectedMove.amountTax ?? 0, selectedMove.currencyId)}</TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(selectedMove.amountTotal ?? 0, selectedMove.currencyId)}</TableCell>
+                        <TableCell className="text-right font-bold">{formatMoveAmount(selectedMove)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>

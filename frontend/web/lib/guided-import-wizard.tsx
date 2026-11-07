@@ -32,6 +32,7 @@ import {
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import {
+  importMappingTemplateMatchesHeaders,
   templatesForEntity,
   useDeleteImportMappingTemplate,
   useFinalizeImportAssistantJob,
@@ -85,6 +86,7 @@ import {
   buildMappedImportCsv,
   filterMappingForHeaders,
   readImportFile,
+  type CsvSourceDelimiter,
 } from "@/lib/import-spreadsheet-file"
 import { previewAllImportRows } from "@/lib/import-preview-batches"
 
@@ -159,6 +161,15 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const [sourceFileName, setSourceFileName] = useState(initialSource?.fileName ?? "")
   const [sourceFormat, setSourceFormat] = useState<"csv" | "xlsx">("csv")
   const [sourceSheetName, setSourceSheetName] = useState<string | undefined>()
+  const [csvDelimiter, setCsvDelimiter] = useState<CsvSourceDelimiter | "auto">("auto")
+  const [sourceDelimiter, setSourceDelimiter] = useState<CsvSourceDelimiter>()
+  const delimiterLabels = {
+    auto: t("settings.import.csvDelimiterAuto", "Detect automatically"),
+    comma: t("settings.import.csvDelimiterComma", "Comma"),
+    semicolon: t("settings.import.csvDelimiterSemicolon", "Semicolon"),
+    tab: t("settings.import.csvDelimiterTab", "Tab"),
+    pipe: t("settings.import.csvDelimiterPipe", "Pipe"),
+  }
   const [sourceAdmission, dispatchSourceAdmission] = useReducer(reduceImportSourceAdmission, null)
   const sourceScopeKey = importRecoveryKey(recoveryScope)
   const sourceAdmissionId = sourceAdmissionForScope(sourceAdmission, sourceScopeKey)
@@ -309,6 +320,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); return false }
     }
     dispatchSourceAdmission({ type: "reset" })
+    setSourceDelimiter(undefined)
     setStep("upload")
     setAnalysis(null)
     setPreparedPreview(false)
@@ -390,7 +402,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       resetFlow()
       setSelectedTemplateId(templateId)
       try {
-        const parsed = await readImportFile(file, { companyId })
+        const parsed = await readImportFile(file, {
+          companyId,
+          csvDelimiter: csvDelimiter === "auto" ? undefined : csvDelimiter,
+        })
         if (importRequestRef.current) return
         assertCsvSafeForAi(parsed.headers, parsed.rows)
         setCsvText(parsed.csvText)
@@ -399,6 +414,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         setSourceFileName(file.name)
         setSourceFormat(parsed.format)
         setSourceSheetName(parsed.sheetName)
+        setSourceDelimiter(parsed.sourceDelimiter)
         dispatchSourceAdmission({ type: "source", scopeKey: sourceScopeKey, id: parsed.sourceAdmissionId })
         setStep("upload")
       } catch (e) {
@@ -409,27 +425,37 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         setRows([])
         setSourceFileName("")
         setSourceSheetName(undefined)
+        if (fileInput.current) fileInput.current.value = ""
       } finally { readingFileRef.current = false; if (mounted.current) setReadingFile(false) }
     },
-    [resetFlow, selectedTemplateId, sourceScopeKey, companyId],
+    [resetFlow, selectedTemplateId, sourceScopeKey, companyId, csvDelimiter],
   )
 
   const applyTemplateMapping = useCallback(
     (templateId: string | null) => {
-      if (!templateId || !analysis) return
+      if (!templateId || !analysis || preparedPreview) return
       const template = selectedTemplateRow(entityTemplates, templateId)
+      if (!importMappingTemplateMatchesHeaders(template, headers)) {
+        setAppliedTemplateId(null)
+        setStatus(t("settings.import.templateLayoutChanged", "The columns differ from the saved template. Review the mapping for this file."))
+        return
+      }
       const prior = priorMappingsFromTemplate(template)
       if (!prior) return
       const compatible = filterMappingForHeaders(prior, headers)
       setMapping(compatible)
       setAppliedTemplateId(templateId)
+      setPreviewResult(null)
+      setDuplicateStates([])
+      setConfirmImportWithErrors(false)
+      setStep("map")
       setStatus(
         t("settings.import.templateApplied", "Applied {{count}} saved column mappings.", {
           count: Object.keys(compatible).length,
         }),
       )
     },
-    [analysis, entityTemplates, headers, t],
+    [analysis, entityTemplates, headers, preparedPreview, t],
   )
 
   const runAnalyze = useCallback(async () => {
@@ -441,8 +467,9 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     setDuplicateStates([])
     setStep("analyze")
     try {
+      const templateMatches = importMappingTemplateMatchesHeaders(selectedTemplate, headers)
       const priorMappings = filterMappingForHeaders(
-        priorMappingsFromTemplate(selectedTemplate) ?? {},
+        templateMatches ? priorMappingsFromTemplate(selectedTemplate) ?? {} : {},
         headers,
       )
       const result = await analyze.mutateAsync({
@@ -464,7 +491,9 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         entity: targetEntity,
         mapped_columns: result.mappings.length,
       })
-      setStatus(t("settings.import.analyzed", "Column mapping suggested — review and continue."))
+      setStatus(selectedTemplate && !templateMatches
+        ? t("settings.import.templateLayoutChanged", "The columns differ from the saved template. Review the mapping for this file.")
+        : t("settings.import.analyzed", "Column mapping suggested — review and continue."))
     } catch (e) {
       setStep("upload")
       setError(e instanceof Error ? e.message : String(e))
@@ -534,6 +563,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     () => (previewResult?.validation_errors ?? []).filter((item) => item.severity === "error"),
     [previewResult],
   )
+  const previewNeedsCorrection = previewErrors.some((error) => error.requires_correction)
+  const correctionMessage = t("settings.import.correctionRequired", {
+    defaultValue: "Correct the number formats or column mappings before importing. You can save the source for review.",
+  })
   const previewWarnings = previewResult?.warnings.length ?? 0
   const saveForReview = async () => {
     if (!companyId || !previewResult || currentWork.current.busy || submitting.current || !mounted.current) return
@@ -571,6 +604,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
           "Every source row must pass preview before import. Run preview again.",
         ),
       )
+      return
+    }
+    if (!importRequestRef.current && previewNeedsCorrection) {
+      setError(correctionMessage)
       return
     }
     if (!importRequestRef.current && previewErrors.length > 0 && (preparedPreview || !confirmImportWithErrors)) {
@@ -676,6 +713,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     companiesQuery.data,
     companyId,
     confirmImportWithErrors,
+    correctionMessage,
     csvText,
     duplicateStates,
     finalizeImport,
@@ -688,6 +726,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     recoveryScope,
     previewResult,
     previewErrors.length,
+    previewNeedsCorrection,
     preparedPreview,
     rows,
     sourceFileName,
@@ -707,12 +746,13 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         name,
         tableName: targetEntity,
         mapping,
+        headers,
         templateId: selectedTemplateId != null ? BigInt(selectedTemplateId) : null,
       })
       setSaveTemplateOpen(false)
       setStatus(t("settings.import.templateSaved", "Mapping template saved."))
     },
-    [mapping, saveTemplate, selectedTemplateId, targetEntity, t],
+    [headers, mapping, saveTemplate, selectedTemplateId, targetEntity, t],
   )
 
   const handleDeleteTemplate = useCallback(async () => {
@@ -789,7 +829,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
           </span>
           <Select
             value={selectedTemplateId ?? NO_TEMPLATE}
-            disabled={operationBusy || !!importRequest}
+            disabled={operationBusy || !!importRequest || preparedPreview}
             onValueChange={(value) => {
               const next = value === NO_TEMPLATE ? null : value
               setSelectedTemplateId(next)
@@ -809,6 +849,26 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
             </SelectContent>
           </Select>
         </label>
+
+        <div className="text-sm space-y-1">
+          <span id="guided-import-delimiter-label" className="block text-muted-foreground">
+            {t("settings.import.csvDelimiter", "Delimiter for next CSV")}
+          </span>
+          <Select
+            value={csvDelimiter}
+            disabled={operationBusy || !!importRequest}
+            onValueChange={(value) => setCsvDelimiter(value as CsvSourceDelimiter | "auto")}
+          >
+            <SelectTrigger aria-labelledby="guided-import-delimiter-label">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(delimiterLabels).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <label className="text-sm space-y-1">
           <span className="block text-muted-foreground">
@@ -830,6 +890,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
           <span className="font-medium">{sourceFileName}</span>
           <span className="ml-2 text-muted-foreground">
             {sourceFormat.toUpperCase()}
+            {sourceDelimiter ? ` · ${delimiterLabels[sourceDelimiter]}` : ""}
             {sourceSheetName ? ` · ${sourceSheetName}` : ""} · {rows.length}{" "}
             {t("settings.import.dataRows", "data rows")}
           </span>
@@ -971,7 +1032,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
               </div>
             </div>
           ) : null}
-          {previewErrors.length > 0 && !preparedPreview ? (
+          {previewNeedsCorrection ? (
+            <p className="text-sm text-destructive">{correctionMessage}</p>
+          ) : null}
+          {previewErrors.length > 0 && !preparedPreview && !previewNeedsCorrection ? (
             <label className="flex items-center gap-2 text-sm text-destructive">
               <input
                 type="checkbox"
@@ -1019,7 +1083,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
           </Button>
         ) : null}
         {step === "preview" ? (
-          <Button type="button" disabled={operationBusy || (preparedPreview && previewErrors.length > 0)} onClick={() => void runImport()}>
+          <Button type="button" disabled={operationBusy || previewNeedsCorrection || (preparedPreview && previewErrors.length > 0)} onClick={() => void runImport()}>
             {t("settings.import.run", "Import")}
           </Button>
         ) : null}

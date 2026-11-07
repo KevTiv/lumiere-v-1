@@ -447,6 +447,11 @@
             "required": false
           },
           {
+            "name": "csvDelimiter",
+            "rustType": "Option<CsvDelimiter>",
+            "required": false
+          },
+          {
             "name": "headers",
             "rustType": "Option<Vec<String>>",
             "required": false

@@ -64,6 +64,7 @@ export type ImportPreviewError = {
   field: string
   message: string
   severity: string
+  requires_correction?: boolean
 }
 
 export type ImportPreviewResponse = {
