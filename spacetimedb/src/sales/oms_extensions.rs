@@ -1,5 +1,6 @@
 //! Sales OMS extensions — fiscal position tax maps, Incoterms, dropship POs,
 //! SaleOrderOption CRUD, promotions, commissions, and exchange orders.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{
@@ -14,8 +15,8 @@ use crate::purchasing::purchase_orders::{
 };
 use crate::sales::return_orders::{return_order, return_order_line};
 use crate::sales::sales_core::{
-    create_sale_order_record, sale_order, sale_order_line, sale_order_option, CreateSaleOrderLineParams,
-    CreateSaleOrderParams, SaleOrder, SaleOrderOption,
+    create_sale_order_record, sale_order, sale_order_line, sale_order_option,
+    CreateSaleOrderLineParams, CreateSaleOrderParams, SaleOrder, SaleOrderOption,
 };
 use crate::types::{AccountMoveState, MoveType, PaymentState};
 
@@ -579,9 +580,10 @@ pub fn create_fiscal_position(
             write_date: Some(ctx.timestamp),
             metadata: params.metadata.clone(),
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_fiscal_position",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "account_fiscal_position",
@@ -592,7 +594,7 @@ pub fn create_fiscal_position(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -624,9 +626,10 @@ pub fn create_fiscal_position_tax(
             sequence: params.sequence,
             metadata: params.metadata.clone(),
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_fiscal_position_tax",
         AuditLogParams {
             company_id: fp.company_id,
             table_name: "account_fiscal_position_tax",
@@ -644,7 +647,7 @@ pub fn create_fiscal_position_tax(
             changed_fields: vec!["tax_src_id".to_string(), "tax_dest_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -685,9 +688,10 @@ pub fn create_incoterm(
         write_date: Some(ctx.timestamp),
         metadata: params.metadata.clone(),
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_incoterm",
         AuditLogParams {
             company_id: None,
             table_name: "account_incoterm",
@@ -698,7 +702,7 @@ pub fn create_incoterm(
             changed_fields: vec!["code".to_string(), "name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -736,9 +740,10 @@ pub fn create_sale_promotion(
         write_date: Some(ctx.timestamp),
         metadata: params.metadata.clone(),
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_promotion",
         AuditLogParams {
             company_id: params.company_id,
             table_name: "sale_promotion",
@@ -749,7 +754,7 @@ pub fn create_sale_promotion(
             changed_fields: vec!["code".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -859,9 +864,10 @@ pub fn apply_sale_promotion_to_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_sale_promotion_to_order",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "sale_order",
@@ -872,7 +878,7 @@ pub fn apply_sale_promotion_to_order(
             changed_fields: vec!["metadata".to_string(), "discount".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -918,9 +924,10 @@ pub fn create_sale_order_option(
         write_date: ctx.timestamp,
         metadata: params.metadata.clone(),
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_order_option",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "sale_order_option",
@@ -931,7 +938,7 @@ pub fn create_sale_order_option(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -972,9 +979,10 @@ pub fn update_sale_order_option(
         write_date: ctx.timestamp,
         ..option
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_sale_order_option",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "sale_order_option",
@@ -985,7 +993,7 @@ pub fn update_sale_order_option(
             changed_fields: vec!["option".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1015,9 +1023,10 @@ pub fn delete_sale_order_option(
         return Err("Sale order option does not match its order organization".to_string());
     }
     ctx.db.sale_order_option().id().delete(&option_id);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_sale_order_option",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "sale_order_option",
@@ -1028,7 +1037,7 @@ pub fn delete_sale_order_option(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1109,9 +1118,10 @@ pub fn apply_sale_order_options(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_sale_order_options",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "sale_order",
@@ -1122,7 +1132,7 @@ pub fn apply_sale_order_options(
             changed_fields: vec!["order_line".to_string(), "sale_order_option".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1484,9 +1494,10 @@ pub fn settle_sale_commissions(
             write_date: Some(ctx.timestamp),
             ..row
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "settle_sale_commissions",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "sale_commission",
@@ -1507,12 +1518,13 @@ pub fn settle_sale_commissions(
                 ],
                 metadata: None,
             },
-        );
+        )?;
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "settle_sale_commissions",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -1530,7 +1542,7 @@ pub fn settle_sale_commissions(
             changed_fields: vec!["amount_total".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1567,9 +1579,10 @@ pub fn cancel_sale_commission(
         write_date: Some(ctx.timestamp),
         ..row
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_sale_commission",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_commission",
@@ -1580,7 +1593,7 @@ pub fn cancel_sale_commission(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1762,9 +1775,10 @@ pub fn reverse_sale_commission_settlement(
         ..row
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "reverse_sale_commission_settlement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_commission",
@@ -1781,7 +1795,7 @@ pub fn reverse_sale_commission_settlement(
             changed_fields: vec!["state".to_string(), "settle_move_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1920,9 +1934,10 @@ pub fn create_exchange_order_from_return(
         ..exchange_order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_exchange_order_from_return",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -1939,6 +1954,6 @@ pub fn create_exchange_order_from_return(
             changed_fields: vec!["origin_so_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

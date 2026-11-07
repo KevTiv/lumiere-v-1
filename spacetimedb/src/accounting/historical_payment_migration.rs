@@ -6,6 +6,7 @@
 //! document would reduce the receivable/payable twice, so those documents fail
 //! closed based on their private migration metadata.
 
+use crate::core::business_changes::write_business_audit;
 use std::collections::BTreeSet;
 
 use serde::Deserialize;
@@ -22,7 +23,7 @@ use crate::accounting::payment_management::{
 };
 use crate::accounting::payments::{account_payment, AccountPayment};
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{
     AccountMoveState, MoveType, PartnerType, PaymentDirection, PaymentState,
     PaymentTransactionStatus,
@@ -506,9 +507,10 @@ pub fn apply_historical_payment_allocations(
         )?;
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_historical_payment_allocations",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "payment_transaction",
@@ -531,7 +533,7 @@ pub fn apply_historical_payment_allocations(
             changed_fields: vec!["payment_reconciliation".to_string()],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     record_result(
         ctx,

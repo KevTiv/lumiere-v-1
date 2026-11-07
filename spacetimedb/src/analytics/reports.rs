@@ -1,3 +1,5 @@
+use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 /// Reports Module — Report templates, scheduling, and analytics metrics
 ///
 /// # Tables
@@ -6,6 +8,7 @@
 /// | **ReportTemplate** | Layout and format definitions for generated reports |
 /// | **ScheduledReport** | Automated periodic report delivery configuration |
 /// | **AnalyticsMetric** | KPI / trend metric with cached computed values |
+use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
 use chrono::{Datelike, Days, LocalResult, NaiveDate, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -16,7 +19,7 @@ use crate::core::persistence::{record_organization_commit, OrganizationCommitInp
 use crate::core::queue::{enqueue_job_internal, EnqueueJobParams};
 use crate::core::users::user_organization;
 use crate::documents::documents::{document, document_version, Document, DocumentVersion};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::MailMessageType;
 
 // ============================================================================
@@ -659,6 +662,7 @@ pub fn record_generated_owner_report(
     company_id: u64,
     params: RecordGeneratedOwnerReportParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "report", "read")?;
     require_company_in_organization(ctx, organization_id, company_id)?;
     if params.report_key.trim().is_empty()
@@ -780,9 +784,10 @@ pub fn record_generated_owner_report(
         });
     document.res_id = Some(row.id);
     ctx.db.document().id().update(document);
-    write_audit_log_v2(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
+        "record_generated_owner_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "generated_owner_report",
@@ -801,7 +806,7 @@ pub fn record_generated_owner_report(
             changed_fields: vec!["generated".to_string()],
             metadata: None,
         },
-    );
+    )?);
     let committed_document = ctx
         .db
         .document()
@@ -829,23 +834,26 @@ pub fn record_generated_owner_report(
             organization_id,
             operation_id: "erp.record_generated_owner_report".to_string(),
             correlation_id: committed_report.correlation_id.clone(),
-            changes: vec![
-                RowChange::upsert_stdb_row(
-                    "document",
-                    serde_json::json!({"id": committed_document.id}),
-                    &committed_document,
-                )?,
-                RowChange::upsert_stdb_row(
-                    "document_version",
-                    serde_json::json!({"id": committed_version.id}),
-                    &committed_version,
-                )?,
-                RowChange::upsert_stdb_row(
-                    "generated_owner_report",
-                    serde_json::json!({"id": committed_report.id}),
-                    &committed_report,
-                )?,
-            ],
+            changes: merge_business_audit_changes(
+                vec![
+                    RowChange::upsert_stdb_row(
+                        "document",
+                        serde_json::json!({"id": committed_document.id}),
+                        &committed_document,
+                    )?,
+                    RowChange::upsert_stdb_row(
+                        "document_version",
+                        serde_json::json!({"id": committed_version.id}),
+                        &committed_version,
+                    )?,
+                    RowChange::upsert_stdb_row(
+                        "generated_owner_report",
+                        serde_json::json!({"id": committed_report.id}),
+                        &committed_report,
+                    )?,
+                ],
+                business_audit_changes,
+            )?,
         },
     )?;
     Ok(())
@@ -890,9 +898,10 @@ pub fn create_report_template(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_report_template",
         AuditLogParams {
             company_id,
             table_name: "report_template",
@@ -903,7 +912,7 @@ pub fn create_report_template(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Report template created: id={}, model={}",
@@ -957,9 +966,10 @@ pub fn update_report_template(
         ..tmpl
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_report_template",
         AuditLogParams {
             company_id: None,
             table_name: "report_template",
@@ -970,7 +980,7 @@ pub fn update_report_template(
             changed_fields: vec!["updated".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Report template updated: id={}", template_id);
     Ok(())
@@ -1022,9 +1032,10 @@ pub fn create_scheduled_report(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_scheduled_report",
         AuditLogParams {
             company_id,
             table_name: "scheduled_report",
@@ -1035,7 +1046,7 @@ pub fn create_scheduled_report(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Scheduled report created: id={}, frequency={}",
@@ -1084,6 +1095,7 @@ pub fn update_owner_report_schedule(
         }
     }
 
+    let history_before = native_row_snapshot(&report)?;
     ctx.db.scheduled_report().id().update(ScheduledReport {
         name: params.name.unwrap_or(report.name),
         frequency: params.frequency.unwrap_or(report.frequency),
@@ -1099,6 +1111,29 @@ pub fn update_owner_report_schedule(
         write_date: ctx.timestamp,
         ..report
     });
+
+    let history_after = ctx
+        .db
+        .scheduled_report()
+        .id()
+        .find(&report_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "update_owner_report_schedule",
+        AuditLogParams {
+            company_id: report.company_id,
+            table_name: "scheduled_report",
+            record_id: report_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1237,6 +1272,7 @@ pub fn complete_scheduled_owner_report_run(
         return Err("scheduled report run already has an artifact".to_string());
     }
     let notifications = create_owner_report_notifications(ctx, &report, run.id, document_id);
+    let history_before = native_row_snapshot(&run)?;
     ctx.db
         .scheduled_report_run()
         .id()
@@ -1256,6 +1292,29 @@ pub fn complete_scheduled_owner_report_run(
         write_date: ctx.timestamp,
         ..report
     });
+
+    let history_after = ctx
+        .db
+        .scheduled_report_run()
+        .id()
+        .find(&run_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "complete_scheduled_owner_report_run",
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "scheduled_report_run",
+            record_id: run_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1285,6 +1344,15 @@ pub fn fail_scheduled_owner_report_run(
     if run.status == "completed" {
         return Ok(());
     }
+    let history_company = ctx
+        .db
+        .scheduled_report()
+        .id()
+        .find(&run.scheduled_report_id)
+        .filter(|row| row.organization_id == organization_id)
+        .ok_or("Report schedule source missing")?
+        .company_id;
+    let history_before = native_row_snapshot(&run)?;
     ctx.db
         .scheduled_report_run()
         .id()
@@ -1293,6 +1361,29 @@ pub fn fail_scheduled_owner_report_run(
             error_message: Some(error_message),
             ..run
         });
+
+    let history_after = ctx
+        .db
+        .scheduled_report_run()
+        .id()
+        .find(&run_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "fail_scheduled_owner_report_run",
+        AuditLogParams {
+            company_id: history_company,
+            table_name: "scheduled_report_run",
+            record_id: run_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1341,9 +1432,10 @@ pub fn record_report_run(
         ..report
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_report_run",
         AuditLogParams {
             company_id: None,
             table_name: "scheduled_report",
@@ -1354,7 +1446,7 @@ pub fn record_report_run(
             changed_fields: vec!["run_recorded".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Scheduled report run recorded: id={}", report_id);
     Ok(())
@@ -1401,9 +1493,10 @@ pub fn create_analytics_metric(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_analytics_metric",
         AuditLogParams {
             company_id,
             table_name: "analytics_metric",
@@ -1414,7 +1507,7 @@ pub fn create_analytics_metric(
             changed_fields: vec!["created".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Analytics metric created: id={}, category={}",
@@ -1480,6 +1573,7 @@ pub fn update_metric_values(
             (None, None, None)
         };
 
+    let history_before = native_row_snapshot(&metric)?;
     ctx.db.analytics_metric().id().update(AnalyticsMetric {
         current_value: Some(params.current_value),
         previous_value: params.previous_value,
@@ -1498,6 +1592,29 @@ pub fn update_metric_values(
         metric_id,
         params.current_value
     );
+
+    let history_after = ctx
+        .db
+        .analytics_metric()
+        .id()
+        .find(&metric_id)
+        .ok_or("History source missing after update")?;
+
+    write_private_business_audit(
+        ctx,
+        organization_id,
+        "update_metric_values",
+        AuditLogParams {
+            company_id: metric.company_id,
+            table_name: "analytics_metric",
+            record_id: metric_id,
+            action: "UPDATE",
+            old_values: Some(history_before),
+            new_values: Some(native_row_snapshot(&history_after)?),
+            changed_fields: vec![],
+            metadata: None,
+        },
+    )?;
     Ok(())
 }
 
@@ -1722,9 +1839,10 @@ pub fn create_saved_report(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_saved_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "saved_report",
@@ -1735,7 +1853,7 @@ pub fn create_saved_report(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1807,9 +1925,10 @@ pub fn update_saved_report(
         write_date: ctx.timestamp,
         ..existing
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_saved_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "saved_report",
@@ -1820,7 +1939,7 @@ pub fn update_saved_report(
             changed_fields: vec!["row_dimension".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1845,9 +1964,10 @@ pub fn delete_saved_report(
         return Err("Saved report does not belong to this company".to_string());
     }
     ctx.db.saved_report().id().delete(&saved_report_id);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_saved_report",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "saved_report",
@@ -1858,6 +1978,6 @@ pub fn delete_saved_report(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

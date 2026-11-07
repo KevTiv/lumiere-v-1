@@ -1,7 +1,8 @@
 //! Packing workflow — physical stock packages beyond cartonization suggestions.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::stock::{stock_move, stock_picking, StockMove};
@@ -192,9 +193,10 @@ pub fn create_stock_package(
     check_permission(ctx, organization_id, "stock_picking", "create")?;
     assert_inventory_writable(ctx, organization_id, company_id)?;
     let row = insert_stock_package(ctx, organization_id, company_id, params)?;
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_package",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_package",
@@ -207,7 +209,7 @@ pub fn create_stock_package(
             changed_fields: vec!["name".to_string(), "state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -283,9 +285,10 @@ pub fn pack_moves_into_package(
         ..pkg
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "pack_moves_into_package",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_package",
@@ -298,7 +301,7 @@ pub fn pack_moves_into_package(
             changed_fields: vec!["move_ids".to_string(), "weight".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -332,9 +335,10 @@ pub fn confirm_stock_package(
         ..pkg
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_stock_package",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_package",
@@ -345,7 +349,7 @@ pub fn confirm_stock_package(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -395,9 +399,10 @@ pub fn done_stock_package(
         ..pkg
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "done_stock_package",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_package",
@@ -414,7 +419,7 @@ pub fn done_stock_package(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -457,9 +462,10 @@ pub fn cancel_stock_package(
         ..pkg
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_stock_package",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_package",
@@ -470,7 +476,7 @@ pub fn cancel_stock_package(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

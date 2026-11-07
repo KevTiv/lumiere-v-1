@@ -1,4 +1,5 @@
 /// Accrual and prepaid expense amortization schedules (mirror deferred revenue pattern).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -10,7 +11,7 @@ use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
 };
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::types::{AccountInternalGroup, AccountMoveState, JournalType, PaymentState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -225,9 +226,10 @@ pub fn create_amortization_schedule(
         });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_amortization_schedule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "amortization_schedule",
@@ -244,7 +246,7 @@ pub fn create_amortization_schedule(
             changed_fields: vec!["schedule_kind".to_string(), "total_amount".to_string()],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -518,9 +520,10 @@ pub fn recognize_amortization_line(
             ..schedule
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "recognize_amortization_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "amortization_line",
@@ -538,7 +541,7 @@ pub fn recognize_amortization_line(
             changed_fields: vec!["recognized".to_string(), "move_id".to_string()],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     record_result(
         ctx,

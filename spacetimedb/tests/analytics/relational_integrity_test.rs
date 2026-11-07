@@ -11,6 +11,8 @@ use crate::analytics::reports::{
     record_report_run, report_template, scheduled_report, CreateReportTemplateParams,
     CreateScheduledReportParams, RecordGeneratedOwnerReportParams,
 };
+use crate::core::audit::audit_log;
+use crate::core::business_changes::business_change;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -336,9 +338,9 @@ pub fn test_generated_owner_report_records_ordered_commit(
                 && commit.correlation_id == correlation_id
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 3 {
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
         return Err(format!(
-            "owner report should emit one three-row organization commit, got {} / {:?}",
+            "owner report should emit one five-row organization commit, got {} / {:?}",
             commits.len(),
             commits.first().map(|commit| commit.row_change_count)
         ));
@@ -358,11 +360,62 @@ pub fn test_generated_owner_report_records_ordered_commit(
         .iter()
         .map(|change| change.table_name.as_str())
         .collect();
-    if tables != ["document", "document_version", "generated_owner_report"] {
+    if tables
+        != [
+            "document",
+            "document_version",
+            "generated_owner_report",
+            "audit_log",
+            "business_change",
+        ]
+    {
         return Err(format!(
             "owner report commit row order mismatch: {tables:?}"
         ));
     }
+    let report_record_id = serde_json::from_str::<serde_json::Value>(&changes[2].row_identity_json)
+        .map_err(|error| format!("owner report source identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("owner report source identity missing")?;
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[3].row_identity_json)
+        .map_err(|error| format!("owner report audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("owner report audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[4].row_identity_json)
+        .map_err(|error| format!("owner report private history identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("owner report private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("owner report audit row missing")?;
+    let history = ctx
+        .db
+        .business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("owner report private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != fixture.organization_id
+        || audit.organization_id != fixture.organization_id
+        || history.record_id != report_record_id
+        || history.resource != "generated_owner_report"
+        || history.subject_resource != "generated_owner_report"
+        || history.subject_record_id != report_record_id
+        || audit.table_name != "generated_owner_report"
+        || audit.record_id != report_record_id
+        || history.operation != "record_generated_owner_report"
+        || history.company_id != fixture.company_id
+        || audit.company_id != Some(fixture.company_id)
+    {
+        return Err("owner report owner commit did not preserve exact audit/private history linkage and scope".into());
+    }
+
     Ok(())
 }
 

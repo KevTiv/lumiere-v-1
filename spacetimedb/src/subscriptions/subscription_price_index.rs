@@ -1,8 +1,9 @@
 //! Subscription price-index maintenance and index-linked renewal.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::billing_helpers::calculate_next_date;
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::subscription_wave_e::subscription_price_index;
@@ -90,9 +91,10 @@ pub fn upsert_subscription_price_index(
             updated_at: ctx.timestamp,
             metadata: params.metadata.unwrap_or_default(),
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "upsert_subscription_price_index",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_price_index",
@@ -114,7 +116,7 @@ pub fn upsert_subscription_price_index(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -207,9 +209,10 @@ pub fn apply_index_linked_renewal(
         },
     );
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_index_linked_renewal",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -227,6 +230,6 @@ pub fn apply_index_linked_renewal(
             changed_fields: vec!["price_unit".to_string(), "recurring_next_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

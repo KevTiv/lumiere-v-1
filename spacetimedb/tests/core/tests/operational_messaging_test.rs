@@ -357,6 +357,9 @@ fn test_batch_creation_captures_canonical_exclusions(
     {
         return Err("private batch evidence has incorrect canonical ownership".into());
     }
+    if capture.subject_resource != "message_batch" || capture.changes_json == "[]" {
+        return Err("batch summary replaced the authoritative exclusion capture".into());
+    }
     let changes: serde_json::Value =
         serde_json::from_str(&capture.changes_json).map_err(|error| error.to_string())?;
     let saved = changes

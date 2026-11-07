@@ -4,6 +4,7 @@
 //! This module never infers an allocation from an invoice's original balance:
 //! only the immutable bank attempt's signed before-residuals may be restored.
 
+use crate::core::business_changes::write_business_audit;
 use std::collections::{BTreeMap, BTreeSet};
 
 use spacetimedb::{ReducerContext, Timestamp};
@@ -24,7 +25,7 @@ use super::relations::{
     require_contact_in_scope,
 };
 use crate::core::organization::{company, require_company_in_organization};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::sales::sales_core::{sale_order, SaleOrder};
 use crate::types::{
     AccountMoveState, AccountTypeInternal, BankStatementState, JournalType, MoveType, PartnerType,
@@ -841,13 +842,14 @@ pub(super) fn apply_bank_settlement_reversal(
         reconciled_bill_ids: Vec::new(),
         ..prepared.payment
     });
-    write_audit_log_v2(ctx, attempt.organization_id, AuditLogParams {
+    write_business_audit(ctx, attempt.organization_id,
+        "reverse_bank_statement_settlement", AuditLogParams {
         company_id: Some(attempt.company_id), table_name: "account_payment", record_id: payment_id,
         action: "BANK_SETTLEMENT_REVERSE", old_values: Some(serde_json::json!({"attempt_id":attempt.id,"state":"Paid"}).to_string()),
         new_values: Some(serde_json::json!({"state":"Reversed","reversal_move_id":reversal_id,"date":request.date.to_micros_since_unix_epoch(),"reason":request.reason}).to_string()),
         changed_fields: vec!["state".to_string(),"reversal_move_id".to_string(),"reconciled_invoice_ids".to_string(),"reconciled_bill_ids".to_string()],
         metadata: None,
-    });
+    })?;
     Ok(reversal_id)
 }
 

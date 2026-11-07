@@ -6,6 +6,7 @@
 /// | **PurchaseOrder** | Purchase orders and quotations |
 /// | **PurchaseOrderLine** | Purchase order lines with products, quantities, and pricing |
 /// | **PurchaseRequisition** | Internal purchase requests/RFQs |
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::payment_terms::account_payment_term;
@@ -989,9 +990,10 @@ fn create_purchase_order_record_impl(
         &custom_fields,
     );
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchase_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order",
@@ -1002,7 +1004,7 @@ fn create_purchase_order_record_impl(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase order {} created", order.id);
     Ok(order.id)
@@ -1060,9 +1062,10 @@ pub fn send_purchase_order_impl(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "send_purchase_order",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "purchase_order",
@@ -1073,7 +1076,7 @@ pub fn send_purchase_order_impl(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase order {} sent to vendor", order_id);
     Ok(())
@@ -1166,9 +1169,10 @@ pub fn confirm_purchase_order_impl(
 
     create_incoming_pickings_for_confirmed_order(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_purchase_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order",
@@ -1184,7 +1188,7 @@ pub fn confirm_purchase_order_impl(
             ],
             metadata: Some(serde_json::json!({ "encumbrance": amount_total }).to_string()),
         },
-    );
+    )?;
 
     log::info!("Purchase order {} confirmed", order_id);
     Ok(())
@@ -1452,9 +1456,10 @@ pub fn cancel_purchase_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_purchase_order",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "purchase_order",
@@ -1467,7 +1472,7 @@ pub fn cancel_purchase_order(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase order {} cancelled", order_id);
     Ok(())
@@ -1562,9 +1567,10 @@ pub fn update_purchase_order(
 
     ctx.db.purchase_order().id().update(updated);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_purchase_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order",
@@ -1575,7 +1581,7 @@ pub fn update_purchase_order(
             changed_fields: vec!["write_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1614,9 +1620,10 @@ pub fn clear_purchase_order_field(
     order.write_uid = ctx.sender();
     order.write_date = ctx.timestamp;
     ctx.db.purchase_order().id().update(order);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "clear_purchase_order_field",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order",
@@ -1627,7 +1634,7 @@ pub fn clear_purchase_order_field(
             changed_fields: vec![format!("{field:?}")],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1653,9 +1660,10 @@ pub fn lock_purchase_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "lock_purchase_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order",
@@ -1666,7 +1674,7 @@ pub fn lock_purchase_order(
             changed_fields: vec!["is_locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1689,9 +1697,10 @@ pub fn unlock_purchase_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unlock_purchase_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order",
@@ -1702,7 +1711,7 @@ pub fn unlock_purchase_order(
             changed_fields: vec!["is_locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1839,9 +1848,10 @@ fn add_purchase_order_line_impl(
     refresh_po_receipt_status(ctx, organization_id, order_id)?;
     refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_purchase_order_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order_line",
@@ -1860,7 +1870,7 @@ fn add_purchase_order_line_impl(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Line added to purchase order {}", order_id);
     Ok(line.id)
@@ -1999,9 +2009,10 @@ pub fn remove_purchase_order_line(
     update_po_receipt_status(ctx, organization_id, order_id)?;
     update_po_invoice_status(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "remove_purchase_order_line",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "purchase_order_line",
@@ -2014,7 +2025,7 @@ pub fn remove_purchase_order_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Line {} removed from purchase order {}", line_id, order.id);
     Ok(())
@@ -2132,9 +2143,10 @@ pub fn update_purchase_order_line(
     update_po_receipt_status(ctx, organization_id, order_id)?;
     update_po_invoice_status(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_purchase_order_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order_line",
@@ -2162,7 +2174,7 @@ pub fn update_purchase_order_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase order line {} updated", line_id);
     Ok(())
@@ -2203,9 +2215,10 @@ pub fn clear_purchase_order_line_field(
     line.write_uid = ctx.sender();
     line.write_date = ctx.timestamp;
     ctx.db.purchase_order_line().id().update(line);
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "clear_purchase_order_line_field",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "purchase_order_line",
@@ -2216,7 +2229,7 @@ pub fn clear_purchase_order_line_field(
             changed_fields: vec![format!("{field:?}")],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -2762,9 +2775,10 @@ pub fn receive_po_line(
         persist_line_match_state(ctx, &order_after, line_after);
         refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "receive_po_line",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "purchase_order_line",
@@ -2785,7 +2799,7 @@ pub fn receive_po_line(
                 changed_fields: vec!["qty_received".to_string(), "metadata".to_string()],
                 metadata: None,
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -2814,9 +2828,10 @@ pub fn receive_po_line(
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
     refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "receive_po_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order_line",
@@ -2839,7 +2854,7 @@ pub fn receive_po_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2896,9 +2911,10 @@ pub fn invoice_po_line(
     update_po_invoice_status(ctx, organization_id, order_id)?;
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "invoice_po_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_order_line",
@@ -2928,7 +2944,7 @@ pub fn invoice_po_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3032,9 +3048,10 @@ pub fn create_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchase_requisition",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_requisition",
@@ -3051,7 +3068,7 @@ pub fn create_purchase_requisition(
             changed_fields: vec!["id".to_string(), "line_ids".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Purchase requisition {} created with {} lines",
@@ -3128,9 +3145,10 @@ pub fn add_purchase_requisition_line(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_purchase_requisition_line",
         AuditLogParams {
             company_id: Some(requisition.company_id),
             table_name: "purchase_requisition_line",
@@ -3152,7 +3170,7 @@ pub fn add_purchase_requisition_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -3186,9 +3204,10 @@ pub fn submit_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "submit_purchase_requisition",
         AuditLogParams {
             company_id: Some(requisition.company_id),
             table_name: "purchase_requisition",
@@ -3199,7 +3218,7 @@ pub fn submit_purchase_requisition(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase requisition {} submitted", requisition_id);
     Ok(())
@@ -3236,9 +3255,10 @@ pub fn approve_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "approve_purchase_requisition",
         AuditLogParams {
             company_id: Some(requisition.company_id),
             table_name: "purchase_requisition",
@@ -3249,7 +3269,7 @@ pub fn approve_purchase_requisition(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase requisition {} approved", requisition_id);
     Ok(())
@@ -3413,9 +3433,10 @@ pub fn convert_purchase_requisition_to_po(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "convert_purchase_requisition_to_po",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_requisition",
@@ -3432,7 +3453,7 @@ pub fn convert_purchase_requisition_to_po(
             changed_fields: vec!["purchase_ids".to_string(), "order_count".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!(
         "Purchase requisition {} converted to PO {}",
@@ -3470,9 +3491,10 @@ pub fn close_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "close_purchase_requisition",
         AuditLogParams {
             company_id: Some(requisition.company_id),
             table_name: "purchase_requisition",
@@ -3485,7 +3507,7 @@ pub fn close_purchase_requisition(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase requisition {} closed", requisition_id);
     Ok(())
@@ -3519,9 +3541,10 @@ pub fn cancel_purchase_requisition(
             ..requisition
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_purchase_requisition",
         AuditLogParams {
             company_id: Some(requisition.company_id),
             table_name: "purchase_requisition",
@@ -3534,7 +3557,7 @@ pub fn cancel_purchase_requisition(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     log::info!("Purchase requisition {} cancelled", requisition_id);
     Ok(())

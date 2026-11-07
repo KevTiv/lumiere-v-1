@@ -1,8 +1,9 @@
 //! Wave E — card statement match, pending-intent batch apply, FX fee helpers.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::ExpensePaymentMode;
 
 use super::expense_wave_d::expense_integration_intent;
@@ -141,9 +142,10 @@ pub fn create_expense_card_statement_line(
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_expense_card_statement_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "expense_card_statement_line",
@@ -165,7 +167,7 @@ pub fn create_expense_card_statement_line(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -234,9 +236,10 @@ pub fn match_expense_card_statement_line(
             metadata: params.metadata.or(line.metadata.clone()),
             ..line
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "match_expense_card_statement_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "expense_card_statement_line",
@@ -253,7 +256,7 @@ pub fn match_expense_card_statement_line(
             changed_fields: vec!["status".into(), "matched_expense_id".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -288,9 +291,10 @@ pub fn unmatch_expense_card_statement_line(
             metadata: params.metadata.or(line.metadata.clone()),
             ..line
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unmatch_expense_card_statement_line",
         AuditLogParams {
             company_id: Some(line.company_id),
             table_name: "expense_card_statement_line",
@@ -301,7 +305,7 @@ pub fn unmatch_expense_card_statement_line(
             changed_fields: vec!["status".into(), "matched_expense_id".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

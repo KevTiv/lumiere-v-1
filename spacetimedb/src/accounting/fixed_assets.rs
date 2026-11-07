@@ -9,6 +9,7 @@
 /// ## Tables
 /// - `AccountAsset` — Fixed asset records with depreciation tracking
 /// - `AccountAssetDepreciationLine` — Individual depreciation entries
+use crate::core::business_changes::write_business_audit;
 use chrono::{DateTime, Months, Utc};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -20,7 +21,7 @@ use crate::accounting::relations::{
 };
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::users::find_user_profile_for_identity;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{AccountInternalGroup, AssetState, AssetType, DepreciationMethod, JournalType};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -488,9 +489,10 @@ pub fn create_account_asset(
         ctx.db.account_asset().id().update(parent);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_asset",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -512,7 +514,7 @@ pub fn create_account_asset(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -796,9 +798,10 @@ pub fn update_account_asset(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_asset",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -809,7 +812,7 @@ pub fn update_account_asset(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -846,9 +849,10 @@ pub fn delete_account_asset(
 
     ctx.db.account_asset().id().delete(&asset_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_account_asset",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -861,7 +865,7 @@ pub fn delete_account_asset(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -893,9 +897,10 @@ pub fn confirm_account_asset(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_account_asset",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -906,7 +911,7 @@ pub fn confirm_account_asset(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -934,9 +939,10 @@ pub fn close_account_asset(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "close_account_asset",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -947,7 +953,7 @@ pub fn close_account_asset(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1052,9 +1058,10 @@ pub fn create_depreciation_line(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_depreciation_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset_depreciation_line",
@@ -1072,7 +1079,7 @@ pub fn create_depreciation_line(
             changed_fields: vec!["asset_id".to_string(), "amount".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     record_result(
         ctx,
@@ -1296,9 +1303,10 @@ pub fn compute_depreciation_board(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "compute_depreciation_board",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -1309,7 +1317,7 @@ pub fn compute_depreciation_board(
             changed_fields: vec!["depreciation_board".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1364,9 +1372,10 @@ pub fn dispose_account_asset(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "dispose_account_asset",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -1377,7 +1386,7 @@ pub fn dispose_account_asset(
             changed_fields: vec!["state".to_string(), "disposal_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1401,9 +1410,10 @@ pub fn set_asset_active(
         ..asset
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_asset_active",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_asset",
@@ -1414,7 +1424,7 @@ pub fn set_asset_active(
             changed_fields: vec!["active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

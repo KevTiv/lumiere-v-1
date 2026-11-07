@@ -10,7 +10,8 @@ use super::{
     subscription_collection, subscription_payment_intent, subscription_tax_settle_intent,
     SubscriptionCollection, SubscriptionPaymentIntent, SubscriptionTaxSettleIntent,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::business_changes::write_business_audit;
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::tables::{subscription, Subscription};
 use spacetimedb::{ReducerContext, Table};
@@ -74,9 +75,10 @@ pub fn create_subscription_payment_intent(
             metadata: params.metadata.unwrap_or_default(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_subscription_payment_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_payment_intent",
@@ -93,7 +95,7 @@ pub fn create_subscription_payment_intent(
             changed_fields: vec!["intent_type".to_string(), "status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -150,9 +152,10 @@ pub fn apply_subscription_payment_intent(
         ..sub
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_subscription_payment_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_payment_intent",
@@ -163,7 +166,7 @@ pub fn apply_subscription_payment_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -267,9 +270,10 @@ pub fn create_subscription_tax_settle_intent(
             metadata: params.metadata.unwrap_or_default(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_subscription_tax_settle_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_tax_settle_intent",
@@ -286,7 +290,7 @@ pub fn create_subscription_tax_settle_intent(
             changed_fields: vec!["intent_type".to_string(), "status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -338,9 +342,10 @@ pub fn apply_subscription_tax_settle_intent(
             applied_at: Some(ctx.timestamp),
             ..intent.clone()
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_subscription_tax_settle_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_tax_settle_intent",
@@ -351,6 +356,6 @@ pub fn apply_subscription_tax_settle_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

@@ -770,7 +770,7 @@ mod tests {
         .unwrap();
         assert!(verify_claims(&hs, &keys, &config, now).is_err());
         let mut long = claims();
-        long["exp"] = json!(now + 3601);
+        long["exp"] = json!(long["iat"].as_u64().unwrap() + 3601);
         assert!(verify_claims(&token(&long, "test-key"), &keys, &config, now).is_err());
     }
     #[test]

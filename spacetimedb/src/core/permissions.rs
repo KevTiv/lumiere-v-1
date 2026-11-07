@@ -6,10 +6,11 @@
 ///          FieldPermission provides column allowlists for read/write.
 ///          PolicySnapshot is a client projection rebuilt on policy mutations.
 ///          UserRoleAssignment links identities to roles within an organization.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::users::{find_user_profile_for_organization, user_organization};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ============================================================================
 // PARAMS TYPES
@@ -1077,9 +1078,10 @@ pub fn create_role(
 
     ensure_identity_may_assign_role(ctx, organization_id, ctx.sender(), &row)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_role",
         AuditLogParams {
             company_id: None,
             table_name: "role",
@@ -1101,7 +1103,7 @@ pub fn create_role(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshots_for_role(ctx, organization_id, row.id);
 
@@ -1247,9 +1249,10 @@ pub fn update_role(
         ..role
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_role",
         AuditLogParams {
             company_id: None,
             table_name: "role",
@@ -1268,7 +1271,7 @@ pub fn update_role(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshots_for_role(ctx, organization_id, role_id);
 
@@ -1326,9 +1329,10 @@ pub fn grant_field_permission(
         created_at: ctx.timestamp,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "grant_field_permission",
         AuditLogParams {
             company_id: None,
             table_name: "field_permission",
@@ -1350,7 +1354,7 @@ pub fn grant_field_permission(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshots_for_subject(ctx, organization_id, &params.subject);
 
@@ -1386,9 +1390,10 @@ pub fn revoke_field_permission(
 
     ctx.db.field_permission().id().delete(&permission_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "revoke_field_permission",
         AuditLogParams {
             company_id: None,
             table_name: "field_permission",
@@ -1399,7 +1404,7 @@ pub fn revoke_field_permission(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshots_for_subject(ctx, organization_id, &subject);
 
@@ -1478,9 +1483,10 @@ pub fn grant_permission(
         return Err("Cannot remove the last organization administrator".into());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "grant_permission",
         AuditLogParams {
             company_id: None,
             table_name: "org_permission",
@@ -1502,7 +1508,7 @@ pub fn grant_permission(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshots_for_subject(ctx, organization_id, &params.subject);
 
@@ -1544,9 +1550,10 @@ pub fn revoke_permission(
         return Err("Cannot remove the last organization administrator".into());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "revoke_permission",
         AuditLogParams {
             company_id: None,
             table_name: "org_permission",
@@ -1557,7 +1564,7 @@ pub fn revoke_permission(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshots_for_subject(ctx, organization_id, &subject);
 
@@ -1590,9 +1597,10 @@ pub fn create_sod_conflict_rule(
         metadata: params.metadata.clone(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sod_conflict_rule",
         AuditLogParams {
             company_id: None,
             table_name: "sod_conflict_rule",
@@ -1610,7 +1618,7 @@ pub fn create_sod_conflict_rule(
             changed_fields: vec!["permission_a".to_string(), "permission_b".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1685,9 +1693,10 @@ pub fn update_sod_conflict_rule(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_sod_conflict_rule",
         AuditLogParams {
             company_id: None,
             table_name: "sod_conflict_rule",
@@ -1709,7 +1718,7 @@ pub fn update_sod_conflict_rule(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1752,9 +1761,10 @@ pub fn grant_delegated_admin_scope(
         metadata: params.metadata.clone(),
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "grant_delegated_admin_scope",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "delegated_admin_scope",
@@ -1771,7 +1781,7 @@ pub fn grant_delegated_admin_scope(
             changed_fields: vec!["user_identity".to_string(), "company_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1814,9 +1824,10 @@ pub fn revoke_delegated_admin_scope(
             ..scope
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "revoke_delegated_admin_scope",
         AuditLogParams {
             company_id: Some(scope.company_id),
             table_name: "delegated_admin_scope",
@@ -1834,7 +1845,7 @@ pub fn revoke_delegated_admin_scope(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1899,9 +1910,10 @@ pub fn assign_role(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "assign_role",
         AuditLogParams {
             company_id: None,
             table_name: "user_role_assignment",
@@ -1923,7 +1935,7 @@ pub fn assign_role(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
 
@@ -2001,9 +2013,10 @@ pub fn revoke_role(
             ..assignment
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "revoke_role",
         AuditLogParams {
             company_id: None,
             table_name: "user_role_assignment",
@@ -2021,7 +2034,7 @@ pub fn revoke_role(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
 

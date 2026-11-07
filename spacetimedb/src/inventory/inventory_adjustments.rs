@@ -6,10 +6,11 @@
 ///   - InventoryAdjustment
 ///   - AdjustmentReason
 ///   - StockCountSheet
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::stock::require_product_in_org;
 use crate::inventory::stock_correction::{
     apply_correction, correction_quant, prepare_correction, require_nonnegative_finite,
@@ -295,9 +296,10 @@ pub fn create_stock_inventory(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_inventory",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_inventory",
@@ -316,7 +318,7 @@ pub fn create_stock_inventory(
             changed_fields: vec!["name".to_string(), "state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -443,9 +445,10 @@ pub fn create_inventory_adjustment(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_inventory_adjustment",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_adjustment",
@@ -470,7 +473,7 @@ pub fn create_inventory_adjustment(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -534,9 +537,10 @@ pub fn create_stock_inventory_line(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_stock_inventory_line",
         AuditLogParams {
             company_id: Some(inventory.company_id),
             table_name: "stock_inventory_line",
@@ -572,7 +576,7 @@ pub fn create_stock_inventory_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -601,9 +605,10 @@ pub fn create_adjustment_reason(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_adjustment_reason",
         AuditLogParams {
             company_id: None,
             table_name: "adjustment_reason",
@@ -627,7 +632,7 @@ pub fn create_adjustment_reason(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -662,9 +667,10 @@ pub fn update_stock_inventory_state(
         ..inventory
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_stock_inventory_state",
         AuditLogParams {
             company_id: Some(inventory_company_id),
             table_name: "stock_inventory",
@@ -675,7 +681,7 @@ pub fn update_stock_inventory_state(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -741,9 +747,10 @@ pub fn process_inventory_adjustment(
             ..adjustment
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "process_inventory_adjustment",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_adjustment",
@@ -764,7 +771,7 @@ pub fn process_inventory_adjustment(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

@@ -311,6 +311,8 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
         configured_calls.add(key)
 
     _validate_dynamic_commit_helpers(repo_root, metadata, locked, configured_calls)
+    _validate_evidence_journals(repo_root, metadata, locked, configured_calls)
+    _validate_conditional_outcomes(repo_root, metadata, locked, configured_calls)
 
     _validate_module_coverage(entries, _canonical_enabled_modules(repo_root))
 
@@ -333,6 +335,155 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
             key = (str(path.relative_to(repo_root)), function)
             if key not in configured_calls:
                 raise CoverageError(f"unregistered C2 commit call at {key[0]}:{function}")
+
+
+def _relative_source(repo_root: Path, value: Any) -> Path:
+    if not isinstance(value, str) or not value:
+        raise CoverageError("history registration source must be a non-empty relative path")
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise CoverageError("history registration source must be repository-relative")
+    return repo_root / path
+
+
+def _validate_evidence_journals(repo_root: Path, metadata: dict[str, Any], locked: dict[str, Any],
+                                 configured_calls: set[tuple[str, str]]) -> None:
+    """Register a restricted evidence append, without granting C2 source coverage."""
+    entries = metadata.get("evidence_journals", [])
+    if not isinstance(entries, list):
+        raise CoverageError("evidence_journals must be an array")
+    for entry in entries:
+        required = {"source", "function", "classification", "owner_policy", "entry_points",
+                    "evidence_tables", "passthrough_helpers"}
+        if not isinstance(entry, dict) or set(entry) != required:
+            raise CoverageError("evidence journal registration has invalid keys")
+        if entry["classification"] != "evidence-only-not-complete-business-outcome":
+            raise CoverageError("evidence journal cannot claim complete business outcome coverage")
+        if entry["entry_points"] != ["write_business_audit", "write_private_business_audit"]:
+            raise CoverageError("evidence journal entry points must be the native private audit wrappers")
+        allowed = {"audit_log", "business_change", "organization_business_change"}
+        if set(entry["evidence_tables"]) != allowed:
+            raise CoverageError("evidence journal can only append audit and private evidence tables")
+        source = _relative_source(repo_root, entry["source"]).read_text(encoding="utf-8")
+        key = (entry["source"], entry["function"])
+        if key in configured_calls:
+            raise CoverageError("evidence journal cannot also be a complete outcome owner")
+        _, body = _function_body(source, entry["function"])
+        if body.count(COMMIT_CALL) != 1 or not re.search(r'operation_id\s*:\s*format!\("erp\.\{operation\}"\)', body):
+            raise CoverageError("evidence journal must use one producer-owned canonical operation expression")
+        guard = re.search(r"if\s+standalone_journal_blocked\(operation\)\?\s*\{", body)
+        if guard is None:
+            raise CoverageError("evidence journal must check the complete-owner policy before capture")
+        end = _matching_brace(body, guard.end() - 1)
+        guard_body = body[guard.end():end]
+        if "write_audit_log_v2_returning(" not in guard_body or "return Ok(())" not in guard_body:
+            raise CoverageError("guarded complete owners must retain legacy audit without a new journal")
+        captured = re.search(r"let\s+rows\s*=\s*capture_business_audit_inner\s*\(", body)
+        if captured is None or captured.start() <= end or body.index(COMMIT_CALL) <= captured.start():
+            raise CoverageError("evidence journal policy guard must precede evidence capture and append")
+        if not re.search(r"changes\s*:\s*rows\b", body) or re.search(r"\brows\s*\.\s*(?:push|extend|insert)\s*\(", body):
+            raise CoverageError("evidence journal must append only its immutable evidence vector")
+        _, capture = _function_body(source, "capture_business_audit_inner")
+        tables = set(re.findall(r'RowChange::upsert_stdb_row\(\s*"([^"]+)"', capture))
+        if tables != allowed or COMMIT_CALL in capture:
+            raise CoverageError("evidence capture cannot journal business sources or recursively commit")
+        policy_path = _relative_source(repo_root, entry["owner_policy"])
+        policy = _load_json(policy_path)
+        if policy.get("schema_version") != 1 or policy.get("policy") != "standalone-journal-blocked-until-exact-owner-envelope-integration":
+            raise CoverageError("unsupported evidence journal owner policy")
+        blocked = policy.get("standalone_blocked_operations")
+        if not isinstance(blocked, dict) or not blocked or any(operation not in locked for operation in blocked):
+            raise CoverageError("evidence journal owner policy must use locked producer operations")
+        _, policy_body = _function_body(source, "standalone_journal_blocked")
+        if policy_path.name not in policy_body or '"standalone_blocked_operations"' not in policy_body or "policy.contains(operation)" not in policy_body:
+            raise CoverageError("evidence journal must enforce its declared owner policy")
+        for wrapper, private in zip(entry["entry_points"], ("false", "true")):
+            _, wrapper_body = _function_body(source, wrapper)
+            expected = rf"write_business_audit_inner\(\s*ctx,\s*organization_id,\s*operation,\s*params,\s*{private}\s*\)"
+            if re.fullmatch(rf"\s*{expected}\s*", wrapper_body) is None:
+                raise CoverageError("native audit wrapper must forward the producer-owned operation unchanged")
+        passthroughs = {}
+        for helper in entry["passthrough_helpers"]:
+            if set(helper) != {"source", "function", "parameter", "operations"} or helper["parameter"] != "operation":
+                raise CoverageError("invalid native operation passthrough registration")
+            if not helper["operations"] or any(op not in locked for op in helper["operations"]):
+                raise CoverageError("native operation passthrough must use locked operations")
+            helper_source = _relative_source(repo_root, helper["source"]).read_text(encoding="utf-8")
+            _, helper_body = _function_body(helper_source, helper["function"])
+            if not re.search(r"write_business_audit\(\s*ctx,\s*organization_id,\s*operation,", helper_body):
+                raise CoverageError("native operation passthrough does not forward the declared operation")
+            literal_calls = re.findall(rf'\b{re.escape(helper["function"])}\(\s*ctx,\s*organization_id,\s*"([^"\n]+)"', _strip_comments(helper_source))
+            if set(literal_calls) != set(helper["operations"]):
+                raise CoverageError("native operation passthrough callers differ from their closed operation set")
+            passthroughs[(helper["source"], helper["function"])] = helper["parameter"]
+        for path in sorted((repo_root / "spacetimedb/src").rglob("*.rs")):
+            clean = _strip_comments(path.read_text(encoding="utf-8"))
+            for match in re.finditer(r'\b(?:write_business_audit|write_private_business_audit)\(\s*[^,]+,\s*[^,]+,\s*([^,]+),', clean):
+                prefix = clean[:match.start()]
+                if prefix.rstrip().endswith("fn"):
+                    continue
+                definitions = list(FUNCTION_RE.finditer(prefix))
+                if not definitions:
+                    raise CoverageError("native history producer outside a function")
+                site = (path.relative_to(repo_root).as_posix(), definitions[-1].group(1))
+                argument = match.group(1).strip()
+                if re.fullmatch(r'"[A-Za-z_][A-Za-z0-9_]*"', argument):
+                    if argument[1:-1] not in locked:
+                        raise CoverageError(f"native history producer uses unlocked operation: {argument}")
+                elif passthroughs.get(site) != argument:
+                    raise CoverageError(f"native history operation is not a closed producer literal at {site}")
+            for match in re.finditer(r"\bwrite_business_audit_inner\(", clean):
+                prefix = clean[:match.start()]
+                if prefix.rstrip().endswith("fn"):
+                    continue
+                definitions = list(FUNCTION_RE.finditer(prefix))
+                site = (path.relative_to(repo_root).as_posix(), definitions[-1].group(1) if definitions else "")
+                if site[0] != entry["source"] or site[1] not in entry["entry_points"]:
+                    raise CoverageError("evidence journal can only be called by its declared native wrappers")
+        configured_calls.add(key)
+
+
+def _validate_conditional_outcomes(repo_root: Path, metadata: dict[str, Any], locked: dict[str, Any],
+                                    configured_calls: set[tuple[str, str]]) -> None:
+    """Recognize a scoped source outcome without certifying the whole operation."""
+    entries = metadata.get("conditional_outcomes", [])
+    if not isinstance(entries, list):
+        raise CoverageError("conditional_outcomes must be an array")
+    for entry in entries:
+        required = {"source", "function", "operation", "operation_id", "classification", "target_selector",
+                    "targets", "change_constructors", "change_helpers"}
+        if not isinstance(entry, dict) or set(entry) != required:
+            raise CoverageError("conditional outcome registration has invalid keys")
+        if entry["classification"] != "partial-control-flow-not-universal-C2-coverage":
+            raise CoverageError("conditional outcome cannot claim universal C2 coverage")
+        if locked.get(entry["operation"]) != entry["operation_id"]:
+            raise CoverageError("conditional outcome operation must use its locked identity")
+        if entry["target_selector"] != "job.table_name" or set(entry["targets"]) != {
+            "product", "contact", "stock_location", "account_move", "account_move_line"
+        }:
+            raise CoverageError("conditional tracked import target scope requires explicit source-owner review")
+        source = _relative_source(repo_root, entry["source"]).read_text(encoding="utf-8")
+        _, body = _function_body(source, entry["function"])
+        key = (entry["source"], entry["function"])
+        if key in configured_calls:
+            raise CoverageError("conditional outcome cannot also be a universal complete owner")
+        if body.count(COMMIT_CALL) != 1 or OPERATION_RE.findall(body) != [entry["operation_id"]]:
+            raise CoverageError("conditional outcome must have one exact locked source commit")
+        guard = re.search(r'if\s+!matches!\(\s*job\.table_name\.as_str\(\),\s*([^)]*)\)\s*\{\s*return Ok\(\(\)\);', body)
+        if guard is None or set(re.findall(r'"([^"\n]+)"', guard.group(1))) != set(entry["targets"]):
+            raise CoverageError("conditional import owner must fail out before unadmitted target effects")
+        if "merge_business_audit_changes(changes, evidence)?" not in body or "audit_matches(" not in body or "found != 1" not in body:
+            raise CoverageError("conditional import owner requires exact staged evidence merged with its source outcome")
+        for token in ('"correlation_version"', '"request_id"', '"sha256"', '"import_job"', '"import_job_record"', '"import_job_error"'):
+            if token not in body:
+                raise CoverageError("conditional import owner lost its sealed native provenance or row outcomes")
+        helpers = [body]
+        for helper in entry["change_helpers"]:
+            helpers.append(_function_body(source, helper)[1])
+        for constructor in entry["change_constructors"]:
+            if not any(f"RowChange::{constructor}" in candidate for candidate in helpers):
+                raise CoverageError("conditional import owner lost its typed source row construction")
+        configured_calls.add(key)
 
 
 def _validate_dynamic_commit_helpers(

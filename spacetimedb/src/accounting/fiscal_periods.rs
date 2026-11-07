@@ -3,11 +3,12 @@
 /// # 7.5 Fiscal Periods
 ///
 /// Tables for managing fiscal years and accounting periods.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, organization, require_company_in_organization};
 use crate::core::users::find_user_profile_for_identity;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::types::{FiscalYearState, PeriodState};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -272,9 +273,10 @@ pub fn create_fiscal_year(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_fiscal_year",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_fiscal_year",
@@ -296,7 +298,7 @@ pub fn create_fiscal_year(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -385,9 +387,10 @@ pub fn update_fiscal_year(
         ..fiscal_year
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_fiscal_year",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_fiscal_year",
@@ -398,7 +401,7 @@ pub fn update_fiscal_year(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -431,9 +434,10 @@ pub fn delete_fiscal_year(
 
     ctx.db.account_fiscal_year().id().delete(&fiscal_year_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_fiscal_year",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_fiscal_year",
@@ -444,7 +448,7 @@ pub fn delete_fiscal_year(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -471,9 +475,10 @@ pub fn open_fiscal_year(
         ..fiscal_year
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "open_fiscal_year",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_fiscal_year",
@@ -484,7 +489,7 @@ pub fn open_fiscal_year(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -526,9 +531,10 @@ pub fn close_fiscal_year(
         ..fiscal_year
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "close_fiscal_year",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_fiscal_year",
@@ -539,7 +545,7 @@ pub fn close_fiscal_year(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -600,9 +606,10 @@ pub fn create_account_period(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_account_period",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_period",
@@ -624,7 +631,7 @@ pub fn create_account_period(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -701,9 +708,10 @@ pub fn update_account_period(
         ..period
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_account_period",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_period",
@@ -714,7 +722,7 @@ pub fn update_account_period(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -736,9 +744,10 @@ pub fn delete_account_period(
 
     ctx.db.account_period().id().delete(&period_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_account_period",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_period",
@@ -751,7 +760,7 @@ pub fn delete_account_period(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -785,9 +794,10 @@ pub fn open_account_period(
         ..period
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "open_account_period",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_period",
@@ -798,7 +808,7 @@ pub fn open_account_period(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -825,9 +835,10 @@ pub fn close_account_period(
         ..period
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "close_account_period",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_period",
@@ -838,7 +849,7 @@ pub fn close_account_period(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1123,9 +1134,10 @@ pub fn setup_fiscal_calendar(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "setup_fiscal_calendar",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_fiscal_year",
@@ -1143,7 +1155,7 @@ pub fn setup_fiscal_calendar(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

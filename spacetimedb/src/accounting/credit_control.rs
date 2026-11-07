@@ -1,4 +1,5 @@
 /// Partner credit control — credit limits, payment holds, bad-debt write-offs.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -9,7 +10,7 @@ use crate::accounting::relations::{
     require_active_account, require_active_journal, require_contact_in_scope,
 };
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, next_doc_number, AuditLogParams};
 use crate::types::{
     AccountInternalGroup, AccountMoveState, AccountTypeInternal, JournalType, PaymentState,
 };
@@ -191,9 +192,10 @@ pub fn upsert_partner_credit_control(
             .id
     };
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "upsert_partner_credit_control",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "partner_credit_control",
@@ -211,7 +213,7 @@ pub fn upsert_partner_credit_control(
             changed_fields: vec!["credit_limit".to_string(), "payment_hold".to_string()],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -445,9 +447,10 @@ pub fn create_bad_debt_write_off(
         ..source
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_bad_debt_write_off",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_move",
@@ -465,7 +468,7 @@ pub fn create_bad_debt_write_off(
             changed_fields: vec!["amount".to_string()],
             metadata: params.metadata.clone(),
         },
-    );
+    )?;
 
     Ok(())
 }

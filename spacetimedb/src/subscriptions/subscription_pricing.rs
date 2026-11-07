@@ -1,7 +1,8 @@
 //! Subscription pricing tiers and commitments reducers.
 
 use super::{CreateSubscriptionPriceTierParams, SetSubscriptionCommitmentParams};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::business_changes::write_business_audit;
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::subscription_wave_d::{
     subscription_commitment, subscription_price_tier, SubscriptionCommitment, SubscriptionPriceTier,
@@ -57,9 +58,10 @@ pub fn create_subscription_price_tier(
             metadata: params.metadata.unwrap_or_default(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_subscription_price_tier",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_price_tier",
@@ -81,7 +83,7 @@ pub fn create_subscription_price_tier(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -136,9 +138,10 @@ pub fn set_subscription_commitment(
             metadata: params.metadata.unwrap_or_default(),
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_subscription_commitment",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_commitment",
@@ -160,6 +163,6 @@ pub fn set_subscription_commitment(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

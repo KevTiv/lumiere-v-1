@@ -3,11 +3,12 @@
 /// This replaces inference from `Contact` booleans/ranks but does not duplicate HR
 /// employee records. Roles are stored as validated strings so tenants can introduce
 /// custom roles without a code change; a small curated set is accepted initially.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
 use crate::crm::contacts::{contact, Contact};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -196,9 +197,10 @@ pub fn assign_contact_role(
                 ..existing.clone()
             });
 
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "assign_contact_role",
             AuditLogParams {
                 company_id: existing.company_id,
                 table_name: "contact_role_assignment",
@@ -221,7 +223,7 @@ pub fn assign_contact_role(
                 changed_fields: changed,
                 metadata: None,
             },
-        );
+        )?;
 
         return Ok(());
     }
@@ -249,9 +251,10 @@ pub fn assign_contact_role(
             metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "assign_contact_role",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact_role_assignment",
@@ -275,7 +278,7 @@ pub fn assign_contact_role(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -321,9 +324,10 @@ pub fn end_contact_role(
             ..assignment.clone()
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "end_contact_role",
         AuditLogParams {
             company_id: assignment.company_id,
             table_name: "contact_role_assignment",
@@ -338,7 +342,7 @@ pub fn end_contact_role(
             ],
             metadata: reason_metadata,
         },
-    );
+    )?;
 
     Ok(())
 }

@@ -670,6 +670,15 @@ async fn import_entity_post(
         // The pinned generated reducer contract must be promoted with the module.
         // Never silently fall back to the uncorrelated legacy reducer.
         require_tracked_capability()?;
+        super::import_reviews::record_review_binding(
+            &state,
+            &session,
+            company_id,
+            spec.job_table,
+            request_id,
+            &inspected,
+        )
+        .await?;
         let expected_hash = inspected.content_sha256;
         if let Some(admission_id) = body.source_admission_id.as_deref() {
             let source = crate::import_admissions::verify_import_source(

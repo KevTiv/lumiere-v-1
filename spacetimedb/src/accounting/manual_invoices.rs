@@ -5,6 +5,7 @@
 //! move, its canonical balanced lines, and one exact operation receipt are
 //! committed in the same SpacetimeDB transaction.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
@@ -24,7 +25,7 @@ use crate::core::organization::{company, require_company_in_organization};
 use crate::documents::invoice_profile::{
     capture_invoice_document_metadata, without_invoice_document_metadata,
 };
-use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{calculate_tax, check_permission, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::{
     AccountInternalGroup, AccountMoveState, AccountTypeInternal, JournalType, MoveType,
@@ -652,9 +653,10 @@ pub fn create_manual_account_invoice(
         return Err("manual account invoice did not produce balanced move lines".to_string());
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_manual_account_invoice",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "account_move",
@@ -682,7 +684,7 @@ pub fn create_manual_account_invoice(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     crate::forms::record_creation::persist_new_record_fields(
         ctx,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslation } from "@lumiere/i18n";
-import type { AccountMoveHistoryEntry } from "@lumiere/query-hooks/hooks/account-move-history-model";
+import type { BusinessHistoryCoverage, BusinessHistoryEntry } from "@lumiere/query-hooks/hooks/business-history-model";
+import type { ReactNode } from "react";
 import { Button } from "../components/button";
 import { cn } from "../lib/utils";
 
@@ -9,7 +10,10 @@ export type RecordChangeHistoryState = "loading" | "denied" | "error" | "ready";
 
 export interface RecordChangeHistoryProps {
   state: RecordChangeHistoryState;
-  entries: readonly AccountMoveHistoryEntry[];
+  entries: readonly BusinessHistoryEntry[];
+  variant?: "accounting" | "record" | "activity";
+  coverage?: BusinessHistoryCoverage;
+  renderRecordLink?: (entry: BusinessHistoryEntry) => ReactNode;
   hasMore?: boolean;
   loadingMore?: boolean;
   isRefreshing?: boolean;
@@ -22,6 +26,9 @@ export interface RecordChangeHistoryProps {
 export function RecordChangeHistory({
   state,
   entries,
+  variant = "accounting",
+  coverage,
+  renderRecordLink,
   hasMore,
   loadingMore = false,
   isRefreshing = false,
@@ -37,7 +44,7 @@ export function RecordChangeHistory({
   });
   const readPending = isRefreshing || loadingMore;
   const fieldLabels: { [key: string]: string } = {
-    name: t("recordChanges.fields.name"),
+    name: variant === "accounting" ? t("recordChanges.fields.name") : t("common.name", { defaultValue: "Name" }),
     debit: t("recordChanges.fields.debit"),
     credit: t("recordChanges.fields.credit"),
     partner_id: t("recordChanges.fields.partner"),
@@ -94,7 +101,7 @@ export function RecordChangeHistory({
   return (
     <section
       className={cn("min-w-0 space-y-4", className)}
-      aria-label={t("recordChanges.title")}
+      aria-label={variant === "accounting" ? t("recordChanges.title") : t("businessHistory.title")}
       aria-busy={readPending}
       data-testid="record-changes"
     >
@@ -103,12 +110,12 @@ export function RecordChangeHistory({
           className="min-w-0 max-w-prose space-y-1 text-sm text-muted-foreground"
           data-testid="record-changes-coverage"
         >
-          <p>{t("recordChanges.coverageLead")}</p>
+          <p>{variant === "accounting" ? t("recordChanges.coverageLead") : t("businessHistory.partial")}</p>
           <details className="min-w-0">
             <summary className="w-fit max-w-full cursor-pointer rounded-sm text-xs underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
               {t("recordChanges.coverageDetails")}
             </summary>
-            <p className="mt-2 break-words">{t("recordChanges.partialCoverage")}</p>
+            <p className="mt-2 break-words">{coverage?.message ?? (variant === "accounting" ? t("recordChanges.partialCoverage") : t("businessHistory.coverage"))}</p>
           </details>
         </div>
         {onRefresh && (
@@ -134,7 +141,7 @@ export function RecordChangeHistory({
       )}
       {entries.length === 0 ? (
         <p role="status" data-testid="record-changes-empty">
-          {hasMore ? t("recordChanges.emptyPage") : t("recordChanges.empty")}
+          {variant === "accounting" ? (hasMore ? t("recordChanges.emptyPage") : t("recordChanges.empty")) : (hasMore ? t("businessHistory.emptyPage") : t("businessHistory.empty"))}
         </p>
       ) : (
         <ol className="min-w-0 divide-y divide-border rounded-lg border border-border bg-card">
@@ -150,7 +157,7 @@ export function RecordChangeHistory({
                     className="block break-words font-medium"
                     data-testid="record-change-summary"
                   >
-                    {t(entry.operation === "add_account_move_line" ? "recordChanges.lineAdded" : "recordChanges.fieldsChanged", {
+                    {entry.changes.length === 0 ? t("businessHistory.recordedOperation", { operation: entry.operation.replace(/_/g, " ") }) : t(entry.operation === "add_account_move_line" ? "recordChanges.lineAdded" : "recordChanges.fieldsChanged", {
                       ...(entry.operation === "add_account_move_line" ? { defaultValue: "Added journal item: {{fields}}" } : {}),
                       fields: fieldList.format(
                         entry.changes.map(
@@ -161,9 +168,7 @@ export function RecordChangeHistory({
                   </span>
                   <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span className="min-w-0 break-all">
-                      {t("recordChanges.lineReference", {
-                        id: entry.changedRecordId,
-                      })}
+                      {variant === "accounting" ? t("recordChanges.lineReference", { id: entry.changedRecordId }) : t("businessHistory.recordReference", { resource: entry.changedResource.replace(/[-_]/g, " "), id: entry.changedRecordId })}
                     </span>
                     <time dateTime={entry.occurredAt} className="break-words">
                       {new Date(entry.occurredAt).toLocaleString(locale, {
@@ -178,6 +183,8 @@ export function RecordChangeHistory({
                   </span>
                 </summary>
                 <div className="min-w-0 border-t border-border px-4 pb-3">
+                  {entry.changes.length === 0 && <p className="py-3 text-sm text-muted-foreground">{t("businessHistory.noComparisons")}</p>}
+                  {renderRecordLink?.(entry)}
                   <dl className="min-w-0 divide-y divide-border">
                     {entry.changes.map((change) => (
                       <div key={change.field} className="min-w-0 space-y-2 py-3">

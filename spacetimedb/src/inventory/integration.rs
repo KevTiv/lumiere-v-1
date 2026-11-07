@@ -2,9 +2,10 @@
 //!
 //! External ASN/outbound workers call create → (HTTP outside reducer) → record.
 //! Successful `asn_inbound` results may post stock when product/location/qty are supplied.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::stock::{
     increase_quant_at_location, require_location_in_org, require_product_in_org,
@@ -132,9 +133,10 @@ pub fn create_inventory_integration_intent(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_inventory_integration_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_integration_intent",
@@ -152,7 +154,7 @@ pub fn create_inventory_integration_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -238,9 +240,10 @@ pub fn record_inventory_integration_result(
             ..intent
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_inventory_integration_result",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_integration_intent",
@@ -251,6 +254,6 @@ pub fn record_inventory_integration_result(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

@@ -185,8 +185,31 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
         .next()
         .ok_or("source")?
         .id;
+    // Confirming a foreign-currency PO also snapshots FX. Keep that setup
+    // independent of the bill-creation missing-rate rejection exercised below.
+    let confirmation_rate = if foreign {
+        Some(ctx.db.currency_rate().insert(CurrencyRate {
+            id: 0,
+            organization_id: org,
+            company_id: Some(fixture.company_id),
+            from_currency_id: doc_currency,
+            to_currency_id: fixture.currency_id,
+            rate: 1.25,
+            inverse_rate: 0.8,
+            date: Timestamp::from_micros_since_unix_epoch(
+                ctx.timestamp.to_micros_since_unix_epoch() - 2,
+            ),
+            created_at: ctx.timestamp,
+            metadata: None,
+        }))
+    } else {
+        None
+    };
     confirm_purchase_order(ctx, org, po_id)?;
     receive_po_line(ctx, org, source_id, 1.0, None)?;
+    if let Some(rate) = confirmation_rate {
+        ctx.db.currency_rate().id().delete(rate.id);
+    }
     let mut expense_line = empty_move_line(expense);
     expense_line.discount = 10.0;
     if taxed {

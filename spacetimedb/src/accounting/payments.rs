@@ -2,6 +2,7 @@
 ///
 /// Backs the `payment_ids` foreign key on BankReconciliationLine and POS transactions.
 /// A payment is a cash/bank movement that settles one or more invoices or bills.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::chart_of_accounts::account_account;
@@ -535,9 +536,10 @@ pub fn create_payment(
         created_at: ctx.timestamp,
         create_uid: ctx.sender(),
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_payment",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "account_payment",
@@ -548,7 +550,7 @@ pub fn create_payment(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     record_result(
         ctx,
         organization_id,
@@ -650,9 +652,10 @@ pub fn post_payment_impl(
             state: PaymentState::Paid,
             ..payment
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "post_payment",
             AuditLogParams {
                 company_id: Some(move_record.company_id),
                 table_name: "account_payment",
@@ -669,7 +672,7 @@ pub fn post_payment_impl(
                 changed_fields: vec!["state".to_string(), "name".to_string()],
                 metadata: None,
             },
-        );
+        )?;
         super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
         return Ok(());
     }
@@ -755,9 +758,10 @@ pub fn post_payment_impl(
         ..payment
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "post_payment",
         AuditLogParams {
             company_id: Some(move_record.company_id),
             table_name: "account_payment",
@@ -779,7 +783,7 @@ pub fn post_payment_impl(
             ],
             metadata: None,
         },
-    );
+    )?;
     super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
     Ok(())
 }
@@ -1216,9 +1220,10 @@ pub fn cancel_payment(
         reversal_move_id,
         ..payment
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_payment",
         AuditLogParams {
             company_id: Some(payment.company_id),
             table_name: "account_payment",
@@ -1236,7 +1241,7 @@ pub fn cancel_payment(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1352,9 +1357,10 @@ fn register_payment_on_invoice_impl(
         reconcile_payment_with_invoice_impl(ctx, organization_id, payment_move_id, *inv_id)?;
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "register_payment_on_invoice",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "account_payment",
@@ -1384,6 +1390,6 @@ fn register_payment_on_invoice_impl(
             },
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

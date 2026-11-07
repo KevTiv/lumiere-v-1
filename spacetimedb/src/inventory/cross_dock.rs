@@ -1,8 +1,9 @@
 //! Cross-dock — ship from inbound receipt location without putaway to stock.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table};
 
 use crate::core::organization::CompanyScopeParams;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::product::product;
 use crate::inventory::stock::{
@@ -254,9 +255,10 @@ pub fn execute_cross_dock(
         company_id: Some(company_id),
     };
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "execute_cross_dock",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_picking",
@@ -276,7 +278,7 @@ pub fn execute_cross_dock(
             changed_fields: vec!["crossdock".to_string()],
             metadata: params.metadata,
         },
-    );
+    )?;
 
     Ok(())
 }

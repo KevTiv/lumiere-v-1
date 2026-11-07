@@ -2057,7 +2057,7 @@ pub fn import_account_move_csv(
                     });
                 if !is_reused {
                     let created = ctx.db.account_move().insert(move_row);
-                    record_import_created_id(ctx, job.id, "account_move", created.id, row_number);
+                    record_import_created_id(ctx, job.id, "account_move", created.id, row_number)?;
                 }
             }
         } else {
@@ -2077,8 +2077,9 @@ pub fn import_account_move_csv(
         }
     } else {
         imported = staged_moves.len() as u32;
-        for (_, move_row, _) in staged_moves {
-            ctx.db.account_move().insert(move_row);
+        for (row_number, move_row, _) in staged_moves {
+            let created = ctx.db.account_move().insert(move_row);
+            record_import_created_id(ctx, job.id, "account_move", created.id, row_number)?;
         }
     }
 
@@ -2814,15 +2815,13 @@ pub fn import_account_move_line_csv(
         });
         for staged in validated_lines {
             let created = ctx.db.account_move_line().insert(staged.value);
-            if bundle_mode {
-                record_import_created_id(
-                    ctx,
-                    job.id,
-                    "account_move_line",
-                    created.id,
-                    staged.row_number,
-                );
-            }
+            record_import_created_id(
+                ctx,
+                job.id,
+                "account_move_line",
+                created.id,
+                staged.row_number,
+            )?;
         }
         if bundle_mode {
             for move_id in &bundle_parent_ids {

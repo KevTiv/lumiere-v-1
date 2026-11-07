@@ -3,10 +3,11 @@
 //! Templates are data-only assets. Materialization inserts versioned workflows
 //! keyed by market + template; pack updates must not silently rewrite timers (WF-18).
 
+use crate::core::business_changes::write_business_audit;
 use serde::Deserialize;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 use super::calendar::{
     calculate_deadline_from_delay_seconds, workflow_calendar, workflow_calendar_exception,
@@ -596,9 +597,10 @@ pub fn recompute_workflow_timers_for_calendar(
         .collect();
 
     if !params.confirm {
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "recompute_workflow_timers_for_calendar",
             AuditLogParams {
                 company_id: Some(params.company_id),
                 table_name: "workflow_timer",
@@ -622,7 +624,7 @@ pub fn recompute_workflow_timers_for_calendar(
                     .to_string(),
                 ),
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -641,9 +643,10 @@ pub fn recompute_workflow_timers_for_calendar(
         after_ids.push(timer_id);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "recompute_workflow_timers_for_calendar",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "workflow_timer",
@@ -678,7 +681,7 @@ pub fn recompute_workflow_timers_for_calendar(
                 .to_string(),
             ),
         },
-    );
+    )?;
     Ok(())
 }
 

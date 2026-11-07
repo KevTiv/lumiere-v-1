@@ -10,6 +10,7 @@
 ///   - Automatic total calculations
 ///   - Integration with inventory for stock availability
 ///   - Audit logging for all mutations
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::fx_metadata::merge_exchange_rate_metadata;
@@ -19,9 +20,7 @@ use crate::core::reference::{
     require_active_currency_by_id, require_currency_by_id, resolve_currency_rate_as_of,
 };
 use crate::crm::contacts::contact;
-use crate::helpers::{
-    calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
-};
+use crate::helpers::{calculate_tax, check_permission, next_doc_number, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::warehouse::warehouse;
 use crate::sales::pricelists::product_pricelist;
@@ -841,9 +840,10 @@ pub(crate) fn create_sale_order_record(
         creation,
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -860,7 +860,7 @@ pub(crate) fn create_sale_order_record(
             changed_fields: vec!["partner_id".to_string(), "amount_total".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     if let Some(receipt) = creation_receipt {
         crate::forms::record_creation_persistence::record_quotation_creation(
@@ -1286,9 +1286,10 @@ pub fn send_sale_order_quotation(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "send_sale_order_quotation",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -1299,7 +1300,7 @@ pub fn send_sale_order_quotation(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1448,9 +1449,10 @@ pub fn confirm_sales_order_impl(
         });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "confirm_sales_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -1463,7 +1465,7 @@ pub fn confirm_sales_order_impl(
             changed_fields: vec!["state".to_string(), "confirmation_date".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1574,9 +1576,10 @@ pub fn cancel_sale_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_sale_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -1589,7 +1592,7 @@ pub fn cancel_sale_order(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1899,9 +1902,10 @@ pub fn update_sale_order(
         .find(&order_id)
         .expect("just updated");
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_sale_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -1919,7 +1923,7 @@ pub fn update_sale_order(
             changed_fields,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1978,9 +1982,10 @@ pub fn create_sale_order_line(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_sale_order_line",
         AuditLogParams {
             company_id: Some(order.company_id),
             table_name: "sale_order_line",
@@ -2002,7 +2007,7 @@ pub fn create_sale_order_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2038,9 +2043,10 @@ pub fn lock_sale_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "lock_sale_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -2051,7 +2057,7 @@ pub fn lock_sale_order(
             changed_fields: vec!["is_locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2084,9 +2090,10 @@ pub fn unlock_sale_order(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "unlock_sale_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -2097,7 +2104,7 @@ pub fn unlock_sale_order(
             changed_fields: vec!["is_locked".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2215,9 +2222,10 @@ pub fn update_sale_order_line(
 
     compute_so_totals(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_sale_order_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order_line",
@@ -2241,7 +2249,7 @@ pub fn update_sale_order_line(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2301,9 +2309,10 @@ pub fn delete_sale_order_line(
 
     compute_so_totals(ctx, organization_id, order_id)?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_sale_order_line",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order_line",
@@ -2314,7 +2323,7 @@ pub fn delete_sale_order_line(
             changed_fields: vec!["id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -2365,9 +2374,10 @@ pub fn accept_sale_order_quotation(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "accept_sale_order_quotation",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -2382,7 +2392,7 @@ pub fn accept_sale_order_quotation(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

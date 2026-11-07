@@ -1,4 +1,6 @@
 //! Wave C — mileage/per diem rates, split allocations, project rebill.
+use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::analytic_accounting::account_analytic_account;
@@ -16,8 +18,7 @@ use crate::expenses::expenses::{
     expense_sheet, hr_expense, metadata_str_eq, HrExpense, HrExpenseSheet,
 };
 use crate::helpers::{
-    calculate_tax, check_permission, next_doc_number, write_audit_log_v2,
-    write_audit_log_v2_returning, AuditLogParams,
+    calculate_tax, check_permission, next_doc_number, write_audit_log_v2_returning, AuditLogParams,
 };
 use crate::projects::project_accounting::{
     project_margin_snapshot, refresh_project_margin_for_projects,
@@ -409,9 +410,10 @@ pub fn seed_statutory_expense_mileage_rates(
             }
         }
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "seed_statutory_expense_mileage_rates",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_mileage_rate",
@@ -428,7 +430,7 @@ pub fn seed_statutory_expense_mileage_rates(
             changed_fields: vec!["statutory_mileage_seeds".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -478,9 +480,10 @@ pub fn upsert_expense_mileage_rate(
                 metadata: params.metadata.or(existing.metadata.clone()),
                 ..existing
             });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_expense_mileage_rate",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "hr_expense_mileage_rate",
@@ -491,7 +494,7 @@ pub fn upsert_expense_mileage_rate(
                 changed_fields: vec!["rate_per_unit".into(), "active".into()],
                 metadata: None,
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -511,9 +514,10 @@ pub fn upsert_expense_mileage_rate(
             active: params.active,
             metadata: params.metadata,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "upsert_expense_mileage_rate",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_mileage_rate",
@@ -524,7 +528,7 @@ pub fn upsert_expense_mileage_rate(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -571,9 +575,10 @@ pub fn upsert_expense_per_diem_rate(
                 metadata: params.metadata.or(existing.metadata.clone()),
                 ..existing
             });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_expense_per_diem_rate",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "hr_expense_per_diem_rate",
@@ -584,7 +589,7 @@ pub fn upsert_expense_per_diem_rate(
                 changed_fields: vec!["amount_per_day".into(), "active".into()],
                 metadata: None,
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -604,9 +609,10 @@ pub fn upsert_expense_per_diem_rate(
             active: params.active,
             metadata: params.metadata,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "upsert_expense_per_diem_rate",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_per_diem_rate",
@@ -617,7 +623,7 @@ pub fn upsert_expense_per_diem_rate(
             changed_fields: vec![],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -792,6 +798,7 @@ pub fn create_expense_project_rebill(
     sheet_id: u64,
     params: CreateExpenseProjectRebillParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "hr_expense_sheet", "post")?;
     check_permission(ctx, organization_id, "account_move", "create")?;
 
@@ -1090,9 +1097,10 @@ pub fn create_expense_project_rebill(
         ..sheet
     });
 
-    write_audit_log_v2(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
+        "create_expense_project_rebill",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "hr_expense_sheet",
@@ -1111,7 +1119,7 @@ pub fn create_expense_project_rebill(
             changed_fields: vec!["rebill_move_id".into()],
             metadata: None,
         },
-    );
+    )?);
 
     let rebill_project_set: std::collections::BTreeSet<u64> =
         rebill_project_ids.iter().copied().collect();
@@ -1142,11 +1150,7 @@ pub fn create_expense_project_rebill(
         .find(&move_record.id)
         .ok_or("Rebill move not found after posting")?;
     let mut changes = vec![
-        RowChange::upsert_stdb_row(
-            "hr_expense_sheet",
-            serde_json::json!({"id": sheet.id}),
-            &sheet,
-        )?,
+        RowChange::upsert_stdb_row("expense_sheet", serde_json::json!({"id": sheet.id}), &sheet)?,
         RowChange::upsert_stdb_row(
             "account_move",
             serde_json::json!({"id": move_record.id}),
@@ -1197,7 +1201,7 @@ pub fn create_expense_project_rebill(
             organization_id,
             operation_id: "erp.create_expense_project_rebill".to_string(),
             correlation_id: format!("expense-sheet:{sheet_id}:rebill:{}", move_record.id),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

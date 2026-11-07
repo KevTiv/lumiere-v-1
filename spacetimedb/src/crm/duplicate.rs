@@ -1,4 +1,5 @@
 /// Contact duplicate detection and merge — complements import wizard duplicate warnings.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::crm::activities::calendar_event;
@@ -12,7 +13,7 @@ use crate::crm::leads::lead;
 use crate::crm::opportunities::opportunity;
 use crate::crm::relationship_intel::{contact_relationship_insight, ContactRelationshipInsight};
 use crate::crm::segments::{contact_segment, segment_member, ContactSegment};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::sales::sales_core::sale_order;
 
 /// Maximum ancestor-chain hops walked when checking for a contact hierarchy cycle.
@@ -265,9 +266,10 @@ pub fn find_duplicate_contacts(
             });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "find_duplicate_contacts",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact_duplicate_candidate",
@@ -278,7 +280,7 @@ pub fn find_duplicate_contacts(
             changed_fields: vec!["pair_count".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -774,9 +776,10 @@ pub fn merge_contacts(
         ctx.db.contact_duplicate_candidate().id().delete(&id);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "merge_contacts",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "contact",
@@ -820,7 +823,7 @@ pub fn merge_contacts(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }

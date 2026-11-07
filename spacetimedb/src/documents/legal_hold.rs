@@ -1,9 +1,10 @@
 //! Wave D — document legal hold (blocks soft-delete and retention purge).
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::documents::documents::document;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -99,9 +100,10 @@ pub fn apply_document_legal_hold(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "apply_document_legal_hold",
         AuditLogParams {
             company_id,
             table_name: "document_legal_hold",
@@ -118,7 +120,7 @@ pub fn apply_document_legal_hold(
             changed_fields: vec!["is_active".to_string(), "reason".to_string()],
             metadata: Some("{\"wave\":\"d\"}".to_string()),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -163,9 +165,10 @@ pub fn release_document_legal_hold(
         ..hold
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "release_document_legal_hold",
         AuditLogParams {
             company_id,
             table_name: "document_legal_hold",
@@ -176,6 +179,6 @@ pub fn release_document_legal_hold(
             changed_fields: vec!["is_active".to_string(), "released_at".to_string()],
             metadata: Some("{\"wave\":\"d\"}".to_string()),
         },
-    );
+    )?;
     Ok(())
 }

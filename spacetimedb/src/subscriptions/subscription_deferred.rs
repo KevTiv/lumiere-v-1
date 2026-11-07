@@ -1,7 +1,8 @@
 //! Subscription deferred revenue reducers.
 
 use super::{secs, RebaseDeferredSchedulesParams};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::business_changes::write_business_audit;
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::subscriptions::relations::require_subscription;
 use crate::subscriptions::tables::{
     deferred_revenue_line, deferred_revenue_schedule, subscription, DeferredRevenueLine,
@@ -96,9 +97,10 @@ pub fn rebase_deferred_schedules_for_subscription(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "rebase_deferred_schedules_for_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -111,6 +113,6 @@ pub fn rebase_deferred_schedules_for_subscription(
             changed_fields: vec!["deferred_revenue_rebase".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

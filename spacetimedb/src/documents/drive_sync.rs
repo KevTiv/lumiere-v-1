@@ -1,11 +1,12 @@
 //! Wave D — Google Drive / SharePoint sync → Document rows + conflict policy.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::documents::documents::{
     add_document_version, create_document, document, CreateDocumentParams, Document,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::integrations::google_drive::{google_drive_connection, DriveConflictPolicy};
 
 #[derive(Clone)]
@@ -223,9 +224,10 @@ pub fn sync_external_file_to_document(
                 ..xref
             });
 
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "sync_external_file_to_document",
             AuditLogParams {
                 company_id: doc.company_id,
                 table_name: "document_external_ref",
@@ -242,7 +244,7 @@ pub fn sync_external_file_to_document(
                 changed_fields: vec!["etag".to_string(), "last_sync_at".to_string()],
                 metadata: Some("{\"wave\":\"d\",\"sync\":\"update\"}".to_string()),
             },
-        );
+        )?;
         return Ok(());
     }
 
@@ -309,9 +311,10 @@ pub fn sync_external_file_to_document(
         metadata: params.metadata,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "sync_external_file_to_document",
         AuditLogParams {
             company_id: doc.company_id,
             table_name: "document_external_ref",
@@ -329,7 +332,7 @@ pub fn sync_external_file_to_document(
             changed_fields: vec!["external_id".to_string()],
             metadata: Some("{\"wave\":\"d\",\"sync\":\"create\"}".to_string()),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -366,9 +369,10 @@ pub fn set_google_drive_conflict_policy(
             ..conn
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_google_drive_conflict_policy",
         AuditLogParams {
             company_id: None,
             table_name: "google_drive_connection",
@@ -382,6 +386,6 @@ pub fn set_google_drive_conflict_policy(
             changed_fields: vec!["conflict_policy".to_string()],
             metadata: Some("{\"wave\":\"d\"}".to_string()),
         },
-    );
+    )?;
     Ok(())
 }

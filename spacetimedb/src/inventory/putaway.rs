@@ -1,7 +1,8 @@
 //! Directed putaway — choose a bin and move stock from receipt/input location.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::inventory_close::assert_inventory_writable;
 use crate::inventory::stock::{move_stock_quant, stock_quant, MoveStockQuantParams};
 use crate::inventory::warehouse::{stock_location, stock_rule, warehouse};
@@ -223,9 +224,10 @@ pub fn execute_directed_putaway(
         },
     )?;
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "execute_directed_putaway",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "stock_quant",
@@ -245,7 +247,7 @@ pub fn execute_directed_putaway(
             changed_fields: vec!["location_id".to_string()],
             metadata: params.metadata,
         },
-    );
+    )?;
 
     Ok(())
 }

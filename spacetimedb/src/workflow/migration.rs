@@ -5,13 +5,14 @@
 //! migrate reducer. History is never rewritten; incompatible instances are left
 //! pinned to their source version.
 
+use crate::core::business_changes::write_business_audit;
 use std::collections::{BTreeMap, BTreeSet};
 
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::require_company_in_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::workflow::approvals::{
     workflow_human_task, WorkflowHumanTask, WorkflowHumanTaskStatus, WorkflowTaskGuardedAction,
 };
@@ -266,9 +267,10 @@ pub fn create_workflow_migration_plan(
             updated_at: ctx.timestamp,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_workflow_migration_plan",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "workflow_migration_plan",
@@ -293,7 +295,7 @@ pub fn create_workflow_migration_plan(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -322,9 +324,10 @@ pub fn set_workflow_migration_plan_active(
             updated_at: ctx.timestamp,
             ..plan.clone()
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_workflow_migration_plan_active",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "workflow_migration_plan",
@@ -335,7 +338,7 @@ pub fn set_workflow_migration_plan_active(
             changed_fields: vec!["active".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -679,9 +682,10 @@ pub fn migrate_workflow_instance(
             recorded_at: ctx.timestamp,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "migrate_workflow_instance",
         AuditLogParams {
             company_id: Some(params.company_id),
             table_name: "workflow_instance",
@@ -709,7 +713,7 @@ pub fn migrate_workflow_instance(
             ],
             metadata: Some(serde_json::json!({ "command": "migration" }).to_string()),
         },
-    );
+    )?;
     Ok(())
 }
 

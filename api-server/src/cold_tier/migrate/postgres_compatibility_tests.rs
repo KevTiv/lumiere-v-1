@@ -176,7 +176,8 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     let previous_tables = public_table_names(pool).await?;
     // Startup upgrades the frozen v13 prefix through the whole current catalog,
     // including history partitions, guide tables, creation receipts and the
-    // owner/prepaid tables added by migration 33 and metering tables added by 36.
+    // owner/prepaid tables added by migration 33, metering tables added by 36,
+    // and organization-wide private history added by 37.
     let expected_new_tables = [
         "ai_metered_price",
         "ai_metered_usage",
@@ -281,6 +282,23 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
+        "organization_business_change",
+        "organization_business_change_p00",
+        "organization_business_change_p01",
+        "organization_business_change_p02",
+        "organization_business_change_p03",
+        "organization_business_change_p04",
+        "organization_business_change_p05",
+        "organization_business_change_p06",
+        "organization_business_change_p07",
+        "organization_business_change_p08",
+        "organization_business_change_p09",
+        "organization_business_change_p10",
+        "organization_business_change_p11",
+        "organization_business_change_p12",
+        "organization_business_change_p13",
+        "organization_business_change_p14",
+        "organization_business_change_p15",
         "purchase_order_creation_operation",
         "purchase_receipt_operation",
         "record_creation_receipt",

@@ -1,6 +1,10 @@
 //! Authored reducer regressions for exact purchase-order creation identity.
 
 use super::gap_fixes_test::seed_vendor_po;
+use crate::forms::{
+    add_form_field, create_form_configuration, form_config, CreateFormConfigParams,
+    CreateFormFieldParams, FieldType, FieldValidation, FieldWidth,
+};
 use crate::purchasing::order_creation_operations::{
     create_purchase_order_once, purchase_order_creation_operation, CreatePurchaseOrderOnceParams,
 };
@@ -36,6 +40,54 @@ pub fn test_exact_purchase_order_creation_identity(ctx: &ReducerContext) -> Resu
         .id()
         .find(&seed_order_id)
         .ok_or("seed order")?;
+    // The request carries a custom buyer note, so create its authorized form
+    // definition before testing creation-key ownership and conflicting replays.
+    create_form_configuration(
+        ctx,
+        organization_id,
+        CreateFormConfigParams {
+            module_id: "purchasing".into(),
+            form_id: "new-purchase-order".into(),
+            name: "Purchase creation identity".into(),
+            description: None,
+            is_system_default: false,
+        },
+    )?;
+    let configuration = ctx
+        .db
+        .form_config()
+        .iter()
+        .find(|config| {
+            config.organization_id == organization_id
+                && config.module_id == "purchasing"
+                && config.form_id == "new-purchase-order"
+        })
+        .ok_or("purchase creation form configuration missing")?;
+    add_form_field(
+        ctx,
+        organization_id,
+        configuration.id,
+        CreateFormFieldParams {
+            field_id: "custom:buyer_note".into(),
+            name: "buyer_note".into(),
+            label: "Buyer note".into(),
+            field_type: FieldType::Text,
+            description: None,
+            placeholder: None,
+            default_value: None,
+            options: vec![],
+            validation: FieldValidation::default(),
+            ai_suggestions: vec![],
+            order: 1,
+            is_system: false,
+            is_enabled: true,
+            category: None,
+            show_in_list: false,
+            width: FieldWidth::Full,
+            section_id: None,
+            visibility_json: None,
+        },
+    )?;
     let create =
         |params| create_purchase_order_once(ctx, organization_id, fixture.company_id, params);
 

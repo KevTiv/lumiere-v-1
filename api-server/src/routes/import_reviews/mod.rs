@@ -2,10 +2,13 @@
 //! ERP reducers. Confirmed rows still enter the normal validated import path.
 mod history_data;
 mod history_period;
+mod import_binding;
 mod model;
 #[cfg(test)]
 mod postgres_tests;
 mod tasks;
+
+pub(crate) use import_binding::{read_review_binding, record_review_binding};
 
 use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
@@ -83,7 +86,7 @@ struct HistoryQuery {
 /// Source documents can include fields from several domains. The first release
 /// is limited to unrestricted organization administrators, rather than using an
 /// import-history grant to bypass a business field restriction.
-fn full_administrator(access: &FieldAccessContext) -> bool {
+pub(crate) fn full_administrator(access: &FieldAccessContext) -> bool {
     access
         .role_permissions
         .iter()

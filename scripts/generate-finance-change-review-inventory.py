@@ -99,6 +99,7 @@ def source_inventory(root: Path, parser: Any) -> tuple[dict[str, Any], dict[str,
                 "source": relative,
                 "line": source.count("\n", 0, match.start()) + 1,
                 "native_reducer": name in native,
+                "function": name,
                 "signature": clean[match.end():opening],
                 "body": clean[opening + 1:end],
             })
@@ -137,27 +138,89 @@ def commit_registrations(payload: dict[str, Any]) -> dict[str, list[str]]:
     return {key: sorted(set(values)) for key, values in result.items()}
 
 
-def source_signals(row: dict[str, Any] | None, structs: dict[str, Any]) -> dict[str, Any]:
+def validate_history_policy(payload: dict[str, Any], identities: dict[str, Any], commits: dict[str, Any]) -> set[str]:
+    if payload.get("schema_version") != 1 or payload.get("policy") != "standalone-journal-blocked-until-exact-owner-envelope-integration":
+        raise ValueError("unsupported business history owner policy")
+    blocked = payload.get("standalone_blocked_operations")
+    if not isinstance(blocked, dict):
+        raise ValueError("business history owner policy has no blocked operations")
+    for operation, owners in blocked.items():
+        if operation not in identities:
+            raise ValueError(f"unknown guarded history producer: {operation}")
+        if not isinstance(owners, list) or not owners or len(owners) != len(set(owners)):
+            raise ValueError(f"invalid guarded history owners: {operation}")
+        for owner in owners:
+            if owner not in commits:
+                raise ValueError(f"unregistered complete history owner: {owner}")
+    return set(blocked)
+
+
+def standalone_audit_operations(body: str) -> tuple[list[str], bool]:
+    helpers = r"(?:write_business_audit|write_private_business_audit)"
+    calls = re.findall(rf"\b{helpers}\s*\(", body)
+    operations = re.findall(rf'\b{helpers}\s*\(\s*[^,()]+,\s*[^,()]+,\s*"([^"\n]+)"', body)
+    return sorted(set(operations)), len(calls) != len(operations)
+
+
+def validate_direct_owner_boundaries(functions: dict[str, Any], complete_owners: set[tuple[str, str]],
+                                     blocked_operations: set[str]) -> None:
+    for name, rows in functions.items():
+        for row in rows:
+            if (row["source"], name) not in complete_owners:
+                continue
+            standalone, _ = standalone_audit_operations(row["body"])
+            unguarded = set(standalone) - blocked_operations
+            if unguarded:
+                raise ValueError(f"standalone history journal precedes complete owner {name}: {', '.join(sorted(unguarded))}")
+
+
+def merged_evidence_vector(body: str) -> bool:
+    return bool(re.search(r"\bchanges\s*:\s*merge_business_audit_changes\s*\(", body)) or bool(
+        re.search(r"\blet\s+changes\s*=\s*merge_business_audit_changes\s*\(", body)
+        and re.search(r"OrganizationCommitInput\s*\{[\s\S]*?\bchanges\s*,", body))
+
+
+def source_signals(row: dict[str, Any] | None, structs: dict[str, Any],
+                   blocked_operations: set[str] | None = None,
+                   complete_owners: set[tuple[str, str]] | None = None) -> dict[str, Any]:
     if row is None:
         return {"status": "source-not-resolved", "audit_call": False, "trusted_capture_call": False,
                 "capture_coverage": "not-observed", "old_values_recorded": False,
                 "new_values_recorded": False, "guarded_action_gate": False, "tables_accessed": [],
-                "parameter_products": []}
+                "parameter_products": [], "guarded_legacy_operations": [],
+                "standalone_policy_unresolved": False, "owner_merged_capture_call": False,
+                "unmerged_capture_only_call": False}
     body = row["body"]
+    blocked_operations = blocked_operations or set()
+    standalone, unresolved = standalone_audit_operations(body)
+    guarded = sorted(set(standalone).intersection(blocked_operations))
+    capture_only = bool(re.search(r"\bcapture_(?:private_)?business_audit\s*\(", body))
+    # Capturing rows alone does not put them into a complete durable outcome.
+    # Count an owner integration only when its registered source body supplies
+    # the merged vector directly to its canonical organization commit.
+    merged = capture_only and (row.get("source"), row.get("function")) in (complete_owners or set()) and bool(
+        re.search(r"\brecord_organization_commit\s*\(", body)) and bool(
+        merged_evidence_vector(body))
+    trusted_capture = bool(re.search(r"\bcapture_business_change\s*\(", body)) or bool(
+        set(standalone) - blocked_operations) or merged
     products = []
-    for product in re.findall(r"\bparams\s*:\s*(\w+)", row["signature"]):
+    for product in re.findall(r"\bparams\s*:\s*(\w+)", row.get("signature", "")):
         definitions = structs.get(product, [])
         products.append({"type": product, "definitions": definitions})
     return {
         "status": "structural-only",
-        "audit_call": bool(re.search(r"\bwrite_audit_log(?:_v2)?\s*\(", body)),
-        "trusted_capture_call": bool(re.search(r"\bcapture_business_change\s*\(", body)),
-        "capture_coverage": "partial-control-flow-owner-review-required" if re.search(r"\bcapture_business_change\s*\(", body) else "not-observed",
+        "audit_call": bool(re.search(r"\b(?:write_audit_log(?:_v2(?:_returning)?)?|write_business_audit|write_private_business_audit|capture_business_audit|capture_private_business_audit)\s*\(", body)),
+        "trusted_capture_call": trusted_capture,
+        "capture_coverage": "partial-control-flow-owner-review-required" if trusted_capture else "not-observed",
         "old_values_recorded": bool(re.search(r"\bold_values\s*:\s*Some\s*\(", body)),
         "new_values_recorded": bool(re.search(r"\bnew_values\s*:\s*Some\s*\(", body)),
         "guarded_action_gate": bool(re.search(r"\brequest_guarded_action\s*\(", body)),
         "tables_accessed": sorted(set(re.findall(r"\bctx\s*\.\s*db\s*\.\s*(\w+)\s*\(", body))),
         "parameter_products": products,
+        "guarded_legacy_operations": guarded,
+        "standalone_policy_unresolved": unresolved,
+        "owner_merged_capture_call": bool(merged),
+        "unmerged_capture_only_call": capture_only and not merged,
     }
 
 
@@ -169,7 +232,11 @@ def build_inventory(root: Path) -> dict[str, Any]:
     exposure = {row["name"]: row for row in read_json(root, "lumiere-codegen/reducer-exposure.json")["reducers"]}
     legacy = {row["operation"]: row for row in read_json(root, "docs/evidence/cov-00a-operation-census.json")["operations"]}
     commits = commit_registrations(read_json(root, "lumiere-codegen/c2-commit-coverage.json"))
+    c2 = read_json(root, "lumiere-codegen/c2-commit-coverage.json")
+    blocked = validate_history_policy(read_json(root, "lumiere-codegen/business-history-owner-policy.json"), identities, commits)
+    complete_owners = {(row["source"], row["function"]) for row in c2.get("reducers", [])}
     functions, structs = source_inventory(root, parser)
+    validate_direct_owner_boundaries(functions, complete_owners, blocked)
     operations = []
     names = set(contracts)
     for name, definitions in functions.items():
@@ -200,7 +267,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
         semantic = contract["semantic_kind"] if contract else "uncontracted-native"
         command = semantic in {"command", "uncontracted-native"}
         policy = exposure.get(name, {}).get("exposure", "unregistered")
-        signal = source_signals(definition, structs)
+        signal = source_signals(definition, structs, blocked, complete_owners)
         legacy_row = legacy.get(name, {})
         candidate = command and name.startswith("update_") and policy == "session"
         if name == "amend_subscription":
@@ -225,6 +292,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
             "certification": "not-certified-by-static-inventory",
         })
     inputs = ["lumiere-codegen/contract-operation-ids.json", "lumiere-codegen/reducer-exposure.json",
+              "lumiere-codegen/business-history-owner-policy.json",
               "lumiere-codegen/c2-commit-coverage.json", "docs/evidence/cov-00a-operation-census.json"]
     inputs.extend(path.relative_to(root).as_posix() for path in sorted((root / "lumiere-codegen/operation-contracts").glob("*.json")))
     failures = []
@@ -263,6 +331,14 @@ def build_inventory(root: Path) -> dict[str, Any]:
             compact["existing_guarded_action_signal"] = True
         if signals["trusted_capture_call"]:
             compact["capture_signal"] = "partial-control-flow-owner-review-required"
+        elif signals["guarded_legacy_operations"]:
+            compact["capture_signal"] = "guarded-legacy-fallback-owner-integration-required"
+        elif signals["unmerged_capture_only_call"]:
+            compact["capture_signal"] = "unmerged-evidence-owner-integration-required"
+        if signals["guarded_legacy_operations"]:
+            compact["guarded_legacy_operations"] = signals["guarded_legacy_operations"]
+        if signals["owner_merged_capture_call"]:
+            compact["owner_merged_capture_signal"] = True
         if row["commit_registration_signals"]:
             compact["commit_registration_signals"] = row["commit_registration_signals"]
         compact_operations.append(compact)

@@ -1,11 +1,12 @@
 //! Wave D — external e-sign TSP envelope metadata + completed PDF version.
 
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::documents::documents::{
     add_document_version, document, AddDocumentVersionParams, Document,
 };
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 
 #[derive(Clone)]
 #[spacetimedb::table(
@@ -113,9 +114,10 @@ pub fn create_document_signature_request(
             metadata: params.metadata,
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_document_signature_request",
         AuditLogParams {
             company_id,
             table_name: "document_signature_request",
@@ -133,7 +135,7 @@ pub fn create_document_signature_request(
             changed_fields: vec!["status".to_string()],
             metadata: Some("{\"wave\":\"d\"}".to_string()),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -201,9 +203,10 @@ pub fn complete_document_signature_request(
             ..req
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "complete_document_signature_request",
         AuditLogParams {
             company_id,
             table_name: "document_signature_request",
@@ -224,6 +227,6 @@ pub fn complete_document_signature_request(
             ],
             metadata: Some("{\"wave\":\"d\"}".to_string()),
         },
-    );
+    )?;
     Ok(())
 }

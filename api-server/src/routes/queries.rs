@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use stdb_auth::{has_resource_read_permission, registry_get};
 
-mod action_drafts;
+pub(crate) mod action_drafts;
 mod activity_work;
 mod expense_allocations;
 #[cfg(test)]

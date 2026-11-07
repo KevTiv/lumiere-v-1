@@ -2,7 +2,8 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::data_ops::import_tracker::{
-    import_job, ImportJob, ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY,
+    import_job, ImportJob, ABANDONED_DRAFT_CLEANUP_METADATA_KEY,
+    ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY,
 };
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -60,9 +61,20 @@ fn merge_assistant_metadata(existing: Option<&str>, assistant: &str) -> Result<S
         .as_object()
         .ok_or_else(|| "metadata_json must be a JSON object".to_string())?;
     for (key, value) in overlay {
-        // File identity and rollback provenance are domain-owned. Finalizing
-        // assistant provenance must neither erase nor forge either marker.
-        if key != "sha256" && key != ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY {
+        // Import request identity, scope and rollback provenance are native
+        // receipts. Assistant annotations cannot rewrite an existing receipt
+        // or manufacture that identity on a legacy, uncorrelated job.
+        if ![
+            "sha256",
+            "request_id",
+            "company_id",
+            "currency_id",
+            "correlation_version",
+            ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY,
+            ABANDONED_DRAFT_CLEANUP_METADATA_KEY,
+        ]
+        .contains(&key.as_str())
+        {
             base.insert(key.clone(), value.clone());
         }
     }
@@ -354,6 +366,42 @@ mod tests {
 
         assert!(merged.get("sha256").is_none());
         assert!(merged.get(ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY).is_none());
+        assert_eq!(merged["assistant"], true);
+    }
+
+    #[test]
+    fn assistant_cannot_rebind_existing_request_or_company_scope() {
+        let original = serde_json::json!({"request_id":"native-request","company_id":17,"currency_id":23,"correlation_version":1,ABANDONED_DRAFT_CLEANUP_METADATA_KEY:{"company_id":17}});
+        let overlay = serde_json::json!({"request_id":"other-request","company_id":99,"currency_id":42,"correlation_version":9,ABANDONED_DRAFT_CLEANUP_METADATA_KEY:{"company_id":99},"assistant":{"mapped":true}});
+        let merged = merge_assistant_metadata(Some(&original.to_string()), &overlay.to_string())
+            .expect("valid metadata");
+        let merged: serde_json::Value = serde_json::from_str(&merged).expect("valid JSON");
+        for key in [
+            "request_id",
+            "company_id",
+            "currency_id",
+            "correlation_version",
+            ABANDONED_DRAFT_CLEANUP_METADATA_KEY,
+        ] {
+            assert_eq!(merged[key], original[key]);
+        }
+        assert_eq!(merged["assistant"], serde_json::json!({"mapped":true}));
+    }
+
+    #[test]
+    fn assistant_cannot_turn_legacy_job_into_native_correlated_receipt() {
+        let overlay = serde_json::json!({"request_id":"forged","company_id":99,"currency_id":42,"correlation_version":1,ABANDONED_DRAFT_CLEANUP_METADATA_KEY:{"company_id":99},"assistant":true});
+        let merged = merge_assistant_metadata(None, &overlay.to_string()).expect("valid metadata");
+        let merged: serde_json::Value = serde_json::from_str(&merged).expect("valid JSON");
+        for key in [
+            "request_id",
+            "company_id",
+            "currency_id",
+            "correlation_version",
+            ABANDONED_DRAFT_CLEANUP_METADATA_KEY,
+        ] {
+            assert!(merged.get(key).is_none());
+        }
         assert_eq!(merged["assistant"], true);
     }
 }

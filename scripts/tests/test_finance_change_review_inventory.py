@@ -65,6 +65,49 @@ pub fn capture_thing(ctx: &ReducerContext) -> Result<(), String> {
         self.assertFalse(signal["trusted_capture_call"])
         self.assertEqual(signal["parameter_products"], [])
 
+    def test_new_native_audit_adapters_are_trusted_but_material_coverage_stays_partial(self):
+        for helper in ("write_business_audit", "write_private_business_audit"):
+            signal = inventory.source_signals({"body": f'{helper}(ctx, org, "update_thing", params)?;', "signature": ""}, {})
+            self.assertTrue(signal["audit_call"])
+            self.assertTrue(signal["trusted_capture_call"])
+            self.assertEqual(signal["capture_coverage"], "partial-control-flow-owner-review-required")
+            self.assertFalse(signal["old_values_recorded"])
+            self.assertFalse(signal["new_values_recorded"])
+
+    def test_guarded_standalone_capture_remains_legacy_until_owner_merge(self):
+        row = {"body": 'write_business_audit(ctx, org, "create_thing", params)?;', "signature": ""}
+        signals = inventory.source_signals(row, {}, {"create_thing"})
+        self.assertTrue(signals["audit_call"])
+        self.assertFalse(signals["trusted_capture_call"])
+        self.assertEqual(signals["guarded_legacy_operations"], ["create_thing"])
+
+    def test_capture_only_requires_exact_registered_owner_merge(self):
+        row = {"source": "owner.rs", "function": "create_thing", "signature": "",
+               "body": 'let evidence = capture_business_audit(ctx, org, "create_thing", params)?;'}
+        signals = inventory.source_signals(row, {}, complete_owners={("owner.rs", "create_thing")})
+        self.assertFalse(signals["trusted_capture_call"])
+        self.assertTrue(signals["unmerged_capture_only_call"])
+        row["body"] += 'record_organization_commit(ctx, OrganizationCommitInput { changes: merge_business_audit_changes(rows, evidence)? })?;'
+        self.assertFalse(inventory.source_signals(row, {})["trusted_capture_call"])
+        signals = inventory.source_signals(row, {}, complete_owners={("owner.rs", "create_thing")})
+        self.assertTrue(signals["trusted_capture_call"])
+        self.assertTrue(signals["owner_merged_capture_call"])
+
+    def test_owner_policy_drift_rejects_unknown_producer_and_unregistered_owner(self):
+        payload = {"schema_version": 1, "policy": "standalone-journal-blocked-until-exact-owner-envelope-integration",
+                   "standalone_blocked_operations": {"create_thing": ["complete_owner"]}}
+        with self.assertRaisesRegex(ValueError, "unknown guarded history producer"):
+            inventory.validate_history_policy(payload, {}, {"complete_owner": []})
+        with self.assertRaisesRegex(ValueError, "unregistered complete history owner"):
+            inventory.validate_history_policy(payload, {"create_thing": "erp.create_thing"}, {})
+        self.assertEqual(inventory.validate_history_policy(payload, {"create_thing": "erp.create_thing"}, {"complete_owner": []}), {"create_thing"})
+
+    def test_complete_direct_owner_cannot_add_an_unguarded_standalone_journal(self):
+        row = {"source": "owner.rs", "body": 'write_business_audit(ctx, org, "create_thing", params)?;'}
+        with self.assertRaisesRegex(ValueError, "standalone history journal precedes complete owner"):
+            inventory.validate_direct_owner_boundaries({"owner": [row]}, {("owner.rs", "owner")}, set())
+        inventory.validate_direct_owner_boundaries({"owner": [row]}, {("owner.rs", "owner")}, {"create_thing"})
+
     def test_pos_is_not_admitted_just_because_sales_is_visible(self):
         contract = {"evidence": "sales/pos_config.rs: mutation", "client_facing": True}
         self.assertEqual(inventory.modules_for("create_pos_config", contract, self.census), [])

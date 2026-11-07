@@ -5,6 +5,8 @@ use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::account_move;
+use crate::core::audit::audit_log;
+use crate::core::business_changes::business_change;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::crm::contacts::{contact, Contact};
 use crate::inventory::product::product;
@@ -348,10 +350,12 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
         .map(|line| line.id)
         .ok_or("subscription line missing after creation")?;
     if commit.operation_id != "erp.create_subscription_from_sale_order"
-        || commit.row_change_count != 2
-        || changes.len() != 2
+        || commit.row_change_count != 4
+        || changes.len() != 4
         || changes[0].table_name != "subscription"
         || changes[1].table_name != "subscription_line"
+        || changes[2].table_name != "audit_log"
+        || changes[3].table_name != "business_change"
         || changes[0].row_identity_json != format!(r#"{{"id":{sub_id}}}"#)
         || changes[1].row_identity_json != format!(r#"{{"id":{line_id}}}"#)
         || changes[0].ordinal != 0
@@ -361,6 +365,46 @@ pub fn test_subscription_create_lines_bill_idempotent(ctx: &ReducerContext) -> R
             .any(|change| change.organization_id != org_id)
     {
         return Err("subscription commit did not preserve parent-before-child org rows".into());
+    }
+
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[2].row_identity_json)
+        .map_err(|error| format!("subscription creation audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("subscription creation audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[3].row_identity_json)
+        .map_err(|error| {
+            format!("subscription creation private history identity invalid: {error}")
+        })?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("subscription creation private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("subscription creation audit row missing")?;
+    let history = ctx
+        .db
+        .business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("subscription creation private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != org_id
+        || audit.organization_id != org_id
+        || history.record_id != sub_id
+        || history.resource != "subscription"
+        || history.subject_resource != "subscription"
+        || history.subject_record_id != sub_id
+        || audit.table_name != "subscription"
+        || audit.record_id != sub_id
+        || history.operation != "create_subscription_from_sale_order"
+        || history.company_id != company_id
+        || audit.company_id != Some(company_id)
+    {
+        return Err("subscription creation owner commit did not preserve exact audit/private history linkage and scope".into());
     }
 
     let sub = ctx

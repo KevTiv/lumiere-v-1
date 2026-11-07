@@ -2,9 +2,10 @@
 //!
 //! Denormalized rows so clients can subscribe with simple string equality filters
 //! (timestamp / float SQL filters are unreliable across STDB subscription surfaces).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::quality::quality_check;
 use crate::inventory::stock::stock_quant;
 use crate::inventory::tracking::stock_production_lot;
@@ -338,9 +339,10 @@ pub fn refresh_inventory_exceptions(
     let (upserted, resolved) =
         refresh_company_exceptions(ctx, organization_id, company_id, params.upsert_only);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "refresh_inventory_exceptions",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_exception",
@@ -357,7 +359,7 @@ pub fn refresh_inventory_exceptions(
             changed_fields: vec!["state".to_string()],
             metadata: params.metadata,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -391,9 +393,10 @@ pub fn resolve_inventory_exception(
             ..ex
         });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "resolve_inventory_exception",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "inventory_exception",
@@ -404,6 +407,6 @@ pub fn resolve_inventory_exception(
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

@@ -4,6 +4,8 @@
 /// (mirrors `seed.rs`) so `convert_opportunity_to_sale_order` can find a won stage.
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::audit::audit_log;
+use crate::core::business_changes::business_change;
 use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::currency;
@@ -246,7 +248,7 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
                     == format!("opportunity:{}:sale-order:{}", opp.id, order.id)
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 3 {
+    if commits.len() != 1 || commits[0].row_change_count != 5 {
         return Err(format!("CRM conversion commit mismatch: {}", commits.len()));
     }
     let mut changes: Vec<_> = ctx
@@ -262,7 +264,14 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         .iter()
         .map(|change| change.table_name.as_str())
         .collect();
-    if tables != ["opportunity", "sale_order", "sale_order_line"]
+    if tables
+        != [
+            "opportunity",
+            "sale_order",
+            "sale_order_line",
+            "audit_log",
+            "business_change",
+        ]
         || changes
             .iter()
             .any(|change| change.organization_id != org_id)
@@ -270,6 +279,44 @@ pub fn test_convert_opportunity_to_sale_order(ctx: &ReducerContext) -> Result<()
         return Err(format!(
             "CRM conversion row order/scope mismatch: {tables:?}"
         ));
+    }
+
+    let audit_id = serde_json::from_str::<serde_json::Value>(&changes[3].row_identity_json)
+        .map_err(|error| format!("CRM conversion audit identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("CRM conversion audit identity missing")?;
+    let history_id = serde_json::from_str::<serde_json::Value>(&changes[4].row_identity_json)
+        .map_err(|error| format!("CRM conversion private history identity invalid: {error}"))?
+        .get("id")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or("CRM conversion private history identity missing")?;
+    let audit = ctx
+        .db
+        .audit_log()
+        .id()
+        .find(&audit_id)
+        .ok_or("CRM conversion audit row missing")?;
+    let history = ctx
+        .db
+        .business_change()
+        .id()
+        .find(&history_id)
+        .ok_or("CRM conversion private history row missing")?;
+    if history.audit_log_id != audit.id
+        || history.organization_id != org_id
+        || audit.organization_id != org_id
+        || history.record_id != opp.id
+        || history.resource != "opportunity"
+        || history.subject_resource != "opportunity"
+        || history.subject_record_id != opp.id
+        || audit.table_name != "opportunity"
+        || audit.record_id != opp.id
+        || history.operation != "convert_opportunity_to_sale_order"
+        || history.company_id != company_id
+        || audit.company_id != Some(company_id)
+    {
+        return Err("CRM conversion owner commit did not preserve exact audit/private history linkage and scope".into());
     }
 
     Ok(())

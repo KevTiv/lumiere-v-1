@@ -8,6 +8,7 @@
 /// Reducers are called via the SpacetimeDB HTTP admin API from the API server.
 /// Password hashes, reset-token hashes, and STDB session tokens are canonical
 /// platform-control data and never enter this ERP binding.
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::users::{
@@ -15,7 +16,7 @@ use crate::core::users::{
     find_user_profile_for_organization, has_duplicate_platform_user_binding, user_organization,
     user_profile, UserProfile,
 };
-use crate::helpers::{write_audit_log_v2, AuditLogParams};
+use crate::helpers::AuditLogParams;
 
 // ============================================================================
 // TABLES (private — NO `public` flag)
@@ -161,9 +162,10 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
             updated_at: ctx.timestamp,
             ..profile
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "dev_promote_caller_superuser",
             AuditLogParams {
                 company_id: None,
                 table_name: "user_profile",
@@ -180,7 +182,7 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
                     .to_string(),
                 ),
             },
-        );
+        )?;
     } else {
         ctx.db.user_profile().insert(UserProfile {
             id: 0,
@@ -207,9 +209,10 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
             last_login: Some(ctx.timestamp),
             metadata: Some("{\"dev_promote_caller_superuser\":true}".to_string()),
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             0,
+            "dev_promote_caller_superuser",
             AuditLogParams {
                 company_id: None,
                 table_name: "user_profile",
@@ -226,7 +229,7 @@ pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> 
                     .to_string(),
                 ),
             },
-        );
+        )?;
     }
     Ok(())
 }
@@ -291,9 +294,10 @@ pub fn bind_user_credential(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "bind_user_credential",
         AuditLogParams {
             company_id: None,
             table_name: "user_credential",
@@ -306,7 +310,7 @@ pub fn bind_user_credential(
             changed_fields: vec!["platform_user_id".to_string(), "identity".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -401,9 +405,10 @@ pub fn project_user_profile(
         ..profile
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "project_user_profile",
         AuditLogParams {
             company_id: None,
             table_name: "user_profile",
@@ -444,7 +449,7 @@ pub fn project_user_profile(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -587,9 +592,10 @@ pub fn create_user_invite(
         accepted_at: None,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_user_invite",
         AuditLogParams {
             company_id: None,
             table_name: "user_invite",
@@ -607,7 +613,7 @@ pub fn create_user_invite(
             changed_fields: vec!["email".to_string(), "role_id".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -656,9 +662,10 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
         ..invite
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         invite.organization_id,
+        "mark_invite_accepted",
         AuditLogParams {
             company_id: None,
             table_name: "user_invite",
@@ -669,7 +676,7 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
             changed_fields: vec!["accepted_at".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -832,9 +839,10 @@ pub fn accept_user_invite(
             platform_user_id,
             accepted_at: ctx.timestamp,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "accept_user_invite",
         AuditLogParams {
             company_id: None,
             table_name: "user_invite",
@@ -847,7 +855,7 @@ pub fn accept_user_invite(
             changed_fields: vec!["accepted_at".into(), "membership".into(), "bindings".into()],
             metadata: None,
         },
-    );
+    )?;
     crate::core::permissions::touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
     Ok(())
 }
@@ -888,9 +896,10 @@ pub fn update_user_email(
 
     let organization_id = audit_organization_for_identity(ctx, ctx.sender())
         .ok_or("User profile has no active organization membership")?;
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_user_email",
         AuditLogParams {
             company_id: None,
             table_name: "user_profile",
@@ -914,7 +923,7 @@ pub fn update_user_email(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     Ok(())
 }

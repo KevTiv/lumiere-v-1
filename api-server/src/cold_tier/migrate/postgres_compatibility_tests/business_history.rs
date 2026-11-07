@@ -49,6 +49,240 @@ async fn postgres_finance_27_to_harness_28_preserves_history() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn postgres_organization_history_upgrade_and_append_only_projection() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!("skipping organization history PostgreSQL proof (set C4_TEST_PG=1 to run)");
+        return Ok(());
+    }
+    let base = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin = admin_pool(&base)?;
+    create_database(&admin, &database, &base.user).await?;
+    let mut config = base;
+    config.database.clone_from(&database);
+    let pool = pg_pool::build_pool(&config)?;
+    let result = exercise_organization_history(&pool).await;
+    drop(pool);
+    let cleanup = drop_database(&admin, &database).await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn postgres_complete_owner_outcome_has_no_history_only_durable_prefix() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!("skipping complete history outcome proof (set C4_TEST_PG=1 to run)");
+        return Ok(());
+    }
+    let base = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin = admin_pool(&base)?;
+    create_database(&admin, &database, &base.user).await?;
+    let mut config = base;
+    config.database.clone_from(&database);
+    let pool = pg_pool::build_pool(&config)?;
+    let result = exercise_complete_history_outcome(&pool).await;
+    drop(pool);
+    let cleanup = drop_database(&admin, &database).await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
+fn outcome_change(table: &str, ordinal: u32, row: Value) -> Result<OrganizationRowChangeInput> {
+    let mut change = history_change(8201, 1, ordinal, row)?;
+    change.table_name = table.into();
+    change.checksum = change_checksum(
+        table,
+        &change.row_identity_json,
+        "upsert",
+        change
+            .row_json
+            .as_deref()
+            .context("outcome image is present")?,
+    );
+    Ok(change)
+}
+
+async fn exercise_complete_history_outcome(pool: &Pool) -> Result<()> {
+    ensure_schema(pool).await?;
+    let manifest = history_manifest()?;
+    let identity = json!({"__identity__":format!("0x{}", "ab".repeat(32))});
+    let timestamp = json!({"__timestamp_micros_since_unix_epoch__":1_762_000_000_123_456_i64});
+    let mut event = history_row(8201, 1, "2.0");
+    event
+        .as_object_mut()
+        .context("history fixture is an object")?
+        .remove("company_id");
+    event["resource"] = json!("warehouse_geo");
+    event["subject_resource"] = json!("warehouse_geo");
+    event["subject_record_id"] = json!(9);
+    event["operation"] = json!("upsert_warehouse_geo");
+    event["changes_json"] = json!([{"field":"latitude","before":"1.0","after":"2.0"}])
+        .to_string()
+        .into();
+    // Deliberately place evidence first and the source row last. Failure of the
+    // actual source insert must not publish an evidence-only durable watermark.
+    let changes = vec![
+        outcome_change("organization_business_change", 0, event)?,
+        outcome_change(
+            "audit_log",
+            1,
+            json!({
+                "id":17,"organization_id":8201,"company_id":null,"table_name":"warehouse_geo",
+                "record_id":9,"action":"UPDATE","old_values":null,"new_values":null,
+                "changed_fields":["latitude"],"user_identity":identity,"session_id":null,
+                "ip_address":null,"user_agent":null,"timestamp":timestamp,"metadata":null,
+            }),
+        )?,
+        outcome_change(
+            "warehouse_geo",
+            2,
+            json!({
+                "id":9,"organization_id":8201,"warehouse_id":3,"latitude":2.0,"longitude":4.0,
+                "address":null,"city":null,"country_code":null,"manager_name":null,
+                "create_uid":identity,"create_date":timestamp,"write_uid":identity,"write_date":timestamp,
+            }),
+        )?,
+    ];
+    let mut commit = history_commit(8201, 1, &changes);
+    commit.operation_id = "erp.upsert_warehouse_geo".into();
+    commit.correlation_id = "warehouse-geo:3".into();
+    commit.checksum = commit_checksum_from_changes(
+        &commit,
+        changes.iter().map(|change| change.checksum.as_str()),
+    );
+    pool.get().await?.batch_execute("CREATE FUNCTION reject_history_source() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'disposable source insert failure'; END $$; CREATE TRIGGER reject_history_source BEFORE INSERT ON warehouse_geo FOR EACH ROW EXECUTE FUNCTION reject_history_source();").await?;
+    ensure!(apply_commit(pool, &manifest, &commit, &changes)
+        .await
+        .is_err());
+    ensure!(watermark(pool, 8201).await?.is_none());
+    for table in [
+        "organization_business_change",
+        "audit_log",
+        "warehouse_geo",
+        "organization_commit",
+        "organization_row_change",
+    ] {
+        let sql = format!("SELECT count(*) FROM {table} WHERE organization_id=8201");
+        ensure!(
+            pool.get()
+                .await?
+                .query_one(&sql, &[])
+                .await?
+                .get::<_, i64>(0)
+                == 0,
+            "failed source write left a durable {table} prefix"
+        );
+    }
+    pool.get().await?.batch_execute("DROP TRIGGER reject_history_source ON warehouse_geo; DROP FUNCTION reject_history_source();").await?;
+    ensure!(apply_commit(pool, &manifest, &commit, &changes).await? == ProjectionResult::Applied);
+    ensure!(watermark(pool, 8201).await? == Some("1".into()));
+    for table in [
+        "organization_business_change",
+        "audit_log",
+        "warehouse_geo",
+        "organization_commit",
+    ] {
+        let sql = format!("SELECT count(*) FROM {table} WHERE organization_id=8201");
+        ensure!(
+            pool.get()
+                .await?
+                .query_one(&sql, &[])
+                .await?
+                .get::<_, i64>(0)
+                == 1,
+            "complete outcome lost its {table} row"
+        );
+    }
+    ensure!(pool.get().await?.query_one("SELECT row_change_count FROM organization_commit WHERE organization_id=8201 AND sequence=1", &[]).await?.get::<_, i64>(0) == 3);
+    ensure!(
+        apply_commit(pool, &manifest, &commit, &changes).await? == ProjectionResult::AlreadyApplied
+    );
+    Ok(())
+}
+
+fn organization_history_change(
+    org: u64,
+    sequence: u64,
+    value: &str,
+) -> Result<OrganizationRowChangeInput> {
+    let mut row = history_row(org, 1, value);
+    row.as_object_mut()
+        .context("history fixture is an object")?
+        .remove("company_id");
+    row["resource"] = json!("product");
+    row["subject_resource"] = json!("product");
+    row["subject_record_id"] = json!(9);
+    row["operation"] = json!("update_product");
+    let mut change = history_change(org, sequence, 0, row)?;
+    change.table_name = "organization_business_change".into();
+    change.checksum = change_checksum(
+        &change.table_name,
+        &change.row_identity_json,
+        "upsert",
+        change
+            .row_json
+            .as_deref()
+            .context("history image is present")?,
+    );
+    Ok(change)
+}
+
+async fn exercise_organization_history(pool: &Pool) -> Result<()> {
+    let migration_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 37)
+        .context("organization history migration is present")?;
+    let manifest = history_manifest()?;
+    let codec: Value = serde_json::from_str(&manifest)?;
+    ensure!(codec["tables"]["organization_business_change"]["projection_mode"] == "append-history");
+    apply_migration_prefix(pool, migration_index).await?;
+    let old_history = applied_migration_history(pool).await?;
+    ensure!(!relation_exists(pool, "organization_business_change").await?);
+    ensure_schema(pool).await?;
+    ensure!(&applied_migration_history(pool).await?[..old_history.len()] == old_history.as_slice());
+    ensure!(relation_exists(pool, "organization_business_change").await?);
+    let client = pool.get().await?;
+    ensure!(client.query_one("SELECT count(*) FROM information_schema.columns WHERE table_name='organization_business_change' AND column_name='company_id'", &[]).await?.get::<_, i64>(0) == 0);
+    drop(client);
+
+    let first = vec![organization_history_change(8101, 1, "20.50")?];
+    let commit = history_commit(8101, 1, &first);
+    ensure!(apply_commit(pool, &manifest, &commit, &first).await? == ProjectionResult::Applied);
+    ensure!(
+        apply_commit(pool, &manifest, &commit, &first).await? == ProjectionResult::AlreadyApplied
+    );
+    let other = vec![organization_history_change(8102, 1, "30.50")?];
+    ensure!(
+        apply_commit(pool, &manifest, &history_commit(8102, 1, &other), &other).await?
+            == ProjectionResult::Applied
+    );
+    let replacement = vec![organization_history_change(8101, 2, "999.00")?];
+    ensure!(apply_commit(
+        pool,
+        &manifest,
+        &history_commit(8101, 2, &replacement),
+        &replacement
+    )
+    .await
+    .is_err());
+    ensure!(watermark(pool, 8101).await? == Some("1".into()));
+    let rows = pool.get().await?.query("SELECT organization_id::TEXT, changes_json FROM organization_business_change ORDER BY organization_id", &[]).await?;
+    ensure!(rows.len() == 2);
+    ensure!(rows[0].get::<_, String>(0) == "8101");
+    ensure!(
+        rows[0].get::<_, String>(1)
+            == history_row(8101, 1, "20.50")["changes_json"]
+                .as_str()
+                .context("encoded changes are present")?
+    );
+    ensure!(rows[1].get::<_, String>(0) == "8102");
+    Ok(())
+}
+
 async fn exercise_harness_upgrade(pool: &Pool) -> Result<()> {
     let index = MIGRATIONS
         .iter()

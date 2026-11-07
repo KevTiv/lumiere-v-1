@@ -3,13 +3,14 @@
 /// Tables:
 ///   - ReplenishmentRule
 ///   - StockReorderGroup
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::relations::require_active_currency_id;
 use crate::core::organization::require_company_in_organization;
 use crate::crm::contacts::contact;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::{product, product_supplier_info};
 use crate::inventory::stock::{
     create_stock_move_system, create_stock_picking_system, require_location_in_org,
@@ -526,9 +527,10 @@ pub fn create_replenishment_rule(
         scheduled_run_job_id: None,
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_replenishment_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "replenishment_rule",
@@ -553,7 +555,7 @@ pub fn create_replenishment_rule(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -709,9 +711,10 @@ fn execute_replenishment_rule_impl(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "execute_replenishment_rule",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "replenishment_rule",
@@ -736,7 +739,7 @@ fn execute_replenishment_rule_impl(
             ],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -831,9 +834,10 @@ pub fn schedule_replenishment_run(
         ..rule
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "schedule_replenishment_run",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "replenishment_rule",
@@ -844,7 +848,7 @@ pub fn schedule_replenishment_run(
             changed_fields: vec!["scheduled".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -893,9 +897,10 @@ pub fn cancel_replenishment_run(
         });
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_replenishment_run",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "replenishment_rule",
@@ -906,7 +911,7 @@ pub fn cancel_replenishment_run(
             changed_fields: vec!["scheduled".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }

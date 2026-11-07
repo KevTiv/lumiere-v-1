@@ -16,6 +16,8 @@
 //! Forms are identified by `module_id` and `form_id` (e.g., "crm:new-lead", "accounting:new-invoice").
 //! Custom fields use the `custom:` prefix convention (e.g., "custom:deals_touched").
 
+use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::{account_move, account_move_line};
@@ -27,7 +29,7 @@ use crate::crm::opportunities::opportunity;
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::fleet::fleet::fleet_vehicle;
 use crate::helpdesk::tickets::helpdesk_ticket;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::hr::contracts::hr_contract;
 use crate::hr::employees::hr_employee;
 use crate::hr::payroll::hr_payslip;
@@ -834,9 +836,10 @@ pub fn create_form_configuration(
 
     let inserted = ctx.db.form_config().insert(config);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_form_configuration",
         AuditLogParams {
             company_id: None,
             table_name: "form_config",
@@ -847,7 +850,7 @@ pub fn create_form_configuration(
             changed_fields: vec![],
             metadata: Some(format!("Created form configuration: {}", params.form_id)),
         },
-    );
+    )?;
 
     log::info!(
         "Created form configuration: {}:{}",
@@ -920,7 +923,7 @@ pub fn add_form_field(
         updated_at: ctx.timestamp,
     };
 
-    ctx.db.form_config_field().insert(field);
+    let history_field = ctx.db.form_config_field().insert(field);
 
     // Update configuration timestamp
     ctx.db.form_config().id().update(FormConfig {
@@ -929,20 +932,21 @@ pub fn add_form_field(
         ..config
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_form_field",
         AuditLogParams {
             company_id: None,
             table_name: "form_config_field",
-            record_id: configuration_id,
+            record_id: history_field.id,
             action: "create",
             old_values: None,
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Added field: {}", params.field_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1021,20 +1025,21 @@ pub fn update_form_field(
         ..config
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_form_field",
         AuditLogParams {
             company_id: None,
             table_name: "form_config_field",
-            record_id: configuration_id,
+            record_id: field.id,
             action: "update",
             old_values: None,
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Updated field: {}", field_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1106,20 +1111,21 @@ pub fn delete_form_field(
         ..config
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_form_field",
         AuditLogParams {
             company_id: None,
             table_name: "form_config_field",
-            record_id: configuration_id,
+            record_id: field.id,
             action: "delete",
             old_values: None,
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Deleted field: {}", field_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1145,7 +1151,8 @@ pub fn set_form_role_config(
         return Err("Configuration does not belong to organization".to_string());
     }
 
-    upsert_form_role_config_row(ctx, organization_id, configuration_id, &params)?;
+    let history_role_id =
+        upsert_form_role_config_row(ctx, organization_id, configuration_id, &params)?;
 
     ctx.db.form_config().id().update(FormConfig {
         updated_at: ctx.timestamp,
@@ -1153,20 +1160,21 @@ pub fn set_form_role_config(
         ..config
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_form_role_config",
         AuditLogParams {
             company_id: None,
             table_name: "form_role_config",
-            record_id: configuration_id,
+            record_id: history_role_id,
             action: "update",
             old_values: None,
             new_values: None,
             changed_fields: vec![],
             metadata: Some(format!("Set role config for: {}", params.role_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1237,9 +1245,10 @@ pub fn set_form_field_label(
             .id
     };
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_form_field_label",
         AuditLogParams {
             company_id: None,
             table_name: "form_field_label",
@@ -1257,7 +1266,7 @@ pub fn set_form_field_label(
             changed_fields: vec!["label".to_string()],
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1334,9 +1343,10 @@ pub fn add_user_custom_field(
 
     let custom_field = ctx.db.user_custom_field().insert(custom_field);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "add_user_custom_field",
         AuditLogParams {
             company_id: None,
             table_name: "user_custom_field",
@@ -1347,7 +1357,7 @@ pub fn add_user_custom_field(
             changed_fields: vec![],
             metadata: Some(format!("Added custom field: {}", params.field_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1379,9 +1389,10 @@ pub fn delete_user_custom_field(
 
     ctx.db.user_custom_field().id().delete(&custom_field_id);
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_user_custom_field",
         AuditLogParams {
             company_id: None,
             table_name: "user_custom_field",
@@ -1392,7 +1403,7 @@ pub fn delete_user_custom_field(
             changed_fields: vec![],
             metadata: Some(format!("Deleted custom field: {}", field.field_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1528,9 +1539,10 @@ pub fn set_record_custom_field_values(
         }
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "set_record_custom_field_values",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "record_custom_field_value",
@@ -1548,7 +1560,7 @@ pub fn set_record_custom_field_values(
             changed_fields: changed_keys,
             metadata: None,
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1589,9 +1601,10 @@ pub fn delete_record_custom_field_values(
         ctx.db.record_custom_field_value().id().delete(&row.id);
     }
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "delete_record_custom_field_values",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "record_custom_field_value",
@@ -1608,7 +1621,7 @@ pub fn delete_record_custom_field_values(
             changed_fields: vec![],
             metadata: Some(format!("Cleared custom fields for {}:{}", model, record_id)),
         },
-    );
+    )?;
 
     Ok(())
 }
@@ -1618,7 +1631,7 @@ fn upsert_form_role_config_row(
     organization_id: u64,
     configuration_id: u64,
     params: &CreateRoleConfigParams,
-) -> Result<(), String> {
+) -> Result<u64, String> {
     let config = ctx
         .db
         .form_config()
@@ -1639,12 +1652,13 @@ fn upsert_form_role_config_row(
         .iter()
         .find(|r| r.configuration_id == configuration_id && r.role_id == params.role_id);
 
-    if let Some(existing_config) = existing {
+    let record_id = if let Some(existing_config) = existing {
         if existing_config.organization_id != config.organization_id {
             return Err(
                 "Role configuration does not belong to configuration organization".to_string(),
             );
         }
+        let id = existing_config.id;
         ctx.db.form_role_config().id().update(FormRoleConfig {
             enabled_fields_json,
             required_fields_json,
@@ -1652,21 +1666,25 @@ fn upsert_form_role_config_row(
             updated_at: ctx.timestamp,
             ..existing_config
         });
+        id
     } else {
-        ctx.db.form_role_config().insert(FormRoleConfig {
-            id: 0,
-            organization_id: config.organization_id,
-            configuration_id,
-            role_id: params.role_id.clone(),
-            enabled_fields_json,
-            required_fields_json,
-            default_prompts_json,
-            is_active: true,
-            created_at: ctx.timestamp,
-            updated_at: ctx.timestamp,
-        });
-    }
-    Ok(())
+        ctx.db
+            .form_role_config()
+            .insert(FormRoleConfig {
+                id: 0,
+                organization_id: config.organization_id,
+                configuration_id,
+                role_id: params.role_id.clone(),
+                enabled_fields_json,
+                required_fields_json,
+                default_prompts_json,
+                is_active: true,
+                created_at: ctx.timestamp,
+                updated_at: ctx.timestamp,
+            })
+            .id
+    };
+    Ok(record_id)
 }
 
 /// Publish a full form configuration (identity + fields + roles) in one transaction.
@@ -1676,6 +1694,7 @@ pub fn publish_form_configuration(
     organization_id: u64,
     params: PublishFormConfigurationParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     let existing = ctx.db.form_config().iter().find(|c| {
         c.organization_id == organization_id
             && c.module_id == params.module_id
@@ -1826,9 +1845,10 @@ pub fn publish_form_configuration(
         });
     }
 
-    write_audit_log_v2(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
+        "publish_form_configuration",
         AuditLogParams {
             company_id: None,
             table_name: "form_config",
@@ -1851,7 +1871,7 @@ pub fn publish_form_configuration(
             ],
             metadata: Some("publish_form_configuration".to_string()),
         },
-    );
+    )?);
 
     let committed_config = ctx
         .db
@@ -1937,7 +1957,7 @@ pub fn publish_form_configuration(
                 "form:{}/{}:config:{}",
                 params.module_id, params.form_id, configuration_id
             ),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
 

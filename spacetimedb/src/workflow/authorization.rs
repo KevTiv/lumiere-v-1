@@ -4,6 +4,7 @@
 //! appending a decision or invoking a guarded action. The result is evidence meant
 //! to be copied onto the append-only decision event.
 
+use crate::core::business_changes::write_business_audit;
 use std::collections::{HashSet, VecDeque};
 
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -622,9 +623,10 @@ pub fn revoke_workflow_delegation(
             revoked_at: Some(ctx.timestamp),
             ..delegation.clone()
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "revoke_workflow_delegation",
         AuditLogParams {
             company_id: Some(delegation.company_id),
             table_name: "workflow_delegation",
@@ -635,7 +637,7 @@ pub fn revoke_workflow_delegation(
             changed_fields: vec!["is_active".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 

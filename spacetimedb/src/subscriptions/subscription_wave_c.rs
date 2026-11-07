@@ -1,5 +1,6 @@
 //! Wave C — amendments, proration, pause/resume, renew, cancel+credit, plan update.
 
+use crate::core::business_changes::write_business_audit;
 use sha2::{Digest, Sha256};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -14,9 +15,7 @@ use crate::core::audit::AuditLog;
 use crate::core::organization::company;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
-use crate::helpers::{
-    check_permission, write_audit_log_v2, write_audit_log_v2_returning, AuditLogParams,
-};
+use crate::helpers::{check_permission, write_audit_log_v2_returning, AuditLogParams};
 use crate::inventory::stock::require_product_in_org;
 use crate::subscriptions::billing_helpers::{
     calculate_next_date, normalize_payment_mode, normalize_plan_billing_period,
@@ -643,9 +642,10 @@ pub fn amend_subscription(
         serde_json::json!({ "fraction_remaining": fraction, "delta_period": delta }).to_string(),
     );
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "amend_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_amendment",
@@ -669,7 +669,7 @@ pub fn amend_subscription(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     log::info!(
         "Amended subscription {} type={} version={} proration={}",
@@ -720,9 +720,10 @@ pub fn pause_subscription(
         params.notes.unwrap_or_default(),
         String::new(),
     );
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "pause_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -736,7 +737,7 @@ pub fn pause_subscription(
                     .to_string(),
             ),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -783,9 +784,10 @@ pub fn resume_subscription(
         params.notes.unwrap_or_default(),
         String::new(),
     );
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "resume_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -803,7 +805,7 @@ pub fn resume_subscription(
                     .to_string(),
             ),
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1264,9 +1266,10 @@ pub fn cancel_subscription(
         serde_json::json!({ "entitlements_revoked": revoked }).to_string(),
     );
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "cancel_subscription",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription",
@@ -1289,7 +1292,7 @@ pub fn cancel_subscription(
                 .to_string(),
             ),
         },
-    );
+    )?;
 
     log::info!(
         "Cancelled subscription {} credit_note={:?} proration={}",
@@ -1392,9 +1395,10 @@ pub fn update_subscription_plan(
         ..plan
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "update_subscription_plan",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_plan",
@@ -1405,7 +1409,7 @@ pub fn update_subscription_plan(
             changed_fields: vec!["updated_at".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1438,9 +1442,10 @@ pub fn deactivate_subscription_plan(
         updated_at: ctx.timestamp,
         ..plan
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "deactivate_subscription_plan",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_plan",
@@ -1451,7 +1456,7 @@ pub fn deactivate_subscription_plan(
             changed_fields: vec!["active".into(), "is_published".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1480,9 +1485,10 @@ pub fn activate_subscription_plan(
         updated_at: ctx.timestamp,
         ..plan
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "activate_subscription_plan",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "subscription_plan",
@@ -1493,6 +1499,6 @@ pub fn activate_subscription_plan(
             changed_fields: vec!["active".into()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

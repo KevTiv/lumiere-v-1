@@ -2,13 +2,15 @@
 //! blanket orders / contracts, vendor scorecards + risk,
 //! consignment agreements, approval delegates, commodity index hooks,
 //! and customs / e-invoice integration intent/result tracking.
+use crate::core::business_changes::write_business_audit;
+use crate::core::business_changes::{capture_business_audit, merge_business_audit_changes};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::relations::{require_active_currency_id, require_contact_in_scope};
 use crate::core::organization::require_company_in_organization;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::users::{find_user_profile_for_organization, user_organization};
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::product;
 use crate::inventory::stock::{require_product_in_org, require_warehouse_in_org_and_company};
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
@@ -586,9 +588,10 @@ pub fn create_purchase_blanket_order(
                 metadata: line.metadata,
             });
     }
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchase_blanket_order",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_blanket_order",
@@ -599,7 +602,7 @@ pub fn create_purchase_blanket_order(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -612,6 +615,7 @@ pub fn release_blanket_to_po(
     blanket_order_id: u64,
     params: ReleaseBlanketToPoParams,
 ) -> Result<(), String> {
+    let mut business_audit_changes = Vec::new();
     check_permission(ctx, organization_id, "purchase_order", "create")?;
     require_purchasing_ri_phase0_unsafe_actions_enabled(ctx, organization_id)?;
     require_advanced_company(ctx, organization_id, company_id)?;
@@ -792,9 +796,10 @@ pub fn release_blanket_to_po(
             ..blanket
         });
 
-    write_audit_log_v2(
+    business_audit_changes.extend(capture_business_audit(
         ctx,
         organization_id,
+        "release_blanket_to_po",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_blanket_order",
@@ -814,7 +819,7 @@ pub fn release_blanket_to_po(
             ],
             metadata: None,
         },
-    );
+    )?);
 
     let committed_blanket = ctx
         .db
@@ -877,7 +882,7 @@ pub fn release_blanket_to_po(
             organization_id,
             operation_id: "erp.release_blanket_to_po".to_string(),
             correlation_id: format!("blanket-order:{blanket_order_id}:release:{idempotency_key}"),
-            changes,
+            changes: merge_business_audit_changes(changes, business_audit_changes)?,
         },
     )?;
     Ok(())
@@ -913,9 +918,10 @@ pub fn create_purchase_contract(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchase_contract",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchase_contract",
@@ -926,7 +932,7 @@ pub fn create_purchase_contract(
             changed_fields: vec!["name".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -964,9 +970,10 @@ pub fn upsert_vendor_scorecard(
             write_date: ctx.timestamp,
             ..row
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_vendor_scorecard",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "vendor_scorecard",
@@ -984,7 +991,7 @@ pub fn upsert_vendor_scorecard(
                 changed_fields: vec!["otif_score".to_string(), "quality_score".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     } else {
         let row = ctx.db.vendor_scorecard().insert(VendorScorecard {
             id: 0,
@@ -999,9 +1006,10 @@ pub fn upsert_vendor_scorecard(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "upsert_vendor_scorecard",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "vendor_scorecard",
@@ -1023,7 +1031,7 @@ pub fn upsert_vendor_scorecard(
                 ],
                 metadata: None,
             },
-        );
+        )?;
     }
     Ok(())
 }
@@ -1064,9 +1072,10 @@ pub fn set_vendor_risk_flag(
             write_date: ctx.timestamp,
             ..row
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "set_vendor_risk_flag",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "vendor_risk_flag",
@@ -1088,7 +1097,7 @@ pub fn set_vendor_risk_flag(
                 ],
                 metadata: None,
             },
-        );
+        )?;
     } else {
         let row = ctx.db.vendor_risk_flag().insert(VendorRiskFlag {
             id: 0,
@@ -1104,9 +1113,10 @@ pub fn set_vendor_risk_flag(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "set_vendor_risk_flag",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "vendor_risk_flag",
@@ -1128,7 +1138,7 @@ pub fn set_vendor_risk_flag(
                 ],
                 metadata: None,
             },
-        );
+        )?;
     }
     Ok(())
 }
@@ -1196,9 +1206,10 @@ pub fn create_consignment_agreement(
         write_date: ctx.timestamp,
         metadata: params.metadata,
     });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_consignment_agreement",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "consignment_agreement",
@@ -1222,7 +1233,7 @@ pub fn create_consignment_agreement(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1361,9 +1372,10 @@ pub fn set_purchase_approval_delegate(
                 write_date: ctx.timestamp,
                 ..row
             });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "set_purchase_approval_delegate",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "purchase_approval_delegate",
@@ -1379,7 +1391,7 @@ pub fn set_purchase_approval_delegate(
                 changed_fields: vec!["delegate_identity".to_string(), "is_active".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     } else {
         let row = ctx
             .db
@@ -1397,9 +1409,10 @@ pub fn set_purchase_approval_delegate(
                 write_date: ctx.timestamp,
                 metadata: params.metadata,
             });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "set_purchase_approval_delegate",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "purchase_approval_delegate",
@@ -1414,7 +1427,7 @@ pub fn set_purchase_approval_delegate(
                 ],
                 metadata: None,
             },
-        );
+        )?;
     }
     Ok(())
 }
@@ -1454,9 +1467,10 @@ pub fn set_commodity_price_index(
                 write_date: ctx.timestamp,
                 ..row
             });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "set_commodity_price_index",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "commodity_price_index",
@@ -1469,7 +1483,7 @@ pub fn set_commodity_price_index(
                 changed_fields: vec!["rate".to_string(), "as_of".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     } else {
         let row = ctx.db.commodity_price_index().insert(CommodityPriceIndex {
             id: 0,
@@ -1484,9 +1498,10 @@ pub fn set_commodity_price_index(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-        write_audit_log_v2(
+        write_business_audit(
             ctx,
             organization_id,
+            "set_commodity_price_index",
             AuditLogParams {
                 company_id: Some(company_id),
                 table_name: "commodity_price_index",
@@ -1499,7 +1514,7 @@ pub fn set_commodity_price_index(
                 changed_fields: vec!["code".to_string(), "rate".to_string(), "as_of".to_string()],
                 metadata: None,
             },
-        );
+        )?;
     }
     Ok(())
 }
@@ -1563,9 +1578,10 @@ pub fn create_purchasing_integration_intent(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "create_purchasing_integration_intent",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchasing_integration_intent",
@@ -1583,7 +1599,7 @@ pub fn create_purchasing_integration_intent(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }
 
@@ -1659,9 +1675,10 @@ pub fn record_purchasing_integration_result(
             write_date: ctx.timestamp,
             ..intent
         });
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "record_purchasing_integration_result",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "purchasing_integration_intent",
@@ -1672,6 +1689,6 @@ pub fn record_purchasing_integration_result(
             changed_fields: vec!["status".to_string()],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

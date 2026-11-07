@@ -1,9 +1,10 @@
 //! Multi-warehouse promise ATP — calendar / lead-time helpers + promise refresh.
 //!
 //! Working calendar MVP: Monday–Friday only (no holiday table).
+use crate::core::business_changes::write_business_audit;
 use spacetimedb::{reducer, ReducerContext, Table, Timestamp};
 
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::helpers::{check_permission, AuditLogParams};
 use crate::inventory::product::{product, product_supplier_info};
 use crate::inventory::stock::{
     product_requires_stock, resolve_warehouse_stock_location, stock_picking, stock_quant,
@@ -422,9 +423,10 @@ pub fn refresh_sale_order_promise_dates(
         ..order
     });
 
-    write_audit_log_v2(
+    write_business_audit(
         ctx,
         organization_id,
+        "refresh_sale_order_promise_dates",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: "sale_order",
@@ -445,6 +447,6 @@ pub fn refresh_sale_order_promise_dates(
             ],
             metadata: None,
         },
-    );
+    )?;
     Ok(())
 }

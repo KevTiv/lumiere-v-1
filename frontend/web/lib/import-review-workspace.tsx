@@ -65,6 +65,7 @@ import { ImportReviewBulk } from "./import-review-bulk"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
+import { exactSourceReviewRevision, pinnedSourceReview, sourceReviewBeforeRevision, type PinnedSourceReview } from "@lumiere/query-hooks/hooks/source-review-navigation"
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(url, init)
@@ -180,6 +181,7 @@ function ReviewWorkspace({
   const [selected, setSelected] = useState<ReviewRow | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [historyId, setHistoryId] = useState("")
+  const [pinnedReview, setPinnedReview] = useState<PinnedSourceReview | null>(null)
   const [busy, setBusy] = useState(false)
   const [locked, setLocked] = useState(false)
   const validatedBulkRequest = useRef<string | null>(null)
@@ -194,8 +196,15 @@ function ReviewWorkspace({
   } | null>(null)
   const [uncertainUndo, setUncertainUndo] = useState(false)
   useEffect(() => {
-    if (initialId) return
     const url = new URL(window.location.href)
+    const pinned = pinnedSourceReview(url.search, String(companyId))
+    if (pinned && (!initialId || initialId === pinned.batchId)) {
+      setSelectedId(pinned.batchId)
+      setHistoryId(pinned.itemId)
+      setPinnedReview(pinned)
+      return
+    }
+    if (initialId) return
     if (url.searchParams.get("sourceReviewCompany") === String(companyId))
       setSelectedId(url.searchParams.get("sourceReview") ?? "")
   }, [initialId, companyId])
@@ -247,10 +256,11 @@ function ReviewWorkspace({
       companyId,
       selectedId,
       historyId,
+      pinnedReview?.revision,
       actor,
     ],
     enabled: !!historyId,
-    initialPageParam: undefined as number | undefined,
+    initialPageParam: sourceReviewBeforeRevision(pinnedReview),
     queryFn: ({ pageParam }) =>
       request<{ history: ReviewHistory[]; nextBeforeRevision: number | null }>(
         `/api/import-reviews/${selectedId}/items/${historyId}/history?companyId=${companyId}${pageParam ? `&beforeRevision=${pageParam}` : ""}`,
@@ -289,12 +299,15 @@ function ReviewWorkspace({
     setSelected(null)
     setChecked(new Set())
     setHistoryId("")
+    setPinnedReview(null)
     setError(null)
     setPage(0)
     setGroup("all")
     const url = new URL(window.location.href)
     url.searchParams.set("sourceReview", id)
     url.searchParams.set("sourceReviewCompany", String(companyId))
+    url.searchParams.delete("sourceReviewItem")
+    url.searchParams.delete("sourceReviewRevision")
     window.history.replaceState(window.history.state, "", url)
   }
   const refresh = () => {
@@ -375,6 +388,7 @@ function ReviewWorkspace({
     requireCurrentScope()
   }
   const open = (item: ReviewRow) => {
+    setPinnedReview(null)
     setSelected(item)
     setHistoryId(item.id)
     setChecked(new Set())
@@ -523,9 +537,11 @@ function ReviewWorkspace({
       if (mounted.current) setBusy(false)
     }
   }
-  const historyEntries = historyId
+  const loadedHistoryEntries = history.error ? [] : historyId
     ? (history.data?.pages.flatMap((page) => page.history) ?? [])
     : (detail.data?.history ?? [])
+  const pinnedEntry = pinnedReview ? exactSourceReviewRevision(loadedHistoryEntries, pinnedReview) : undefined
+  const historyEntries = pinnedReview ? (pinnedEntry ? [pinnedEntry] : []) : loadedHistoryEntries
   return (
     <section
       className="flex min-w-0 flex-col gap-4"
@@ -597,6 +613,7 @@ function ReviewWorkspace({
       ) : null}
       {detail.data && !detail.error ? (
         <>
+          {pinnedReview && <p role="status" className="rounded-lg border p-3 text-sm">{t("businessHistory.pinnedReview", { revision: pinnedReview.revision })} <a className="underline underline-offset-4" href="#source-review-history">{t("businessHistory.openSourceReview")}</a></p>}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-medium">{detail.data.title}</h3>
             <div className="flex flex-wrap gap-2">
@@ -854,7 +871,7 @@ function ReviewWorkspace({
                         variant="ghost"
                         size="sm"
                         disabled={unavailable || !!selected}
-                        onClick={() => setHistoryId(item.id)}
+                        onClick={() => { setPinnedReview(null); setHistoryId(item.id) }}
                       >
                         {t("settings.importReview.grouped.historyAction")}
                       </Button>
@@ -912,13 +929,15 @@ function ReviewWorkspace({
               {t("settings.importReview.grouped.nextPage")}
             </Button>
           </div>
-          <details>
+          <details id="source-review-history" open={pinnedReview ? true : undefined}>
             <summary className="cursor-pointer text-sm font-medium">
               {historyId
                 ? t("settings.importReview.grouped.itemHistory")
                 : t("settings.importReview.history")}
             </summary>
             {history.error ? <p role="alert">{history.error.message}</p> : null}
+            {pinnedReview && history.isPending ? <p role="status">{t("businessHistory.savedReviewLoading")}</p> : null}
+            {pinnedReview && !history.isPending && !history.error && !pinnedEntry ? <p role="status">{t("businessHistory.savedReviewUnavailable")}</p> : null}
             <ul className="mt-2 flex flex-col gap-2 text-sm">
               {historyEntries.map((entry) => {
                 const item = detail.data.items.find(
@@ -930,11 +949,13 @@ function ReviewWorkspace({
                     key={`${entry.itemId}:${entry.revision}`}
                   >
                     <span>
+                      {pinnedReview ? `${t("businessHistory.reviewReference", { item: entry.itemId, revision: entry.revision })} · ` : ""}
                       {item?.source.label} · {entry.createdAt} ·{" "}
                       {resolveIdentityLabel(entry.actor, identityLabels)} ·{" "}
                       {entry.reason}
                     </span>
-                    {item &&
+                    {pinnedReview && <dl className="w-full space-y-2 rounded border p-3">{Object.entries(entry.values).map(([field, value]) => <div key={field} className="grid min-w-0 gap-1 sm:grid-cols-2"><dt className="break-words text-muted-foreground">{item?.source.fields.find((sourceField) => sourceField.key === field)?.label ?? field}</dt><dd className="whitespace-pre-wrap break-all">{value === null ? t("recordChanges.noValue") : value === "" ? t("recordChanges.emptyText") : value}</dd></div>)}</dl>}
+                    {!pinnedReview && item &&
                     entry.previousValues &&
                     item.revision === entry.revision ? (
                       <Button
@@ -950,7 +971,7 @@ function ReviewWorkspace({
                 )
               })}
             </ul>
-            {historyId && history.hasNextPage ? (
+            {!pinnedReview && historyId && history.hasNextPage ? (
               <Button
                 variant="outline"
                 disabled={history.isFetchingNextPage}

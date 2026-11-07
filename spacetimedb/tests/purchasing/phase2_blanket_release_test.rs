@@ -269,9 +269,9 @@ pub fn test_blanket_release_lines_bounds_and_retry(ctx: &ReducerContext) -> Resu
                     )
         })
         .collect();
-    if commits.len() != 1 || commits[0].row_change_count != 5 {
+    if commits.len() != 1 || commits[0].row_change_count != 7 {
         return Err(format!(
-            "blanket release should emit one five-row organization commit, got {} / {:?}",
+            "blanket release should emit one seven-row organization commit, got {} / {:?}",
             commits.len(),
             commits.first().map(|commit| commit.row_change_count)
         ));
@@ -322,8 +322,10 @@ pub fn test_blanket_release_lines_bounds_and_retry(ctx: &ReducerContext) -> Resu
             "purchase_order",
             "purchase_order_line",
             "purchase_blanket_release",
+            "audit_log",
+            "business_change",
         ]
-        || changes.len() != 5
+        || changes.len() != 7
         || changes[0].row_identity_json != format!(r#"{{"id":{}}}"#, blanket.id)
         || changes[1].row_identity_json != format!(r#"{{"id":{}}}"#, line.id)
         || changes[2].row_identity_json != format!(r#"{{"id":{}}}"#, purchase_order.id)
