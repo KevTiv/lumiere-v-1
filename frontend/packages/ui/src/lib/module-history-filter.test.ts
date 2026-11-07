@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   MODULE_HISTORY_FIELDS,
+  configuredModuleHistoryField,
   filterModuleHistoryRows,
   getModuleHistoryField,
   moduleHistoryTimestampMs,
@@ -22,6 +23,18 @@ describe("module history drilldown", () => {
       const scoped = resolveModuleHistoryFilter(module, field.tabId, "all")
       expect(filterModuleHistoryRows([{ [field.dateField]: "1940-01-01" }], scoped)).toHaveLength(1)
     }
+  })
+
+  it("uses configured business dates across modules without a recent-history cutoff", () => {
+    for (const module of ["accounting", "inventory", "hr", "projects", "pos", "fleet", "helpdesk", "manufacturing"]) {
+      const field = configuredModuleHistoryField(module, "records", [{ key: "name" }, { key: "businessDate", type: "date" }])
+      expect(field).toEqual({ tabId: "records", dateField: "businessDate" })
+      const rows = [{ businessDate: "1940-01-01" }, { business_date: "2040-12-31" }]
+      expect(filterModuleHistoryRows(rows, resolveModuleHistoryFilter(module, "records", "all", { field }))).toHaveLength(2)
+      expect(filterModuleHistoryRows(rows, resolveModuleHistoryFilter(module, "records", "custom:2040-01-01:2040-12-31", { field }))).toEqual([rows[1]])
+    }
+    expect(configuredModuleHistoryField("contacts", "contacts", [{ key: "name", type: "text" }])).toBeNull()
+    expect(configuredModuleHistoryField("sales", "orders", [{ key: "dateDue", type: "date" }])?.dateField).toBe("dateOrder")
   })
 
   it("keeps source date-only values and real instants aligned to the selected zone across DST", () => {
