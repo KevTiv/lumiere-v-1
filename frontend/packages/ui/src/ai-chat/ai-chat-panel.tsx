@@ -42,6 +42,8 @@ import { AiActionDraftCard } from "./ai-action-draft-card"
 import { AiNativeActionCard } from "./ai-native-action-card"
 import { Dialog, DialogContent, DialogTitle } from "../components/dialog"
 import { AssistantGuideCard } from "./assistant-guide-viewer"
+import { ImportTaskStatusCard } from "./import-task-status-card"
+import type { ChatImportTaskStatus } from "../lib/import-task-status"
 import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guide-types"
 import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
@@ -58,6 +60,7 @@ interface ChatReply {
   sources?: ChatMessageSourceRef[]
   actions?: ChatAction[]
   guides?: GuideReference[]
+  importTasks?: ChatImportTaskStatus[]
 }
 
 interface AIChatPanelProps {
@@ -523,6 +526,7 @@ export function AIChatPanel({
                 ? streamedActions
                 : undefined,
           guides: reply.guides,
+          importTasks: reply.importTasks,
           metadata: {
             duration: Math.round(t1 - t0),
             runId: reply.runId,
@@ -544,6 +548,7 @@ export function AIChatPanel({
           sources: reply.sources && reply.sources.length > 0 ? reply.sources : undefined,
           actions: reply.actions && reply.actions.length > 0 ? reply.actions : undefined,
           guides: reply.guides,
+          importTasks: reply.importTasks,
           metadata: {
             duration: Math.round(t1 - t0),
             runId: reply.runId,
@@ -810,6 +815,7 @@ export function AIChatPanel({
                       )}>
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
+                      {message.role === "assistant" ? message.importTasks?.map(status => <ImportTaskStatusCard key={status.taskId} status={status} companyId={context?.companyId} />) : null}
                       {message.role === "assistant" && config?.onOpenGuide ? <>
                         {message.guides?.map((reference) => <AssistantGuideCard key={`${reference.guideId}:${reference.revision}`} title={reference.title ?? t("aiChat.guide.savedGuide", { defaultValue: "Saved ERP guide" })} module={reference.module} revision={reference.revision} onOpen={() => void handleOpenGuide({ messageId: message.id, reference })} />)}
                         {!isLoading && message.content.trim().length >= 240 && context?.companyId ? <AssistantGuideCard title={message.content.split("\n").find((line) => line.trim())?.replace(/^#{1,6}\s*/, "").replace(/\*\*/g, "").slice(0, 100) ?? t("aiChat.guide.newGuide", { defaultValue: "ERP guidance" })} module={context.module ?? context.activeView} onOpen={() => void handleOpenGuide({ messageId: message.id, draft: {

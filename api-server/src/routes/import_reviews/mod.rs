@@ -1,14 +1,19 @@
-//! Durable, tenant-scoped source review documents. These routes never dispatch
-//! ERP reducers. Confirmed rows still enter the normal validated import path.
+//! Durable, tenant-scoped source review and approved import workflows.
+//! Business writes use the existing validated native import owner.
+mod capabilities;
 mod history_data;
 mod history_period;
 mod import_binding;
 mod model;
+mod native_requests;
 #[cfg(test)]
 mod postgres_tests;
+mod recipes;
 mod tasks;
+mod workflow;
 
 pub(crate) use import_binding::{read_review_binding, record_review_binding};
+pub(crate) use workflow::read_workflow_binding;
 
 use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
@@ -34,6 +39,7 @@ use model::{validate_confirmed_fields, validate_dataset, validate_values, Datase
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct Scope {
+    #[serde(alias = "companyId")]
     company_id: u64,
 }
 
@@ -479,6 +485,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/import-reviews/:batch/items/:item/history", get(history))
         .layer(DefaultBodyLimit::max(5_000_000))
         .merge(tasks::router())
+        .merge(recipes::router())
+        .merge(workflow::router())
         .layer(axum::middleware::map_response(
             |mut response: axum::response::Response| async move {
                 response.headers_mut().insert(

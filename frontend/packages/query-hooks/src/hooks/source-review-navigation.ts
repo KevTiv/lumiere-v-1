@@ -25,6 +25,13 @@ export function sourceReviewHistoryHref(companyId: string, review: PinnedSourceR
     sourceReviewCompany: companyId, sourceReviewItem: review.itemId, sourceReviewRevision: String(review.revision) })}#source-review-history`;
 }
 
+/** The receiving workspace reauthorizes this company and saved task. */
+export function sourceImportTaskHref(companyId: string, taskRequestId: string, batchId: string): string {
+  if (!validHistoryId(companyId) || !validHistoryId(batchId) || !/^[a-f0-9]{32}$/.test(taskRequestId)) throw new Error("Invalid saved import link");
+  return `/settings?${new URLSearchParams({ section: "imports", importTask: taskRequestId,
+    importCompany: companyId, importView: "results", sourceReview: batchId, sourceReviewCompany: companyId })}#import-task`;
+}
+
 /** Before-revision cursors are exclusive; the maximum revision has no representable successor. */
 export function sourceReviewBeforeRevision(review: PinnedSourceReview | null): number | undefined {
   return review && review.revision < 2_147_483_647 ? review.revision + 1 : undefined;

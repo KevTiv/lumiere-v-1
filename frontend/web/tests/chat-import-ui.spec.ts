@@ -79,12 +79,24 @@ async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDec
       return route.fulfill({ json: task })
     }
     if (route.request().method() === "GET" && path === "/api/import-tasks") {
-      return route.fulfill({ json: { tasks: requests.hideStoredTasks ? [] : [...tasks.values()].filter(task => task.companyId === url.searchParams.get("companyId") && task.conversationKey === url.searchParams.get("conversationKey")) } })
+      const conversationKey = url.searchParams.get("conversationKey")
+      return route.fulfill({ json: { tasks: requests.hideStoredTasks ? [] : [...tasks.values()].filter(task => task.companyId === url.searchParams.get("companyId") && (!conversationKey || task.conversationKey === conversationKey)), nextCursor: null } })
     }
     const requestId = path.split("/")[3]
     const task = tasks.get(requestId)
     requests.exactReads += 1
-    if (!task || task.companyId !== url.searchParams.get("companyId")) return route.fulfill({ status: 404, json: { error: "Not found" } })
+    if (path.includes("/workflow") && route.request().method() !== "GET") {
+      requests.businessWrites += 1
+      return route.fulfill({ status: 500, json: { error: "Source preparation must not dispatch ERP workflow actions" } })
+    }
+    if (!task || requests.hideStoredTasks || task.companyId !== url.searchParams.get("companyId")) return route.fulfill({ status: 404, json: { error: "Not found" } })
+    if (path.includes("/workflow")) {
+      if (!path.endsWith("/workflow")) return route.fulfill({ status: 404, json: { error: "No saved proposal request" } })
+      return route.fulfill({ json: {
+        version: 1, organizationId: "8001", companyId: task.companyId, requestId: task.requestId,
+        capabilities: [], proposals: [], nativeResults: [], nativeResultsMore: false,
+      } })
+    }
     const decisionId = url.searchParams.get("decisionId")
     if (decisionId) {
       requests.decisionReads += 1
@@ -97,6 +109,9 @@ async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDec
     if (route.request().method() === "POST") requests.businessWrites += 1
     return route.fulfill({ status: 500, json: { error: "Preparation must not import records" } })
   })
+  await page.route("**/api/import-recipes**", route => route.request().method() === "GET"
+    ? route.fulfill({ json: { recipes: [] } })
+    : route.fulfill({ status: 500, json: { error: "No recipe mutation is expected in this fixture" } }))
   return requests
 }
 
@@ -129,6 +144,7 @@ async function mockSourceReview(page: Page, inspection = false) {
     const data = path.endsWith("/companies") ? [{ id: 9001, organizationId: 8001, name: "Synthetic farm company", currencyId: 1 }] : []
     return route.fulfill({ json: { data } })
   })
+  await page.route("**/api/bootstrap/currencies", route => route.fulfill({ json: { data: [{ id: "1", code: "RWF", decimalPlaces: 0 }] } }))
   const review = {
     id: "71", title: inspection ? "Synthetic file inspection" : "Synthetic farm history", targetEntity: "source_observation", sourceFile: "synthetic-farm-1.csv",
     total: 1, pending: inspection ? 0 : 1, confirmed: inspection ? 1 : 0, excluded: 0,
