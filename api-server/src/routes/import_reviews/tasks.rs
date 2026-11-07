@@ -9,6 +9,7 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -20,8 +21,10 @@ use tokio::{
 
 use crate::{cold_tier::pg_pool, error::ApiError, state::AppState, web_session::OrgSession};
 
+mod manifest;
 #[cfg(test)]
 mod tests;
+use manifest::validate_preparation_manifest;
 
 const MAX_FILE_BYTES: usize = 5_000_000;
 const MAX_TOTAL_BYTES: usize = 20_000_000;
@@ -42,6 +45,8 @@ struct Submission {
     request_id: String,
     conversation_key: String,
     files: Vec<SourceFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    preparation: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -50,6 +55,7 @@ struct TaskQuery {
     company_id: u64,
     conversation_key: Option<String>,
     decision_id: Option<String>,
+    cursor: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -98,6 +104,10 @@ struct Preparation {
     datasets: Vec<Dataset>,
     #[serde(default)]
     warnings: Vec<String>,
+    #[serde(default)]
+    coverage: Option<Value>,
+    #[serde(default, rename = "preparationReceipt")]
+    preparation_receipt: Option<Value>,
 }
 
 fn valid_request_id(value: &str) -> bool {
@@ -119,6 +129,18 @@ fn decode_submission(body: &Submission) -> Result<(Vec<Original>, String), ApiEr
         return Err(ApiError::BadRequest(
             "invalid import task identity or file count".into(),
         ));
+    }
+    if let Some(options) = &body.preparation {
+        if options.get("version").and_then(Value::as_u64) != Some(1)
+            || serde_json::to_vec(options)
+                .map_err(ApiError::internal)?
+                .len()
+                > 200_000
+        {
+            return Err(ApiError::BadRequest(
+                "invalid or oversized import preparation options".into(),
+            ));
+        }
     }
     let mut total = 0usize;
     let mut originals = Vec::with_capacity(body.files.len());
@@ -153,8 +175,12 @@ fn decode_submission(body: &Submission) -> Result<(Vec<Original>, String), ApiEr
     }
     // Hash decoded bytes, not interchangeable base64 spellings, and bind all
     // scope and file ordering fields to the immutable request identity.
-    let identity = json!({"companyId":body.company_id.to_string(),"conversationKey":body.conversation_key,
+    let mut identity = json!({"companyId":body.company_id.to_string(),"conversationKey":body.conversation_key,
         "files":originals.iter().map(|s|json!({"fileName":s.file_name,"sha256":s.sha256,"size":s.bytes.len()})).collect::<Vec<_>>()});
+    // Preserve old request hashes when no options were selected.
+    if let Some(options) = &body.preparation {
+        identity["preparation"] = options.clone();
+    }
     let hash = hex::encode(Sha256::digest(
         serde_json::to_vec(&identity).map_err(ApiError::internal)?,
     ));
@@ -173,7 +199,7 @@ async fn accept(
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
     let decision = decision_request(&body.request_id, 1, false, &Value::Null);
-    let inserted = tx.query_opt("INSERT INTO lumiere_platform.import_task (organization_id,company_id,actor_identity,request_id,conversation_key,request_sha256,decision_request) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING RETURNING request_id", &[&org,&company,&scope.actor,&body.request_id,&body.conversation_key,&hash,&decision]).await.map_err(ApiError::internal)?;
+    let inserted = tx.query_opt("INSERT INTO lumiere_platform.import_task (organization_id,company_id,actor_identity,request_id,conversation_key,request_sha256,decision_request,preparation_json) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING request_id", &[&org,&company,&scope.actor,&body.request_id,&body.conversation_key,&hash,&decision,&body.preparation]).await.map_err(ApiError::internal)?;
     if inserted.is_some() {
         for (ordinal, source) in originals.iter().enumerate() {
             let ordinal = ordinal as i32;
@@ -341,8 +367,11 @@ async fn run_preparation_script(
             "Import preparation is busy. The files are saved; retry the same submission.".into(),
         )
     })?;
-    let input =
-        serde_json::to_vec(&json!({"files":body.files,"mode":mode})).map_err(ApiError::internal)?;
+    let mut input = json!({"files":body.files,"mode":mode});
+    if let Some(options) = &body.preparation {
+        input["preparation"] = options.clone();
+    }
+    let input = serde_json::to_vec(&input).map_err(ApiError::internal)?;
     let mut child = tokio::process::Command::new("python3")
         .arg("-B")
         .arg("-I")
@@ -426,7 +455,14 @@ fn validate_preparation(
     originals: &[Original],
     mode: ProcessingMode,
 ) -> Result<(), ApiError> {
-    if prepared.datasets.is_empty()
+    validate_preparation_manifest(prepared, originals)?;
+    let held_only = prepared.coverage.as_ref().is_some_and(|coverage| {
+        coverage["complete"] == false
+            && coverage["files"].as_array().is_some_and(|files| {
+                !files.is_empty() && files.iter().all(|file| file["status"] == "held")
+            })
+    });
+    if (prepared.datasets.is_empty() && !held_only)
         || prepared.datasets.len() > 100
         || prepared.warnings.len() > 100
         || prepared.warnings.iter().any(|s| s.len() > 1000)
@@ -481,8 +517,14 @@ async fn finish(
     }
     if task.get::<_, String>("state") == "saved" {
         for dataset in &prepared.datasets {
+            // Same-task retries reuse the immutable review; a new preparation
+            // gets fresh confirmations even when its source bytes and rules
+            // are identical. Prior business effects remain guarded separately.
             let hash = hex::encode(Sha256::digest(
-                serde_json::to_vec(dataset).map_err(ApiError::internal)?,
+                serde_json::to_vec(
+                    &json!({"version":1,"actor":scope.actor,"requestId":request,"dataset":dataset}),
+                )
+                .map_err(ApiError::internal)?,
             ));
             let inserted = tx.query_opt("INSERT INTO lumiere_platform.import_review_batch (organization_id,company_id,title,target_entity,source_file,source_sha256,created_by) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7) ON CONFLICT (organization_id,company_id,source_sha256) DO NOTHING RETURNING id", &[&org,&company,&dataset.title,&dataset.target_entity,&dataset.source_file,&hash,&scope.actor]).await.map_err(ApiError::internal)?;
             let batch: i64 = if let Some(row) = inserted {
@@ -505,12 +547,12 @@ async fn finish(
         } else {
             "needs_review"
         };
-        tx.execute("UPDATE lumiere_platform.import_task SET state=$6,warnings=$5 WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request,&warnings,&ready]).await.map_err(ApiError::internal)?;
+        tx.execute("UPDATE lumiere_platform.import_task SET state=$6,warnings=$5,coverage_json=$7,preparation_receipt_json=$8 WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request,&warnings,&ready,&prepared.coverage,&prepared.preparation_receipt]).await.map_err(ApiError::internal)?;
     }
     tx.commit().await.map_err(ApiError::internal)
 }
 
-async fn read_task(
+pub(super) async fn read_task(
     pool: &deadpool_postgres::Pool,
     scope: StorageScope<'_>,
     request: &str,
@@ -527,7 +569,7 @@ async fn read_task(
         .map_err(ApiError::internal)?;
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
-    let task = tx.query_opt("SELECT request_id,company_id::text,conversation_key,state,warnings,error,created_at::text,decision_request FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?
+    let task = tx.query_opt("SELECT request_id,company_id::text,conversation_key,state,warnings,error,created_at::text,decision_request,preparation_json,coverage_json,preparation_receipt_json FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?
         .ok_or_else(||ApiError::NotFound("import task not found".into()))?;
     let sources = tx
         .query(
@@ -595,7 +637,7 @@ async fn read_task(
         })
         .collect::<Vec<_>>();
     Ok(
-        json!({"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":files,"reviews":reviews.iter().map(|r|json!({"id":r.get::<_,String>("id"),"title":r.get::<_,String>("title"),"targetEntity":r.get::<_,String>("target_entity"),"total":r.get::<_,i32>("total"),"pending":r.get::<_,i32>("pending"),"confirmed":r.get::<_,i32>("confirmed"),"excluded":r.get::<_,i32>("excluded")})).collect::<Vec<_>>()}),
+        json!({"organizationId":scope.organization.to_string(),"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"preparation":task.get::<_,Option<Value>>("preparation_json"),"coverage":task.get::<_,Option<Value>>("coverage_json"),"preparationReceipt":task.get::<_,Option<Value>>("preparation_receipt_json"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":files,"reviews":reviews.iter().map(|r|json!({"id":r.get::<_,String>("id"),"title":r.get::<_,String>("title"),"targetEntity":r.get::<_,String>("target_entity"),"total":r.get::<_,i32>("total"),"pending":r.get::<_,i32>("pending"),"confirmed":r.get::<_,i32>("confirmed"),"excluded":r.get::<_,i32>("excluded")})).collect::<Vec<_>>()}),
     )
 }
 
@@ -702,8 +744,141 @@ async fn resume_task(
                 content_base64: STANDARD.encode(&s.bytes),
             })
             .collect(),
+        preparation: task
+            .get("preparation")
+            .filter(|value| !value.is_null())
+            .cloned(),
     };
     prepare_saved(&pool, scoped, &body, &originals).await
+}
+
+/// Apply explicitly selected saved preparation rules to immutable task files.
+/// The new task keeps the original task and every prior review unchanged.
+pub(super) async fn create_prepared_task_from_saved_sources(
+    pool: &deadpool_postgres::Pool,
+    scoped: StorageScope<'_>,
+    source_request: &str,
+    request: &str,
+    source_ordinals: &[i32],
+    preparation: Value,
+) -> Result<Value, ApiError> {
+    if !valid_request_id(source_request)
+        || !valid_request_id(request)
+        || source_request == request
+        || source_ordinals.is_empty()
+        || source_ordinals.len() > 20
+        || source_ordinals
+            .iter()
+            .any(|ordinal| !(0..20).contains(ordinal))
+        || source_ordinals
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != source_ordinals.len()
+    {
+        return Err(ApiError::BadRequest(
+            "choose unique saved files and a new preparation request identity".into(),
+        ));
+    }
+    let source_task = read_task(pool, scoped, source_request).await?;
+    let client = pool.get().await.map_err(ApiError::internal)?;
+    let saved = client.query("SELECT ordinal,file_name,original_bytes FROM lumiere_platform.import_task_source WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND ordinal=ANY($5::int[])", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&source_request,&source_ordinals]).await.map_err(ApiError::internal)?;
+    if saved.len() != source_ordinals.len() {
+        return Err(ApiError::NotFound(
+            "selected original import file not found".into(),
+        ));
+    }
+    let files = source_ordinals
+        .iter()
+        .map(|ordinal| {
+            let row = saved
+                .iter()
+                .find(|row| row.get::<_, i32>("ordinal") == *ordinal)
+                .ok_or_else(|| {
+                    ApiError::NotFound("selected original import file not found".into())
+                })?;
+            Ok(SourceFile {
+                file_name: row.get("file_name"),
+                content_base64: STANDARD.encode(row.get::<_, Vec<u8>>("original_bytes")),
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+    drop(client);
+    let body = Submission {
+        company_id: scoped.company,
+        request_id: request.into(),
+        conversation_key: source_task["conversationKey"]
+            .as_str()
+            .ok_or_else(|| ApiError::Internal("saved task conversation is missing".into()))?
+            .into(),
+        files,
+        preparation: Some(preparation),
+    };
+    let (originals, hash) = decode_submission(&body)?;
+    accept(pool, scoped, &body, &originals, &hash).await?;
+    let decision_id = hex::encode(Sha256::digest(format!(
+        "import-recipe-prepare/v1\0{request}"
+    )))[..32]
+        .to_owned();
+    save_decision(
+        pool,
+        scoped,
+        request,
+        &DecisionBody {
+            company_id: scoped.company,
+            decision_id,
+            expected_revision: 1,
+            option_id: "prepare_import".into(),
+            other_text: None,
+        },
+    )
+    .await?;
+    Ok(resume_task(pool, scoped, request).await?.0)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ReprepareBody {
+    company_id: u64,
+    request_id: String,
+    preparation: Value,
+}
+
+async fn reprepare(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Path(request): Path<String>,
+    Json(body): Json<ReprepareBody>,
+) -> Result<Json<Value>, ApiError> {
+    let context = scope(&state, &session, body.company_id).await?;
+    let scoped = StorageScope {
+        organization: context.organization_id(),
+        company: body.company_id,
+        actor: context.actor_identity(),
+    };
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let task = read_task(&pool, scoped, &request).await?;
+    let ordinals = task["files"]
+        .as_array()
+        .ok_or_else(|| ApiError::Internal("saved task files are missing".into()))?
+        .iter()
+        .map(|file| {
+            file["ordinal"]
+                .as_i64()
+                .and_then(|value| i32::try_from(value).ok())
+                .ok_or_else(|| ApiError::Internal("saved file ordinal is invalid".into()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    create_prepared_task_from_saved_sources(
+        &pool,
+        scoped,
+        &request,
+        &body.request_id,
+        &ordinals,
+        body.preparation,
+    )
+    .await
+    .map(Json)
 }
 
 async fn decide(
@@ -773,15 +948,96 @@ async fn list(
         company: query.company_id,
         actor: context.actor_identity(),
     };
+    let after = task_cursor(&task_cursor_secret(&state), scoped, &query)?;
+    let after_time = after.as_ref().map(|value| value.created_at.as_str());
+    let after_request = after.as_ref().map(|value| value.request_id.as_str());
     let requests = {
         let client = pool.get().await.map_err(ApiError::internal)?;
-        client.query("SELECT request_id FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND ($4::text IS NULL OR conversation_key=$4) ORDER BY created_at DESC,request_id LIMIT 20", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&query.conversation_key]).await.map_err(ApiError::internal)?
+        client.query("SELECT request_id,created_at::text FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND ($4::text IS NULL OR conversation_key=$4) AND ($5::text IS NULL OR (created_at,request_id)<($5::text::timestamptz,$6)) ORDER BY created_at DESC,request_id DESC LIMIT 21", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&query.conversation_key,&after_time,&after_request]).await.map_err(ApiError::internal)?
     };
-    let mut tasks = Vec::with_capacity(requests.len());
-    for row in requests {
+    let next_cursor = if requests.len() > 20 {
+        requests
+            .get(19)
+            .map(|row| encode_task_cursor(&state, scoped, &query, row))
+            .transpose()?
+    } else {
+        None
+    };
+    let mut tasks = Vec::with_capacity(requests.len().min(20));
+    for row in requests.iter().take(20) {
         tasks.push(read_task(&pool, scoped, &row.get::<_, String>("request_id")).await?);
     }
-    Ok(Json(json!({"tasks":tasks})))
+    Ok(Json(json!({"tasks":tasks,"nextCursor":next_cursor})))
+}
+
+const TASK_CURSOR_AUDIENCE: &str = "lumiere-import-task-list/v1";
+
+#[derive(Serialize, Deserialize)]
+struct TaskCursor {
+    aud: String,
+    exp: u64,
+    organization: String,
+    company: String,
+    actor: String,
+    conversation: Option<String>,
+    created_at: String,
+    request_id: String,
+}
+
+fn task_cursor_secret(state: &AppState) -> Vec<u8> {
+    Sha256::digest(format!("{TASK_CURSOR_AUDIENCE}\0{}", state.stdb.token())).to_vec()
+}
+
+fn task_cursor(
+    secret: &[u8],
+    scope: StorageScope<'_>,
+    query: &TaskQuery,
+) -> Result<Option<TaskCursor>, ApiError> {
+    let Some(token) = query.cursor.as_deref() else {
+        return Ok(None);
+    };
+    if token.len() > 4096 {
+        return Err(ApiError::BadRequest("invalid import task cursor".into()));
+    }
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_audience(&[TASK_CURSOR_AUDIENCE]);
+    let cursor = decode::<TaskCursor>(token, &DecodingKey::from_secret(secret), &validation)
+        .map_err(|_| ApiError::BadRequest("invalid or expired import task cursor".into()))?
+        .claims;
+    if cursor.organization != scope.organization.to_string()
+        || cursor.company != scope.company.to_string()
+        || cursor.actor != scope.actor
+        || cursor.conversation != query.conversation_key
+        || !valid_request_id(&cursor.request_id)
+    {
+        return Err(ApiError::BadRequest(
+            "import task cursor belongs to another scope or filter".into(),
+        ));
+    }
+    Ok(Some(cursor))
+}
+
+fn encode_task_cursor(
+    state: &AppState,
+    scope: StorageScope<'_>,
+    query: &TaskQuery,
+    row: &tokio_postgres::Row,
+) -> Result<String, ApiError> {
+    encode(
+        &Header::new(Algorithm::HS256),
+        &TaskCursor {
+            aud: TASK_CURSOR_AUDIENCE.into(),
+            exp: (chrono::Utc::now().timestamp() + 3600) as u64,
+            organization: scope.organization.to_string(),
+            company: scope.company.to_string(),
+            actor: scope.actor.into(),
+            conversation: query.conversation_key.clone(),
+            created_at: row.get("created_at"),
+            request_id: row.get("request_id"),
+        },
+        &EncodingKey::from_secret(&task_cursor_secret(state)),
+    )
+    .map_err(ApiError::internal)
 }
 
 async fn download(
@@ -828,6 +1084,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route("/import-tasks/:request", get(read))
         .route("/import-tasks/:request/files/:ordinal", get(download))
         .route("/import-tasks/:request/resume", axum::routing::post(resume))
+        .route(
+            "/import-tasks/:request/reprepare",
+            axum::routing::post(reprepare),
+        )
         .route(
             "/import-tasks/:request/decision",
             axum::routing::post(decide),

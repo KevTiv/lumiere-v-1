@@ -5,7 +5,9 @@ import {
   chatImportScopeKey, listChatImportTasks, parseChatImportTask, readChatImportPointer,
   recoverChatImportPointer, submitChatImportFiles, submitChatImportDecision, recoverChatImportDecision,
   retryChatImportDecision, readChatImportDecisionPointer, type ChatImportScope, type ChatImportTask,
+  parseSavedImportTask, readSavedImportTask, listSavedImportTasks,
 } from "./chat-import-task"
+import type { ImportPreparation } from "./import-preparation"
 
 const scope: ChatImportScope = { identity: "actor", organizationId: 7, companyId: 3, conversationKey: "conversation" }
 const id = "a".repeat(32)
@@ -23,6 +25,63 @@ function task(overrides: Partial<ChatImportTask> = {}): ChatImportTask {
     decisionReceipt: null, decisionHistory: [], files: [{ ordinal: 0, ...source }], reviews: [], ...overrides }
 }
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status })
+
+test("saved tasks reopen outside their original conversation without crossing company scope", async () => {
+  const original = task({ conversationKey: "earlier-conversation" })
+  assert.equal(parseSavedImportTask(original, 3).conversationKey, "earlier-conversation")
+  assert.throws(() => parseChatImportTask(original, scope), /conversation/)
+  assert.throws(() => parseSavedImportTask(original, 4), /company/)
+  const saved = await readSavedImportTask(async () => json(original), 3, id)
+  assert.equal(saved?.requestId, id)
+  await assert.rejects(readSavedImportTask(async () => json(original), 4, id), /company/)
+})
+
+test("saved task pagination omits conversation and keeps the opaque cursor", async () => {
+  const page = await listSavedImportTasks(async url => {
+    const parsed = new URL(url, "https://app.example")
+    assert.equal(parsed.searchParams.get("companyId"), "3")
+    assert.equal(parsed.searchParams.has("conversationKey"), false)
+    assert.equal(parsed.searchParams.get("cursor"), "opaque+/=")
+    return json({ tasks: [task({ conversationKey: "earlier" })], nextCursor: "next-cursor" })
+  }, 3, "opaque+/=")
+  assert.equal(page.nextCursor, "next-cursor")
+  assert.equal(page.tasks[0]?.conversationKey, "earlier")
+})
+
+test("preparation options bind exact upload recovery and cannot change an uncertain request", async () => {
+  const preparation: ImportPreparation = { version: 1, files: [{ fileName: source.fileName, sourceSha256: source.sha256, decimalSeparator: ",", groupingSeparator: "." }] }
+  const retained = storage()
+  let firstBody = ""
+  const args = { files: [file()], scope, storage: retained, isCurrent: () => true, preparation, createRequestId: () => id }
+  await assert.rejects(submitChatImportFiles({ ...args, fetcher: async (_, init) => {
+    if (init?.method === "POST") { firstBody = String(init.body); throw new Error("lost after acceptance") }
+    return new Response(null, { status: 404 })
+  } }), /uncertain/)
+  assert.match(readChatImportPointer(retained, scope)?.preparationSha256 ?? "", /^[a-f0-9]{64}$/)
+  for (const changed of [undefined, { version: 1 as const, files: [] }]) {
+    await assert.rejects(submitChatImportFiles({ ...args, preparation: changed, fetcher: async () => { throw new Error("must not dispatch changed options") } }), /same rules/)
+  }
+  const restored = await submitChatImportFiles({ ...args, createRequestId: () => { throw new Error("must reuse the exact request") }, fetcher: async (_, init) => {
+    assert.equal(String(init?.body), firstBody)
+    return json(task({ preparation }))
+  } })
+  assert.deepEqual(restored.preparation, preparation)
+  assert.equal(retained.values.size, 0)
+})
+
+test("distinct preparation starts a different request and wrong option readback retains its receipt", async () => {
+  const preparation: ImportPreparation = { version: 1, files: [] }
+  const retained = storage()
+  await assert.rejects(submitChatImportFiles({ files: [file()], scope, storage: retained, isCurrent: () => true, preparation, knownTasks: [task()], createRequestId: () => "b".repeat(32),
+    fetcher: async (url, init) => {
+      assert.equal(init?.method, "POST")
+      assert.equal(url, "/api/import-tasks")
+      const changed = task({ requestId: "b".repeat(32) })
+      changed.decision.id = changed.requestId + ":purpose"
+      return json(changed)
+    } }), /does not match/)
+  assert.equal(readChatImportPointer(retained, scope)?.requestId, "b".repeat(32))
+})
 
 test("file-only submission saves one immutable request and clears only its verified receipt", async () => {
   const saved = storage()

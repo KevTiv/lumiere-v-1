@@ -61,6 +61,12 @@ export interface AiGuideReference {
   revision: number
 }
 
+/** Saved import identities only; status and result authority are read by the server. */
+export interface AiImportTaskReference {
+  taskId: string
+  companyId: string
+}
+
 /** Authorized saved-document references, distinct from evidence for live ERP facts. */
 export interface AiRelatedGuide extends AiGuideReference {
   title: string
@@ -292,6 +298,7 @@ export function useAiMemoryRag() {
       limit?: number
       ui_context?: AiUiContext
       guide_refs?: AiGuideReference[]
+      import_task_refs?: AiImportTaskReference[]
     }) => {
       const r = await apiFetch("/api/ai/rag", {
         method: "POST",
@@ -303,6 +310,7 @@ export function useAiMemoryRag() {
           ...(args.limit != null ? { limit: args.limit } : {}),
           ...(args.ui_context ? { ui_context: args.ui_context } : {}),
           ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
+          ...(args.import_task_refs?.length ? { import_task_refs: args.import_task_refs } : {}),
         }),
       })
       if (!r.ok) throw await httpResponseError(r)

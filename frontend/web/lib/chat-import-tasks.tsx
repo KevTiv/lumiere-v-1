@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/
 import { apiFetch } from "./api-fetch"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
-import { ImportReviewWorkspace } from "./import-review-workspace"
+import type { ImportTaskView } from "./import-task-navigation"
 import {
   chatImportScopeKey, listChatImportTasks, parseChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
   retryChatImportDecision, submitChatImportDecision, submitChatImportFiles,
@@ -43,7 +43,8 @@ export function useChatImportTasks(args: {
     decisionPointers: Record<string, ChatImportDecisionPointer>;
     available: boolean; busy: boolean; error: string | null;
   }>({ key: null, epoch, tasks: [], pointer: null, decisionPointers: {}, available: false, busy: false, error: null })
-  const [review, setReview] = useState<{ key: string; epoch: number; id: string; inspectionOnly: boolean } | null>(null)
+  const [review, setReview] = useState<{ key: string; epoch: number; taskId: string; id?: string; view: ImportTaskView; inspectionOnly: boolean } | null>(null)
+  const [focus, setFocus] = useState<{ key: string; epoch: number; taskId: string; task?: ChatImportTask } | null>(null)
   const isCurrent = useCallback(() => mounted.current && currentScope.current.key === key && currentScope.current.epoch === epoch, [key, epoch])
 
   useEffect(() => {
@@ -92,7 +93,10 @@ export function useChatImportTasks(args: {
     setState(previous => ({ ...previous, busy: true, error: null }))
     try {
       const task = await submitChatImportFiles({ files, scope, storage: window.localStorage, fetcher: apiFetch, isCurrent: current, knownTasks: state.key === key && state.epoch === epoch ? state.tasks : [] })
-      if (current()) setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, task), pointer: null }))
+      if (current()) {
+        setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, task), pointer: null }))
+        setFocus({ key: key!, epoch, taskId: task.requestId })
+      }
     } catch (error) {
       if (current()) {
         // Reauthorize saved cards after any uncertain read instead of retaining possibly revoked data.
@@ -167,6 +171,21 @@ export function useChatImportTasks(args: {
 
   const visible = state.key === key && state.epoch === epoch && scope ? state : null
   const selectedReview = review?.key === key && review.epoch === epoch ? review : null
+  const focusTask = useCallback((task: ChatImportTask) => {
+    if (!key || !scope || !isCurrent() || task.companyId !== String(scope.companyId)) return
+    setFocus(previous => previous?.key === key && previous.epoch === epoch && previous.task === task
+      ? previous : { key, epoch, taskId: task.requestId, task })
+  }, [key, scope, isCurrent, epoch])
+  const focusedTask = visible?.available
+    ? focus?.key === key && focus.epoch === epoch
+      ? focus.task ?? visible.tasks.find(task => task.requestId === focus.taskId)
+      : visible.tasks.length === 1 ? visible.tasks[0] : undefined
+    : undefined
+  const openTask = (task: ChatImportTask, view: ImportTaskView, id?: string) => {
+    if (!key || !visible?.available) return
+    focusTask(task)
+    setReview({ key, epoch, taskId: task.requestId, id, view, inspectionOnly: task.decision.selectedOptionId === "inspect_only" })
+  }
   const content = scope && visible ? <div className="space-y-3" data-testid="chat-import-tasks">
     {visible.available ? <ChatReconciliationPreview key={key} organizationId={scope.organizationId} companyId={scope.companyId} /> : null}
     {visible.busy ? <p role="status" className="text-sm">{t("aiChat.import.savingTask", { defaultValue: "Saving files or checking the selected action…" })}</p> : null}
@@ -218,18 +237,20 @@ export function useChatImportTasks(args: {
         onSubmit={answer => answerTask(task, answer)}
       /> : null}
       {task.status === "saved" ? <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => void resume(task)}>{task.decision.selectedOptionId === "inspect_only" ? t("aiChat.import.resumeInspection", { defaultValue: "Resume inspection" }) : t("aiChat.import.resume", { defaultValue: "Resume preparation" })}</Button> : null}
+      <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openTask(task, "sources")}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</Button>
+      {focusedTask?.requestId === task.requestId
+        ? <p className="text-xs text-muted-foreground">{t("settings.importTask.chatFocus", { defaultValue: "Using this saved task for your next chat question." })}</p>
+        : <Button type="button" variant="ghost" size="sm" disabled={visible.busy} onClick={() => focusTask(task)}>{t("settings.importTask.askAboutTask", { defaultValue: "Ask about this task" })}</Button>}
       {task.reviews.map(batch => <div key={batch.id} className="space-y-1">
         <p>{t("aiChat.import.counts", { defaultValue: "{{total}} source rows · {{pending}} unresolved · {{confirmed}} confirmed · {{excluded}} excluded", ...batch })}</p>
-        <Button type="button" variant="outline" size="sm" onClick={() => setReview({ key: key!, epoch, id: batch.id, inspectionOnly: task.status === "inspection_ready" })}>{task.status === "inspection_ready" ? t("aiChat.import.viewInspection", { defaultValue: "View inspection {{title}}", title: batch.title }) : t("aiChat.import.review", { defaultValue: "Review {{title}}", title: batch.title })}</Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => openTask(task, "decisions", batch.id)}>{task.status === "inspection_ready" ? t("aiChat.import.viewInspection", { defaultValue: "View inspection {{title}}", title: batch.title }) : t("aiChat.import.review", { defaultValue: "Review {{title}}", title: batch.title })}</Button>
       </div>)}
     </article>)}
     {selectedReview ? <Dialog open onOpenChange={open => { if (!open) { setReview(null); void reload() } }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
         <DialogTitle>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionTitle", { defaultValue: "Inspect saved source files" }) : t("aiChat.import.reviewTitle", { defaultValue: "Review source and prepare import" })}</DialogTitle>
         <DialogDescription>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionDescription", { defaultValue: "Review the source evidence. This action does not prepare business records." }) : t("aiChat.import.reviewDescription", { defaultValue: "Resolve uncertain values, then use the import preview to confirm the records to create." })}</DialogDescription>
-        {selectedReview.inspectionOnly
-          ? <ImportReviewWorkspace organizationId={scope.organizationId} selectedId={selectedReview.id} allowImport={false} onContinue={() => undefined} />
-          : <DataImportWorkspace organizationId={scope.organizationId} initialReviewId={selectedReview.id} />}
+        <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} inspectionOnly={selectedReview.inspectionOnly} syncUrl={false} onTaskFocus={focusTask} />
       </DialogContent>
     </Dialog> : null}
   </div> : null
@@ -237,6 +258,7 @@ export function useChatImportTasks(args: {
   return {
     onImportFiles: visible?.available ? importFiles : undefined,
     fileNames: visible?.tasks.flatMap(task => task.files.map(file => file.fileName)),
+    focusedTask,
     content,
   }
 }

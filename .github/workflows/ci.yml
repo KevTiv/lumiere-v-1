@@ -207,6 +207,12 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import_inspection::
           python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway skills::import::
 
+      - name: Saved import chat context and authority freshness
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::rag::import_tasks::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::rag::tests::import_authority_changes_before_or_during_provenance_withhold_the_answer
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::rag::tests::import_task_references_do_not_bypass_generated_claim_review
+
       - name: Managed document storage and scoped byte access
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib document_blob
@@ -506,6 +512,9 @@ jobs:
 
       - name: Chat file import and recovery browser regressions
         run: pnpm --dir web test:e2e:chat-import
+
+      - name: Import preview, approval and result recovery browser regressions
+        run: pnpm --dir web test:e2e:import-workflow
 
       - name: Sales workflow browser regressions
         id: sales_workflow_ui

@@ -790,6 +790,11 @@
             "required": false
           },
           {
+            "name": "import_task_refs",
+            "rustType": "Vec<ImportTaskReference>",
+            "required": false
+          },
+          {
             "name": "ui_action_offers",
             "rustType": "Vec<UiActionOffer>",
             "required": false

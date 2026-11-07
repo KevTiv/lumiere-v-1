@@ -624,6 +624,17 @@ async fn import_entity_post(
         return Err(ApiError::Unauthorized);
     }
 
+    submit_import(&state, &session, &entity, body)
+        .await
+        .map(Json)
+}
+
+async fn submit_import(
+    state: &AppState,
+    session: &crate::session::ApiSession,
+    entity: &str,
+    body: ImportBody,
+) -> Result<Value, ApiError> {
     let org_id = session
         .organization_id
         .ok_or_else(|| ApiError::Forbidden("No organization assigned".into()))?;
@@ -676,6 +687,7 @@ async fn import_entity_post(
             company_id,
             spec.job_table,
             request_id,
+            body.file_name.as_deref(),
             &inspected,
         )
         .await?;
@@ -710,7 +722,7 @@ async fn import_entity_post(
         )
         .await?;
         response["inspection"] = inspection;
-        return Ok(Json(response));
+        return Ok(response);
     }
 
     let args = match spec.shape {
@@ -736,9 +748,64 @@ async fn import_entity_post(
     dispatch_session_reducer(&state, &session, spec.reducer, args).await?;
     // A legacy import has no receipt token: returning another concurrent job's
     // ID or row counts would falsely attribute its outcome to this request.
-    Ok(Json(
-        json!({ "ok": true, "entity": spec.table_name, "inspection": inspection }),
-    ))
+    Ok(json!({ "ok": true, "entity": spec.table_name, "inspection": inspection }))
+}
+
+/// Submit a server-prepared operation through the same admission, scope,
+/// generated-contract and native-owner checks as an interactive CSV import.
+pub(crate) async fn submit_workflow_import(
+    state: &AppState,
+    session: &crate::session::ApiSession,
+    request: &WorkflowImportRequest,
+) -> Result<Value, ApiError> {
+    submit_import(
+        state,
+        session,
+        &request.entity,
+        ImportBody {
+            csv: request.csv.clone(),
+            request_id: Some(request.request_id.clone()),
+            file_name: Some(request.file_name.clone()),
+            source_admission_id: None,
+            params: Some(ImportParams {
+                company_id: Some(request.company_id),
+                currency_id: None,
+            }),
+        },
+    )
+    .await
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct WorkflowImportRequest {
+    pub entity: String,
+    pub company_id: u64,
+    pub request_id: String,
+    pub file_name: String,
+    pub csv: String,
+}
+
+/// Resolve an exact caller-owned receipt. An absent response is never treated
+/// as proof that the underlying import failed or did not execute.
+pub(crate) async fn read_workflow_import(
+    context: &TrustedOperationContext,
+    request: &WorkflowImportRequest,
+    content_sha256: &str,
+) -> Result<Value, ApiError> {
+    validate_request_id(&request.request_id)?;
+    let spec = resolve_import_entity(&request.entity)
+        .ok_or_else(|| ApiError::NotFound("Import request not found".into()))?;
+    authorize_reducer_company_scope(context, vec![request.company_id]).await?;
+    validate_currency(spec, None)?;
+    read_exact_outcome(
+        context,
+        spec,
+        &request.request_id,
+        request.company_id,
+        None,
+        Some(content_sha256),
+    )
+    .await
 }
 
 fn validate_request_id(request_id: &str) -> Result<(), ApiError> {

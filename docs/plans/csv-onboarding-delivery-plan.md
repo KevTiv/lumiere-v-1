@@ -1,7 +1,10 @@
 # CSV onboarding delivery plan
 
-**Status** Proposed. This plan covers CSV intake through verified records in the
-normal ERP modules. It builds on the
+**Status** In implementation. The saved-task, preparation recipe, and historical
+expense journal delivery is described in the
+[implementation and acceptance notes](./import-backfill-implementation.md).
+This plan covers CSV intake through verified records in the normal ERP modules.
+It builds on the
 [agent sandbox import plan](./agent-sandbox-import-onboarding-plan.md).
 
 ## Scope
@@ -130,9 +133,9 @@ separate actions. Posting follows the owning module's approval flow.
 
 | Area | First delivery | Remaining release work |
 | --- | --- | --- |
-| File intake | Guided delimiter selection, bounded parsing and source diagnostics. Saved tasks preserve the original files, hold malformed files, and count review, blank, and header records. | Add operator-defined section boundaries, side-by-side layouts, full-file coverage exports, and resumable processing above current limits. |
-| Data preparation | Recognized sequential tables get separate review batches. Ambiguous values and layouts remain evidence. | Add explicit locale rules, approved joins and unpivot operations, and reconciliation of control totals across files. |
-| Decisions and reuse | Source review separates evidence from eligible import previews. Guided templates saved with their layout trigger a fresh mapping review after column changes. | Add a decision for competing source versions and versioned recipes that include approved transforms and target rules. |
-| Duplicate and revision checks | Same-byte files within a selection stay in evidence review. Saved tasks show earlier same-byte and same-name matches in the same company and actor scope. | Reconcile row identity, report overlap, and native receipts across changed exports and multiple authorized operators. |
-| Native Accounting | Journal bundle execution uses native receipts and company-scoped readback for headers and lines. | Bind a confirmed expense source group to a typed Accounting proposal and prove the farm electricity replay in an isolated company. |
-| Other destinations | Product, contact, and location continue through their existing native import preview. | Register, validate, and verify the remaining destination operations separately. |
+| File intake | Saved tasks preserve original files and source coverage. Operators can choose explicit section boundaries, side-by-side columns, and header rows. | Add downloadable coverage exports, broader workbook support, and resumable processing above current limits. |
+| Data preparation | Explicit locale rules, bounded text transforms, stable source identities, and versioned preparation receipts preserve ambiguous values as evidence. | Add approved joins, unpivot operations, and reconciliation of control totals across files. |
+| Decisions and reuse | Immutable recipe versions pin source layout. Repreparing or applying a recipe creates fresh review groups without copying confirmations or ERP approvals. | Add broader competing-version decisions and destination-specific transformation rules. |
+| Duplicate and revision checks | Approved source claims prevent repeated effects. Company-wide period/amount comparisons and explicit candidate-bound distinct-expense decisions hold stale or ambiguous overlaps. | Add target-specific reconciliation and correction/supersession for the remaining native destinations. |
+| Native Accounting | Confirmed expense facts produce immutable previews, exact approvals, recoverable header/line requests, and company-scoped native readback. | Prove the farm electricity replay and interruption recovery in an isolated company against the live native ERP. |
+| Other destinations | Product, contact, and location retain their existing native preview with receipts linked to the saved task. A server catalog explains evidence-only destinations. | Register, validate, and verify the remaining destination operations separately. |
