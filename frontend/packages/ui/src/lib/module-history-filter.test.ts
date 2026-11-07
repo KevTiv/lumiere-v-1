@@ -4,6 +4,7 @@ import {
   configuredModuleHistoryField,
   filterModuleHistoryRows,
   getModuleHistoryField,
+  moduleHistoryDateValue,
   moduleHistoryTimestampMs,
   removeModuleHistoryFilter,
   resolveModuleHistoryFilter,
@@ -35,6 +36,34 @@ describe("module history drilldown", () => {
     }
     expect(configuredModuleHistoryField("contacts", "contacts", [{ key: "name", type: "text" }])).toBeNull()
     expect(configuredModuleHistoryField("sales", "orders", [{ key: "dateDue", type: "date" }])?.dateField).toBe("dateOrder")
+  })
+
+  it("accepts typed rows without requiring an index signature or overview date fields", () => {
+    interface BusinessDatedRow { id: string; businessDate?: string; business_date?: string }
+    const rows: BusinessDatedRow[] = [
+      { id: "canonical", businessDate: "1990-06-01" },
+      { id: "alias", business_date: "1990-06-02" },
+      { id: "recent", businessDate: "2026-06-01" },
+    ]
+    const field = configuredModuleHistoryField("accounting", "entries", [{ key: "businessDate", type: "date" }])
+    const filter = resolveModuleHistoryFilter("accounting", "entries", "custom:1990-01-01:1990-12-31", { field })
+    expect(moduleHistoryDateValue(rows[0], "businessDate")).toBe("1990-06-01")
+    expect(filterModuleHistoryRows(rows, filter).map((row) => row.id)).toEqual(["canonical", "alias"])
+  })
+
+  it("preserves explicit canonical values and reads only own date properties", () => {
+    for (const [key, alias] of [
+      ["dateOrder", "date_order"], ["createdAt", "created_at"],
+      ["createDate", "create_date"], ["businessDate", "business_date"],
+    ]) {
+      for (const value of [null, undefined, "2024-03-09"]) {
+        expect(moduleHistoryDateValue({ [key]: value, [alias]: "2024-03-10" }, key)).toBe(value)
+      }
+      const inherited: object = Object.create({ [key]: "2024-03-09", [alias]: "2024-03-10" })
+      expect(moduleHistoryDateValue(inherited, key)).toBeUndefined()
+      Object.defineProperty(inherited, alias, { value: "2024-03-11" })
+      expect(moduleHistoryDateValue(inherited, key)).toBe("2024-03-11")
+    }
   })
 
   it("keeps source date-only values and real instants aligned to the selected zone across DST", () => {

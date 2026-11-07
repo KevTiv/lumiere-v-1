@@ -21,23 +21,14 @@ export const MODULE_HISTORY_FIELDS = {
 export type ModuleHistoryModule = keyof typeof MODULE_HISTORY_FIELDS
 export interface ModuleHistoryField { tabId: string; dateField: string }
 
-/** Known overview fields plus business dates declared by entity configuration. */
-export interface HistoryDatedRecord {
-  [key: string]: unknown
-  dateOrder?: unknown
-  date_order?: unknown
-  createdAt?: unknown
-  created_at?: unknown
-  createDate?: unknown
-  create_date?: unknown
-}
-
-const historyDateAliases = { dateOrder: "date_order", createdAt: "created_at", createDate: "create_date" } as const
-
-/** Preserve an explicitly unknown canonical date instead of falling back to a second field. */
-export function moduleHistoryDateValue(row: HistoryDatedRecord, key: ModuleHistoryField["dateField"]): unknown {
-  const alias = historyDateAliases[key as keyof typeof historyDateAliases] ?? key.replace(/[A-Z]/g, (letter) => "_" + letter.toLowerCase())
-  return Object.hasOwn(row, key) ? (row as Record<string, unknown>)[key] : Object.hasOwn(row, alias) ? (row as Record<string, unknown>)[alias] : undefined
+/**
+ * Read only the configured own field; timestamp decoding validates its unknown value.
+ * Preserve an explicitly unknown canonical date instead of falling back to a second field.
+ */
+export function moduleHistoryDateValue(row: object, key: ModuleHistoryField["dateField"]): unknown {
+  if (Object.hasOwn(row, key)) return Reflect.get(row, key)
+  const alias = key.replace(/[A-Z]/g, (letter) => "_" + letter.toLowerCase())
+  return Object.hasOwn(row, alias) ? Reflect.get(row, alias) : undefined
 }
 
 interface HistoryMicrosTimestamp {
@@ -147,7 +138,7 @@ export function resolveModuleHistoryFilter(
 }
 
 /** Invalid links fail closed. An inactive filter preserves the original rows/reference. */
-export function filterModuleHistoryRows<T extends HistoryDatedRecord>(rows: T[], filter: ModuleHistoryFilter): T[] {
+export function filterModuleHistoryRows<T extends object>(rows: T[], filter: ModuleHistoryFilter): T[] {
   if (filter.status === "inactive") return rows
   if (filter.status === "invalid") return []
   return rows.filter((row) => isHistoryTimestampInRange(
