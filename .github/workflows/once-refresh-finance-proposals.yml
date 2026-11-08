@@ -1,0 +1,32 @@
+name: One-time finance proposal binding refresh
+on:
+  push:
+    branches:
+      - codex/documents-viewer-recovery
+    paths:
+      - .github/workflows/once-refresh-finance-proposals.yml
+permissions:
+  contents: write
+jobs:
+  regenerate:
+    if: github.repository == 'KevTiv/lumiere-v-1' && github.ref == 'refs/heads/codex/documents-viewer-recovery'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Rebuild proposed finance skill bindings
+        run: |
+          python3 -B scripts/finance-skill-manifests.py --write
+          python3 -B scripts/finance-skill-manifests.py --check
+          git diff --check
+      - name: Commit reviewed generated proposals (never activate)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- infra/skill-releases/finance/ infra/railway/pilots/report-analysis-certification-manifest.proposed.json spacetimedb/src/seed.rs
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(evidence): align proposed finance bindings with document changes"
+            git push origin HEAD:refs/heads/codex/documents-viewer-recovery
+          fi
