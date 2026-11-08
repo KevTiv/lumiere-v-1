@@ -10,6 +10,15 @@ import { useRBAC } from "@/lib/rbac-context"
 import { isSettingsSectionVisibleForProfile, settingsSections } from "@/lib/rbac-defaults"
 import { Badge } from "@/components/ui/badge"
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   User,
   Bell,
   Palette,
@@ -216,18 +225,27 @@ export function SettingsModule({
             <label htmlFor={sectionId} className="text-sm font-medium">
               {t("settings.selectSection", { defaultValue: "Settings section" })}
             </label>
-            <select
-              id={sectionId}
-              className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              value={active.id}
-              onChange={(event) => selectSection(event.target.value)}
-            >
-              {groups.map((group) => (
-                <optgroup key={group.id} label={t(`settings.groups.${group.id}`, { defaultValue: group.title })}>
-                  {group.sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
-                </optgroup>
-              ))}
-            </select>
+            <Select value={active.id} onValueChange={selectSection}>
+              <SelectTrigger id={sectionId} className="h-10 rounded-md">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((group) => (
+                  <SelectGroup key={group.id}>
+                    <SelectLabel>
+                      {t(`settings.groups.${group.id}`, {
+                        defaultValue: group.title,
+                      })}
+                    </SelectLabel>
+                    {group.sections.map((section) => (
+                      <SelectItem key={section.id} value={section.id}>
+                        {section.title}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
         {isAdmin() && (

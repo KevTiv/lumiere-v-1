@@ -4399,14 +4399,14 @@ export const SUBSCRIPTION_DESCRIPTORS = {
     "resource": "documents",
     "source": {
       "table": "document",
-      "readModel": "Document"
+      "readModel": "bff-authorized:document"
     },
     "scope": "organization+company",
-    "deliveryMode": "invalidation-only",
-    "realtime": true,
+    "deliveryMode": "bff-only",
+    "realtime": false,
     "directRowExposure": false,
     "fieldSensitivity": "field-policy",
-    "predicateClass": "none",
+    "predicateClass": "authorization-sensitive",
     "expectedCardinality": "broad",
     "latencyClass": "interactive",
     "updateFanout": "medium",
@@ -4415,7 +4415,7 @@ export const SUBSCRIPTION_DESCRIPTORS = {
     "accessPath": {
       "status": "pending",
       "key": null,
-      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+      "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
     }
   },
   "documents-deleted": {
@@ -4425,11 +4425,11 @@ export const SUBSCRIPTION_DESCRIPTORS = {
       "readModel": "bff-authorized:document"
     },
     "scope": "organization+company",
-    "deliveryMode": "invalidation-only",
-    "realtime": true,
+    "deliveryMode": "bff-only",
+    "realtime": false,
     "directRowExposure": false,
     "fieldSensitivity": "field-policy",
-    "predicateClass": "none",
+    "predicateClass": "authorization-sensitive",
     "expectedCardinality": "broad",
     "latencyClass": "interactive",
     "updateFanout": "medium",
@@ -4438,21 +4438,21 @@ export const SUBSCRIPTION_DESCRIPTORS = {
     "accessPath": {
       "status": "pending",
       "key": null,
-      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+      "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
     }
   },
   "document-folders": {
     "resource": "document-folders",
     "source": {
       "table": "doc_folder",
-      "readModel": "DocumentFolder"
+      "readModel": "bff-authorized:doc_folder"
     },
     "scope": "organization+company",
-    "deliveryMode": "invalidation-only",
-    "realtime": true,
+    "deliveryMode": "bff-only",
+    "realtime": false,
     "directRowExposure": false,
     "fieldSensitivity": "field-policy",
-    "predicateClass": "none",
+    "predicateClass": "authorization-sensitive",
     "expectedCardinality": "broad",
     "latencyClass": "interactive",
     "updateFanout": "medium",
@@ -4461,7 +4461,30 @@ export const SUBSCRIPTION_DESCRIPTORS = {
     "accessPath": {
       "status": "pending",
       "key": null,
-      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+      "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
+    }
+  },
+  "document-folders-deleted": {
+    "resource": "document-folders-deleted",
+    "source": {
+      "table": "doc_folder",
+      "readModel": "bff-authorized:doc_folder"
+    },
+    "scope": "organization+company",
+    "deliveryMode": "bff-only",
+    "realtime": false,
+    "directRowExposure": false,
+    "fieldSensitivity": "field-policy",
+    "predicateClass": "authorization-sensitive",
+    "expectedCardinality": "broad",
+    "latencyClass": "interactive",
+    "updateFanout": "medium",
+    "sourceClass": "canonical-table",
+    "reconnectClass": "on-demand",
+    "accessPath": {
+      "status": "pending",
+      "key": null,
+      "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
     }
   },
   "document-versions": {
@@ -4470,12 +4493,12 @@ export const SUBSCRIPTION_DESCRIPTORS = {
       "table": "document_version",
       "readModel": "bff-authorized:document_version"
     },
-    "scope": "organization",
-    "deliveryMode": "invalidation-only",
-    "realtime": true,
+    "scope": "organization+company",
+    "deliveryMode": "bff-only",
+    "realtime": false,
     "directRowExposure": false,
     "fieldSensitivity": "field-policy",
-    "predicateClass": "none",
+    "predicateClass": "authorization-sensitive",
     "expectedCardinality": "broad",
     "latencyClass": "interactive",
     "updateFanout": "medium",
@@ -4484,7 +4507,7 @@ export const SUBSCRIPTION_DESCRIPTORS = {
     "accessPath": {
       "status": "pending",
       "key": null,
-      "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+      "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
     }
   },
   "document-external-refs": {
@@ -6616,6 +6639,7 @@ export const SUBSCRIPTION_RESOURCE_KEYS = [
   "documents",
   "documents-deleted",
   "document-folders",
+  "document-folders-deleted",
   "document-versions",
   "document-external-refs",
   "document-legal-holds",

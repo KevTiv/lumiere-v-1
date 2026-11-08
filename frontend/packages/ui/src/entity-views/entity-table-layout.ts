@@ -1,5 +1,9 @@
 import { entityColumnLayouts } from "../lib/entity-column-layouts"
-import type { EntityColumn } from "../lib/entity-view-types"
+import type {
+  ColumnType,
+  EntityColumn,
+  EntityColumnLayout,
+} from "../lib/entity-view-types"
 
 interface ColumnTrack {
   min: number
@@ -11,7 +15,7 @@ interface ColumnTrack {
 export const SELECTION_COLUMN_REM = 2.75
 export const ACTION_COLUMN_REM = 3.5
 
-const typeLayouts = {
+const typeLayouts: Partial<Record<ColumnType, EntityColumnLayout>> = {
   currency: entityColumnLayouts.amount,
   number: entityColumnLayouts.quantity,
   percent: entityColumnLayouts.quantity,
@@ -26,7 +30,7 @@ const typeLayouts = {
 function getTrack(column: EntityColumn): ColumnTrack {
   // Existing configs use Tailwind's quarter-rem spacing scale for min-width.
   const legacySpacing = /(?:^|\s)min-w-(\d+(?:\.\d+)?)(?:$|\s)/.exec(column.width ?? "")?.[1]
-  const fallback = typeLayouts[column.type as keyof typeof typeLayouts]
+  const fallback = column.type ? typeLayouts[column.type] : undefined
   const layout = column.layout ?? (legacySpacing ? undefined : fallback)
   const min = layout?.min ?? (legacySpacing ? Number(legacySpacing) / 4 : 6)
   const max = Math.max(min, layout?.max ?? Infinity)
