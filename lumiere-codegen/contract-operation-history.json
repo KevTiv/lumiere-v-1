@@ -3010,6 +3010,14 @@
       "name": "migrate_workflow_instance",
       "shape_fingerprint": "sha256:42a869a987d10c41366c195c2061319a0257bccebec5019ff4bca85a5957d3f6"
     },
+    "erp.move_document": {
+      "name": "move_document",
+      "shape_fingerprint": "sha256:ab6fe36c5f6cb2f7665442dae868c9b45bc135b5d31219a76ec74bd2b096851d"
+    },
+    "erp.move_document_folder": {
+      "name": "move_document_folder",
+      "shape_fingerprint": "sha256:64f465b1b2134c82424537878dfcca281b2bc1877da09a05d67d9650f3b04de0"
+    },
     "erp.move_stock_quant": {
       "name": "move_stock_quant",
       "shape_fingerprint": "sha256:9d27f79ff300cf692d1e28f7b1cb04d171fd3929f81a0c32d844c840b21e801c"
@@ -3733,6 +3741,10 @@
     "erp.restore_document": {
       "name": "restore_document",
       "shape_fingerprint": "sha256:f377132aa04c9d387ed5793f758d448b9cc0e778160d571d961bd3b41e40999a"
+    },
+    "erp.restore_document_folder": {
+      "name": "restore_document_folder",
+      "shape_fingerprint": "sha256:81b77d250b6cbaa1f2f0b35a1b8c8f8f733e02f843d0f09db9beda317c56a1ec"
     },
     "erp.restore_product_category": {
       "name": "restore_product_category",
@@ -5242,6 +5254,10 @@
       "name": "toggle_project_favorite",
       "shape_fingerprint": "sha256:3cc2760d5ae46674981ee59671918e3ec5de3ecc13f54efc8d282b421d18a8b0"
     },
+    "erp.trash_document_folder": {
+      "name": "trash_document_folder",
+      "shape_fingerprint": "sha256:dc7ddbb27a2bfc9771a1218d1d670e3ecc955ae0b616e65a7ccd1fd1d94bd151"
+    },
     "erp.unassign_team_member_skill": {
       "name": "unassign_team_member_skill",
       "shape_fingerprint": "sha256:af6e9755178cdf77b54d23e2aa1c8e75f7a5ef91838ca20b8ddb7e6133f2790a"
@@ -6440,6 +6456,14 @@
       "current_operations_fingerprint": "sha256:b9583991a4f676077bbe081abbb7c8867b71434f7ed4abf2895f0e768bb1b973",
       "operation_count": 1518,
       "reason": "release on top of v0.3.168: add set_ai_agent_action; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.170",
+      "previous_ir_sha256": "sha256:6f64e6a784ffdcd84878e66485e5d80791b2db0238189245ff7d5c2cd1841ca7",
+      "previous_operations_fingerprint": "sha256:b9583991a4f676077bbe081abbb7c8867b71434f7ed4abf2895f0e768bb1b973",
+      "current_operations_fingerprint": "sha256:c6968f8ef5ffe8a198f76673595187ba2a3b00ac0daf785138a1e51f08943478",
+      "operation_count": 1522,
+      "reason": "release on top of v0.3.170: add move_document, move_document_folder, restore_document_folder, trash_document_folder; change the shape of none"
     }
   ]
 }
