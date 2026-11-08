@@ -12,6 +12,7 @@ import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Undo2 } from "lucide-rea
 
 import { Badge } from "../components/badge"
 import { Button } from "../components/button"
+import { FileIdentity } from "../components/file-identity"
 
 function readCount(row: ImportJobRow, camel: keyof ImportJobRow, snake: keyof ImportJobRow): number {
   const value = row[camel] ?? row[snake]
@@ -66,6 +67,16 @@ export function ImportJobStatusPanel({
   const isSuccess = status === "success"
   const isPartial = status === "partial"
   const isRolledBack = status === "rolled_back"
+  const stateLabels = {
+    pending: t("settings.importTask.nativeJobStatus.pending", { defaultValue: "Pending" }),
+    success: t("settings.importTask.nativeJobStatus.success", { defaultValue: "Success" }),
+    partial: t("settings.importTask.nativeJobStatus.partial", { defaultValue: "Partial" }),
+    failed: t("settings.importTask.nativeJobStatus.failed", { defaultValue: "Failed" }),
+    rolled_back: t("settings.importTask.nativeJobStatus.rolled_back", { defaultValue: "Rolled back" }),
+  }
+  const stateLabel = Object.hasOwn(stateLabels, status)
+    ? stateLabels[status as keyof typeof stateLabels]
+    : t("settings.importJob.unknownStatus", { defaultValue: "Status unavailable" })
   const showRollback = canRollbackImportJob(job) && onRollback
 
   return (
@@ -77,15 +88,14 @@ export function ImportJobStatusPanel({
           <AlertCircle className="h-5 w-5 text-amber-600" />
         ) : status === "failed" ? (
           <AlertCircle className="h-5 w-5 text-destructive" />
-        ) : (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        )}
-        <div>
-          <p className="font-medium">{t("common.importAssistant.jobStatusTitle")}</p>
-          {fileName ? <p className="text-sm text-muted-foreground">{fileName}</p> : null}
-        </div>
-        <Badge variant={isSuccess ? "default" : isPartial ? "secondary" : "outline"}>
-          {status}
+        ) : isRolledBack ? (
+          <Undo2 className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        ) : status === "pending" ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
+        ) : null}
+        <p className="font-medium">{t("common.importAssistant.jobStatusTitle")}</p>
+        <Badge variant={isSuccess ? "default" : isPartial ? "secondary" : status === "failed" ? "destructive" : "outline"}>
+          {stateLabel}
         </Badge>
         {isRolledBack ? (
           <span className="text-xs text-muted-foreground">
@@ -94,7 +104,9 @@ export function ImportJobStatusPanel({
         ) : null}
       </div>
 
-      <div className="grid gap-2 text-sm sm:grid-cols-3">
+      {fileName ? <FileIdentity fileName={fileName} /> : null}
+
+      <div className="grid gap-2 text-sm tabular-nums sm:grid-cols-3">
         <div>
           <span className="text-muted-foreground">{t("common.importAssistant.jobTotal")}: </span>
           {totalRows}
@@ -112,7 +124,7 @@ export function ImportJobStatusPanel({
       {jobErrors.length > 0 ? (
         <ul className="max-h-56 space-y-2 overflow-auto text-sm" aria-label={t("common.importAssistant.jobErrors")}>
           {jobErrors.map((row, index) => (
-            <li key={String(row.id ?? index)} className="rounded border p-2">
+            <li key={String(row.id ?? index)} className="rounded border p-2 [overflow-wrap:anywhere]">
               {t("common.csvImportDialog.rowError", {
                 defaultValue: "Row {{row}}: {{message}}",
                 row: row.rowNumber ?? row.row_number ?? "?",

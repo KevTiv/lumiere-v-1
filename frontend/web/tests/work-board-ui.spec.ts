@@ -581,11 +581,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     expect(state.unexpected).toEqual([])
   })
 
-  test("an embedded module opens Kanban in its existing navigation and fixes its configured scope and source", async ({ page }) => {
+  test("an embedded module opens its work queue in existing navigation and fixes its configured scope and source", async ({ page }) => {
     await page.goto("/work-board?fixtureHost=module&workScope=sales&workSource=activities")
     await expect(page.getByTestId("module-work-fixture-overview")).toBeVisible()
     const kanban = page.getByTestId("module-workspace-fixture-purchasing-work")
-    await expect(kanban).toHaveText("Kanban")
+    await expect(kanban).toHaveText("Work queue")
     expect(state.scopedReads).toBe(0)
     await kanban.click()
     await expect(page).toHaveURL((url) =>

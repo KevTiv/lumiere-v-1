@@ -1554,9 +1554,9 @@ function AccountingClientReady({
         Cancelled: "destructive",
       } as Record<string, BadgeVariant>,
       badgeLabels: {
-        Draft: "Draft",
-        Posted: "Posted",
-        Cancelled: "Cancelled",
+        Draft: t("accounting.states.draft"),
+        Posted: t("accounting.states.posted"),
+        Cancelled: t("accounting.states.cancelled"),
       },
     }
     const linesConfig = accountMoveLinesTableConfig(t, {
@@ -4821,6 +4821,8 @@ function AccountingClientReady({
                 customContent: (
                   <GeneralLedgerView
                     moves={allMoves}
+                    accountLabels={accountLabelMap}
+                    partnerLabels={partnerLabelMap}
                     moveLines={canUseModuleData(accountMoveLinesRead.state) ? accountMoveLines : undefined}
                     onImportMovesCsv={canImportCsv("accountMove") ? openAccountingMoveImport : undefined}
                     onImportOutstandingDocumentsCsv={
@@ -4839,14 +4841,23 @@ function AccountingClientReady({
                         : undefined
                     }
                     onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? openAccountingMoveLineImport : undefined}
-                    onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
-                    onPostMove={(move) => postDraft(move)}
-                    onCancelMove={(move) =>
-                      void runMutation(() => cancelMove.mutateAsync(move.id as string | number | bigint))
-                    }
-                    onComputeInvoiceTotals={(move) =>
-                      void runMutation(() => computeInvoiceTotals.mutateAsync(move.id as string | number | bigint))
-                    }
+                    onCreate={checkPermission("account_move", "create").allowed
+                      ? () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })
+                      : undefined}
+                    onPostMove={checkPermission("account_move", "write").allowed ? postDraft : undefined}
+                    onCancelMove={checkPermission("account_move", "write").allowed ? async (move) => {
+                      const label = t("accounting.journalEntries.cancelEntryAction", { defaultValue: "Cancel entry" })
+                      const confirmed = await confirmDialog({
+                        title: label,
+                        description: t("accounting.journalEntries.cancelEntryConfirm", { defaultValue: "Cancel this journal entry?" }),
+                        confirmLabel: label,
+                        cancelLabel: t("common.back"),
+                      })
+                      if (confirmed) await runMutation(() => cancelMove.mutateAsync(move.id))
+                    } : undefined}
+                    onComputeInvoiceTotals={checkPermission("account_move", "write").allowed
+                      ? (move) => void runMutation(() => computeInvoiceTotals.mutateAsync(move.id))
+                      : undefined}
                     postMovePending={postMove.isPending || invoiceToPayment.isPending}
                     cancelMovePending={cancelMove.isPending}
                     computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
@@ -5374,6 +5385,9 @@ function AccountingClientReady({
       accountTypes,
       accounts,
       allMoves,
+      accountLabelMap,
+      partnerLabelMap,
+      confirmDialog,
       accountMoveLines,
       bankStatements,
       bankStatementsActionsConfig,
@@ -5726,6 +5740,7 @@ function AccountingClientReady({
         account={glDrilldownAccount}
         moveLines={accountMoveLines}
         moves={allMoves}
+        partnerLabels={partnerLabelMap}
         open={glDrilldownAccount != null}
         onOpenChange={(open) => {
           if (!open) setGlDrilldownAccount(null)
@@ -5944,6 +5959,7 @@ function AccountingClientReady({
       <InvoiceDetailModal
         invoice={selectedInvoice}
         organizationId={organizationId}
+        partnerLabels={partnerLabelMap}
         draftPersonalization={draftInvoicePersonalization?.personalization}
         draftPersonalizationState={selectedInvoice && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType)
           ? draftInvoicePersonalization?.personalizationError ? { status: "error", message: draftInvoicePersonalization.personalizationError } : selectedDraftReviewState
@@ -6332,7 +6348,7 @@ function AccountingClientReady({
           }
         }}
       >
-        <DialogContent className="max-h-[94dvh] max-w-[calc(100%-1rem)] overflow-y-auto sm:max-w-6xl [&_button]:min-h-11 [&_button]:min-w-11">
+        <DialogContent size="review" className="[&_button]:min-h-11 [&_button]:min-w-11">
           <DialogHeader>
             <DialogTitle>
               {t("accounting.bankStatementDetail.title")}

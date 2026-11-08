@@ -7,7 +7,7 @@ import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
-import { Building2, Plug, Upload, Wrench } from "lucide-react"
+import { Building2, Plug, Wrench } from "lucide-react"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig, type SettingsExtraSection } from "@lumiere/ui"
 import {
   toCreateWhatsAppBusinessAccountParams,
@@ -37,8 +37,7 @@ import {
   useUpdateUserEmail,
   useUpdateWhatsappCredentials,
 } from "@lumiere/query-hooks/hooks/auth"
-import { DataImportWorkspace } from "@/lib/data-import-workspace"
-import { CompanyAvailableHistory } from "../../../components/available-history"
+import { dataImportSection } from "./data-import-section"
 import { CompanySetupWorkspace } from "@/lib/company-setup-workspace"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
@@ -518,7 +517,7 @@ export function SettingsClient({
     return (
       <div className="space-y-6">
         <DashboardHeader title={t("settings.page.title")} description={t("settings.page.description")} />
-        <SettingsModule firstOrgProfile />
+        <SettingsModule firstOrgProfile extraSections={[dataImportSection(organizationId)]} />
       </div>
     )
   }
@@ -538,7 +537,7 @@ function FinanceAlphaSetup({
     <div className="space-y-6">
       <DashboardHeader title={title} description={description} />
       <CompanySetupWorkspace organizationId={organizationId} />
-      <SettingsModule firstOrgProfile />
+      <SettingsModule firstOrgProfile extraSections={[dataImportSection(organizationId)]} />
     </div>
   )
 }
@@ -800,8 +799,8 @@ function SettingsLoaded({
     { id: "revokePermission", title: "Revoke permission", description: "Delete an organization permission by ID." },
     { id: "archiveAiChatSession", title: "AI chat archive", description: "Archive or restore an AI chat session." },
     { id: "updateOrgMemberRole", title: "Org member role", description: "Set membership role by role display name." },
-    { id: "createUserInviteDirect", title: "Invite (direct reducer)", description: "Superuser: create invite row directly." },
-    { id: "createUserSession", title: "Create session", description: "Record a user session row (admin/testing)." },
+    { id: "createUserInviteDirect", title: "Create an invite record", description: "For superusers. Requires an existing token hash and an expiry date." },
+    { id: "createUserSession", title: "Create a session record", description: "Record a session token and its expiry for administration or testing." },
     { id: "logAuditEvent", title: "Log audit event", description: "Insert a manual audit log entry." },
   ]
 
@@ -845,21 +844,7 @@ function SettingsLoaded({
       icon: Building2,
       content: <CompanySetupWorkspace organizationId={organizationId} />,
     },
-    {
-      id: "imports",
-      groupId: "data",
-      title: "Data import",
-      description: "Bring existing records into the workspace from CSV files.",
-      icon: Upload,
-      content: (
-        <section className="space-y-6 rounded-xl border border-border bg-card p-4">
-          <div id="available-history" className="scroll-mt-6">
-            <CompanyAvailableHistory organizationId={organizationId} />
-          </div>
-          <DataImportWorkspace organizationId={organizationId} />
-        </section>
-      ),
-    },
+    dataImportSection(organizationId),
     {
       id: "integrations",
       groupId: "data",
@@ -870,7 +855,7 @@ function SettingsLoaded({
       content: (
         <section className="space-y-3 rounded-xl border border-border bg-card p-4">
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            OAuth flows and webhooks are recorded via these admin reducers until polished OAuth UI ships.
+            These administration forms use existing account IDs and credential references. Have them ready before configuring a connection.
           </p>
           {actionCards(integrationActions)}
         </section>
@@ -879,8 +864,8 @@ function SettingsLoaded({
     {
       id: "advanced",
       groupId: "platform",
-      title: "Advanced actions",
-      description: "Less common administration tasks that are not part of the other sections.",
+      title: "Technical administration",
+      description: "Maintain access, sessions and audit records. Some tasks require existing record IDs.",
       icon: Wrench,
       content: (
         <section className="rounded-xl border border-dashed border-border bg-card p-4">

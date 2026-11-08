@@ -6,8 +6,10 @@ import { useCalendarModuleSubscription } from "@/lib/module-subscription-hooks"
 import { toCreateCalendarEventParams } from "@/lib/calendar-create-params"
 import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
+import { Button } from "@lumiere/ui/components/button"
+import { Plus } from "lucide-react"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
-import { useCalendarEvents, useCalendarActivities, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
+import { useCalendarEvents, useCalendarActivities, useCalendarContacts, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import type { CalendarEvent as StdbCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import { useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
 import type { FormConfig, CalendarEvent as UICalendarEvent } from "@lumiere/ui"
@@ -20,7 +22,7 @@ import { calendarDate, calendarDayKey, calendarMode, shiftCalendarDate, shiftCal
 import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, eventInputValue, eventTimestampLabel, eventStateTag, updateCalendarEventParams } from "./calendar-event"
+import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, eventAttendees, eventBoundaryLabel, eventInputValue, eventStateTag, eventText, updateCalendarEventParams } from "./calendar-event"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { variantTag } from "@lumiere/erp-workflows"
 import { useCalendarTimezone } from "@/lib/use-calendar-timezone"
@@ -94,6 +96,19 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const activitiesQuery = useCalendarActivities(orgId, readScope)
   const eventsRead = moduleCollection({ ...eventsQuery, isLoading: !scopeReady || !calendarTimezone.ready || eventsQuery.isLoading })
   const events = scopeReady && eventsRead.state.status === "ready" ? eventsRead.rows : []
+  const eventRecordsTab = params.get("tab") === "events"
+  const contactsQuery = useCalendarContacts(orgId, {
+    ...readScope,
+    enabled: scopeReady && eventsRead.state.status === "ready" && (eventRecordsTab || selectedEventId != null),
+  })
+  const contactsRead = moduleCollection(contactsQuery)
+  const contacts = useMemo(() => scopeReady && contactsRead.state.status === "ready"
+    ? contactsRead.rows as unknown as Record<string, unknown>[] : [], [scopeReady, contactsRead.state.status, contactsRead.rows])
+  const returnContext = params.size ? `${pathname}?${params}` : pathname
+  const openNewEvent = useCallback(() => setQuickActionForm({
+    form: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create", timeZone),
+    action: "createEvent",
+  }), [newEventDay, t, timeZone])
   const activitiesRead = moduleCollection({ ...activitiesQuery, isLoading: !scopeReady || activitiesQuery.isLoading })
   const activities = scopeReady && activitiesRead.state.status === "ready" ? activitiesRead.rows : []
   const createCalendarEvent = useCreateCalendarEvent(orgId)
@@ -145,15 +160,17 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
             ...tab,
             label: t("calendar.activitiesTab"),
             createForm: newActivityForm(t),
+            createPermission: { resource: "activity", action: "create" as const },
           }
         }
         if (tab.id === "events") {
           return {
             ...tab,
+            description: t("calendar.workspace.listTimezone", { defaultValue: "Event times use {{timezone}}. All-day events display dates.", timezone: timeZone }),
             createForm: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create", timeZone),
             createPermission: { resource: "calendar_event", action: "create" as const },
             entityConfig: tab.entityConfig
-              ? withInlineEdits({ ...tab.entityConfig, view: "columns" in tab.entityConfig.view ? { ...tab.entityConfig.view, columns: tab.entityConfig.view.columns.map((column) => ["start", "stop"].includes(column.key) ? { ...column, render: (value: unknown) => eventTimestampLabel(value, i18n.language, timeZone) } : column) } : tab.entityConfig.view }, {
+              ? withInlineEdits({ ...tab.entityConfig, view: "columns" in tab.entityConfig.view ? { ...tab.entityConfig.view, columns: tab.entityConfig.view.columns.map((column) => ["start", "stop"].includes(column.key) ? { ...column, render: (_value: unknown, row: Record<string, unknown>) => eventBoundaryLabel(row, column.key === "start" ? "start" : "stop", i18n.language, timeZone) } : column) } : tab.entityConfig.view }, {
                   name: {
                     kind: "text",
                     save: async (row, value) => {
@@ -170,17 +187,19 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
               titleKey: "name",
               auditTableName: "calendar_event",
               discussion: {},
-              openHref: calendarEventHref,
+              openHref: (row: Record<string, unknown>) => calendarEventHref(row, returnContext),
               detailConfig: {
                 mode: "detail" as const,
                 sections: [
                   {
                     id: "event",
                     fields: [
-                      { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const, render: (value: unknown) => eventTimestampLabel(value, i18n.language, timeZone) },
-                      { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const, render: (value: unknown) => eventTimestampLabel(value, i18n.language, timeZone) },
-                      { key: "location", label: t("calendar.events.columns.location") },
-                      { key: "description", type: "markdown" as const, label: "Description" },
+                      { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const, render: (_value: unknown, row: Record<string, unknown>) => eventBoundaryLabel(row, "start", i18n.language, timeZone) },
+                      { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const, render: (_value: unknown, row: Record<string, unknown>) => eventBoundaryLabel(row, "stop", i18n.language, timeZone) },
+                      { key: "location", label: t("calendar.events.columns.location"), render: (value: unknown) => eventText(value) ?? "—" },
+                      { key: "partnerIds", label: t("calendar.eventDetail.attendees", { defaultValue: "Attendees" }), render: (_: unknown, row: Record<string, unknown>) =>
+                        <span className="[overflow-wrap:anywhere]">{eventAttendees(row, contacts).map(({ label }) => label).join(", ") || t("calendar.eventDetail.noAttendees", { defaultValue: "No attendees" })}</span> },
+                      { key: "description", type: "markdown" as const, label: t("calendar.forms.newEvent.fields.description", { defaultValue: "Description" }) },
                     ],
                   },
                 ],
@@ -189,13 +208,18 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           }
         }
         if (tab.id === "calendar") {
-          const uiEvents = events.map(calendarEventForView).filter((event): event is UICalendarEvent => event != null)
+          const uiEvents = events.map((event) => calendarEventForView(event as unknown as Record<string, unknown>, contacts)).filter((event): event is UICalendarEvent => event != null)
           return {
             ...tab,
             type: "custom" as const,
+            primaryAction: canCreateEvent && eventsRead.state.status === "ready" ? (
+              <Button onClick={openNewEvent} disabled={createCalendarEvent.isPending}>
+                <Plus aria-hidden="true" />
+                {t("calendar.view.newEvent")}
+              </Button>
+            ) : undefined,
             customContent: (
               <CalendarView
-                className="my-4"
                 timeZone={timeZone}
                 timezoneSource={calendarTimezone.source}
                 timezoneReady={calendarTimezone.ready}
@@ -213,26 +237,25 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                 onSelectDate={(date) => updateParams({ calendarDay: calendarDayKey(date, timeZone) })}
                 onSearchChange={(value) => updateParams({ calendarSearch: value }, true)}
                 onSelectEvent={setSelectedEventId}
-                onCreateEvent={canCreateEvent ? () => setQuickActionForm({ form: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create", timeZone), action: "createEvent" }) : undefined}
                 onEditEvent={canEditEvent ? (eventId) => {
                   const event = events.find((e) => String(e.id) === eventId)
                   if (event) {
                     setQuickActionForm({
                       form: newCalendarEventForm(t, {
-                        name: String(event.name ?? ""),
+                        name: eventText(event.name) ?? "",
                         start: eventInputValue(event.start, timeZone),
                         stop: eventInputValue(event.stop, timeZone),
                         allday: Boolean(event.allday),
                         privacy: variantTag(event.privacy).toLowerCase() || "public",
-                        location: event.location ? String(event.location) : "",
-                        description: event.description ? String(event.description) : "",
+                        location: eventText(event.location) ?? "",
+                        description: eventText(event.description) ?? "",
                       }, "edit", timeZone),
                       action: "editEvent",
                       eventId,
                     })
                   }
                 } : undefined}
-                eventHref={(eventId) => `${calendarEventHref({ id: eventId })}?returnTo=${encodeURIComponent(`${pathname}?${params}`)}`}
+                eventHref={(eventId) => calendarEventHref({ id: eventId }, returnContext)}
                 onDeleteEvent={canDeleteEvent ? async (eventId) => {
                   if (await confirmDialog({ description: t("calendar.confirmDelete") })) {
                     setActionError(null)
@@ -251,7 +274,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, newEventDay, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog, canCreateEvent, canEditEvent, canDeleteEvent, params, pathname, updateParams, setSelectedEventId, timeZone, i18n.language, calendarTimezone.source, calendarTimezone.ready, calendarTimezone.fallbackReason],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, newEventDay, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog, canCreateEvent, canEditEvent, canDeleteEvent, contacts, returnContext, openNewEvent, createCalendarEvent.isPending, eventsRead.state.status, updateParams, setSelectedEventId, timeZone, i18n.language, calendarTimezone.source, calendarTimezone.ready, calendarTimezone.fallbackReason],
   )
 
   const data = useMemo(
@@ -270,7 +293,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   }
   const eventsUsable = scopeReady && eventsRead.state.status === "ready"
   const actionUsable = (action: string) => scopeReady && (
-    action === "createActivity" ? activitiesRead.state.status === "ready"
+    action === "createActivity" ? activitiesRead.state.status === "ready" && checkPermission("activity", "create").allowed
       : eventsUsable && (action === "createEvent" ? canCreateEvent : canEditEvent)
   )
   const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)

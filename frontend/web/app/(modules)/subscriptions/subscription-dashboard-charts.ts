@@ -5,6 +5,8 @@
  * History is reconstructed from each subscription's start and close dates with its current MRR,
  * so a past month reflects who was subscribed then, priced at today's contract value.
  */
+import { formatEntityReference } from "@lumiere/ui/lib/entity-row-values"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { variantTag } from "@lumiere/erp-workflows"
 import type { Subscription, SubscriptionPlan } from "@lumiere/stdb/types"
 import { chartColor, monthBuckets, type ChartDatum, type ChartSeriesSpec } from "@lumiere/ui/lib/chart-format"
@@ -58,8 +60,9 @@ export function mrrAndChurnByMonth(subscriptions: readonly Subscription[], now: 
       const closed = closeMs(row)
       if (!isTrial(row) && closed != null && closed >= bucket.startMs && closed <= monthEnd) churned += value
     }
-    const churnRate = opening > 0 ? Math.round((churned / opening) * 1000) / 10 : 0
-    return { month: bucket.label, mrr: Math.round(mrr), newMrr: Math.round(added), churnRate }
+    const row: ChartDatum = { month: bucket.label, mrr, newMrr: added }
+    if (opening > 0) row.churnRate = Math.round((churned / opening) * 1000) / 10
+    return row
   })
 }
 
@@ -70,13 +73,13 @@ export function planMix(
   now: Date,
   maxPlans = 5,
 ): { segments: ChartSeriesSpec[]; rows: ShareBarRow[] } {
-  const planNames = new Map(plans.map((plan) => [String(plan.id), plan.name?.trim() || `Plan #${String(plan.id)}`]))
+  const planNames = new Map(plans.map((plan) => [String(plan.id), plan.name]))
   const byPlan = new Map<string, number>()
   for (const row of subscriptions) {
     if (!activeAt(row, now.getTime())) continue
     const value = subscriptionMrr(row)
     if (value <= 0) continue
-    const key = String(row.planId)
+    const key = parseStrictU64(row.planId)?.toString() ?? "unavailable"
     byPlan.set(key, (byPlan.get(key) ?? 0) + value)
   }
   const ranked = [...byPlan.entries()].sort((a, b) => b[1] - a[1])
@@ -84,14 +87,14 @@ export function planMix(
   const otherTotal = ranked.slice(maxPlans).reduce((sum, [, value]) => sum + value, 0)
   const segments: ChartSeriesSpec[] = top.map(([key], index) => ({
     key: `plan-${key}`,
-    label: planNames.get(key) ?? `Plan #${key}`,
+    label: formatEntityReference(key, { labels: planNames, formatId: (id) => `Plan #${id}`, missing: "Plan unavailable" }),
     color: chartColor(index),
   }))
   const values: { [segmentKey: string]: number } = {}
-  for (const [key, value] of top) values[`plan-${key}`] = Math.round(value)
+  for (const [key, value] of top) values[`plan-${key}`] = value
   if (otherTotal > 0) {
     segments.push({ key: "other", label: "Other plans", color: "hsl(var(--muted-foreground))" })
-    values.other = Math.round(otherTotal)
+    values.other = otherTotal
   }
   return { segments, rows: segments.length > 0 ? [{ label: "MRR", values }] : [] }
 }

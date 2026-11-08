@@ -146,3 +146,26 @@ reviewer
 Do not publish a firm remaining-session estimate before `COV-00` re-audits the current implementation. Many routes/commands already exist and historical plans are stale in both directions.
 
 As a planning envelope, exhaustive module parity is likely a **major parallel track (roughly 30–45 focused Luna sessions)**, but accepted current functionality may reduce that materially. `COV-00` must replace this range with evidence-based sizing and avoid reimplementing already-complete workflows.
+
+
+## Alpha interface cohesion follow-up on 8 November 2026
+
+Implementation coverage is recorded in [alpha-ui-cohesion-coverage.json](alpha-ui-cohesion-coverage.json). This is the current finance-alpha batch: 10 business workspaces and seven support surfaces, including reachable child pages, dialogs, imports and file/AI handoffs. It does not complete the wider module parity program.
+
+The branch builds on the Documents viewer/recovery work in PR #387. It retains that work's storage, receipt, permission and folder-lifecycle owners. No bucket cutover or production business writes are part of this UI change.
+
+Shared changes cover semantic dialog/sheet dimensions and review focus; column allocation, bounded collections and accessible full text; file identity/upload controls; typed value/reference presentation; and useful page customization alongside fixed business work. Module corrections include the ledger tagged payment state and missing partner, confirmed order-value semantics, alpha import deep links and history density, document identification, and daily-work/approval/calendar context.
+
+The comparison informed these corrections to Lumiere's existing alpha features; it is not a claim of complete ERP feature parity:
+
+| Reference | Existing Lumiere capability and friction | Correction in this batch |
+| --- | --- | --- |
+| [Odoo search and views](https://www.odoo.com/documentation/19.0/applications/general/search.html) | Lists, record boards and work queues already exist, but actions and presentation do not always distinguish their purpose. | Keep contextual creation in the page header, label work queues clearly, and preserve record/filter context across presentation changes. |
+| [Frappe workspaces](https://docs.frappe.io/framework/user/en/desk/navigation/workspace) | Saved widgets and page editing already exist, but empty editor strips and competing sections obscure the core task. | Put customization in the header, offer useful scoped content, and preserve fixed record work and saved-layout ownership. |
+| [Business Central Role Centers](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-designing-role-centers) | Alpha modules expose operational actions, overviews and records with inconsistent hierarchy. | Prioritize daily work, group related actions, and use consistent collection, record, form and review dimensions. |
+
+Sources were checked on 8 November 2026. The acceptance criterion is a discoverable record, understandable status, authorized next action and inspectable supporting evidence. Broader competitor capabilities remain outside this interface correction.
+
+Focused component and model checks are local evidence. Browser geometry cases are registered in existing Accounting, Product/Fleet/Warehouse, Productivity and AI suites. Local Chromium was blocked by the environment's UNIX-socket policy; fixture warmup also failed in this environment. Full type checking, builds, browser suites and required repository checks run on GitHub as requested. No deployed, permission-revocation, transactional persistence or full mobile/zoom/theme certification is claimed by this entry.
+
+Release acceptance remains open until the combined PR checks and deployed acceptance pass. In particular, source review of an unchanged tax, FX, reconciliation, recognition or administration surface is not proof of its live workflow completion. Preserve those distinctions when updating the ledger.

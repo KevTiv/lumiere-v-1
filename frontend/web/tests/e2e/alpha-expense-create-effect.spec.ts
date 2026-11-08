@@ -304,7 +304,7 @@ test.describe("Alpha generic expense create effect", { tag: ["@dev-fixture", "@a
     await expect(draft.modal.getByTestId("form-field-pricelistId")).toHaveText(draft.pricelistLabel)
     await expect(draft.modal.getByTestId("form-field-paymentMode")).toHaveText(draft.paymentLabel)
     await expect(draft.modal.getByTestId("form-field-lineKind")).toContainText("Purchase")
-    expect(await draft.modal.getByTestId("form-field-receiptFile").evaluate((node) => (node as HTMLInputElement).files?.[0]?.name)).toBe(draft.filename)
+    await expect(draft.modal.locator('[data-slot="file-upload-field"]').getByText(draft.filename, { exact: true })).toBeVisible()
     const saved = await assertSavedPayload(page, writes, draft)
     await expect(attempt).toHaveAttribute("data-client-request-id", saved.key)
     await expect(attempt).toHaveAttribute("data-company-id", draft.companyId)

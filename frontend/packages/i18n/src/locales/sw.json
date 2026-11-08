@@ -188,7 +188,13 @@
         "empty": "Hakuna vinavyolingana",
         "remove": "Ondoa {{value}}"
       },
-      "setupOpensNewTab": "hufunguka kwenye kichupo kipya"
+      "setupOpensNewTab": "hufunguka kwenye kichupo kipya",
+      "file": {
+        "choose": "Chagua faili",
+        "chooseMultiple": "Chagua faili",
+        "remove": "Ondoa {{name}}",
+        "selected": "Imechaguliwa kuwasilishwa"
+      }
     },
     "formPreview": {
       "label": "Hakiki"
@@ -333,7 +339,9 @@
         "description": "Jaribu utafutaji mwingine au uondoe vichujio.",
         "title": "Hakuna rekodi zinazolingana"
       },
-      "groupBy": "Panga kwa makundi kwa"
+      "groupBy": "Panga kwa makundi kwa",
+      "records": "Rekodi",
+      "showFullValue": "Onyesha thamani kamili"
     },
     "retry": "Jaribu tena",
     "recordsDenied": "Huna ruhusa ya kufikia rekodi hizi.",

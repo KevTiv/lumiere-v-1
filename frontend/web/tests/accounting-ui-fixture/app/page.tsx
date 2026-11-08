@@ -12,6 +12,7 @@ import { Tabs, TabsContent } from "../../../../packages/ui/src/components/tabs"
 import { Button } from "../../../../packages/ui/src/components/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../../packages/ui/src/components/table"
 import { CreateInvoiceModal } from "../../../../packages/ui/src/accounting-components/create-invoice-modal"
+import { GeneralLedgerView } from "../../../../packages/ui/src/accounting-components/general-ledger-view"
 import { InvoiceDetailModal } from "../../../../packages/ui/src/accounting-components/invoice-detail-modal"
 import type { ModuleTab } from "../../../../packages/ui/src/lib/module-types"
 import { accountingWorkspaceNavigation } from "../../../lib/accounting-workspace-navigation"
@@ -46,6 +47,17 @@ function AccountingFixture() {
         <WorkspaceNav moduleId="accounting" tabs={tabs} config={navigation} activeTab={activeTab} onTabChange={setActiveTab} hrefForTab={(id) => `/?tab=${id}`} />
         {tabs.map((tab) => <TabsContent key={tab.id} value={tab.id}>{tab.id === "dashboard"
           ? <AccountantOverview data={overviewFixture} companyName="Lumière Alpha Ltd" now={fixtureNow} onNavigate={setActiveTab} onOpenBankLine={(line, statement) => setBankSelection(`Synthetic bank selection: statement ${String(statement.id)}, line ${String(line.id)}`)} />
+          : tab.id === "journal-entries"
+          ? <GeneralLedgerView
+              moves={[
+                { id: 901n, name: "INV/2026/0901", companyId: 1n, moveType: { tag: "OutInvoice" }, state: { tag: "Posted" }, paymentState: { tag: "Partial" }, amountTotal: 100, amountResidual: 40 },
+                { id: 902n, name: "BILL/2026/0902", companyId: 1n, moveType: { tag: "InInvoice" }, state: { tag: "Draft" }, paymentState: { tag: "NotPaid" }, partnerId: 2n, ref: "LONG-REFERENCE-".repeat(20) },
+              ]}
+              partnerLabels={new Map([["2", "Acme Corporation"]])}
+              onPostMove={() => setPostRequested(true)}
+              onCancelMove={() => undefined}
+              onComputeInvoiceTotals={() => undefined}
+            />
           : <section className="mt-5 rounded-xl border bg-card p-5"><h2 className="text-lg font-semibold">{tab.label}</h2><p className="mt-2 text-sm text-muted-foreground">Controlled fixture for workspace navigation and responsive layout.</p><Table><TableHeader><TableRow><TableHead>Record</TableHead><TableHead>State</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell data-testid="fixture-density-cell">Synthetic record</TableCell><TableCell>Draft</TableCell></TableRow></TableBody></Table></section>}</TabsContent>)}
       </Tabs>
       <CreateInvoiceModal open={invoiceOpen} companyId={1n} onClose={() => setInvoiceOpen(false)}

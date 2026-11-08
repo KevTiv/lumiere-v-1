@@ -32,12 +32,6 @@ import { clearFormDraft, useFormDraftStorageKey } from "./form-draft"
 import { ModularForm } from "./modular-form"
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
-const sizeClasses: Record<string, string> = {
-  md: "sm:max-w-[600px]",
-  lg: "sm:max-w-[760px]",
-  xl: "sm:max-w-[920px]",
-}
-
 export interface FormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -182,8 +176,7 @@ export function FormModal({
     requestOpenChange(false)
   }
 
-  const size = config.size ?? "md"
-  const maxW = sizeClasses[size] ?? sizeClasses.md
+  const size = renderPreview ? "review" : config.size === "lg" || config.size === "xl" ? "record" : "form"
 
   // Resolve optional header icon
   const HeaderIcon = config.icon
@@ -194,15 +187,14 @@ export function FormModal({
     <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent
         data-testid={`form-modal-${config.id}`}
+        size={size}
         className={cn(
-          maxW,
           workspaceStyles.surface,
-          "flex max-h-[86dvh] min-h-0 flex-col gap-0 overflow-hidden p-0",
-          "sm:has-[[data-form-preview]]:max-w-[min(1200px,calc(100vw-2rem))]",
+          "flex min-h-0 flex-col gap-0 overflow-hidden p-0",
           className
         )}
       >
-        <DialogHeader className={cn(workspaceStyles.pageHeader, "sticky top-0 z-10 min-w-0 flex-shrink-0 bg-card/95 px-4 py-4 pr-12 backdrop-blur sm:px-6 sm:py-5 sm:pr-12")}>
+        <DialogHeader className={cn(workspaceStyles.pageHeader, "sticky top-0 z-10 min-w-0 flex-shrink-0 bg-card/95 px-4 py-4 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(

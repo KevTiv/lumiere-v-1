@@ -156,9 +156,9 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "work": {
-      const workTabPanel = page.getByRole("tabpanel", { name: "Kanban", exact: true })
+      const workTabPanel = page.getByRole("tabpanel", { name: "Work queue", exact: true })
       await expect(workTabPanel).toBeVisible()
-      const workspace = workTabPanel.getByRole("region", { name: "Kanban", exact: true })
+      const workspace = workTabPanel.getByRole("region", { name: "Work queue", exact: true })
       await expect(workspace).toBeVisible()
       await expect(workspace.getByRole("combobox", { name: "Work type", exact: true })).toHaveText("Workflow assignments")
       await expect(workspace.getByRole("group", { name: "View layout", exact: true })).toBeVisible()

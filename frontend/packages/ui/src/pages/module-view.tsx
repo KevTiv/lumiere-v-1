@@ -19,7 +19,7 @@ import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardGrid } from "./dashboard-grid"
-import { ModulePageComposition } from "./page-composition-host"
+import { ModulePageComposition, PageCompositionActionTargetProvider, usePageCompositionActionSlot } from "./page-composition-host"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
@@ -38,7 +38,7 @@ import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from ".
 import { WorkspaceNav } from "./workspace-nav"
 import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
 import { HistoryPeriodSelect } from "../components/history-period-select"
-import { serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { parseHistoryPeriod, resolveHistoryPeriod, serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
 import { configuredModuleHistoryField, filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
 import { useAssistantNativeForms, type AssistantNativeFormStatus } from "../components/assistant-native-form-provider"
 
@@ -306,6 +306,23 @@ export function ModuleView({
   }, [activeTabUsable])
 
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
+  const { target: compositionActionTarget, slot: compositionActionSlot } = usePageCompositionActionSlot()
+  const showHeaderCreate = activeTabConfig?.type === "entity" &&
+    activeTabConfig.createForm &&
+    activeTabConfig.entityConfig &&
+    !showAltView(activeTabConfig) &&
+    dataState?.[activeTab]?.status !== "error" &&
+    dataState?.[activeTab]?.status !== "denied" &&
+    createGate(activeTabConfig.createPermission) !== "denied"
+  const dashboardHistoryBounds = useMemo(() => {
+    if (rawHistoryPeriod != null && !parseHistoryPeriod(rawHistoryPeriod)) return null
+    if (dashboardTimeRange === undefined) return undefined
+    try {
+      return resolveHistoryPeriod(dashboardTimeRange, { timeZone: periodTimeZone })
+    } catch {
+      return null
+    }
+  }, [dashboardTimeRange, periodTimeZone, rawHistoryPeriod])
   useEffect(() => {
     if (!assistantEditorScope || assistantEditorScope === assistantForms?.scopeKey) return
     setOpenForm(null)
@@ -353,12 +370,20 @@ export function ModuleView({
           activeTabConfig?.description ??
           (activeTabConfig?.type === "dashboard" || activeTabConfig == null ? config.description : undefined)
         }
+        primaryAction={showHeaderCreate ? (
+          <Button onClick={() => openCreateForm(activeTab)} data-testid={`module-create-${config.id}-${activeTab}`}>
+            <Plus className="h-4 w-4" />
+            {activeTabConfig.createLabel ?? "New"}
+          </Button>
+        ) : activeTabUsable ? activeTabConfig?.primaryAction : undefined}
+        secondaryAction={compositionActionSlot}
         timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
         onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
         timeZone={historyTimeZone}
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
+      <PageCompositionActionTargetProvider value={compositionActionTarget}>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-w-0 flex-col">
         {currentArea ? (
           <>
@@ -412,7 +437,7 @@ export function ModuleView({
             key={tab.id}
             value={tab.id}
             keepMounted={onOpenFormChange != null && openForm === tab.id}
-            className="mt-6"
+            className="mt-3 space-y-4"
             aria-label={tab.label}
             aria-busy={dataState?.[tab.id]?.status === "loading"}
             data-testid={`module-panel-${config.id}-${tab.id}`}
@@ -426,6 +451,7 @@ export function ModuleView({
                 pageId={tab.id}
                 title={`${config.title} · ${tab.label}`}
                 sections={dashboardContent == null ? tab.sections : undefined}
+                historyBounds={showDashboardTimeRange ? dashboardHistoryBounds : undefined}
                 isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
               >
                 {dashboardContent ?? (tab.sections && <DashboardGrid
@@ -435,10 +461,6 @@ export function ModuleView({
                 />)}
               </ModulePageComposition>
             )}
-            {tab.type !== "dashboard" && activeTab === tab.id && (
-              <ModulePageComposition moduleId={config.id} pageId={tab.id} title={`${config.title} · ${tab.label}`} />
-            )}
-
             {tab.type === "custom" && tab.customContent}
 
             {tab.type === "entity" && tab.entityConfig && tab.entityAltView && (
@@ -534,17 +556,6 @@ export function ModuleView({
                 )}
                 <EntityView
                   useCard={false}
-                  headerAction={
-                    tab.createForm && createGate(tab.createPermission) !== "denied" ? (
-                      <Button
-                        onClick={() => openCreateForm(tab.id)}
-                        data-testid={`module-create-${config.id}-${tab.id}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                        {tab.createLabel ?? "New"}
-                      </Button>
-                    ) : undefined
-                  }
                   config={
                     tab.createForm
                       ? {
@@ -685,10 +696,21 @@ export function ModuleView({
                   ))}
               </div>
             )}
+            {tab.type !== "dashboard" && activeTab === tab.id && (
+              <ModulePageComposition
+                moduleId={config.id}
+                pageId={tab.id}
+                title={`${config.title} · ${tab.label}`}
+                placement="insights"
+                sections={tab.insightSections}
+                historyBounds={historyFilter.status === "active" ? historyFilter.bounds : historyFilter.status === "invalid" ? null : undefined}
+              />
+            )}
             </>)}
           </TabsContent>
         ))}
       </Tabs>
+      </PageCompositionActionTargetProvider>
     </div>
   )
 }

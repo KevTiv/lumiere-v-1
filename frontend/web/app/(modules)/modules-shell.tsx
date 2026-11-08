@@ -11,7 +11,6 @@ import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-cont
 import { AssistantNativeFormProvider, useAssistantNativeFormController, useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
 import { ALPHA_ASSISTANT_CAPABILITIES, ASSISTANT_PAGE_MODULES, assistantActionHref, decodeAssistantAction, getAssistantCapability, isAssistantPageAction, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
 import { ModulePageCompositionProvider, useModulePageComposition } from "@/lib/module-page-composition"
-import { OperationalPageComposition } from "../../components/operational-page-composition"
 import {
   DashboardSidebar,
   DashboardWorkspace,
@@ -703,6 +702,7 @@ function ModulesContent({
         onOpenSearch={() => setIsSearchOpen(true)}
         onSignOut={performSignOut}
         userProfile={currentUserProfile.data}
+        headerTools={<ModuleActivity />}
         notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
         sidebar={
           <DashboardSidebar
@@ -755,8 +755,6 @@ function ModulesContent({
           </>
         }
       >
-        <ModuleActivity />
-        <OperationalPageComposition />
         {children}
       </DashboardWorkspace>
     </ErpAiChatControllerProvider>

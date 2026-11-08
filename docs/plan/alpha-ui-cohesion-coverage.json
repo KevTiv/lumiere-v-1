@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-08",
+  "workspaceProfile": "finance-alpha",
+  "scopeSource": "frontend/packages/ui/src/lib/workspace-profile.ts",
+  "baseRef": "codex/documents-viewer-recovery",
+  "baseCommit": "eb145af181e24574884126eb1b3f694485c2ae31",
+  "status": "implemented; full CI and deployed acceptance pending",
+  "verificationPolicy": "Focused component/model checks locally. Full frontend/build/E2E and browser geometry are delegated to GitHub at the user request. Source coverage is not deployed verification.",
+  "surfaces": [
+    {
+      "id": "accounting",
+      "name": "Accounting",
+      "packet": "M1",
+      "requiredSurfaceInventory": "`/accounting`; dashboard; invoices; credit-control; bills; bank-statements; payments; payment-operations; reconciliation-widgets; journal-entries; move-lines; accounts; budgets; analytic-lines; fixed-assets; amortization; period-close; account-periods; fx-revaluation; tax-deadlines; taxes; tax-groups; tax-jurisdictions; tax-schedules; account-journals; fiscal-years; payment-terms; payment-term-lines; analytic; analytic-distribution; consolidation; intercompany-rules; intercompany-transactions; configured work board. `/accounting/invoices/[id]`; ledger, account, payment, reconciliation, close, tax, asset, and drilldown overlays.",
+      "sourceReview": "reviewed",
+      "implementation": "Tagged journal/payment states, missing partner/amounts, safe review focus, permission-aware lifecycle actions, sized ledger/drilldown/invoice/banking forms and financial column roles.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "sales",
+      "name": "Sales",
+      "packet": "M2",
+      "requiredSurfaceInventory": "`/sales`; dashboard; ops; orders; order-lines; returns; invoices; deliveries; fulfillment; pricelists; pricelist-items; loyalty-programs; loyalty-cards; delivery-price-rules; delivery-carriers; shipping-methods; pos-payment-methods; commission-plans; configured work board. `/sales/orders/[id]`, order forms and delivery/invoice/payment handoffs. Embedded payment-method configuration does not admit the POS module.",
+      "sourceReview": "reviewed",
+      "implementation": "Header creation and distinct Work queue, column roles, truthful confirmed-order value with missing amount/currency disclosure, quotation document viewer size.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "crm",
+      "name": "CRM",
+      "packet": "M3",
+      "requiredSurfaceInventory": "`/crm`; dashboard; leads; opportunities; opportunity-lines; contacts; activities; my-activities; contact-tags; contact-categories; contact-segments; attribution; pipeline-admin; duplicates. Include runtime inbox/panel states where reachable, record sheets, conversion, activity, and merge/review forms.",
+      "sourceReview": "reviewed",
+      "implementation": "Identity-first columns, optional secondary fields, long pipeline/attribution content, contact/duplicate review and permission-aware inline edits.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "purchasing",
+      "name": "Purchasing",
+      "packet": "M2",
+      "requiredSurfaceInventory": "`/purchasing`; dashboard; operations; orders; lines; requisitions; vendors; partner-banks; rfqs; rfq-bids; blanket-orders; supplier-intakes; purchase-returns; landed-costs; discrepancies wherever exposed; configured work board. `/purchasing/orders/[id]`, receipt/bill/return and supplier-review handoffs.",
+      "sourceReview": "reviewed",
+      "implementation": "Supplier/product identity widths, usable order/reference text, semantic operation/reason/landed-cost dialogs, missing values and linked product labels.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "reports",
+      "name": "Reports",
+      "packet": "M6",
+      "requiredSurfaceInventory": "`/reports`; dashboard/catalog; owner-reports; reports; statements; trial-balance; vat-report; dashboards; pivot-explorer; scheduled-reports; report-templates; dashboard-widgets; analytics-metrics; query-builder. Include report output, saved dashboard, schedule, export, sharing, and widget dialogs.",
+      "sourceReview": "reviewed",
+      "implementation": "Catalog/output identity, scoped tagged metadata, saved-dashboard dimensions, statement scrolling and complete values, editor activation from collapsed overview.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "subscriptions",
+      "name": "Subscriptions",
+      "packet": "M5",
+      "requiredSurfaceInventory": "`/subscriptions`; dashboard; subscriptions; plans; lines; amendments; usage-events; usage-charges; rating-backlog; price-tiers; past-due; due-to-bill; bundles; entitlements; payment-intents; deferred-schedules; deferred-lines; recognition-rules. `/subscriptions/[id]`, lifecycle, billing, recognition, and related invoice/payment dialogs.",
+      "sourceReview": "reviewed",
+      "implementation": "Readable recurring-billing collections, typed status/reference values, explicit currency context, lifecycle forms and linked record handoffs.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "expenses",
+      "name": "Expenses",
+      "packet": "M5",
+      "requiredSurfaceInventory": "`/expenses`; dashboard; expenses; expense-sheets; inbox; operations/capture; card-reconciliation; expense-settings; configured work board. `/expenses/reports/[id]`, receipt capture, allocation, review, submit/approve/refuse/post/reimburse actions.",
+      "sourceReview": "reviewed",
+      "implementation": "Receipt selection and retained file state, review/allocation dimensions, operational notes, list value presentation and lifecycle handoffs.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "products",
+      "name": "Products",
+      "packet": "M4",
+      "requiredSurfaceInventory": "`/products`; products and product-categories, product sheets, create/edit/category forms and linked pickers. Reuses `inventory/inventory-client.tsx` and its product-catalog adapter.",
+      "sourceReview": "reviewed",
+      "implementation": "Flexible product identity and bounded SKU, record sheet dimensions, category form grouping and existing command ownership.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "warehouse",
+      "name": "Warehouse",
+      "packet": "M4",
+      "requiredSurfaceInventory": "`/warehouse`; stock; lots; serials; transfers; stock-moves; adjustments; cycle-counts; cycle-wizard; warehouses; locations; replenishment. `/inventory/transfers/[id]` and authorized linked receive/deliver/count/setup workflows. Do not expose unrelated legacy Inventory tabs.",
+      "sourceReview": "reviewed",
+      "implementation": "Product/location/unit context, bounded movement/count lists and detail values, cycle count form labels; no additional legacy Inventory admission.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "fleet",
+      "name": "Fleet",
+      "packet": "M4",
+      "requiredSurfaceInventory": "`/fleet`; fleet-vehicles; fleet-driver-assignment; fleet-service-records; fleet-inspections. `/fleet/vehicles/[id]`, driver assignment, service, inspection, and accounting linkage forms.",
+      "sourceReview": "reviewed",
+      "implementation": "Vehicle/plate identity, assignment/service/inspection columns, record detail and setup/recovery context.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "overview",
+      "name": "Overview",
+      "packet": "M8",
+      "requiredSurfaceInventory": "`/overview`; attention queues, company/date context, summaries, shortcuts, and page editing where supported. All displayed destinations must land in the correct scoped state.",
+      "sourceReview": "reviewed",
+      "implementation": "Company/date context, attention work prioritized, explanatory disclosures and customization in header.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "tasks",
+      "name": "My work",
+      "packet": "M8",
+      "requiredSurfaceInventory": "`/tasks`; current list/board/filter states, task detail, assignment, activity, due-date and linked record interactions; composition host.",
+      "sourceReview": "reviewed",
+      "implementation": "Fixed task work before optional insights, clear task assignment/due/source details and responsive work review.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "approvals",
+      "name": "Approvals",
+      "packet": "M8",
+      "requiredSurfaceInventory": "`/approvals`; inbox/filter states, request review detail, available bulk actions, approve/reject/review and related-record handoffs.",
+      "sourceReview": "reviewed",
+      "implementation": "Scope-aware counts, valid-record targeting, acting principal and requested effect, optional rejection comments and accessible review.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "documents",
+      "name": "Documents",
+      "packet": "M7",
+      "requiredSurfaceInventory": "`/documents`; documents; knowledge-base; knowledge-categories; document-folders; documents-recycle-bin; document-templates; mail-templates; document-processing; document-insights; dashboard where exposed. `/documents/[id]`, `/documents/knowledge`, `/documents/knowledge/[id]`; file/folder/version/viewer/template dialogs.",
+      "sourceReview": "reviewed",
+      "implementation": "Shared exact file identity, adaptive cards/list, viewer/version detail/context, explicit upload actions, knowledge/templates/folders/trash tables; existing recovery and access preserved.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "calendar",
+      "name": "Calendar",
+      "packet": "M8",
+      "requiredSurfaceInventory": "`/calendar`; calendar; events; activities; dashboard where exposed. `/calendar/events/[id]`, event/activity create/edit, attendee and linked-record interactions.",
+      "sourceReview": "reviewed",
+      "implementation": "Date-only all-day events, attendee names and timezone, record dimensions and exact return context.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "settings",
+      "name": "Settings",
+      "packet": "M9",
+      "requiredSurfaceInventory": "`/settings`; built-in `profile`, `notifications`, `appearance`, `custom-fields`, `organization`, `users`, `roles`, `sso`, `ai`, `form-config`, and `audit`, filtered by the actual exposure and permission policies; `my-profile` fallback; host sections `finance-setup`, `imports`, `integrations`, and `advanced`. Include their company, membership/role, session/security and other action forms. `/settings/import-jobs/[id]`, saved import and historical-data review flows.",
+      "sourceReview": "reviewed",
+      "implementation": "Alpha import entry restored, same-section deep links, start/continue/review first, bounded history and clear file identity; administration admission preserved.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    },
+    {
+      "id": "ai-assistant",
+      "name": "AI assistant",
+      "packet": "M9",
+      "requiredSurfaceInventory": "Existing shell-integrated full/side chat, context selection, history, composer/attachments, results, errors, native actions, prefilled forms, and proposed widgets. Do not assume there is a standalone `/ai-assistant` page. Include linked skills/harness/draft/presentation inspection only where an alpha journey and permissions actually reach them.",
+      "sourceReview": "reviewed",
+      "implementation": "Side/full context, selected files, proposal versus confirmed outcomes, native form/widget dispatch and saved import continuation.",
+      "browserAcceptance": "pending GitHub CI",
+      "deployedAcceptance": "not run"
+    }
+  ]
+}

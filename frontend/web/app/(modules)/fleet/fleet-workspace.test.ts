@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   fleetCompanyRows,
   fleetHistoryRows,
+  fleetVehicleChoiceLabel,
   fleetVehicleRows,
   fleetVehicleTypes,
 } from "./fleet-workspace";
@@ -93,18 +94,21 @@ test("history uses authorized names and retains real currency and exact accounti
       },
     ],
     {
-      vehicles: [{ id: 8, name: "Delivery truck" }],
+      vehicles: [{ id: 8, name: "Delivery truck", licensePlate: { some: "RAA 201" } }],
       serviceTypes: [{ id: 12, name: "Oil service" }],
       employees: [],
       currencies: [{ id: 3, code: "RWF" }],
     },
   );
   assert.equal(rows[0]?.vehicle_name, "Delivery truck");
+  assert.equal(rows[0]?.vehicle_plate, "RAA 201");
+  assert.equal(fleetVehicleChoiceLabel({ id: 8, name: "Delivery truck", licensePlate: { some: "RAA 201" } }), "Delivery truck · RAA 201");
   assert.equal(rows[0]?.service_type_name, "Oil service");
   assert.equal(rows[0]?.inspector_name, "#42");
   assert.equal(rows[0]?.currency_name, "RWF");
   assert.equal(rows[0]?.account_move_id, "9007199254740993");
   assert.equal(rows[1]?.vehicle_name, "#99");
+  assert.equal(rows[1]?.vehicle_plate, undefined);
   assert.equal(rows[1]?.currency_name, "—");
   assert.equal(rows[1]?.cost_amount, null);
   assert.equal(rows[1]?.outcome, "failed");

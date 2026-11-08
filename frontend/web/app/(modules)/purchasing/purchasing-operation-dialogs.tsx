@@ -219,7 +219,7 @@ function OperationDialog({
 }: OperationDialogProps) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !pending) onDismiss() }}>
-      <DialogContent className="flex max-h-[90dvh] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+      <DialogContent size="form" className="flex min-h-0 flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="min-w-0 shrink-0 p-6 pr-12">
           <DialogTitle className="[overflow-wrap:anywhere]">{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

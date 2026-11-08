@@ -5,6 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
+import { stbEnumTag } from "../lib/accounting-move-utils"
 import type { ModuleDataState } from "../lib/module-data-state"
 import {
   savedAssetSchedule,
@@ -41,10 +42,7 @@ export function AssetDepreciationSchedule({
     dataState.status === "ready"
       ? savedAssetSchedule(asset, lines, companyId)
       : { status: "unavailable" as const }
-  const state =
-    typeof asset.state === "object" && asset.state != null && "tag" in asset.state
-      ? String(asset.state.tag)
-      : String(asset.state ?? "")
+  const state = stbEnumTag(asset.state)
   const number = (value: number | null) =>
     value == null
       ? "—"

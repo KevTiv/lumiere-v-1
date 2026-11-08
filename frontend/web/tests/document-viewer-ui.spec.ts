@@ -136,6 +136,32 @@ async function setup(page: Page) {
 }
 
 for (const width of [390, 1440]) {
+  test(`file cards keep distinct original names at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    await setup(page)
+    await page.getByTestId("file-browser-layout-grid").click()
+    const signed = page.getByTestId("file-browser-file-5")
+    const exported = page.getByTestId("file-browser-file-6")
+    await expect(signed.getByRole("button", { name: "Quarter-end evidence", exact: true })).toBeVisible()
+    await expect(exported.getByRole("button", { name: "Quarter-end evidence", exact: true })).toBeVisible()
+    await expect(signed).toContainText("PDF · 1.5 KB")
+    await expect(exported).toContainText("Spreadsheet · 400 B")
+
+    const reveal = signed.getByRole("button", { name: /^Show original filename:/ })
+    const extension = reveal.getByText(".PDF", { exact: true })
+    const cardBounds = await signed.boundingBox()
+    const extensionBounds = await extension.boundingBox()
+    expect(cardBounds && extensionBounds && extensionBounds.x + extensionBounds.width <= cardBounds.x + cardBounds.width).toBe(true)
+    await reveal.focus()
+    await page.keyboard.press("Enter")
+    const original = page.getByRole("dialog", { name: "Original filename" })
+    await expect(original).toContainText("Supplier reconciliation for the north distribution center ".repeat(4) + " signed.PDF")
+    await expect(page.getByRole("dialog", { name: "File preview" })).toHaveCount(0)
+    await page.keyboard.press("Escape")
+    await expect(reveal).toBeFocused()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
+  })
+
   test(`Documents and ERP attachments share versioned CSV preview at ${width}px`, async ({
     page,
   }) => {

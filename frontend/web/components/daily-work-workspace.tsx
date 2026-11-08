@@ -4,6 +4,8 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import { DashboardHeader, useRBAC } from "@lumiere/ui"
+import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
+import { OperationalPageComposition } from "./operational-page-composition"
 import { WorkBoardWorkspace } from "./work-board/work-board-workspace"
 import { dailyWorkHref } from "./daily-work-navigation"
 
@@ -15,6 +17,7 @@ export function DailyWorkWorkspace({ organizationId, summary = false }: {
   const { t } = useTranslation()
   const { checkPermission, permissionsReady } = useRBAC()
   const params = useSearchParams()
+  const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
   const canReadCrm = permissionsReady !== false && checkPermission("module:crm", "read").allowed
   const canReadProjects = permissionsReady !== false && checkPermission("module:projects", "read").allowed
   const canReadSubscriptions = permissionsReady !== false && checkPermission("module:subscriptions", "read").allowed
@@ -33,8 +36,10 @@ export function DailyWorkWorkspace({ organizationId, summary = false }: {
         </Link>}
       </header> : <DashboardHeader
         title={t("workBoard.title")}
+        secondaryAction={compositionSlot}
         description={t("workspace.dailyWork.shortDescription", { defaultValue: "Review your assignments and record follow-ups." })}
       />}
+      <WorkBoardWorkspace organizationId={organizationId} initialView="mine" defaultLayout="list" embedded />
       <details className="text-sm text-muted-foreground">
         <summary className="w-fit cursor-pointer rounded-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {t("workspace.dailyWork.help", { defaultValue: "How this inbox works" })}
@@ -47,7 +52,6 @@ export function DailyWorkWorkspace({ organizationId, summary = false }: {
       <p className="text-xs text-muted-foreground">{t("workspace.dailyWork.coverage", { defaultValue: "This inbox covers Accounting, Sales, Purchasing and Expenses. CRM follow-ups, subscription billing and report schedules remain in their own workspaces." })}</p>
         </div>
       </details>
-      <WorkBoardWorkspace organizationId={organizationId} initialView="mine" defaultLayout="list" embedded />
       {(canReadCrm || canReadProjects || canReadSubscriptions || canReadReports) && <nav className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-sm" aria-label={t("workspace.dailyWork.otherWork", { defaultValue: "Other workspaces" })}>
         {canReadCrm && <Link href="/crm?tab=my-activities" className="font-medium text-primary underline-offset-4 hover:underline">
           {t("workspace.dailyWork.crmWork", { defaultValue: "CRM daily work" })}
@@ -58,6 +62,7 @@ export function DailyWorkWorkspace({ organizationId, summary = false }: {
         {canReadSubscriptions && <Link href="/subscriptions?tab=due-to-bill" className="font-medium text-primary underline-offset-4 hover:underline">{t("workspace.dailyWork.subscriptionBilling", { defaultValue: "Subscriptions due to bill" })}</Link>}
         {canReadReports && <Link href="/reports?tab=scheduled-reports" className="font-medium text-primary underline-offset-4 hover:underline">{t("workspace.dailyWork.reportSchedules", { defaultValue: "Report schedules" })}</Link>}
       </nav>}
+      {!summary && <OperationalPageComposition moduleId="tasks" title={t("workBoard.title")} actionTarget={compositionTarget} />}
     </section>
   )
 }

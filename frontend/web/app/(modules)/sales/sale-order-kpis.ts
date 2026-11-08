@@ -20,21 +20,31 @@ export function isQuotation(row: Row): boolean {
 }
 
 /** A confirmed order placed in the month of `now`. */
-export function isRevenueThisMonth(row: Row, now: Date): boolean {
+export function isConfirmedOrderThisMonth(row: Row, now: Date): boolean {
   return isSaleOrderConfirmed(row as RowValueMap) && isInMonthOf(kpiDate(firstNonNullKey(row as RowValueMap, 'dateOrder', 'date_order')), now);
 }
 
 /**
  * KPI tiles for the sales order list, counted from the rows it already shows: quotations, orders
- * waiting to be invoiced, and confirmed revenue this month (per currency, never summed across them).
+ * waiting to be invoiced, and confirmed order value this month (per currency, never summed across them).
  */
 export function saleOrderKpis(rows: readonly Row[], ctx: KpiContext): KpiTileDef[] {
   const { t, now } = ctx;
-  const revenueRows = rows.filter((row) => isRevenueThisMonth(row, now));
-  const revenue = sumByCurrency(
-    revenueRows,
-    (row) => Number(firstNonNullKey(row as RowValueMap, 'amountTotal', 'amount_total') ?? 0),
-    currencyCodeOfRow(ctx.currencyCodeById, 'currencyId', 'currency_id'),
+  const confirmedRows = rows.filter((row) => isConfirmedOrderThisMonth(row, now));
+  const amountOf = (row: Row): number => {
+    const amount = firstNonNullKey(row as RowValueMap, 'amountTotal', 'amount_total');
+    if (typeof amount !== 'number' && typeof amount !== 'string') return Number.NaN;
+    return typeof amount === 'string' && !amount.trim() ? Number.NaN : Number(amount);
+  };
+  const missingAmounts = confirmedRows.filter((row) => !Number.isFinite(amountOf(row))).length;
+  const currencyOf = currencyCodeOfRow(ctx.currencyCodeById, 'currencyId', 'currency_id');
+  const hasKnownCurrency = (row: Row) => /^[A-Za-z]{3}$/.test(currencyOf(row));
+  const unresolvedCurrencies = confirmedRows.filter((row) => Number.isFinite(amountOf(row)) && !hasKnownCurrency(row)).length;
+  // Missing currency projections must not combine unrelated monetary units into one bare total.
+  const orderValue = sumByCurrency(
+    confirmedRows.filter(hasKnownCurrency),
+    amountOf,
+    currencyOf,
   );
   return [
     {
@@ -52,12 +62,17 @@ export function saleOrderKpis(rows: readonly Row[], ctx: KpiContext): KpiTileDef
       matches: (row) => isSaleOrderInvoiceable(row as RowValueMap),
     },
     {
+      // Retain the existing selection key for saved list state.
       key: 'revenue',
-      label: t('sales.kpi.revenueThisMonth', { defaultValue: 'Revenue this month' }),
-      value: formatMoneyTotals(revenue, (amount, code) => formatKpiMoney(amount, code, ctx.locale)),
-      hint: t('sales.kpi.revenueOrders', { defaultValue: 'Orders: {{count}}', count: revenueRows.length }),
+      label: t('sales.kpi.revenueThisMonth', { defaultValue: 'Confirmed order value this month' }),
+      value: formatMoneyTotals(orderValue, (amount, code) => formatKpiMoney(amount, code, ctx.locale)),
+      hint: [
+        t('sales.kpi.revenueOrders', { defaultValue: 'Confirmed orders: {{count}} · Current calendar month', count: confirmedRows.length }),
+        missingAmounts > 0 ? t('sales.kpi.missingAmounts', { defaultValue: '{{count}} orders have no valid amount', count: missingAmounts }) : null,
+        unresolvedCurrencies > 0 ? t('sales.kpi.unresolvedCurrencies', { defaultValue: '{{count}} orders excluded because their currency is unavailable', count: unresolvedCurrencies }) : null,
+      ].filter(Boolean).join(' · '),
       tone: 'success',
-      matches: (row) => isRevenueThisMonth(row, now),
+      matches: (row) => isConfirmedOrderThisMonth(row, now),
     },
   ];
 }

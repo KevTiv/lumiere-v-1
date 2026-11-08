@@ -1,6 +1,14 @@
+import { entityColumnLayouts as layout } from "./entity-column-layouts"
+import { recordCurrencyColumn } from "./record-currency-column"
 import type { TFunction } from "i18next"
 import type { EntityAction, EntityViewConfig } from "./entity-view-types"
 import { withReadOnlyStateBoard } from "./entity-state-board"
+
+const subscriptionReference = (t: TFunction) => ({
+  key: "subscriptionId",
+  label: t("subscriptions.lines.columns.subscriptionId", { defaultValue: "Subscription" }),
+  layout: layout.reference,
+})
 
 const subscriptionStateBadges = (t: TFunction) => ({
   badgeVariants: { draft: "secondary", active: "default", paused: "outline", closed: "destructive" },
@@ -33,7 +41,7 @@ export const subscriptionsTableConfig = (
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("subscriptions.subscriptions.searchPlaceholder"),
-    searchKeys: ["code", "description"],
+    searchKeys: ["code", "description", "partnerId", "planId"],
     filters: [
       {
         key: "state",
@@ -48,14 +56,16 @@ export const subscriptionsTableConfig = (
       },
     ],
     columns: [
-      { key: "code", label: t("subscriptions.subscriptions.columns.code"), width: "min-w-28" },
-      { key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description"), width: "min-w-40" },
-      { key: "state", label: t("subscriptions.subscriptions.columns.state"), type: "badge", ...subscriptionStateBadges(t) },
-      { key: "health", label: t("subscriptions.subscriptions.columns.health"), type: "badge", ...healthBadges(t) },
-      { key: "recurringMonthly", label: t("subscriptions.subscriptions.columns.recurringMonthly"), type: "currency", align: "right" },
-      { key: "isTrial", label: t("subscriptions.subscriptions.columns.isTrial"), type: "boolean" },
-      { key: "dateStart", label: t("subscriptions.subscriptions.columns.dateStart"), type: "date" },
-      { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date" },
+      { key: "code", label: t("subscriptions.subscriptions.columns.code"), layout: layout.reference },
+      { key: "partnerId", label: t("subscriptions.subscriptions.columns.customer", { defaultValue: "Customer" }), layout: layout.identity },
+      { key: "planId", label: t("subscriptions.bundles.columns.plan", { defaultValue: "Plan" }), layout: layout.location },
+      { key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description"), layout: layout.description, defaultHidden: true },
+      { key: "state", label: t("subscriptions.subscriptions.columns.state"), type: "badge", layout: layout.status, ...subscriptionStateBadges(t) },
+      { key: "health", label: t("subscriptions.subscriptions.columns.health"), type: "badge", layout: layout.status, ...healthBadges(t) },
+      recordCurrencyColumn("recurringMonthly", t("subscriptions.subscriptions.columns.recurringMonthly")),
+      { key: "isTrial", label: t("subscriptions.subscriptions.columns.isTrial"), type: "boolean", layout: layout.flag, defaultHidden: true },
+      { key: "dateStart", label: t("subscriptions.subscriptions.columns.dateStart"), type: "date", layout: layout.date, defaultHidden: true },
+      { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date", layout: layout.date },
     ],
     emptyMessage: t("subscriptions.subscriptions.emptyMessage"),
     emptyState: {
@@ -80,9 +90,9 @@ export const subscriptionPlansTableConfig = (t: TFunction): EntityViewConfig => 
     searchPlaceholder: t("subscriptions.plans.searchPlaceholder"),
     searchKeys: ["name", "code"],
     columns: [
-      { key: "name", label: t("subscriptions.plans.columns.name"), width: "min-w-40" },
-      { key: "code", label: t("subscriptions.plans.columns.code"), width: "min-w-24" },
-      { key: "billingPeriod", label: t("subscriptions.plans.columns.billingPeriod"), width: "min-w-28" },
+      { key: "name", label: t("subscriptions.plans.columns.name"), layout: layout.identity },
+      { key: "code", label: t("subscriptions.plans.columns.code"), layout: layout.reference },
+      { key: "billingPeriod", label: t("subscriptions.plans.columns.billingPeriod"), layout: layout.reference },
       { key: "billingPeriodUnit", label: t("subscriptions.plans.columns.billingPeriodUnit"), type: "number", align: "right" },
       { key: "trialPeriod", label: t("subscriptions.plans.columns.trialPeriod"), type: "boolean" },
       { key: "trialDuration", label: t("subscriptions.plans.columns.trialDuration"), type: "number", align: "right" },
@@ -109,35 +119,20 @@ export const subscriptionLinesTableConfig = (t: TFunction): EntityViewConfig => 
     }),
     searchKeys: ["name"],
     columns: [
-      {
-        key: "subscriptionId",
-        label: t("subscriptions.lines.columns.subscriptionId", { defaultValue: "Subscription" }),
-        type: "number",
-        align: "right",
-      },
-      { key: "name", label: t("subscriptions.lines.columns.name", { defaultValue: "Description" }), width: "min-w-40" },
+      subscriptionReference(t),
+      { key: "name", label: t("subscriptions.lines.columns.name", { defaultValue: "Description" }), layout: layout.identity },
       {
         key: "productUomQty",
         label: t("subscriptions.lines.columns.qty", { defaultValue: "Qty" }),
         type: "number",
         align: "right",
       },
-      {
-        key: "priceUnit",
-        label: t("subscriptions.lines.columns.priceUnit", { defaultValue: "Unit price" }),
-        type: "currency",
-        align: "right",
-      },
-      {
-        key: "priceSubtotal",
-        label: t("subscriptions.lines.columns.priceSubtotal", { defaultValue: "Subtotal" }),
-        type: "currency",
-        align: "right",
-      },
+      recordCurrencyColumn("priceUnit", t("subscriptions.lines.columns.priceUnit", { defaultValue: "Unit price" })),
+      recordCurrencyColumn("priceSubtotal", t("subscriptions.lines.columns.priceSubtotal", { defaultValue: "Subtotal" })),
       {
         key: "recurringRuleType",
         label: t("subscriptions.lines.columns.recurringRuleType", { defaultValue: "Cadence" }),
-        width: "min-w-24",
+        layout: layout.reference,
       },
     ],
     emptyMessage: t("subscriptions.lines.emptyMessage", { defaultValue: "No subscription lines yet." }),
@@ -197,7 +192,7 @@ export const subscriptionAmendmentsTableConfig = (t: TFunction): EntityViewConfi
         key: "notes",
         type: "markdown",
         label: t("subscriptions.amendments.columns.notes", { defaultValue: "Notes" }),
-        width: "min-w-40",
+        layout: layout.identity,
       },
     ],
     emptyMessage: t("subscriptions.amendments.emptyMessage", {
@@ -219,22 +214,12 @@ export const deferredRevenueSchedulesTableConfig = (t: TFunction): EntityViewCon
     searchKeys: ["description", "state"],
     columns: [
       { key: "id", label: t("subscriptions.deferredSchedules.columns.id"), type: "number", align: "right" },
-      { key: "description", type: "markdown", label: t("subscriptions.deferredSchedules.columns.description"), width: "min-w-40" },
+      { key: "description", type: "markdown", label: t("subscriptions.deferredSchedules.columns.description"), layout: layout.identity },
       { key: "state", label: t("subscriptions.deferredSchedules.columns.state"), type: "badge" },
-      {
-        key: "totalAmount",
-        label: t("subscriptions.deferredSchedules.columns.totalAmount"),
-        type: "currency",
-        align: "right",
-      },
-      {
-        key: "deferredAmount",
-        label: t("subscriptions.deferredSchedules.columns.deferredAmount"),
-        type: "currency",
-        align: "right",
-      },
-      { key: "startDate", label: t("subscriptions.deferredSchedules.columns.startDate"), type: "date" },
-      { key: "endDate", label: t("subscriptions.deferredSchedules.columns.endDate"), type: "date" },
+      recordCurrencyColumn("totalAmount", t("subscriptions.deferredSchedules.columns.totalAmount")),
+      recordCurrencyColumn("deferredAmount", t("subscriptions.deferredSchedules.columns.deferredAmount")),
+      { key: "startDate", label: t("subscriptions.deferredSchedules.columns.startDate"), type: "date", layout: layout.date },
+      { key: "endDate", label: t("subscriptions.deferredSchedules.columns.endDate"), type: "date", layout: layout.date },
     ],
     emptyMessage: t("subscriptions.deferredSchedules.emptyMessage"),
   },
@@ -273,7 +258,7 @@ export const deferredRevenueLinesTableConfig = (
         label: t("subscriptions.deferredLines.columns.recognitionDate"),
         type: "date",
       },
-      { key: "amount", label: t("subscriptions.deferredLines.columns.amount"), type: "currency", align: "right" },
+      recordCurrencyColumn("amount", t("subscriptions.deferredLines.columns.amount")),
       {
         key: "recognized",
         label: t("subscriptions.deferredLines.columns.recognized"),
@@ -301,7 +286,7 @@ export const revenueRecognitionRulesTableConfig = (
     searchKeys: ["description", "notes"],
     columns: [
       { key: "id", label: t("subscriptions.recognitionRules.columns.id"), type: "number", align: "right" },
-      { key: "description", type: "markdown", label: t("subscriptions.recognitionRules.columns.description"), width: "min-w-40" },
+      { key: "description", type: "markdown", label: t("subscriptions.recognitionRules.columns.description"), layout: layout.identity },
       {
         key: "priority",
         label: t("subscriptions.recognitionRules.columns.priority"),
@@ -316,12 +301,12 @@ export const revenueRecognitionRulesTableConfig = (
       {
         key: "recognitionMethod",
         label: t("subscriptions.recognitionRules.columns.recognitionMethod"),
-        width: "min-w-28",
+        layout: layout.reference,
       },
       {
         key: "recognitionPeriod",
         label: t("subscriptions.recognitionRules.columns.recognitionPeriod"),
-        width: "min-w-24",
+        layout: layout.reference,
       },
     ],
     emptyMessage: t("subscriptions.recognitionRules.emptyMessage"),
@@ -341,9 +326,9 @@ export const subscriptionUsageEventsTableConfig = (t: TFunction): EntityViewConf
     searchable: true,
     searchKeys: ["source", "eventId", "status"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
-      { key: "source", label: "Source", width: "min-w-24" },
-      { key: "eventId", label: "Event id", width: "min-w-28" },
+      subscriptionReference(t),
+      { key: "source", label: "Source", layout: layout.reference },
+      { key: "eventId", label: "Event id", layout: layout.reference },
       { key: "quantity", label: "Qty", type: "number", align: "right" },
       { key: "status", label: "Status", type: "badge" },
     ],
@@ -365,9 +350,9 @@ export const subscriptionUsageChargesTableConfig = (t: TFunction): EntityViewCon
     searchable: true,
     searchKeys: ["status", "tierBand", "description"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
+      subscriptionReference(t),
       { key: "quantity", label: "Qty", type: "number", align: "right" },
-      { key: "amount", label: "Amount", type: "currency", align: "right" },
+      recordCurrencyColumn("amount", "Amount"),
       { key: "tierBand", label: "Tier band", width: "min-w-32" },
       { key: "status", label: "Status", type: "badge" },
     ],
@@ -389,7 +374,7 @@ export const subscriptionRatingBacklogTableConfig = (t: TFunction): EntityViewCo
     searchable: true,
     searchKeys: ["source", "eventId"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
+      subscriptionReference(t),
       { key: "source", label: "Source" },
       { key: "eventId", label: "Event id" },
       { key: "quantity", label: "Qty", type: "number", align: "right" },
@@ -413,11 +398,11 @@ export const subscriptionPriceTiersTableConfig = (t: TFunction): EntityViewConfi
     searchable: true,
     searchKeys: ["planId"],
     columns: [
-      { key: "planId", label: "Plan", type: "number", align: "right" },
+      { key: "planId", label: t("subscriptions.bundles.columns.plan", { defaultValue: "Plan" }), layout: layout.identity },
       { key: "sequence", label: "Seq", type: "number", align: "right" },
       { key: "minQty", label: "Min", type: "number", align: "right" },
       { key: "maxQty", label: "Max", type: "number", align: "right" },
-      { key: "unitPrice", label: "Unit price", type: "currency", align: "right" },
+      recordCurrencyColumn("unitPrice", "Unit price"),
       { key: "active", label: "Active", type: "boolean" },
     ],
     emptyMessage: t("subscriptions.priceTiers.emptyMessage", {
@@ -438,7 +423,7 @@ export const subscriptionPastDueTableConfig = (t: TFunction): EntityViewConfig =
     searchable: true,
     searchKeys: ["subscriptionId", "stage"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
+      subscriptionReference(t),
       { key: "stage", label: "Stage", type: "badge" },
       { key: "failedPaymentCount", label: "Failures", type: "number", align: "right" },
       { key: "pastDueDays", label: "Past-due days", type: "number", align: "right" },
@@ -462,7 +447,7 @@ export const subscriptionDueToBillTableConfig = (t: TFunction): EntityViewConfig
     searchable: true,
     searchKeys: ["subscriptionId"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
+      subscriptionReference(t),
       { key: "stage", label: "Stage", type: "badge" },
       { key: "dueToBill", label: "Due", type: "boolean" },
     ],
@@ -484,8 +469,8 @@ export const subscriptionEntitlementsTableConfig = (t: TFunction): EntityViewCon
     searchable: true,
     searchKeys: ["featureCode", "status"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
-      { key: "partnerId", label: "Partner", type: "number", align: "right" },
+      subscriptionReference(t),
+      { key: "partnerId", label: t("subscriptions.subscriptions.columns.customer", { defaultValue: "Customer" }), layout: layout.identity },
       { key: "featureCode", label: "Feature", width: "min-w-32" },
       { key: "status", label: "Status", type: "badge" },
     ],
@@ -507,9 +492,9 @@ export const subscriptionBundlesTableConfig = (t: TFunction): EntityViewConfig =
     searchable: true,
     searchKeys: ["name", "code", "planName"],
     columns: [
-      { key: "name", label: t("subscriptions.bundles.columns.name", { defaultValue: "Name" }), width: "min-w-40" },
-      { key: "code", label: t("subscriptions.bundles.columns.code", { defaultValue: "Code" }), width: "min-w-24" },
-      { key: "planName", label: t("subscriptions.bundles.columns.plan", { defaultValue: "Plan" }), width: "min-w-40" },
+      { key: "name", label: t("subscriptions.bundles.columns.name", { defaultValue: "Name" }), layout: layout.identity },
+      { key: "code", label: t("subscriptions.bundles.columns.code", { defaultValue: "Code" }), layout: layout.reference },
+      { key: "planName", label: t("subscriptions.bundles.columns.plan", { defaultValue: "Plan" }), layout: layout.identity },
       { key: "active", label: t("subscriptions.bundles.columns.active", { defaultValue: "Active" }), type: "boolean" },
     ],
     emptyMessage: t("subscriptions.bundles.emptyMessage", {
@@ -522,7 +507,7 @@ export const subscriptionPaymentIntentsTableConfig = (t: TFunction): EntityViewC
   id: "subscription-payment-intents-table",
   title: t("subscriptions.paymentIntents.title", { defaultValue: "Payment intents" }),
   description: t("subscriptions.paymentIntents.description", {
-    defaultValue: "Card + local rail charge intents for workers",
+    defaultValue: "Requested card and local payment charges. An intent alone does not confirm payment.",
   }),
   view: {
     mode: "table",
@@ -530,9 +515,9 @@ export const subscriptionPaymentIntentsTableConfig = (t: TFunction): EntityViewC
     searchable: true,
     searchKeys: ["intentType", "status"],
     columns: [
-      { key: "subscriptionId", label: "Subscription", type: "number", align: "right" },
+      subscriptionReference(t),
       { key: "intentType", label: "Rail", type: "badge" },
-      { key: "amount", label: "Amount", type: "currency", align: "right" },
+      recordCurrencyColumn("amount", "Amount"),
       { key: "status", label: "Status", type: "badge" },
       { key: "fallbackDraftInvoice", label: "Draft fallback", type: "boolean" },
     ],
@@ -570,8 +555,8 @@ export const subscriptionsWithBoard = (t: TFunction, config: EntityViewConfig): 
       titleKey: "code",
       fields: [{ key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description") }],
       footerFields: [
-        { key: "recurringMonthly", label: t("subscriptions.subscriptions.columns.recurringMonthly"), type: "currency" },
-        { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date" },
+        recordCurrencyColumn("recurringMonthly", t("subscriptions.subscriptions.columns.recurringMonthly")),
+        { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date", layout: layout.date },
       ],
     },
   })

@@ -13,6 +13,7 @@ import {
   CommandList,
 } from "./command"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
+import { recordPickerPopupClass } from "./record-picker-layout"
 
 export interface RecordPickerOption {
   value: string
@@ -28,6 +29,9 @@ export interface RecordPickerProps {
   placeholder?: string
   searchPlaceholder?: string
   emptyText?: string
+  loadingText?: string
+  errorText?: string
+  unavailableLabel?: (value: string) => string
   disabled?: boolean
   invalid?: boolean
   id?: string
@@ -47,6 +51,9 @@ export function RecordPicker({
   placeholder = "Select...",
   searchPlaceholder = "Search...",
   emptyText = "No matches",
+  loadingText,
+  errorText,
+  unavailableLabel = (missing) => `Unavailable selection: ${missing}`,
   disabled,
   invalid,
   id,
@@ -56,6 +63,7 @@ export function RecordPicker({
 }: RecordPickerProps) {
   const [open, setOpen] = useState(false)
   const selected = options.find((option) => option.value === value)
+  const label = selected?.label ?? (value ? unavailableLabel(value) : placeholder)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -79,14 +87,18 @@ export function RecordPicker({
           />
         }
       >
-        <span className="truncate">{selected?.label ?? placeholder}</span>
+        <span className="min-w-0 truncate" title={label}>{label}</span>
         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden="true" />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-(--anchor-width) min-w-64 p-0">
-        <Command>
+      <PopoverContent align="start" className={recordPickerPopupClass}>
+        <Command className="min-h-0">
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
+            {errorText ? (
+                <p role="alert" className="px-3 py-2 text-sm text-destructive">{errorText}</p>
+              ) : loadingText ? (
+                <p role="status" className="px-3 py-2 text-sm text-muted-foreground">{loadingText}</p>
+              ) : <CommandEmpty>{emptyText}</CommandEmpty>}
             {options.map((option) => (
               <CommandItem
                 key={option.value}

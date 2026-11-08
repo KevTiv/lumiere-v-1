@@ -676,7 +676,7 @@ it("saved native receipts link their jobs without claiming full ERP verification
         name: "Open import job and row errors",
       })
     ).getAttribute("href"),
-  ).toBe("/settings/import-jobs/90?companyId=3")
+  ).toBe(`/settings/import-jobs/90?companyId=3&fromTask=${taskId}`)
   expect(
     screen.getByText(
       "Only the latest 20 native receipts for this task are shown. More saved receipts exist.",
