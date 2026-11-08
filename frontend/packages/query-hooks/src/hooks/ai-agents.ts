@@ -7,6 +7,7 @@ import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { AiAgent } from "@lumiere/stdb/types"
+import { dispatchAiAgentActionCommand } from "../operations/ai-agent-action-command"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -82,11 +83,7 @@ export function useSetAiAgentActive(organizationId: number) {
 export function useSetAiAgentAction(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { agentId: number; action: "chat" | "analytics_read" | "analytics_run" | "web_search"; enabled: boolean }) => {
-      const { urlPath, init } = stdbBffCommandPost("set_ai_agent_action", args)
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
-    },
+    mutationFn: dispatchAiAgentActionCommand,
     onSuccess: () => invalidateAiAgents(qc, organizationId),
   })
 }
