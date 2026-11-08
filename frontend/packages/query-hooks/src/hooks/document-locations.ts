@@ -1,11 +1,9 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { decodeOperationDispatch } from "@lumiere/api-client"
-import { scalarToU64 } from "@lumiere/erp-shared/u64"
-import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type { DocumentFolder } from "@lumiere/stdb/types"
-import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
+import { fetchQueryList, rqBigIntKey } from "../http"
+import { dispatchDocumentLocationCommand } from "../operations/document-location-commands"
 import { documentLocationResource, normalizeDocumentLocationAction, resolveDocumentLocationEffect, type DocumentLocationAction } from "./document-location-effect"
 import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect } from "./operation-effect"
 import { documentReadRefresh } from "./document-read-refresh"
@@ -31,7 +29,6 @@ export function useDocumentLocationMutation(
     mutationFn: async (action: DocumentLocationAction) => {
       action = normalizeDocumentLocationAction(action)
       assertCurrent(action)
-      const id = scalarToU64(action.id)
       const outcome = await executeOperationWithCanonicalReadback({
         resolveEffect: async () => {
           assertCurrent(action)
@@ -41,14 +38,7 @@ export function useDocumentLocationMutation(
         },
         dispatch: async () => {
           assertCurrent(action)
-          const command = action.kind === "trashFolder"
-            ? stdbBffCommandPost("trash_document_folder", { folderId: id })
-            : action.kind === "moveFolder"
-              ? stdbBffCommandPost("move_document_folder", { folderId: id, parentId: action.parentId === null ? null : scalarToU64(action.parentId) })
-              : action.kind === "restoreFolder"
-                ? stdbBffCommandPost("restore_document_folder", { folderId: id, parentId: action.parentId === null ? null : scalarToU64(action.parentId) })
-                : stdbBffCommandPost("move_document", { documentId: id, folderId: action.folderId === null ? null : scalarToU64(action.folderId) })
-          return decodeOperationDispatch(await apiFetch(command.urlPath, command.init), "The file operation could not be completed")
+          return dispatchDocumentLocationCommand(action)
         },
         readbackAttempts: 6,
         readbackDelayMs: 150,
