@@ -66,6 +66,7 @@ import { useApprovalInboxCount } from "@lumiere/query-hooks/hooks/approvals"
 import { useRecordEvidenceContribution } from "@lumiere/query-hooks/hooks/ai-evidence-contributions"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext, useErpAiErrorQuestion } from "@/lib/erp-ai-context"
 import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
@@ -156,6 +157,23 @@ function ErpAiChatPanel({
   [identity, orgReady, organizationId, operatingCompanyId])
   const allowedActionModules = useMemo(() => [...new Set(ALPHA_ASSISTANT_CAPABILITIES.map(capability => capability.module))]
     .filter(moduleId => isWorkspaceSurfaceVisible(workspaceProfile, moduleId)), [workspaceProfile])
+  const agentsQuery = useAiAgents(orgId, orgReady && operatingCompanyId != null)
+  const chatAgents = useMemo(
+    () => (agentsQuery.data ?? []).flatMap((agent) => {
+      const id = Number(agent.id)
+      if (!Number.isSafeInteger(id) || id <= 0 || !agent.isActive) return []
+      if (agent.companyId != null && Number(agent.companyId) !== operatingCompanyId) return []
+      if (!agent.allowedActions.includes("chat")) return []
+      if (agent.allowedModels.length > 0 && !agent.allowedModels.includes(agent.model)) return []
+      return [{ value: String(id), label: agent.name || agent.model }]
+    }),
+    [agentsQuery.data, operatingCompanyId],
+  )
+  const [selectedAgent, setSelectedAgent] = useState("default")
+  useEffect(() => setSelectedAgent("default"), [organizationId, operatingCompanyId])
+  const requestedAgentId = chatAgents.some(({ value }) => value === selectedAgent)
+    ? Number(selectedAgent)
+    : undefined
   const rag = useAiMemoryRag()
   const actionDraft = useAiActionDraft()
   const actorHistoryScope = assistantHistoryScope(identity, organizationId, operatingCompanyId)
@@ -506,12 +524,14 @@ function ErpAiChatPanel({
           if (!stream) return assistantAnswer(await rag.mutateAsync({
             query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
             include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
+            ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
           }))
           const response = await fetch("/api/ai/rag/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
+              ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
               ...(includeTypes.length ? { include_types: includeTypes } : {}),
               ...(uiContext ? { ui_context: uiContext } : {}),
               ...(guideRefs?.length ? { guide_refs: guideRefs } : {}),
@@ -548,7 +568,7 @@ function ErpAiChatPanel({
       })
       return { content, runId: out?.run_id, sources, guides, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
-    [orgId, orgReady, operatingCompanyId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
+    [orgId, orgReady, operatingCompanyId, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
@@ -608,6 +628,9 @@ function ErpAiChatPanel({
       contextOptions={AI_WORKSPACE_SCOPES}
       selectedContext={selectedScope}
       onContextChange={setSelectedScope}
+      agentOptions={chatAgents}
+      selectedAgent={selectedAgent}
+      onAgentChange={setSelectedAgent}
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
       onImportFiles={importTasks.onImportFiles}
