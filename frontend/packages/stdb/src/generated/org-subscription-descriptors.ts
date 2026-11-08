@@ -478,6 +478,11 @@ export const ORG_SUBSCRIPTION_QUERY_DESCRIPTORS = {
     "predicates": [],
     "order_by": []
   },
+  "document-folders-deleted": {
+    "table": "doc_folder",
+    "predicates": [],
+    "order_by": []
+  },
   "document-legal-holds": {
     "table": "document_legal_hold",
     "predicates": [],
