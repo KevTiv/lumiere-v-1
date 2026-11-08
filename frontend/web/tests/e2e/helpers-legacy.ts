@@ -938,9 +938,13 @@ export async function installPostHogResetProbe(page: Page) {
   }
 }
 
+function entityRowCheckbox(row: Locator) {
+  return row.getByTestId(/^entity-select-row-/)
+}
+
 async function checkEntityRow(row: Locator) {
   // A click on a cell can disclose its text, open a link, or open the record.
-  const checkbox = row.getByTestId(/^entity-select-row-/)
+  const checkbox = entityRowCheckbox(row)
   await expect(checkbox).toBeVisible()
   await checkbox.setChecked(true)
   await expect(checkbox).toBeChecked()
@@ -961,9 +965,16 @@ export async function selectEntityRowById(page: Page, id: number | string) {
   const row = table.getByTestId(`entity-row-${id}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
 
-  const clearSelection = table.getByTestId("entity-selection-clear")
-  if (await clearSelection.isVisible()) await clearSelection.click()
+  const selection = table.getByTestId("entity-selection-actions")
+  const soleSelection = selection.getByText("1 selected", { exact: true })
+  const clearSelection = selection.getByTestId("entity-selection-clear")
+  if (await clearSelection.isVisible() &&
+      !(await soleSelection.isVisible() && await entityRowCheckbox(row).isChecked())) {
+    // The notification stack can cover the button while a mutation settles.
+    await clearSelection.press("Enter", { timeout: 10_000 })
+  }
   await checkEntityRow(row)
+  if (await selection.isVisible()) await expect(soleSelection).toBeVisible()
 }
 
 /** Wait until a selection-gated entity action is enabled (proves row context is applied). */
