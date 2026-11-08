@@ -295,6 +295,7 @@ export function useAiMemoryRag() {
     mutationFn: async (args: {
       query: string
       companyId: number
+      agent_id?: number
       include_types?: string[]
       limit?: number
       ui_context?: AiUiContext
@@ -307,6 +308,7 @@ export function useAiMemoryRag() {
         body: JSON.stringify({
           query: args.query,
           companyId: args.companyId,
+          ...(args.agent_id != null ? { agent_id: args.agent_id } : {}),
           ...(args.include_types?.length ? { include_types: args.include_types } : {}),
           ...(args.limit != null ? { limit: args.limit } : {}),
           ...(args.ui_context ? { ui_context: args.ui_context } : {}),
