@@ -6,7 +6,11 @@ import ts from "typescript"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { toCreateAiAgentParams } from "@lumiere/erp-shared/ai-create-params"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import type { useCreateAiAgent, useUpdateAiAgent } from "./ai-agents"
+import type {
+  useCreateAiAgent,
+  useUpdateAiAgent,
+  useSetAiAgentAction,
+} from "./ai-agents"
 
 type CreateAgentInput = Parameters<
   ReturnType<typeof useCreateAiAgent>["mutateAsync"]
@@ -15,6 +19,9 @@ type UpdateAgentInput = Parameters<
   ReturnType<typeof useUpdateAiAgent>["mutateAsync"]
 >[0]
 type Mutation<T> = { mutationFn(params: T): Promise<void> }
+type ActionInput = Parameters<
+  ReturnType<typeof useSetAiAgentAction>["mutateAsync"]
+>[0]
 
 function fixture() {
   const requests: { path: string; body: unknown }[] = []
@@ -46,6 +53,7 @@ function fixture() {
     exports: {} as {
       useCreateAiAgent(organizationId: number): Mutation<CreateAgentInput>
       useUpdateAiAgent(organizationId: number): Mutation<UpdateAgentInput>
+      useSetAiAgentAction(organizationId: number): Mutation<ActionInput>
     },
   }
   runInNewContext(compiled, {
@@ -63,8 +71,20 @@ function fixture() {
     requests,
     create: module.exports.useCreateAiAgent(7).mutationFn,
     update: module.exports.useUpdateAiAgent(7).mutationFn,
+    setAction: module.exports.useSetAiAgentAction(7).mutationFn,
   }
 }
+
+test("action toggles send only the exact binding and preserve private agent configuration", async () => {
+  const f = fixture()
+  await f.setAction({ agentId: 12, action: "chat", enabled: true })
+  assert.deepEqual(f.requests, [
+    {
+      path: "/api/operations/erp.set_ai_agent_action",
+      body: { agentId: 12, action: "chat", enabled: true },
+    },
+  ])
+})
 
 const createForm = {
   name: "Chat agent",

@@ -67,6 +67,7 @@ import { useRecordEvidenceContribution } from "@lumiere/query-hooks/hooks/ai-evi
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
+import { chatAgentOptions } from "@/lib/chat-agent-options"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext, useErpAiErrorQuestion } from "@/lib/erp-ai-context"
 import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
@@ -159,14 +160,7 @@ function ErpAiChatPanel({
     .filter(moduleId => isWorkspaceSurfaceVisible(workspaceProfile, moduleId)), [workspaceProfile])
   const agentsQuery = useAiAgents(orgId, orgReady && operatingCompanyId != null)
   const chatAgents = useMemo(
-    () => (agentsQuery.data ?? []).flatMap((agent) => {
-      const id = Number(agent.id)
-      if (!Number.isSafeInteger(id) || id <= 0 || !agent.isActive) return []
-      if (agent.companyId != null && Number(agent.companyId) !== operatingCompanyId) return []
-      if (!agent.allowedActions.includes("chat")) return []
-      if (agent.allowedModels.length > 0 && !agent.allowedModels.includes(agent.model)) return []
-      return [{ value: String(id), label: agent.name || agent.model }]
-    }),
+    () => chatAgentOptions(agentsQuery.data ?? [], operatingCompanyId),
     [agentsQuery.data, operatingCompanyId],
   )
   const [selectedAgent, setSelectedAgent] = useState("default")
@@ -521,6 +515,9 @@ function ErpAiChatPanel({
       const turn = await coordinateAssistantTurn({
         isCurrent,
         answer: async () => {
+          if (selectedAgent !== "default" && requestedAgentId == null) {
+            throw new Error("The selected AI agent is no longer available. Choose another agent.")
+          }
           if (!stream) return assistantAnswer(await rag.mutateAsync({
             query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
             include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
@@ -568,7 +565,7 @@ function ErpAiChatPanel({
       })
       return { content, runId: out?.run_id, sources, guides, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
-    [orgId, orgReady, operatingCompanyId, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
+    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(

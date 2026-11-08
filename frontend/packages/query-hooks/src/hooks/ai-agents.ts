@@ -79,6 +79,18 @@ export function useSetAiAgentActive(organizationId: number) {
   })
 }
 
+export function useSetAiAgentAction(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { agentId: number; action: "chat" | "analytics_read" | "analytics_run" | "web_search"; enabled: boolean }) => {
+      const { urlPath, init } = stdbBffCommandPost("set_ai_agent_action", args)
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => invalidateAiAgents(qc, organizationId),
+  })
+}
+
 export function useCreateAiTeamMember(organizationId: number) {
   return useMutation({
     mutationFn: async (args: { companyId: number | null; params: Record<string, unknown> }) => {
