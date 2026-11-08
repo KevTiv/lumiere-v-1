@@ -297,8 +297,8 @@ mod tests {
 
     #[test]
     fn restricted_audiences_cannot_be_broadened_by_a_move() {
-        let owner = Identity::from_u128(1);
-        let other = Identity::from_u128(2);
+        let owner = Identity::from_byte_array([1; 32]);
+        let other = Identity::from_byte_array([2; 32]);
         let limited = Audience::Only(BTreeSet::from([owner]));
         assert!(limited.is_subset_of(&Audience::Everyone));
         assert!(!Audience::Everyone.is_subset_of(&limited));
