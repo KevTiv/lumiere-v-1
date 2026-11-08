@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Bot, Database, Loader2, Plus, RefreshCw, Shield, Sparkles, Trash2, Coins } from "lucide-react"
+import { hasCompleteAiAgentConfiguration } from "./ai-agent-configuration"
 
 type Row = Record<string, unknown>
 
@@ -864,7 +865,13 @@ export function AiSettings() {
                         />
                         <span className="text-sm text-muted-foreground">{t("settings.ai.active")}</span>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => setEditAgent(a)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditAgent(a)}
+                        disabled={mutating || agentOpsPending || !hasCompleteAiAgentConfiguration(a)}
+                        title={!hasCompleteAiAgentConfiguration(a) ? "Full agent settings are unavailable. You can still change individual action bindings." : undefined}
+                      >
                         {t("settings.ai.edit")}
                       </Button>
                       <div className="flex items-center gap-2">
@@ -1033,6 +1040,10 @@ export function AiSettings() {
           onSubmit={async (data) => {
             setEditAgentError(null)
             if (!orgId) return
+            if (!hasCompleteAiAgentConfiguration(editAgent)) {
+              setEditAgentError("Full agent settings are unavailable. Reopen settings with access to the complete configuration.")
+              return
+            }
             const aid = Number.parseInt(String(data.agentId), 10)
             if (!Number.isFinite(aid)) {
               setEditAgentError(t("settings.ai.mutationError"))
