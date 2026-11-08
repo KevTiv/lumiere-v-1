@@ -380,7 +380,7 @@ export function AiSettings() {
 
   const handleToggleAgentAction = async (
     agent: Row,
-    action: "analytics_read" | "analytics_run" | "web_search",
+    action: "chat" | "analytics_read" | "analytics_run" | "web_search",
     enabled: boolean,
   ) => {
     if (!orgId) return
@@ -808,6 +808,17 @@ export function AiSettings() {
                         {a.monthlyBudget != null ? ` / ${t("settings.ai.budget")} ${Number(a.monthlyBudget).toFixed(2)}` : ""}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-4">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={agentAllowedActions(a).includes("chat")}
+                            onCheckedChange={(checked) => {
+                              void handleToggleAgentAction(a, "chat", checked)
+                            }}
+                            disabled={mutating || agentOpsPending}
+                            aria-label="Allow this agent to answer chat"
+                          />
+                          <span className="text-xs text-muted-foreground">Chat</span>
+                        </div>
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={agentAllowedActions(a).includes("analytics_read")}
