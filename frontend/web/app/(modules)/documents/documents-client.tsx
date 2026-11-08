@@ -239,7 +239,7 @@ function DocumentsClientLoaded({
     kind: "moveFolder" | "restoreFolder" | "moveDocument"
     id: string
     name: string
-    parentId: string | null
+    parentId: string | null | undefined
   } | null>(null)
   const [locationError, setLocationError] = useState<string | null>(null)
   useEffect(() => { setViewer(null); setLocationDialog(null); setLocationError(null) }, [templateScopeKey])
@@ -286,9 +286,9 @@ function DocumentsClientLoaded({
     checkPermission("document_folder", "create").allowed
   const canReadFolderTrash = browserScopeReady && checkPermission("document_folder", "read").allowed
   const deletedFolderCollection = moduleCollection(useDeletedDocumentFolders(orgId, operatingCompanyId, canReadFolderTrash))
-  const deletedFoldersRead = canReadFolderTrash ? deletedFolderCollection : {
-    rows: [] as DocumentFolder[],
-    state: { status: browserScopeReady ? "denied" : "loading" } as ModuleDataState,
+  const deletedFoldersRead: typeof deletedFolderCollection = canReadFolderTrash ? deletedFolderCollection : {
+    rows: [],
+    state: { status: browserScopeReady ? "denied" : "loading" },
   }
   const canWriteFolders = browserScopeReady && foldersRead.state.status === "ready" && checkPermission("document_folder", "write").allowed
   const canTrashFolders = browserScopeReady && foldersRead.state.status === "ready" && checkPermission("document_folder", "delete").allowed
@@ -611,7 +611,7 @@ function DocumentsClientLoaded({
     assertLocationCurrent(kind)
     const parent = kind === "moveDocument" ? row.folderId : row.parentId
     setLocationError(null)
-    setLocationDialog({ scopeKey: templateScopeKey, kind, id: String(row.id), name: String(row.name ?? ""), parentId: parent == null ? null : String(parent) })
+    setLocationDialog({ scopeKey: templateScopeKey, kind, id: String(row.id), name: String(row.name ?? ""), parentId: parent == null ? parent : String(parent) })
   }
   const locationOptions = documentFolderDestinations(folders, locationDialog?.kind === "moveDocument" ? undefined : locationDialog?.id)
   const locationForm: FormConfig = {
@@ -1421,7 +1421,7 @@ function DocumentsClientLoaded({
       "knowledge-base": articles as unknown as Record<string, unknown>[],
       "knowledge-categories": categories as unknown as Record<string, unknown>[],
       "document-folders": folders as unknown as Record<string, unknown>[],
-      "document-folders-trash": deletedFoldersRead.rows as unknown as Record<string, unknown>[],
+      "document-folders-trash": deletedFoldersRead.rows,
       "documents-recycle-bin": deletedDocuments as unknown as Record<string, unknown>[],
       "document-templates": documentTemplates as unknown as Record<string, unknown>[],
       "mail-templates": mailTemplates as unknown as Record<string, unknown>[],

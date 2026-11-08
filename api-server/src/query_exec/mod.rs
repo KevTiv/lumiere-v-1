@@ -47,6 +47,7 @@ pub use company_scope::{
 };
 use crm::filter_crm_company_rows;
 use documents::{read_document_templates, read_mail_templates};
+pub(crate) use documents::{read_document_versions, read_documents, DocumentReadProjection};
 use hr::{maybe_log_hr_pii_read, read_direct_reports, read_employees, read_my_employee};
 use messaging::read_queued_mail_messages;
 use row_values::row_company_matches;
@@ -473,6 +474,7 @@ async fn read_resource_query_for_company(
             identity_hex,
             fa,
             requested_company_id,
+            DocumentReadProjection::List,
         )
         .await;
     }
@@ -484,6 +486,7 @@ async fn read_resource_query_for_company(
             identity_hex,
             fa,
             requested_company_id,
+            DocumentReadProjection::List,
         )
         .await;
     }
