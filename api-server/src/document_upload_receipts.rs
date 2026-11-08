@@ -1,5 +1,6 @@
 //! Durable upload receipts reuse the private blob store; no browser value proves a save.
 use super::*;
+use crate::query_exec::{read_document_versions, read_documents, DocumentReadProjection};
 use serde_json::Value;
 
 fn require_receipt_fields(access: &stdb_auth::FieldAccessContext) -> Result<(), ApiError> {
@@ -203,13 +204,14 @@ pub(super) async fn require_version_upload(
         ));
     }
     require_receipt_fields(trusted.field_access())?;
-    let documents = execute_resource_query_for_company(
+    let documents = read_documents(
         trusted.client(),
         "documents",
         organization_id,
         trusted.actor_identity(),
         Some(trusted.field_access()),
         Some(company_id),
+        DocumentReadProjection::UploadReceipt,
     )
     .await?;
     if !documents.iter().any(|row| {
@@ -407,22 +409,23 @@ pub(super) async fn receipt(
                 })
         })
         .transpose()?;
-    let rows = execute_resource_query_for_company(
+    let rows = read_documents(
         trusted.client(),
         "documents",
         organization_id,
         trusted.actor_identity(),
         access,
         Some(query.company_id),
+        DocumentReadProjection::UploadReceipt,
     )
     .await?;
-    let versions = execute_resource_query_for_company(
+    let versions = read_document_versions(
         trusted.client(),
-        "document-versions",
         organization_id,
         trusted.actor_identity(),
         access,
         Some(query.company_id),
+        DocumentReadProjection::UploadReceipt,
     )
     .await?;
     let checksum = meta

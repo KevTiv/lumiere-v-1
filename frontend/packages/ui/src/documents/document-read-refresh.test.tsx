@@ -16,7 +16,7 @@ import { moduleCollection } from "../lib/module-data-state"
 
 const transport = vi.hoisted(() => ({ read: vi.fn() }))
 vi.mock("../../../query-hooks/src/http", () => ({
-  apiFetch: vi.fn(),
+  apiFetch: async (path: string) => Response.json({ data: await transport.read(path) }),
   fetchQueryList: transport.read,
   rqBigIntKey: String,
 }))
@@ -90,7 +90,7 @@ beforeEach(() => {
   focusManager.setFocused(true)
   transport.read.mockReset()
   transport.read.mockResolvedValue([
-    { id: "41", name: "Previously permitted row" },
+    { id: "41", organizationId: "7", name: "Previously permitted row" },
   ])
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 })

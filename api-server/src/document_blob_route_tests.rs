@@ -1330,6 +1330,12 @@ async fn version_submission_recovery_preserves_the_exact_historical_version_and_
         .json();
     assert_eq!(historical["versionId"], "32");
     assert_eq!(historical["indexing"], "superseded");
+    fixture.rows.lock().unwrap().documents[0]["folder_id"] = json!(99);
+    fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+    fixture.rows.lock().unwrap().documents[0]["folder_id"] = Value::Null;
     fixture.rows.lock().unwrap().versions[0]["changes_description"] = json!("different intent");
     fixture
         .get("actor-token", &receipt_url)

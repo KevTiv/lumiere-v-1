@@ -153,7 +153,7 @@ pub fn test_folder_tree_move_trash_restore(ctx: &ReducerContext) -> Result<(), S
     trash_document_folder(ctx, org, already_trashed.id)?;
     ctx.db.document().id().update(Document {
         is_locked: true,
-        locked_by: Some(Identity::from_u128(991)),
+        locked_by: Some(Identity::from_byte_array([0xe3; 32])),
         ..live.clone()
     });
     reject(
@@ -380,7 +380,7 @@ pub fn test_folder_scope_acl_and_collision(ctx: &ReducerContext) -> Result<(), S
     )?;
     let other_owner_file = create_file(ctx, &fixture, "other-owner", None)?;
     ctx.db.document().id().update(Document {
-        owner_id: Identity::from_u128(990),
+        owner_id: Identity::from_byte_array([0xe2; 32]),
         ..other_owner_file.clone()
     });
     reject(
@@ -450,7 +450,7 @@ pub fn test_folder_scope_acl_and_collision(ctx: &ReducerContext) -> Result<(), S
         .find(&parent.id)
         .ok_or("Restricted parent missing")?;
     ctx.db.doc_folder().id().update(DocumentFolder {
-        owner_id: Identity::from_u128(989),
+        owner_id: Identity::from_byte_array([0xe1; 32]),
         write_access_ids: vec![],
         read_access_ids: vec![],
         ..restricted
@@ -552,7 +552,7 @@ pub fn test_historical_document_version_retry(ctx: &ReducerContext) -> Result<()
     }
     ctx.db.document().id().update(Document {
         is_locked: true,
-        locked_by: Some(Identity::from_u128(992)),
+        locked_by: Some(Identity::from_byte_array([0xe4; 32])),
         locked_at: Some(ctx.timestamp),
         locked_until: Some(ctx.timestamp),
         ..recovered

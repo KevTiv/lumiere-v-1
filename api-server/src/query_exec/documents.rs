@@ -4,8 +4,8 @@ use crate::error::ApiError;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use stdb_auth::{
-    has_resource_read_permission, identity_sql_literal, resolve_http_sql_columns,
-    FieldAccessContext,
+    has_resource_field_read_permission, has_resource_read_permission, identity_sql_literal,
+    resolve_http_sql_columns, FieldAccessContext,
 };
 use stdb_client::StdbClient;
 
@@ -17,6 +17,62 @@ mod tests;
 
 #[path = "document_tree.rs"]
 mod tree;
+
+pub(crate) enum DocumentReadProjection {
+    List,
+    UploadReceipt,
+}
+
+fn document_read_columns(
+    resource: &str,
+    field_access: Option<&FieldAccessContext>,
+    projection: DocumentReadProjection,
+) -> Result<Vec<String>, ApiError> {
+    if matches!(projection, DocumentReadProjection::List) {
+        return resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal);
+    }
+    // A receipt needs fields omitted by the public lists. Select only those
+    // fields here and enforce the caller's field permissions before the read.
+    let fields: &[&str] = match resource {
+        "documents" => &[
+            "id",
+            "organization_id",
+            "company_id",
+            "owner_id",
+            "is_deleted",
+            "url",
+            "checksum",
+        ],
+        "document-versions" => &[
+            "id",
+            "organization_id",
+            "document_id",
+            "version_number",
+            "file_name",
+            "file_size",
+            "mimetype",
+            "url",
+            "checksum",
+            "metadata",
+            "created_by",
+            "changes_description",
+        ],
+        _ => {
+            return Err(ApiError::Internal(
+                "Invalid document receipt resource".into(),
+            ))
+        }
+    };
+    if fields
+        .iter()
+        .any(|field| !has_resource_field_read_permission(field_access, resource, field))
+    {
+        return Err(ApiError::Forbidden(
+            "Document receipt field access denied".into(),
+        ));
+    }
+    Ok(fields.iter().map(|field| (*field).to_owned()).collect())
+}
 
 // These projections retain the existing owner-scoped document model. Parent
 // membership/ACL/trash state is checked using internal columns, then only the
@@ -118,16 +174,17 @@ pub(super) async fn read_document_folders(
     Ok(rows)
 }
 
-pub(super) async fn read_documents(
+pub(crate) async fn read_documents(
     client: &StdbClient,
     resource: &str,
     organization_id: u64,
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
     requested_company_id: Option<u64>,
+    projection: DocumentReadProjection,
 ) -> Result<Vec<Value>, ApiError> {
     let id = require_read_context(resource, organization_id, identity_hex, field_access)?;
-    let cols = resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal)?;
+    let cols = document_read_columns(resource, field_access, projection)?;
     let deleted = resource == "documents-deleted";
     let sql = format!(
         "SELECT {} FROM document WHERE organization_id = {organization_id} AND is_deleted = {deleted} AND owner_id = {id}", cols.join(", ")
@@ -148,12 +205,13 @@ pub(super) async fn read_documents(
     Ok(rows)
 }
 
-pub(super) async fn read_document_versions(
+pub(crate) async fn read_document_versions(
     client: &StdbClient,
     organization_id: u64,
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
     requested_company_id: Option<u64>,
+    projection: DocumentReadProjection,
 ) -> Result<Vec<Value>, ApiError> {
     let id = require_read_context(
         "document-versions",
@@ -166,8 +224,7 @@ pub(super) async fn read_document_versions(
             "Document read permission denied".into(),
         ));
     }
-    let mut cols =
-        resolve_http_sql_columns("document-versions", field_access).map_err(ApiError::Internal)?;
+    let mut cols = document_read_columns("document-versions", field_access, projection)?;
     let strip_document_id = !cols.iter().any(|column| column == "document_id");
     if strip_document_id {
         cols.push("document_id".into());

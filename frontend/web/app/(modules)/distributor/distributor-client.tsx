@@ -1,7 +1,7 @@
 "use client"
 
 import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
-import { OperationalPageComposition } from "@/components/operational-page-composition"
+import { OperationalPageComposition } from "../../../components/operational-page-composition"
 
 import { useMemo, type ReactNode } from "react"
 import Link from "next/link"

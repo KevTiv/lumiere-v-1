@@ -7,10 +7,11 @@ import { resolveUniqueRow, type CanonicalRecordRef } from "./operation-effect"
 
 export type DocumentLocationAction =
   | {
-      kind: "moveFolder" | "restoreFolder"
+      kind: "moveFolder"
       id: ScalarId
       parentId: ScalarId | null
     }
+  | { kind: "restoreFolder"; id: ScalarId; parentId: ScalarId | null }
   | { kind: "trashFolder"; id: ScalarId }
   | { kind: "moveDocument"; id: ScalarId; folderId: ScalarId | null }
 

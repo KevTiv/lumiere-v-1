@@ -2,7 +2,7 @@
 
 import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
-import { OperationalPageComposition } from "@/components/operational-page-composition"
+import { OperationalPageComposition } from "../../../components/operational-page-composition"
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"

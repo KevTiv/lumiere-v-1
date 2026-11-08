@@ -20,6 +20,7 @@ import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { calendarDate, calendarDayKey, calendarMode, shiftCalendarDate, shiftCalendarMonth } from "@lumiere/ui/lib/calendar-dates"
 import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import type { EntityColumn, EntityRow } from "@lumiere/ui/lib/entity-view-types"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, eventAttendees, eventBoundaryLabel, eventInputValue, eventStateTag, eventText, updateCalendarEventParams } from "./calendar-event"
@@ -103,7 +104,13 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   })
   const contactsRead = moduleCollection(contactsQuery)
   const contacts = useMemo(() => scopeReady && contactsRead.state.status === "ready"
-    ? contactsRead.rows as unknown as Record<string, unknown>[] : [], [scopeReady, contactsRead.state.status, contactsRead.rows])
+    ? contactsRead.rows.map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        displayName: "displayName" in contact ? contact.displayName : undefined,
+        display_name: "display_name" in contact ? contact.display_name : undefined,
+      }))
+    : [], [scopeReady, contactsRead.state.status, contactsRead.rows])
   const returnContext = params.size ? `${pathname}?${params}` : pathname
   const openNewEvent = useCallback(() => setQuickActionForm({
     form: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create", timeZone),
@@ -151,6 +158,12 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           })
   }, [events, moduleConfig, t, newEventDay, timeZone])
 
+  const renderEventBoundary = useCallback(
+    (boundary: "start" | "stop"): NonNullable<EntityColumn["render"]> =>
+      (_value, row) => eventBoundaryLabel({ start: row.start, stop: row.stop, allday: row.allday }, boundary, i18n.language, timeZone),
+    [i18n.language, timeZone],
+  )
+
   const config = useMemo(
     () => ({
       ...moduleConfig,
@@ -170,7 +183,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
             createForm: newCalendarEventForm(t, calendarEventCreationDefaults(newEventDay), "create", timeZone),
             createPermission: { resource: "calendar_event", action: "create" as const },
             entityConfig: tab.entityConfig
-              ? withInlineEdits({ ...tab.entityConfig, view: "columns" in tab.entityConfig.view ? { ...tab.entityConfig.view, columns: tab.entityConfig.view.columns.map((column) => ["start", "stop"].includes(column.key) ? { ...column, render: (_value: unknown, row: Record<string, unknown>) => eventBoundaryLabel(row, column.key === "start" ? "start" : "stop", i18n.language, timeZone) } : column) } : tab.entityConfig.view }, {
+              ? withInlineEdits({ ...tab.entityConfig, view: "columns" in tab.entityConfig.view ? { ...tab.entityConfig.view, columns: tab.entityConfig.view.columns.map((column) => column.key === "start" || column.key === "stop" ? { ...column, render: renderEventBoundary(column.key) } : column) } : tab.entityConfig.view }, {
                   name: {
                     kind: "text",
                     save: async (row, value) => {
@@ -187,18 +200,18 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
               titleKey: "name",
               auditTableName: "calendar_event",
               discussion: {},
-              openHref: (row: Record<string, unknown>) => calendarEventHref(row, returnContext),
+              openHref: (row: EntityRow) => calendarEventHref({ id: row.id }, returnContext),
               detailConfig: {
                 mode: "detail" as const,
                 sections: [
                   {
                     id: "event",
                     fields: [
-                      { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const, render: (_value: unknown, row: Record<string, unknown>) => eventBoundaryLabel(row, "start", i18n.language, timeZone) },
-                      { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const, render: (_value: unknown, row: Record<string, unknown>) => eventBoundaryLabel(row, "stop", i18n.language, timeZone) },
+                      { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const, render: renderEventBoundary("start") },
+                      { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const, render: renderEventBoundary("stop") },
                       { key: "location", label: t("calendar.events.columns.location"), render: (value: unknown) => eventText(value) ?? "—" },
-                      { key: "partnerIds", label: t("calendar.eventDetail.attendees", { defaultValue: "Attendees" }), render: (_: unknown, row: Record<string, unknown>) =>
-                        <span className="[overflow-wrap:anywhere]">{eventAttendees(row, contacts).map(({ label }) => label).join(", ") || t("calendar.eventDetail.noAttendees", { defaultValue: "No attendees" })}</span> },
+                      { key: "partnerIds", label: t("calendar.eventDetail.attendees", { defaultValue: "Attendees" }), render: (_: unknown, row: EntityRow) =>
+                        <span className="[overflow-wrap:anywhere]">{eventAttendees({ partner_ids: row.partner_ids, partnerIds: row.partnerIds }, contacts).map(({ label }) => label).join(", ") || t("calendar.eventDetail.noAttendees", { defaultValue: "No attendees" })}</span> },
                       { key: "description", type: "markdown" as const, label: t("calendar.forms.newEvent.fields.description", { defaultValue: "Description" }) },
                     ],
                   },
@@ -208,7 +221,19 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
           }
         }
         if (tab.id === "calendar") {
-          const uiEvents = events.map((event) => calendarEventForView(event as unknown as Record<string, unknown>, contacts)).filter((event): event is UICalendarEvent => event != null)
+          const uiEvents = events.map((event) => calendarEventForView({
+            id: event.id,
+            name: event.name,
+            description: event.description,
+            location: event.location,
+            start: event.start,
+            stop: event.stop,
+            allday: event.allday,
+            state: event.state,
+            privacy: event.privacy,
+            partnerIds: "partnerIds" in event ? event.partnerIds : undefined,
+            partner_ids: "partner_ids" in event ? event.partner_ids : undefined,
+          }, contacts)).filter((event): event is UICalendarEvent => event != null)
           return {
             ...tab,
             type: "custom" as const,
@@ -274,7 +299,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, newEventDay, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog, canCreateEvent, canEditEvent, canDeleteEvent, contacts, returnContext, openNewEvent, createCalendarEvent.isPending, eventsRead.state.status, updateParams, setSelectedEventId, timeZone, i18n.language, calendarTimezone.source, calendarTimezone.ready, calendarTimezone.fallbackReason],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, newEventDay, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog, canCreateEvent, canEditEvent, canDeleteEvent, contacts, returnContext, openNewEvent, createCalendarEvent.isPending, eventsRead.state.status, updateParams, setSelectedEventId, timeZone, renderEventBoundary, calendarTimezone.source, calendarTimezone.ready, calendarTimezone.fallbackReason],
   )
 
   const data = useMemo(

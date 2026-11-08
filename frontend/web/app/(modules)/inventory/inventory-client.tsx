@@ -18,6 +18,7 @@ import {
 } from '@lumiere/ui/lib/dashboard-sections';
 import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
 import { formatTimestampLike, getRowField, humanizeEnumValue, unwrapEntityValue } from '@lumiere/ui/lib/entity-row-values';
+import type { EntityRow } from '@lumiere/ui/lib/entity-view-types';
 import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
@@ -268,7 +269,7 @@ function TrackingDetailValue({ value }: { value: unknown }) {
 
 function withTrackingDetailValues(
   config: FormConfig,
-  row: Record<string, unknown>,
+  row: EntityRow,
   warehouse: boolean,
   t: TFunction,
 ): FormConfig {

@@ -1,17 +1,17 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { DocumentFolder } from "@lumiere/stdb/types"
 import { fetchQueryList, rqBigIntKey } from "../http"
 import { dispatchDocumentLocationCommand } from "../operations/document-location-commands"
 import { documentLocationResource, normalizeDocumentLocationAction, resolveDocumentLocationEffect, type DocumentLocationAction } from "./document-location-effect"
 import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect } from "./operation-effect"
+import { readDeletedDocumentFolders } from "./deleted-document-folders"
 import { documentReadRefresh } from "./document-read-refresh"
 
 export function useDeletedDocumentFolders(organizationId: bigint, companyId: bigint, enabled: boolean) {
-  return useQuery<DocumentFolder[]>({
+  return useQuery({
     queryKey: ["document-folders-deleted", rqBigIntKey(organizationId), rqBigIntKey(companyId)],
-    queryFn: () => fetchQueryList(`/api/query/document-folders-deleted?companyId=${companyId}`, "Failed to load folder trash"),
+    queryFn: () => readDeletedDocumentFolders(organizationId, companyId),
     ...documentReadRefresh,
     enabled,
     staleTime: 0,
