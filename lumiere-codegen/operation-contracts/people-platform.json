@@ -5081,6 +5081,16 @@
       },
       "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
+    "set_ai_agent_action": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: updates one authorized action binding and preserves other agent configuration; exact retries return without a write"
+    },
     "set_ai_agent_run_wait_state": {
       "semantic_kind": "internal",
       "client_facing": false,

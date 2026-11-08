@@ -2965,6 +2965,12 @@ mod tests {
     fn ai_agent_projection_keeps_company_binding_in_default_and_selective_reads() {
         let default = resolve_http_sql_columns("ai-agents", None).expect("agent projection");
         assert!(default.iter().any(|column| column == "company_id"));
+        for field in ["allowed_actions", "allowed_models"] {
+            assert!(default.iter().any(|column| column == field));
+        }
+        for field in ["system_prompt", "api_key_reference"] {
+            assert!(!default.iter().any(|column| column == field));
+        }
         let mut access = field_access(&["ai-agents:read"]);
         access.field_permissions.push(FieldPermissionLike {
             id: Some(1),
@@ -2982,6 +2988,8 @@ mod tests {
             assert!(restricted.iter().any(|column| column == field));
         }
         assert!(!restricted.iter().any(|column| column == "monthly_spend"));
+        assert!(!restricted.iter().any(|column| column == "allowed_actions"));
+        assert!(!restricted.iter().any(|column| column == "allowed_models"));
     }
 
     #[test]
