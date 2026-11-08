@@ -14,6 +14,7 @@ use axum::{
     http::{header::AUTHORIZATION, HeaderMap},
     Json,
 };
+use lumiere_auth_context::ORGANIZATION_HEADER;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -58,13 +59,14 @@ async fn post_operation_inner(
         contract.contract_operation_id,
         &state.organization_placements,
     )?;
+    let organization_id = context.organization_id();
+    require_expected_organization(&headers, organization_id)?;
     if !body.is_object() {
         return Err(ApiError::Unprocessable(
             "Operation body must be a named object".into(),
         ));
     }
-    let args = named_command_args(contract, body, context.organization_id())?;
-    let organization_id = context.organization_id();
+    let args = named_command_args(contract, body, organization_id)?;
     let company_scope = validate_reducer_scope(contract, &args, organization_id)?;
     let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
     let context = context.with_company_scope(company_scope)?;
@@ -77,6 +79,39 @@ async fn post_operation_inner(
         contract.contract_operation_id,
         correlation_id.as_str(),
     )
+}
+
+/// This optional precondition can only narrow the authenticated session scope.
+/// A session that changes organization after preflight must not redirect a write.
+fn require_expected_organization(
+    headers: &HeaderMap,
+    organization_id: u64,
+) -> Result<(), ApiError> {
+    let mut values = headers.get_all(ORGANIZATION_HEADER).iter();
+    let Some(value) = values.next() else {
+        return Ok(());
+    };
+    let invalid = || {
+        ApiError::Unprocessable(format!(
+            "{ORGANIZATION_HEADER} must contain one positive organization ID"
+        ))
+    };
+    if values.next().is_some() {
+        return Err(invalid());
+    }
+    let expected = value
+        .to_str()
+        .ok()
+        .filter(|value| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|id| *id > 0)
+        .ok_or_else(invalid)?;
+    if expected != organization_id {
+        return Err(ApiError::Forbidden(
+            "requested organization does not match the authenticated session".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn attach_operation_receipt(
@@ -135,7 +170,85 @@ pub(crate) async fn post_compat_reducer(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{
+        http::{HeaderValue, StatusCode},
+        response::IntoResponse,
+    };
     use serde_json::json;
+
+    fn organization_header(value: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            ORGANIZATION_HEADER,
+            HeaderValue::from_str(value).expect("test organization header"),
+        );
+        headers
+    }
+
+    #[test]
+    fn typed_operation_accepts_absent_or_matching_organization_precondition() {
+        assert!(require_expected_organization(&HeaderMap::new(), 7).is_ok());
+        assert!(require_expected_organization(&organization_header("7"), 7).is_ok());
+        assert!(require_expected_organization(
+            &organization_header(&u64::MAX.to_string()),
+            u64::MAX
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn typed_operation_rejects_a_session_organization_change() {
+        let error = require_expected_organization(&organization_header("7"), 8)
+            .expect_err("preflight organization must match the current session");
+        assert_eq!(error.into_response().status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn typed_operation_rejects_malformed_organization_preconditions() {
+        for value in [
+            "",
+            "0",
+            "-7",
+            "+7",
+            "7.0",
+            "7, 7",
+            " 7 ",
+            "18446744073709551616",
+        ] {
+            let error = require_expected_organization(&organization_header(value), 7)
+                .expect_err("organization precondition must be a positive u64");
+            assert_eq!(
+                error.into_response().status(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "header value: {value:?}"
+            );
+        }
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            ORGANIZATION_HEADER,
+            HeaderValue::from_bytes(b"\xff").expect("opaque header value"),
+        );
+        let error = require_expected_organization(&headers, 7)
+            .expect_err("non-text organization precondition must fail closed");
+        assert_eq!(
+            error.into_response().status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+
+    #[test]
+    fn typed_operation_rejects_duplicate_organization_preconditions() {
+        for second in ["7", "8"] {
+            let mut headers = organization_header("7");
+            headers.append(ORGANIZATION_HEADER, HeaderValue::from_static(second));
+            let error = require_expected_organization(&headers, 7)
+                .expect_err("duplicate scope preconditions must fail closed");
+            assert_eq!(
+                error.into_response().status(),
+                StatusCode::UNPROCESSABLE_ENTITY
+            );
+        }
+    }
 
     #[test]
     fn typed_operation_receipt_preserves_ack_and_adds_server_metadata() {

@@ -4886,6 +4886,10 @@
       "name": "send_sale_order_quotation",
       "shape_fingerprint": "sha256:96c5bda723e4505e474bb954b7bdb7f98b1fecc4dd9dd2ee22aceec985d705f3"
     },
+    "erp.set_ai_agent_action": {
+      "name": "set_ai_agent_action",
+      "shape_fingerprint": "sha256:6d1d93c826c028abef3ff64a9911ff485eacb5beb27edd67aaff18818451a5ec"
+    },
     "erp.set_ai_agent_active": {
       "name": "set_ai_agent_active",
       "shape_fingerprint": "sha256:89941af3704d234685720c079ecc5f79872e9955729b583a3514d2c998ebb9fe"
@@ -6449,9 +6453,17 @@
       "previous_release": "v0.3.168",
       "previous_ir_sha256": "sha256:891cdc41222fee8bc59849fc74038e96802308aa8debbaa3e99839965c6da4e6",
       "previous_operations_fingerprint": "sha256:1d322b3f40b1c544b97c9417a796396e8201f1da581baf4de9024b91363be8d0",
-      "current_operations_fingerprint": "sha256:0412273de87917d84ab6757658826b265182fac728ac1791ee7b18d7c8e40e6a",
-      "operation_count": 1521,
-      "reason": "release on top of v0.3.168: add move_document, move_document_folder, restore_document_folder, trash_document_folder; change the shape of none"
+      "current_operations_fingerprint": "sha256:b9583991a4f676077bbe081abbb7c8867b71434f7ed4abf2895f0e768bb1b973",
+      "operation_count": 1518,
+      "reason": "release on top of v0.3.168: add set_ai_agent_action; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.170",
+      "previous_ir_sha256": "sha256:6f64e6a784ffdcd84878e66485e5d80791b2db0238189245ff7d5c2cd1841ca7",
+      "previous_operations_fingerprint": "sha256:b9583991a4f676077bbe081abbb7c8867b71434f7ed4abf2895f0e768bb1b973",
+      "current_operations_fingerprint": "sha256:c6968f8ef5ffe8a198f76673595187ba2a3b00ac0daf785138a1e51f08943478",
+      "operation_count": 1522,
+      "reason": "release on top of v0.3.170: add move_document, move_document_folder, restore_document_folder, trash_document_folder; change the shape of none"
     }
   ]
 }

@@ -25,6 +25,7 @@ import {
   useDismissAiInsight,
   useRecordAiSpend,
   useSetAiAgentActive,
+  useSetAiAgentAction,
   useUpdateAiAgent,
 } from "@lumiere/query-hooks/hooks/ai-agents"
 import {
@@ -80,15 +81,6 @@ function agentAllowedActions(row: Row): string[] {
   const raw = row.allowedActions ?? row.allowed_actions
   if (!Array.isArray(raw)) return []
   return raw.map((item) => String(item))
-}
-
-function buildAgentUpdateParams(row: Row, allowedActions: string[]): Record<string, unknown> {
-  return {
-    temperature: Number(row.temperature ?? 0.7),
-    maxTokens: num(row.maxTokens),
-    rateLimitPerMinute: num(row.rateLimitPerMinute),
-    allowedActions,
-  }
 }
 
 function numFromForm(v: unknown): number {
@@ -173,6 +165,7 @@ export function AiSettings() {
   const createAgentMutation = useCreateAiAgent(orgId)
   const updateAgentMutation = useUpdateAiAgent(orgId)
   const setActiveMutation = useSetAiAgentActive(orgId)
+  const setActionMutation = useSetAiAgentAction(orgId)
   const createTeamMemberMutation = useCreateAiTeamMember(orgId)
   const dismissInsightMutation = useDismissAiInsight(orgId)
   const createInsightMutation = useCreateAiInsight(orgId)
@@ -380,19 +373,13 @@ export function AiSettings() {
 
   const handleToggleAgentAction = async (
     agent: Row,
-    action: "analytics_read" | "analytics_run" | "web_search",
+    action: "chat" | "analytics_read" | "analytics_run" | "web_search",
     enabled: boolean,
   ) => {
     if (!orgId) return
     const id = num(agent.id)
-    const next = new Set(agentAllowedActions(agent))
-    if (enabled) next.add(action)
-    else next.delete(action)
     try {
-      await updateAgentMutation.mutateAsync({
-        agentId: id,
-        params: buildAgentUpdateParams(agent, Array.from(next)),
-      })
+      await setActionMutation.mutateAsync({ agentId: id, action, enabled })
       toast({
         title: enabled ? "Action enabled" : "Action disabled",
         description: action.replace(/_/g, " "),
@@ -442,7 +429,7 @@ export function AiSettings() {
 
   const listLoading = loading || agentsQuery.isLoading || allowlistQuery.isLoading
   const agentOpsPending =
-    createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending
+    createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending || setActionMutation.isPending
   const allowlistPending =
     createAllowlistMutation.isPending ||
     deleteAllowlistMutation.isPending ||
@@ -808,6 +795,17 @@ export function AiSettings() {
                         {a.monthlyBudget != null ? ` / ${t("settings.ai.budget")} ${Number(a.monthlyBudget).toFixed(2)}` : ""}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-4">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={agentAllowedActions(a).includes("chat")}
+                            onCheckedChange={(checked) => {
+                              void handleToggleAgentAction(a, "chat", checked)
+                            }}
+                            disabled={mutating || agentOpsPending}
+                            aria-label="Allow this agent to answer chat"
+                          />
+                          <span className="text-xs text-muted-foreground">Chat</span>
+                        </div>
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={agentAllowedActions(a).includes("analytics_read")}

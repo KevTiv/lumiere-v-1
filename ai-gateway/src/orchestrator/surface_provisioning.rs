@@ -3,6 +3,7 @@
 //! Catalog registration does not configure agents, policies, or execution grants.
 
 use anyhow::{ensure, Context, Result};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use stdb_client::{ReducerCall, StdbClient, StdbClientError};
@@ -145,12 +146,50 @@ fn create_surface(organization_id: u64, skill_key: &str) -> Result<ReducerCall> 
     )?)
 }
 
-/// Provision only missing generation catalog rows during an explicit admin
-/// operation. Native reducers recheck the writer's `ai_skill:create` authority.
-/// A failed write is never retried; only an explicit duplicate can recover by
-/// reading the concurrently created organization row.
+/// The writer reports only a confirmed create or an explicit duplicate. Any
+/// other outcome stops setup before another create can be attempted.
+#[async_trait]
+pub(crate) trait SurfaceWriter: Sync {
+    async fn create_surface(&self, skill_key: &str, create: ReducerCall) -> Result<bool>;
+}
+
+#[async_trait]
+impl SurfaceWriter for StdbClient {
+    async fn create_surface(&self, skill_key: &str, create: ReducerCall) -> Result<bool> {
+        match self.call_reducer(create).await {
+            Ok(()) => Ok(true),
+            Err(error) => {
+                let duplicate = error
+                    .downcast_ref::<StdbClientError>()
+                    .and_then(StdbClientError::response_body)
+                    .is_some_and(|body| {
+                        body.contains(&format!("skill_key '{skill_key}' already exists"))
+                    });
+                if duplicate {
+                    Ok(false)
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+}
+
+/// Operator-owned bootstrap uses its configured native database credential.
+/// Interactive API credentials must use the session-owning API writer instead.
 pub(crate) async fn ensure_bundled_generation_surfaces(
     writer: &StdbClient,
+    reader: &StdbClient,
+    organization_id: u64,
+) -> Result<Vec<ProvisionedSurface>> {
+    provision_generation_surfaces(writer, reader, organization_id).await
+}
+
+/// Provision only missing catalog rows after the caller has authorized setup.
+/// A failed write is never retried; an explicit duplicate recovers only after
+/// reading the concurrently created organization row.
+pub(super) async fn provision_generation_surfaces(
+    writer: &impl SurfaceWriter,
     reader: &StdbClient,
     organization_id: u64,
 ) -> Result<Vec<ProvisionedSurface>> {
@@ -167,23 +206,14 @@ pub(crate) async fn ensure_bundled_generation_surfaces(
             result.push(row.provisioned(false));
             continue;
         }
-        let created = match writer.call_reducer(create).await {
-            Ok(()) => true,
-            Err(error) => {
-                let duplicate = error
-                    .downcast_ref::<StdbClientError>()
-                    .and_then(StdbClientError::response_body)
-                    .is_some_and(|body| {
-                        body.contains(&format!("skill_key '{skill_key}' already exists"))
-                    });
-                if !duplicate {
-                    return Err(error).with_context(|| {
-                        format!("create generation surface '{skill_key}' failed; inspect setup before retrying")
-                    });
-                }
-                false
-            }
-        };
+        let created = writer
+            .create_surface(skill_key, create)
+            .await
+            .with_context(|| {
+                format!(
+                    "create generation surface '{skill_key}' failed; inspect setup before retrying"
+                )
+            })?;
         catalog = read_catalog(reader, organization_id)
             .await
             .context("verify generation surface registration")?;
@@ -205,7 +235,7 @@ mod tests {
         extract::State,
         http::{HeaderMap, StatusCode},
         response::{IntoResponse, Response},
-        routing::post,
+        routing::{get, post},
         Json, Router,
     };
     use std::sync::{Arc, Mutex};
@@ -219,6 +249,18 @@ mod tests {
         LostResponse,
         MissingReadback,
         ReadUnavailable,
+        SessionDenied,
+        SessionWrongOrganization,
+        SessionWrongFieldScope,
+        SessionWrongIdentity,
+        SessionMissingCreatePermission,
+        SessionOrganizationDeniesCreate,
+        SessionMalformed,
+        OperationScopeChanged,
+        WrongOperationReceipt,
+        DuplicatePermissionDenied,
+        DuplicateWithoutReadback,
+        RedirectCreate,
     }
 
     #[derive(Default)]
@@ -229,6 +271,9 @@ mod tests {
         behavior: Behavior,
         policy: Option<Value>,
         governed_writes: usize,
+        session_reads: usize,
+        api_writes: Vec<Value>,
+        redirect_url: String,
     }
 
     struct Fixture {
@@ -240,6 +285,47 @@ mod tests {
     impl Drop for Fixture {
         fn drop(&mut self) {
             self.server.abort();
+        }
+    }
+
+    struct ApiFixture {
+        native: Fixture,
+        origin: String,
+        server: tokio::task::JoinHandle<()>,
+    }
+
+    impl Drop for ApiFixture {
+        fn drop(&mut self) {
+            self.server.abort();
+        }
+    }
+
+    impl ApiFixture {
+        async fn state(&self) -> crate::state::AppState {
+            use crate::routes::harness_descriptor::test_support;
+
+            let mut config = test_support::config();
+            config.stdb_host = self.native.client.base_url().into();
+            config.stdb_module = "fixture".into();
+            config.stdb_token = "administrator".into();
+            config.api_server_url = Some(self.origin.clone());
+            test_support::state(config).await
+        }
+
+        async fn setup(
+            &self,
+        ) -> crate::error::AppResult<Json<crate::routes::skills::ProvisionSurfacesResponse>>
+        {
+            use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
+
+            post_provision_surfaces(
+                State(self.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await
         }
     }
 
@@ -401,6 +487,146 @@ mod tests {
         }
     }
 
+    async fn api_session(
+        State(database): State<Arc<Mutex<Database>>>,
+        headers: HeaderMap,
+    ) -> Response {
+        assert_eq!(headers["authorization"], "Bearer workos-api-credential");
+        let mut database = database.lock().unwrap();
+        database.session_reads += 1;
+        if matches!(database.behavior, Behavior::SessionDenied) {
+            return (
+                StatusCode::UNAUTHORIZED,
+                "credential must not appear in errors",
+            )
+                .into_response();
+        }
+        let mut access = stdb_auth::FieldAccessContext {
+            organization_id: 9,
+            role_permissions: vec!["ai_skill:create".into()],
+            identity_hex: "a".repeat(64),
+            ..Default::default()
+        };
+        match database.behavior {
+            Behavior::SessionWrongOrganization | Behavior::SessionWrongFieldScope => {
+                access.organization_id = 10;
+            }
+            Behavior::SessionWrongIdentity => access.identity_hex = "b".repeat(64),
+            Behavior::SessionMissingCreatePermission => {
+                access.role_permissions = vec!["ai_skill:read".into()];
+            }
+            Behavior::SessionOrganizationDeniesCreate => {
+                access.org_permissions = vec![stdb_auth::ActionPermission {
+                    resource: "ai_skill".into(),
+                    action: "create".into(),
+                    allow: false,
+                }];
+            }
+            Behavior::SessionMalformed => {
+                return Json(json!({"organizationId": 9})).into_response()
+            }
+            _ => {}
+        }
+        Json(json!({
+            "identityHex": "a".repeat(64),
+            "organizationId": if matches!(database.behavior, Behavior::SessionWrongOrganization) { 10 } else { 9 },
+            "fieldAccess": access,
+        }))
+        .into_response()
+    }
+
+    async fn api_create(
+        State(database): State<Arc<Mutex<Database>>>,
+        headers: HeaderMap,
+        Json(body): Json<Value>,
+    ) -> Response {
+        assert_eq!(headers["authorization"], "Bearer workos-api-credential");
+        assert_eq!(headers["x-stdb-identity"], "a".repeat(64));
+        assert_eq!(headers[lumiere_auth_context::ORGANIZATION_HEADER], "9");
+        assert_eq!(body.as_object().unwrap().len(), 1);
+        let params = &body["params"];
+        assert_eq!(params["is_system"], false);
+        assert_eq!(params["is_active"], true);
+        let key = params["skill_key"].as_str().unwrap();
+        assert!(GENERATION_SURFACES.contains(&key));
+        let mut database = database.lock().unwrap();
+        database.api_writes.push(body.clone());
+        let duplicate = json!({"error": format!("skill_key '{key}' already exists")});
+        let receipt = json!({
+            "ok": true, "operationId": "erp.create_ai_skill", "correlationId": "receipt-1"
+        });
+        match database.behavior {
+            Behavior::WriteDenied | Behavior::OperationScopeChanged => {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(
+                        json!({"error": "credential and private upstream detail must be redacted"}),
+                    ),
+                )
+                    .into_response();
+            }
+            Behavior::DuplicatePermissionDenied => {
+                return (StatusCode::FORBIDDEN, Json(duplicate)).into_response();
+            }
+            Behavior::DuplicateWithoutReadback => {
+                return (StatusCode::UNPROCESSABLE_ENTITY, Json(duplicate)).into_response();
+            }
+            Behavior::MissingReadback => return Json(receipt).into_response(),
+            Behavior::RedirectCreate => {
+                return (
+                    StatusCode::TEMPORARY_REDIRECT,
+                    [("location", database.redirect_url.clone())],
+                )
+                    .into_response();
+            }
+            _ => {}
+        }
+        let id = 100 + database.api_writes.len() as u64;
+        let concurrent = matches!(database.behavior, Behavior::ConcurrentCreate);
+        let row = if concurrent {
+            catalog_row(id, 9, key, false)
+        } else {
+            let mut row = params.clone();
+            row["id"] = json!(id);
+            row["organization_id"] = json!(9);
+            row
+        };
+        database.rows.push(row);
+        match database.behavior {
+            Behavior::ConcurrentCreate => {
+                (StatusCode::UNPROCESSABLE_ENTITY, Json(duplicate)).into_response()
+            }
+            Behavior::LostResponse => {
+                (StatusCode::SERVICE_UNAVAILABLE, "outcome unknown").into_response()
+            }
+            Behavior::WrongOperationReceipt => Json(json!({
+                "ok": true, "operationId": "erp.update_ai_skill", "correlationId": "receipt-1"
+            }))
+            .into_response(),
+            _ => Json(receipt).into_response(),
+        }
+    }
+
+    async fn api_fixture(rows: Vec<Value>, behavior: Behavior) -> ApiFixture {
+        let native = fixture(rows, behavior).await;
+        native.database.lock().unwrap().redirect_url = format!(
+            "{}/v1/database/fixture/call/create_ai_skill",
+            native.client.base_url()
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let app = Router::new()
+            .route("/v1/session/field-access", get(api_session))
+            .route("/v1/operations/erp.create_ai_skill", post(api_create))
+            .with_state(native.database.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        ApiFixture {
+            native,
+            origin,
+            server,
+        }
+    }
+
     #[tokio::test]
     async fn missing_surfaces_are_created_once_with_confirmed_ids() {
         let fixture = fixture(Vec::new(), Behavior::Success).await;
@@ -538,18 +764,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn admin_route_requires_and_uses_actor_token_without_service_fallback() {
-        use crate::routes::{
-            harness_descriptor::test_support,
-            skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest},
-        };
+    async fn admin_route_sends_workos_token_only_to_api_and_reads_with_native_credentials() {
+        use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
 
-        let fixture = fixture(Vec::new(), Behavior::Success).await;
-        let mut config = test_support::config();
-        config.stdb_host = fixture.client.base_url().into();
-        config.stdb_module = "fixture".into();
-        config.stdb_token = "service-token-must-not-be-used".into();
-        let state = test_support::state(config).await;
+        let fixture = api_fixture(Vec::new(), Behavior::Success).await;
+        let state = fixture.state().await;
         let denied = post_provision_surfaces(
             State(state.clone()),
             Json(GatewayProvisionSurfacesRequest {
@@ -559,7 +778,8 @@ mod tests {
         )
         .await;
         assert!(matches!(denied, Err(crate::error::AppError::Forbidden(_))));
-        assert_eq!(fixture.database.lock().unwrap().reads, 0);
+        assert_eq!(fixture.native.database.lock().unwrap().reads, 0);
+        assert_eq!(fixture.native.database.lock().unwrap().session_reads, 0);
         assert!(
             serde_json::from_value::<GatewayProvisionSurfacesRequest>(json!({"org_id": 9}))
                 .is_err()
@@ -569,7 +789,7 @@ mod tests {
             State(state),
             Json(GatewayProvisionSurfacesRequest {
                 org_id: 9,
-                stdb_token: "administrator".into(),
+                stdb_token: "workos-api-credential".into(),
             }),
         )
         .await
@@ -579,6 +799,158 @@ mod tests {
             serde_json::to_value(result).unwrap()["skills"][0],
             json!({"skill_key": "rag_generation", "skill_id": 101, "status": "created"})
         );
+        let repeated = fixture.setup().await.expect("authorized no-op setup");
+        assert!(repeated
+            .0
+            .skills
+            .iter()
+            .all(|surface| surface.status == SurfaceProvisioningStatus::Existing));
+        let database = fixture.native.database.lock().unwrap();
+        assert_eq!(
+            database.session_reads, 2,
+            "even no-op setup must authorize the actor"
+        );
+        assert_eq!(database.api_writes.len(), 3);
+        assert_eq!(database.reads, 5);
+        assert!(
+            database.writes.is_empty(),
+            "interactive setup never uses a native writer"
+        );
+    }
+
+    #[tokio::test]
+    async fn interactive_setup_checks_session_scope_and_create_permission_before_catalog_reads() {
+        for behavior in [
+            Behavior::SessionDenied,
+            Behavior::SessionWrongOrganization,
+            Behavior::SessionWrongFieldScope,
+            Behavior::SessionWrongIdentity,
+            Behavior::SessionMissingCreatePermission,
+            Behavior::SessionOrganizationDeniesCreate,
+            Behavior::SessionMalformed,
+        ] {
+            let existing = GENERATION_SURFACES
+                .iter()
+                .enumerate()
+                .map(|(index, key)| catalog_row(index as u64 + 1, 9, key, true))
+                .collect();
+            let fixture = api_fixture(existing, behavior).await;
+            let error = fixture.setup().await.unwrap_err();
+            if matches!(behavior, Behavior::SessionMalformed) {
+                assert!(matches!(error, crate::error::AppError::Unavailable(_)));
+            } else {
+                assert!(matches!(error, crate::error::AppError::Forbidden(_)));
+            }
+            assert!(!error.to_string().contains("credential must not appear"));
+            let database = fixture.native.database.lock().unwrap();
+            assert_eq!(database.session_reads, 1);
+            assert_eq!(database.reads, 0);
+            assert!(database.api_writes.is_empty());
+            assert!(database.writes.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn interactive_setup_requires_api_configuration_without_native_write_fallback() {
+        use crate::routes::{
+            harness_descriptor::test_support,
+            skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest},
+        };
+
+        let fixture = fixture(Vec::new(), Behavior::Success).await;
+        let mut config = test_support::config();
+        config.stdb_host = fixture.client.base_url().into();
+        config.stdb_module = "fixture".into();
+        config.stdb_token = "administrator".into();
+        config.api_server_url = None;
+        let result = post_provision_surfaces(
+            State(test_support::state(config).await),
+            Json(GatewayProvisionSurfacesRequest {
+                org_id: 9,
+                stdb_token: "workos-api-credential".into(),
+            }),
+        )
+        .await;
+        assert!(matches!(
+            result,
+            Err(crate::error::AppError::Unavailable(_))
+        ));
+        let database = fixture.database.lock().unwrap();
+        assert_eq!(database.reads, 0);
+        assert!(database.writes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn interactive_setup_preserves_existing_ids_and_explicit_duplicate_readback() {
+        let fixture = api_fixture(
+            vec![
+                catalog_row(11, 0, "form_suggestion", false),
+                catalog_row(12, 9, "action_draft_generation", true),
+            ],
+            Behavior::ConcurrentCreate,
+        )
+        .await;
+        let Json(result) = fixture
+            .setup()
+            .await
+            .expect("read back concurrent registration");
+        assert_eq!(
+            result
+                .skills
+                .iter()
+                .map(|surface| surface.skill_id)
+                .collect::<Vec<_>>(),
+            [101, 11, 12]
+        );
+        assert_eq!(result.skills[0].status, SurfaceProvisioningStatus::Inactive);
+        assert_eq!(result.skills[1].status, SurfaceProvisioningStatus::Inactive);
+        let database = fixture.native.database.lock().unwrap();
+        assert_eq!(database.api_writes.len(), 1);
+        assert_eq!(database.reads, 2);
+        assert!(database.writes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn interactive_setup_stops_on_denied_unknown_or_unconfirmed_writes() {
+        for behavior in [
+            Behavior::WriteDenied,
+            Behavior::OperationScopeChanged,
+            Behavior::DuplicatePermissionDenied,
+            Behavior::LostResponse,
+            Behavior::WrongOperationReceipt,
+            Behavior::MissingReadback,
+            Behavior::DuplicateWithoutReadback,
+            Behavior::RedirectCreate,
+        ] {
+            let fixture = api_fixture(Vec::new(), behavior).await;
+            let error = fixture.setup().await.unwrap_err();
+            match behavior {
+                Behavior::WriteDenied
+                | Behavior::OperationScopeChanged
+                | Behavior::DuplicatePermissionDenied => {
+                    assert!(matches!(error, crate::error::AppError::Forbidden(_)));
+                }
+                Behavior::LostResponse
+                | Behavior::WrongOperationReceipt
+                | Behavior::RedirectCreate => {
+                    assert!(matches!(error, crate::error::AppError::Unavailable(_)));
+                }
+                _ => {}
+            }
+            assert!(!error.to_string().contains("private upstream detail"));
+            assert!(!error.to_string().contains("workos-api-credential"));
+            if matches!(behavior, Behavior::RedirectCreate) {
+                assert!(error.to_string().contains("HTTP 307"));
+            }
+            let database = fixture.native.database.lock().unwrap();
+            assert_eq!(database.api_writes.len(), 1, "no retries or later creates");
+            assert!(database.writes.is_empty());
+            let readback_expected = matches!(
+                behavior,
+                Behavior::MissingReadback | Behavior::DuplicateWithoutReadback
+            );
+            assert_eq!(database.reads, if readback_expected { 2 } else { 1 });
+        }
     }
 
     #[tokio::test]

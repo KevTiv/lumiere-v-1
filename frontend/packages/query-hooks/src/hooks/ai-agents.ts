@@ -7,6 +7,7 @@ import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { AiAgent } from "@lumiere/stdb/types"
+import { dispatchAiAgentActionCommand } from "../operations/ai-agent-action-command"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -41,7 +42,10 @@ export function useCreateAiAgent(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Record<string, unknown>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_ai_agent", { companyId: null, params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("create_ai_agent", {
+        companyId: null,
+        params: stdbParamsToJson(params, "CreateAiAgentParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -53,7 +57,10 @@ export function useUpdateAiAgent(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { agentId: number; params: Record<string, unknown> }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_ai_agent", { agentId: args.agentId, params: stdbParamsToJson(args.params as object) })
+      const { urlPath, init } = stdbBffCommandPost("update_ai_agent", {
+        agentId: args.agentId,
+        params: stdbParamsToJson(args.params, "UpdateAiAgentParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -69,6 +76,14 @@ export function useSetAiAgentActive(organizationId: number) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
+    onSuccess: () => invalidateAiAgents(qc, organizationId),
+  })
+}
+
+export function useSetAiAgentAction(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: dispatchAiAgentActionCommand,
     onSuccess: () => invalidateAiAgents(qc, organizationId),
   })
 }

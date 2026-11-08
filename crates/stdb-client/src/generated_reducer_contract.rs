@@ -5099,6 +5099,12 @@ const PARAMS_SEND_SALE_ORDER_QUOTATION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "order_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
+const PARAMS_SET_AI_AGENT_ACTION: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "action", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "enabled", kind: ScalarKind::Bool, ref_target: None },
+];
 const PARAMS_SET_AI_AGENT_ACTIVE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -7833,6 +7839,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "seed_statutory_expense_mileage_rates", contract_operation_id: "erp.seed_statutory_expense_mileage_rates", params: PARAMS_SEED_STATUTORY_EXPENSE_MILEAGE_RATES, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "send_purchase_order", contract_operation_id: "erp.send_purchase_order", params: PARAMS_SEND_PURCHASE_ORDER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "send_sale_order_quotation", contract_operation_id: "erp.send_sale_order_quotation", params: PARAMS_SEND_SALE_ORDER_QUOTATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_agent_action", contract_operation_id: "erp.set_ai_agent_action", params: PARAMS_SET_AI_AGENT_ACTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_agent_active", contract_operation_id: "erp.set_ai_agent_active", params: PARAMS_SET_AI_AGENT_ACTIVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_agent_run_wait_state", contract_operation_id: "erp.set_ai_agent_run_wait_state", params: PARAMS_SET_AI_AGENT_RUN_WAIT_STATE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "set_ai_calibration_profile_active", contract_operation_id: "erp.set_ai_calibration_profile_active", params: PARAMS_SET_AI_CALIBRATION_PROFILE_ACTIVE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -9343,6 +9350,7 @@ pub mod reducer_names {
     pub const SEED_STATUTORY_EXPENSE_MILEAGE_RATES: ReducerName = ReducerName::new("seed_statutory_expense_mileage_rates");
     pub const SEND_PURCHASE_ORDER: ReducerName = ReducerName::new("send_purchase_order");
     pub const SEND_SALE_ORDER_QUOTATION: ReducerName = ReducerName::new("send_sale_order_quotation");
+    pub const SET_AI_AGENT_ACTION: ReducerName = ReducerName::new("set_ai_agent_action");
     pub const SET_AI_AGENT_ACTIVE: ReducerName = ReducerName::new("set_ai_agent_active");
     pub const SET_AI_AGENT_RUN_WAIT_STATE: ReducerName = ReducerName::new("set_ai_agent_run_wait_state");
     pub const SET_AI_CALIBRATION_PROFILE_ACTIVE: ReducerName = ReducerName::new("set_ai_calibration_profile_active");
@@ -10838,6 +10846,7 @@ macro_rules! reducer_call {
     ("seed_statutory_expense_mileage_rates", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SEED_STATUTORY_EXPENSE_MILEAGE_RATES, $args) };
     ("send_purchase_order", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SEND_PURCHASE_ORDER, $args) };
     ("send_sale_order_quotation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SEND_SALE_ORDER_QUOTATION, $args) };
+    ("set_ai_agent_action", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_ACTION, $args) };
     ("set_ai_agent_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_ACTIVE, $args) };
     ("set_ai_agent_run_wait_state", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_RUN_WAIT_STATE, $args) };
     ("set_ai_calibration_profile_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_CALIBRATION_PROFILE_ACTIVE, $args) };

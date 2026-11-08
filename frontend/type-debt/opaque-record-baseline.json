@@ -179,7 +179,7 @@
   "packages/ui/src/proposal-workspace/section-sidebar.tsx": 1,
   "packages/ui/src/proposal-workspace/section-template.ts": 3,
   "packages/ui/src/proposal-workspace/version-history-bar.tsx": 1,
-  "packages/ui/src/settings/ai-settings.tsx": 8,
+  "packages/ui/src/settings/ai-settings.tsx": 7,
   "packages/ui/src/settings/audit-log.tsx": 3,
   "packages/ui/src/settings/company-switcher.tsx": 1,
   "packages/ui/src/settings/field-permissions-editor.tsx": 2,

@@ -395,7 +395,9 @@
       "max_tokens",
       "monthly_spend",
       "monthly_budget",
-      "cost_per_1_k_tokens"
+      "cost_per_1_k_tokens",
+      "allowed_actions",
+      "allowed_models"
     ],
     "mandatory": [
       "id",
