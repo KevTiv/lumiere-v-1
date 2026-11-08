@@ -4886,6 +4886,10 @@
       "name": "send_sale_order_quotation",
       "shape_fingerprint": "sha256:96c5bda723e4505e474bb954b7bdb7f98b1fecc4dd9dd2ee22aceec985d705f3"
     },
+    "erp.set_ai_agent_action": {
+      "name": "set_ai_agent_action",
+      "shape_fingerprint": "sha256:6d1d93c826c028abef3ff64a9911ff485eacb5beb27edd67aaff18818451a5ec"
+    },
     "erp.set_ai_agent_active": {
       "name": "set_ai_agent_active",
       "shape_fingerprint": "sha256:89941af3704d234685720c079ecc5f79872e9955729b583a3514d2c998ebb9fe"

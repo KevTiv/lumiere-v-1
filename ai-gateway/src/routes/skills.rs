@@ -13,7 +13,8 @@ use crate::{
     harness::legacy_fence::governed_skill_replacement,
     orchestrator::{
         skill_loader::{list_skills, sync_bundled_skills},
-        surface_provisioning::{ensure_bundled_generation_surfaces, ProvisionedSurface},
+        surface_provisioning::ProvisionedSurface,
+        surface_provisioning_api::{setup_error, ApiSurfaceWriter},
     },
     state::AppState,
 };
@@ -141,10 +142,11 @@ pub async fn post_sync(
     }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GatewayProvisionSurfacesRequest {
     pub org_id: u64,
+    /// API bearer credential; hosted sessions carry a WorkOS access token.
     pub stdb_token: String,
 }
 
@@ -153,8 +155,8 @@ pub(crate) struct ProvisionSurfacesResponse {
     pub skills: Vec<ProvisionedSurface>,
 }
 
-/// Explicit catalog repair under the administrator's own database identity.
-/// No service-token fallback and no agent, grant, or release changes.
+/// Explicit catalog repair through the administrator's canonical API session.
+/// Only the scope-validated catalog read uses the configured native credential.
 pub async fn post_provision_surfaces(
     State(state): State<AppState>,
     Json(req): Json<GatewayProvisionSurfacesRequest>,
@@ -167,10 +169,17 @@ pub async fn post_provision_surfaces(
             "an authenticated administrator token is required".into(),
         ));
     }
-    let actor = state.stdb.with_token(req.stdb_token);
-    let skills = ensure_bundled_generation_surfaces(&actor, &actor, req.org_id)
+    let writer = ApiSurfaceWriter::authorize(
+        state.config.api_server_url.as_deref(),
+        &req.stdb_token,
+        req.org_id,
+    )
+    .await
+    .map_err(setup_error)?;
+    let skills = writer
+        .provision(state.stdb.as_ref())
         .await
-        .map_err(|error| AppError::Internal(error.to_string()))?;
+        .map_err(setup_error)?;
     Ok(Json(ProvisionSurfacesResponse { skills }))
 }
 

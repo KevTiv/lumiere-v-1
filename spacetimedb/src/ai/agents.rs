@@ -309,6 +309,62 @@ pub fn update_ai_agent(
     Ok(())
 }
 
+/// Change one action binding without replacing private configuration or other actions.
+#[reducer]
+pub fn set_ai_agent_action(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    agent_id: u64,
+    action: String,
+    enabled: bool,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_agent", "write")?;
+    if !matches!(
+        action.as_str(),
+        "chat" | "analytics_read" | "analytics_run" | "web_search"
+    ) {
+        return Err("Unsupported AI agent action".to_string());
+    }
+    let mut agent = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(&agent_id)
+        .ok_or("AI agent not found")?;
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".to_string());
+    }
+    if agent.allowed_actions.contains(&action) == enabled {
+        return Ok(());
+    }
+    if enabled {
+        agent.allowed_actions.push(action.clone());
+    } else {
+        agent.allowed_actions.retain(|existing| existing != &action);
+    }
+    let company_id = agent.company_id;
+    agent.write_uid = ctx.sender();
+    agent.write_date = ctx.timestamp;
+    ctx.db.ai_agent().id().update(agent);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id,
+            table_name: "ai_agent",
+            record_id: agent_id,
+            action: "write",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({ "action": action, "enabled": enabled }).to_string(),
+            ),
+            changed_fields: vec!["allowed_actions".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
 /// Activate or deactivate an AI agent
 #[reducer]
 pub fn set_ai_agent_active(

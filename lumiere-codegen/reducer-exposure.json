@@ -3840,6 +3840,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "set_ai_agent_action",
+      "exposure": "session",
+      "reason": "authenticated AI settings action toggle; server enforces ai_agent:write and organization ownership"
+    },
+    {
       "name": "set_ai_agent_active",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

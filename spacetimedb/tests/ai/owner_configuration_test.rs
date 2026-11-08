@@ -12,6 +12,83 @@ use crate::core::users::{
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use spacetimedb::{ReducerContext, Table};
 
+pub fn test_agent_action_preserves_configuration(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::ai::agents::{set_ai_agent_action, AiAgent};
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    let run_id = super::decision_events_test::seed_run(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        &format!("action-toggle-{}", fixture.organization_id),
+    )?;
+    let run = ctx
+        .db
+        .ai_agent_run()
+        .id()
+        .find(run_id)
+        .ok_or("run missing")?;
+    let agent_id = run.agent_id;
+    let original = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("agent missing")?;
+    let original = ctx.db.ai_agent().id().update(AiAgent {
+        system_prompt: Some("Keep this private prompt".into()),
+        monthly_budget: Some(42.0),
+        allowed_actions: vec!["analytics_read".into()],
+        ..original
+    });
+    for _ in 0..2 {
+        set_ai_agent_action(ctx, fixture.organization_id, agent_id, "chat".into(), true)?;
+    }
+    let enabled = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("agent missing")?;
+    if enabled.allowed_actions != vec!["analytics_read", "chat"] {
+        return Err("Action toggle lost another binding or duplicated a retry".into());
+    }
+    if set_ai_agent_action(ctx, foreign.organization_id, agent_id, "chat".into(), false).is_ok()
+        || set_ai_agent_action(
+            ctx,
+            fixture.organization_id,
+            agent_id,
+            "unknown".into(),
+            true,
+        )
+        .is_ok()
+    {
+        return Err("Action toggle accepted a foreign organization or unknown action".into());
+    }
+    set_ai_agent_action(ctx, fixture.organization_id, agent_id, "chat".into(), false)?;
+    let saved = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("agent missing")?;
+    if saved.allowed_actions != original.allowed_actions
+        || saved.system_prompt != original.system_prompt
+        || saved.monthly_budget != original.monthly_budget
+        || saved.rate_limit_per_minute != original.rate_limit_per_minute
+        || saved.temperature != original.temperature
+        || saved.max_tokens != original.max_tokens
+        || saved.is_default != original.is_default
+        || saved.is_active != original.is_active
+        || saved.provider != original.provider
+        || saved.model != original.model
+    {
+        return Err("Action toggle changed unrelated agent configuration".into());
+    }
+    Ok(())
+}
+
 pub fn test_owner_configuration(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let local = OrgFixture::seed_minimal(ctx)?;

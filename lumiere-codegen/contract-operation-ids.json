@@ -1207,6 +1207,7 @@
     "send_purchase_order": "erp.send_purchase_order",
     "send_sale_order_quotation": "erp.send_sale_order_quotation",
     "set_ai_agent_active": "erp.set_ai_agent_active",
+    "set_ai_agent_action": "erp.set_ai_agent_action",
     "set_ai_agent_run_wait_state": "erp.set_ai_agent_run_wait_state",
     "set_ai_calibration_profile_active": "erp.set_ai_calibration_profile_active",
     "set_ai_capability_role_grant": "erp.set_ai_capability_role_grant",

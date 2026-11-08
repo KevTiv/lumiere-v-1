@@ -12,6 +12,7 @@ export const AI_AGENTS_BFF_REDUCERS = [
   "dismiss_insight",
   "record_ai_spend",
   "set_ai_agent_active",
+  "set_ai_agent_action",
   "update_ai_agent",
 ] as const;
 
@@ -23,6 +24,7 @@ const AI_AGENTS_HINT_OVERRIDES: Partial<
   create_ai_agent: ["ai-agents"],
   update_ai_agent: ["ai-agents"],
   set_ai_agent_active: ["ai-agents"],
+  set_ai_agent_action: ["ai-agents"],
   record_ai_spend: ["ai-agents"],
 };
 
