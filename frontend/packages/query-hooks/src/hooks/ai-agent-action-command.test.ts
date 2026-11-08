@@ -20,7 +20,7 @@ test("action toggles send only one binding, without replacing private agent conf
   const calls = context.mock.method(
     globalThis,
     "fetch",
-    async (input, init) => {
+    async (input: RequestInfo | URL, init?: RequestInit) => {
       assert.equal(
         String(input),
         "http://api.test/api/operations/erp.set_ai_agent_action",
