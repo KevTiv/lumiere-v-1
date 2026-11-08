@@ -7,7 +7,7 @@ readonly TEST_BIN_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_BIN_DIR"' EXIT
 
 for binary in \
-  api-server expense-integration-worker gateway hr-integration-worker owner-report-worker \
+  api-server document-blob-migrate expense-integration-worker gateway hr-integration-worker owner-report-worker \
   projection-worker project-integration-worker storage-migrate workflow-worker; do
   sed "s/__BINARY__/$binary/" >"$TEST_BIN_DIR/$binary" <<'SCRIPT'
 #!/usr/bin/env sh
@@ -22,7 +22,7 @@ sed "s#/usr/local/bin/#$TEST_BIN_DIR/#g" "$ENTRYPOINT" >"$TEST_BIN_DIR/entrypoin
 chmod +x "$TEST_BIN_DIR/entrypoint"
 
 for binary in \
-  api-server expense-integration-worker gateway hr-integration-worker owner-report-worker \
+  api-server document-blob-migrate expense-integration-worker gateway hr-integration-worker owner-report-worker \
   projection-worker project-integration-worker storage-migrate workflow-worker; do
   output="$(LUMIERE_BIN="$binary" "$TEST_BIN_DIR/entrypoint" first second)"
   [[ "$output" == "$binary"$'\nfirst\nsecond' ]]
