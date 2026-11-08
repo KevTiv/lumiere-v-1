@@ -419,7 +419,7 @@ pub async fn post_suggest(
         state.config.ollama_supports_tool_calling,
     )
     .await
-    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    .map_err(AppError::from_agent_resolution)?;
 
     ensure_allowed_action(&agent, "form_suggest")
         .map_err(|e| AppError::Forbidden(e.to_string()))?;

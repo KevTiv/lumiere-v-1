@@ -243,6 +243,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
         .route("/v1/skills/sync", post(routes::skills::post_sync))
+        .route(
+            "/v1/skills/provision-surfaces",
+            post(routes::skills::post_provision_surfaces),
+        )
         .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
         .route("/v1/evidence/run", post(routes::evidence::post_run_inspect))
         .route(

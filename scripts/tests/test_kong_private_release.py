@@ -85,6 +85,8 @@ class PrivateReleaseTests(unittest.TestCase):
             ('POST', '/api/ai/skills/report-analysis/extra'),
             ('POST', '/api/ai/skills/other/readiness'),
             ('POST', '/api/ai/skills/run'),
+            ('GET', '/api/ai/skills/provision-surfaces'),
+            ('POST', '/api/ai/skills/sync'),
             ('GET', '/api/ai/rag'),
             ('GET', '/api/ai/rag/stream'),
             ('POST', '/api/ai/rag/stream/extra'),

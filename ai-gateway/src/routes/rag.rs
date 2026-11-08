@@ -655,7 +655,7 @@ pub async fn post_rag(
         state.config.ollama_supports_tool_calling,
     )
     .await
-    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    .map_err(AppError::from_agent_resolution)?;
 
     // Authorize and meter one query vector, then reuse it across both indexes.
     // No provider charge is made for a missing or incompatible collection.

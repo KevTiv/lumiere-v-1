@@ -371,6 +371,12 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-surface-provisioning
+        paths:
+          - '~/api/ai/skills/provision-surfaces$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-run-history
         paths:
           - '~/api/ai/evidence/runs/history$'

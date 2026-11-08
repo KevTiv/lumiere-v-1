@@ -5,7 +5,7 @@ import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { toCreateAiSkillParams } from "@lumiere/erp-shared/ai-create-params"
-import { DashboardHeader, FormModal, MissingOrganization, type FormConfig } from "@lumiere/ui"
+import { Button, DashboardHeader, FormModal, MissingOrganization, useRBAC, type FormConfig } from "@lumiere/ui"
 import {
   useRegisteredAiSkills,
   useAiTeamMemberSkills,
@@ -14,6 +14,7 @@ import {
   useAiAgentRuns,
   useCancelAiAgentRun,
   useCreateAiSkill,
+  useProvisionAiSurfaces,
   useSetAiSkillActive,
   useSyncAiSkills,
   useUnassignTeamMemberSkill,
@@ -206,18 +207,21 @@ function agentRunStatusLabel(t: Translate, status: string): string {
 
 export function AiSkillsClient({ organizationId }: { organizationId?: number }) {
   if (!hasValidOrganizationId(organizationId)) return <MissingOrganization />
-  return <AiSkillsLoaded organizationId={organizationId} />
+  return <AiSkillsLoaded key={organizationId} organizationId={organizationId} />
 }
 
 function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
+  const { checkPermission, permissionsReady } = useRBAC()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyId(organizationId)
   const { data: skills = [], isLoading, error } = useRegisteredAiSkills(organizationId)
   const { data: teamMembers = [] } = useAiTeamMembers(orgId)
   const { data: memberSkills = [] } = useAiTeamMemberSkills(orgId)
-  const syncSkills = useSyncAiSkills()
+  const syncSkills = useSyncAiSkills(organizationId)
+  const provisionSurfaces = useProvisionAiSurfaces(organizationId)
+  const canProvisionSurfaces = permissionsReady === true && checkPermission("ai_skill", "create").allowed
   const createSkill = useCreateAiSkill(organizationId)
   const setSkillActive = useSetAiSkillActive(organizationId)
   const upsertConfig = useUpsertAiSkillConfig()
@@ -273,6 +277,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   }, [skills])
 
   const handleSync = async () => {
+    if (provisionSurfaces.isPending) return
     setSyncMessage(null)
     try {
       const response = await syncSkills.mutateAsync()
@@ -325,6 +330,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
 
   const isPending =
     syncSkills.isPending ||
+    provisionSurfaces.isPending ||
     createSkill.isPending ||
     setSkillActive.isPending ||
     upsertConfig.isPending ||
@@ -354,6 +360,44 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           },
         ]}
       />
+
+      <section aria-labelledby="ai-feature-setup-title" className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <h2 id="ai-feature-setup-title" className="text-sm font-semibold">{t("aiSkills.setup.title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("aiSkills.setup.description")}</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending || !canProvisionSurfaces}
+            onClick={() => provisionSurfaces.mutate()}
+            data-testid="ai-skills-provision-surfaces"
+          >
+            {t(provisionSurfaces.isPending ? "aiSkills.setup.settingUp" : "aiSkills.setup.action")}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">{t("aiSkills.setup.prerequisites")}</p>
+        {permissionsReady === true && !canProvisionSurfaces ? (
+          <p className="text-sm text-muted-foreground">{t("aiSkills.setup.permissionRequired")}</p>
+        ) : null}
+        {provisionSurfaces.data ? (
+          <div role="status" className="space-y-2 text-sm">
+            <p>{t("aiSkills.setup.checked")}</p>
+            <ul className="space-y-1">
+              {provisionSurfaces.data.skills.map((skill) => (
+                <li key={skill.skill_key} className="flex flex-wrap justify-between gap-2">
+                  <span>{t(`aiSkills.setup.skills.${skill.skill_key}`)}</span>
+                  <span className="text-muted-foreground">{t(`aiSkills.setup.status.${skill.status}`)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {provisionSurfaces.error ? (
+          <p role="alert" className="text-sm text-destructive">{provisionSurfaces.error.message}</p>
+        ) : null}
+      </section>
 
       {syncMessage ? (
         <p className="text-sm text-muted-foreground" role="status">

@@ -9,6 +9,7 @@
     "/api/ai/evidence/ingestion/documents",
     "/api/ai/evidence/ingestion/documents/lifecycle",
     "/api/ai/skills/certifications",
+    "/api/ai/skills/provision-surfaces",
     "/api/ai/evidence/runs/history",
     "/api/ai/skills/report-analysis",
     "/api/ai/evidence/runs/inspect",

@@ -17957,6 +17957,25 @@
     "messages": {
       "syncSuccess": "Synced {{count}} bundled skill(s) to SpacetimeDB."
     },
+    "setup": {
+      "title": "AI feature setup",
+      "action": "Set up AI features",
+      "settingUp": "Setting up…",
+      "description": "Register missing skills for chat answers, form suggestions and action drafts. Existing settings and releases are preserved.",
+      "prerequisites": "This prepares skill definitions. Provider, company, budget and release checks still apply when you use AI.",
+      "permissionRequired": "Skill creation permission is required to run setup.",
+      "checked": "Skill definitions checked.",
+      "skills": {
+        "rag_generation": "Chat answers",
+        "form_suggestion": "Form suggestions",
+        "action_draft_generation": "Action drafts"
+      },
+      "status": {
+        "created": "Added",
+        "existing": "Already registered",
+        "inactive": "Inactive (kept unchanged)"
+      }
+    },
     "registry": {
       "validation": {
         "title": "Validate a new skill version",
