@@ -5641,6 +5641,9 @@ function AccountingClientReady({
     />
   }
 
+  const showPaymentOperations = paymentOperationsLocked ||
+    (accountingActiveTab === "payment-operations" && dataState["payment-operations"].status === "ready")
+
   return (
     <CurrencyFormatProvider currencies={currencies} defaultCode={operatingCompanyCurrencyCode}>
     <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
@@ -5690,6 +5693,7 @@ function AccountingClientReady({
           },
         }}
         config={config}
+        fillHeight={!showPaymentOperations}
         data={data}
         dataLoading={accountingActiveTab === "dashboard" ? undefined : dataLoading}
         dataState={dataState}
@@ -5705,7 +5709,7 @@ function AccountingClientReady({
         }}
       /> : null}
 
-      {(accountingActiveTab === "payment-operations" && dataState["payment-operations"].status === "ready") || paymentOperationsLocked ? (
+      {showPaymentOperations ? (
         <section className="mt-6 space-y-3" aria-label="Payment operations">
           {accountingActiveTab !== "payment-operations" ? <p role="status" className="rounded-lg border p-3 text-sm">The original payment operation is retained here until its result is confirmed.</p> : null}
           <PaymentOperationsPanel

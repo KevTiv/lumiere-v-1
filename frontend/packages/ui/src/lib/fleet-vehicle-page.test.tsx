@@ -246,6 +246,7 @@ const page = productionExports(
       }),
     },
     "../../fleet-record": fleetRecord,
+    "../../fleet-workspace": fleetWorkspace,
     "../../use-fleet-workspace": workspace,
     "../../fleet-recovery-notice": { FleetRecoveryNotice: () => null },
     "../../fleet-service-setup-notice": { FleetServiceSetupNotice: () => null },

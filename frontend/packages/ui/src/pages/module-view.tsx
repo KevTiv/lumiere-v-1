@@ -41,6 +41,7 @@ import { HistoryPeriodSelect } from "../components/history-period-select"
 import { parseHistoryPeriod, resolveHistoryPeriod, serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
 import { configuredModuleHistoryField, filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
 import { useAssistantNativeForms, type AssistantNativeFormStatus } from "../components/assistant-native-form-provider"
+import { cn } from "../lib/utils"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -51,6 +52,8 @@ export interface ModuleViewRuntimeForms {
 
 interface ModuleViewProps {
   config: ModuleConfig
+  /** Let a sibling workspace surface follow the module without a full-height gap. */
+  fillHeight?: boolean
   /** Live data keyed by tab id — entity tabs receive data[tab.id] */
   data?: Record<string, Record<string, unknown>[]>
   /** Called when a create form is submitted: tabId, createAction, form values */
@@ -137,6 +140,7 @@ function liveSheetRecord(
 
 export function ModuleView({
   config,
+  fillHeight = true,
   data = {},
   onFormSubmit,
   onRowClick,
@@ -360,7 +364,7 @@ export function ModuleView({
 
   return (
     <div
-      className="flex min-h-full min-w-0 flex-col gap-2"
+      className={cn("flex min-w-0 flex-col gap-2", fillHeight && "min-h-full")}
       data-testid={`module-view-${config.id}`}
       data-hydrated={isHydrated ? "true" : "false"}
     >

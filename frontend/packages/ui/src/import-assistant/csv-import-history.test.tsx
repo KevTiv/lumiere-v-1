@@ -44,7 +44,7 @@ describe("CSV import outcome history", () => {
   it("shows selected counts and only that job's inline row errors", () => {
     render(<CsvImportHistory organizationId={1n} tableName="hr_employee" />)
     chooseSelectValue(screen.getByRole("combobox"), "2")
-    expect(screen.getByText("partial")).toBeTruthy()
+    expect(screen.getByText("Partial")).toBeTruthy()
     expect(screen.getByText(/Row 3: Unknown employee/)).toBeTruthy()
     expect(screen.queryByText(/Other job error/)).toBeNull()
     expect(screen.getByText("common.importAssistant.jobImported:").parentElement?.textContent).toContain("2")
