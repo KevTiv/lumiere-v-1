@@ -78,7 +78,6 @@ function EmbeddedModuleFixture() {
       workBoard: configured
         ? {
             scope: "purchasing",
-            label: "Kanban",
             sources: ["workflow"],
             defaultLayout: "list",
             workflowColumnOrder: ["Claimed", "Open"],
@@ -96,8 +95,8 @@ function EmbeddedModuleFixture() {
         onClick={() => setConfigured((current) => !current)}
       >
         {configured
-          ? "Disable synthetic Kanban view"
-          : "Enable synthetic Kanban view"}
+          ? "Disable synthetic work queue"
+          : "Enable synthetic work queue"}
       </button>
       <ModuleWorkView
         organizationId={7}

@@ -584,10 +584,10 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
   test("an embedded module opens its work queue in existing navigation and fixes its configured scope and source", async ({ page }) => {
     await page.goto("/work-board?fixtureHost=module&workScope=sales&workSource=activities")
     await expect(page.getByTestId("module-work-fixture-overview")).toBeVisible()
-    const kanban = page.getByTestId("module-workspace-fixture-purchasing-work")
-    await expect(kanban).toHaveText("Work queue")
+    const workQueue = page.getByTestId("module-workspace-fixture-purchasing-work")
+    await expect(workQueue).toHaveText("Work queue")
     expect(state.scopedReads).toBe(0)
-    await kanban.click()
+    await workQueue.click()
     await expect(page).toHaveURL((url) =>
       url.pathname === "/work-board" &&
       url.searchParams.get("fixtureHost") === "module" &&
@@ -1357,6 +1357,9 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     await expect(
       review.getByRole("link", { name: "Open source record" }),
     ).toBeVisible()
+    await expect(
+      review.getByText("Review supplier order", { exact: true }),
+    ).toBeVisible()
     const row = state.rows.find((candidate) => candidate.id === 42)!
     delete row.workSourceTitle
     delete row.nodeKey
@@ -1364,13 +1367,15 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     delete row.subjectId
     await control(page, "realtime-source")
     await expect(
+      review.getByRole("heading", { name: "Purchasing assignment", exact: true }),
+    ).toBeVisible()
+    await expect(
       review.getByRole("heading", { name: "Purchase review 42" }),
     ).toHaveCount(0)
     await expect(
       review.getByText("Review supplier order", { exact: true }),
     ).toHaveCount(0)
     await expect(review.getByRole("link")).toHaveCount(0)
-    await expect(review.getByRole("heading", { name: "#42" })).toBeVisible()
     expect(state.writes).toHaveLength(0)
   })
 

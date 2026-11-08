@@ -166,7 +166,9 @@ export async function partialValidatePickingViaInventoryUi(
   await gotoModule(page, "/warehouse", "warehouse")
   await selectModuleTab(page, "warehouse", "transfers")
   await selectEntityRowById(page, pickingId)
-  await page.getByTestId("entity-action-partial-validate-picking").click()
+  const action = page.getByTestId("entity-action-partial-validate-picking")
+  await expect(action).toBeEnabled()
+  await action.click()
   await expect(
     page.getByTestId("form-modal-partial-delivery-validate"),
   ).toBeVisible({ timeout: 15_000 })
