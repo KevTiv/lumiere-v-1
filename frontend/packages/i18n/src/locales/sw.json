@@ -460,7 +460,9 @@
     },
     "listToolbar": {
       "viewSettings": "Mipangilio ya mwonekano"
-    }
+    },
+    "restore": "Rejesha",
+    "previous": "Iliyotangulia"
   },
   "navigation": {
     "overview": "Muhtasari",
@@ -3469,6 +3471,54 @@
         "table": "Jedwali",
         "code": "Msimbo"
       }
+    },
+    "viewer": {
+      "open": "Hakiki faili",
+      "title": "Hakikisho la faili",
+      "description": "Tazama faili iliyohifadhiwa na matoleo yake unayoruhusiwa.",
+      "scopeChanged": "Eneo lako la kazi limebadilika. Funga hakikisho hili na ufungue faili tena.",
+      "denied": "Huna ruhusa ya kufikia faili hii.",
+      "unavailable": "Faili au toleo hili halipatikani kwa ruhusa zako za sasa.",
+      "changed": "Maelezo ya faili iliyohifadhiwa yamebadilika. Pakia hakikisho tena kabla ya kuendelea.",
+      "tooLarge": "Faili hii imezidi kikomo cha hakikisho.",
+      "invalid": "Hakikisho la faili halikuweza kuthibitishwa.",
+      "failed": "Faili haikuweza kupakiwa. Jaribu tena.",
+      "currentVersion": "Toleo la sasa",
+      "version": "Toleo la faili",
+      "versionNumber": "Toleo {{number}}",
+      "current": "la sasa",
+      "reload": "Pakia hakikisho tena",
+      "downloading": "Kuandaa upakuaji…",
+      "download": "Pakua faili",
+      "loading": "Kukagua ruhusa na kupakia faili…",
+      "pdfFallback": "Kivinjari chako hakiwezi kuonyesha PDF hii. Tumia Pakua faili kuifungua.",
+      "unsupported": "Hakikisho la umbizo hili bado halipatikani.",
+      "content": "Yaliyomo kwenye faili",
+      "empty": "Faili hii haina rekodi.",
+      "csv": "Hakikisho la CSV",
+      "rows": "Safu {{start}}–{{end}} kati ya {{total}}",
+      "pages": "Ukurasa {{page}} kati ya {{total}}"
+    },
+    "fileManagement": {
+      "move": "Hamisha",
+      "restoreFolder": "Rejesha folda",
+      "destination": "Mahali pa kuhamishia",
+      "root": "Folda kuu",
+      "trashFolder": "Hamisha folda kwenye tupio?",
+      "trashDescription": "Folda hii na yaliyomo yatafichwa hadi folda irejeshwe. Matoleo yaliyopo ya faili yatahifadhiwa.",
+      "trash": "Hamisha kwenye tupio",
+      "editFolder": "Hariri folda",
+      "folderTrash": "Tupio la folda",
+      "restoreDescription": "Rejesha folda ili faili zake zilizohifadhiwa zipatikane tena. Chagua mahali pake pa awali au mahali pengine unaporuhusiwa.",
+      "folderActions": "Vitendo vya {{name}}",
+      "scopeChanged": "Eneo lako la faili au ruhusa zako zimebadilika. Fungua kitendo hiki tena.",
+      "unavailableDestination": "Chagua mahali panapopatikana."
+    },
+    "attachments": {
+      "readFailed": "Viambatisho havikuweza kupakiwa. Onyesha upya kabla ya kupakia."
+    },
+    "receipts": {
+      "indexDisallowed": "Uorodheshaji wa AI haupatikani kwa faili hii"
     }
   },
   "subscriptions": {

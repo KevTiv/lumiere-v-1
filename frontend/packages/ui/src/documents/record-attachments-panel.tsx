@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
+import { DOCUMENT_FILE_ACCEPT } from "@lumiere/erp-shared/document-file-profile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,6 +26,7 @@ export type RecordAttachmentsPanelProps = {
   resId: bigint | number
   documents: RecordAttachmentRow[]
   onUpload: (file: File, meta: { name: string }) => Promise<void>
+  onOpen?: (documentId: string) => void
   title?: string
   emptyLabel?: string
   uploadLabel?: string
@@ -52,6 +54,7 @@ export function RecordAttachmentsPanel({
   resId,
   documents,
   onUpload,
+  onOpen,
   title = "Attachments",
   emptyLabel = "No attachments yet",
   uploadLabel = "Upload",
@@ -61,6 +64,7 @@ export function RecordAttachmentsPanel({
   const [name, setName] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const inputId = useId()
 
   const linked = useMemo(() => {
     const idStr = String(resId)
@@ -96,7 +100,15 @@ export function RecordAttachmentsPanel({
                 key={String(d.id)}
                 className="flex min-w-0 flex-wrap items-start justify-between gap-2 [overflow-wrap:anywhere]"
               >
-                {href ? (
+                {onOpen ? (
+                  <button
+                    type="button"
+                    className="min-w-0 max-w-full text-left text-primary underline-offset-2 hover:underline"
+                    onClick={() => onOpen(String(d.id))}
+                  >
+                    {label}
+                  </button>
+                ) : href ? (
                   <a
                     className="min-w-0 max-w-full text-primary underline-offset-2 hover:underline"
                     href={href}
@@ -117,9 +129,9 @@ export function RecordAttachmentsPanel({
 
       <div className="grid gap-2 @lg/attachments:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] @lg/attachments:items-end">
         <div className="min-w-0 space-y-1">
-          <Label htmlFor="attach-name">Name</Label>
+          <Label htmlFor={`${inputId}-name`}>Name</Label>
           <Input
-            id="attach-name"
+            id={`${inputId}-name`}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Attachment name"
@@ -127,10 +139,11 @@ export function RecordAttachmentsPanel({
           />
         </div>
         <div className="min-w-0 space-y-1">
-          <Label htmlFor="attach-file">File</Label>
+          <Label htmlFor={`${inputId}-file`}>File</Label>
           <Input
-            id="attach-file"
+            id={`${inputId}-file`}
             type="file"
+            accept={DOCUMENT_FILE_ACCEPT}
             data-testid="record-attachments-file"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             disabled={disabled || pending}

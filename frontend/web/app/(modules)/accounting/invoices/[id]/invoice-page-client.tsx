@@ -85,7 +85,7 @@ import {
   useUpdateAccountMoveLine,
 } from '@lumiere/query-hooks/hooks/accounting';
 import { useInvoiceToPaymentWorkflow } from '@lumiere/query-hooks/hooks/accounting/invoice-workflow';
-import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
+
 import { accountingBillCorrectionAvailable } from '@lumiere/stdb/commands';
 import { billLineCorrectionSource, billLineCorrectionParams } from '../../bill-line-correction';
 import { usePurchaseOrderLines, usePurchaseOrders } from '@lumiere/query-hooks/hooks/purchasing';
@@ -104,6 +104,7 @@ import { toUpdateAccountMoveLineParams, updateAccountMoveLineParamsToJson } from
 import { toCreateCreditNoteParams } from '@/lib/accounting-create-params';
 import { resolveDefaultCogsInventoryAccountIds } from '@/lib/accounting-post-draft';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
+import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload";
 import { useModuleSubscription } from '@lumiere/stdb/live';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
@@ -208,7 +209,7 @@ function InvoicePageLoaded({
   const purchaseLines = purchaseLinesRead.rows;
 
   const emailTemplatesRead = moduleCollection(useInvoiceEmailTemplates(organizationId, emailReview !== null && checkPermission('mail_template', 'read').allowed));
-  const createDocument = useCreateDocument(orgId, operatingCompanyId);
+  const documentUploads = useManagedDocumentUpload(orgId, operatingCompanyId);
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId);
   const cancelMove = useCancelAccountMove(organizationId);
   const computeTotals = useComputeInvoiceTotals(organizationId, operatingCompanyId);
@@ -584,14 +585,13 @@ function InvoicePageLoaded({
       show: true,
       run: () =>
         withBusy('archive', 'Archive PDF', async () => {
-          const params = await archiveRenderedPdfAsDocument({
+          await archiveRenderedPdfAsDocument({
             kind: 'account-move',
             recordId: Number(moveId),
-            companyId: operatingCompanyId,
+            saveGenerated: documentUploads.submitGenerated,
             name: String(move.name || `Invoice ${moveId}`),
           });
-          await createDocument.mutateAsync(params);
-          showWorkflowToast({
+            showWorkflowToast({
             kind: 'success',
             title: 'Archived to Documents',
             description: 'PDF stored as a linked document version.',

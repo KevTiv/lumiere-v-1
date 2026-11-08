@@ -1,5 +1,6 @@
 //! Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 mod country_pack_test;
+mod document_folders_test;
 mod document_templates_test;
 mod knowledge_guides_test;
 mod platform_smoke;
@@ -78,7 +79,15 @@ pub fn run_documents_wave_a_tests(ctx: &ReducerContext) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn run_documents_wave_b_tests(ctx: &ReducerContext) -> Result<(), String> {
     platform_smoke::test_documents_wave_b_restore_and_folder_ops(ctx)
-        .map_err(|e| format!("documents wave b: {e}"))
+        .map_err(|e| format!("documents wave b: {e}"))?;
+    document_folders_test::test_folder_tree_move_trash_restore(ctx)
+        .map_err(|e| format!("document folder lifecycle: {e}"))?;
+    document_folders_test::test_folder_scope_acl_and_collision(ctx)
+        .map_err(|e| format!("document folder scope: {e}"))?;
+    document_folders_test::test_historical_document_version_retry(ctx)
+        .map_err(|e| format!("document version recovery: {e}"))?;
+    document_folders_test::test_folder_trash_records_complete_evidence_outcome(ctx)
+        .map_err(|e| format!("document folder evidence outcome: {e}"))
 }
 
 #[spacetimedb::reducer]

@@ -65,22 +65,17 @@ The implemented rules are in [document blob access](../../api-server/src/documen
 
 ## Visible folder projection
 
-The [browser projection](../../frontend/web/app/(modules)/documents/file-browser-rows.ts) and [file browser](../../frontend/packages/ui/src/documents/file-browser.tsx) use the actor's supplied document/folder collections. They now support child-folder navigation and breadcrumbs through visible ancestors. Missing or hidden ancestors start a new visible root without exposing ancestor names or IDs. Cycles terminate safely; a disappearing selection returns to current visible files.
+The [browser projection](../../frontend/web/app/(modules)/documents/file-browser-rows.ts) and [file browser](../../frontend/packages/ui/src/documents/file-browser.tsx) use the actor's authorized document/folder collections. Child navigation and breadcrumbs follow visible ancestors. The API now requires a complete authorized, live ancestor chain; an orphan, hidden ancestor, cycle, or trashed ancestor does not become an accessible root. A disappearing selection returns to current visible files.
 
 The root keeps the existing **All files** view. Folder counts and sizes use the visible files supplied to the browser, not unrestricted database totals. New-folder creation and uploads use the selected folder. The [Documents client](../../frontend/web/app/(modules)/documents/documents-client.tsx) requires current identity/company readiness and create permissions for these controls; scope changes close stale creation forms and stop continued upload work.
 
-This is navigation over the existing authorized projection. It does not introduce team grants, inherited folder ACLs, or a filesystem mount.
+Folder and file moves, root destinations, folder trash, and restore now apply the same ancestor policy at the mutation boundary. Moves cannot widen the existing effective audience. Folder trash retains files and versions. These operations do not introduce team grant management or a filesystem mount; see the [file-management implementation and rollout](./document-file-management.md).
 
 ## Migration prerequisites and operator sequence
 
-**This slice contains no document-blob migration CLI or automatic legacy backfill.** The existing `storage-migrate` database command is not a file-copy tool. Treat the following as a reviewed migration procedure to implement and execute separately:
+The `document-blob-migrate` CLI now prepares a complete local object inventory, copies immutable bytes and metadata, checks every destination object, and supports recovery of a reviewed manifest. It includes historical versions, saved import originals, and receipt/preparation/review sidecars. It never changes the selected backend or deletes source files.
 
-1. Inventory the source document/version references and local object pairs. Snapshot the metadata and bytes, and fence all relevant upload, completion, generated-document and ingestion writers before the final copy. Preserve a rollback manifest.
-2. Validate each completed `.bin`/`.meta.json` pair: logical key, organization/company, MIME type, completion state, byte length and SHA-256 must agree with its trusted records. Missing or incomplete pairs are exceptions to resolve, not files to silently declare migrated.
-3. Review legacy creator/purpose evidence before enabling the stricter access rules for old objects. Use authoritative creation/audit/workflow evidence; a filename, path, caller-supplied URL or current document row alone is insufficient. Keep unverifiable objects unavailable pending reviewed repair or authorized re-upload.
-4. Copy both members of every accepted pair under the configured S3 prefix, preserving object IDs and references. Any reviewed metadata backfill must be explicit in the migration manifest. Do not overwrite a conflicting target object.
-5. Read back from the destination and verify counts, lengths, metadata and every accepted binary checksum against the manifest. Test the endpoint's conditional-write prerequisite and authenticated allowed/denied reads for each supported purpose, including cross-company, revoked and unproven legacy cases.
-6. Select the same backend/bucket/prefix configuration on every service that reads or writes these objects, then deploy through the normal release process. Recheck old and newly created document/version downloads before releasing the writer fence. Record the live configuration and test evidence.
+Follow the [migration runbook](./document-file-management.md#storage-migration-preparation) to reconcile authoritative reference exports, fence every writer, resolve incomplete or unverifiable objects, check actual provider conditional writes, and rehearse authenticated access plus upload/import recovery before activating the bucket. S3 verification certifies manifest keys, not a complete remote bucket inventory. No production copy, provider acceptance, or activation has run as part of this code change.
 
 Retain the source copy until migration acceptance. If writes occur after S3 cutover, switching the environment variable back to local is not a complete rollback: reconcile those new pairs with verified copies first. Do not remove the old volume or source files as part of this implementation slice.
 
@@ -89,8 +84,8 @@ Retain the source copy until migration acceptance. If writes occur after S3 cuto
 | Area | Status after this slice |
 | --- | --- |
 | Private S3 document adapter and stable URLs | Implemented in code; live Railway connection, credentials, bucket behavior and cutover remain unverified. |
-| Existing object migration | Procedure above only; no production inventory, verified copy or legacy creator/purpose backfill has run. |
-| Folder/team access | Existing scoped projection retained. Full read/write member management, team grants, inherited ACLs and complete folder move semantics remain separate work. |
+| Existing object migration | CLI and recovery tests implemented; production inventory, verified copy, application recovery rehearsal, and legacy creator/purpose repair remain operator gates. |
+| Folder/team access | Authoritative ancestor checks, explicit moves/root, trash, and restore implemented. Full member/team grant management remains separate work. |
 | File redaction | Access may deny delivery. Field masking and template sanitization do not redact sensitive bytes inside an already-saved PDF, image or office file. Policy-specific derivative generation remains unimplemented here. |
 | AI/OCR/search | The ingestion entry now authorizes source bytes through the current document policy before extraction/OCR. Permission and revocation propagation across extracted text, embeddings, search, passage retrieval and caches, plus redaction and lifecycle handling, still require implementation review and end-to-end evidence; this slice does not certify those downstream paths. |
 | Storage lifecycle | Bucket retention, deletion/garbage collection, backups, residency guarantees and operational recovery require explicit provider configuration and validation. |

@@ -217,6 +217,7 @@ jobs:
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib document_blob
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib config::tests::document_
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --bin document-blob-migrate
 
       - name: Alpha saved-effect readback and retention authorization
         run: |

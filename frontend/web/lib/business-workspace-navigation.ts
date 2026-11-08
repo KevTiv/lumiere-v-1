@@ -59,7 +59,7 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
       ["templates", ["document-templates", "mail-templates"]],
     ],
     overflow: [
-      ["manage", ["document-folders", "knowledge-categories", "document-processing", "document-insights", "documents-recycle-bin"]],
+      ["manage", ["document-folders", "knowledge-categories", "document-processing", "document-insights", "documents-recycle-bin", "document-folders-trash"]],
       ["overview", ["dashboard"]],
     ],
   },

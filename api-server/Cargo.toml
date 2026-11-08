@@ -39,6 +39,10 @@ name = "storage-migrate"
 path = "src/bin/storage-migrate.rs"
 
 [[bin]]
+name = "document-blob-migrate"
+path = "src/bin/document-blob-migrate.rs"
+
+[[bin]]
 name = "reconstruct-organization"
 path = "src/bin/reconstruct-organization.rs"
 

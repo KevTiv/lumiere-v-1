@@ -3,7 +3,7 @@
   "status": "C8 canonical subscription classification; live acceptance/access-path mapping pending",
   "authoritativeResourceSet": {
     "source": "crates/stdb-auth/assets/subscription-census.json:entries",
-    "count": 279
+    "count": 280
   },
   "rustCompatibility": {
     "subscriptionResourceKeysSource": "crates/stdb-auth/assets/subscription-resource-keys.json",
@@ -88,6 +88,7 @@
       "dashboard-widgets",
       "documents-deleted",
       "document-folders",
+      "document-folders-deleted",
       "document-versions",
       "document-external-refs",
       "document-legal-holds",
@@ -8403,13 +8404,13 @@
       "resource": "documents",
       "source": {
         "table": "document",
-        "readModel": "Document"
+        "readModel": "bff-authorized:document"
       },
       "scope": "organization+company",
-      "deliveryMode": "invalidation-only",
+      "deliveryMode": "bff-only",
       "directRowExposure": false,
       "fieldSensitivity": "field-policy",
-      "predicateClass": "none",
+      "predicateClass": "authorization-sensitive",
       "consumerEvidence": {
         "sources": [
           "frontend/web/app/providers.tsx:FULL_CLIENT_SUBSCRIPTION_RESOURCES",
@@ -8425,7 +8426,7 @@
       "accessPath": {
         "status": "pending",
         "key": null,
-        "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+        "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
       },
       "subscriptionApiAcceptance": {
         "required": true,
@@ -8450,10 +8451,10 @@
         "readModel": "bff-authorized:document"
       },
       "scope": "organization+company",
-      "deliveryMode": "invalidation-only",
+      "deliveryMode": "bff-only",
       "directRowExposure": false,
       "fieldSensitivity": "field-policy",
-      "predicateClass": "none",
+      "predicateClass": "authorization-sensitive",
       "consumerEvidence": {
         "sources": [
           "frontend/packages/stdb/src/subscriptions/documents-workspace.ts"
@@ -8468,7 +8469,7 @@
       "accessPath": {
         "status": "pending",
         "key": null,
-        "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+        "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
       },
       "subscriptionApiAcceptance": {
         "required": true,
@@ -8490,13 +8491,13 @@
       "resource": "document-folders",
       "source": {
         "table": "doc_folder",
-        "readModel": "DocumentFolder"
+        "readModel": "bff-authorized:doc_folder"
       },
       "scope": "organization+company",
-      "deliveryMode": "invalidation-only",
+      "deliveryMode": "bff-only",
       "directRowExposure": false,
       "fieldSensitivity": "field-policy",
-      "predicateClass": "none",
+      "predicateClass": "authorization-sensitive",
       "consumerEvidence": {
         "sources": [
           "frontend/packages/stdb/src/subscriptions/documents-workspace.ts"
@@ -8511,7 +8512,50 @@
       "accessPath": {
         "status": "pending",
         "key": null,
-        "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+        "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
+      },
+      "subscriptionApiAcceptance": {
+        "required": true,
+        "status": "not-run",
+        "method": "live-subscription-api",
+        "spacetimeSqlStringValidationEquivalent": false
+      },
+      "rustCompatibility": {
+        "subscriptionResourceKeys": false,
+        "fullClientSubscriptionResources": false
+      },
+      "broadSubscription": {
+        "approved": false,
+        "reason": "Broad cardinality is a census classification only; direct realtime exposure remains disabled pending SQ-2/SQ-5 evidence.",
+        "loadTestOwner": "subscription-query-ir/SQ-5"
+      }
+    },
+    {
+      "resource": "document-folders-deleted",
+      "source": {
+        "table": "doc_folder",
+        "readModel": "bff-authorized:doc_folder"
+      },
+      "scope": "organization+company",
+      "deliveryMode": "bff-only",
+      "directRowExposure": false,
+      "fieldSensitivity": "field-policy",
+      "predicateClass": "authorization-sensitive",
+      "consumerEvidence": {
+        "sources": [
+          "frontend/packages/stdb/src/subscriptions/documents-workspace.ts"
+        ],
+        "status": "observed"
+      },
+      "expectedCardinality": "broad",
+      "latencyClass": "interactive",
+      "updateFanout": "medium",
+      "sourceClass": "canonical-table",
+      "reconnectClass": "on-demand",
+      "accessPath": {
+        "status": "pending",
+        "key": null,
+        "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
       },
       "subscriptionApiAcceptance": {
         "required": true,
@@ -8535,11 +8579,11 @@
         "table": "document_version",
         "readModel": "bff-authorized:document_version"
       },
-      "scope": "organization",
-      "deliveryMode": "invalidation-only",
+      "scope": "organization+company",
+      "deliveryMode": "bff-only",
       "directRowExposure": false,
       "fieldSensitivity": "field-policy",
-      "predicateClass": "none",
+      "predicateClass": "authorization-sensitive",
       "consumerEvidence": {
         "sources": [
           "frontend/packages/stdb/src/subscriptions/documents-workspace.ts"
@@ -8554,7 +8598,7 @@
       "accessPath": {
         "status": "pending",
         "key": null,
-        "exception": "SQ-0 records the resource shape; SQ-2 must map interactive reads to a shared STDB access path."
+        "exception": "Current company membership, owner projection and complete folder ancestry/trash checks are enforced by query_exec/documents.rs; raw SQL subscriptions cannot reproduce these checks."
       },
       "subscriptionApiAcceptance": {
         "required": true,

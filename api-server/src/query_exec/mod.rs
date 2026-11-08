@@ -220,6 +220,7 @@ async fn read_resource_query_for_company(
                 organization_id,
                 identity_hex,
                 fa,
+                requested_company_id,
             )
             .await;
         }
@@ -452,17 +453,39 @@ async fn read_resource_query_for_company(
         return read_employees(client, organization_id, identity_hex, fa).await;
     }
 
-    if resource == "document-folders" {
-        return documents::read_document_folders(client, organization_id, identity_hex, fa).await;
+    if resource == "document-folders" || resource == "document-folders-deleted" {
+        return documents::read_document_folders(
+            client,
+            resource,
+            organization_id,
+            identity_hex,
+            fa,
+            requested_company_id,
+        )
+        .await;
     }
 
     if resource == "documents" || resource == "documents-deleted" {
-        return documents::read_documents(client, resource, organization_id, identity_hex, fa)
-            .await;
+        return documents::read_documents(
+            client,
+            resource,
+            organization_id,
+            identity_hex,
+            fa,
+            requested_company_id,
+        )
+        .await;
     }
 
     if resource == "document-versions" {
-        return documents::read_document_versions(client, organization_id, identity_hex, fa).await;
+        return documents::read_document_versions(
+            client,
+            organization_id,
+            identity_hex,
+            fa,
+            requested_company_id,
+        )
+        .await;
     }
 
     let Some(reg) = registry_get(resource) else {

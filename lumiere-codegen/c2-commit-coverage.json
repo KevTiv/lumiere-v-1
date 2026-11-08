@@ -33,6 +33,15 @@
   ],
   "reducers": [
     {
+      "source": "spacetimedb/src/documents/documents.rs",
+      "function": "move_document",
+      "operation": "move_document",
+      "operation_id": "erp.move_document",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ]
+    },
+    {
       "source": "spacetimedb/src/accounting/journal_entries.rs",
       "function": "update_account_move_line",
       "operation": "update_account_move_line",
@@ -522,6 +531,61 @@
     }
   ],
   "dynamic_commit_helpers": [
+    {
+      "source": "spacetimedb/src/documents/folder_operations.rs",
+      "function": "record_folder_commit",
+      "operation_id_parameter": "operation_id",
+      "snapshot_type": "FolderChangeSnapshot",
+      "method": "record_folder_commit",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [
+        "prepare_folder_change"
+      ],
+      "callers": [
+        {
+          "source": "spacetimedb/src/documents/documents.rs",
+          "function": "create_document_folder",
+          "argument": "\"erp.create_document_folder\"",
+          "operations": {
+            "create_document_folder": "erp.create_document_folder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/documents/folder_operations.rs",
+          "function": "update_folder",
+          "argument": "\"erp.update_document_folder\"",
+          "operations": {
+            "update_document_folder": "erp.update_document_folder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/documents/folder_operations.rs",
+          "function": "move_document_folder",
+          "argument": "\"erp.move_document_folder\"",
+          "operations": {
+            "move_document_folder": "erp.move_document_folder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/documents/folder_operations.rs",
+          "function": "trash_document_folder",
+          "argument": "\"erp.trash_document_folder\"",
+          "operations": {
+            "trash_document_folder": "erp.trash_document_folder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/documents/folder_operations.rs",
+          "function": "restore_document_folder",
+          "argument": "\"erp.restore_document_folder\"",
+          "operations": {
+            "restore_document_folder": "erp.restore_document_folder"
+          }
+        }
+      ]
+    },
     {
       "source": "spacetimedb/src/manufacturing/effects.rs",
       "function": "record",

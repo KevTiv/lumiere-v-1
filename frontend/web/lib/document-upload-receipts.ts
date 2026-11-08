@@ -1,9 +1,10 @@
 import { z } from "zod"
-import type { CreateDocumentParams } from "@lumiere/stdb/types"
+import type { AddDocumentVersionParams, CreateDocumentParams } from "@lumiere/stdb/types"
 import { uploadDocumentBlob } from "./document-blob-upload"
 
 const id = z.string().regex(/^[1-9]\d*$/).refine((value) => BigInt(value) <= 18446744073709551615n)
 const optionalId = id.nullish()
+const documentMetadataSchema = z.record(z.unknown())
 export const documentRegistrationSchema = z.object({
   name: z.string().trim().min(1).max(500),
   description: z.string().max(8_000).nullish(),
@@ -17,6 +18,13 @@ export const documentRegistrationSchema = z.object({
   retentionDays: z.number().int().nonnegative().max(4294967295).nullish(),
   fiscalKind: z.string().max(100).nullish(),
   residencyRegion: z.string().max(100).nullish(),
+  metadata: z.string().max(8_000).refine((value) => {
+    try {
+      return documentMetadataSchema.safeParse(JSON.parse(value)).success
+    } catch { return false }
+  }, "Document metadata must be a JSON object").nullish(),
+  versionDocumentId: optionalId,
+  changesDescription: z.string().max(8_000).nullish(),
 }).strict()
 
 export type DocumentRegistration = z.infer<typeof documentRegistrationSchema>
@@ -27,11 +35,28 @@ export function documentRegistrationFromParams(params: CreateDocumentParams): Do
     resModel: params.resModel, resId: params.resId?.toString(), partnerId: params.partnerId?.toString(),
     tagIds: params.tagIds.map(String), isFavorite: params.isFavorite,
     classificationId: params.classificationId?.toString(), retentionDays: params.retentionDays,
-    fiscalKind: params.fiscalKind, residencyRegion: params.residencyRegion,
+    fiscalKind: params.fiscalKind, residencyRegion: params.residencyRegion, metadata: params.metadata,
   })
 }
 const submissionId = z.string().regex(/^[0-9a-f]{32}$/)
 const checksum = z.string().regex(/^[0-9a-f]{64}$/)
+export const documentInspectionReceiptSchema = z.object({
+  schemaVersion: z.number().int().positive(),
+  policyVersion: z.string(),
+  organizationId: z.number().int().positive().safe(),
+  companyId: z.number().int().positive().safe().nullable(),
+  objectKey: z.string(),
+  sourceSha256: checksum,
+  sourceSize: z.number().int().positive().safe(),
+  contentType: z.string(),
+  fileName: z.string(),
+  profile: z.string(),
+  sourceTrust: z.string(),
+  processingAllowed: z.boolean(),
+  aiAllowed: z.boolean(),
+  datasetSha256: checksum.optional(),
+  contentPolicyVersion: z.string().optional(),
+}).strict()
 export const documentUploadReceiptSchema = z.object({
   submissionId,
   objectKey: z.string().regex(/^org-[1-9]\d*\/[A-Za-z0-9_-]{1,32}\/[0-9a-f]{32}$/),
@@ -45,7 +70,9 @@ export const documentUploadReceiptSchema = z.object({
   registration: documentRegistrationSchema,
   registrationState: z.enum(["registered", "unconfirmed"]),
   documentId: id.nullable(),
+  versionId: id.nullish(),
   indexing: z.enum(["pending", "failed", "queued", "running", "completed", "unavailable", "superseded"]),
+  inspection: documentInspectionReceiptSchema.nullish(),
 }).strict()
 export type DocumentUploadReceipt = z.infer<typeof documentUploadReceiptSchema>
 
@@ -55,10 +82,19 @@ const pointerSchema = z.object({
   fileName: z.string(),
   checksum,
   requestHash: checksum,
+  target: z.object({ resModel: z.string().optional(), resId: id.optional(), versionDocumentId: id.optional() }).strict().optional(),
+  intentKey: z.string().min(1).max(200).optional(),
+  settled: z.boolean().optional(),
 }).strict()
 export type DocumentSubmissionPointer = z.infer<typeof pointerSchema>
 export interface DocumentUploadScope { organizationId: bigint; companyId: bigint; actorId: string }
 export interface ReceiptStorage { getItem(key: string): string | null; setItem(key: string, value: string): void }
+export interface GeneratedDocumentSubmission {
+  intentKey: string
+  registration: DocumentRegistration
+  createFile(): Promise<File>
+  residency?: string
+}
 
 export function documentReceiptStorageKey(scope: DocumentUploadScope): string {
   return `lumiere:document-submissions:v1:${JSON.stringify([String(scope.organizationId), String(scope.companyId), scope.actorId])}`
@@ -78,18 +114,31 @@ export function saveDocumentSubmissionPointer(storage: ReceiptStorage, scope: Do
   }
 }
 
+export function settleDocumentSubmissionPointer(storage: ReceiptStorage, scope: DocumentUploadScope, pointer: DocumentSubmissionPointer): void {
+  if (!pointer.intentKey) return
+  const existing = loadDocumentSubmissionPointers(storage, scope)
+  storage.setItem(documentReceiptStorageKey(scope), JSON.stringify(existing.map((item) =>
+    item.submissionId === pointer.submissionId ? { ...item, settled: true } : item)))
+}
+
 async function hash(bytes: BufferSource): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)))
     .map((byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 export async function prepareDocumentSubmission(file: File, registration: DocumentRegistration, residency?: string): Promise<DocumentSubmissionPointer> {
+  const details = documentRegistrationSchema.parse(registration)
   return {
     submissionId: crypto.randomUUID().replaceAll("-", ""),
     residency,
     fileName: file.name,
     checksum: await hash(await file.arrayBuffer()),
-    requestHash: await hash(new TextEncoder().encode(JSON.stringify(documentRegistrationSchema.parse(registration)))),
+    requestHash: await hash(new TextEncoder().encode(JSON.stringify(details))),
+    target: {
+      resModel: details.resModel ?? undefined,
+      resId: details.resId ?? undefined,
+      versionDocumentId: details.versionDocumentId ?? undefined,
+    },
   }
 }
 
@@ -108,11 +157,25 @@ export async function readDocumentUploadReceipt(scope: DocumentUploadScope, poin
   if (!key || key[1] !== String(scope.organizationId) || receipt.submissionId !== pointer.submissionId || receipt.checksum !== pointer.checksum || receipt.url !== `/api/documents/blobs/object/${key[1]}/${key[2]}/${key[3]}` || (receipt.registrationState === "registered") !== (receipt.documentId !== null)) {
     throw new Error("The saved submission does not match this file or workspace")
   }
+  if (receipt.registration.versionDocumentId && (
+    (receipt.documentId !== null && receipt.documentId !== receipt.registration.versionDocumentId) ||
+    (receipt.documentId !== null) !== (receipt.versionId != null)
+  )) throw new Error("The saved version does not match this document")
+  const inspection = receipt.inspection
+  if (inspection && (
+    String(inspection.organizationId) !== String(scope.organizationId) ||
+    String(inspection.companyId) !== String(scope.companyId) ||
+    inspection.objectKey !== receipt.objectKey || inspection.sourceSha256 !== receipt.checksum ||
+    String(inspection.sourceSize) !== receipt.fileSize || inspection.contentType !== receipt.mimetype ||
+    inspection.fileName !== receipt.fileName || !inspection.processingAllowed
+  )) throw new Error("The file inspection does not match this saved submission")
   return receipt
 }
 
 export function documentRegistrationParams(receipt: DocumentUploadReceipt): CreateDocumentParams {
   const form = receipt.registration
+  if (form.versionDocumentId) throw new Error("A version submission cannot create a new document")
+  const metadata = documentMetadataSchema.parse(form.metadata ? JSON.parse(form.metadata) : {})
   return {
     name: form.name,
     description: form.description ?? undefined,
@@ -131,7 +194,16 @@ export function documentRegistrationParams(receipt: DocumentUploadReceipt): Crea
     retentionDays: form.retentionDays ?? undefined,
     fiscalKind: form.fiscalKind ?? undefined,
     residencyRegion: form.residencyRegion ?? undefined,
-    metadata: JSON.stringify({ uploadSubmissionId: receipt.submissionId }),
+    metadata: JSON.stringify({ ...metadata, uploadSubmissionId: receipt.submissionId }),
+  }
+}
+
+export function documentVersionParams(receipt: DocumentUploadReceipt): AddDocumentVersionParams {
+  if (!receipt.registration.versionDocumentId) throw new Error("A document submission cannot create a version")
+  return {
+    fileName: receipt.fileName, fileSize: BigInt(receipt.fileSize), mimetype: receipt.mimetype,
+    url: receipt.url, checksum: receipt.checksum,
+    changesDescription: receipt.registration.changesDescription ?? undefined,
   }
 }
 
@@ -139,7 +211,8 @@ export interface DocumentSubmissionPorts {
   assertCurrent(): void
   read(): Promise<DocumentUploadReceipt | null>
   create(params: CreateDocumentParams): Promise<{ resource: string; id: string }>
-  index(documentId: string): Promise<unknown>
+  addVersion?(documentId: string, params: AddDocumentVersionParams): Promise<unknown>
+  index(documentId: string, receipt: DocumentUploadReceipt): Promise<unknown>
   changed(receipt: DocumentUploadReceipt): void
 }
 
@@ -159,17 +232,25 @@ export async function resumeDocumentSubmission(ports: DocumentSubmissionPorts, o
   ports.changed(receipt)
   if (!receipt.documentId) {
     ports.assertCurrent()
-    await ports.create(documentRegistrationParams(receipt))
+    let registrationError: unknown
+    try {
+      if (receipt.registration.versionDocumentId) {
+        if (!ports.addVersion) throw new Error("Version saving is unavailable here. Reopen Documents to check this receipt.")
+        await ports.addVersion(receipt.registration.versionDocumentId, documentVersionParams(receipt))
+      } else {
+        await ports.create(documentRegistrationParams(receipt))
+      }
+    } catch (error) { registrationError = error }
     ports.assertCurrent()
     receipt = await ports.read()
     ports.assertCurrent()
-    if (!receipt?.documentId) throw new Error("The file is saved; document registration is not yet confirmed. Check this receipt before retrying.")
+    if (!receipt?.documentId) throw registrationError ?? new Error("The file is saved; document registration is not yet confirmed. Check this receipt before retrying.")
     ports.changed(receipt)
   }
-  if (receipt.indexing === "pending" || (receipt.indexing === "failed" && options.retryIndexing)) {
+  if (receipt.inspection?.aiAllowed !== false && (receipt.indexing === "pending" || (receipt.indexing === "failed" && options.retryIndexing))) {
     ports.assertCurrent()
     try {
-      await ports.index(receipt.documentId!)
+      await ports.index(receipt.documentId!, receipt)
       ports.assertCurrent()
       receipt = { ...receipt, indexing: "queued" }
     } catch {
@@ -181,7 +262,7 @@ export async function resumeDocumentSubmission(ports: DocumentSubmissionPorts, o
     try {
       const current = await ports.read()
       ports.assertCurrent()
-      if (current?.documentId === receipt.documentId) receipt = current
+      if (current?.documentId === receipt.documentId && current?.versionId === receipt.versionId) receipt = current
     } catch { ports.assertCurrent() }
     ports.changed(receipt)
   }

@@ -30,10 +30,14 @@ test('file sizes read in the largest fitting unit', () => {
 
 import { legalHoldReason, moveDocumentParams } from './document-record';
 
-test('a folder move needs a chosen folder', () => {
+test('a folder move accepts an explicit root and rejects missing or invalid destinations', () => {
   assert.deepEqual(moveDocumentParams(' 4 '), { folderId: '4' });
+  assert.deepEqual(moveDocumentParams('__root__'), { folderId: null });
   assert.equal(moveDocumentParams(''), null);
   assert.equal(moveDocumentParams(undefined), null);
+  assert.equal(moveDocumentParams('0'), null);
+  assert.equal(moveDocumentParams('other'), null);
+  assert.equal(moveDocumentParams('18446744073709551616'), null);
 });
 
 test('a legal hold needs a reason', () => {

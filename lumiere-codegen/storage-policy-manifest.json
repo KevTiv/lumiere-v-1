@@ -5707,7 +5707,8 @@
       "module": "documents",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
       "authoritative_resources": [
-        "document-folders"
+        "document-folders",
+        "document-folders-deleted"
       ],
       "durability_class": "durable_business_record",
       "organization_ownership": "direct",

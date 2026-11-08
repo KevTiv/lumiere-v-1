@@ -1,7 +1,7 @@
 import { billDocumentContentType } from "@lumiere/erp-shared/document-file-profile"
-import type { CreateDocumentParams } from "@lumiere/stdb/types"
 import { billSourceDocuments, documentActorId, documentId, documentOptional, type BillSourceDocument } from "@lumiere/ui/lib/bill-source-document-model"
 import type { DocumentBlobUploadResult } from "./document-blob-upload"
+import type { DocumentRegistration, DocumentUploadReceipt } from "./document-upload-receipts"
 
 export interface BillDocumentScope { organizationId: bigint; companyId: bigint; billId: bigint | number | string; partnerId?: unknown; actorId?: string }
 export interface BillDocumentAttempt {
@@ -38,13 +38,12 @@ export function resolveBillDocumentAttempt(documents: readonly BillSourceDocumen
   return matches.length === 1 ? documentId(matches[0]!.id) ?? null : null
 }
 
-/** A managed upload followed by an exact linked-document readback. Unknown linking never retries automatically. */
+/** Common document saving owns retries; bill intake additionally verifies the exact ERP link. */
 export async function uploadBillSourceDocument(args: {
   file: File
   scope: BillDocumentScope
   isCurrent: () => boolean
-  upload: (args: { file: File; companyId: bigint }) => Promise<DocumentBlobUploadResult>
-  create: (params: CreateDocumentParams) => Promise<{ resource: string; id: string }>
+  submit(file: File, registration: DocumentRegistration): Promise<DocumentUploadReceipt>
   readDocuments: () => Promise<readonly BillSourceDocument[]>
   onAttempt: (attempt: BillDocumentAttempt) => void
 }): Promise<void> {
@@ -53,45 +52,33 @@ export async function uploadBillSourceDocument(args: {
   if (scope.companyId > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("This company ID cannot be represented safely by the managed upload API")
   billDocumentContentType(file)
   let uploaded: DocumentBlobUploadResult | undefined
-  let linkingStarted = false
   let createdId: string | undefined
   args.onAttempt({ phase: "pending" })
   try {
-    uploaded = await args.upload({ file, companyId: scope.companyId })
-    validateManagedUpload(uploaded, file, scope)
-    if (!args.isCurrent()) throw new Error("The bill scope or document permissions changed before linking. Reopen this bill and review its documents.")
-    args.onAttempt({ phase: "pending", uploaded })
-    linkingStarted = true
-    const ref = await args.create({
-      name: file.name,
-      description: undefined,
-      fileName: uploaded.fileName,
-      fileSize: uploaded.fileSize,
-      mimetype: uploaded.mimetype,
-      url: uploaded.url,
-      checksum: uploaded.checksum,
-      folderId: undefined,
-      resModel: "account_move",
-      resId: BigInt(scope.billId),
-      partnerId: documentId(scope.partnerId) ? BigInt(documentId(scope.partnerId)!) : undefined,
-      tagIds: [],
-      isFavorite: false,
-      classificationId: undefined,
-      retentionDays: undefined,
-      fiscalKind: undefined,
-      residencyRegion: undefined,
-      metadata: JSON.stringify({ source: "accounting_bill_intake", object_key: uploaded.objectKey, uploaded_by: scope.actorId }),
+    const receipt = await args.submit(file, {
+      name: file.name, resModel: "account_move", resId: String(scope.billId),
+      partnerId: documentId(scope.partnerId), tagIds: [], isFavorite: false,
+      metadata: JSON.stringify({ source: "accounting_bill_intake" }),
     })
-    if (ref.resource !== "documents" || !documentId(ref.id)) throw new Error("The attachment operation returned an unexpected document reference")
-    createdId = ref.id
+    uploaded = {
+      objectKey: receipt.objectKey, url: receipt.url, checksum: receipt.checksum,
+      fileName: receipt.fileName, fileSize: BigInt(receipt.fileSize), mimetype: receipt.mimetype,
+    }
+    validateManagedUpload(uploaded, file, scope)
+    if (!receipt.fileSaved || !receipt.documentId || receipt.registration.resModel !== "account_move" || receipt.registration.resId !== String(scope.billId)) {
+      throw new Error("The attachment receipt does not confirm this bill's document")
+    }
+    createdId = receipt.documentId
     args.onAttempt({ phase: "pending", uploaded, documentId: createdId })
+    if (!args.isCurrent()) throw new Error("The bill scope or document permissions changed. Reopen this bill and review its saved documents.")
     const documents = await args.readDocuments()
-    const id = resolveBillDocumentAttempt(documents, scope, uploaded, ref.id)
+    if (!args.isCurrent()) throw new Error("The bill scope or document permissions changed during document readback")
+    const id = resolveBillDocumentAttempt(documents, scope, uploaded, createdId)
     if (!id) throw new Error("The supplier document could not be verified on this bill. Refresh its documents before uploading again.")
     args.onAttempt({ phase: "attached", uploaded, documentId: id })
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause)
-    args.onAttempt({ phase: linkingStarted ? "unknown" : "error", uploaded, documentId: createdId, message })
+    args.onAttempt({ phase: uploaded ? "unknown" : "error", uploaded, documentId: createdId, message })
     throw cause
   }
 }

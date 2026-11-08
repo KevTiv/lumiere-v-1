@@ -46,6 +46,7 @@ RUN cargo chef cook --locked --release --recipe-path recipe.json \
       --bin projection-worker \
       --bin project-integration-worker \
       --bin storage-migrate \
+      --bin document-blob-migrate \
       --bin workflow-worker \
     && cargo chef cook --locked --release --recipe-path recipe.json \
       -p ai-gateway --bin gateway
@@ -77,6 +78,7 @@ RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       --bin projection-worker \
       --bin project-integration-worker \
       --bin storage-migrate \
+      --bin document-blob-migrate \
       --bin workflow-worker \
     && cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       -p ai-gateway --bin gateway \
@@ -90,6 +92,7 @@ RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       target/release/projection-worker \
       target/release/project-integration-worker \
       target/release/storage-migrate \
+      target/release/document-blob-migrate \
       target/release/workflow-worker \
       /out/
 

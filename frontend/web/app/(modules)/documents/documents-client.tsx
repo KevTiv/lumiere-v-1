@@ -3,11 +3,14 @@ import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { guideLibraryHref } from "@/lib/assistant-guides"
 import { DocumentUploadReceipts } from "../../../components/document-upload-receipts"
-import { useDocumentUploadReceipts } from "@/lib/use-document-upload-receipts"
+import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload"
+import { DocumentViewerDialog } from "../../../components/document-viewer-dialog"
+import { useDeletedDocumentFolders, useDocumentLocationMutation } from "@lumiere/query-hooks/hooks/document-locations"
+import { documentFolderDestinations } from "./document-folder-gates"
 import { documentRegistrationFromParams } from "@/lib/document-upload-receipts"
 import { readRetentionPreview, type RetentionPreview } from "@lumiere/query-hooks/hooks/document-retention-preview"
 import { reviewRetentionPurgeScope, useRetentionPurgeAuthority } from "./retention-purge-review"
@@ -51,14 +54,12 @@ import {
   useKnowledgeArticles,
   useKnowledgeCategories,
   useDocumentFolders,
-  useCreateDocumentWithRef,
   useUpdateDocument,
   useDeleteDocument,
   useRestoreDocument,
   useLockDocument,
   useUnlockDocument,
   useRecordDocumentView,
-  useAddDocumentVersion,
   useIngestDocumentEvidence,
   useSetDocumentRetention,
   usePurgeExpiredDocuments,
@@ -78,7 +79,6 @@ import {
   useCreateKnowledgeCategory,
   useCreateDocumentFolder,
   useUpdateDocumentFolder,
-  useDeleteDocumentFolder,
   useDocumentsCsvImportMutations,
   useAiDocumentProcessingJobs,
   useAiInsightsForOrg,
@@ -101,10 +101,7 @@ import {
   useUpdateDocumentTemplate,
   useCreateMailTemplate,
 } from "@lumiere/query-hooks/hooks/templates"
-import {
-  firstFileFromFormValue,
-  uploadDocumentBlob,
-} from "@/lib/document-blob-upload"
+import { firstFileFromFormValue } from "@/lib/document-blob-upload"
 import {
   toCreateDocumentParams,
   toCreateDocumentFolderParams,
@@ -112,19 +109,17 @@ import {
   toCreateKnowledgeArticleParams,
   toCreateKnowledgeCategoryParams,
   toCreateMailTemplateParams,
-  toAddDocumentVersionParams,
   toUpdateKnowledgeArticleParams,
   toUpdateDocumentFolderParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
 import { documentRecordHref, formatFileSize } from "./document-record"
 import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-browser-rows"
-import { documentBrowserHref, documentBrowserRecordHref, documentBrowserState } from "./document-browser-navigation"
+import { documentBrowserHref, documentBrowserState } from "./document-browser-navigation"
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { useAuthorizedPeople } from "@/lib/use-authorized-people"
 import { articleMemberOptions, currentArticleMember } from "./article-member-options"
-import { documentFolderCanBeDeleted } from "./document-folder-gates"
 import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { DocumentTemplateDesignerDialog, customizableDocumentTemplate, type DocumentTemplateDesignSource } from "./document-template-designer-dialog"
 import {
@@ -153,7 +148,7 @@ type DocumentRowAction =
   | { action: "uploadVersion"; row: Record<string, unknown>; form: FormConfig }
   | { action: "setRetention"; row: Record<string, unknown>; form: FormConfig }
   | { action: "updateArticle"; row: Record<string, unknown>; form: FormConfig }
-  | { action: "updateFolder"; row: Record<string, unknown>; form: FormConfig }
+  | { action: "updateFolder"; row: Record<string, unknown>; form: FormConfig; scopeKey: string }
   | { action: "addArticleMember"; row: Record<string, unknown>; form: FormConfig }
   | null
 
@@ -238,14 +233,27 @@ function DocumentsClientLoaded({
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
   const [processingToolbarError, setProcessingToolbarError] = useState<string | null>(null)
   const [documentToolbarError, setDocumentToolbarError] = useState<string | null>(null)
+  const [viewer, setViewer] = useState<{ scopeKey: string; documentId: string } | null>(null)
+  const [locationDialog, setLocationDialog] = useState<{
+    scopeKey: string
+    kind: "moveFolder" | "restoreFolder" | "moveDocument"
+    id: string
+    name: string
+    parentId: string | null
+  } | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  useEffect(() => { setViewer(null); setLocationDialog(null); setLocationError(null) }, [templateScopeKey])
   const [documentRowAction, setDocumentRowAction] = useState<DocumentRowAction>(null)
   const [documentRowSubmitError, setDocumentRowSubmitError] = useState<string | null>(null)
+  useEffect(() => {
+    setDocumentRowAction(null)
+    setDocumentRowSubmitError(null)
+  }, [templateScopeKey])
   const [completeModalRows, setCompleteModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [completeSubmitError, setCompleteSubmitError] = useState<string | null>(null)
   const [ackModalRows, setAckModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
   const openErpAiChat = useOpenErpAiChat()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const browserQuery = searchParams.toString()
   const [browserViewState, setBrowserViewState] = useState(() => documentBrowserState(searchParams))
@@ -276,6 +284,32 @@ function DocumentsClientLoaded({
     foldersRead.state.status === "ready" && checkPermission("document", "create").allowed
   const canCreateDocumentFolder = browserScopeReady && foldersRead.state.status === "ready" &&
     checkPermission("document_folder", "create").allowed
+  const canReadFolderTrash = browserScopeReady && checkPermission("document_folder", "read").allowed
+  const deletedFolderCollection = moduleCollection(useDeletedDocumentFolders(orgId, operatingCompanyId, canReadFolderTrash))
+  const deletedFoldersRead = canReadFolderTrash ? deletedFolderCollection : {
+    rows: [] as DocumentFolder[],
+    state: { status: browserScopeReady ? "denied" : "loading" } as ModuleDataState,
+  }
+  const canWriteFolders = browserScopeReady && foldersRead.state.status === "ready" && checkPermission("document_folder", "write").allowed
+  const canTrashFolders = browserScopeReady && foldersRead.state.status === "ready" && checkPermission("document_folder", "delete").allowed
+  const canMoveFiles = browserScopeReady && documentsRead.state.status === "ready" && checkPermission("document", "write").allowed
+  const locationAuthority = useRef({ scopeKey: templateScopeKey, canWriteFolders, canTrashFolders, canMoveFiles, mounted: true, generation: 0 })
+  if (locationAuthority.current.scopeKey !== templateScopeKey || locationAuthority.current.canWriteFolders !== canWriteFolders ||
+    locationAuthority.current.canTrashFolders !== canTrashFolders || locationAuthority.current.canMoveFiles !== canMoveFiles) locationAuthority.current.generation++
+  locationAuthority.current = { ...locationAuthority.current, scopeKey: templateScopeKey, canWriteFolders, canTrashFolders, canMoveFiles }
+  useEffect(() => {
+    locationAuthority.current.mounted = true
+    return () => { locationAuthority.current.mounted = false; locationAuthority.current.generation++ }
+  }, [])
+  const locationGeneration = locationAuthority.current.generation
+  const assertLocationCurrent = (kind: "moveFolder" | "restoreFolder" | "moveDocument" | "trashFolder") => {
+    const current = locationAuthority.current
+    const allowed = kind === "moveDocument" ? current.canMoveFiles : kind === "trashFolder" ? current.canTrashFolders : current.canWriteFolders
+    if (!current.mounted || current.scopeKey !== templateScopeKey || current.generation !== locationGeneration || !allowed) {
+      throw new Error(t("documents.fileManagement.scopeChanged", { defaultValue: "Your file workspace or permissions changed. Reopen this action." }))
+    }
+  }
+  const locationMutation = useDocumentLocationMutation(orgId, operatingCompanyId, (action) => assertLocationCurrent(action.kind))
   const browserActionScope = useRef({ key: templateScopeKey, upload: false, createFolder: false })
   browserActionScope.current = { key: templateScopeKey, upload: canUploadDocument, createFolder: canCreateDocumentFolder }
   const retentionAuthority = useRetentionPurgeAuthority(
@@ -315,23 +349,17 @@ function DocumentsClientLoaded({
   const mailTemplatesRead = moduleCollection(useMailTemplates(organizationId))
   const mailTemplates = mailTemplatesRead.rows
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
-  const createDocument = useCreateDocumentWithRef(orgId, operatingCompanyId, {
-    mayDispatch: () => browserActionScope.current.key === templateScopeKey && browserActionScope.current.upload,
-  })
+
   const updateDocument = useUpdateDocument(orgId)
   const deleteDocument = useDeleteDocument(orgId)
   const restoreDocument = useRestoreDocument(orgId)
   const lockDocument = useLockDocument(orgId)
   const unlockDocument = useUnlockDocument(orgId)
   const recordDocumentView = useRecordDocumentView(orgId)
-  const addDocumentVersion = useAddDocumentVersion(orgId)
   const ingestDocumentEvidence = useIngestDocumentEvidence(orgId)
-  const uploadReceipts = useDocumentUploadReceipts({
-    scope: { organizationId: orgId, companyId: operatingCompanyId, actorId: session.identity ?? "" },
-    allowed: canUploadDocument,
-    assertCurrent: () => assertBrowserAction("upload"),
-    create: (params) => createDocument.mutateAsync(params),
-    index: (documentId) => ingestDocumentEvidence.mutateAsync({ companyId: operatingCompanyId, documentId }),
+  const uploadReceipts = useManagedDocumentUpload(orgId, operatingCompanyId, {
+    enabled: browserScopeReady && documentsRead.state.status === "ready" && foldersRead.state.status === "ready",
+    contextKey: templateScopeKey,
   })
   const setDocumentRetention = useSetDocumentRetention(orgId)
   const purgeExpiredDocuments = usePurgeExpiredDocuments(orgId, () => retentionAuthority.mayDispatch(0))
@@ -354,7 +382,6 @@ function DocumentsClientLoaded({
   const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
   const createDocumentFolder = useCreateDocumentFolder(orgId)
   const updateDocumentFolder = useUpdateDocumentFolder(orgId)
-  const deleteDocumentFolder = useDeleteDocumentFolder(orgId)
   const updateDocumentTemplate = useUpdateDocumentTemplate(organizationId, templateScope)
   const createMailTemplate = useCreateMailTemplate(organizationId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, operatingCompanyId)
@@ -580,6 +607,43 @@ function DocumentsClientLoaded({
     [folders],
   )
 
+  const openLocationDialog = (kind: "moveFolder" | "restoreFolder" | "moveDocument", row: EntityRow) => {
+    assertLocationCurrent(kind)
+    const parent = kind === "moveDocument" ? row.folderId : row.parentId
+    setLocationError(null)
+    setLocationDialog({ scopeKey: templateScopeKey, kind, id: String(row.id), name: String(row.name ?? ""), parentId: parent == null ? null : String(parent) })
+  }
+  const locationOptions = documentFolderDestinations(folders, locationDialog?.kind === "moveDocument" ? undefined : locationDialog?.id)
+  const locationForm: FormConfig = {
+    id: "document-location",
+    title: locationDialog?.kind === "restoreFolder" ? t("documents.fileManagement.restoreFolder", { defaultValue: "Restore folder" }) : t("documents.fileManagement.move", { defaultValue: "Move" }),
+    description: locationDialog?.name,
+    submitLabel: locationDialog?.kind === "restoreFolder" ? t("common.restore", { defaultValue: "Restore" }) : t("documents.fileManagement.move", { defaultValue: "Move" }),
+    sections: [{ id: "destination", fields: [{
+      id: "destination", name: "destination", type: "select", required: true,
+      label: t("documents.fileManagement.destination", { defaultValue: "Destination" }),
+      defaultValue: locationDialog?.parentId === null ? "__root__" : locationOptions.some((option) => option.value === locationDialog?.parentId) ? locationDialog?.parentId : undefined,
+      options: [{ value: "__root__", label: t("documents.fileManagement.root", { defaultValue: "Root folder" }) }, ...locationOptions],
+    }] }],
+  }
+  const openFolderEditor = (row: EntityRow) => {
+    assertLocationCurrent("moveFolder")
+    const form = editDocumentFolderForm(t, row)
+    setDocumentRowAction({ action: "updateFolder", row, scopeKey: templateScopeKey, form: { ...form, sections: form.sections.map((section) => ({ ...section, fields: section.fields.filter((field) => field.name !== "parentId") })) } })
+  }
+  const trashFolder = async (row: EntityRow) => {
+    assertLocationCurrent("trashFolder")
+    const confirmed = await confirmDialog({
+      title: t("documents.fileManagement.trashFolder", { defaultValue: "Move folder to trash?" }),
+      description: t("documents.fileManagement.trashDescription", { defaultValue: "This folder and its contents will be hidden until the folder is restored. Existing file versions are retained." }),
+      confirmLabel: t("documents.fileManagement.trash", { defaultValue: "Move to trash" }),
+      cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+    })
+    if (!confirmed) return
+    assertLocationCurrent("trashFolder")
+    await locationMutation.mutateAsync({ kind: "trashFolder", id: String(row.id) })
+  }
+
   const categorySelectOptions = useMemo(
     () => knowledgeCategoryRowsToSelectOptions(categories as Record<string, unknown>[]),
     [categories],
@@ -790,6 +854,22 @@ function DocumentsClientLoaded({
               withTableActions(
               tab.entityConfig,
               [
+                {
+                  id: "preview-document",
+                  label: t("documents.viewer.open", { defaultValue: "Preview file" }),
+                  requiresSelection: true,
+                  selection: "single",
+                  permission: { resource: "document", action: "read" },
+                  onClick: (rows) => { if (rows[0]) setViewer({ scopeKey: templateScopeKey, documentId: String(rows[0].id) }) },
+                },
+                {
+                  id: "move-document",
+                  label: t("documents.fileManagement.move", { defaultValue: "Move" }),
+                  requiresSelection: true,
+                  selection: "single",
+                  permission: { resource: "document", action: "write" },
+                  onClick: (rows) => { if (rows[0]) openLocationDialog("moveDocument", rows[0]) },
+                },
                 {
                   id: "lock-document",
                   label: "Lock",
@@ -1060,38 +1140,27 @@ function DocumentsClientLoaded({
               [
                 {
                   id: "edit-folder",
-                  label: "Edit folder",
+                  label: t("documents.fileManagement.editFolder", { defaultValue: "Edit folder" }),
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    if (rows.length !== 1) return
-                    setDocumentRowAction({
-                      action: "updateFolder",
-                      row: rows[0],
-                      form: mergeSelectOptionsForFields(editDocumentFolderForm(t, rows[0]), {
-                        parentId: folderSelectOptions,
-                      }),
-                    })
-                  },
+                  selection: "single",
+                  permission: { resource: "document_folder", action: "write" },
+                  onClick: (rows) => { if (rows[0]) openFolderEditor(rows[0]) },
                 },
                 {
-                  id: "delete-folder",
-                  label: "Delete folder",
+                  id: "move-folder",
+                  label: t("documents.fileManagement.move", { defaultValue: "Move" }),
                   requiresSelection: true,
-                  selection: "multiple",
-                  isApplicable: (rows) =>
-                    rows.every((row) => documentFolderCanBeDeleted(row, folders as Record<string, unknown>[])),
-                  successMessage: t("common.actionCompleted", { action: "Delete folder" }),
-                  onClick: async (rows) => {
-                    setDocumentToolbarError(null)
-                    try {
-                      for (const row of rows) {
-                        await deleteDocumentFolder.mutateAsync(row.id as string | number)
-                      }
-                    } catch (e) {
-                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
-                      throw e
-                    }
-                  },
+                  selection: "single",
+                  permission: { resource: "document_folder", action: "write" },
+                  onClick: (rows) => { if (rows[0]) openLocationDialog("moveFolder", rows[0]) },
+                },
+                {
+                  id: "trash-folder",
+                  label: t("documents.fileManagement.trash", { defaultValue: "Move to trash" }),
+                  requiresSelection: true,
+                  selection: "single",
+                  permission: { resource: "document_folder", action: "delete" },
+                  onClick: async (rows) => { if (rows[0]) await trashFolder(rows[0]) },
                 },
               ],
               true,
@@ -1297,6 +1366,11 @@ function DocumentsClientLoaded({
     }),
     [
       liveSections,
+      templateScopeKey,
+      locationGeneration,
+      canWriteFolders,
+      canTrashFolders,
+      canMoveFiles,
       moduleConfig,
       t,
       approveProcessingJob,
@@ -1322,12 +1396,32 @@ function DocumentsClientLoaded({
     ],
   )
 
+  const folderTableConfig = config.tabs.find((tab) => tab.id === "document-folders")?.entityConfig
+  const folderTrashTab = folderTableConfig ? {
+    id: "document-folders-trash",
+    label: t("documents.fileManagement.folderTrash", { defaultValue: "Folder trash" }),
+    type: "entity" as const,
+    entityConfig: withTableActions({ ...folderTableConfig,
+      id: "document-folders-trash-table",
+      title: t("documents.fileManagement.folderTrash", { defaultValue: "Folder trash" }),
+      description: t("documents.fileManagement.restoreDescription", { defaultValue: "Restore a folder to make its retained files available again. Choose its original location or another permitted destination." }),
+    }, [{
+      id: "restore-folder",
+      label: t("common.restore", { defaultValue: "Restore" }),
+      requiresSelection: true,
+      selection: "single",
+      permission: { resource: "document_folder", action: "write" },
+      onClick: (rows) => { if (rows[0]) openLocationDialog("restoreFolder", rows[0]) },
+    }], true),
+  } : null
+
   const data = useMemo(
     () => ({
       documents: documents as unknown as Record<string, unknown>[],
       "knowledge-base": articles as unknown as Record<string, unknown>[],
       "knowledge-categories": categories as unknown as Record<string, unknown>[],
       "document-folders": folders as unknown as Record<string, unknown>[],
+      "document-folders-trash": deletedFoldersRead.rows as unknown as Record<string, unknown>[],
       "documents-recycle-bin": deletedDocuments as unknown as Record<string, unknown>[],
       "document-templates": documentTemplates as unknown as Record<string, unknown>[],
       "mail-templates": mailTemplates as unknown as Record<string, unknown>[],
@@ -1337,6 +1431,7 @@ function DocumentsClientLoaded({
     [
       documents,
       deletedDocuments,
+      deletedFoldersRead.rows,
       articles,
       categories,
       folders,
@@ -1353,6 +1448,7 @@ function DocumentsClientLoaded({
     "knowledge-base": articlesRead.state,
     "knowledge-categories": categoriesRead.state,
     "document-folders": foldersRead.state,
+    "document-folders-trash": deletedFoldersRead.state,
     "documents-recycle-bin": deletedDocumentsRead.state,
     "document-templates": templateDataState,
     "mail-templates": mailTemplatesRead.state,
@@ -1375,7 +1471,8 @@ function DocumentsClientLoaded({
     (quickActionForm.action !== "createDocumentFolder" || canCreateDocumentFolder) &&
     (!["createDocument", "uploadDocument"].includes(quickActionForm.action) || canUploadDocument))
   const csvSourceState = csvKind == null ? undefined : dataState[csvKind === "knowledge_category" ? "knowledge-categories" : "knowledge-base"]
-  const rowActionUsable = documentRowAction == null || tabUsable(rowActionTabs[documentRowAction.action])
+  const rowActionUsable = documentRowAction == null || (tabUsable(rowActionTabs[documentRowAction.action]) &&
+    (documentRowAction.action !== "updateFolder" || (documentRowAction.scopeKey === templateScopeKey && canWriteFolders)))
   const processingUsable = tabUsable("document-processing")
   const insightsUsable = tabUsable("document-insights")
   // Prompted category/article/retention dialogs read rows from these collections.
@@ -1459,14 +1556,13 @@ function DocumentsClientLoaded({
   }
 
   const isFormMutationPending =
-    createDocument.isPending ||
+    uploadReceipts.pending ||
     updateDocument.isPending ||
     deleteDocument.isPending ||
     restoreDocument.isPending ||
     lockDocument.isPending ||
     unlockDocument.isPending ||
     recordDocumentView.isPending ||
-    addDocumentVersion.isPending ||
     ingestDocumentEvidence.isPending ||
     setDocumentRetention.isPending ||
     purgeExpiredDocuments.isPending ||
@@ -1484,7 +1580,7 @@ function DocumentsClientLoaded({
     createKnowledgeCategory.isPending ||
     createDocumentFolder.isPending ||
     updateDocumentFolder.isPending ||
-    deleteDocumentFolder.isPending ||
+    locationMutation.isPending ||
     createMailTemplate.isPending ||
     createProcessingJob.isPending ||
     completeProcessingJob.isPending ||
@@ -1507,6 +1603,36 @@ function DocumentsClientLoaded({
           {documentToolbarError}
         </p>
       ) : null}
+      <FormModal
+        key={locationDialog ? `${locationDialog.scopeKey}:${locationDialog.kind}:${locationDialog.id}` : "closed-location"}
+        open={locationDialog !== null && locationDialog.scopeKey === templateScopeKey}
+        onOpenChange={(open) => { if (!open) { setLocationDialog(null); setLocationError(null) } }}
+        config={locationForm}
+        isPending={locationMutation.isPending}
+        closeOnSubmit={false}
+        submitError={locationError}
+        onSubmit={async (values) => {
+          if (!locationDialog) return
+          setLocationError(null)
+          try {
+            assertLocationCurrent(locationDialog.kind)
+            const value = values.destination
+            if (value !== "__root__" && !locationOptions.some((option) => option.value === value)) {
+              throw new Error(t("documents.fileManagement.unavailableDestination", { defaultValue: "Choose an available destination." }))
+            }
+            const destination = value === "__root__" ? null : String(value)
+            await locationMutation.mutateAsync(locationDialog.kind === "moveDocument"
+              ? { kind: "moveDocument", id: locationDialog.id, folderId: destination }
+              : { kind: locationDialog.kind, id: locationDialog.id, parentId: destination })
+            setLocationDialog(null)
+          } catch (error) { setLocationError(error instanceof Error ? error.message : String(error)) }
+        }}
+      />
+      <DocumentViewerDialog
+        organizationId={orgId}
+        documentId={viewer?.scopeKey === templateScopeKey ? viewer.documentId : null}
+        onOpenChange={(open) => { if (!open) setViewer(null) }}
+      />
       {promptsUsable && formDialog}
       {confirmDialogNode}
       {templateDesigner && templateDesigner.scopeKey === templateScopeKey && templateScopeReady && session.identity && typeof session.activeCompanyId === "number" ? (
@@ -1521,10 +1647,10 @@ function DocumentsClientLoaded({
         />
       ) : null}
       <ModuleView
-        assistantFormBlocked={quickActionForm !== null || templateDesigner !== null || documentRowAction !== null || completeModalRows !== null || ackModalRows !== null}
+        assistantFormBlocked={quickActionForm !== null || templateDesigner !== null || documentRowAction !== null || viewer !== null || locationDialog !== null || completeModalRows !== null || ackModalRows !== null}
         config={{
           ...config,
-          tabs: config.tabs.map((tab) =>
+          tabs: [...config.tabs, ...(folderTrashTab ? [folderTrashTab] : [])].map((tab) =>
             tab.id === "documents" && tab.type === "entity"
               ? {
                   ...tab,
@@ -1545,7 +1671,10 @@ function DocumentsClientLoaded({
                           // typing in search must not wait for a server navigation.
                           window.history.replaceState(null, "", documentBrowserHref(state, browserQuery))
                         }}
-                        onOpenFile={(id) => router.push(documentBrowserRecordHref(id, browserViewState, browserQuery))}
+                        onOpenFile={(id) => setViewer({ scopeKey: templateScopeKey, documentId: id })}
+                        onRenameFolder={canWriteFolders ? (id) => { const row = folders.find((folder) => String(folder.id) === id); if (row) openFolderEditor({ ...row }) } : undefined}
+                        onMoveFolder={canWriteFolders ? (id) => { const row = folders.find((folder) => String(folder.id) === id); if (row) openLocationDialog("moveFolder", { ...row }) } : undefined}
+                        onTrashFolder={canTrashFolders ? (id) => { const row = folders.find((folder) => String(folder.id) === id); if (row) void trashFolder({ ...row }).catch((error) => setDocumentToolbarError(error instanceof Error ? error.message : String(error))) } : undefined}
                         onCreateFolder={canCreateDocumentFolder ? (parentId) => {
                           const current = browserActionScope.current
                           if (current.key !== templateScopeKey || !current.createFolder) return
@@ -1642,37 +1771,17 @@ function DocumentsClientLoaded({
                   typeof documentRowAction.row.residencyRegion === "string"
                     ? documentRowAction.row.residencyRegion
                     : undefined
-                const uploaded = await uploadDocumentBlob({
-                  file,
-                  companyId: operatingCompanyId,
-                  residency,
-                })
-                const params = toAddDocumentVersionParams({
-                  ...formData,
-                  fileName: uploaded.fileName,
-                  fileSize: uploaded.fileSize,
-                  mimetype: uploaded.mimetype,
-                  url: uploaded.url,
-                  checksum: uploaded.checksum,
-                })
-                if (!params) throw new Error("Version params incomplete after upload")
-                await addDocumentVersion.mutateAsync({
-                  documentId: documentRowAction.row.id as string | number,
-                  params,
-                })
-                await ingestDocumentEvidence.mutateAsync({
-                  companyId: operatingCompanyId,
-                  documentId: documentRowAction.row.id as string | number,
-                  language:
-                    typeof formData.language === "string" ? formData.language : undefined,
-                })
-                // unlock_document rejects an already-unlocked document, so only
-                // release a lock that this check-in row actually holds.
-                if (formData.unlockAfter !== false && documentRowAction.row.isLocked === true) {
-                  await unlockDocument.mutateAsync(
-                    documentRowAction.row.id as string | number,
-                  )
-                }
+                uploadReceipts.assertCurrent("version")
+                const receipt = await uploadReceipts.submit(file, {
+                  name: file.name,
+                  tagIds: [],
+                  isFavorite: false,
+                  versionDocumentId: String(documentRowAction.row.id),
+                  changesDescription: typeof formData.changesDescription === "string" ? formData.changesDescription.trim() || undefined : undefined,
+                }, residency)
+                if (!receipt.documentId || !receipt.versionId) throw new Error("The saved version is being checked. Resume its receipt before uploading again.")
+                uploadReceipts.assertCurrent("version")
+                if (formData.unlockAfter !== false) await uploadReceipts.releaseVersionLock(receipt)
               } else if (documentRowAction.action === "setRetention") {
                 await setDocumentRetention.mutateAsync({
                   documentId: documentRowAction.row.id as string | number,
@@ -1684,9 +1793,11 @@ function DocumentsClientLoaded({
                   params: toUpdateKnowledgeArticleParams(formData, operatingCompanyId),
                 })
               } else if (documentRowAction.action === "updateFolder") {
+                assertLocationCurrent("moveFolder")
+                if (documentRowAction.scopeKey !== templateScopeKey) throw new Error(t("documents.fileManagement.scopeChanged", { defaultValue: "Your file workspace or permissions changed. Reopen this action." }))
                 await updateDocumentFolder.mutateAsync({
                   folderId: documentRowAction.row.id as string | number,
-                  params: toUpdateDocumentFolderParams(formData),
+                  params: toUpdateDocumentFolderParams({ ...formData, parentId: undefined }),
                 })
               } else if (documentRowAction.action === "addArticleMember") {
                 const [member] = await articlePeople.validateSelection([formData.member])

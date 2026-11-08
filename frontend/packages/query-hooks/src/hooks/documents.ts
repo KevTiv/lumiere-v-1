@@ -34,6 +34,7 @@ import { resolveDocumentVersionEffect } from "./document-version-effect"
 import { resolveDocumentCreateEffect } from "./document-create-effect"
 import { documentCreateCommand, documentFolderCreateCommand, type DocumentFolderCreateInput } from "./document-create-command"
 import { resolveDocumentLockEffect } from "./document-lock-effect"
+import { documentReadRefresh } from "./document-read-refresh"
 import {
   executeOperationWithCanonicalReadback,
   requireResolvedOperationEffect,
@@ -55,6 +56,7 @@ export function useDocuments(
   return useQuery<Document[]>({
     queryKey: ['documents', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/documents', 'Failed to fetch documents'),
+    ...documentReadRefresh,
     staleTime: 30_000,
     initialData,
   })
@@ -92,6 +94,7 @@ export function useDocumentFolders(
   return useQuery<DocumentFolder[]>({
     queryKey: ['document-folders', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/document-folders', 'Failed to fetch document folders'),
+    ...documentReadRefresh,
     staleTime: 30_000,
     initialData,
   })
@@ -128,6 +131,7 @@ export function useDocumentVersions(organizationId: bigint, initialData?: QueryR
     queryKey: ['document-versions', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/document-versions', 'Failed to fetch document versions'),
+    ...documentReadRefresh,
     staleTime: 30_000,
     initialData,
   })
@@ -168,6 +172,7 @@ export function useDeletedDocuments(organizationId: bigint, initialData?: QueryR
     queryKey: ['documents-deleted', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/documents-deleted', 'Failed to fetch deleted documents'),
+    ...documentReadRefresh,
     staleTime: 30_000,
     initialData,
   })
@@ -321,7 +326,7 @@ export function useUnlockDocument(organizationId: bigint) {
   })
 }
 
-export function useAddDocumentVersion(organizationId: bigint) {
+export function useAddDocumentVersion(organizationId: bigint, options?: { mayDispatch?: () => boolean }) {
   const qc = useQueryClient()
   return useMutation<
     CanonicalRecordRef,
@@ -333,6 +338,7 @@ export function useAddDocumentVersion(organizationId: bigint) {
       const url = typeof params.url === "string" ? params.url : ""
       const checksum = typeof params.checksum === "string" ? params.checksum : ""
       const before = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Document scope or permissions changed before version submission")
       const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId, params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))

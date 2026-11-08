@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   List,
   Loader2,
+  MoreHorizontal,
   Lock,
   Presentation,
   Search,
@@ -32,6 +33,7 @@ import { fileKindOf, formatFileSize, type FileKind } from "../lib/file-kind"
 import { formatFileDate } from "../lib/file-metadata"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/dropdown-menu"
 import { EmptyStateCard } from "../components/empty-state-card"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import type { ModuleDataState } from "../lib/module-data-state"
@@ -86,6 +88,9 @@ export interface FileBrowserProps {
   /** Creates inside the open folder. Omitted hides the new-folder button. */
   onCreateFolder?: (parentId: string | null) => void
   onOpenFile?: (fileId: string) => void
+  onRenameFolder?: (folderId: string) => void
+  onMoveFolder?: (folderId: string) => void
+  onTrashFolder?: (folderId: string) => void
   /** Remembers the grid/list choice under this key. */
   storageKey?: string
   /** Optional route-owned view state, so opening a record does not lose its list. */
@@ -171,6 +176,9 @@ export function FileBrowser({
   onUpload,
   onCreateFolder,
   onOpenFile,
+  onRenameFolder,
+  onMoveFolder,
+  onTrashFolder,
   storageKey,
   state,
   onStateChange,
@@ -401,29 +409,44 @@ export function FileBrowser({
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
             {childFolders.map((folder, index) => {
               return (
-                <button
-                  key={folder.id}
-                  type="button"
-                  onClick={() => changeState({ folderId: folder.id })}
-                  data-testid={`file-browser-folder-${folder.id}`}
-                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className={cn("flex h-10 w-10 items-center justify-center rounded-lg", FOLDER_TILES[index % FOLDER_TILES.length])}>
-                      <Folder className="h-5 w-5" aria-hidden />
-                    </span>
-                    {folder.isFavorite ? <Star className="h-4 w-4 fill-warning text-warning" aria-label="Favorite" /> : null}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{folder.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {t("documents.browser.filesLoaded", { count: folder.fileCount, defaultValue: "{{count}} loaded files" })} · {sizeLabel(folder.totalSize)}
+                <div key={folder.id} className="relative min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => changeState({ folderId: folder.id })}
+                    data-testid={`file-browser-folder-${folder.id}`}
+                    className="flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40"
+                  >
+                    <div className={cn("flex items-start justify-between gap-2", (onRenameFolder || onMoveFolder || onTrashFolder) && "pr-8")}>
+                      <span className={cn("flex h-10 w-10 items-center justify-center rounded-lg", FOLDER_TILES[index % FOLDER_TILES.length])}>
+                        <Folder className="h-5 w-5" aria-hidden />
+                      </span>
+                      {folder.isFavorite ? <Star className="h-4 w-4 fill-warning text-warning" aria-label="Favorite" /> : null}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{folder.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("documents.browser.filesLoaded", { count: folder.fileCount, defaultValue: "{{count}} loaded files" })} · {sizeLabel(folder.totalSize)}
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {t("documents.browser.updated", { date: formatDate(folder.updatedAt) })}
                     </p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {t("documents.browser.updated", { date: formatDate(folder.updatedAt) })}
-                  </p>
-                </button>
+                  </button>
+                  {onRenameFolder || onMoveFolder || onTrashFolder ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="absolute right-2 top-2 h-8 w-8 bg-card" aria-label={t("documents.fileManagement.folderActions", { defaultValue: "Actions for {{name}}", name: folder.name })}>
+                          <MoreHorizontal className="h-4 w-4" aria-hidden />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {onRenameFolder ? <DropdownMenuItem onSelect={() => onRenameFolder(folder.id)}>{t("documents.fileManagement.editFolder", { defaultValue: "Edit folder" })}</DropdownMenuItem> : null}
+                        {onMoveFolder ? <DropdownMenuItem onSelect={() => onMoveFolder(folder.id)}>{t("documents.fileManagement.move", { defaultValue: "Move" })}</DropdownMenuItem> : null}
+                        {onTrashFolder ? <DropdownMenuItem className="text-destructive" onSelect={() => onTrashFolder(folder.id)}>{t("documents.fileManagement.trash", { defaultValue: "Move to trash" })}</DropdownMenuItem> : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+                </div>
               )
             })}
           </div>

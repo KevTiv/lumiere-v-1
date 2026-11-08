@@ -53,7 +53,7 @@ test("Expenses operations land on the connected Inbox and keep specialist settin
 test("Documents keeps every file, knowledge and management destination reachable after grouping", () => {
   const config = businessWorkspaceNavigation("documents", i18n.t)
   const tab = (id: string): ModuleTab => ({ id, label: id, type: "custom" })
-  const ids = ["dashboard", "documents", "knowledge-base", "knowledge-categories", "document-folders", "documents-recycle-bin", "document-templates", "mail-templates", "document-processing", "document-insights"]
+  const ids = ["dashboard", "documents", "knowledge-base", "knowledge-categories", "document-folders", "documents-recycle-bin", "document-folders-trash", "document-templates", "mail-templates", "document-processing", "document-insights"]
   const result = resolveWorkspaceNavigation(ids.map(tab), config)
   assert.deepEqual(result.workspaces.map((group) => group.id), ["files", "knowledge", "templates"])
   assert.deepEqual(result.overflow.map((group) => group.id), ["manage", "overview"])

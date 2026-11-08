@@ -24,6 +24,7 @@ struct Rows {
     actor_permissions: Vec<String>,
     other_permissions: Vec<String>,
     documents: Vec<Value>,
+    folders: Vec<Value>,
     templates: Vec<Value>,
     receipts: Vec<Value>,
     versions: Vec<Value>,
@@ -46,6 +47,7 @@ impl Default for Rows {
             actor_permissions: permissions(),
             other_permissions: permissions(),
             documents: Vec::new(),
+            folders: Vec::new(),
             templates: Vec::new(),
             receipts: Vec::new(),
             versions: Vec::new(),
@@ -127,6 +129,18 @@ async fn sql(State(rows): State<Arc<Mutex<Rows>>>, headers: HeaderMap, query: St
             rows.documents
                 .iter()
                 .filter(|row| row["owner_id"] == actor && row["is_deleted"] == false)
+                .cloned()
+                .collect()
+        } else if query.contains(" FROM doc_folder ") {
+            assert!(
+                query.contains(&format!(
+                    "is_access_restricted = false OR owner_id = 0x{actor}"
+                )),
+                "{query}"
+            );
+            rows.folders
+                .iter()
+                .filter(|row| row["is_access_restricted"] == false || row["owner_id"] == actor)
                 .cloned()
                 .collect()
         } else if query.contains(" FROM document_version ") {
@@ -241,7 +255,7 @@ impl UploadSlot {
         json!({
             "id": if owner == ACTOR {21} else {22},
             "organization_id":7, "company_id":3, "owner_id":owner,
-            "url":self.url, "checksum":self.checksum, "is_deleted":false
+            "url":self.url, "checksum":self.checksum, "is_deleted":false, "folder_id":null
         })
     }
 
@@ -528,6 +542,90 @@ async fn document_delivery_requires_current_registration_and_cannot_be_copied_to
         .get("actor-token", &slot.url)
         .await
         .expect_status(StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn current_and_historical_blobs_recheck_trash_and_ancestor_access() {
+    let fixture = Fixture::new().await;
+    let previous = fixture
+        .completed("document", "text/plain", b"previous revision")
+        .await;
+    let current = fixture
+        .completed("document", "text/plain", b"current revision")
+        .await;
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        let mut document = current.document(ACTOR);
+        document["folder_id"] = json!(42);
+        rows.documents = vec![document];
+        rows.versions = vec![json!({
+            "id":31,"organization_id":7,"document_id":21,"version_number":1,
+            "url":previous.url,"checksum":previous.checksum,"created_by":ACTOR
+        })];
+        rows.folders = vec![
+            json!({"id":41,"organization_id":7,"company_id":3,"parent_id":null,
+                "owner_id":ACTOR,"is_access_restricted":false,"metadata":null}),
+            json!({"id":42,"organization_id":7,"company_id":3,"parent_id":41,
+                "owner_id":ACTOR,"is_access_restricted":false,"metadata":null}),
+        ];
+    }
+    for slot in [&previous, &current] {
+        fixture
+            .get("actor-token", &slot.url)
+            .await
+            .expect_status(StatusCode::OK);
+    }
+    fixture.rows.lock().unwrap().folders[0]["metadata"] = json!(json!({
+        "documentFolderLifecycle":{
+            "state":"trashed","deletedAtMicros":"1","deletedBy":ACTOR,
+            "originalParentId":null,"previousMetadata":null
+        }
+    })
+    .to_string());
+    for slot in [&previous, &current] {
+        fixture
+            .get("actor-token", &slot.url)
+            .await
+            .expect_status(StatusCode::NOT_FOUND);
+    }
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.folders[0]["metadata"] = Value::Null;
+        rows.folders[0]["owner_id"] = json!(OTHER);
+        rows.folders[0]["is_access_restricted"] = json!(true);
+    }
+    for slot in [&previous, &current] {
+        fixture
+            .get("actor-token", &slot.url)
+            .await
+            .expect_status(StatusCode::NOT_FOUND);
+    }
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.folders[0]["owner_id"] = json!(ACTOR);
+        rows.folders[0]["company_id"] = json!(4);
+    }
+    for slot in [&previous, &current] {
+        fixture
+            .get("actor-token", &slot.url)
+            .await
+            .expect_status(StatusCode::NOT_FOUND);
+    }
+    fixture.rows.lock().unwrap().folders[0]["company_id"] = json!(3);
+    for slot in [&previous, &current] {
+        fixture
+            .get("actor-token", &slot.url)
+            .await
+            .expect_status(StatusCode::OK);
+    }
+    // Restoring folder visibility never restores an independently deleted file.
+    fixture.rows.lock().unwrap().documents[0]["is_deleted"] = json!(true);
+    for slot in [&previous, &current] {
+        fixture
+            .get("actor-token", &slot.url)
+            .await
+            .expect_status(StatusCode::NOT_FOUND);
+    }
 }
 
 #[tokio::test]
@@ -1078,7 +1176,7 @@ async fn submission_recovery_uses_immutable_version_and_rejects_purged_record() 
     fixture
         .get("actor-token", &url)
         .await
-        .expect_status(StatusCode::FORBIDDEN);
+        .expect_status(StatusCode::GONE);
     {
         let mut rows = fixture.rows.lock().unwrap();
         rows.documents.clear();
@@ -1128,4 +1226,225 @@ async fn submission_receipts_respect_field_masks_and_late_narrowing() {
         .get("actor-token", &url)
         .await
         .expect_status(StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn version_submission_recovery_preserves_the_exact_historical_version_and_write_authority() {
+    let fixture = Fixture::new().await;
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.actor_permissions = vec![
+            "document:read".into(),
+            "document:write".into(),
+            "document_version:read".into(),
+        ];
+        rows.documents = vec![
+            json!({"id":21,"organization_id":7,"company_id":3,"owner_id":ACTOR,"is_deleted":false,
+            "url":"/api/documents/blobs/object/7/default/old","checksum":"c".repeat(64)}),
+        ];
+    }
+    let bytes = b"updated farm notes";
+    let checksum = hex::encode(Sha256::digest(bytes));
+    let submission_id = "e".repeat(32);
+    let body = json!({"fileName":"notes.txt","contentType":"text/plain","contentLength":bytes.len(),
+        "companyId":3,"checksum":checksum,"submissionId":submission_id,
+        "registration":{"name":"notes.txt","versionDocumentId":"21","changesDescription":"Added notes","tagIds":[],"isFavorite":false}});
+    let reserve = fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    let slot = UploadSlot {
+        object_key: reserve["objectKey"].as_str().unwrap().to_owned(),
+        upload_url: reserve["uploadUrl"].as_str().unwrap().to_owned(),
+        url: reserve["publicUrl"].as_str().unwrap().to_owned(),
+        checksum: checksum.clone(),
+    };
+    fixture
+        .request("actor-token", "PUT", &slot.upload_url, bytes.to_vec())
+        .await
+        .expect_status(StatusCode::NO_CONTENT);
+    fixture
+        .complete("actor-token", &slot)
+        .await
+        .expect_status(StatusCode::OK);
+    let receipt_url =
+        format!("/api/documents/blobs/receipt?companyId=3&submissionId={submission_id}");
+    let pending = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(pending["fileSaved"], true);
+    assert_eq!(pending["documentId"], Value::Null);
+    assert_eq!(pending["versionId"], Value::Null);
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.documents[0]["url"] = json!(slot.url);
+        rows.documents[0]["checksum"] = json!(checksum);
+        rows.versions.push(json!({"id":32,"organization_id":7,"document_id":21,"version_number":2,
+            "url":slot.url,"checksum":checksum,"created_by":ACTOR,"metadata":null,
+            "file_name":"notes.txt","file_size":bytes.len(),"mimetype":"text/plain","changes_description":"Added notes"}));
+    }
+    record_indexing_receipt(
+        &fixture.state.config.document_blob_store,
+        &slot.object_key,
+        21,
+        &checksum,
+        false,
+    )
+    .await
+    .unwrap();
+    let saved = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(saved["documentId"], "21");
+    assert_eq!(saved["versionId"], "32");
+    assert_eq!(saved["indexing"], "failed");
+    assert_eq!(saved["registration"]["changesDescription"], "Added notes");
+    fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::OK);
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.documents[0]["url"] = json!("/api/documents/blobs/object/7/default/newer");
+        rows.documents[0]["checksum"] = json!("f".repeat(64));
+    }
+    let historical = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(historical["versionId"], "32");
+    assert_eq!(historical["indexing"], "superseded");
+    fixture.rows.lock().unwrap().versions[0]["changes_description"] = json!("different intent");
+    fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::CONFLICT);
+    fixture
+        .rows
+        .lock()
+        .unwrap()
+        .actor_permissions
+        .retain(|permission| permission != "document:write");
+    fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn version_upload_cannot_borrow_create_permission_or_an_inaccessible_parent() {
+    let fixture = Fixture::new().await;
+    let body = json!({"fileName":"notes.txt","contentType":"text/plain","contentLength":4,"companyId":3,
+        "checksum":"a".repeat(64),"submissionId":"f".repeat(32),
+        "registration":{"name":"notes.txt","versionDocumentId":"21","tagIds":[],"isFavorite":false}});
+    fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+    fixture
+        .rows
+        .lock()
+        .unwrap()
+        .actor_permissions
+        .push("document:write".into());
+    fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+    fixture.rows.lock().unwrap().documents = vec![
+        json!({"id":21,"organization_id":7,"company_id":4,"owner_id":ACTOR,"is_deleted":false}),
+    ];
+    fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn bill_submission_provenance_is_server_owned_and_survives_recovery() {
+    let fixture = Fixture::new().await;
+    let submission_id = "c".repeat(32);
+    let body = json!({"fileName":"bill.txt","contentType":"text/plain","contentLength":4,"companyId":3,
+        "checksum":"b".repeat(64),"submissionId":submission_id,
+        "registration":{"name":"Bill source","resModel":"account_move","resId":"41","tagIds":[],"isFavorite":false,
+            "metadata":json!({"source":"accounting_bill_intake"}).to_string()}});
+    let reserved = fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    let receipt_url =
+        format!("/api/documents/blobs/receipt?companyId=3&submissionId={submission_id}");
+    let receipt = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    let metadata: Value =
+        serde_json::from_str(receipt["registration"]["metadata"].as_str().unwrap()).unwrap();
+    assert_eq!(metadata["source"], "accounting_bill_intake");
+    assert_eq!(metadata["uploaded_by"], ACTOR);
+    assert_eq!(metadata["object_key"], reserved["objectKey"]);
+    let replay = fixture
+        .request(
+            "actor-token",
+            "POST",
+            "/api/documents/blobs/presign",
+            serde_json::to_vec(&body).unwrap(),
+        )
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(replay["objectKey"], reserved["objectKey"]);
+    for key in ["uploadSubmissionId", "uploaded_by", "object_key"] {
+        let mut forged = body.clone();
+        let mut metadata = json!({"source":"accounting_bill_intake"});
+        metadata[key] = json!("forged");
+        forged["registration"]["metadata"] = json!(metadata.to_string());
+        fixture
+            .request(
+                "actor-token",
+                "POST",
+                "/api/documents/blobs/presign",
+                serde_json::to_vec(&forged).unwrap(),
+            )
+            .await
+            .expect_status(StatusCode::UNPROCESSABLE_ENTITY);
+    }
 }

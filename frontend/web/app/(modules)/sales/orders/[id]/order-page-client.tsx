@@ -57,7 +57,7 @@ import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
 import type { StockPicking } from '@lumiere/stdb/types';
 import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
-import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
+
 import { useProducts, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
 import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
 import {
@@ -80,6 +80,7 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
+import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload";
 import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { toCreateSaleOrderLineParams, toUpdateSaleOrderLineParams } from '@/lib/sales-create-params';
@@ -169,7 +170,7 @@ function SaleOrderPageLoaded({
   const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
   const accrueSaleCommission = useAccrueSaleCommission(orgId);
   const applyOmnichannelAllocation = useApplyOmnichannelAllocation(orgId, operatingCompanyId);
-  const createDocument = useCreateDocument(orgId, operatingCompanyId);
+  const documentUploads = useManagedDocumentUpload(orgId, operatingCompanyId);
 
   const [transitionError, setTransitionError] = useState<string>();
   const workflowSurface = useWorkflowSurface({ organizationId });
@@ -547,13 +548,12 @@ function SaleOrderPageLoaded({
       label: t('sales.actions.archivePdfToDocuments', { defaultValue: 'Archive PDF to Documents' }),
       show: true,
       run: async () => {
-        const params = await archiveRenderedPdfAsDocument({
+        await archiveRenderedPdfAsDocument({
           kind: 'sale-order',
           recordId: Number(orderId),
-          companyId: operatingCompanyId,
+          saveGenerated: documentUploads.submitGenerated,
           name: String(order.name ?? `Sale order ${orderId}`),
         });
-        await createDocument.mutateAsync(params);
       },
     },
     {

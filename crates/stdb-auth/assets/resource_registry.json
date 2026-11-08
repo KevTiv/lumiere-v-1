@@ -1817,7 +1817,8 @@
   "document-folders": {
     "aliases": [
       "document-folders",
-      "doc_folder"
+      "doc_folder",
+      "document_folder"
     ],
     "default_restricted": [
       "name",
@@ -1828,6 +1829,25 @@
       "is_favorite",
       "is_hidden",
       "create_date"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id"
+    ],
+    "table": "doc_folder"
+  },
+  "document-folders-deleted": {
+    "aliases": [
+      "document-folders-deleted",
+      "doc_folder",
+      "document_folder"
+    ],
+    "default_restricted": [
+      "name",
+      "parent_id",
+      "company_id",
+      "parent_path",
+      "write_date"
     ],
     "mandatory": [
       "id",

@@ -10,6 +10,7 @@ export const DOCUMENTS_WORKSPACE_RESOURCE_KEYS = [
   "documents",
   "documents-deleted",
   "document-folders",
+  "document-folders-deleted",
   "document-versions",
   "document-external-refs",
   "document-legal-holds",

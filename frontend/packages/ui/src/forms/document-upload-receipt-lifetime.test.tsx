@@ -2,6 +2,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 import { StrictMode, type ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useDocumentUploadReceipts } from "../../../../web/lib/use-document-upload-receipts"
+import { documentReceiptStorageKey, loadDocumentSubmissionPointers } from "../../../../web/lib/document-upload-receipts"
 
 const pointer = { submissionId: "a".repeat(32), fileName: "farm.csv", checksum: "b".repeat(64), requestHash: "c".repeat(64) }
 const receipt = {
@@ -46,5 +47,34 @@ describe("document upload receipt scope lifetime", () => {
     expect(await result).toBeInstanceOf(Error)
     expect(create).not.toHaveBeenCalled()
     expect(index).not.toHaveBeenCalled()
+  })
+
+  it("recovers an uncertain generated archive before rendering again and coalesces concurrent retries", async () => {
+    const scope = { organizationId: 7n, companyId: 3n, actorId: "actor" }
+    const retained = { ...pointer, intentKey: "pdf:account-move:17" }
+    localStorage.setItem(documentReceiptStorageKey(scope), JSON.stringify([retained]))
+    const saved = { ...receipt, registrationState: "registered", documentId: "99", indexing: "failed" }
+    const fetch = vi.fn().mockImplementation(async () => Response.json(saved))
+    vi.stubGlobal("fetch", fetch)
+    const create = vi.fn()
+    const index = vi.fn()
+    const createFile = vi.fn()
+    const view = renderHook(() => useDocumentUploadReceipts({ scope, allowed: true, assertCurrent: () => undefined, create, index }))
+    await waitFor(() => expect(view.result.current.rows[0]?.receipt?.documentId).toBe("99"))
+    fetch.mockClear()
+    let results: unknown[] = []
+    await act(async () => {
+      results = await Promise.all([
+        view.result.current.submitGenerated({ intentKey: retained.intentKey, registration: receipt.registration, createFile }),
+        view.result.current.submitGenerated({ intentKey: retained.intentKey, registration: receipt.registration, createFile }),
+      ])
+    })
+    expect(results).toEqual([saved, saved])
+    expect(createFile).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
+    expect(index).not.toHaveBeenCalled()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(loadDocumentSubmissionPointers(localStorage, scope)).toEqual([{ ...retained, settled: true }])
+    expect(view.result.current.pending).toBe(false)
   })
 })

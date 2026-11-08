@@ -481,6 +481,34 @@
     },
     "browser": {
       "upload": "Ohereza file"
+    },
+    "viewer": {
+      "open": "Reba file",
+      "title": "Igaragaza rya file",
+      "description": "Reba file yabitswe n’amaverisiyo yayo wemerewe.",
+      "scopeChanged": "Aho ukorera hahindutse. Funga iri garagaza wongere ufungure file.",
+      "denied": "Ntabwo wemerewe kubona iyi file.",
+      "unavailable": "Iyi file cyangwa verisiyo ntiboneka mu byo wemerewe ubu.",
+      "changed": "Amakuru ya file yabitswe yahindutse. Ongera ufungure igaragaza mbere yo gukomeza.",
+      "tooLarge": "Iyi file irenze ingano ntarengwa yo kugaragazwa.",
+      "invalid": "Igaragaza rya file ntiryashoboye kugenzurwa.",
+      "failed": "File ntiyashoboye gufungurwa. Ongera ugerageze.",
+      "version": "Verisiyo ya file",
+      "downloading": "Gutegura gukuramo file…",
+      "download": "Kuramo file",
+      "loading": "Kugenzura uburenganzira no gufungura file…",
+      "pdfFallback": "Mushakisha yawe ntishobora kugaragaza iyi PDF. Kanda Kuramo file kugira ngo uyifungure.",
+      "unsupported": "Igaragaza ry’ubu bwoko bwa file ntiriraboneka.",
+      "content": "Ibiri muri file",
+      "empty": "Iyi file nta makuru irimo."
+    },
+    "fileManagement": {
+      "trashDescription": "Ubu bubiko n’iburimo bizahishwa kugeza igihe bugaruriwe. Amaverisiyo ya file asanzwe azagumaho.",
+      "restoreDescription": "Garura ububiko kugira ngo file zabugumyemo zongere kuboneka. Hitamo aho bwari buri cyangwa ahandi wemerewe.",
+      "scopeChanged": "Aho ukorera file cyangwa uburenganzira bwawe byahindutse. Ongera ufungure iki gikorwa."
+    },
+    "receipts": {
+      "indexDisallowed": "Gushyira iyi file mu ishakiro rya AI ntibishoboka"
     }
   },
   "subscriptions": {

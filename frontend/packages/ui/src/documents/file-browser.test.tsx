@@ -31,6 +31,25 @@ const nestedFolders: FileBrowserFolder[] = [
 ]
 
 describe("FileBrowser", () => {
+  it("offers permitted folder actions without opening the folder", async () => {
+    const onMoveFolder = vi.fn()
+    render(<FileBrowser folders={folders} files={files} onMoveFolder={onMoveFolder} />)
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Actions for Finance" }), { key: "Enter" })
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Move" })).toBeTruthy())
+    expect(screen.queryByRole("menuitem", { name: "Edit folder" })).toBeNull()
+    expect(screen.queryByRole("menuitem", { name: "Move to trash" })).toBeNull()
+    fireEvent.click(screen.getByRole("menuitem", { name: "Move" }))
+
+    expect(onMoveFolder).toHaveBeenCalledWith("5")
+    expect(shownFileIds()).toEqual(["1", "2", "3"])
+  })
+
+  it("hides the folder action menu when no actions are permitted", () => {
+    render(<FileBrowser folders={folders} files={files} />)
+    expect(screen.queryByRole("button", { name: "Actions for Finance" })).toBeNull()
+  })
+
   it("pages all list records at 25 and resets after filtering", () => {
     const many = Array.from({ length: 61 }, (_, index) => ({ ...files[0]!, id: String(index + 1), name: `File ${index + 1}`, folderId: null, updatedAt: 100 - index }))
     render(<FileBrowser folders={[]} files={many} />)

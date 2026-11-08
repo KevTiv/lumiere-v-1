@@ -15,22 +15,107 @@ use super::row_values::sort_rows_by_id_desc;
 #[path = "documents_tests.rs"]
 mod tests;
 
-// Pilot ACL = owner-only on both WS and HTTP (match erp_subscriptions.rs; not full
-// `read_access_ids`). Documents/folders/versions must not fall through to org-only SQL.
-pub(super) async fn read_document_folders(
-    client: &StdbClient,
+#[path = "document_tree.rs"]
+mod tree;
+
+// These projections retain the existing owner-scoped document model. Parent
+// membership/ACL/trash state is checked using internal columns, then only the
+// caller's original field projection is returned.
+fn require_read_context(
+    resource: &str,
     organization_id: u64,
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
+) -> Result<String, ApiError> {
+    let identity = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let access = field_access
+        .filter(|access| access.organization_id == organization_id)
+        .ok_or_else(|| {
+            ApiError::Forbidden("Document read context does not match organization".into())
+        })?;
+    if organization_id == 0
+        || identity_sql_literal(&access.identity_hex).map_err(ApiError::Internal)? != identity
+        || stdb_auth::resource_read_denied(access, resource)
+        || !has_resource_read_permission(Some(access), resource)
+    {
+        return Err(ApiError::Forbidden(
+            "Document read permission denied".into(),
+        ));
+    }
+    Ok(identity)
+}
+
+pub(super) async fn read_document_folders(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let cols =
-        resolve_http_sql_columns("document-folders", field_access).map_err(ApiError::Internal)?;
-    let col_part = cols.join(", ");
+    let id = require_read_context(resource, organization_id, identity_hex, field_access)?;
+    let cols = resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal)?;
     let sql = format!(
-        "SELECT {col_part} FROM doc_folder WHERE organization_id = {organization_id} AND (is_access_restricted = false OR owner_id = {id})"
+        "SELECT {} FROM doc_folder WHERE organization_id = {organization_id} AND (is_access_restricted = false OR owner_id = {id})", cols.join(", ")
     );
-    client.query_sql(&sql).await.map_err(ApiError::internal)
+    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    if rows.is_empty() {
+        return Ok(rows);
+    }
+    let tree = tree::read_tree(client, organization_id, identity_hex, requested_company_id).await?;
+    rows.retain(|row| {
+        document_row_id(row, "id", "id")
+            .is_some_and(|id| tree.folder_visible(id, resource == "document-folders-deleted"))
+    });
+    // Persisted totals can include rows the actor cannot see. Never expose them.
+    let needs_counts = rows.iter().any(|row| {
+        row.get("documentCount")
+            .or_else(|| row.get("document_count"))
+            .is_some()
+    });
+    let counts = if resource != "document-folders-deleted"
+        && needs_counts
+        && has_document_read_permission(field_access)
+    {
+        Some(tree::visible_counts(
+            &tree::visible_document_rows(client, organization_id, identity_hex, &tree, false)
+                .await?,
+        ))
+    } else {
+        None
+    };
+    for row in &mut rows {
+        let id = document_row_id(row, "id", "id")
+            .ok_or_else(|| ApiError::Internal("Visible folder ID is invalid".into()))?;
+        if let Some(object) = row.as_object_mut() {
+            for key in ["parentPath", "parent_path"] {
+                if object.contains_key(key) {
+                    match tree.parent_path(id) {
+                        Some(path) => {
+                            object.insert(key.to_string(), Value::String(path));
+                        }
+                        None => {
+                            object.remove(key);
+                        }
+                    }
+                }
+            }
+            for key in ["documentCount", "document_count"] {
+                if object.contains_key(key) {
+                    if let Some(counts) = &counts {
+                        object.insert(
+                            key.to_string(),
+                            Value::from(counts.get(&id).copied().unwrap_or(0)),
+                        );
+                    } else {
+                        object.remove(key);
+                    }
+                }
+            }
+        }
+    }
+    sort_rows_by_id_desc(&mut rows);
+    Ok(rows)
 }
 
 pub(super) async fn read_documents(
@@ -39,37 +124,71 @@ pub(super) async fn read_documents(
     organization_id: u64,
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let id = require_read_context(resource, organization_id, identity_hex, field_access)?;
     let cols = resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal)?;
-    let col_part = cols.join(", ");
-    let deleted = if resource == "documents-deleted" {
-        "true"
-    } else {
-        "false"
-    };
+    let deleted = resource == "documents-deleted";
     let sql = format!(
-        "SELECT {col_part} FROM document WHERE organization_id = {organization_id} AND is_deleted = {deleted} AND owner_id = {id}"
+        "SELECT {} FROM document WHERE organization_id = {organization_id} AND is_deleted = {deleted} AND owner_id = {id}", cols.join(", ")
     );
-    client.query_sql(&sql).await.map_err(ApiError::internal)
+    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    if rows.is_empty() {
+        return Ok(rows);
+    }
+    let tree = tree::read_tree(client, organization_id, identity_hex, requested_company_id).await?;
+    let visible =
+        tree::visible_document_rows(client, organization_id, identity_hex, &tree, deleted).await?;
+    let ids: BTreeSet<_> = visible
+        .iter()
+        .filter_map(|row| document_row_id(row, "id", "id"))
+        .collect();
+    rows.retain(|row| document_row_id(row, "id", "id").is_some_and(|id| ids.contains(&id)));
+    sort_rows_by_id_desc(&mut rows);
+    Ok(rows)
 }
 
-// Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL cannot
-// JOIN/subquery parent `document.owner_id`. Filter by `created_by` (same as WS).
 pub(super) async fn read_document_versions(
     client: &StdbClient,
     organization_id: u64,
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let cols =
+    let id = require_read_context(
+        "document-versions",
+        organization_id,
+        identity_hex,
+        field_access,
+    )?;
+    if !has_document_read_permission(field_access) {
+        return Err(ApiError::Forbidden(
+            "Document read permission denied".into(),
+        ));
+    }
+    let mut cols =
         resolve_http_sql_columns("document-versions", field_access).map_err(ApiError::Internal)?;
-    let col_part = cols.join(", ");
+    let strip_document_id = !cols.iter().any(|column| column == "document_id");
+    if strip_document_id {
+        cols.push("document_id".into());
+    }
     let sql = format!(
-        "SELECT {col_part} FROM document_version WHERE organization_id = {organization_id} AND created_by = {id}"
+        "SELECT {} FROM document_version WHERE organization_id = {organization_id} AND created_by = {id}", cols.join(", ")
     );
-    client.query_sql(&sql).await.map_err(ApiError::internal)
+    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    if rows.is_empty() {
+        return Ok(rows);
+    }
+    let tree = tree::read_tree(client, organization_id, identity_hex, requested_company_id).await?;
+    let parents =
+        tree::visible_document_rows(client, organization_id, identity_hex, &tree, false).await?;
+    let ids: BTreeSet<_> = parents
+        .iter()
+        .filter_map(|row| document_row_id(row, "id", "id"))
+        .collect();
+    filter_document_child_rows(&mut rows, organization_id, &ids, strip_document_id);
+    sort_rows_by_id_desc(&mut rows);
+    Ok(rows)
 }
 
 /// Child reads inherit the document permission, not a separately provisioned child grant.
@@ -255,6 +374,7 @@ pub(super) async fn read_document_child_rows(
     organization_id: u64,
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
     document_child_table(resource)?;
     let (parent_sql, identity) = document_parent_sql(organization_id, identity_hex, field_access)?;
@@ -262,7 +382,18 @@ pub(super) async fn read_document_child_rows(
         .query_sql(&parent_sql)
         .await
         .map_err(ApiError::internal)?;
-    let visible_ids = visible_document_ids(&parents, organization_id, &identity);
+    let mut visible_ids = visible_document_ids(&parents, organization_id, &identity);
+    if visible_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let tree = tree::read_tree(client, organization_id, identity_hex, requested_company_id).await?;
+    let live_parents =
+        tree::visible_document_rows(client, organization_id, identity_hex, &tree, false).await?;
+    let current_ids: BTreeSet<_> = live_parents
+        .iter()
+        .filter_map(|row| document_row_id(row, "id", "id"))
+        .collect();
+    visible_ids.retain(|id| current_ids.contains(id));
     let parent_ids: Vec<_> = visible_ids.iter().copied().collect();
     let mut rows = Vec::new();
     // Equality/OR predicates are supported by STDB, unlike parent subqueries.
