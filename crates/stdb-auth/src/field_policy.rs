@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::resource_registry::registry_get;
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FieldAccessContext {
     pub organization_id: u64,
@@ -23,7 +23,7 @@ pub struct FieldAccessContext {
     pub org_permissions: Vec<ActionPermission>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionPermission {
     pub resource: String,

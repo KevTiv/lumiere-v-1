@@ -240,7 +240,10 @@ export function useCreateAiChatSession(organizationId: number, companyId: number
         metadata: params.metadata,
       })
       if (!mapped) throw new Error(i18n.t("common.paramsMapper.invalidAiChatSession"))
-      const { urlPath, init } = stdbBffCommandPost("create_ai_chat_session", { companyId: companyId, params: stdbParamsToJson(mapped as object) })
+      const { urlPath, init } = stdbBffCommandPost("create_ai_chat_session", {
+        companyId,
+        params: stdbParamsToJson(mapped, "CreateAiChatSessionParams"),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -267,15 +270,13 @@ export function useAppendAiChatMessage(organizationId: number, companyId: number
       if (companyId == null || companyId <= 0) {
         throw new Error("companyId is required")
       }
-      const { urlPath, init } = stdbBffCommandPost("append_ai_chat_message", { companyId: companyId, params: stdbParamsToJson({
-          ...params,
-          sources_json: params.sources_json ?? null,
-          ui_context_json: params.ui_context_json ?? null,
-          model: params.model ?? null,
-          duration_ms: params.duration_ms ?? null,
-          status: params.status ?? "completed",
-          metadata: params.metadata ?? null,
-        }) })
+      const { urlPath, init } = stdbBffCommandPost("append_ai_chat_message", {
+        companyId,
+        params: stdbParamsToJson(
+          { ...params, status: params.status ?? "completed" },
+          "AppendAiChatMessageParams",
+        ),
+      })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
