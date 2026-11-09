@@ -61,10 +61,11 @@ wait_ready() {
 }
 
 query_fixture() {
-  docker exec "$1" "${cli[@]}" sql "$database" \
-    "SELECT organization_id, pack_key FROM country_pack_definition" \
-    --server "$host" --format json -y --no-config \
-    | jq --compact-output --exit-status 'first(.. | objects | .rows? // empty)'
+  docker exec "$1" curl --fail-with-body --silent --show-error \
+    -H 'Content-Type: text/plain' \
+    --data-binary 'SELECT organization_id, pack_key FROM country_pack_definition' \
+    "$host/v1/database/$database/sql" \
+    | jq --compact-output --exit-status '.[0].rows'
 }
 
 wait_ready "$source_container"
