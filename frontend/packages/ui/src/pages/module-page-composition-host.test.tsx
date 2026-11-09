@@ -80,9 +80,12 @@ vi.mock("@/hooks/use-stored-dashboard-data-sources", () => ({
   useStoredDashboardDataSources: () => fixture.sources,
 }));
 vi.mock("./dashboard-widget-renderer", () => ({
-  DashboardWidgetRenderer: ({ widget }: { widget: DashboardWidget }) => (
-    <h3 data-testid="fixture-rendered-widget">{widget.title}</h3>
-  ),
+  DashboardWidgetRenderer: ({ widget }: { widget: DashboardWidget }) =>
+    widget.type === "custom" ? (
+      <widget.component data={widget.data} />
+    ) : (
+      <h3 data-testid="fixture-rendered-widget">{widget.title}</h3>
+    ),
 }));
 vi.mock("@/app/(modules)/reports/query-builder", () => ({
   QueryBuilder: ({
@@ -173,7 +176,13 @@ function App({ client }: { client: QueryClient }) {
   );
 }
 
-function Collection({ invalidDate = false }: { invalidDate?: boolean }) {
+function Collection({
+  invalidDate = false,
+  content = false,
+}: {
+  invalidDate?: boolean;
+  content?: boolean;
+}) {
   const { target, slot } = usePageCompositionActionSlot();
   return (
     <>
@@ -186,7 +195,7 @@ function Collection({ invalidDate = false }: { invalidDate?: boolean }) {
         moduleId="sales"
         pageId="dashboard"
         title="Sales orders"
-        placement="insights"
+        placement={content ? "content" : "insights"}
         actionTarget={target}
         sections={sections}
         historyBounds={invalidDate ? null : undefined}
@@ -218,7 +227,11 @@ function Disclosure() {
   );
 }
 
-function mount(collection?: { invalidDate?: boolean; disclosure?: boolean }) {
+function mount(collection?: {
+  invalidDate?: boolean;
+  disclosure?: boolean;
+  content?: boolean;
+}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -250,7 +263,7 @@ function mount(collection?: { invalidDate?: boolean; disclosure?: boolean }) {
 }
 
 function click(name: string) {
-  fireEvent.click(screen.getByRole("button", { name, exact: true }));
+  fireEvent.click(screen.getByRole("button", { name }));
 }
 async function ready() {
   await waitFor(() =>
@@ -315,6 +328,72 @@ afterEach(() => {
 });
 
 describe("module page production host", () => {
+  it("moves native collections alongside widgets and saves insertion below the table at the existing revision", async () => {
+    pages.set("1", {
+      companyId: "1",
+      moduleId: "sales",
+      pageId: "dashboard",
+      revision: "2",
+      layout: {
+        schemaVersion: 1,
+        moduleId: "sales",
+        pageId: "dashboard",
+        widgets: [
+          { id: "existing", source: "saved", widgetId: "42", width: 6 },
+        ],
+      },
+    });
+    mount({ content: true });
+    const header = screen.getByRole("banner");
+    fireEvent.click(
+      await within(header).findByRole("button", { name: "Edit page" }),
+    );
+    expect(
+      screen.getByRole("region", { name: "Sales order list" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Remove Sales orders" }),
+    ).toBeNull();
+    click("Add widget below Sales orders");
+    const gallery = screen.getByRole("dialog");
+    fireEvent.click(within(gallery).getByRole("button", { name: /^Revenue/ }));
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: "Add to page" }),
+    );
+    const grid = screen.getByTestId("page-composition-grid");
+    const keys = () =>
+      Array.from(grid.querySelectorAll("[data-widget-key]")).map((el) =>
+        el.getAttribute("data-widget-key"),
+      );
+    expect(keys()).toEqual([
+      "builtin:module-content",
+      "builtin:revenue",
+      "saved:42",
+    ]);
+    click("Move Sales orders later");
+    expect(keys()).toEqual([
+      "builtin:revenue",
+      "builtin:module-content",
+      "saved:42",
+    ]);
+    click("Undo");
+    expect(keys()).toEqual([
+      "builtin:module-content",
+      "builtin:revenue",
+      "saved:42",
+    ]);
+    click("Done");
+    await within(header).findByRole("button", { name: "Edit page" });
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.body.expectedRevision).toBe("2");
+    expect(
+      writes[0]?.body.layout?.widgets.map((widget) => widget.widgetId),
+    ).toEqual(["module-content", "revenue", "42"]);
+    expect(
+      screen.getByRole("region", { name: "Sales order list" }),
+    ).toBeTruthy();
+  });
+
   it("keeps collection work fixed and places its empty insights editor in the title actions", async () => {
     mount({});
     const header = screen.getByRole("banner");

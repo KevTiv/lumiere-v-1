@@ -64,57 +64,59 @@ export function DailyWorkWorkspace({
           })}
         />
       )}
-      <WorkBoardWorkspace
-        organizationId={organizationId}
-        initialView="mine"
-        defaultLayout="list"
-        embedded
-      />
-      <DailyWorkSources organizationId={organizationId} summary={summary} />
-      <details className="text-sm text-muted-foreground">
-        <summary className="w-fit cursor-pointer rounded-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {t("workspace.dailyWork.help", {
-            defaultValue: "How this inbox works",
-          })}
-        </summary>
-        <div className="mt-3 max-w-3xl space-y-2">
-          {!summary && <p>{t("workspace.dailyWork.description")}</p>}
-          <p className="text-xs text-muted-foreground">
-            {t("workspace.dailyWork.viewsHint", {
-              defaultValue:
-                "Mine shows your assignments. Eligible includes work available to your role; Available shows unclaimed workflow work or unassigned follow-ups. Counts describe only loaded records.",
-            })}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {t("workspace.dailyWork.coverage", {
-              defaultValue:
-                "Workflow assignments cover Accounting, Sales, Purchasing and Expenses. Other queues show loaded CRM follow-ups, subscriptions due to bill and company report schedules you can access.",
-            })}
-          </p>
+      <OperationalPageComposition
+        moduleId="tasks"
+        title={t("workBoard.title")}
+        actionTarget={compositionTarget}
+        active={!summary}
+      >
+        <div className="min-w-0 space-y-4">
+          <WorkBoardWorkspace
+            organizationId={organizationId}
+            initialView="mine"
+            defaultLayout="list"
+            embedded
+          />
+          <DailyWorkSources organizationId={organizationId} summary={summary} />
+          <details className="text-sm text-muted-foreground">
+            <summary className="w-fit cursor-pointer rounded-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              {t("workspace.dailyWork.help", {
+                defaultValue: "How this inbox works",
+              })}
+            </summary>
+            <div className="mt-3 max-w-3xl space-y-2">
+              {!summary && <p>{t("workspace.dailyWork.description")}</p>}
+              <p className="text-xs text-muted-foreground">
+                {t("workspace.dailyWork.viewsHint", {
+                  defaultValue:
+                    "Mine shows your assignments. Eligible includes work available to your role; Available shows unclaimed workflow work or unassigned follow-ups. Counts describe only loaded records.",
+                })}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("workspace.dailyWork.coverage", {
+                  defaultValue:
+                    "Workflow assignments cover Accounting, Sales, Purchasing and Expenses. Other queues show loaded CRM follow-ups, subscriptions due to bill and company report schedules you can access.",
+                })}
+              </p>
+            </div>
+          </details>
+          {canReadProjects && (
+            <nav
+              className="border-t pt-3 text-sm"
+              aria-label={t("workspace.dailyWork.otherWork", {
+                defaultValue: "Other workspaces",
+              })}
+            >
+              <Link
+                href="/tasks?source=projects"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {t("workBoard.projectTasks")}
+              </Link>
+            </nav>
+          )}
         </div>
-      </details>
-      {canReadProjects && (
-        <nav
-          className="border-t pt-3 text-sm"
-          aria-label={t("workspace.dailyWork.otherWork", {
-            defaultValue: "Other workspaces",
-          })}
-        >
-          <Link
-            href="/tasks?source=projects"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            {t("workBoard.projectTasks")}
-          </Link>
-        </nav>
-      )}
-      {!summary && (
-        <OperationalPageComposition
-          moduleId="tasks"
-          title={t("workBoard.title")}
-          actionTarget={compositionTarget}
-        />
-      )}
+      </OperationalPageComposition>
     </section>
   )
 }

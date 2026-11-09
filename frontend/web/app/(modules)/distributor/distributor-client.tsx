@@ -127,47 +127,50 @@ export function DistributorClient() {
         secondaryAction={compositionSlot}
         description="Cash, credit, order-to-cash and stock control for distribution companies"
       />
-      <Card>
-        <CardHeader>
-          <div>
-            <div className="flex items-center gap-2"><CardTitle>Distributor workspace</CardTitle><Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Not enabled"}</Badge></div>
-            <CardDescription>Company-scoped cash, credit, order, and stock control built on the shared ERP workflows.</CardDescription>
-          </div>
-          <CardAction><Button size="sm" variant={enabled ? "outline" : "default"} disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>{enabled ? "Disable pack" : "Enable pack"}</Button></CardAction>
-        </CardHeader>
-        {!enabled ? <CardContent><Empty><EmptyHeader><EmptyMedia variant="icon"><StoreIcon /></EmptyMedia><EmptyTitle>Enable this company’s distributor pack</EmptyTitle><EmptyDescription>Enabling exposes the distributor control workspace without changing any operational records.</EmptyDescription></EmptyHeader><EmptyContent><Button disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>Enable distributor pack</Button></EmptyContent></Empty></CardContent> : null}
-      </Card>
-      {enabled ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Open sales orders" value={metrics.openOrders} description="Orders requiring fulfilment or payment follow-up." icon={<ReceiptTextIcon />} href="/sales" />
-        <MetricCard title="Open customer balances" value={metrics.openInvoices} description="Posted customer invoices with a remaining balance." icon={<CircleDollarSignIcon />} href="/reports" />
-        <MetricCard title="Posted payments" value={metrics.postedPayments} description="Operational payments available for reconciliation." icon={<BoxesIcon />} href="/accounting" />
-        <MetricCard title="Low-stock alerts" value={metrics.lowStock} description="Current quants at or below zero, or marked outdated." icon={<PackageIcon />} href="/reports" destructive={metrics.lowStock > 0} />
-      </div> : null}
-      {enabled ? <Card data-testid="distributor-o2c">
-        <CardHeader>
-          <CardTitle>Order-to-cash exceptions</CardTitle>
-          <CardDescription>Confirmed orders with a missing or unfinished delivery, no invoice, an overdue balance, or a customer on credit hold. Each links to the record that owns it.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {exceptionRows.length === 0
-            ? <p className="text-sm text-muted-foreground" data-testid="distributor-o2c-empty">No order-to-cash exceptions.</p>
-            : <table className="w-full text-sm" data-testid="distributor-o2c-table">
-              <thead><tr className="text-left text-muted-foreground"><th className="pb-2">Order</th><th className="pb-2">Customer</th><th className="pb-2">Stage</th><th className="pb-2">Exceptions</th><th className="pb-2">Deliveries &amp; invoices</th><th className="pb-2 text-right">Open balance</th></tr></thead>
-              <tbody>
-                {exceptionsPager.pageRows.map((row) => <tr key={String(row.orderId)} className="border-t align-top" data-testid={`distributor-o2c-row-${row.orderId}`}>
-                  <td className="py-2"><Link className="underline underline-offset-2" href={orderHref(row.orderId)} data-testid={`distributor-o2c-order-${row.orderId}`}>{row.reference || `Order #${row.orderId}`}</Link></td>
-                  <td className="py-2">{row.partnerId == null ? "—" : partnerNames.get(String(row.partnerId)) || `Partner ${row.partnerId}`}</td>
-                  <td className="py-2" data-testid={`distributor-o2c-stage-${row.orderId}`}>{STAGE_LABELS[row.stage]}</td>
-                  <td className="py-2"><div className="flex flex-wrap gap-1">{row.exceptions.map((exception) => <Badge key={exception} variant="destructive" data-testid={`distributor-o2c-exception-${row.orderId}-${exception}`}>{EXCEPTION_LABELS[exception]}</Badge>)}</div></td>
-                  <td className="py-2"><OrderHandoffLinks handoffs={row.handoffs} testIdPrefix={`distributor-o2c-${row.orderId}`} /></td>
-                  <td className="py-2 text-right">{row.openBalance > 0 ? row.openBalance.toFixed(2) : "—"}</td>
-                </tr>)}
-              </tbody>
-            </table>}
-            <TablePager {...exceptionsPager} />
-        </CardContent>
-      </Card> : null}
-      <OperationalPageComposition moduleId="distributor" title={"Distributor"} actionTarget={compositionTarget} />
+      <OperationalPageComposition moduleId="distributor" title={"Distributor"} actionTarget={compositionTarget}>
+        <div className="min-w-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <div>
+                <div className="flex items-center gap-2"><CardTitle>Distributor workspace</CardTitle><Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Not enabled"}</Badge></div>
+                <CardDescription>Company-scoped cash, credit, order, and stock control built on the shared ERP workflows.</CardDescription>
+              </div>
+              <CardAction><Button size="sm" variant={enabled ? "outline" : "default"} disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>{enabled ? "Disable pack" : "Enable pack"}</Button></CardAction>
+            </CardHeader>
+            {!enabled ? <CardContent><Empty><EmptyHeader><EmptyMedia variant="icon"><StoreIcon /></EmptyMedia><EmptyTitle>Enable this company’s distributor pack</EmptyTitle><EmptyDescription>Enabling exposes the distributor control workspace without changing any operational records.</EmptyDescription></EmptyHeader><EmptyContent><Button disabled={companyId <= 0n || setPack.isPending} onClick={toggle}>Enable distributor pack</Button></EmptyContent></Empty></CardContent> : null}
+          </Card>
+          {enabled ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Open sales orders" value={metrics.openOrders} description="Orders requiring fulfilment or payment follow-up." icon={<ReceiptTextIcon />} href="/sales" />
+            <MetricCard title="Open customer balances" value={metrics.openInvoices} description="Posted customer invoices with a remaining balance." icon={<CircleDollarSignIcon />} href="/reports" />
+            <MetricCard title="Posted payments" value={metrics.postedPayments} description="Operational payments available for reconciliation." icon={<BoxesIcon />} href="/accounting" />
+            <MetricCard title="Low-stock alerts" value={metrics.lowStock} description="Current quants at or below zero, or marked outdated." icon={<PackageIcon />} href="/reports" destructive={metrics.lowStock > 0} />
+          </div> : null}
+          {enabled ? <Card data-testid="distributor-o2c">
+            <CardHeader>
+              <CardTitle>Order-to-cash exceptions</CardTitle>
+              <CardDescription>Confirmed orders with a missing or unfinished delivery, no invoice, an overdue balance, or a customer on credit hold. Each links to the record that owns it.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {exceptionRows.length === 0
+                ? <p className="text-sm text-muted-foreground" data-testid="distributor-o2c-empty">No order-to-cash exceptions.</p>
+                : <table className="w-full text-sm" data-testid="distributor-o2c-table">
+                  <thead><tr className="text-left text-muted-foreground"><th className="pb-2">Order</th><th className="pb-2">Customer</th><th className="pb-2">Stage</th><th className="pb-2">Exceptions</th><th className="pb-2">Deliveries &amp; invoices</th><th className="pb-2 text-right">Open balance</th></tr></thead>
+                  <tbody>
+                    {exceptionsPager.pageRows.map((row) => <tr key={String(row.orderId)} className="border-t align-top" data-testid={`distributor-o2c-row-${row.orderId}`}>
+                      <td className="py-2"><Link className="underline underline-offset-2" href={orderHref(row.orderId)} data-testid={`distributor-o2c-order-${row.orderId}`}>{row.reference || `Order #${row.orderId}`}</Link></td>
+                      <td className="py-2">{row.partnerId == null ? "—" : partnerNames.get(String(row.partnerId)) || `Partner ${row.partnerId}`}</td>
+                      <td className="py-2" data-testid={`distributor-o2c-stage-${row.orderId}`}>{STAGE_LABELS[row.stage]}</td>
+                      <td className="py-2"><div className="flex flex-wrap gap-1">{row.exceptions.map((exception) => <Badge key={exception} variant="destructive" data-testid={`distributor-o2c-exception-${row.orderId}-${exception}`}>{EXCEPTION_LABELS[exception]}</Badge>)}</div></td>
+                      <td className="py-2"><OrderHandoffLinks handoffs={row.handoffs} testIdPrefix={`distributor-o2c-${row.orderId}`} /></td>
+                      <td className="py-2 text-right">{row.openBalance > 0 ? row.openBalance.toFixed(2) : "—"}</td>
+                    </tr>)}
+                  </tbody>
+                </table>}
+                <TablePager {...exceptionsPager} />
+            </CardContent>
+          </Card> : null}
+        </div>
+      </OperationalPageComposition>
     </main>
   )
 }

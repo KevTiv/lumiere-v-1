@@ -5,6 +5,8 @@ import {
   createDefaultPageLayout,
   createPageCompositionHistory,
   createPageWidgetPlacement,
+  includeRequiredPageWidgets,
+  insertPageWidget,
   movePageWidget,
   pageCompositionHistoryReducer,
   pageLayoutsEqual,
@@ -25,6 +27,41 @@ const second: PageWidgetPlacement = {
 }
 
 describe("page composition draft model", () => {
+  it("restores native work in legacy layouts without changing saved placements or their order", () => {
+    const catalog = [
+      {
+        source: "builtin" as const,
+        widgetId: "orders",
+        title: "Orders",
+        required: true,
+      },
+    ]
+    const saved = Object.freeze([Object.freeze(second)])
+    expect(includeRequiredPageWidgets(saved, [first], catalog)).toEqual([
+      first,
+      second,
+    ])
+    const moved = [
+      second,
+      { ...first, id: "existing-native-placement", width: 12 as const },
+    ]
+    expect(includeRequiredPageWidgets(moved, [first], catalog)).toBe(moved)
+    expect(includeRequiredPageWidgets([], [first], catalog)).toEqual([first])
+  })
+
+  it("inserts after the selected block and safely appends when its anchor is missing", () => {
+    const added = { ...second, id: "added" }
+    expect(insertPageWidget([first, second], added, first.id)).toEqual([
+      first,
+      added,
+      second,
+    ])
+    expect(insertPageWidget([first, second], added, "missing")).toEqual([
+      first,
+      second,
+      added,
+    ])
+  })
   it("references live built-in definitions while keeping each placement independent", () => {
     const sections: DashboardSection[] = [
       {

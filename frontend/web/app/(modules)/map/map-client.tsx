@@ -347,8 +347,9 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
         </div>
       </div>
 
+      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget}>
       {/* Body */}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex h-[calc(100dvh-12rem)] min-h-96 min-w-0">
         {/* Map */}
         <div className="relative min-h-0 flex-1" data-testid="map-view">
           <MapView
@@ -488,7 +489,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           onSubmit={handleFleetSubmit}
         />
       ) : null}
-      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget} />
+      </OperationalPageComposition>
     </div>
   )
 }

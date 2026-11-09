@@ -12,12 +12,13 @@ import type { DashboardSection } from "../lib/dashboard-types";
 
 /** The application supplies persistence and data; module pages keep their renderers. */
 export interface PageCompositionMountProps {
+  active?: boolean;
   moduleId: string;
   pageId: string;
   title: string;
   sections?: readonly DashboardSection[];
-  /** Insights are optional, start empty, and cannot replace the page's business content. */
-  placement?: "dashboard" | "insights";
+  /** Content joins native work to the layout; insights adds an optional separate area. */
+  placement?: "dashboard" | "insights" | "content";
   /** The owning page supplies its resolved period; null means the selection is invalid. */
   historyBounds?: HistoryBounds | null;
   /** Explains page controls (such as currency) that do not scope saved widgets. */
@@ -60,7 +61,7 @@ export function PageCompositionHostProvider({
 export function ModulePageComposition(props: PageCompositionMountProps) {
   const Host = useContext(PageCompositionHostContext);
   const inheritedTarget = useContext(PageCompositionActionTargetContext);
-  return Host ? (
+  return Host && props.active !== false ? (
     <Host
       {...props}
       actionTarget={

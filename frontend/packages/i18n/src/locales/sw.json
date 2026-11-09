@@ -5042,5 +5042,9 @@
       "reject": "Kataa",
       "complete": "Kamilisha"
     }
+  },
+  "pageComposition": {
+    "addBelow": "Ongeza wijeti hapa chini",
+    "addBelowNamed": "Ongeza wijeti chini ya {{title}}"
   }
 }
