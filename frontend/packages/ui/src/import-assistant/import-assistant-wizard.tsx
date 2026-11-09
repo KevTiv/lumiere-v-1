@@ -57,6 +57,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogSkeleton,
   DialogTitle,
 } from "../components/dialog"
 import { Input } from "../components/input"
@@ -548,7 +549,10 @@ export function ImportAssistantWizard({
 
         <DialogBody className="space-y-4">
           <ModuleDataNotice state={sourceState} />
-          {sourceState?.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p> : null}
+          {sourceState?.status === "loading" ? (
+            step === "upload" && !fileName ? <DialogSkeleton /> :
+              <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
+          ) : null}
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <Badge variant={step === "upload" ? "default" : "outline"}>
               1. {t("common.importAssistant.stepUpload")}

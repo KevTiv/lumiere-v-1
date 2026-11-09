@@ -8,7 +8,7 @@ import { Button } from "../components/button"
 import { Textarea } from "../components/textarea"
 import { Input } from "../components/input"
 import { MarkdownView } from "../components/markdown-view"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../components/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogSkeleton, DialogTitle } from "../components/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from "../components/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 import { cn } from "../lib/utils"
@@ -227,26 +227,52 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onLoadVer
   </section>
 }
 
-export interface AssistantGuideModalProps extends AssistantGuideViewerProps {
+export type AssistantGuideModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-}
+} & (AssistantGuideViewerProps | {
+  document: null
+  loading: boolean
+  loadError?: string | null
+  onRetryLoad?: () => void
+})
 
 export function AssistantGuideModal({ open, onOpenChange, ...viewer }: AssistantGuideModalProps) {
   const { t } = useTranslation()
   const [dirty, setDirty] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  const hasDocument = viewer.document !== null
+  useEffect(() => {
+    if (!hasDocument) {
+      setDirty(false)
+      setConfirmClose(false)
+    }
+  }, [hasDocument])
+
   return <><Dialog open={open} onOpenChange={(next) => {
-    if (!next && dirty) { setConfirmClose(true); return }
+    if (!next && hasDocument && dirty) { setConfirmClose(true); return }
     onOpenChange(next)
   }}>
     <DialogContent className="flex h-[min(900px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:w-full max-sm:max-w-full max-sm:rounded-none sm:max-w-5xl" showCloseButton>
-      <DialogTitle className="sr-only">{viewer.document.title}</DialogTitle>
+      <DialogTitle className="sr-only">{viewer.document?.title ?? t("aiChat.guide.document", { defaultValue: "ERP guide" })}</DialogTitle>
       <DialogDescription className="sr-only">{t("aiChat.guide.modalDescription", { defaultValue: "Read and save this guide without leaving your ERP task. Follow-up questions use the same conversation." })}</DialogDescription>
-      <div className="flex min-h-0 flex-1 flex-col [&_header]:pr-14"><AssistantGuideViewer {...viewer} onDirtyChange={(next) => { setDirty(next); viewer.onDirtyChange?.(next) }} /></div>
+      {viewer.document ? (
+        <div className="flex min-h-0 flex-1 flex-col [&_header]:pr-14"><AssistantGuideViewer {...viewer} onDirtyChange={(next) => { setDirty(next); viewer.onDirtyChange?.(next) }} /></div>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5 pe-16 sm:p-8 sm:pe-16">
+          {viewer.loading ? (
+            <DialogSkeleton variant="document" label={t("aiChat.guide.loading", { defaultValue: "Loading the guide in your current access scope…" })} />
+          ) : (
+            <>
+              <p role="alert">{viewer.loadError ?? t("aiChat.guide.unavailable", { defaultValue: "This guide is unavailable in the current company." })}</p>
+              {viewer.onRetryLoad ? <Button type="button" variant="outline" onClick={viewer.onRetryLoad}>{t("aiChat.guide.retryAccess", { defaultValue: "Retry access check" })}</Button> : null}
+            </>
+          )}
+        </div>
+      )}
     </DialogContent>
   </Dialog>
-    <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+    <AlertDialog open={hasDocument && confirmClose} onOpenChange={setConfirmClose}>
       <AlertDialogContent>
         <AlertDialogTitle>{t("aiChat.guide.discardTitle", { defaultValue: "Discard unsaved changes?" })}</AlertDialogTitle>
         <AlertDialogDescription>{t("aiChat.guide.discardDescription", { defaultValue: "Your guide edits or unsent question will be discarded. Your ERP task stays as it is." })}</AlertDialogDescription>
