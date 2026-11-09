@@ -57,9 +57,10 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     let module_schema: Value = serde_json::from_str(&read_to_string(&paths.module_schema_json)?)
         .with_context(|| format!("parse {}", paths.module_schema_json.display()))?;
-    let view_names = module_view_names(&module_schema)?;
+    let mut excluded_relations = module_view_names(&module_schema)?;
+    excluded_relations.extend(platform_control_table_names(&module_schema)?);
     let schema_manifest =
-        stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir, &view_names)
+        stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir, &excluded_relations)
             .context("extracting schema IR from STDB Rust bindings")?;
     let c0_enforced = std::env::var("C0_ENFORCE_TENANT_OWNERSHIP").as_deref() == Ok("1");
     let ownership_counts: Option<OwnershipCounts> = match schema_manifest.ownership_counts() {
@@ -265,6 +266,41 @@ pub fn run(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
+/// Reviewed platform control truth is outside tenant projection/restore. These
+/// three private tables select the centrally approved AI template and retain
+/// the historical sponsored-enrollment ledger. Even though enrollment carries
+/// organization_id for authorization, tenant rollback must not rewind its
+/// sponsorship cap history or replace its deployment-local template pin.
+/// Do not infer exclusions from a missing organization_id: unknown tables must
+/// continue to fail C0 ownership validation.
+fn platform_control_table_names(module_schema: &Value) -> Result<BTreeSet<String>> {
+    const PLATFORM_CONTROL_TABLES: [&str; 3] = [
+        "ai_platform_default",
+        "ai_platform_template",
+        "ai_managed_enrollment",
+    ];
+    let tables = module_schema["tables"]
+        .as_array()
+        .context("module schema tables must be an array")?;
+    let mut names = BTreeSet::new();
+    for table in tables {
+        let Some(name) = table["name"].as_str() else {
+            continue;
+        };
+        if !PLATFORM_CONTROL_TABLES.contains(&name) {
+            continue;
+        }
+        let private = table["table_access"] == serde_json::json!({"Private": []})
+            || table["table_access"] == serde_json::json!("Private");
+        anyhow::ensure!(private, "platform control table {name} must be private");
+        anyhow::ensure!(
+            names.insert(name.to_owned()),
+            "duplicate platform control table {name}"
+        );
+    }
+    Ok(names)
+}
+
 fn module_view_names(module_schema: &Value) -> Result<BTreeSet<String>> {
     let exports = module_schema["misc_exports"]
         .as_array()
@@ -287,7 +323,48 @@ fn module_view_names(module_schema: &Value) -> Result<BTreeSet<String>> {
 
 #[cfg(test)]
 mod tests {
-    use super::module_view_names;
+    use super::{module_view_names, platform_control_table_names};
+
+    #[test]
+    fn platform_control_exclusion_is_closed_and_private() {
+        let schema = serde_json::json!({"tables": [
+            {"name":"ai_platform_default","table_access":{"Private":[]}},
+            {"name":"ai_platform_template","table_access":"Private"},
+            {"name":"ai_managed_enrollment","table_access":{"Private":[]}},
+            {"name":"unknown_global","table_access":{"Private":[]}},
+            {"name":"ai_agent","table_access":{"Private":[]}}
+        ]});
+        assert_eq!(
+            platform_control_table_names(&schema)
+                .unwrap()
+                .into_iter()
+                .collect::<Vec<_>>(),
+            vec![
+                "ai_managed_enrollment",
+                "ai_platform_default",
+                "ai_platform_template"
+            ]
+        );
+        for name in [
+            "ai_platform_default",
+            "ai_platform_template",
+            "ai_managed_enrollment",
+        ] {
+            for access in [serde_json::json!({"Public":[]}), serde_json::Value::Null] {
+                let schema = serde_json::json!({"tables":[{"name":name,"table_access":access}]});
+                assert!(platform_control_table_names(&schema).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn duplicate_platform_control_tables_are_rejected() {
+        let table = serde_json::json!({"name":"ai_platform_default","table_access":{"Private":[]}});
+        assert!(
+            platform_control_table_names(&serde_json::json!({"tables":[table.clone(),table]}))
+                .is_err()
+        );
+    }
 
     #[test]
     fn extracts_only_view_relations_from_misc_exports() {

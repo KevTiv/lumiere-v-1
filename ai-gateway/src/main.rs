@@ -240,7 +240,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/actions/bridge",
             post(routes::action_draft_bridge::post_bridge),
         )
-        .route("/v1/harness/platform-profile", post(routes::platform_profile::post_platform_profile))
+        .route(
+            "/v1/harness/platform-profile",
+            post(routes::platform_profile::post_platform_profile),
+        )
         .route("/v1/skills", get(routes::skills::get_skills))
         .route("/v1/skills/run", post(routes::skills::post_run))
         .route("/v1/skills/sync", post(routes::skills::post_sync))

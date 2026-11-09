@@ -25,9 +25,13 @@ export type PlatformAiProfileState = {
   templates: { id: number; template_key: string; template_version: number }[]
 }
 
-function record(value: unknown): Record<string, unknown> {
+type ProfileInput = {
+  [Key in keyof PlatformAiProfile | keyof PlatformModelProfile | "id" | "templates" | "active_template"]?: unknown
+}
+
+function record(value: unknown): ProfileInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid AI profile")
-  return value as Record<string, unknown>
+  return value as ProfileInput
 }
 
 function integer(value: unknown, minimum = 1, maximum = Number.MAX_SAFE_INTEGER): number {

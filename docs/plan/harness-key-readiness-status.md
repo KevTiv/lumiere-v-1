@@ -399,3 +399,11 @@ allowance; month rollover inserts only a missing period at admission, preserving
 settled and outstanding spend. New template versions do not silently migrate
 existing enrollments. Custom report-analysis releases and certification remain
 separate from these built-in chat/form/action-draft defaults.
+
+Platform templates, the selected default, and the sponsored-enrollment ledger
+are private platform control records. They stay outside tenant projections and
+tenant restore manifests, including the organization-scoped enrollment ledger:
+a tenant rollback must not reset sponsorship capacity or replace a template pin.
+Back up and migrate these records through the platform database lifecycle;
+restore their deployment-local references consistently with the platform state.
+Tenant restore does not recreate platform enrollment from restored agents.
