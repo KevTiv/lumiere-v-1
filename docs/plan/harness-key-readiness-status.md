@@ -319,3 +319,26 @@ migration is certified here. Cross-provider funding, multi-account/region
 provider instances, new skill expansion, and WorkPrograms are separate
 admission scopes; the initial pilot deliberately uses one Mistral account with
 no automatic retries, fallbacks, shadows, or consequential operations.
+
+### Managed company surface completion
+
+The operator provisioning command now completes the built-in chat, form suggestion,
+and action draft bindings after the approved harness profile, agent, prices, and
+current-period allowance exist. Governed bootstrap registers the bundled skill
+catalog first; `provision_ai_company_defaults` then binds missing company settings
+to that same funded agent. This shares the existing allowance and does not create
+additional funding or activate custom skill releases.
+
+`--check` reports generation surfaces as `configured`, `disabled`, `missing`, or
+`blocked_override`. Explicit company settings take precedence over inherited
+organization settings. Disabled features and custom bindings are preserved.
+A policy-only or malformed explicit agent override requires operator review;
+setup does not silently replace it. `configured` describes the binding only:
+normal execution still validates permissions, scope, provider, budget, and release
+requirements. No billable generation call is needed for setup verification.
+
+New companies still need the platform onboarding/deployment process to invoke
+provisioning with its approved company manifest. This command is not yet wired
+into company creation, and does not choose commercial limits or model credentials
+for an unconfigured installation. Tenants do not need to assemble the individual
+agent and built-in skill bindings once this platform provisioning runs.

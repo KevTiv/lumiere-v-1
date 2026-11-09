@@ -2,6 +2,11 @@
   "version": 1,
   "reducers": [
     {
+      "name": "provision_ai_company_defaults",
+      "exposure": "session",
+      "reason": "Authenticated organization AI setup; native reducer enforces agent/skill configuration permission, company ownership, funded agent/profile compatibility, and preserves existing overrides."
+    },
+    {
       "name": "run_ai_owner_configuration_tests",
       "exposure": "denied",
       "reason": "isolated native test runner; never an authenticated application operation"

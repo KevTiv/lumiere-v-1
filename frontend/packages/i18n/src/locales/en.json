@@ -18009,8 +18009,8 @@
       "title": "AI feature setup",
       "action": "Set up AI features",
       "settingUp": "Setting up…",
-      "description": "Register missing skills for chat answers, form suggestions and action drafts. Existing settings and releases are preserved.",
-      "prerequisites": "This prepares skill definitions. Provider, company, budget and release checks still apply when you use AI.",
+      "description": "Apply the company’s harness profile to chat answers, form suggestions and action drafts. Existing custom settings and disabled features are preserved.",
+      "prerequisites": "Uses the company’s existing AI profile and usage limits. Provider, budget and release checks still apply when AI runs.",
       "permissionRequired": "Skill creation permission is required to run setup.",
       "checked": "Skill definitions checked.",
       "skills": {
@@ -18022,6 +18022,11 @@
         "created": "Added",
         "existing": "Already registered",
         "inactive": "Inactive (kept unchanged)"
+      },
+      "companyRequired": "Select a company before setting up AI features.",
+      "companyStatus": {
+        "configured": "Default AI bindings configured. Existing overrides and disabled features were preserved.",
+        "profile_required": "A harness AI profile is needed for this company. Ask your platform administrator to provision it, then retry setup."
       }
     },
     "registry": {

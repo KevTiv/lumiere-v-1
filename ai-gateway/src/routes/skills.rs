@@ -12,7 +12,7 @@ use crate::{
     error::{AppError, AppResult},
     harness::legacy_fence::governed_skill_replacement,
     orchestrator::{
-        skill_loader::{list_skills, sync_bundled_skills},
+        skill_loader::{intelligence_policy_ref, list_skills, skill_agent_id, sync_bundled_skills},
         surface_provisioning::ProvisionedSurface,
         surface_provisioning_api::{setup_error, ApiSurfaceWriter},
     },
@@ -146,6 +146,7 @@ pub async fn post_sync(
 #[serde(deny_unknown_fields)]
 pub struct GatewayProvisionSurfacesRequest {
     pub org_id: u64,
+    pub company_id: Option<u64>,
     /// API bearer credential; hosted sessions carry a WorkOS access token.
     pub stdb_token: String,
 }
@@ -153,6 +154,15 @@ pub struct GatewayProvisionSurfacesRequest {
 #[derive(Debug, Serialize)]
 pub(crate) struct ProvisionSurfacesResponse {
     pub skills: Vec<ProvisionedSurface>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_setup: Option<CompanySetup>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct CompanySetup {
+    company_id: u64,
+    status: &'static str,
+    message: &'static str,
 }
 
 /// Explicit catalog repair through the administrator's canonical API session.
@@ -163,6 +173,9 @@ pub async fn post_provision_surfaces(
 ) -> AppResult<Json<ProvisionSurfacesResponse>> {
     if req.org_id == 0 {
         return Err(AppError::BadRequest("org_id is required".into()));
+    }
+    if req.company_id == Some(0) {
+        return Err(AppError::BadRequest("company_id must be positive".into()));
     }
     if req.stdb_token.trim().is_empty() {
         return Err(AppError::Forbidden(
@@ -180,7 +193,82 @@ pub async fn post_provision_surfaces(
         .provision(state.stdb.as_ref())
         .await
         .map_err(setup_error)?;
-    Ok(Json(ProvisionSurfacesResponse { skills }))
+    let company_setup = if let Some(company_id) = req.company_id {
+        // Reuse the explicitly approved company harness binding. A missing profile
+        // is an actionable setup state, never permission to select an arbitrary agent.
+        if let Some((agent_id, policy)) =
+            company_harness_binding(state.stdb.as_ref(), req.org_id, company_id)
+                .await
+                .map_err(AppError::from_agent_resolution)?
+        {
+            writer
+                .provision_company_defaults(company_id, agent_id, &policy)
+                .await
+                .map_err(setup_error)?;
+            Some(CompanySetup {
+                company_id,
+                status: "configured",
+                message: "Default AI bindings applied. Existing custom settings and disabled features are preserved.",
+            })
+        } else {
+            Some(CompanySetup {
+                company_id,
+                status: "profile_required",
+                message: "A platform administrator must provision the harness AI profile and usage budget for this company.",
+            })
+        }
+    } else {
+        None
+    };
+    Ok(Json(ProvisionSurfacesResponse {
+        skills,
+        company_setup,
+    }))
+}
+
+async fn company_harness_binding(
+    reader: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+) -> anyhow::Result<Option<(u64, String)>> {
+    let skills = reader.query_sql(&format!(
+        "SELECT id FROM ai_skill WHERE organization_id = {org_id} AND skill_key = 'report_analysis' AND is_active = true LIMIT 2"
+    )).await?;
+    let [skill] = skills.as_slice() else {
+        return Ok(None);
+    };
+    let Some(skill_id) = crate::wire_decode::row_u64(skill, "id", "id") else {
+        return Ok(None);
+    };
+    let configs = reader.query_sql(&format!(
+        "SELECT is_enabled, config_json FROM ai_skill_config WHERE organization_id = {org_id} AND company_id = {company_id} AND skill_id = {skill_id} LIMIT 2"
+    )).await?;
+    let [config] = configs.as_slice() else {
+        return Ok(None);
+    };
+    if config
+        .get("isEnabled")
+        .or_else(|| config.get("is_enabled"))
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Ok(None);
+    }
+    let Some(raw) = config
+        .get("configJson")
+        .or_else(|| config.get("config_json"))
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+    let settings = serde_json::from_str(raw)?;
+    match (
+        skill_agent_id(&settings, None, None)?,
+        intelligence_policy_ref(&settings)?,
+    ) {
+        (Some(agent), Some(policy)) => Ok(Some((agent, policy))),
+        _ => Ok(None),
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -232,6 +320,26 @@ pub async fn post_run(Json(req): Json<GatewayRunSkillRequest>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn managed_setup_accepts_only_company_scope_from_client() {
+        let request: GatewayProvisionSurfacesRequest = serde_json::from_value(serde_json::json!({
+            "org_id": 1, "company_id": 7, "stdb_token": "session"
+        }))
+        .unwrap();
+        assert_eq!(request.company_id, Some(7));
+        for key in [
+            "agent_id",
+            "intelligence_policy_ref",
+            "model",
+            "monthly_budget",
+        ] {
+            let mut payload =
+                serde_json::json!({"org_id": 1, "company_id": 7, "stdb_token": "session"});
+            payload[key] = serde_json::json!("untrusted override");
+            assert!(serde_json::from_value::<GatewayProvisionSurfacesRequest>(payload).is_err());
+        }
+    }
 
     fn request(skill_key: &str) -> GatewayRunSkillRequest {
         GatewayRunSkillRequest {

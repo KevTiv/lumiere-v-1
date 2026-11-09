@@ -127,6 +127,57 @@ impl<'a> ApiSurfaceWriter<'a> {
         provision_generation_surfaces(self, reader, self.organization_id).await
     }
 
+    /// Apply defaults through the same actor-authorized operation bridge.
+    pub(crate) async fn provision_company_defaults(
+        &self,
+        company_id: u64,
+        agent_id: u64,
+        intelligence_policy_ref: &str,
+    ) -> Result<()> {
+        const OPERATION: &str = "erp.provision_ai_company_defaults";
+        let mut url = self.origin.clone();
+        url.set_path("/v1/operations/erp.provision_ai_company_defaults");
+        let response = self
+            .http
+            .post(url)
+            .bearer_auth(self.api_token)
+            .header("x-stdb-identity", &self.identity)
+            .header(ORGANIZATION_HEADER, self.organization_id)
+            .json(&json!({
+                "companyId": company_id,
+                "agentId": agent_id,
+                "intelligencePolicyRef": intelligence_policy_ref,
+            }))
+            .send()
+            .await
+            .map_err(|source| ApiSurfaceError::Transport {
+                stage: ApiStage::Create,
+                source,
+            })?;
+        if response.status() != StatusCode::OK {
+            return Err(ApiSurfaceError::Rejected {
+                stage: ApiStage::Create,
+                status: response.status().as_u16(),
+            }
+            .into());
+        }
+        let bytes = bounded_response(response, ApiStage::Create, MAX_OPERATION_BYTES).await?;
+        let receipt: OperationReceipt =
+            serde_json::from_slice(&bytes).map_err(|_| ApiSurfaceError::InvalidResponse {
+                stage: ApiStage::Create,
+            })?;
+        if !receipt.ok
+            || receipt.operation_id != OPERATION
+            || receipt.correlation_id.trim().is_empty()
+        {
+            return Err(ApiSurfaceError::InvalidResponse {
+                stage: ApiStage::Create,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     pub(crate) async fn authorize(
         api_origin: Option<&str>,
         api_token: &'a str,

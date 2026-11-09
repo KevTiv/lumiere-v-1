@@ -6180,6 +6180,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "provision_ai_company_defaults": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/company_defaults.rs: fills missing bindings and actions without resetting existing tenant settings or spend"
     }
   }
 }

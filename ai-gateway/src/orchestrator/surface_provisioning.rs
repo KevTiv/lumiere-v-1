@@ -274,6 +274,8 @@ mod tests {
         session_reads: usize,
         api_writes: Vec<Value>,
         redirect_url: String,
+        company_config: Option<Value>,
+        company_writes: Vec<Value>,
     }
 
     struct Fixture {
@@ -321,6 +323,7 @@ mod tests {
             post_provision_surfaces(
                 State(self.state().await),
                 Json(GatewayProvisionSurfacesRequest {
+                    company_id: None,
                     org_id: 9,
                     stdb_token: "workos-api-credential".into(),
                 }),
@@ -348,6 +351,22 @@ mod tests {
         assert_eq!(headers["authorization"], "Bearer administrator");
         let mut database = database.lock().unwrap();
         database.reads += 1;
+        if statement.contains("skill_key = 'report_analysis'") {
+            assert!(statement.contains("organization_id = 9"));
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}}]},"rows":[[55]]}]))
+                .into_response();
+        }
+        if statement.contains("FROM ai_skill_config ") {
+            assert!(statement.contains("organization_id = 9"));
+            assert!(statement.contains("company_id = 7"));
+            assert!(statement.contains("skill_id = 55"));
+            let rows: Vec<_> = database
+                .company_config
+                .iter()
+                .map(|c| vec![c["is_enabled"].clone(), c["config_json"].clone()])
+                .collect();
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"is_enabled"}},{"name":{"some":"config_json"}}]},"rows":rows}])).into_response();
+        }
         if statement.contains("FROM ai_intelligence_policy ") {
             assert!(statement.contains("organization_id = 9"));
             assert!(statement.contains("policy_key = 'pilot'"));
@@ -607,6 +626,21 @@ mod tests {
         }
     }
 
+    async fn api_company_defaults(
+        State(database): State<Arc<Mutex<Database>>>,
+        headers: HeaderMap,
+        Json(payload): Json<Value>,
+    ) -> Response {
+        assert_eq!(headers["authorization"], "Bearer workos-api-credential");
+        assert_eq!(headers[lumiere_auth_context::ORGANIZATION_HEADER], "9");
+        assert_eq!(
+            payload,
+            json!({"companyId":7,"agentId":42,"intelligencePolicyRef":"pilot@1"})
+        );
+        database.lock().unwrap().company_writes.push(payload);
+        Json(json!({"ok":true,"operationId":"erp.provision_ai_company_defaults","correlationId":"setup-1"})).into_response()
+    }
+
     async fn api_fixture(rows: Vec<Value>, behavior: Behavior) -> ApiFixture {
         let native = fixture(rows, behavior).await;
         native.database.lock().unwrap().redirect_url = format!(
@@ -618,12 +652,76 @@ mod tests {
         let app = Router::new()
             .route("/v1/session/field-access", get(api_session))
             .route("/v1/operations/erp.create_ai_skill", post(api_create))
+            .route(
+                "/v1/operations/erp.provision_ai_company_defaults",
+                post(api_company_defaults),
+            )
             .with_state(native.database.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         ApiFixture {
             native,
             origin,
             server,
+        }
+    }
+
+    #[tokio::test]
+    async fn company_setup_reuses_only_enabled_approved_binding() {
+        use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
+        for (config, expected, writes) in [
+            (
+                Some(
+                    json!({"is_enabled":true,"config_json":"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"}),
+                ),
+                "configured",
+                1,
+            ),
+            (
+                Some(
+                    json!({"is_enabled":false,"config_json":"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"}),
+                ),
+                "profile_required",
+                0,
+            ),
+            (None, "profile_required", 0),
+        ] {
+            let fixture = api_fixture(Vec::new(), Behavior::Success).await;
+            fixture.native.database.lock().unwrap().company_config = config;
+            let result = post_provision_surfaces(
+                State(fixture.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    company_id: Some(7),
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                serde_json::to_value(result.0).unwrap()["company_setup"]["status"],
+                expected
+            );
+            assert_eq!(
+                fixture.native.database.lock().unwrap().company_writes.len(),
+                writes
+            );
+        }
+        for (company_id, behavior) in [(0, Behavior::Success), (7, Behavior::SessionDenied)] {
+            let fixture = api_fixture(Vec::new(), behavior).await;
+            let result = post_provision_surfaces(
+                State(fixture.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    company_id: Some(company_id),
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await;
+            assert!(result.is_err());
+            let db = fixture.native.database.lock().unwrap();
+            assert_eq!(db.reads, 0);
+            assert!(db.company_writes.is_empty());
+            assert!(db.api_writes.is_empty());
         }
     }
 
@@ -772,6 +870,7 @@ mod tests {
         let denied = post_provision_surfaces(
             State(state.clone()),
             Json(GatewayProvisionSurfacesRequest {
+                company_id: None,
                 org_id: 9,
                 stdb_token: " \t ".into(),
             }),
@@ -788,6 +887,7 @@ mod tests {
         let Json(result) = post_provision_surfaces(
             State(state),
             Json(GatewayProvisionSurfacesRequest {
+                company_id: None,
                 org_id: 9,
                 stdb_token: "workos-api-credential".into(),
             }),
@@ -866,6 +966,7 @@ mod tests {
         let result = post_provision_surfaces(
             State(test_support::state(config).await),
             Json(GatewayProvisionSurfacesRequest {
+                company_id: None,
                 org_id: 9,
                 stdb_token: "workos-api-credential".into(),
             }),

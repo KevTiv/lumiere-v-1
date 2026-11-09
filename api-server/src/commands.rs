@@ -1532,6 +1532,29 @@ mod tests {
     }
 
     #[test]
+    fn company_ai_defaults_use_session_scope_and_reject_scope_injection() {
+        let contract = session_operation_contract("erp.provision_ai_company_defaults")
+            .expect("managed AI setup operation");
+        assert_eq!(contract.organization_position, Some(0));
+        assert_eq!(contract.company_position, Some(1));
+        let body = json!({"companyId": 42, "agentId": 9, "intelligencePolicyRef": "alpha@1"});
+        let args = named_command_args(contract, body.clone(), 7).expect("named setup arguments");
+        assert_eq!(args, vec![json!(7), json!(42), json!(9), json!("alpha@1")]);
+        assert_eq!(validate_reducer_scope(contract, &args, 7).unwrap(), vec![42]);
+        assert!(validate_reducer_scope(contract, &args, 8).is_err());
+        let mut injected = body.clone();
+        injected["organizationId"] = json!(8);
+        assert!(named_command_args(contract, injected, 7).is_err());
+        let mut missing = body.clone();
+        missing.as_object_mut().unwrap().remove("companyId");
+        assert!(named_command_args(contract, missing, 7).is_err());
+        let mut duplicate = body;
+        duplicate["company_id"] = json!(43);
+        assert!(named_command_args(contract, duplicate, 7).is_err());
+        assert!(session_operation_contract("provision_ai_company_defaults").is_err());
+    }
+
+    #[test]
     fn historical_payment_replay_has_one_signature_pinned_bff_boundary() {
         let contract = historical_payment_allocations_contract().expect("historical payment");
         assert_eq!(contract.exposure, Exposure::Denied);

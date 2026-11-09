@@ -53,7 +53,7 @@ function fixture(response: unknown = result, status = 200) {
   ).outputText
   const module = {
     exports: {} as {
-      useProvisionAiSurfaces(organizationId: number): Mutation
+      useProvisionAiSurfaces(organizationId: number, companyId?: number): Mutation
       useSyncAiSkills(organizationId: number): Mutation
       parseAiSurfaceProvisioningResult(
         value: unknown,
@@ -83,7 +83,7 @@ test("setup uses the fixed session-scoped route and refreshes both skill catalog
     { path: "/api/ai/skills/provision-surfaces", init: { method: "POST" } },
   ])
   await mutation.onSettled()
-  assert.deepEqual(f.invalidations, [["ai-skills-stdb", "7"], ["ai-skills"]])
+  assert.deepEqual(f.invalidations, [["ai-skills-stdb", "7"], ["ai-skills"], ["stdb", "ai-agents", "7"]])
 })
 
 test("failed or incomplete setup is not reported as successful and saved rows still refresh", async () => {
@@ -94,6 +94,7 @@ test("failed or incomplete setup is not reported as successful and saved rows st
   assert.deepEqual(denied.invalidations, [
     ["ai-skills-stdb", "7"],
     ["ai-skills"],
+    ["stdb", "ai-agents", "7"],
   ])
 
   const f = fixture()
@@ -143,4 +144,33 @@ test("existing full synchronization also refreshes the persisted registry", asyn
   await mutation.mutationFn()
   await mutation.onSettled()
   assert.deepEqual(f.invalidations, [["ai-skills-stdb", "7"], ["ai-skills"]])
+})
+
+
+test("company setup validates read-back scope and refreshes agent permissions", async () => {
+  const configured = { ...result, company_setup: { company_id: 42, status: "configured", message: "Configured" } }
+  const f = fixture(configured)
+  const mutation = f.hooks.useProvisionAiSurfaces(7, 42)
+  assert.deepEqual(JSON.parse(JSON.stringify(await mutation.mutationFn())), configured)
+  assert.deepEqual(f.requests, [{ path: "/api/ai/skills/provision-surfaces", init: {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ companyId: 42 }),
+  } }])
+  await mutation.onSettled()
+  assert.deepEqual(f.invalidations.at(-1), ["stdb", "ai-agents", "7"])
+  for (const reply of [result, { ...configured, company_setup: { ...configured.company_setup, company_id: 43 } }]) {
+    await assert.rejects(fixture(reply).hooks.useProvisionAiSurfaces(7, 42).mutationFn(), /could not be verified/)
+  }
+  for (const companyId of [0, -1, NaN, 1.5]) {
+    const invalid = fixture(configured)
+    await assert.rejects(invalid.hooks.useProvisionAiSurfaces(7, companyId).mutationFn(), /company is required/)
+    assert.equal(invalid.requests.length, 0)
+  }
+})
+
+test("profile-required is a distinct setup result, not a ready claim", async () => {
+  const reply = { ...result, company_setup: { company_id: 42, status: "profile_required", message: "Profile required" } }
+  assert.equal((await fixture(reply).hooks.useProvisionAiSurfaces(7, 42).mutationFn()).company_setup?.status, "profile_required")
+  for (const setup of [null, {}, { company_id: 42, status: "ready", message: "Ready" }, { company_id: 42, status: "configured" }]) {
+    assert.throws(() => fixture().hooks.parseAiSurfaceProvisioningResult({ ...result, company_setup: setup }), /could not be verified/)
+  }
 })

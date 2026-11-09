@@ -3641,6 +3641,12 @@ const PARAMS_PROPOSE_AI_KNOWLEDGE_SKILL_PROMOTION: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ProposeAiKnowledgeSkillPromotionParams") },
 ];
+const PARAMS_PROVISION_AI_COMPANY_DEFAULTS: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "intelligence_policy_ref", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_PUBLISH_FORM_CONFIGURATION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("PublishFormConfigurationParams") },
@@ -7413,6 +7419,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "propose_ai_decision_pattern", contract_operation_id: "erp.propose_ai_decision_pattern", params: PARAMS_PROPOSE_AI_DECISION_PATTERN, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "propose_ai_knowledge_entry_version", contract_operation_id: "erp.propose_ai_knowledge_entry_version", params: PARAMS_PROPOSE_AI_KNOWLEDGE_ENTRY_VERSION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "propose_ai_knowledge_skill_promotion", contract_operation_id: "erp.propose_ai_knowledge_skill_promotion", params: PARAMS_PROPOSE_AI_KNOWLEDGE_SKILL_PROMOTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "provision_ai_company_defaults", contract_operation_id: "erp.provision_ai_company_defaults", params: PARAMS_PROVISION_AI_COMPANY_DEFAULTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "publish_form_configuration", contract_operation_id: "erp.publish_form_configuration", params: PARAMS_PUBLISH_FORM_CONFIGURATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "publish_workflow_version", contract_operation_id: "erp.publish_workflow_version", params: PARAMS_PUBLISH_WORKFLOW_VERSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "purchasing_integrity_inventory", contract_operation_id: "erp.purchasing_integrity_inventory", params: PARAMS_PURCHASING_INTEGRITY_INVENTORY, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
@@ -8924,6 +8931,7 @@ pub mod reducer_names {
     pub const PROPOSE_AI_DECISION_PATTERN: ReducerName = ReducerName::new("propose_ai_decision_pattern");
     pub const PROPOSE_AI_KNOWLEDGE_ENTRY_VERSION: ReducerName = ReducerName::new("propose_ai_knowledge_entry_version");
     pub const PROPOSE_AI_KNOWLEDGE_SKILL_PROMOTION: ReducerName = ReducerName::new("propose_ai_knowledge_skill_promotion");
+    pub const PROVISION_AI_COMPANY_DEFAULTS: ReducerName = ReducerName::new("provision_ai_company_defaults");
     pub const PUBLISH_FORM_CONFIGURATION: ReducerName = ReducerName::new("publish_form_configuration");
     pub const PUBLISH_WORKFLOW_VERSION: ReducerName = ReducerName::new("publish_workflow_version");
     pub const PURCHASING_INTEGRITY_INVENTORY: ReducerName = ReducerName::new("purchasing_integrity_inventory");
@@ -10420,6 +10428,7 @@ macro_rules! reducer_call {
     ("propose_ai_decision_pattern", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PROPOSE_AI_DECISION_PATTERN, $args) };
     ("propose_ai_knowledge_entry_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PROPOSE_AI_KNOWLEDGE_ENTRY_VERSION, $args) };
     ("propose_ai_knowledge_skill_promotion", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PROPOSE_AI_KNOWLEDGE_SKILL_PROMOTION, $args) };
+    ("provision_ai_company_defaults", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PROVISION_AI_COMPANY_DEFAULTS, $args) };
     ("publish_form_configuration", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PUBLISH_FORM_CONFIGURATION, $args) };
     ("publish_workflow_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PUBLISH_WORKFLOW_VERSION, $args) };
     ("purchasing_integrity_inventory", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::PURCHASING_INTEGRITY_INVENTORY, $args) };

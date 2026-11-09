@@ -1522,6 +1522,7 @@
     "configure_ai_metered_price": "erp.configure_ai_metered_price",
     "reconcile_ai_metered_spend": "erp.reconcile_ai_metered_spend",
     "reserve_ai_metered_spend": "erp.reserve_ai_metered_spend",
-    "settle_ai_metered_spend": "erp.settle_ai_metered_spend"
+    "settle_ai_metered_spend": "erp.settle_ai_metered_spend",
+    "provision_ai_company_defaults": "erp.provision_ai_company_defaults"
   }
 }

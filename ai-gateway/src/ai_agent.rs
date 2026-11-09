@@ -5,7 +5,7 @@ use serde_json::Value;
 use stdb_client::StdbClient;
 
 use crate::{
-    error::{AppError, SurfaceSkillNotProvisioned},
+    error::{AppError, DefaultAgentNotProvisioned, SurfaceSkillNotProvisioned},
     providers::llm::normalize_provider,
     rate_limit::AgentRateLimiter,
 };
@@ -95,6 +95,13 @@ pub async fn resolve_surface_agent(
         anyhow::bail!("AI surface is disabled for this company");
     }
     let agent_id = skill_agent_id(&skill.config_json, requested_agent_id, team_member_id)?;
+    // Resolve a default inside the requested company before loading its configuration.
+    // Explicit skill, request and persona bindings never fall back to another agent.
+    let agent_id = if agent_id.is_none() && team_member_id.is_none() {
+        Some(fetch_company_default_agent_id(stdb, org_id, company_id).await?)
+    } else {
+        agent_id
+    };
     let agent = resolve_agent(
         stdb,
         org_id,
@@ -323,10 +330,48 @@ async fn fetch_default_agent(stdb: &StdbClient, org_id: u64) -> Result<AgentRow>
         "SELECT * FROM ai_agent WHERE organization_id = {org_id} AND is_default = true AND is_active = true LIMIT 1"
     );
     let rows = stdb.query_sql(&sql).await?;
-    let row = rows
-        .first()
-        .context("No default AI agent configured for this organization")?;
+    let row = rows.first().ok_or(DefaultAgentNotProvisioned)?;
     parse_agent_row(row)
+}
+
+/// Company defaults take precedence over organization-wide defaults. Ambiguous
+/// configurations fail closed instead of depending on database iteration order.
+async fn fetch_company_default_agent_id(
+    stdb: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+) -> Result<u64> {
+    let rows = stdb.query_sql(&format!(
+        "SELECT id, company_id FROM ai_agent WHERE organization_id = {org_id} AND is_default = true AND is_active = true"
+    )).await?;
+    select_company_default_agent_id(&rows, company_id)
+}
+
+fn select_company_default_agent_id(rows: &[Value], company_id: u64) -> Result<u64> {
+    let eligible: Vec<_> = rows
+        .iter()
+        .filter(|row| agent_company_matches(row, company_id))
+        .collect();
+    let company_defaults: Vec<_> = eligible
+        .iter()
+        .copied()
+        .filter(|row| {
+            !matches!(
+                row.get("companyId").or_else(|| row.get("company_id")),
+                Some(Value::Null)
+            )
+        })
+        .collect();
+    let candidates = if company_defaults.is_empty() {
+        &eligible
+    } else {
+        &company_defaults
+    };
+    match candidates.as_slice() {
+        [] => Err(DefaultAgentNotProvisioned.into()),
+        [row] => row_u64(row, "id", "id").context("default agent id"),
+        _ => anyhow::bail!("Multiple default AI agents are configured for this scope"),
+    }
 }
 
 async fn fetch_team_member(
@@ -603,6 +648,30 @@ mod tests {
         ] {
             assert!(!agent_company_matches(&row, 7));
         }
+    }
+
+    #[test]
+    fn defaults_respect_company_scope_and_reject_ambiguity() {
+        use serde_json::json;
+        let shared = json!({"id": 1, "company_id": null});
+        let local = json!({"id": 2, "company_id": 7});
+        let other = json!({"id": 3, "company_id": 8});
+        assert_eq!(
+            select_company_default_agent_id(&[shared.clone(), local.clone(), other.clone()], 7)
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            select_company_default_agent_id(&[shared.clone(), other.clone()], 7).unwrap(),
+            1
+        );
+        assert!(
+            select_company_default_agent_id(&[other, json!({"id": 4})], 7)
+                .unwrap_err()
+                .is::<DefaultAgentNotProvisioned>()
+        );
+        assert!(select_company_default_agent_id(&[local.clone(), local], 7).is_err());
+        assert!(select_company_default_agent_id(&[shared.clone(), shared], 7).is_err());
     }
 
     fn sample_agent(

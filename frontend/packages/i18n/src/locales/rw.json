@@ -4,8 +4,8 @@
       "title": "Gutegura ibikorwa bya AI",
       "action": "Tegura ibikorwa bya AI",
       "settingUp": "Birategurwa…",
-      "description": "Andikisha ubushobozi bubura bwo gusubiza mu biganiro, gutanga inama zo kuzuza amafishi no gutegura ibikorwa. Igenamiterere na verisiyo zisanzwe biragumaho.",
-      "prerequisites": "Ibi bitegura ibisobanuro by’ubushobozi. Igenzura ry’utanga AI, sosiyete, ingengo y’imari na verisiyo ikora rikomeza gukurikizwa mu gukoresha AI.",
+      "description": "Koresha igenamiterere rya AI rya sosiyete mu bisubizo by’ibiganiro, inama zo kuzuza amafishi no mu mishinga y’ibikorwa. Igenamiterere ryihariye n’ibikorwa byahagaritswe biragumaho.",
+      "prerequisites": "Hakoreshwa igenamiterere rya AI n’imipaka yo gukoresha bya sosiyete. Igenzura ry’utanga AI, ingengo y’imari na verisiyo rikomeza gukurikizwa.",
       "permissionRequired": "Ukeneye uburenganzira bwo kwandika ubushobozi bwa AI kugira ngo ubitegure.",
       "checked": "Ibisobanuro by’ubushobozi byagenzuwe.",
       "skills": {
@@ -17,6 +17,11 @@
         "created": "Byongeweho",
         "existing": "Byari byaranditswe",
         "inactive": "Ntibikora (ntibyahinduwe)"
+      },
+      "companyRequired": "Hitamo sosiyete mbere yo gutegura ibikorwa bya AI.",
+      "companyStatus": {
+        "configured": "Igenamiterere risanzwe rya AI ryashyizweho. Igenamiterere ryihariye n’ibikorwa byahagaritswe byagumishijweho.",
+        "profile_required": "Iyi sosiyete ikeneye igenamiterere rya AI. Saba umuyobozi wa sisitemu kuritegura, hanyuma wongere ugerageze."
       }
     }
   },

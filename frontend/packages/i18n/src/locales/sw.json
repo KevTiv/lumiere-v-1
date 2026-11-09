@@ -4,8 +4,8 @@
       "title": "Maandalizi ya vipengele vya AI",
       "action": "Sanidi vipengele vya AI",
       "settingUp": "Inaandaa…",
-      "description": "Sajili ujuzi unaokosekana wa majibu ya gumzo, mapendekezo ya fomu na rasimu za hatua. Mipangilio na matoleo yaliyopo huhifadhiwa.",
-      "prerequisites": "Hii inaandaa maelezo ya ujuzi. Ukaguzi wa mtoa huduma, kampuni, bajeti na toleo bado hutumika unapotumia AI.",
+      "description": "Tumia wasifu wa AI wa kampuni kwa majibu ya gumzo, mapendekezo ya fomu na rasimu za hatua. Mipangilio maalum na vipengele vilivyozimwa huhifadhiwa.",
+      "prerequisites": "Hutumia wasifu wa AI na mipaka ya matumizi ya kampuni. Ukaguzi wa mtoa huduma, bajeti na matoleo bado hutumika wakati AI inaendeshwa.",
       "permissionRequired": "Ruhusa ya kuunda ujuzi inahitajika kufanya maandalizi.",
       "checked": "Maelezo ya ujuzi yamekaguliwa.",
       "skills": {
@@ -17,6 +17,11 @@
         "created": "Imeongezwa",
         "existing": "Imesajiliwa tayari",
         "inactive": "Haijawashwa (haijabadilishwa)"
+      },
+      "companyRequired": "Chagua kampuni kabla ya kusanidi vipengele vya AI.",
+      "companyStatus": {
+        "configured": "Mipangilio chaguomsingi ya AI imetumika. Mipangilio maalum na vipengele vilivyozimwa vimehifadhiwa.",
+        "profile_required": "Kampuni hii inahitaji wasifu wa AI. Mwombe msimamizi wa jukwaa auandae, kisha ujaribu tena."
       }
     }
   },

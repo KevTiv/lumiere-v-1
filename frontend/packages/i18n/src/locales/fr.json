@@ -4,8 +4,8 @@
       "title": "Configuration des fonctions d’IA",
       "action": "Configurer les fonctions d’IA",
       "settingUp": "Configuration…",
-      "description": "Enregistrez les compétences manquantes pour les réponses du chat, les suggestions de formulaire et les brouillons d’action. Les paramètres et versions publiées existants sont conservés.",
-      "prerequisites": "Cette étape prépare les définitions des compétences. Les contrôles du fournisseur, de la société, du budget et des versions publiées restent nécessaires lors de l’utilisation de l’IA.",
+      "description": "Appliquez le profil IA de la société aux réponses du chat, aux suggestions de formulaire et aux brouillons d’action. Les réglages personnalisés et les fonctions désactivées sont conservés.",
+      "prerequisites": "Utilise le profil IA et les limites de la société. Les contrôles du fournisseur, du budget et des versions restent applicables.",
       "permissionRequired": "L’autorisation de créer des compétences est nécessaire pour lancer la configuration.",
       "checked": "Définitions des compétences vérifiées.",
       "skills": {
@@ -17,6 +17,11 @@
         "created": "Ajoutée",
         "existing": "Déjà enregistrée",
         "inactive": "Inactive (inchangée)"
+      },
+      "companyRequired": "Sélectionnez une société avant de configurer les fonctions d’IA.",
+      "companyStatus": {
+        "configured": "Configuration IA par défaut appliquée. Les réglages personnalisés et les fonctions désactivées ont été conservés.",
+        "profile_required": "Cette société nécessite un profil IA. Demandez à l’administrateur de la plateforme de le préparer, puis relancez la configuration."
       }
     }
   },
