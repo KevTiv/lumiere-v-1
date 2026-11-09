@@ -1,13 +1,16 @@
 "use client"
 
+import { entityEnumTag, formatEntityReference } from "@lumiere/ui/lib/entity-row-values"
+import { subscriptionStateOf } from "./subscription-status"
+
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Button } from "@lumiere/ui/components/button"
-import { useCurrencyFormat, useRBAC } from "@lumiere/ui"
+import { CurrencyFormatProvider, useCurrencyFormat, useRBAC } from "@lumiere/ui"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { SubscriptionOverview } from "./subscription-overview"
 import { SubscriptionCreateDialog } from "./subscription-create-dialog"
-import { eligibleSubscriptionOrders, eligibleSubscriptionPlans, inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, subscriptionActionPermissions } from "./subscription-workflow"
+import { inSubscriptionScope, subscriptionQueueHref, eligibleSubscriptionOrders, eligibleSubscriptionPlans, subscriptionInvoices, invoiceOutstanding, subscriptionActionPermissions } from "./subscription-workflow"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 
@@ -151,18 +154,6 @@ import {
   currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 
-function subscriptionState(row: unknown): string {
-  if (!row || typeof row !== "object" || !("state" in row)) return ""
-  const value = row.state
-  if (typeof value === "string") return value.toLowerCase()
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    if ("tag" in value && typeof value.tag === "string") return value.tag.toLowerCase()
-    const keys = Object.keys(value)
-    if (keys.length === 1) return keys[0]!.toLowerCase()
-  }
-  return ""
-}
-
 interface SubscriptionsClientProps {
   initialSubscriptions?: Subscription[]
   initialPlans?: SubscriptionPlan[]
@@ -243,11 +234,13 @@ function SubscriptionsClientLoaded({
   const bundlesQuery = useSubscriptionBundles(orgId)
   const bundles = canUseModuleData(moduleQueryState(bundlesQuery)) ? bundlesQuery.data ?? [] : []
   const bundleRows = useMemo(
-    () =>
-      (bundles as unknown as Record<string, unknown>[]).map((bundle) => {
-        const plan = (plans as unknown as Record<string, unknown>[]).find((p) => String(p.id) === String(bundle.planId))
-        return { ...bundle, planName: plan?.name ?? (bundle.planId != null ? `#${String(bundle.planId)}` : "") }
-      }),
+    () => {
+      const planLabels = labelsFromRows(plans)
+      return bundles.map((bundle) => ({
+        ...bundle,
+        planName: formatEntityReference(bundle.planId, { labels: planLabels }),
+      }))
+    },
     [bundles, plans],
   )
   const paymentIntentsQuery = useSubscriptionPaymentIntents(orgId)
@@ -353,24 +346,19 @@ function SubscriptionsClientLoaded({
       : [{ value: "", label: "No currencies available", disabled: true }]
   }, [currencies])
 
+  const contacts = contactsQuery.data
   const entityLabels = useMemo(
     () => ({
       subscriptionId: labelsFromRows(subscriptions),
       planId: labelsFromRows(plans),
+      partnerId: labelsFromRows(contacts),
       currencyId: labelsFromOptions(currencyFieldOptions),
     }),
-    [subscriptions, plans, currencyFieldOptions],
+    [subscriptions, plans, contacts, currencyFieldOptions],
   )
 
   const recognizeMoveSelectOptions = useMemo(() => {
-    const posted = (accountMoves as Record<string, unknown>[]).filter((m) => {
-      const state = m.state
-      const tag =
-        state != null && typeof state === "object" && "tag" in state
-          ? String((state as { tag: string }).tag)
-          : String(state ?? "")
-      return tag === "Posted"
-    })
+    const posted = accountMoves.filter((move) => entityEnumTag(move.state) === "Posted")
     const fromApi = accountMoveRowsToSelectOptions(posted)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
@@ -435,7 +423,7 @@ function SubscriptionsClientLoaded({
     const gate = (id: SubscriptionActionId) => (rows: Record<string, unknown>[]) =>
       rows.length === 1 && rows.every((row) => inSubscriptionScope(row, { organizationId: orgId, companyId: operatingCompanyId })
         && subscriptionActionPermissions(id).every(([resource, action]) => checkPermission(resource, action).allowed)
-        && isSubscriptionActionApplicable(id, subscriptionState(row))
+        && isSubscriptionActionApplicable(id, subscriptionStateOf(row))
         && (id !== "pay-invoice" || (!billingRunsLoading && !billingRunsError && !accountMovesLoading && !accountMovesError
           && subscriptionInvoices(row, billingRuns, accountMoves, { organizationId: orgId, companyId: operatingCompanyId }).some((invoice) => (invoiceOutstanding(invoice) ?? 0) > 0))))
     const direct = (
@@ -734,7 +722,7 @@ function SubscriptionsClientLoaded({
   const liveSections = useMemo(() => {
     const now = new Date()
     const currencyCodeById = currencyCodeMap(currencies)
-    const chartSubscriptions = subscriptions.filter((subscription) => subscription.companyId === operatingCompanyId)
+    const chartSubscriptions = subscriptions.filter((subscription) => inSubscriptionScope(subscription, { organizationId: orgId, companyId: operatingCompanyId }))
     const subscriptionCurrencies = new Set(chartSubscriptions.map((row) => currencyCodeById.get(String(row.currencyId)) ?? ""))
     if (chartSubscriptions.length === 0) {
       const base = companyCurrencyRows.find(company => company.id === operatingCompanyId)?.currencyId
@@ -750,14 +738,44 @@ function SubscriptionsClientLoaded({
           return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
         }
         if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
-          return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now, 12, locale), valueFormat: money } }
+          return {
+            ...w,
+            title: t("subscriptions.workflow.contractMrrHistory", { defaultValue: "Estimated MRR and churn · last 12 months ({{currency}})", currency: onlyCurrency }),
+            data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now, 12, locale), valueFormat: money },
+          }
         }
         if (w.type === "share-bar" && w.id === "sub-plan-mix") {
-          return { ...w, data: { ...w.data, ...planMix(chartSubscriptions, plans, now), valueFormat: money } }
+          return {
+            ...w,
+            title: t("subscriptions.workflow.contractMrrByPlan", { defaultValue: "Current contract MRR by plan ({{currency}})", currency: onlyCurrency }),
+            data: { ...w.data, ...planMix(chartSubscriptions, plans, now), valueFormat: money },
+          }
         }
         return w
           })
-  }, [locale, companyCurrencyRows, subscriptions, plans, currencies, moduleConfig, operatingCompanyId])
+  }, [locale, companyCurrencyRows, subscriptions, plans, currencies, moduleConfig, orgId, operatingCompanyId, t])
+
+  const reviewQueue = useMemo(() => {
+    const scope = { organizationId: orgId, companyId: operatingCompanyId }
+    const availableIds = new Set(subscriptions.filter((row) => inSubscriptionScope(row, scope)).map((row) => String(row.id)))
+    return (config: EntityViewConfig, tab: "overview" | "billing"): EntityViewConfig => {
+      if (config.view.mode !== "table") return config
+      const hrefFor = (row: Record<string, unknown>) => subscriptionQueueHref(row, scope, availableIds, tab)
+      return {
+        ...config,
+        view: {
+          ...config.view,
+          rowActions: [{
+            id: "review-subscription",
+            label: t("subscriptions.workflow.viewSubscription"),
+            permission: { resource: "subscription", action: "read" },
+            isApplicable: (row) => hrefFor(row) != null,
+            onClick: (row) => { const href = hrefFor(row); if (href) router.push(href) },
+          }],
+        },
+      }
+    }
+  }, [orgId, operatingCompanyId, router, subscriptions, t])
 
   const config = useMemo(
     () =>
@@ -804,7 +822,7 @@ function SubscriptionsClientLoaded({
           if (tab.id === "usage-charges")
             return { ...tab, entityConfig: subscriptionUsageChargesTableConfig(t) }
           if (tab.id === "rating-backlog")
-            return { ...tab, entityConfig: subscriptionRatingBacklogTableConfig(t) }
+            return { ...tab, entityConfig: reviewQueue(subscriptionRatingBacklogTableConfig(t), "overview") }
           if (tab.id === "price-tiers")
             return {
               ...tab,
@@ -816,9 +834,9 @@ function SubscriptionsClientLoaded({
               entityConfig: subscriptionPriceTiersTableConfig(t),
             }
           if (tab.id === "past-due")
-            return { ...tab, entityConfig: subscriptionPastDueTableConfig(t) }
+            return { ...tab, entityConfig: reviewQueue(subscriptionPastDueTableConfig(t), "billing") }
           if (tab.id === "due-to-bill")
-            return { ...tab, entityConfig: subscriptionDueToBillTableConfig(t) }
+            return { ...tab, entityConfig: reviewQueue(subscriptionDueToBillTableConfig(t), "billing") }
           if (tab.id === "bundles") return { ...tab, entityConfig: subscriptionBundlesTableConfig(t) }
           if (tab.id === "entitlements")
             return { ...tab, entityConfig: subscriptionEntitlementsTableConfig(t) }
@@ -847,6 +865,7 @@ function SubscriptionsClientLoaded({
       recognitionRuleFormConfig,
       t,
       subscriptionRowActions,
+      reviewQueue,
       deferredLineActions,
       recognitionRuleActions,
       planEntityConfig,
@@ -866,25 +885,34 @@ function SubscriptionsClientLoaded({
   )
 
   const data = useMemo(
-    () => ({
-      subscriptions: subscriptions as unknown as Record<string, unknown>[],
-      plans: plans as unknown as Record<string, unknown>[],
-      lines: subscriptionLines as unknown as Record<string, unknown>[],
-      amendments: subscriptionAmendments as unknown as Record<string, unknown>[],
-      "usage-events": usageEvents as unknown as Record<string, unknown>[],
-      "usage-charges": usageCharges as unknown as Record<string, unknown>[],
-      "rating-backlog": ratingBacklog as unknown as Record<string, unknown>[],
-      "price-tiers": priceTiers as unknown as Record<string, unknown>[],
-      "past-due": pastDue as unknown as Record<string, unknown>[],
-      "due-to-bill": dueToBill as unknown as Record<string, unknown>[],
-      bundles: bundleRows,
-      entitlements: entitlements as unknown as Record<string, unknown>[],
-      "payment-intents": paymentIntents as unknown as Record<string, unknown>[],
-      "deferred-schedules": deferredSchedules as unknown as Record<string, unknown>[],
-      "deferred-lines": deferredLines as unknown as Record<string, unknown>[],
-      "recognition-rules": recognitionRules as unknown as Record<string, unknown>[],
-    }),
+    () => {
+      const scope = { organizationId: orgId, companyId: operatingCompanyId }
+      const currencyById = (rows: readonly { id: bigint; currencyId: bigint }[]) =>
+        new Map(rows.map((row) => [String(row.id), row.currencyId]))
+      const subCurrencies = currencyById(subscriptions.filter((row) => inSubscriptionScope(row, scope)))
+      const planCurrencies = currencyById(plans.filter((row) => inSubscriptionScope(row, scope)))
+      return {
+        subscriptions: subscriptions as unknown as Record<string, unknown>[],
+        plans: plans as unknown as Record<string, unknown>[],
+        lines: subscriptionLines as unknown as Record<string, unknown>[],
+        amendments: subscriptionAmendments as unknown as Record<string, unknown>[],
+        "usage-events": usageEvents as unknown as Record<string, unknown>[],
+        "usage-charges": usageCharges.map((row) => ({ ...row, currencyId: inSubscriptionScope(row, scope) ? subCurrencies.get(String(row.subscriptionId)) : undefined })),
+        "rating-backlog": ratingBacklog as unknown as Record<string, unknown>[],
+        "price-tiers": priceTiers.map((row) => ({ ...row, currencyId: inSubscriptionScope(row, scope) ? planCurrencies.get(String(row.planId)) : undefined })),
+        "past-due": pastDue as unknown as Record<string, unknown>[],
+        "due-to-bill": dueToBill as unknown as Record<string, unknown>[],
+        bundles: bundleRows,
+        entitlements: entitlements as unknown as Record<string, unknown>[],
+        "payment-intents": paymentIntents as unknown as Record<string, unknown>[],
+        "deferred-schedules": deferredSchedules as unknown as Record<string, unknown>[],
+        "deferred-lines": deferredLines as unknown as Record<string, unknown>[],
+        "recognition-rules": recognitionRules as unknown as Record<string, unknown>[],
+      }
+    },
     [
+      orgId,
+      operatingCompanyId,
       subscriptions,
       plans,
       subscriptionLines,
@@ -1021,6 +1049,7 @@ function SubscriptionsClientLoaded({
   ]
 
   return (
+    <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
     <EntityLabelsProvider value={entityLabels}>
       <ModuleView config={withDashboardSections(config, dashboardSections)} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending}
         assistantFormBlocked={createOpen || quickActionForm !== null}
@@ -1098,5 +1127,6 @@ function SubscriptionsClientLoaded({
         }}
       />
     </EntityLabelsProvider>
+    </CurrencyFormatProvider>
   )
 }

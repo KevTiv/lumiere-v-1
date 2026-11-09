@@ -353,8 +353,8 @@ export function ModularForm({
       if (field.type === "multiselect") {
         if (!Array.isArray(value) || value.length === 0) return t("common.validation.required")
       } else if (field.type === "file") {
-        const fl = value as FileList | null | undefined
-        if (!fl || fl.length === 0) return t("common.validation.required")
+        const files = Array.isArray(value) || (typeof FileList !== "undefined" && value instanceof FileList) ? value : []
+        if (files.length === 0) return t("common.validation.required")
       } else if (value === "" || value === null || value === undefined) {
         return t("common.validation.required")
       }
@@ -588,7 +588,7 @@ export function ModularForm({
           : undefined
 
         const fields = (
-          <div className="grid min-w-0 grid-cols-12 gap-x-4 gap-y-5 [&>div]:min-w-0">
+          <div className="@container/form-fields grid min-w-0 grid-cols-12 gap-x-4 gap-y-5 [&>div]:min-w-0">
             {visibleSectionFields(section.fields, values).map((field) => (
               <FormFieldRenderer
                 key={field.id}
@@ -653,13 +653,13 @@ export function ModularForm({
   const hasPreview = preview != null && preview !== false
 
   const formContent = (
-    <form noValidate onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
+    <form noValidate onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={cn("@container/form-layout flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
       <div
         ref={formBodyRef}
         data-form-body={scrollable ? "" : undefined}
         className={cn(
           scrollable && "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5",
-          hasPreview && "grid items-start gap-6 lg:grid-cols-2",
+          hasPreview && "grid items-start gap-6 @min-[58rem]/form-layout:grid-cols-2",
         )}
       >
         <div className="flex min-w-0 flex-col gap-6">

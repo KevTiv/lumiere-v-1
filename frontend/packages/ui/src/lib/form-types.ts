@@ -267,8 +267,8 @@ export interface AiFormAssistConfig {
 
 export const fieldWidthClasses: Record<FieldWidth, string> = {
   full: "col-span-12",
-  "2/3": "col-span-12 md:col-span-8",
-  "1/2": "col-span-12 md:col-span-6",
-  "1/3": "col-span-12 md:col-span-4",
-  "1/4": "col-span-12 md:col-span-3",
+  "2/3": "col-span-12 @min-[32rem]/form-fields:col-span-8",
+  "1/2": "col-span-12 @min-[32rem]/form-fields:col-span-6",
+  "1/3": "col-span-12 @min-[40rem]/form-fields:col-span-4",
+  "1/4": "col-span-12 @min-[48rem]/form-fields:col-span-3",
 }

@@ -93,7 +93,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expectNoAppError(page)
   })
 
-  test("capture panel queues delayed-sync expense @p0", async ({ page }) => {
+  test("capture panel queues an expense without a receipt for delayed sync @p0", async ({ page, context }) => {
     await gotoModule(page, "/expenses?tab=operations", "expenses")
     await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
 
@@ -105,9 +105,24 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const name = smokeName("capture")
     await page.getByTestId("expenses-capture-name").fill(name)
     await page.getByTestId("expenses-capture-amount").fill("12.5")
-    await page.getByTestId("expenses-capture-submit").click()
+    await page.getByTestId("expenses-capture-has-receipt").uncheck()
+    await context.setOffline(true)
+    const item = page.getByTestId("expenses-capture-item-queued").filter({ hasText: name })
+    try {
+      await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false)
+      await page.getByTestId("expenses-capture-submit").click()
 
-    await expect(page.getByTestId("expenses-capture-status")).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByTestId("expenses-capture-status")).toHaveText("Capture queued on this device.")
+      await expect(item).toBeVisible()
+    } finally {
+      await context.setOffline(false)
+    }
+    await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(true)
+    await expect(item).toBeVisible()
+    await page.reload()
+    await expect(item).toBeVisible()
+    await item.getByTestId("expenses-capture-discard").click()
+    await expect(item).toHaveCount(0)
     await expectNoAppError(page)
   })
 

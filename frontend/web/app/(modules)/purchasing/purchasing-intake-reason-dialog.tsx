@@ -64,7 +64,7 @@ export function PurchasingIntakeReasonDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !pending && onOpenChange(nextOpen)}>
-      <DialogContent>
+      <DialogContent size="form">
         <form onSubmit={submit} className="contents">
           <DialogHeader>
             <DialogTitle>{content.title}</DialogTitle>

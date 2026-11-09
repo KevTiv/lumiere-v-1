@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import type { DocumentReceiptRow } from "@/lib/use-document-upload-receipts"
 import type { DocumentSubmissionPointer } from "@/lib/document-upload-receipts"
 
@@ -20,7 +21,12 @@ export function DocumentUploadReceipts({ rows, error, onResume }: {
     <ul className="mt-3 max-h-80 space-y-3 overflow-y-auto">
       {[...rows].reverse().map(({ pointer, receipt, error: rowError, busy }) => <li key={pointer.submissionId} className="rounded border p-3" data-testid="document-upload-receipt">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="break-all font-medium">{receipt?.fileName ?? pointer.fileName}</span>
+          <FileIdentity
+            className="flex-1 basis-48"
+            fileName={receipt?.fileName ?? pointer.fileName}
+            mimetype={receipt?.mimetype}
+            size={receipt?.fileSize}
+          />
           {receipt?.documentId ? <Link className="text-sm underline" href={`/documents/${receipt.documentId}`}>{t("documents.receipts.open", { defaultValue: "Open document" })}</Link> : null}
         </div>
         <ol className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm" aria-live="polite">

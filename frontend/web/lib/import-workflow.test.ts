@@ -6,6 +6,7 @@ import {
   parseImportProposalAttempt,
   readImportProposalAttempt,
   ImportWorkflowRequestError,
+  importCapabilitySchema,
   parseImportProposal,
   prepareImportProposal,
   readImportWorkflow,
@@ -562,4 +563,33 @@ test("a distinct expense decision changes the frozen request and preserves the c
     distinctExpenses: [{ ...decision, candidateDigest: "f".repeat(64) }],
   })
   assert.notEqual(resolved.requestKey, changed.requestKey)
+})
+
+test("destination links stay within the ERP", () => {
+  const capability = {
+    key: "warehouse_locations",
+    module: "warehouse",
+    label: "Warehouse locations",
+    targetEntities: ["stock_location"],
+    requiredFacts: [],
+    readiness: "native_preview",
+    blockingReason: null,
+  }
+  assert.equal(
+    importCapabilitySchema.safeParse({
+      ...capability,
+      destination: "/warehouse?tab=locations",
+    }).success,
+    true,
+  )
+  for (const destination of [
+    "//another.example",
+    "/\\another.example",
+    "/\tanother.example",
+  ]) {
+    assert.equal(
+      importCapabilitySchema.safeParse({ ...capability, destination }).success,
+      false,
+    )
+  }
 })

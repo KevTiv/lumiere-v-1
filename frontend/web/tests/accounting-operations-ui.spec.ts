@@ -147,6 +147,33 @@ for (const width of [390, 1440]) {
       await expect(dialog).toHaveCount(0)
     })
 
+    test("bank exceptions preserve exact references and dispatch no settlement", async ({ page }, testInfo) => {
+      await page.getByRole("button", { name: "Bank recovery", exact: true }).click()
+      await page.getByRole("button", { name: "Load partial bank payment", exact: true }).click()
+      const desk = page.getByTestId("reconciliation-workbench")
+      await desk.getByTestId("reconciliation-candidate-501").getByRole("checkbox").check()
+      const partial = desk.getByRole("region", { name: "Bank amount is below the selected balance" })
+      await expect(partial).toContainText("separate write-off in Payment Operations")
+      await expect(partial).toContainText("The bank line stays unmatched")
+      const document = partial.getByRole("link", { name: "Open INV/BANK/91 in a new tab" })
+      await expect(document).toHaveAttribute("href", "/accounting/invoices/91")
+      await expect(document).toHaveAttribute("target", "_blank")
+      await expect(desk.getByTestId("reconciliation-confirm")).toBeDisabled()
+      await noOverflow(page)
+      await page.screenshot({ path: testInfo.outputPath(`bank-partial-${width}.png`), fullPage: true })
+
+      await page.getByRole("button", { name: "Load FX bank line", exact: true }).click()
+      const fx = desk.getByRole("region", { name: "FX review required" })
+      await expect(fx).toContainText("Bank line #301")
+      await expect(fx).toContainText("INV/BANK/91 (#91) · Item #501")
+      await expect(fx).toContainText("USD")
+      await expect(fx.getByRole("link")).toHaveCount(0)
+      await expect(desk.getByTestId("reconciliation-confirm")).toHaveCount(0)
+      await expect(page.getByTestId("operations-state")).toContainText("bank dispatches 0")
+      await noOverflow(page)
+      await page.screenshot({ path: testInfo.outputPath(`bank-fx-${width}.png`), fullPage: true })
+    })
+
     test("pending and unknown bank settlement retain the original request across workspace and company changes", async ({ page }, testInfo) => {
       await page.getByRole("button", { name: "Bank recovery", exact: true }).click()
       const desk = page.getByTestId("reconciliation-workbench")

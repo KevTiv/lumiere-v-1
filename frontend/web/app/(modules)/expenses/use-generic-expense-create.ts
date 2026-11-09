@@ -16,7 +16,7 @@ interface GenericExpenseCreateOptions {
   companyId: bigint
   actorIdentity: string | null
   create: (params: Partial<CreateExpenseParams>) => Promise<unknown>
-  onConfirmed: () => void
+  onConfirmed: (expenseId: string) => void
   canWrite: () => boolean
 }
 
@@ -87,11 +87,11 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
         if (live.current.actorIdentity === item.formOrigin?.actorIdentity && live.current.organizationId === scope.organizationId) setAttempt(next)
       },
     })
-    if (result.syncState !== "synced") throw new Error(result.lastError ?? "The saved expense is not confirmed. Check its status before further action.")
+    if (result.syncState !== "synced" || !result.expenseId) throw new Error(result.lastError ?? "The saved expense is not confirmed. Check its status before further action.")
     assertScope()
     fileRef.current = null
     setAttempt(null)
-    live.current.onConfirmed()
+    live.current.onConfirmed(result.expenseId)
   }, [])
 
   const execute = useCallback(async (work: () => Promise<void>) => {

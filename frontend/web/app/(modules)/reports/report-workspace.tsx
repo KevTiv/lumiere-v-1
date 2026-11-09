@@ -5,7 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
-import { reportDate, reportTag, type ReportRow } from "./report-workspace-model"
+import { reportDate, reportTag, reportDisplayName, type ReportRow } from "./report-workspace-model"
 
 export const REPORT_CHOICES = ["trialBalance", "profitAndLoss", "balanceSheet", "cashFlow", "generalLedger"] as const
 
@@ -53,7 +53,7 @@ export function ReportResult({ report, sourceState, companyLabel, currencyLabel,
     {sourceState.status === "ready" && !report ? <p role="status">{t("reports.workspace.unavailable")}</p> : null}
     {sourceState.status === "ready" && report ? <>
       <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-5">
-        <div className="min-w-0"><h2 className="break-words text-xl font-semibold">{String(report.name ?? `#${String(report.id)}`)}</h2><p className="mt-1 text-sm text-muted-foreground">{t(`reports.financialReports.states.${reportTag(report.state)}`, { defaultValue: t("reports.workspace.unknown") })}</p></div>
+        <div className="min-w-0"><h2 className="text-xl font-semibold [overflow-wrap:anywhere]">{reportDisplayName(report, t("reports.workspace.unknown"))}</h2><p className="mt-1 text-sm text-muted-foreground">{t(`reports.financialReports.states.${reportTag(report.state)}`, { defaultValue: t("reports.workspace.unknown") })}</p></div>
         <div className="flex flex-wrap gap-2 print:hidden">{actions}</div>
       </div>
       <dl className="grid gap-4 border-b pb-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -61,8 +61,8 @@ export function ReportResult({ report, sourceState, companyLabel, currencyLabel,
           [t("reports.workspace.company"), companyLabel],
           [t("reports.workspace.period"), `${reportDate(report.dateFrom ?? report.date_from, i18n.language)} – ${reportDate(report.dateTo ?? report.date_to, i18n.language)}`],
           [t("reports.workspace.currency"), currencyLabel],
-          [t("reports.workspace.basis"), report.targetMove === "posted" ? t("reports.workspace.posted") : report.targetMove === "all" ? t("reports.workspace.allEntries") : t("reports.workspace.unknown")],
-          [t("reports.workspace.comparison"), t(`reports.forms.generateReport.fields.comparisonOptions.${({ none: "none", previous_period: "previousPeriod", previous_year: "previousYear" } as Record<string, string>)[String(report.comparisonMode)] ?? "unknown"}`, { defaultValue: t("reports.workspace.unknown") })],
+          [t("reports.workspace.basis"), reportTag(report.targetMove) === "posted" ? t("reports.workspace.posted") : reportTag(report.targetMove) === "all" ? t("reports.workspace.allEntries") : t("reports.workspace.unknown")],
+          [t("reports.workspace.comparison"), t(`reports.forms.generateReport.fields.comparisonOptions.${({ none: "none", previousperiod: "previousPeriod", previousyear: "previousYear" } as Record<string, string>)[reportTag(report.comparisonMode)] ?? "unknown"}`, { defaultValue: t("reports.workspace.unknown") })],
         ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div>)}
       </dl>
       {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}

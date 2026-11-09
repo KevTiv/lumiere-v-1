@@ -1,3 +1,8 @@
+import {
+  entityEnumTag,
+  entityScalarText,
+  formatEntityReference,
+} from "@lumiere/ui/lib/entity-row-values"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { stbTimestampMicros } from "@lumiere/erp-shared/stb-timestamp"
 
@@ -23,10 +28,7 @@ export type ReportRow = {
 }
 
 export function reportTag(value: unknown): string {
-  if (value && typeof value === "object") {
-    value = "tag" in value ? value.tag : Object.keys(value)[0]
-  }
-  return String(value ?? "").replaceAll(/[_-]/g, "").toLowerCase()
+  return (entityEnumTag(value) ?? "").replaceAll(/[_-]/g, "").toLowerCase()
 }
 
 export function scopedReports<Row extends ReportRow>(rows: readonly Row[], organizationId: bigint, companyId: bigint | undefined): Row[] {
@@ -58,4 +60,12 @@ export function reportDate(raw: unknown, locale: string): string {
 
 export function reportCanDownload(row: ReportRow): boolean {
   return ["generated", "exported"].includes(reportTag(row.state))
+}
+
+/** A readable name or exact record identifier; malformed values remain unavailable. */
+export function reportDisplayName(row: ReportRow, missing: string): string {
+  return formatEntityReference(row.id, {
+    label: entityScalarText(row.name),
+    missing,
+  })
 }

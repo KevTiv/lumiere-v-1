@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { activationChecklist, activationTaskHref, availableActivationTasks, selectedActivationTask } from "./activation-checklist"
+import { activationChecklist, activationForm, activationRecordHref, activationTaskHref, availableActivationTasks, matchesActivationRecord, parseActivationReceipt, selectedActivationTask } from "./activation-checklist"
 
 const company = { id: 2n, organizationId: 1n, currencyId: 4n, fiscalYearEndMonth: 12, fiscalYearEndDay: 31 }
 const customer = { id: 9n, organizationId: 1n, companyId: 2n, isCustomer: true }
@@ -77,4 +77,27 @@ test("task handoffs use existing workspace routes", () => {
   assert.equal(activationTaskHref("expense"), "/expenses?tab=expenses")
   assert.equal(activationTaskHref("accounting"), "/accounting")
   assert.equal(activationTaskHref("reports"), "/reports")
+})
+
+test("create tasks address only their native editors and link to exact saved records", () => {
+  assert.deepEqual(activationForm("contact"), { moduleId: "crm", tabId: "contacts", permission: "contact", resource: "contacts" })
+  assert.equal(activationForm("quotation")?.tabId, "orders")
+  assert.equal(activationForm("expense")?.tabId, "expenses")
+  assert.equal(activationForm("reports"), null)
+  assert.equal(activationRecordHref({ task: "expense", recordId: "9" }), "/expenses?tab=expenses&filter=id%3A9")
+  assert.equal(activationRecordHref({ task: "quotation", recordId: "9" }), "/sales/orders/9?tab=lines")
+})
+
+test("a retained save pointer requires an exact current-scope record", () => {
+  const receipt = parseActivationReceipt('{"task":"contact","recordId":"9007199254740993"}')
+  assert.ok(receipt)
+  const row = { id: receipt.recordId, organization_id: "1", company_id: "2" }
+  assert.equal(matchesActivationRecord(row, receipt, 1, 2), true)
+  assert.equal(matchesActivationRecord({ ...row, id: "9" }, receipt, 1, 2), false)
+  assert.equal(matchesActivationRecord({ ...row, id: Number(receipt.recordId) }, receipt, 1, 2), false)
+  assert.equal(matchesActivationRecord({ ...row, company_id: "3" }, receipt, 1, 2), false)
+  assert.equal(matchesActivationRecord({ ...row, organization_id: "2" }, receipt, 1, 2), false)
+  assert.equal(matchesActivationRecord({ ...row, company_id: null }, receipt, 1, 2), false)
+  assert.equal(parseActivationReceipt('{"task":"reports","recordId":"9"}'), null)
+  assert.equal(parseActivationReceipt('{"task":"contact","recordId":"../9"}'), null)
 })

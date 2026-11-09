@@ -356,3 +356,6 @@ export { DashboardWidgetRenderer } from "./pages/dashboard-widget-renderer"
 export * from "./accounting-components/asset-depreciation-schedule";
 export * from "./lib/assistant-guide-types";
 export * from "./ai-chat/assistant-guide-viewer";
+
+export * from "./components/file-identity";
+export * from "./components/file-upload-field";

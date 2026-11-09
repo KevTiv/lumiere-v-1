@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   billDocumentContentType,
+  DOCX_DOCUMENT_MIME,
   documentFileContentType,
 } from "./document-file-profile"
 
@@ -14,10 +15,14 @@ test("document declarations infer missing MIME only for supported exact extensio
     documentFileContentType({ name: "receipt.pdf", type: "", size: 50 }),
     "application/pdf",
   )
+  assert.equal(
+    documentFileContentType({ name: "document.docx", type: "", size: 50 }),
+    DOCX_DOCUMENT_MIME,
+  )
   for (const name of [
     "active.svg",
     "legacy.xls",
-    "document.docx",
+    "document.docm",
     "unknown.bin",
   ]) {
     assert.throws(

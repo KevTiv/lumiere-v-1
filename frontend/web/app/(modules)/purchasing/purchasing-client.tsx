@@ -1,4 +1,9 @@
 "use client"
+import { entityColumnLayouts } from "@lumiere/ui/lib/entity-column-layouts"
+import {
+  entityScalarText,
+  formatEntityReference,
+} from "@lumiere/ui/lib/entity-row-values"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
@@ -1369,7 +1374,7 @@ function PurchasingClientLoaded({
       mergeSelectOptionsForFields(removeLandedCostLineForm(t), {
         lineId: landedCostLines.map((line) => ({
           value: String(line.id ?? ""),
-          label: `#${String(line.id ?? "")} · LC ${String(line.landedCostId ?? "")} · ${Number(line.priceUnit ?? 0).toLocaleString()}`,
+          label: `#${String(line.id ?? "")} · LC ${String(line.landedCostId ?? "")} · ${typeof line.priceUnit === "number" && Number.isFinite(line.priceUnit) ? line.priceUnit.toLocaleString() : "—"}`,
         })),
       }),
     [t, landedCostLines],
@@ -1551,8 +1556,8 @@ function PurchasingClientLoaded({
       view: {
         ...view,
         columns: [
-          { key: "orderId", label: t("purchasing.orderLines.columns.orderId"), width: "min-w-24" },
-          { key: "productId", label: t("purchasing.orderLines.columns.productId"), width: "min-w-40" },
+          { key: "orderId", label: t("purchasing.orderLines.columns.orderId"), layout: entityColumnLayouts.reference },
+          { key: "productId", label: t("purchasing.orderLines.columns.productId"), layout: entityColumnLayouts.identity },
           {
             key: "productQty",
             label: t("purchasing.orderLines.columns.productQty"),
@@ -1638,7 +1643,7 @@ function PurchasingClientLoaded({
             key: "state",
             label: t("purchasing.orderLines.columns.state"),
             type: "badge",
-            width: "min-w-24",
+            layout: entityColumnLayouts.status,
             badgeVariants: {
               Draft: "secondary",
               Confirmed: "outline",
@@ -1833,10 +1838,10 @@ function PurchasingClientLoaded({
       searchPlaceholder: t("purchasing.landedCosts.searchPlaceholder"),
       searchKeys: ["name", "description"],
       columns: [
-        { key: "description", label: t("purchasing.landedCosts.columns.name"), width: "min-w-40" },
-        { key: "state", label: t("purchasing.landedCosts.columns.state"), width: "min-w-24" },
+        { key: "description", label: t("purchasing.landedCosts.columns.name"), layout: entityColumnLayouts.identity },
+        { key: "state", label: t("purchasing.landedCosts.columns.state"), layout: entityColumnLayouts.status },
         { key: "amountTotal", label: t("purchasing.landedCosts.columns.amountTotal"), type: "currency", align: "right" },
-        { key: "vendorBillId", label: t("purchasing.landedCosts.columns.vendorBillId"), width: "min-w-24" },
+        { key: "vendorBillId", label: t("purchasing.landedCosts.columns.vendorBillId"), layout: entityColumnLayouts.reference },
       ],
       emptyMessage: t("purchasing.landedCosts.emptyMessage"),
       actions: [
@@ -1968,10 +1973,10 @@ function PurchasingClientLoaded({
       searchPlaceholder: t("purchasing.supplierIntakes.searchPlaceholder"),
       searchKeys: ["companyName", "email", "contactName", "notes"],
       columns: [
-        { key: "companyName", label: t("purchasing.supplierIntakes.columns.companyName"), width: "min-w-36" },
-        { key: "contactName", label: t("purchasing.supplierIntakes.columns.contactName"), width: "min-w-28" },
-        { key: "state", label: t("purchasing.supplierIntakes.columns.state"), width: "min-w-24" },
-        { key: "email", label: t("purchasing.supplierIntakes.columns.email"), width: "min-w-32" },
+        { key: "companyName", label: t("purchasing.supplierIntakes.columns.companyName"), layout: entityColumnLayouts.identity },
+        { key: "contactName", label: t("purchasing.supplierIntakes.columns.contactName"), layout: entityColumnLayouts.identity },
+        { key: "state", label: t("purchasing.supplierIntakes.columns.state"), layout: entityColumnLayouts.status },
+        { key: "email", label: t("purchasing.supplierIntakes.columns.email"), layout: entityColumnLayouts.identity },
       ],
       emptyMessage: t("purchasing.supplierIntakes.emptyMessage"),
       actions: [
@@ -2712,7 +2717,7 @@ function PurchasingClientLoaded({
       const form = mergeSelectOptionsForFields(removeLandedCostLineForm(t), {
         lineId: linesForCost.map((line) => ({
           value: String(line.id ?? ""),
-          label: `#${String(line.id ?? "")} · ${Number(line.priceUnit ?? 0).toLocaleString()}`,
+          label: `#${String(line.id ?? "")} · ${typeof line.priceUnit === "number" && Number.isFinite(line.priceUnit) ? line.priceUnit.toLocaleString() : "—"}`,
         })),
       })
       setLandedCostDetailRow(null)
@@ -2962,19 +2967,19 @@ function PurchasingClientLoaded({
         />
       ) : null}
       <Dialog open={landedCostDetailRow != null && landedCostsUsable} onOpenChange={(open) => !open && setLandedCostDetailRow(null)}>
-        <DialogContent>
+        <DialogContent size="record">
           <DialogHeader>
             <DialogTitle>{t("purchasing.landedCostDetail.title")}</DialogTitle>
           </DialogHeader>
           {landedCostDetailRow ? (
-            <div className="space-y-2 text-sm">
-              <p>{String(landedCostDetailRow.description ?? `Landed cost ${landedCostDetailRow.id}`)}</p>
+            <div className="min-w-0 space-y-2 text-sm [overflow-wrap:anywhere]">
+              <p>{formatEntityReference(landedCostDetailRow.id, { label: entityScalarText(landedCostDetailRow.description) })}</p>
               <p>
                 {t("purchasing.landedCostDetail.state")}: {landedCostState(landedCostDetailRow)}
               </p>
               <p>
                 {t("purchasing.landedCostDetail.amountTotal")}:{" "}
-                {Number(landedCostDetailRow.amountTotal ?? 0).toLocaleString()}
+                {typeof landedCostDetailRow.amountTotal === "number" && Number.isFinite(landedCostDetailRow.amountTotal) ? landedCostDetailRow.amountTotal.toLocaleString() : "—"}
               </p>
               {landedCostDetailLines.length > 0 ? (
                 <div className="space-y-1 pt-2">
@@ -2982,8 +2987,8 @@ function PurchasingClientLoaded({
                   <ul className="max-h-40 space-y-1 overflow-y-auto text-muted-foreground">
                     {landedCostDetailLines.map((line) => (
                       <li key={String(line.id ?? "")}>
-                        #{String(line.id ?? "")} · product {String(line.productId ?? "—")} ·{" "}
-                        {Number(line.priceUnit ?? 0).toLocaleString()}
+                        {formatEntityReference(line.id)} · {formatEntityReference(line.productId, { formatId: productLabel })} ·{" "}
+                        {typeof line.priceUnit === "number" && Number.isFinite(line.priceUnit) ? line.priceUnit.toLocaleString() : "—"}
                       </li>
                     ))}
                   </ul>

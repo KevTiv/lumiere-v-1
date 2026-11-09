@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { confirmedOrderTrend, overviewFinancialInputsComplete, overviewMoneySummary, overduePostedInvoices } from "./financial-summary"
+import { confirmedOrderTrend, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
+import {
+  clearOwnerQueueHref, isDraftVendorBill, isOwnerQueue, lowStockQuants, overduePostedInvoices, ownerQueueHref,
+} from "../../../lib/owner-queues"
 
 describe("overview financial meaning", () => {
   it("keeps transaction currencies separate and preserves currency precision", () => {
@@ -23,13 +26,14 @@ describe("overview financial meaning", () => {
     const base = { state: { tag: "Posted" }, moveType: { tag: "OutInvoice" }, amountResidual: 12 }
     const rows = [
       { ...base, invoiceDateDue: "2026-10-28", name: "overdue" },
+      { ...base, moveType: "out_invoice", invoiceDateDue: "2026-10-28", name: "snake case" },
       { ...base, invoiceDateDue: "2026-10-29", name: "today" },
       { ...base, invoiceDateDue: null, name: "unknown" },
       { ...base, invoiceDateDue: "2026-10-28", state: { tag: "Draft" }, name: "draft" },
       { ...base, invoiceDateDue: "2026-10-28", amountResidual: 0, name: "paid" },
       { ...base, invoiceDateDue: "2026-10-28", moveType: { tag: "InInvoice" }, name: "bill" },
     ]
-    assert.deepEqual(overduePostedInvoices(rows, new Date("2026-10-29T15:00:00Z")).map((row) => row.name), ["overdue"])
+    assert.deepEqual(overduePostedInvoices(rows, new Date("2026-10-29T15:00:00Z")).map((row) => row.name), ["overdue", "snake case"])
   })
 
   it("does not treat redacted eligibility fields as a confirmed empty queue", () => {
@@ -74,5 +78,59 @@ describe("overview financial meaning", () => {
     const after = confirmedOrderTrend(rows, new Date("2026-10-29"), "en-US", { kind: "custom", from: "1970-01-01", through: "1970-01-01" })
     assert.equal(before.reduce((sum, point) => sum + point.value, 0), 1)
     assert.equal(after.reduce((sum, point) => sum + point.value, 0), 0)
+  })
+})
+
+describe("owner work queues", () => {
+  it("routes to the exact list and removes only the owner queue when clearing", () => {
+    const queues = [
+      ["overdueInvoices", "/accounting", "invoices", "overdue-invoices"],
+      ["draftBills", "/accounting", "bills", "draft-bills"],
+      ["lowStockProducts", "/warehouse", "stock", "low-stock"],
+    ] as const
+    for (const [queue, path, tab, value] of queues) {
+      assert.equal(ownerQueueHref(queue), `${path}?tab=${tab}&ownerQueue=${value}`)
+      assert.equal(isOwnerQueue(queue, tab, value), true)
+      assert.equal(isOwnerQueue(queue, "another-tab", value), false)
+      assert.equal(isOwnerQueue(queue, tab, null), false)
+      assert.equal(clearOwnerQueueHref(path, `tab=${tab}&ownerQueue=${value}&filter=id%3A8`), `${path}?tab=${tab}&filter=id%3A8`)
+    }
+  })
+
+  it("selects draft vendor bills across read projections", () => {
+    const rows = [
+      { id: 1, state: { tag: "Draft" }, moveType: { tag: "InInvoice" } },
+      { id: 2, state: "Draft", move_type: "in_invoice" },
+      { id: 3, state: "Posted", moveType: "InInvoice" },
+      { id: 4, state: "Draft", moveType: "OutInvoice" },
+      { id: 5, moveType: "InInvoice" },
+    ]
+    assert.deepEqual(rows.filter(isDraftVendorBill).map((row) => row.id), [1, 2])
+  })
+
+  it("counts only matching stock rows with verified products, company and eligibility", () => {
+    const scope = { organizationId: 7n, companyId: 3n }
+    const base = { ...scope, productId: 2n, availableQuantity: 5, isOutdated: false }
+    const products = [
+      { organizationId: 7n, id: 2n, reorderingMinQty: { some: 4 } },
+      { organizationId: 7n, id: 3n },
+      { organizationId: 7n, id: 4n, reorderingMinQty: { none: [] } },
+      { organizationId: 9n, id: 5n },
+    ]
+    const stock = [
+      { ...base, id: 1, availableQuantity: 4 },
+      { ...base, id: 2, isOutdated: { tag: "True" } },
+      { ...base, id: 3, isOutdated: { tag: "False" } },
+      { ...base, id: 4, availableQuantity: undefined, isOutdated: undefined },
+      { ...base, id: 5, productId: 3n, availableQuantity: 0 },
+      { ...base, id: 6, productId: 4n, availableQuantity: 0 },
+      { ...base, id: 7, productId: 0n, isOutdated: true },
+      { ...base, id: 8, productId: 5n, isOutdated: true },
+      { ...base, id: 9, organizationId: 9n, isOutdated: true },
+      { ...base, id: 10, companyId: 4n, isOutdated: true },
+      { ...base, id: 11, availableQuantity: "" },
+    ]
+    assert.deepEqual(lowStockQuants(stock, products, scope).map((row) => row.id), [1, 2, 5])
+    assert.deepEqual(lowStockQuants(stock, products, { ...scope, companyId: null }), [])
   })
 })

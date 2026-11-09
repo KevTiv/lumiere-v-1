@@ -3,7 +3,8 @@ import Link from "next/link";
 import { accountMoveHref } from "@lumiere/erp-shared/record-links";
 import { parseStrictU64 } from "@lumiere/erp-shared/u64";
 import type { TFunction } from "i18next";
-import type { EntityViewConfig } from "./entity-view-types";
+import type { EntityColumn, EntityViewConfig } from "./entity-view-types";
+import { entityColumnLayouts as layout } from "./entity-column-layouts";
 
 export const fleetVehiclesTableConfig = (
   t: TFunction,
@@ -71,44 +72,55 @@ export const fleetVehiclesTableConfig = (
         : []),
     ],
     columns: [
-      { key: "name", label: t("fleet.table.name"), width: "min-w-36" },
-      {
-        key: "vehicle_type",
-        label: t("fleet.table.vehicleType"),
-        width: "min-w-24",
-      },
+      { key: "name", label: t("fleet.table.name"), layout: layout.identity },
       {
         key: "license_plate",
         label: t("fleet.table.licensePlate"),
-        width: "min-w-28",
+        layout: layout.reference,
       },
       {
         key: "driver_name",
         label: t("fleet.table.driverName"),
-        width: "min-w-32",
+        layout: layout.location,
       },
-      { key: "status", label: t("fleet.table.status"), type: "badge" },
+      { key: "status", label: t("fleet.table.status"), type: "badge", layout: layout.status },
       {
         key: "odometer_km",
         label: t("fleet.table.odometer"),
         type: "number",
+        layout: layout.quantity,
         align: "right",
       },
       {
         key: "last_position_at",
         label: t("fleet.table.lastPosition"),
         type: "datetime",
+        layout: layout.date,
+      },
+      {
+        key: "vehicle_type",
+        label: t("fleet.table.vehicleType"),
+        layout: layout.status,
       },
       {
         key: "id",
         label: "ID",
-        type: "number",
-        align: "right",
-        width: "min-w-16",
+        defaultHidden: true,
+        layout: layout.reference,
       },
     ],
     emptyMessage: t("fleet.empty"),
   },
+});
+
+const historyVehicleColumn = (t: TFunction): EntityColumn => ({
+  key: "vehicle_name",
+  label: t("fleet.lifecycle.vehicle"),
+  layout: layout.identity,
+  render: (name, row) =>
+    [name, row.vehicle_plate]
+      .filter((value): value is string => typeof value === "string" && value.trim() !== "")
+      .join(" · ") || "—",
 });
 
 export const fleetServiceRecordsTableConfig = (
@@ -123,31 +135,35 @@ export const fleetServiceRecordsTableConfig = (
     searchable: true,
     searchKeys: [
       "vehicle_name",
+      "vehicle_plate",
       "vehicle_id",
       "service_type_name",
       "provider",
       "notes",
     ],
     columns: [
-      { key: "vehicle_name", label: t("fleet.lifecycle.vehicle") },
-      { key: "service_type_name", label: t("fleet.lifecycle.serviceType") },
+      historyVehicleColumn(t),
+      { key: "service_type_name", label: t("fleet.lifecycle.serviceType"), layout: layout.location },
       {
         key: "serviced_at",
         label: t("fleet.lifecycle.servicedAt"),
         type: "datetime",
+        layout: layout.date,
       },
-      { key: "odometer_km", label: t("fleet.table.odometer"), type: "number" },
-      { key: "provider", label: t("fleet.lifecycle.provider") },
+      { key: "odometer_km", label: t("fleet.table.odometer"), type: "number", align: "right", layout: layout.quantity },
+      { key: "provider", label: t("fleet.lifecycle.provider"), layout: layout.location },
       {
         key: "cost_amount",
         label: t("fleet.lifecycle.costAmount"),
         type: "number",
+        layout: layout.amount,
         align: "right",
       },
-      { key: "currency_name", label: t("fleet.lifecycle.currency") },
+      { key: "currency_name", label: t("fleet.lifecycle.currency"), layout: layout.unit },
       {
         key: "account_move_id",
         label: t("fleet.lifecycle.accountMove"),
+        layout: layout.reference,
         render: (value) => {
           const id = parseStrictU64(value);
           return id == null
@@ -156,6 +172,7 @@ export const fleetServiceRecordsTableConfig = (
                 Link,
                 {
                   href: accountMoveHref(id),
+                  "aria-label": `${t("fleet.lifecycle.accountMove")} #${id}`,
                   className: "underline underline-offset-4",
                   onClick: (event: MouseEvent<HTMLAnchorElement>) =>
                     event.stopPropagation(),
@@ -164,7 +181,7 @@ export const fleetServiceRecordsTableConfig = (
               );
         },
       },
-      { key: "notes", type: "markdown", label: t("fleet.lifecycle.notes") },
+      { key: "notes", type: "markdown", label: t("fleet.lifecycle.notes"), layout: layout.description },
     ],
     emptyMessage: t("fleet.lifecycle.service.empty"),
   },
@@ -182,22 +199,24 @@ export const fleetInspectionsTableConfig = (
     searchable: true,
     searchKeys: [
       "vehicle_name",
+      "vehicle_plate",
       "vehicle_id",
       "inspector_name",
       "outcome",
       "notes",
     ],
     columns: [
-      { key: "vehicle_name", label: t("fleet.lifecycle.vehicle") },
-      { key: "inspector_name", label: t("fleet.lifecycle.inspector") },
+      historyVehicleColumn(t),
+      { key: "inspector_name", label: t("fleet.lifecycle.inspector"), layout: layout.location },
       {
         key: "inspected_at",
         label: t("fleet.lifecycle.inspectedAt"),
         type: "datetime",
+        layout: layout.date,
       },
-      { key: "outcome", label: t("fleet.lifecycle.outcome"), type: "badge" },
-      { key: "odometer_km", label: t("fleet.table.odometer"), type: "number" },
-      { key: "notes", type: "markdown", label: t("fleet.lifecycle.notes") },
+      { key: "outcome", label: t("fleet.lifecycle.outcome"), type: "badge", layout: layout.status },
+      { key: "odometer_km", label: t("fleet.table.odometer"), type: "number", align: "right", layout: layout.quantity },
+      { key: "notes", type: "markdown", label: t("fleet.lifecycle.notes"), layout: layout.description },
     ],
     emptyMessage: t("fleet.lifecycle.inspections.empty"),
   },

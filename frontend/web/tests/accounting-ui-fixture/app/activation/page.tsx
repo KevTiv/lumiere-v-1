@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { I18nProvider } from "@lumiere/i18n"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
+import { AssistantNativeFormProvider, useAssistantNativeFormController } from "../../../../../packages/ui/src/components/assistant-native-form-provider"
 import { ActivationChecklistPanel } from "../../../../app/(modules)/overview/activation-checklist-panel"
 
 const api = createLumiereApiClient({ baseUrl: "" })
@@ -17,8 +18,10 @@ export default function ActivationFixture() {
   const [companyId, setCompanyId] = useState<number | null>(2)
   const [ready, setReady] = useState(true)
   const [compact, setCompact] = useState(false)
+  const nativeForms = useAssistantNativeFormController(companyId == null ? null : `fixture-actor:1:${companyId}`)
   return <QueryClientProvider client={client}><LumiereApiProvider client={api}><I18nProvider>
     <RBACProvider initialUser={user} initialRoles={[]} initialPolicies={policies} permissionsReady={ready}>
+      <AssistantNativeFormProvider value={nativeForms}>
       <main className="mx-auto max-w-5xl space-y-4 p-3 sm:p-6">
         <p data-testid="activation-fixture-disclosure" className="text-sm">Synthetic UI fixture. No authentication or backend business operations.</p>
         <div className="flex flex-wrap gap-3">
@@ -30,6 +33,7 @@ export default function ActivationFixture() {
         </div>
         <ActivationChecklistPanel organizationId={1} companyId={companyId} collapseWhenReady={compact} />
       </main>
+      </AssistantNativeFormProvider>
     </RBACProvider>
   </I18nProvider></LumiereApiProvider></QueryClientProvider>
 }

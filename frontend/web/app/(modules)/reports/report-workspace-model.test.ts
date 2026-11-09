@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { reportDate, reportWorkspaceHref, reportCanDownload, reportTag, scopedReports, selectedReport } from "./report-workspace-model"
+import { reportDisplayName, reportDate, reportWorkspaceHref, reportCanDownload, reportTag, scopedReports, selectedReport } from "./report-workspace-model"
 
 const report = { id: "9007199254740993", organizationId: "7", companyId: "8", state: { tag: "Generated" } }
 
@@ -38,4 +38,13 @@ test("report dates retain their UTC accounting day and missing values remain unk
   assert.equal(reportDate({ microsSinceUnixEpoch: "1790812800000000" }, "en-US"), "Oct 1, 2026")
   assert.equal(reportDate(undefined, "en-US"), "—")
   assert.equal(reportDate("not-a-date", "en-US"), "—")
+})
+
+
+test("report identity and metadata never expose object coercion or invented identifiers", () => {
+  assert.equal(reportDisplayName({ name: { some: "October accounts" } }, "Unavailable"), "October accounts")
+  assert.equal(reportDisplayName({ id: "9007199254740993", name: {} }, "Unavailable"), "#9007199254740993")
+  assert.equal(reportDisplayName({ name: {}, id: undefined }, "Unavailable"), "Unavailable")
+  assert.equal(reportTag({ tag: "PreviousPeriod" }), "previousperiod")
+  assert.equal(reportTag({ posted: [], metadata: "unknown" }), "")
 })

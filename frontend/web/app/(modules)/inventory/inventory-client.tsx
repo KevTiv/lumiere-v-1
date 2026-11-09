@@ -17,12 +17,18 @@ import {
   withDashboardSections,
 } from '@lumiere/ui/lib/dashboard-sections';
 import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
+import { formatTimestampLike, getRowField, humanizeEnumValue, unwrapEntityValue } from '@lumiere/ui/lib/entity-row-values';
+import type { EntityRow } from '@lumiere/ui/lib/entity-view-types';
 import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
+import { OwnerQueueScope } from '../../../components/owner-queue-scope';
+import { isOwnerQueue, lowStockQuants } from '@/lib/owner-queues';
 import { useTranslation } from '@lumiere/i18n';
+import type { TFunction } from 'i18next';
 import {
   ModuleView,
   useRBAC,
@@ -254,6 +260,44 @@ function recordPickerFields(
     options,
   );
   return picked.sections[0].fields;
+}
+
+function TrackingDetailValue({ value }: { value: unknown }) {
+  return (
+    <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-foreground">
+      {typeof value === 'string' && value ? value : '—'}
+    </p>
+  );
+}
+
+function withTrackingDetailValues(
+  config: FormConfig,
+  row: EntityRow,
+  warehouse: boolean,
+  t: TFunction,
+): FormConfig {
+  return {
+    ...config,
+    sections: config.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field): FormField => {
+        const key = warehouse && field.name === 'productId'
+          ? 'warehouseProductName'
+          : warehouse && field.name === 'locationId'
+            ? 'warehouseLocationName'
+            : field.name;
+        const raw = unwrapEntityValue(getRowField(row, key));
+        const value = field.name === 'expirationDate'
+          ? formatTimestampLike(raw)?.toLocaleDateString()
+          : typeof raw === 'boolean'
+            ? t(raw ? 'common.yes' : 'common.no')
+            : typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'bigint'
+              ? field.name === 'state' ? humanizeEnumValue(String(raw)) : String(raw)
+              : undefined;
+        return { ...field, type: 'custom', component: TrackingDetailValue, defaultValue: value };
+      }),
+    })),
+  };
 }
 
 import { rowState } from './inventory-tab-actions';
@@ -516,6 +560,8 @@ function InventoryClientLoaded({
     workspace === 'products' ? 'products' : workspace === 'warehouse' ? 'stock' : 'dashboard',
     inventoryTabIds,
   );
+  const searchParams = useSearchParams();
+  const lowStockQueue = workspace === 'warehouse' && isOwnerQueue('lowStockProducts', activeTab, searchParams.get('ownerQueue'));
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | ''>(
     '',
   );
@@ -1010,46 +1056,14 @@ function InventoryClientLoaded({
   const serialDetailModalConfig = useMemo((): FormConfig => {
     const base = serialDetailForm(t);
     if (!selectedSerialRow) return base;
-    return {
-      ...base,
-      sections: base.sections.map((section) => ({
-        ...section,
-        fields: section.fields.map((field) => {
-          const value =
-            field.name === 'isLocked'
-              ? selectedSerialRow.isLocked
-                ? 'Yes'
-                : 'No'
-              : selectedSerialRow[field.name] != null
-                ? String(selectedSerialRow[field.name])
-                : field.defaultValue != null
-                  ? String(field.defaultValue)
-                  : undefined;
-          return { ...field, defaultValue: value };
-        }),
-      })),
-    } as FormConfig;
-  }, [t, selectedSerialRow]);
+    return withTrackingDetailValues(base, selectedSerialRow, workspace === 'warehouse', t);
+  }, [t, selectedSerialRow, workspace]);
 
   const lotDetailModalConfig = useMemo((): FormConfig => {
     const base = lotDetailForm(t);
     if (!selectedLotRow) return base;
-    return {
-      ...base,
-      sections: base.sections.map((section) => ({
-        ...section,
-        fields: section.fields.map((field) => {
-          const value =
-            selectedLotRow[field.name] != null
-              ? String(selectedLotRow[field.name])
-              : field.defaultValue != null
-                ? String(field.defaultValue)
-                : undefined;
-          return { ...field, defaultValue: value };
-        }),
-      })),
-    } as FormConfig;
-  }, [t, selectedLotRow]);
+    return withTrackingDetailValues(base, selectedLotRow, workspace === 'warehouse', t);
+  }, [t, selectedLotRow, workspace]);
 
   const editProductModalConfig = useMemo(() => {
     if (!editProductRow) return editProductForm(t);
@@ -1557,6 +1571,7 @@ function InventoryClientLoaded({
     const status = productStatusBadges(t);
     return {
       titleKey: 'sheetTitle',
+      wide: true,
       statusKey: 'type',
       statusBadgeVariants: status.badgeVariants,
       statusBadgeLabels: status.badgeLabels,
@@ -3410,11 +3425,14 @@ function InventoryClientLoaded({
   ]);
 
   const filteredStockQuants = useMemo(() => {
-    if (!stockLocationFilter) return stockQuants;
-    return stockQuants.filter(
-      (q) => String(q.locationId ?? '') === stockLocationFilter,
-    );
-  }, [stockQuants, stockLocationFilter]);
+    const rows = lowStockQueue
+      ? (stockQuantsRead.state.status === 'ready' && productsRead.state.status === 'ready'
+        ? lowStockQuants(stockQuants, products, { organizationId: orgId, companyId: operatingCompanyId })
+        : [])
+      : stockQuants;
+    if (!stockLocationFilter) return rows;
+    return rows.filter((q) => String(q.locationId ?? '') === stockLocationFilter);
+  }, [lowStockQueue, operatingCompanyId, orgId, products, productsRead.state.status, stockLocationFilter, stockQuants, stockQuantsRead.state.status]);
 
   const data = useMemo(
     () => ({
@@ -3543,7 +3561,9 @@ function InventoryClientLoaded({
       : productsRead.state,
     'product-categories': productCategoriesRead.state,
     uoms: uomsRead.state,
-    stock: stockQuantsRead.state,
+    stock: lowStockQueue && selectedOperatingCompanyId == null
+      ? { status: 'error' as const, message: t('financeReview.selectCompany', { defaultValue: 'Select a company' }) }
+      : stockQuantsRead.state,
     transfers: transfersRead.state,
     'stock-moves': stockMovesRead.state,
     warehouses: warehousesRead.state,
@@ -3926,6 +3946,9 @@ function InventoryClientLoaded({
           if ('onRetry' in locationsRead.state) locationsRead.state.onRetry?.();
         } : undefined}
       />}
+      {lowStockQueue && (
+        <div className="mb-3"><OwnerQueueScope queue="lowStockProducts" /></div>
+      )}
       {/* A record selection must not outlive its actor, organization, or company. */}
       <ModuleView
         key={`${identity ?? 'anonymous'}:${sessionOrganizationId ?? 'no-organization'}:${organizationId}:${operatingCompanyId}`}
@@ -3974,6 +3997,7 @@ function InventoryClientLoaded({
         open={selectedSerialRow !== null && serialsUsable}
         onOpenChange={(open) => !open && setSelectedSerialRow(null)}
         config={serialDetailModalConfig}
+        showSubmitSuccessToast={false}
         isPending={isFormMutationPending}
         onSubmit={() => setSelectedSerialRow(null)}
         formLeadingActions={
@@ -3997,6 +4021,7 @@ function InventoryClientLoaded({
         open={selectedLotRow !== null && lotsUsable}
         onOpenChange={(open) => !open && setSelectedLotRow(null)}
         config={lotDetailModalConfig}
+        showSubmitSuccessToast={false}
         isPending={isFormMutationPending}
         onSubmit={() => setSelectedLotRow(null)}
       />

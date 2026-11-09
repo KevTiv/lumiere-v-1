@@ -1,17 +1,10 @@
+import { entityEnumTag } from "@lumiere/ui/lib/entity-row-values";
+
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** Lower-cased state of an enum cell (`{ tag }`, `{ Active: [] }`) or plain string. */
 export function subscriptionStateOf(row: { state?: unknown }): string {
-  const value = row.state;
-  if (typeof value === 'string') return value.toLowerCase();
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    if ('tag' in value && typeof (value as { tag: unknown }).tag === 'string') {
-      return (value as { tag: string }).tag.toLowerCase();
-    }
-    const keys = Object.keys(value);
-    if (keys.length === 1) return keys[0]!.toLowerCase();
-  }
-  return '';
+  return entityEnumTag(row.state)?.toLowerCase() ?? '';
 }
 
 /**

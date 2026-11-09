@@ -220,23 +220,23 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
           })}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <div className="min-w-0 rounded-lg border">
+          <Table pagination={false} bounded={visibleRows.length >= 10} viewportLabel={t("reports.statements.lines", { defaultValue: "Statement lines" })}>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("reports.statements.columns.line", { defaultValue: "Line" })}</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="min-w-48 whitespace-normal">{t("reports.statements.columns.line", { defaultValue: "Line" })}</TableHead>
+                <TableHead className="min-w-32 whitespace-normal text-right">
                   {t("reports.statements.columns.amount", { defaultValue: "Amount" })}
                 </TableHead>
                 {showComparison ? (
                   <>
-                    <TableHead className="text-right">
+                    <TableHead className="min-w-32 whitespace-normal text-right">
                       {t("reports.statements.columns.comparison", { defaultValue: "Comparison" })}
                     </TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="min-w-32 whitespace-normal text-right">
                       {t("reports.statements.columns.variance", { defaultValue: "Variance" })}
                     </TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="min-w-32 whitespace-normal text-right">
                       {t("reports.statements.columns.variancePercent", { defaultValue: "Variance %" })}
                     </TableHead>
                   </>
@@ -258,7 +258,7 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
                     className={r.kind === "section" ? "bg-muted/40" : r.kind === "total" ? "border-t-2" : undefined}
                   >
                     <TableCell
-                      className={bold ? "font-semibold" : undefined}
+                      className={`min-w-48 max-w-lg whitespace-normal [overflow-wrap:anywhere] ${bold ? "font-semibold" : ""}`}
                       style={{ paddingLeft: `${0.75 + r.depth * 1.25}rem` }}
                     >
                       {r.kind === "section" ? (

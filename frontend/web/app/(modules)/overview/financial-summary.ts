@@ -1,6 +1,6 @@
 import { createHistoryBuckets, resolveHistoryPeriod, type HistoryPeriod, type HistoryPeriodOptions } from "@lumiere/erp-shared/history-period"
 import { moduleHistoryDateValue, moduleHistoryTimestampMs } from "@lumiere/ui/lib/module-history-filter"
-import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
+import { overdueInvoiceInputsComplete } from "../../../lib/owner-queues"
 import { variantTag } from "@lumiere/erp-workflows"
 
 /** Only projected fields used by the owner overview; missing financial values stay unknown. */
@@ -30,29 +30,8 @@ export function orderDate(row: OverviewFinancialRow, timeZone = "UTC"): Date | n
 
 /** Required eligibility fields cannot be redacted into a reassuring zero-valued queue. */
 export function overviewFinancialInputsComplete(rows: readonly OverviewFinancialRow[], kind: "orders" | "invoices"): boolean {
-  return rows.every((row) => {
-    const state = variantTag(row.state).toLowerCase()
-    if (!state) return false
-    if (kind === "orders") return !confirmedOrder(row) || orderDate(row) != null
-    const moveType = variantTag(row.moveType ?? row.move_type).toLowerCase()
-    if (!moveType) return false
-    if (state !== "posted" || moveType !== "outinvoice") return true
-    return row.amountResidual != null && row.amountResidual !== "" && Number.isFinite(Number(row.amountResidual))
-      && "invoiceDateDue" in row && (row.invoiceDateDue == null || kpiDate(row.invoiceDateDue) != null)
-  })
-}
-
-/** Match Accounting's calendar-day definition: posted, positive balance, known past due date. */
-export function overduePostedInvoices<T extends OverviewFinancialRow>(rows: readonly T[], now = new Date()): T[] {
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  return rows.filter((row) => {
-    const residual = row.amountResidual
-    const due = kpiDate(row.invoiceDateDue)
-    return variantTag(row.state).toLowerCase() === "posted"
-      && variantTag(row.moveType ?? row.move_type).toLowerCase() === "outinvoice"
-      && residual != null && residual !== "" && Number.isFinite(Number(residual)) && Number(residual) > 0
-      && due != null && due.getTime() < today
-  })
+  if (kind === "invoices") return overdueInvoiceInputsComplete(rows)
+  return rows.every((row) => Boolean(variantTag(row.state)) && (!confirmedOrder(row) || orderDate(row) != null))
 }
 
 /** No FX conversion is implied: every amount is kept in its explicit transaction currency. */

@@ -19,7 +19,7 @@ import {
   timeRangeToMs,
 } from "@lumiere/ui"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
-import { ModulePageComposition } from "@lumiere/ui/pages/page-composition-host"
+import { ModulePageComposition, usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
 import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { toDashboardSections, overviewDashboardWebOptions } from "@lumiere/ui/lib/presentation-dashboard"
 import { overviewDashboardDefinition, type DashboardDefinition, type OverviewDashboardData } from "@lumiere/presentation-core"
@@ -35,17 +35,20 @@ import { useTasks, useProjects, type ProjectTask, type ProjectProject } from "@l
 import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { resolveHistoryPeriod } from "@lumiere/erp-shared/history-period"
 import { useExpenseSheetsToApprove } from "@lumiere/query-hooks/hooks/expenses"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { isDraftVendorBill, lowStockQuants, overduePostedInvoices } from "@/lib/owner-queues"
 import { OwnerControlLoop } from "./owner-control-loop"
 import { ActivationChecklistPanel } from "./activation-checklist-panel"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
-import { confirmedOrder, confirmedOrderTrend, orderDate, overduePostedInvoices, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
+import { confirmedOrder, confirmedOrderTrend, orderDate, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
 
 interface OverviewClientProps {
   organizationId?: number
@@ -116,8 +119,12 @@ function OverviewClientLoaded({
   useOverviewModuleSubscription()
   const { t, i18n } = useTranslation()
   const [timeRange, setTimeRange, invalidPeriod] = useHistoryPeriod()
+  const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
+  const historyBounds = useMemo(() => invalidPeriod ? null : resolveHistoryPeriod(timeRange, { timeZone: "UTC" }), [invalidPeriod, timeRange])
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
+  const companies = useCompanies(organizationId, true)
+  const companyName = companies.data?.find((company) => String(company.id) === String(operatingCompanyId))?.name
 
   const ordersQuery = useSaleOrders(orgId, initialOrders)
   const movesQuery = useAccountMoves(orgId)
@@ -188,8 +195,8 @@ function OverviewClientLoaded({
     [orders, operatingCompanyId],
   )
   const scopedMoves = useMemo(
-    () => moves.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
-    [moves, operatingCompanyId],
+    () => moves.filter((row) => row.organizationId === orgId && matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    [moves, operatingCompanyId, orgId],
   )
   const scopedTasks = useMemo(
     () => tasks.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
@@ -299,24 +306,18 @@ function OverviewClientLoaded({
       const payment = row as Record<string, unknown>
       return matchesCompany(payment, operatingCompanyId) && enumTag(payment.status) === "Posted" && !reconciledTransactionIds.has(String(payment.id))
     }).length
-    const productByTemplate = new Map(products.map((row) => [String((row as Record<string, unknown>).productTmplId ?? (row as Record<string, unknown>).id ?? ""), row as Record<string, unknown>]))
-    const lowStockProducts = stockQuants.filter((row) => {
-      const quant = row as Record<string, unknown>
-      if (!matchesCompany(quant, operatingCompanyId)) return false
-      const product = productByTemplate.get(String(quant.productId ?? ""))
-      return Number(quant.availableQuantity ?? 0) <= Number(product?.reorderingMinQty ?? 0) || Boolean(quant.isOutdated)
-    }).length
+    const lowStockProducts = lowStockQuants(stockQuants, products, { organizationId: orgId, companyId: operatingCompanyId }).length
     const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval").length
     const overdueInvoices = invoicesComplete ? overduePostedInvoices(scopedMoves).length : incompleteFinancialData
-    const draftBills = scopedMoves.filter((row) => enumTag(row.moveType) === "InInvoice" && enumTag(row.state) === "Draft").length
+    const draftBills = scopedMoves.filter(isDraftVendorBill).length
     return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals, draftBills }
-  }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData])
+  }, [messageBatches, operatingCompanyId, orgId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData])
 
   const router = useRouter()
   const workspaceProfile = useWorkspaceProfile()
   const myWorkActions = useMemo(
     () => [
-      { id: "new-task", label: t("workspace.actions.openMyWork", { defaultValue: "Open my work" }), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") },
+      ...(workspaceProfile !== "finance-alpha" ? [{ id: "new-task", label: t("workspace.actions.openMyWork", { defaultValue: "Open my work" }), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") }] : []),
       { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents") },
       ...(isWorkspaceSurfaceVisible(workspaceProfile, "projects") ? [{ id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") }] : []),
       { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar?tab=calendar&create=event") },
@@ -357,26 +358,26 @@ function OverviewClientLoaded({
   const activationContent = <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} collapseWhenReady />
   const dailyWorkContent = workspaceProfile === "finance-alpha" ? <DailyWorkWorkspace organizationId={organizationId} summary /> : null
   const compositionSections = [
-    ...keyMetrics,
     createPageContentSection({ id: "overview-owner-control-loop", title: t("financeReview.queueTitle", { defaultValue: "Finance work queue" }), content: ownerContent }),
-    createPageContentSection({ id: "overview-activation", title: t("activation.title", { defaultValue: "Getting started" }), content: activationContent }),
+    ...keyMetrics,
     ...analysisSections,
     ...(dailyWorkContent ? [createPageContentSection({ id: "overview-daily-work", title: t("workspace.actions.openMyWork", { defaultValue: "My work" }), content: dailyWorkContent })] : []),
     ...workSections,
+    createPageContentSection({ id: "overview-activation", title: t("activation.title", { defaultValue: "Getting started" }), content: activationContent }),
   ]
 
   return (
     <div className="space-y-6">
       <DashboardHeader
         title={t(overviewDashboardDefinition.titleKey)}
-        description={t(overviewDashboardDefinition.descriptionKey)}
+        description={companyName ? t("overview.financial.companyContext", { defaultValue: "Overview for {{company}}", company: companyName }) : t(overviewDashboardDefinition.descriptionKey)}
+        secondaryAction={compositionSlot}
+        timeZone="UTC"
         timeRange={timeRange}
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}
       />
       {invalidPeriod && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{salesState}</p><Button type="button" variant="outline" onClick={() => setTimeRange("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}</Button></div>}
-      <p className="text-sm text-muted-foreground"><Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link> · {t("overview.financial.historyLink", { defaultValue: "Inspect imported dates and source records awaiting review." })}</p>
-      <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today." })}</p>
       {isHydrated ? (
         <div ref={dashboardGridRef} data-testid="overview-dashboard" className="flex flex-col gap-6">
           <section aria-label="Dashboard resource status" data-testid="overview-resource-status" className="space-y-1 text-sm">
@@ -386,16 +387,33 @@ function OverviewClientLoaded({
             })}
           </section>
           {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
-          <ModulePageComposition moduleId="overview" pageId="dashboard" title={t(overviewDashboardDefinition.titleKey)} sections={compositionSections}>
+          <ModulePageComposition
+            moduleId="overview"
+            pageId="dashboard"
+            title={t(overviewDashboardDefinition.titleKey)}
+            sections={compositionSections}
+            actionTarget={compositionTarget}
+            historyBounds={historyBounds}
+            savedWidgetScopeNote={t("pageComposition.overviewScope", { defaultValue: "Saved widgets follow the operating company and selected date range. Open work and other current-state totals use the period stated on each built-in section." })}
+          >
             <div className="flex flex-col gap-6">
-              <DashboardGrid sections={keyMetrics} testId="overview-key-metrics" widgetTestIdPrefix="overview-widget" />
               {ownerContent}
-              {activationContent}
+              <DashboardGrid sections={keyMetrics} testId="overview-key-metrics" widgetTestIdPrefix="overview-widget" />
               <DashboardGrid sections={analysisSections} testId="overview-analysis" widgetTestIdPrefix="overview-widget" />
               {dailyWorkContent}
               <DashboardGrid sections={workSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
+              {activationContent}
             </div>
           </ModulePageComposition>
+          <details className="border-t pt-3 text-sm">
+            <summary className="w-fit cursor-pointer rounded-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">
+              {t("overview.financial.dataNotes", { defaultValue: "How figures are calculated" })}
+            </summary>
+            <div className="mt-2 max-w-prose space-y-2">
+              <p className="text-sm text-muted-foreground"><Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link> · {t("overview.financial.historyLink", { defaultValue: "Inspect imported dates and source records awaiting review." })}</p>
+              <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today." })}</p>
+            </div>
+          </details>
         </div>
       ) : (
         <OverviewDashboardSkeleton />
