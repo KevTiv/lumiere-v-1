@@ -2,6 +2,34 @@
   "version": 1,
   "reducers": [
     {
+      "name": "ensure_ai_managed_allowance",
+      "exposure": "denied",
+      "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority."
+    },
+    {
+      "name": "publish_ai_platform_skill",
+      "exposure": "session",
+      "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority.",
+      "unscoped_reason": "platform superuser-only bundled catalog publication; native authorization is authoritative"
+    },
+    {
+      "name": "set_ai_platform_default",
+      "exposure": "session",
+      "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority.",
+      "unscoped_reason": "platform superuser-only default selection; native authorization is authoritative"
+    },
+    {
+      "name": "register_ai_platform_template",
+      "exposure": "session",
+      "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority.",
+      "unscoped_reason": "platform superuser-only template registration; native authorization is authoritative"
+    },
+    {
+      "name": "enroll_ai_company_defaults",
+      "exposure": "session",
+      "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority."
+    },
+    {
       "name": "provision_ai_company_defaults",
       "exposure": "session",
       "reason": "Authenticated organization AI setup; native reducer enforces agent/skill configuration permission, company ownership, funded agent/profile compatibility, and preserves existing overrides."

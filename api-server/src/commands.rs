@@ -145,12 +145,29 @@ fn snake_to_lower_camel(name: &str) -> String {
     result
 }
 
+fn require_platform_configuration_authority(
+    reducer: &str,
+    is_superuser: bool,
+) -> Result<(), ApiError> {
+    if matches!(
+        reducer,
+        "register_ai_platform_template" | "set_ai_platform_default" | "publish_ai_platform_skill"
+    ) && !is_superuser
+    {
+        return Err(ApiError::Forbidden(
+            "Platform administrator required".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) async fn execute_reducer_call(
     context: &TrustedOperationContext,
     contract: &'static ReducerContract,
     args: Vec<Value>,
 ) -> Result<Json<Value>, ApiError> {
     context.ensure_contract(contract)?;
+    require_platform_configuration_authority(contract.name, context.field_access().is_superuser)?;
     let organization_id = context.organization_id();
     let company_ids = validate_reducer_scope(contract, &args, organization_id)?;
     context.require_company_scope(&company_ids)?;
@@ -1532,6 +1549,27 @@ mod tests {
     }
 
     #[test]
+    fn platform_profile_operations_require_superuser_before_dispatch() {
+        for name in [
+            "register_ai_platform_template",
+            "set_ai_platform_default",
+            "publish_ai_platform_skill",
+        ] {
+            assert!(matches!(
+                require_platform_configuration_authority(name, false),
+                Err(ApiError::Forbidden(_))
+            ));
+            assert!(require_platform_configuration_authority(name, true).is_ok());
+            let contract = session_operation_contract(&format!("erp.{name}")).unwrap();
+            assert!(contract.organization_position.is_none());
+            assert!(contract.unscoped_reason.is_some());
+        }
+        let enrollment = session_operation_contract("erp.enroll_ai_company_defaults").unwrap();
+        assert_eq!(enrollment.organization_position, Some(0));
+        assert_eq!(enrollment.company_position, Some(1));
+    }
+
+    #[test]
     fn company_ai_defaults_use_session_scope_and_reject_scope_injection() {
         let contract = session_operation_contract("erp.provision_ai_company_defaults")
             .expect("managed AI setup operation");
@@ -1540,7 +1578,10 @@ mod tests {
         let body = json!({"companyId": 42, "agentId": 9, "intelligencePolicyRef": "alpha@1"});
         let args = named_command_args(contract, body.clone(), 7).expect("named setup arguments");
         assert_eq!(args, vec![json!(7), json!(42), json!(9), json!("alpha@1")]);
-        assert_eq!(validate_reducer_scope(contract, &args, 7).unwrap(), vec![42]);
+        assert_eq!(
+            validate_reducer_scope(contract, &args, 7).unwrap(),
+            vec![42]
+        );
         assert!(validate_reducer_scope(contract, &args, 8).is_err());
         let mut injected = body.clone();
         injected["organizationId"] = json!(8);

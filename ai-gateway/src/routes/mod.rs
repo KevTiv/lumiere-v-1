@@ -22,3 +22,5 @@ pub mod run_lifecycle;
 pub mod search;
 pub mod skill_bindings;
 pub mod skills;
+
+pub mod platform_profile;

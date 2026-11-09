@@ -13,7 +13,7 @@ use crate::{
     harness::legacy_fence::governed_skill_replacement,
     orchestrator::{
         skill_loader::{intelligence_policy_ref, list_skills, skill_agent_id, sync_bundled_skills},
-        surface_provisioning::ProvisionedSurface,
+        surface_provisioning::{existing_generation_surfaces, ProvisionedSurface},
         surface_provisioning_api::{setup_error, ApiSurfaceWriter},
     },
     state::AppState,
@@ -189,35 +189,61 @@ pub async fn post_provision_surfaces(
     )
     .await
     .map_err(setup_error)?;
-    let skills = writer
-        .provision(state.stdb.as_ref())
-        .await
-        .map_err(setup_error)?;
+    let skills;
     let company_setup = if let Some(company_id) = req.company_id {
         // Reuse the explicitly approved company harness binding. A missing profile
         // is an actionable setup state, never permission to select an arbitrary agent.
-        if let Some((agent_id, policy)) =
-            company_harness_binding(state.stdb.as_ref(), req.org_id, company_id)
-                .await
-                .map_err(AppError::from_agent_resolution)?
+        if let Some((agent_id, policy)) = company_harness_binding(
+            state.stdb.as_ref(),
+            req.org_id,
+            company_id,
+            "report_analysis",
+        )
+        .await
+        .map_err(AppError::from_agent_resolution)?
         {
+            skills = writer
+                .provision(state.stdb.as_ref())
+                .await
+                .map_err(setup_error)?;
             writer
                 .provision_company_defaults(company_id, agent_id, &policy)
                 .await
                 .map_err(setup_error)?;
+            let bound = company_chat_bound(state.stdb.as_ref(), req.org_id, company_id, agent_id)
+                .await
+                .map_err(AppError::from_agent_resolution)?;
             Some(CompanySetup {
                 company_id,
-                status: "configured",
-                message: "Default AI bindings applied. Existing custom settings and disabled features are preserved.",
+                status: if bound { "configured" } else { "preserved" },
+                message: "Default AI bindings applied where eligible. Existing custom settings and disabled features are preserved.",
             })
         } else {
+            writer
+                .enroll_company_defaults(company_id)
+                .await
+                .map_err(setup_error)?;
+            skills = existing_generation_surfaces(state.stdb.as_ref(), req.org_id)
+                .await
+                .map_err(setup_error)?;
+            let status = managed_company_setup_status(state.stdb.as_ref(), req.org_id, company_id)
+                .await
+                .map_err(AppError::from_agent_resolution)?;
             Some(CompanySetup {
                 company_id,
-                status: "profile_required",
-                message: "A platform administrator must provision the harness AI profile and usage budget for this company.",
+                status,
+                message: match status {
+                    "configured" => "The platform AI profile is applied. Existing custom settings and disabled features are preserved.",
+                    "preserved" => "Existing AI settings are preserved. This company's chat binding is disabled or unavailable; review the company configuration before using chat.",
+                    _ => "No managed AI defaults were applied. A platform administrator must configure an available profile, or review this organization's existing custom setup.",
+                },
             })
         }
     } else {
+        skills = writer
+            .provision(state.stdb.as_ref())
+            .await
+            .map_err(setup_error)?;
         None
     };
     Ok(Json(ProvisionSurfacesResponse {
@@ -226,17 +252,98 @@ pub async fn post_provision_surfaces(
     }))
 }
 
+async fn managed_company_setup_status(
+    reader: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+) -> anyhow::Result<&'static str> {
+    let rows = reader.query_sql(&format!(
+        "SELECT agent_id, is_enabled FROM ai_managed_enrollment WHERE organization_id = {org_id} LIMIT 2"
+    )).await?;
+    let [row] = rows.as_slice() else {
+        return Ok("profile_required");
+    };
+    if row
+        .get("isEnabled")
+        .or_else(|| row.get("is_enabled"))
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Ok("preserved");
+    }
+    let Some(agent_id) = crate::wire_decode::row_u64(row, "agentId", "agent_id") else {
+        return Ok("preserved");
+    };
+    Ok(
+        if company_chat_bound(reader, org_id, company_id, agent_id).await? {
+            "configured"
+        } else {
+            "preserved"
+        },
+    )
+}
+
+async fn company_chat_bound(
+    reader: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+    agent_id: u64,
+) -> anyhow::Result<bool> {
+    let companies = reader.query_sql(&format!(
+        "SELECT id FROM company WHERE organization_id = {org_id} AND id = {company_id} AND deleted_at IS NULL LIMIT 2"
+    )).await?;
+    if companies.len() != 1 {
+        return Ok(false);
+    }
+    let agents = reader.query_sql(&format!(
+        "SELECT id, company_id, allowed_actions FROM ai_agent WHERE organization_id = {org_id} AND id = {agent_id} AND is_active = true LIMIT 2"
+    )).await?;
+    let [agent] = agents.as_slice() else {
+        return Ok(false);
+    };
+    let scope = agent.get("companyId").or_else(|| agent.get("company_id"));
+    if !matches!(scope, Some(serde_json::Value::Null))
+        && scope.and_then(serde_json::Value::as_u64) != Some(company_id)
+    {
+        return Ok(false);
+    }
+    if !agent
+        .get("allowedActions")
+        .or_else(|| agent.get("allowed_actions"))
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|actions| actions.iter().any(|action| action.as_str() == Some("chat")))
+    {
+        return Ok(false);
+    }
+    let binding = company_harness_binding(reader, org_id, company_id, "rag_generation").await?;
+    Ok(binding.is_some_and(|(bound, _)| bound == agent_id))
+}
+
 async fn company_harness_binding(
     reader: &stdb_client::StdbClient,
     org_id: u64,
     company_id: u64,
+    skill_key: &'static str,
 ) -> anyhow::Result<Option<(u64, String)>> {
-    let skills = reader.query_sql(&format!(
-        "SELECT id FROM ai_skill WHERE organization_id = {org_id} AND skill_key = 'report_analysis' AND is_active = true LIMIT 2"
+    let local = reader.query_sql(&format!(
+        "SELECT id, is_active FROM ai_skill WHERE organization_id = {org_id} AND skill_key = '{skill_key}' LIMIT 2"
     )).await?;
+    let skills = if local.is_empty() {
+        reader.query_sql(&format!("SELECT id, is_active FROM ai_skill WHERE organization_id = 0 AND skill_key = '{skill_key}' LIMIT 2")).await?
+    } else {
+        local
+    };
     let [skill] = skills.as_slice() else {
         return Ok(None);
     };
+    if skill
+        .get("isActive")
+        .or_else(|| skill.get("is_active"))
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Ok(None);
+    }
     let Some(skill_id) = crate::wire_decode::row_u64(skill, "id", "id") else {
         return Ok(None);
     };

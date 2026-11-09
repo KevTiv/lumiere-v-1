@@ -13931,6 +13931,45 @@
     }
   },
   "aiHarness": {
+    "platformProfile": {
+      "tab": "AI profile",
+      "title": "Platform AI profile",
+      "description": "Choose the models and shared usage policy once. Eligible organizations inherit their own agent and default skills automatically; company data and user permissions remain scoped.",
+      "loading": "Loading the platform AI profile…",
+      "unavailable": "The platform AI profile could not be loaded.",
+      "retry": "Try again",
+      "invalid": "Check the AI profile settings.",
+      "active": "Current default: {{key}}, version {{version}}",
+      "empty": "No platform default is published. Configure and publish a profile to enable automatic tenant setup.",
+      "chooseProvider": "Select a provider",
+      "limits": "Organization usage limits",
+      "budgetHint": "The monthly budget is shared by all companies in each organization. Budget and model prices use micro-units: 1,000,000 equals one unit of the selected currency.",
+      "publishHint": "Publishing creates an immutable version and makes it the default for new enrollments. Existing enrollments, custom settings and disabled features are preserved.",
+      "saved": "Platform default published. New eligible organizations can inherit it automatically.",
+      "publish": "Publish as platform default",
+      "publishing": "Publishing…",
+      "modelHint": "Use exact model versions with tool calling and structured output support. Both models must use the same provider. Provider credentials are managed on the server.",
+      "roles": {
+        "generation_profile": "Generation model",
+        "review_profile": "Independent review model"
+      },
+      "fields": {
+        "template_key": "Profile key",
+        "template_version": "New version",
+        "currency": "Currency code",
+        "provider": "Provider",
+        "model": "Exact model ID",
+        "max_tokens": "Output token limit",
+        "context_window": "Context window (tokens)",
+        "timeout_ms": "Request timeout (ms)",
+        "max_concurrency": "Concurrent requests",
+        "input_cost_per_1k_microunits": "Input price per 1,000 tokens (micro-units)",
+        "output_cost_per_1k_microunits": "Output price per 1,000 tokens (micro-units)",
+        "monthly_limit_units": "Monthly budget (micro-units)",
+        "rate_limit_per_minute": "Requests per minute",
+        "max_enrolled_organizations": "Maximum sponsored organizations"
+      }
+    },
     "reportReadiness": {
       "checking": "Checking AI configuration. This check does not call a model.",
       "ready": "AI configuration is ready. Authorization and spend admission are checked again when analysis starts.",
@@ -18010,7 +18049,7 @@
       "action": "Set up AI features",
       "settingUp": "Setting up…",
       "description": "Apply the company’s harness profile to chat answers, form suggestions and action drafts. Existing custom settings and disabled features are preserved.",
-      "prerequisites": "Uses the company’s existing AI profile and usage limits. Provider, budget and release checks still apply when AI runs.",
+      "prerequisites": "Uses an existing company profile or the platform default. Provider, budget and release checks still apply when AI runs.",
       "permissionRequired": "Skill creation permission is required to run setup.",
       "checked": "Skill definitions checked.",
       "skills": {
@@ -18026,7 +18065,8 @@
       "companyRequired": "Select a company before setting up AI features.",
       "companyStatus": {
         "configured": "Default AI bindings configured. Existing overrides and disabled features were preserved.",
-        "profile_required": "A harness AI profile is needed for this company. Ask your platform administrator to provision it, then retry setup."
+        "profile_required": "No eligible platform AI profile is available. Ask your platform administrator to publish a default profile, then retry.",
+        "preserved": "Existing AI settings preserved. Disabled or custom settings still control availability."
       }
     },
     "registry": {

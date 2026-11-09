@@ -337,8 +337,65 @@ setup does not silently replace it. `configured` describes the binding only:
 normal execution still validates permissions, scope, provider, budget, and release
 requirements. No billable generation call is needed for setup verification.
 
-New companies still need the platform onboarding/deployment process to invoke
-provisioning with its approved company manifest. This command is not yet wired
-into company creation, and does not choose commercial limits or model credentials
-for an unconfigured installation. Tenants do not need to assemble the individual
-agent and built-in skill bindings once this platform provisioning runs.
+This legacy pilot command uses an approved company manifest and does not choose
+commercial limits or model credentials for an unconfigured installation. The
+deployment-wide template below supplies automatic defaults for standard tenants.
+Tenants do not need to assemble individual agents and built-in skill bindings.
+
+### Deployment-wide alpha AI default
+
+Platform superusers can publish the default from **AI Workbench → AI profile**.
+That flow publishes the three bundled global generation skills, registers the
+immutable model/funding template, and selects it for future enrollment. It does
+not accept provider credentials; configure those on the gateway deployment.
+Before publishing, the deployment must have one active `ai_spend_reader` identity
+and one distinct active `ai_spend_writer` identity registered. These must match
+the gateway's configured reader and runtime writer credentials. The template
+pins those identities. Enrollment adds tenant-scoped reader bindings and a blank,
+non-superuser writer profile with a restricted AI execution role. It does not
+copy human profile data, grant business mutations, or restore revoked access.
+
+Configure the shared model policy once with `scripts/configure-ai-platform.mjs`.
+The deployment operator owns this manifest; tenants never supply it, credentials,
+agent IDs, or per-company skill bindings. It contains:
+
+- `templateKey` and immutable `templateVersion`;
+- `generation` and independent `review` profiles: `provider`, exact `model`,
+  `maxTokens`, `contextWindow`, `timeoutMs`, `maxConcurrency`, reviewed
+  `inputUnitsPer1k` and `outputUnitsPer1k`;
+- `skillIds`: the three validated global system definitions for `rag_generation`,
+  `form_suggestion`, and `action_draft_generation`;
+- `currency`, `monthlyLimitUnits`, `rateLimitPerMinute`, and
+  `maxEnrolledOrganizations` to bound sponsored enrollment.
+
+Keep the manifest in `AI_PLATFORM_TEMPLATE_JSON` or a deployment-owned JSON file.
+Credentials stay in `STDB_SERVER_TOKEN`; database routing uses `STDB_HOST` and
+`STDB_MODULE`. Commands require the database operator identity:
+
+```sh
+node scripts/configure-ai-platform.mjs --plan --env
+node scripts/configure-ai-platform.mjs --register --env
+node scripts/configure-ai-platform.mjs --activate --env
+node scripts/configure-ai-platform.mjs --check --env
+```
+
+Registration does not change the default. Activation explicitly selects the
+immutable template for enrollment. Both writes verify durable state and stop
+on an unknown result instead of blindly retrying. No generation call occurs.
+Published global skill definitions are prerequisites: registration must not
+promote arbitrary tenant skills or fabricate release certification.
+
+Enrollment is handled by the server's `enroll_ai_company_defaults` path and
+company lifecycle integration. It creates scoped tenant records using the active
+platform template; the template is not a shared cross-tenant execution identity.
+Existing company overrides and disabled surfaces remain authoritative. The
+per-tenant `provision-ai-harness.mjs` command remains available for explicitly
+customized operator-managed pilot deployments.
+
+New tenant bootstrap and company creation enroll automatically when a default is
+available and the organization is eligible. Existing tenants can apply the same
+default through AI Skills setup. Companies share one organization agent and
+allowance; month rollover inserts only a missing period at admission, preserving
+settled and outstanding spend. New template versions do not silently migrate
+existing enrollments. Custom report-analysis releases and certification remain
+separate from these built-in chat/form/action-draft defaults.

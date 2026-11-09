@@ -586,6 +586,7 @@ pub fn bootstrap_new_tenant(
         },
     )?;
 
+    crate::ai::platform_defaults::enroll_company_from_platform(ctx, org.id, company.id)?;
     seed_country_catalog_for_organization(ctx, org.id)?;
     record_bootstrap_organization_commit(ctx, org.id)?;
 
@@ -1038,6 +1039,8 @@ pub fn create_company(
         deleted_at: None,
         metadata: params.metadata,
     });
+
+    crate::ai::platform_defaults::enroll_company_from_platform(ctx, organization_id, company.id)?;
 
     write_business_audit(
         ctx,

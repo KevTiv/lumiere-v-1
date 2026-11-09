@@ -174,3 +174,13 @@ test("profile-required is a distinct setup result, not a ready claim", async () 
     assert.throws(() => fixture().hooks.parseAiSurfaceProvisioningResult({ ...result, company_setup: setup }), /could not be verified/)
   }
 })
+
+test("missing platform defaults and preserved settings may return a partial catalog without claiming ready", async () => {
+  for (const status of ["profile_required", "preserved"] as const) {
+    const reply = { skills: [], company_setup: { company_id: 42, status, message: "Setup preserved" } }
+    assert.equal((await fixture(reply).hooks.useProvisionAiSurfaces(7, 42).mutationFn()).company_setup?.status, status)
+  }
+  assert.throws(() => fixture().hooks.parseAiSurfaceProvisioningResult({
+    skills: [], company_setup: { company_id: 42, status: "configured", message: "Configured" },
+  }), /could not be verified/)
+})

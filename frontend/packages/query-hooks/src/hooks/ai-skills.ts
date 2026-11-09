@@ -237,7 +237,7 @@ type AiSurfaceSkillKey = (typeof AI_SURFACE_SKILL_KEYS)[number]
 export type AiSurfaceProvisioningResult = {
   company_setup?: {
     company_id: number
-    status: "configured" | "profile_required"
+    status: "configured" | "profile_required" | "preserved"
     message: string
   }
   skills: {
@@ -256,7 +256,9 @@ type AiSurfaceProvisioningSkillInput = {
 export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvisioningResult {
   const skills = value && typeof value === "object" && "skills" in value ? value.skills : undefined
   const invalid = () => new Error("AI feature setup could not be verified. Refresh the skills list and try again.")
-  if (!Array.isArray(skills) || skills.length !== AI_SURFACE_SKILL_KEYS.length) throw invalid()
+  const companySetup = value && typeof value === "object" && "company_setup" in value ? value.company_setup : undefined
+  if (!Array.isArray(skills) || skills.length > AI_SURFACE_SKILL_KEYS.length
+    || (companySetup === undefined && skills.length !== AI_SURFACE_SKILL_KEYS.length)) throw invalid()
 
   const seen = new Set<string>()
   const result = skills.map((value: unknown): AiSurfaceProvisioningResult["skills"][number] => {
@@ -275,8 +277,9 @@ export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvi
   if (!setup || typeof setup !== "object"
     || !("company_id" in setup) || typeof setup.company_id !== "number"
     || !Number.isSafeInteger(setup.company_id) || setup.company_id <= 0
-    || !("status" in setup) || (setup.status !== "configured" && setup.status !== "profile_required")
+    || !("status" in setup) || (setup.status !== "configured" && setup.status !== "profile_required" && setup.status !== "preserved")
     || !("message" in setup) || typeof setup.message !== "string") throw invalid()
+  if (setup.status === "configured" && result.length !== AI_SURFACE_SKILL_KEYS.length) throw invalid()
   return { skills: result, company_setup: {
     company_id: setup.company_id, status: setup.status, message: setup.message,
   } }
