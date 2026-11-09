@@ -5094,6 +5094,10 @@
       "name": "settle_ai_spend",
       "shape_fingerprint": "sha256:b161e41160e50f10cd8603e3f538975a7f6d8f711ca1ee4c8b7ec846277aa655"
     },
+    "erp.settle_bank_line_with_payment_transaction": {
+      "name": "settle_bank_line_with_payment_transaction",
+      "shape_fingerprint": "sha256:75e9bfb7108d3536804c118a65ced11f71957a739e1cdff31cdb27bc6ec13d6c"
+    },
     "erp.settle_sale_commissions": {
       "name": "settle_sale_commissions",
       "shape_fingerprint": "sha256:204cb246117a9b34a841e00699a8d067a6c447f0fca0ceb36e2d86916ff8ed50"
@@ -6464,6 +6468,14 @@
       "current_operations_fingerprint": "sha256:c6968f8ef5ffe8a198f76673595187ba2a3b00ac0daf785138a1e51f08943478",
       "operation_count": 1522,
       "reason": "release on top of v0.3.170: add move_document, move_document_folder, restore_document_folder, trash_document_folder; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.173",
+      "previous_ir_sha256": "sha256:13c5e49a25ade8b572415771174d0455fd3482876647f4663c280eafdbed39b1",
+      "previous_operations_fingerprint": "sha256:c6968f8ef5ffe8a198f76673595187ba2a3b00ac0daf785138a1e51f08943478",
+      "current_operations_fingerprint": "sha256:efbaf21d71c9520538661ea7d4947afcd5082606cd20df07c3a35ca795281921",
+      "operation_count": 1523,
+      "reason": "release on top of v0.3.173: add settle_bank_line_with_payment_transaction; change the shape of none"
     }
   ]
 }

@@ -22,11 +22,11 @@
   "inputs": [
     {
       "path": "lumiere-codegen/contract-operation-ids.json",
-      "sha256": "a167fec328ecb7d32759ec5084683db2412e034b8fa9547c5671d82251c37de5"
+      "sha256": "eaa8b7113c782eb29bf29a93a9c9aeb7b997ccae49a7befae4179738be3cc040"
     },
     {
       "path": "lumiere-codegen/reducer-exposure.json",
-      "sha256": "789033bf9d09d754f5b57c25dae8916d1fe54ff01785f27d336dc463d3f9bec9"
+      "sha256": "df79364b2a4bcfc4f442a205dec28d3c48c1ccdbb0cfecbbf0dac14f27195bdb"
     },
     {
       "path": "lumiere-codegen/business-history-owner-policy.json",
@@ -42,7 +42,7 @@
     },
     {
       "path": "lumiere-codegen/operation-contracts/finance-commercial.json",
-      "sha256": "2787958532213a7ec37a3ae6819aa325c8364438c9e1db165071d0f91a843032"
+      "sha256": "c15fcf1468e3ae1fe0c8feba9de854c0a5ce1ed935d28d9c5f7c2e0e1138fd78"
     },
     {
       "path": "lumiere-codegen/operation-contracts/operations.json",
@@ -83,9 +83,9 @@
     "entry_paths": "Every row needs native-owner review; session rows additionally need BFF/UI review. Imports, bulk actions and jobs must converge through the same owner."
   },
   "summary": {
-    "operations": 480,
+    "operations": 481,
     "by_module": {
-      "Accounting": 190,
+      "Accounting": 191,
       "Sales": 72,
       "CRM": 73,
       "Purchasing": 89,
@@ -94,11 +94,11 @@
       "Expenses": 37
     },
     "by_semantic_kind": {
-      "command": 427,
+      "command": 428,
       "internal": 46,
       "operator": 7
     },
-    "session_exposed": 427,
+    "session_exposed": 428,
     "uncontracted_native": 0,
     "unresolved_native_source": 0,
     "candidate_edit_proposals": 68,
@@ -3379,6 +3379,21 @@
         ]
       }
     ],
+    "SettleBankLineWithPaymentTransactionParams": [
+      {
+        "source": "spacetimedb/src/accounting/bank_transaction_settlement.rs",
+        "field_names": [
+          "statement_id",
+          "payment_transaction_id",
+          "move_line_id",
+          "currency_id",
+          "bank_amount",
+          "open_amount",
+          "allocated_amount",
+          "idempotency_key"
+        ]
+      }
+    ],
     "SettleSaleCommissionsParams": [
       {
         "source": "spacetimedb/src/sales/oms_extensions.rs",
@@ -4544,7 +4559,7 @@
     {"operation":"add_widget_to_dashboard","operation_id":"erp.add_widget_to_dashboard","modules":["Reports"],"source":"spacetimedb/src/analytics/dashboards.rs","line":520,"exposure":"session","audit_signal":"call-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"add_workflow_human_task_comment","operation_id":"erp.add_workflow_human_task_comment","modules":["Accounting","Expenses","Purchasing","Sales"],"source":"spacetimedb/src/workflow/approvals.rs","line":996,"exposure":"session","audit_signal":"not-observed","params":["AddWorkflowHumanTaskCommentParams"],"commit_registration_signals":["spacetimedb/src/accounting/bank_settlement_lifecycle.rs::record","spacetimedb/src/workflow/finance_persistence.rs::record"]},
     {"operation":"advance_subscription_dunning","operation_id":"erp.advance_subscription_dunning","modules":["Subscriptions"],"source":"spacetimedb/src/subscriptions/subscription_dunning.rs","line":92,"exposure":"session","audit_signal":"after-only","params":["AdvanceSubscriptionDunningParams"],"capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"allocate_payment_transaction","operation_id":"erp.allocate_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":1769,"exposure":"session","audit_signal":"after-only","params":["AllocatePaymentParams"],"legacy_reachability":"command-only","capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"allocate_payment_transaction","operation_id":"erp.allocate_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":1775,"exposure":"session","audit_signal":"not-observed","params":["AllocatePaymentParams"],"legacy_reachability":"command-only"},
     {"operation":"amend_subscription","operation_id":"erp.amend_subscription","modules":["Subscriptions"],"source":"spacetimedb/src/subscriptions/subscription_wave_c.rs","line":448,"exposure":"session","audit_signal":"before-and-after","params":["AmendSubscriptionParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"append_crm_conversation_message","operation_id":"erp.append_crm_conversation_message","modules":["CRM"],"source":"spacetimedb/src/crm/inbox.rs","line":1123,"exposure":"session","audit_signal":"after-only","params":["AppendCrmConversationMessageParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"apply_expense_advance_to_sheet","operation_id":"erp.apply_expense_advance_to_sheet","modules":["Expenses"],"source":"spacetimedb/src/expenses/expense_wave_d.rs","line":950,"exposure":"session","audit_signal":"after-only","params":["ApplyExpenseAdvanceParams"],"capture_signal":"partial-control-flow-owner-review-required"},
@@ -4554,7 +4569,7 @@
     {"operation":"apply_landed_costs","operation_id":"erp.apply_landed_costs","modules":["Purchasing"],"source":"spacetimedb/src/purchasing/landed_costs.rs","line":875,"exposure":"session","audit_signal":"after-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"apply_omnichannel_allocation","operation_id":"erp.apply_omnichannel_allocation","modules":["Sales"],"source":"spacetimedb/src/sales/oms_advanced.rs","line":520,"exposure":"session","audit_signal":"after-only","params":["ApplyOmnichannelAllocationParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"apply_pending_expense_integration_intents","operation_id":"erp.apply_pending_expense_integration_intents","modules":["Expenses"],"source":"spacetimedb/src/expenses/expense_wave_e.rs","line":314,"exposure":"unregistered","audit_signal":"not-observed","kind":"operator","legacy_reachability":"backend-only"},
-    {"operation":"apply_reconciliation_rules","operation_id":"erp.apply_reconciliation_rules","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2499,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"apply_reconciliation_rules","operation_id":"erp.apply_reconciliation_rules","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2515,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"apply_sale_order_options","operation_id":"erp.apply_sale_order_options","modules":["Sales"],"source":"spacetimedb/src/sales/oms_extensions.rs","line":1046,"exposure":"session","audit_signal":"after-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"apply_sale_promotion_to_order","operation_id":"erp.apply_sale_promotion_to_order","modules":["Sales"],"source":"spacetimedb/src/sales/oms_extensions.rs","line":763,"exposure":"session","audit_signal":"after-only","params":["ApplySalePromotionParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"apply_subscription_bundle","operation_id":"erp.apply_subscription_bundle","modules":["Subscriptions"],"source":"spacetimedb/src/subscriptions/subscription_bundles.rs","line":145,"exposure":"unregistered","audit_signal":"after-only","kind":"internal","params":["ApplySubscriptionBundleParams"],"legacy_reachability":"command-only","capture_signal":"partial-control-flow-owner-review-required"},
@@ -4636,7 +4651,7 @@
     {"operation":"create_account_journal","operation_id":"erp.create_account_journal","modules":["Accounting"],"source":"spacetimedb/src/accounting/chart_of_accounts.rs","line":848,"exposure":"session","audit_signal":"after-only","params":["CreateAccountJournalParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_account_move","operation_id":"erp.create_account_move","modules":["Accounting"],"source":"spacetimedb/src/accounting/journal_entries.rs","line":1351,"exposure":"session","audit_signal":"after-only","params":["CreateAccountMoveParams"],"capture_signal":"guarded-legacy-fallback-owner-integration-required","guarded_legacy_operations":["create_account_move"]},
     {"operation":"create_account_period","operation_id":"erp.create_account_period","modules":["Accounting"],"source":"spacetimedb/src/accounting/fiscal_periods.rs","line":554,"exposure":"session","audit_signal":"after-only","params":["CreateAccountPeriodParams"],"capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"create_account_reconciliation_widget","operation_id":"erp.create_account_reconciliation_widget","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2265,"exposure":"session","audit_signal":"after-only","params":["CreateAccountReconciliationWidgetParams"],"capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"create_account_reconciliation_widget","operation_id":"erp.create_account_reconciliation_widget","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2281,"exposure":"session","audit_signal":"after-only","params":["CreateAccountReconciliationWidgetParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_account_tax","operation_id":"erp.create_account_tax","modules":["Accounting"],"source":"spacetimedb/src/accounting/tax_management.rs","line":638,"exposure":"session","audit_signal":"after-only","params":["CreateAccountTaxParams"],"legacy_reachability":"command-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_account_tax_group","operation_id":"erp.create_account_tax_group","modules":["Accounting"],"source":"spacetimedb/src/accounting/tax_management.rs","line":488,"exposure":"session","audit_signal":"after-only","params":["CreateAccountTaxGroupParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_activity","operation_id":"erp.create_activity","modules":["CRM"],"source":"spacetimedb/src/crm/activities.rs","line":470,"exposure":"session","audit_signal":"after-only","params":["CreateActivityParams"],"capture_signal":"partial-control-flow-owner-review-required"},
@@ -4702,7 +4717,7 @@
     {"operation":"create_partner_bank","operation_id":"erp.create_partner_bank","modules":["Purchasing"],"source":"spacetimedb/src/purchasing/vendor_management.rs","line":273,"exposure":"session","audit_signal":"after-only","params":["CreatePartnerBankParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_payment","operation_id":"erp.create_payment","modules":["Accounting"],"source":"spacetimedb/src/accounting/payments.rs","line":453,"exposure":"session","audit_signal":"call-only","params":["CreatePaymentParams"],"capture_signal":"guarded-legacy-fallback-owner-integration-required","guarded_legacy_operations":["create_payment"]},
     {"operation":"create_payment_account","operation_id":"erp.create_payment_account","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":581,"exposure":"session","audit_signal":"call-only","params":["CreatePaymentAccountParams"],"capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"create_payment_fee","operation_id":"erp.create_payment_fee","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":1241,"exposure":"session","audit_signal":"call-only","params":["CreatePaymentFeeParams"],"capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"create_payment_fee","operation_id":"erp.create_payment_fee","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":1247,"exposure":"session","audit_signal":"call-only","params":["CreatePaymentFeeParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_payment_term","operation_id":"erp.create_payment_term","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_terms.rs","line":76,"exposure":"session","audit_signal":"call-only","params":["CreatePaymentTermParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_payment_term_line","operation_id":"erp.create_payment_term_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_terms.rs","line":247,"exposure":"session","audit_signal":"after-only","params":["CreatePaymentTermLineParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"create_payment_transaction","operation_id":"erp.create_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":831,"exposure":"session","audit_signal":"call-only","params":["CreatePaymentTransactionParams"],"capture_signal":"partial-control-flow-owner-review-required"},
@@ -4754,7 +4769,7 @@
     {"operation":"delete_account_bank_statement_line","operation_id":"erp.delete_account_bank_statement_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":1257,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"delete_account_move_line","operation_id":"erp.delete_account_move_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/journal_entries.rs","line":3574,"exposure":"session","audit_signal":"before-only","params":["DeleteAccountMoveLineParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"delete_account_period","operation_id":"erp.delete_account_period","modules":["Accounting"],"source":"spacetimedb/src/accounting/fiscal_periods.rs","line":731,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"delete_account_reconciliation_widget","operation_id":"erp.delete_account_reconciliation_widget","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2442,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"delete_account_reconciliation_widget","operation_id":"erp.delete_account_reconciliation_widget","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2458,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"delete_analytic_line","operation_id":"erp.delete_analytic_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/analytic_accounting.rs","line":745,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"delete_budget_line","operation_id":"erp.delete_budget_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/budgeting.rs","line":1045,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"delete_contact","operation_id":"erp.delete_contact","modules":["CRM"],"source":"spacetimedb/src/crm/contacts.rs","line":789,"exposure":"session","audit_signal":"before-only","capture_signal":"partial-control-flow-owner-review-required"},
@@ -4820,7 +4835,7 @@
     {"operation":"mark_all_notifications_read","operation_id":"erp.mark_all_notifications_read","modules":["Accounting","Purchasing","Sales"],"source":"spacetimedb/src/core/messaging.rs","line":654,"exposure":"session","audit_signal":"not-observed"},
     {"operation":"mark_mail_message_delivered","operation_id":"erp.mark_mail_message_delivered","modules":["Accounting","Purchasing","Sales"],"source":"spacetimedb/src/core/messaging.rs","line":362,"exposure":"unregistered","audit_signal":"after-only","kind":"internal","legacy_reachability":"internal-intentional","capture_signal":"partial-control-flow-owner-review-required","owner_merged_capture_signal":true,"commit_registration_signals":["spacetimedb/src/core/messaging.rs::mark_mail_message_delivered"]},
     {"operation":"mark_notification_read","operation_id":"erp.mark_notification_read","modules":["Accounting","Purchasing","Sales"],"source":"spacetimedb/src/core/messaging.rs","line":607,"exposure":"session","audit_signal":"not-observed"},
-    {"operation":"match_bank_line","operation_id":"erp.match_bank_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2586,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"match_bank_line","operation_id":"erp.match_bank_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2602,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"match_elimination_entries","operation_id":"erp.match_elimination_entries","modules":["Accounting"],"source":"spacetimedb/src/accounting/consolidation.rs","line":1020,"exposure":"session","audit_signal":"after-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"match_expense_card_statement_line","operation_id":"erp.match_expense_card_statement_line","modules":["Expenses"],"source":"spacetimedb/src/expenses/expense_wave_e.rs","line":175,"exposure":"session","audit_signal":"before-and-after","params":["MatchExpenseCardStatementLineParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"merge_contacts","operation_id":"erp.merge_contacts","modules":["CRM"],"source":"spacetimedb/src/crm/duplicate.rs","line":289,"exposure":"session","audit_signal":"before-and-after","params":["MergeContactsParams"],"capture_signal":"partial-control-flow-owner-review-required"},
@@ -4850,7 +4865,7 @@
     {"operation":"recognize_deferred_revenue","operation_id":"erp.recognize_deferred_revenue","modules":["Subscriptions"],"source":"spacetimedb/src/subscriptions/reducers.rs","line":1377,"exposure":"session","audit_signal":"before-and-after","params":["RecognizeDeferredRevenueParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"recompute_lead_score","operation_id":"erp.recompute_lead_score","modules":["CRM"],"source":"spacetimedb/src/crm/lead_scoring.rs","line":200,"exposure":"session","audit_signal":"after-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"recompute_relationship_insights","operation_id":"erp.recompute_relationship_insights","modules":["CRM"],"source":"spacetimedb/src/crm/relationship_intel.rs","line":110,"exposure":"session","audit_signal":"after-only","capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"reconcile_account_bank_statement_line","operation_id":"erp.reconcile_account_bank_statement_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":1824,"exposure":"session","audit_signal":"before-and-after","params":["ReconcileAccountBankStatementLineParams"],"capture_signal":"guarded-legacy-fallback-owner-integration-required","guarded_legacy_operations":["reconcile_account_bank_statement_line"],"commit_registration_signals":["spacetimedb/src/accounting/bank_settlement_lifecycle.rs::record"]},
+    {"operation":"reconcile_account_bank_statement_line","operation_id":"erp.reconcile_account_bank_statement_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":1830,"exposure":"session","audit_signal":"before-and-after","params":["ReconcileAccountBankStatementLineParams"],"capture_signal":"guarded-legacy-fallback-owner-integration-required","guarded_legacy_operations":["reconcile_account_bank_statement_line"],"commit_registration_signals":["spacetimedb/src/accounting/bank_settlement_lifecycle.rs::record"]},
     {"operation":"reconcile_payment_with_invoice","operation_id":"erp.reconcile_payment_with_invoice","modules":["Accounting"],"source":"spacetimedb/src/accounting/journal_entries.rs","line":4978,"exposure":"session","audit_signal":"not-observed"},
     {"operation":"record_contact_identity_verification_proof","operation_id":"erp.record_contact_identity_verification_proof","modules":["CRM"],"source":"spacetimedb/src/crm/contact_identities.rs","line":716,"exposure":"unregistered","audit_signal":"before-and-after","kind":"internal","params":["RecordContactIdentityVerificationProofParams"],"legacy_reachability":"backend-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"record_crm_provider_delivery","operation_id":"erp.record_crm_provider_delivery","modules":["CRM"],"source":"spacetimedb/src/crm/inbox.rs","line":799,"exposure":"unregistered","audit_signal":"after-only","kind":"internal","params":["RecordCrmProviderDeliveryParams"],"legacy_reachability":"backend-only","capture_signal":"partial-control-flow-owner-review-required"},
@@ -4879,7 +4894,7 @@
     {"operation":"resume_subscription","operation_id":"erp.resume_subscription","modules":["Subscriptions"],"source":"spacetimedb/src/subscriptions/subscription_wave_c.rs","line":745,"exposure":"session","audit_signal":"before-and-after","params":["ResumeSubscriptionParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"retry_intercompany_transaction","operation_id":"erp.retry_intercompany_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/intercompany.rs","line":1014,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"reverse_bank_statement_settlement","operation_id":"erp.reverse_bank_statement_settlement","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_settlement_lifecycle.rs","line":1437,"exposure":"session","audit_signal":"not-observed","params":["ReverseBankStatementSettlementParams"],"legacy_reachability":"backend-only","existing_guarded_action_signal":true,"commit_registration_signals":["spacetimedb/src/accounting/bank_settlement_lifecycle.rs::record"]},
-    {"operation":"reverse_payment_transaction","operation_id":"erp.reverse_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":2225,"exposure":"session","audit_signal":"not-observed","params":["ReversePaymentTransactionParams"]},
+    {"operation":"reverse_payment_transaction","operation_id":"erp.reverse_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":2250,"exposure":"session","audit_signal":"not-observed","params":["ReversePaymentTransactionParams"]},
     {"operation":"reverse_sale_commission_settlement","operation_id":"erp.reverse_sale_commission_settlement","modules":["Sales"],"source":"spacetimedb/src/sales/oms_extensions.rs","line":1601,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"review_message_batch","operation_id":"erp.review_message_batch","modules":["Accounting","Purchasing","Sales"],"source":"spacetimedb/src/core/operational_messaging.rs","line":1333,"exposure":"session","audit_signal":"call-only","params":["ReviewMessageBatchParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"review_supplier_intake","operation_id":"erp.review_supplier_intake","modules":["Purchasing"],"source":"spacetimedb/src/purchasing/vendor_management.rs","line":587,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
@@ -4906,6 +4921,7 @@
     {"operation":"set_purchase_approval_delegate","operation_id":"erp.set_purchase_approval_delegate","modules":["Purchasing"],"source":"spacetimedb/src/purchasing/procurement_advanced.rs","line":1241,"exposure":"session","audit_signal":"after-only","params":["SetPurchaseApprovalDelegateParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"set_subscription_commitment","operation_id":"erp.set_subscription_commitment","modules":["Subscriptions"],"source":"spacetimedb/src/subscriptions/subscription_pricing.rs","line":91,"exposure":"session","audit_signal":"after-only","params":["SetSubscriptionCommitmentParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"set_vendor_risk_flag","operation_id":"erp.set_vendor_risk_flag","modules":["Purchasing"],"source":"spacetimedb/src/purchasing/procurement_advanced.rs","line":1040,"exposure":"session","audit_signal":"after-only","params":["SetVendorRiskFlagParams"],"capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"settle_bank_line_with_payment_transaction","operation_id":"erp.settle_bank_line_with_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_transaction_settlement.rs","line":238,"exposure":"session","audit_signal":"before-and-after","params":["SettleBankLineWithPaymentTransactionParams"],"legacy_reachability":"not-in-census"},
     {"operation":"settle_sale_commissions","operation_id":"erp.settle_sale_commissions","modules":["Sales"],"source":"spacetimedb/src/sales/oms_extensions.rs","line":1336,"exposure":"session","audit_signal":"before-and-after","params":["SettleSaleCommissionsParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"setup_fiscal_calendar","operation_id":"erp.setup_fiscal_calendar","modules":["Accounting"],"source":"spacetimedb/src/accounting/fiscal_periods.rs","line":1029,"exposure":"session","audit_signal":"after-only","params":["SetupFiscalCalendarParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"share_dashboard","operation_id":"erp.share_dashboard","modules":["Reports"],"source":"spacetimedb/src/analytics/dashboards.rs","line":596,"exposure":"session","audit_signal":"call-only","params":["UpdateDashboardShareParams"],"capture_signal":"partial-control-flow-owner-review-required"},
@@ -4920,7 +4936,7 @@
     {"operation":"unlock_sale_order","operation_id":"erp.unlock_sale_order","modules":["Sales"],"source":"spacetimedb/src/sales/sales_core.rs","line":2066,"exposure":"session","audit_signal":"before-and-after","legacy_reachability":"command-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"unmatch_elimination_entry","operation_id":"erp.unmatch_elimination_entry","modules":["Accounting"],"source":"spacetimedb/src/accounting/consolidation.rs","line":1076,"exposure":"session","audit_signal":"after-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"unmatch_expense_card_statement_line","operation_id":"erp.unmatch_expense_card_statement_line","modules":["Expenses"],"source":"spacetimedb/src/expenses/expense_wave_e.rs","line":264,"exposure":"session","audit_signal":"before-and-after","params":["UnmatchExpenseCardStatementLineParams"],"capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"unreconciled_account_bank_statement_line","operation_id":"erp.unreconciled_account_bank_statement_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2172,"exposure":"session","audit_signal":"before-and-after","params":["UnreconcileAccountBankStatementLineParams"],"capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"unreconciled_account_bank_statement_line","operation_id":"erp.unreconciled_account_bank_statement_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2188,"exposure":"session","audit_signal":"before-and-after","params":["UnreconcileAccountBankStatementLineParams"],"capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"unregister_payment_allocations","operation_id":"erp.unregister_payment_allocations","modules":["Accounting"],"source":"spacetimedb/src/accounting/payments.rs","line":1152,"exposure":"denied","audit_signal":"not-observed","kind":"operator","legacy_reachability":"backend-only"},
     {"operation":"unsubscribe_from_record","operation_id":"erp.unsubscribe_from_record","modules":["Accounting","Purchasing","Sales"],"source":"spacetimedb/src/core/messaging.rs","line":338,"exposure":"session","audit_signal":"not-observed"},
     {"operation":"update_account_account","operation_id":"erp.update_account_account","modules":["Accounting"],"source":"spacetimedb/src/accounting/chart_of_accounts.rs","line":766,"exposure":"session","audit_signal":"call-only","params":["UpdateAccountAccountParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
@@ -4932,7 +4948,7 @@
     {"operation":"update_account_journal","operation_id":"erp.update_account_journal","modules":["Accounting"],"source":"spacetimedb/src/accounting/chart_of_accounts.rs","line":947,"exposure":"session","audit_signal":"call-only","params":["UpdateAccountJournalParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"update_account_move_line","operation_id":"erp.update_account_move_line","modules":["Accounting"],"source":"spacetimedb/src/accounting/journal_entries.rs","line":3392,"exposure":"session","audit_signal":"not-observed","params":["UpdateAccountMoveLineParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required","commit_registration_signals":["spacetimedb/src/accounting/journal_entries.rs::update_account_move_line"]},
     {"operation":"update_account_period","operation_id":"erp.update_account_period","modules":["Accounting"],"source":"spacetimedb/src/accounting/fiscal_periods.rs","line":640,"exposure":"session","audit_signal":"before-only","params":["UpdateAccountPeriodParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
-    {"operation":"update_account_reconciliation_widget","operation_id":"erp.update_account_reconciliation_widget","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2340,"exposure":"session","audit_signal":"before-and-after","params":["UpdateAccountReconciliationWidgetParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"update_account_reconciliation_widget","operation_id":"erp.update_account_reconciliation_widget","modules":["Accounting"],"source":"spacetimedb/src/accounting/bank_reconciliation.rs","line":2356,"exposure":"session","audit_signal":"before-and-after","params":["UpdateAccountReconciliationWidgetParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"update_account_tax","operation_id":"erp.update_account_tax","modules":["Accounting"],"source":"spacetimedb/src/accounting/tax_management.rs","line":716,"exposure":"session","audit_signal":"before-only","params":["UpdateAccountTaxParams"],"legacy_reachability":"command-only","proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"update_account_tax_group","operation_id":"erp.update_account_tax_group","modules":["Accounting"],"source":"spacetimedb/src/accounting/tax_management.rs","line":544,"exposure":"session","audit_signal":"before-only","params":["UpdateAccountTaxGroupParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"update_analytic_account","operation_id":"erp.update_analytic_account","modules":["Accounting"],"source":"spacetimedb/src/accounting/analytic_accounting.rs","line":404,"exposure":"session","audit_signal":"before-and-after","params":["UpdateAnalyticAccountParams"],"proposal":"owner-review-required","capture_signal":"partial-control-flow-owner-review-required"},
@@ -5004,7 +5020,7 @@
     {"operation":"validate_budget","operation_id":"erp.validate_budget","modules":["Accounting"],"source":"spacetimedb/src/accounting/budgeting.rs","line":746,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"validate_consolidation","operation_id":"erp.validate_consolidation","modules":["Accounting"],"source":"spacetimedb/src/accounting/consolidation.rs","line":839,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"verify_contact_identity","operation_id":"erp.verify_contact_identity","modules":["CRM"],"source":"spacetimedb/src/crm/contact_identities.rs","line":640,"exposure":"session","audit_signal":"not-observed"},
-    {"operation":"void_payment_transaction","operation_id":"erp.void_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":1189,"exposure":"session","audit_signal":"call-only","capture_signal":"partial-control-flow-owner-review-required"},
+    {"operation":"void_payment_transaction","operation_id":"erp.void_payment_transaction","modules":["Accounting"],"source":"spacetimedb/src/accounting/payment_management.rs","line":1195,"exposure":"session","audit_signal":"call-only","capture_signal":"partial-control-flow-owner-review-required"},
     {"operation":"waive_tax_deadline","operation_id":"erp.waive_tax_deadline","modules":["Accounting"],"source":"spacetimedb/src/accounting/tax_management.rs","line":1587,"exposure":"session","audit_signal":"before-and-after","capture_signal":"partial-control-flow-owner-review-required"}
   ]
 }
