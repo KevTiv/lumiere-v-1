@@ -12,6 +12,8 @@ import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-p
 import { Button } from "../../../../../packages/ui/src/components/button"
 import { CalendarView } from "../../../../../packages/ui/src/calendar-components/calendar-view"
 import { FileBrowser, type FileBrowserState } from "../../../../../packages/ui/src/documents/file-browser"
+import { JournalPanel } from "../../../../../packages/ui/src/journal/journal-panel"
+import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import type { CalendarEvent, ViewMode } from "../../../../../packages/ui/src/lib/calendar-types"
 import { calendarDate, calendarDayKey, calendarMode } from "../../../../../packages/ui/src/lib/calendar-dates"
 import { documentBrowserState } from "../../../../app/(modules)/documents/document-browser-navigation"
@@ -64,6 +66,18 @@ function AccountTimezoneFixture() {
   )
 }
 
+function JournalFixture() {
+  const [open, setOpen] = useState(true)
+  return (
+    <ErpSessionProvider value={{ identity: "synthetic-journal-author", organizationId: 1, connected: true, companyIds: [1] }}>
+      <RBACProvider>
+        <Button onClick={() => setOpen(true)}>Open Journal</Button>
+        <JournalPanel open={open} onClose={() => setOpen(false)} />
+      </RBACProvider>
+    </ErpSessionProvider>
+  )
+}
+
 function Preview() {
   const router = useRouter()
   const params = useSearchParams()
@@ -104,6 +118,7 @@ function Preview() {
   return <main className="mx-auto min-w-0 max-w-7xl space-y-6 p-4 md:p-6">
     <p data-testid="productivity-disclosure" data-hydrated={hydrated}>Synthetic productivity preview. Production components; no authentication or ERP operations.</p>
     <nav aria-label="Preview components" className="flex flex-wrap gap-3">{["files", "calendar", "messages"].map((id) => <Link key={id} href={`/productivity?panel=${id}`} className="rounded-md border px-3 py-2 text-sm capitalize">{id}</Link>)}</nav>
+    {panel === "journal" && <JournalFixture />}
     {panel === "files" && <section aria-label="Files preview" className="space-y-4 rounded-xl border p-4"><h1 className="text-xl font-semibold">Files</h1>{params.get("document") ? <div data-testid="synthetic-document"><h2>Document #{params.get("document")}</h2><p>Synthetic record destination; the file ID comes from the production browser.</p><Button onClick={() => { const next = new URLSearchParams(params.toString()); next.delete("document"); router.push(`/productivity?${next}`) }}>Back to files</Button></div> : <FileBrowser folders={folders} files={files} state={browserState} onStateChange={onFileState} onOpenFile={(id) => update({ document: id }, true)} onUpload={async () => { throw new Error("Synthetic upload failure: file outcome unconfirmed") }} />}</section>}
     {panel === "account-calendar" && <AccountTimezoneFixture />}
     {panel === "calendar" && <section aria-label="Calendar preview" className="space-y-4 rounded-xl border p-4"><h1 className="text-xl font-semibold">Calendar</h1><p data-testid="synthetic-create-count">Create callbacks: {createCount}</p><CalendarView events={events} viewMode={mode} currentDate={date} selectedDate={selectedDate} searchTerm={params.get("search") ?? ""} selectedEventId={eventId} onViewModeChange={setMode} onPrevMonth={() => update({ date: calendarDayKey(new Date(date.getFullYear(), date.getMonth()-1, date.getDate())) })} onNextMonth={() => update({ date: calendarDayKey(new Date(date.getFullYear(), date.getMonth()+1, date.getDate())) })} onToday={() => update({ date: "2026-10-28" })} onSelectDate={(value) => update({ day: calendarDayKey(value) })} onSearchChange={(value) => update({ search: value || null })} onSelectEvent={(id) => update({ event: id }, true)} onCreateEvent={() => setCreateCount((count) => count + 1)} eventHref={(id) => `/calendar/events/${id}`} /></section>}

@@ -152,12 +152,22 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
       await expect(page.getByText("Synthetic draft captured", { exact: true })).toBeVisible()
     })
 
-    test("document review keeps the draft next action reachable", async ({ page }, testInfo) => {
+    test("document review keeps the draft next action reachable", { tag: "@aside-fit" }, async ({ page }, testInfo) => {
       await page.getByRole("button", { name: "Review invoice", exact: true }).click()
       const dialog = page.getByTestId("invoice-detail-modal")
       await expect(dialog).toContainText("INV/2026/0103")
       await expect(dialog).toContainText("Acme Corporation")
       await expect(dialog).toContainText("EUR")
+      const document = dialog.getByTestId("invoice-document")
+      const summary = dialog.locator("aside")
+      if (viewport.width === 1440) {
+        const [paper, rail] = await Promise.all([document.boundingBox(), summary.boundingBox()])
+        expect(rail!.x).toBeGreaterThanOrEqual(paper!.x + paper!.width - 1)
+        // A constrained host must stack even though the desktop viewport is unchanged.
+        await dialog.evaluate((node) => node.style.setProperty("max-width", "36rem"))
+      }
+      const [paper, rail] = await Promise.all([document.boundingBox(), summary.boundingBox()])
+      expect(rail!.y).toBeGreaterThanOrEqual(paper!.y + paper!.height - 1)
       await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible()
       await expectNoHorizontalOverflow(page)
       await page.screenshot({ path: testInfo.outputPath(`invoice-review-${viewport.width}.png`), fullPage: true })

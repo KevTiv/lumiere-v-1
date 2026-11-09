@@ -126,6 +126,67 @@ test("narrow nested panels stay contained on a wide screen and under text enlarg
   await expectContained(page.getByTestId("entity-pivot-chart"))
 })
 
+for (const { height, short } of [{ height: 600, short: false }, { height: 340, short: true }]) {
+  test(`calendar sheet keeps its actions and long content reachable at 390x${height}`, { tag: "@aside-fit" }, async ({ page }) => {
+    await openFixture(page, 390)
+    await page.setViewportSize({ width: 390, height })
+    await page.getByRole("button", { name: "Open calendar event", exact: true }).click()
+    const sheet = page.getByRole("dialog", { name: "Quarterly operating review with external attendees" })
+    const body = sheet.locator('[data-slot="sheet-body"]')
+    const edit = sheet.getByRole("button", { name: "Edit", exact: true })
+    const close = sheet.getByRole("button", { name: "Close", exact: true })
+    await expectContained(sheet)
+    await expectContained(body)
+    await expectInViewport(page, close)
+
+    const scrollRegion = short ? sheet : body
+    if (!short) await expectInViewport(page, edit)
+    await expect.poll(() => scrollRegion.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(1)
+    const relatedRecord = sheet.getByText("Quarterly review project", { exact: true })
+    await relatedRecord.scrollIntoViewIfNeeded()
+    await expect(relatedRecord).toBeInViewport({ ratio: 1 })
+    if (short) {
+      await edit.scrollIntoViewIfNeeded()
+    } else {
+      await expectInViewport(page, close)
+    }
+    await expectInViewport(page, edit)
+    await edit.click()
+    await expect(sheet).toBeHidden()
+    await expect(page.getByTestId("last-action")).toHaveText("event edited")
+  })
+}
+
+test.describe("touch date drawer", () => {
+  test.use({ hasTouch: true, isMobile: true })
+
+  test("fits a short phone and dismisses before the parent sheet", { tag: "@aside-fit" }, async ({ page }) => {
+    await openFixture(page, 320)
+    await page.setViewportSize({ width: 320, height: 340 })
+    const opener = page.getByRole("button", { name: "Open date sheet", exact: true })
+    await opener.click()
+    const sheet = page.getByTestId("date-sheet")
+    const input = sheet.getByRole("textbox", { name: "Scheduled date" })
+    const initialDate = await input.inputValue()
+    const trigger = sheet.getByRole("button", { name: "Open calendar", exact: true })
+    await trigger.click()
+    const drawer = page.locator('[data-slot="drawer-content"]')
+    await expectContained(drawer)
+    const shortcut = drawer.getByRole("button", { name: "End of month", exact: true })
+    await shortcut.scrollIntoViewIfNeeded()
+    await expect(shortcut).toBeInViewport({ ratio: 1 })
+
+    await page.keyboard.press("Escape")
+    await expect(drawer).toBeHidden()
+    await expect(sheet).toBeVisible()
+    await expect(input).toHaveValue(initialDate)
+    await expect(trigger).toBeFocused()
+    await page.keyboard.press("Escape")
+    await expect(sheet).toBeHidden()
+    await expect(opener).toBeFocused()
+  })
+})
+
 test("query builder added filters fit the panel and remain removable", async ({ page }) => {
   await openFixture(page, 1280)
   await page.getByTestId("qb-model").click()

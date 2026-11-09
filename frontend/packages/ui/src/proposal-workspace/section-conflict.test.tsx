@@ -99,6 +99,22 @@ describe("section revision conflict banner", () => {
     expect(screen.queryByTestId("proposal-section-conflict")).toBeNull()
   })
 
+  it("keeps the section editor and draft mounted across compact panel changes", () => {
+    renderWorkspace()
+    const editor = contentBox()
+    fireEvent.change(editor, { target: { value: "Retained proposal draft" } })
+    const sections = screen.getByRole("button", { name: "proposalWorkspace.sectionSidebar.sections" })
+    const history = screen.getByRole("button", { name: "proposalWorkspace.versionHistoryBar.title" })
+    fireEvent.click(sections)
+    expect(sections.getAttribute("aria-expanded")).toBe("true")
+    fireEvent.click(history)
+    expect(sections.getAttribute("aria-expanded")).toBe("false")
+    expect(history.getAttribute("aria-expanded")).toBe("true")
+    fireEvent.click(history)
+    expect(contentBox()).toBe(editor)
+    expect(editor.value).toBe("Retained proposal draft")
+  })
+
   it("shows both versions on a conflict and keeps the draft", () => {
     renderWorkspace()
     fireEvent.change(contentBox(), { target: { value: "my text" } })

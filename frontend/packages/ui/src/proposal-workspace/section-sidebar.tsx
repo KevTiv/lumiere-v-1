@@ -86,7 +86,7 @@ export function SectionSidebar({
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(val)
 
   return (
-    <aside className="flex flex-col h-full overflow-y-auto bg-muted/30">
+    <aside aria-label={t("proposalWorkspace.sectionSidebar.sections")} className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overscroll-contain bg-muted/30">
       {/* Sections header */}
       <div className="px-3 pt-3 pb-1 flex items-center justify-between shrink-0">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("proposalWorkspace.sectionSidebar.sections")}</span>
@@ -177,11 +177,13 @@ export function SectionSidebar({
           const isActive = activeSectionId === sectionId
 
           return (
-            <li key={String(sectionId)}>
+            <li key={String(sectionId)} className="flex items-start gap-1">
               <button
+                type="button"
+                aria-current={isActive ? "true" : undefined}
                 onClick={() => onSelectSection(sectionId)}
                 className={cn(
-                  "w-full text-left rounded-md px-2.5 py-2 text-xs transition-colors group relative",
+                  "min-w-0 flex-1 rounded-md px-2.5 py-2 text-left text-xs transition-colors",
                   isActive
                     ? "bg-primary/10 text-primary border border-primary/20"
                     : "hover:bg-muted text-foreground"
@@ -203,12 +205,7 @@ export function SectionSidebar({
                         {String(p.userName ?? "?").slice(0, 1).toUpperCase()}
                       </div>
                     ))}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDeleteSection(sectionId) }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
@@ -220,6 +217,15 @@ export function SectionSidebar({
                   )}
                 </div>
               </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("common.delete")}
+                onClick={() => onDeleteSection(sectionId)}
+              >
+                <Trash2 aria-hidden="true" />
+              </Button>
             </li>
           )
         })}

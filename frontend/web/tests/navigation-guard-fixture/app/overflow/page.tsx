@@ -6,7 +6,10 @@ import { I18nProvider, i18n } from "@lumiere/i18n"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { Button } from "../../../../../packages/ui/src/components/button"
+import { DatePicker } from "../../../../../packages/ui/src/components/date-picker"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../../../../../packages/ui/src/components/sheet"
+import { EventDetailPanel } from "../../../../../packages/ui/src/calendar-components/event-detail-panel"
 import { ImportAssistantWizard } from "../../../../../packages/ui/src/import-assistant/import-assistant-wizard"
 import { FormModal } from "../../../../../packages/ui/src/forms/form-modal"
 import type { FormConfig } from "../../../../../packages/ui/src/lib/form-types"
@@ -94,6 +97,9 @@ export default function OverflowFixture() {
   const [expanded, setExpanded] = useState(false)
   const [readOnly, setReadOnly] = useState(false)
   const [sheet, setSheet] = useState(false)
+  const [eventSheet, setEventSheet] = useState(false)
+  const [dateSheet, setDateSheet] = useState(false)
+  const [scheduledDate, setScheduledDate] = useState("2026-11-09")
   const [stressDialog, setStressDialog] = useState<"plain" | "bounded" | null>(null)
   const StressBody = stressDialog === "bounded" ? DialogBody : "div"
   const [formDialog, setFormDialog] = useState(false)
@@ -163,6 +169,8 @@ export default function OverflowFixture() {
                   </label>
                   <Button onClick={() => setReadOnly(!readOnly)}>Toggle read-only</Button>
                   <Button onClick={() => setSheet(true)}>Open record sheet</Button>
+                  <Button onClick={() => setEventSheet(true)}>Open calendar event</Button>
+                  <Button onClick={() => setDateSheet(true)}>Open date sheet</Button>
                   <Button onClick={() => setStressDialog("plain")}>Open stressed plain dialog</Button>
                   <Button onClick={() => setStressDialog("bounded")}>Open stressed bounded dialog</Button>
                   <Button onClick={() => { setFormError(null); setFormDialog(true) }}>Open stressed form dialog</Button>
@@ -251,6 +259,37 @@ export default function OverflowFixture() {
                   </Sample>
                 </div>
               </main>
+              {eventSheet && (
+                <EventDetailPanel
+                  event={{
+                    id: "synthetic-calendar-event",
+                    title: "Quarterly operating review with external attendees",
+                    description: `Review the entire event description. ${longValue}\n`.repeat(16),
+                    startTime: new Date("2026-11-09T12:00:00Z"),
+                    endTime: new Date("2026-11-09T13:00:00Z"),
+                    type: "meeting",
+                    status: "scheduled",
+                    createdBy: "fixture-user",
+                    attendees: [longValue],
+                    relatedTo: { type: "project", id: "Quarterly review project" },
+                    visibility: "team",
+                  }}
+                  onClose={() => setEventSheet(false)}
+                  onEdit={() => { setLastAction("event edited"); setEventSheet(false) }}
+                />
+              )}
+              <Sheet open={dateSheet} onOpenChange={setDateSheet}>
+                <SheetContent size="form" layout="bounded" data-testid="date-sheet">
+                  <SheetHeader>
+                    <SheetTitle>Schedule review</SheetTitle>
+                    <SheetDescription>Choose when the review is due.</SheetDescription>
+                  </SheetHeader>
+                  <SheetBody>
+                    <label htmlFor="scheduled-date">Scheduled date</label>
+                    <DatePicker id="scheduled-date" value={scheduledDate} onChange={setScheduledDate} />
+                  </SheetBody>
+                </SheetContent>
+              </Sheet>
               <Dialog open={stressDialog !== null} onOpenChange={(open) => { if (!open) setStressDialog(null) }}>
                 <DialogContent layout={stressDialog === "bounded" ? "bounded" : undefined} data-testid="plain-stress-dialog">
                   <DialogHeader>

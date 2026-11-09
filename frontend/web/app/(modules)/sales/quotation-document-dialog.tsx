@@ -14,7 +14,7 @@ import {
   type QuotationDocumentPreview,
 } from "@lumiere/query-hooks/hooks/quotations"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { Label } from "@lumiere/ui/components/label"
 import { readDocumentDesignerMetadata } from "@lumiere/ui/lib/document-template-designer"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
@@ -133,13 +133,13 @@ export function QuotationDocumentDialog({ organizationId, companyId, identity, o
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !submitLock.current) onClose() }}>
-      <DialogContent size="document" className="flex h-[94dvh] flex-col gap-0 overflow-hidden p-0" data-testid="quotation-document-dialog">
-        <header className="min-w-0 shrink-0 border-b px-6 py-5 pr-12">
+      <DialogContent size="document" layout="bounded" className="@container/quotation h-[94dvh] gap-0 p-0" data-testid="quotation-document-dialog">
+        <DialogHeader className="border-b px-6 py-5">
           <DialogTitle className="flex items-center gap-2"><FileText className="size-5 text-primary" />{t("sales.quotationDocument.title")}</DialogTitle>
           <DialogDescription className="mt-2">{t("sales.quotationDocument.description")}</DialogDescription>
-        </header>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-          <aside className="flex min-w-0 shrink-0 flex-col gap-4 border-b bg-muted/20 p-5 md:min-h-0 md:w-72 md:overflow-y-auto md:border-r md:border-b-0">
+        </DialogHeader>
+        <DialogBody className="grid grid-cols-1 @min-[54rem]/quotation:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="flex min-w-0 flex-col gap-4 border-b bg-muted/20 p-5 @min-[54rem]/quotation:border-e @min-[54rem]/quotation:border-b-0">
             <div className="space-y-2">
               <Label htmlFor="quotation-document-template">{t("sales.quotationDocument.layout")}</Label>
               <Select
@@ -171,7 +171,7 @@ export function QuotationDocumentDialog({ organizationId, companyId, identity, o
               <p>{t("sales.quotationDocument.loadError")}</p>
               <Button variant="outline" onClick={() => void templatesQuery.refetch()}>{t("sales.quotationDocument.retry")}</Button>
             </div> : !templatesLoading && layouts.length === 0 ? <p className="text-sm text-muted-foreground">{t("sales.quotationDocument.noLayouts")}</p> : null}
-            <Button variant="outline" disabled={!selectedLayout || previewing || generating || Boolean(output)} onClick={() => void loadPreview()}>
+            <Button variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={!selectedLayout || previewing || generating || Boolean(output)} onClick={() => void loadPreview()}>
               {previewing ? <LoaderCircle className="size-4 animate-spin" /> : <FileText className="size-4" />}
               {t(previewing ? "sales.quotationDocument.previewing" : readyPreview ? "sales.quotationDocument.refreshPreview" : "sales.quotationDocument.preview")}
             </Button>
@@ -185,15 +185,15 @@ export function QuotationDocumentDialog({ organizationId, companyId, identity, o
               <a className="text-primary underline-offset-4 hover:underline" href="/documents?tab=documents">{t("sales.quotationDocument.viewDocuments")}</a>
             </div> : null}
           </aside>
-          <main className="min-w-0 flex-none bg-muted/40 p-3 md:min-h-0 md:flex-1 md:overflow-auto md:p-6">
+          <div className="flex min-w-0 flex-col bg-muted/40 p-3 @min-[54rem]/quotation:p-6">
             {readyPreview ? <iframe title={t("sales.quotationDocument.previewTitle")} sandbox="" referrerPolicy="no-referrer"
-              className="h-full min-h-[480px] w-full rounded border bg-white shadow-sm" srcDoc={readyPreview.html} /> :
-              <div className="flex h-full min-h-48 items-center justify-center p-8 text-center text-sm text-muted-foreground" role="status">
+              className="h-[clamp(16rem,65dvh,38rem)] min-h-64 w-full flex-1 rounded border bg-white shadow-sm" srcDoc={readyPreview.html} /> :
+              <div className="flex min-h-48 flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground" role="status">
                 {t(previewing ? "sales.quotationDocument.previewing" : "sales.quotationDocument.previewHint")}
               </div>}
-          </main>
-        </div>
-        <footer className="flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-background px-5 py-4 [overflow-wrap:anywhere]">
+          </div>
+        </DialogBody>
+        <DialogFooter className="mx-0 mb-0 items-start gap-3 bg-background px-5 py-4 sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">{t("sales.quotationDocument.generateHint")}</p>
           <div className="flex min-w-0 flex-wrap items-center gap-2 [&>button]:max-w-full [&>button]:whitespace-normal">
             <Button variant="outline" disabled={generating} onClick={onClose}>{t("sales.quotationDocument.close")}</Button>
@@ -205,7 +205,7 @@ export function QuotationDocumentDialog({ organizationId, companyId, identity, o
               {t(generating ? "sales.quotationDocument.generating" : "sales.quotationDocument.generate")}
             </Button>}
           </div>
-        </footer>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

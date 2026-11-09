@@ -68,6 +68,28 @@ test("sidebar categories persist and every destination remains accessible in ico
   await expect(accounting).toBeVisible()
 })
 
+test("sidebar preserves the preferred width while the ERP workspace is narrow", { tag: "@aside-fit" }, async ({ page }) => {
+  await openWorkspace(page)
+  const edge = page.getByTestId("sidebar-resize-handle")
+  await edge.press("End")
+  await expect(container(page)).toHaveCSS("width", "400px")
+
+  await page.setViewportSize({ width: 800, height: 950 })
+  await expect(edge).toHaveAttribute("aria-valuemax", "256")
+  await expect(container(page)).toHaveCSS("width", "256px")
+  await edge.press("End")
+  expect(await page.evaluate(() => localStorage.getItem("lumiere-sidebar-width"))).toBe("400")
+
+  await page.setViewportSize({ width: 980, height: 950 })
+  await page.evaluate(() => { document.documentElement.style.fontSize = "20px" })
+  await expect(edge).toHaveAttribute("aria-valuemax", "300")
+  await expect(container(page)).toHaveCSS("width", "300px")
+
+  await page.evaluate(() => { document.documentElement.style.fontSize = "" })
+  await page.setViewportSize({ width: 1440, height: 950 })
+  await expect(container(page)).toHaveCSS("width", "400px")
+})
+
 test("sidebar highlights the active module for a nested record and leaves AI neutral", async ({ page }) => {
   await openWorkspace(page)
   const ai = page.getByTestId("sidebar-open-ai-chat")

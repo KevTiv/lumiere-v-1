@@ -12,7 +12,7 @@ import { Button } from "@lumiere/ui/components/button"
 import { Calendar } from "@lumiere/ui/components/calendar"
 import { Input } from "@lumiere/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@lumiere/ui/components/popover"
-import { Drawer, DrawerContent, DrawerTitle } from "@lumiere/ui/components/drawer"
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "@lumiere/ui/components/drawer"
 
 /*
  * Value contract: `YYYY-MM-DD` (DatePicker) and `YYYY-MM-DDTHH:mm`
@@ -264,7 +264,7 @@ export function DatePicker({
   const partTestId = (suffix: string) => (testId ? `${testId}-${suffix}` : undefined)
 
   const panel = (
-    <div className={cn("flex flex-col gap-2", coarse && "items-center pb-4")}>
+    <div className={cn("flex flex-col gap-2", coarse && "min-w-0 shrink-0 items-center pb-4")}>
       <Calendar
         mode="single"
         selected={selected}
@@ -276,7 +276,7 @@ export function DatePicker({
         endMonth={maxDate}
         locale={locale.startsWith("pt") ? ptBR : undefined}
         autoFocus
-        className={cn(coarse && "[--cell-size:--spacing(11)]")}
+        className={cn(coarse && "max-w-full [--cell-size:min(2.75rem,calc((100vw_-_2rem)/7))]")}
       />
       {hideShortcuts ? null : (
         <div className={cn("flex flex-wrap gap-1 border-t pt-2", coarse ? "px-4" : "px-1")}>
@@ -324,7 +324,6 @@ export function DatePicker({
       data-testid={partTestId("calendar")}
       disabled={disabled || readOnly}
       className={cn("absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground", coarse && "size-9")}
-      onClick={coarse ? () => setOpen(true) : undefined}
     >
       <CalendarIcon />
     </Button>
@@ -366,15 +365,16 @@ export function DatePicker({
         }}
       />
       {coarse ? (
-        <>
-          {triggerButton}
-          <Drawer open={open} onOpenChange={setOpen}>
-            <DrawerContent>
-              <DrawerTitle className="sr-only">{openLabel}</DrawerTitle>
-              {panel}
-            </DrawerContent>
-          </Drawer>
-        </>
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
+          <DrawerContent
+            // Vaul handles Escape during capture. Keep it from reaching the parent sheet or dialog.
+            onEscapeKeyDown={(event) => event.stopPropagation()}
+          >
+            <DrawerTitle className="sr-only">{openLabel}</DrawerTitle>
+            {panel}
+          </DrawerContent>
+        </Drawer>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger render={triggerButton} />

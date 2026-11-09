@@ -7,6 +7,7 @@ import { Badge } from "../components/badge"
 import { Button } from "../components/button"
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -63,14 +64,14 @@ export function EntityRecordSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent size={config.wide ? "review" : "record"} className="gap-0 overflow-hidden">
+      <SheetContent size={config.wide ? "review" : "record"} layout="bounded">
         {record && (
           <>
-            <SheetHeader className="shrink-0 border-b">
+            <SheetHeader className="border-b">
               <SheetTitle>{title}</SheetTitle>
             </SheetHeader>
 
-            <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
+            <SheetBody className="space-y-4 py-4">
               {(config.statusKey || config.actions || openHref) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {config.statusKey && statusRaw && (
@@ -152,7 +153,7 @@ export function EntityRecordSheet({
                   )}
                 </TabsContent>
               </Tabs>
-            </div>
+            </SheetBody>
           </>
         )}
       </SheetContent>

@@ -679,7 +679,7 @@ export function ModularForm({
             data-form-preview
             data-testid={`form-preview-${config.id}`}
             aria-label={t("common.formPreview.label", { defaultValue: "Preview" })}
-            className="min-w-0 lg:sticky lg:top-0"
+            className="min-w-0 @min-[58rem]/form-layout:sticky @min-[58rem]/form-layout:top-0"
             onKeyDown={(event) => {
               // Editing a local example must not implicitly submit the record form.
               if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault()

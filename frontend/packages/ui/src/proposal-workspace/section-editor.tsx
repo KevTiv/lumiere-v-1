@@ -193,7 +193,7 @@ export function SectionEditor({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto px-6 py-4" onFocus={onFocus}>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-4 sm:px-6" onFocus={onFocus}>
       {conflict ? (
         <SectionConflictBanner
           view={conflict.view}
@@ -211,7 +211,7 @@ export function SectionEditor({
           onChange={(e) => setLocalTitle(e.target.value)}
           onBlur={handleTitleBlur}
           placeholder={t("proposalWorkspace.sectionEditor.sectionTitle")}
-          className="flex-1 text-lg font-semibold bg-transparent border-none outline-none focus:outline-none placeholder:text-muted-foreground/50 text-foreground"
+          className="min-w-0 flex-1 text-lg font-semibold bg-transparent border-none outline-none focus:outline-none placeholder:text-muted-foreground/50 text-foreground"
         />
         {/* Status selector */}
         <div className="relative group shrink-0">
@@ -256,7 +256,7 @@ export function SectionEditor({
 
         {/* @-mention popover */}
         {mention && (
-          <div className="absolute left-0 z-30 w-64 rounded-lg border border-border bg-popover shadow-lg" style={{ top: "2rem" }}>
+          <div className="absolute left-0 z-30 w-64 max-w-full rounded-lg border border-border bg-popover shadow-lg" style={{ top: "2rem" }}>
             <div className="px-3 py-2 border-b border-border">
               <p className="text-xs text-muted-foreground">{t("proposalWorkspace.sectionEditor.linkProductService")}</p>
               {mentionSearch && (

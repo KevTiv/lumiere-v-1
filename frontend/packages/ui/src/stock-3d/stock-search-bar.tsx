@@ -19,6 +19,7 @@ interface StockSearchBarProps {
 export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarProps) {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { searchQuery, setSearchQuery, highlightedItemIds, items, slots, zones, setSelectedItem } =
@@ -36,7 +37,7 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
     }
@@ -57,7 +58,7 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
   }
 
   return (
-    <div className={cn('relative', className)}>
+    <div ref={searchRef} className={cn('relative', className)}>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input

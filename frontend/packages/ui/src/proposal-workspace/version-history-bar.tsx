@@ -40,7 +40,7 @@ export function VersionHistoryBar({ versions, activeVersionId, currentSections, 
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted/40 transition-colors"
+          className="flex w-full flex-wrap items-center gap-2 px-4 py-2 text-left transition-colors hover:bg-muted/40"
         >
           <GitCommit className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium text-foreground">{t("proposalWorkspace.versionHistoryBar.title")}</span>

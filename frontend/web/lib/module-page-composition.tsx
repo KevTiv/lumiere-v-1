@@ -36,6 +36,7 @@ import { useRBAC } from "@lumiere/ui/lib/rbac-context";
 import { Button } from "@lumiere/ui/components/button";
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -696,7 +697,7 @@ function ScopedModulePageHost({
             if (!open) closeEditor();
           }}
         >
-          <SheetContent size="review">
+          <SheetContent size="review" layout="bounded">
             <SheetHeader>
               <SheetTitle>
                 {t("pageComposition.buildWidget", {
@@ -711,7 +712,7 @@ function ScopedModulePageHost({
               </SheetDescription>
             </SheetHeader>
             {editor && (
-              <div className="px-4 pb-6">
+              <SheetBody className="pb-6">
                 <QueryBuilder
                   key={editor.id}
                   organizationId={BigInt(scope.organizationId)}
@@ -723,7 +724,7 @@ function ScopedModulePageHost({
                   onStatusChange={setEditorStatus}
                   onCreated={onCreated}
                 />
-              </div>
+              </SheetBody>
             )}
           </SheetContent>
         </Sheet>

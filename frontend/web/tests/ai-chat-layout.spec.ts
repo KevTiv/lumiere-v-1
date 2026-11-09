@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 
 // Geometry and interactions use the real shell and panel; replies are simulated.
 for (const width of [320, 390, 768, 1024, 1440]) {
-  test(`keeps ERP and chat usable at ${width}px`, async ({ page }) => {
+  test(`keeps ERP and chat usable at ${width}px`, { tag: "@aside-fit" }, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto("/chat-workspace")
     const reference = page.getByRole("textbox", { name: "Invoice reference" })
@@ -12,8 +12,9 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     const input = page.getByTestId("erp-ai-chat-input")
     await expect(input).toBeFocused()
     const bounds = (await panel.boundingBox())!
-    expect(bounds.y).toBe(width >= 1024 ? 12 : 0)
-    expect(bounds.height).toBe(width >= 1024 ? 876 : 900)
+    await expect(panel).toHaveAttribute("data-mode", width >= 1024 ? "side" : "full")
+    expect(bounds.y).toBe(width >= 1024 ? 13 : 0)
+    expect(bounds.height).toBe(width >= 1024 ? 874 : 900)
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width)
     if (width >= 1024) {
       await expect(page.getByTestId("sidebar-open-ai-chat")).toHaveAttribute("aria-pressed", "true")
@@ -32,16 +33,20 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await expect(context).toBeHidden()
     await expect(input).toHaveValue("Keep this question")
     await expect(panel.getByRole("group", { name: "ERP quick actions" })).toBeHidden()
-    await expect(panel.locator("header")).toHaveCSS("border-bottom-width", "0px")
+    await expect(panel.locator("header")).toHaveCSS("border-bottom-width", width >= 1024 ? "0px" : "1px")
     await panel.getByRole("button", { name: "Skills", exact: true }).click()
     await panel.getByRole("button", { name: "Create a draft", exact: true }).click()
     await expect(input).toHaveValue("Keep this question")
     await expect(panel.getByRole("button", { name: "Create a draft", exact: true })).toHaveAttribute("aria-pressed", "true")
     await expect(panel.getByTestId("erp-ai-chat-message-user")).toHaveCount(0)
-    await panel.getByRole("button", { name: "Open full workspace" }).click()
-    await expect(panel).toHaveAttribute("data-mode", "full")
-    await expect(input).toHaveValue(/^Keep this question/)
-    await panel.getByRole("button", { name: "Dock beside ERP" }).click()
+    if (width >= 1024) {
+      await panel.getByRole("button", { name: "Open full workspace" }).click()
+      await expect(panel).toHaveAttribute("data-mode", "full")
+      await expect(input).toHaveValue(/^Keep this question/)
+      await panel.getByRole("button", { name: "Dock beside ERP" }).click()
+    } else {
+      await expect(panel.getByRole("button", { name: "Dock beside ERP" })).toHaveCount(0)
+    }
     await input.fill("Check overflow wrapping of long record references.")
     await panel.getByRole("button", { name: "Send message" }).click()
     const reply = panel.getByTestId("erp-ai-chat-message-assistant")
@@ -56,6 +61,53 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await expect(reference).toHaveValue(width >= 1024 ? "Edited alongside chat" : "Unsent invoice reference")
   })
 }
+
+test("switches to a modal when the workspace shrinks and preserves the chat draft", { tag: "@aside-fit" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/chat-workspace")
+  const opener = page.getByRole("button", { name: "Ask Lumière", exact: true }).last()
+  await opener.click()
+  const host = page.getByTestId("workspace-tool-host")
+  await expect(host).toHaveAttribute("data-docked", "assistant")
+  const input = page.getByTestId("erp-ai-chat-input")
+  await input.fill("Retain this draft across placements")
+  const original = await input.elementHandle()
+  await page.locator('[data-slot="sidebar-wrapper"]').evaluate(element => {
+    element.style.width = "800px"
+  })
+  const modal = page.getByRole("dialog", { name: "Lumière Assistant" })
+  await expect(modal).toBeVisible()
+  await expect(input).toHaveValue("Retain this draft across placements")
+  await expect(input).toBeFocused()
+  expect(await original?.evaluate(node => node === document.querySelector('[data-testid="erp-ai-chat-input"]'))).toBe(true)
+  await page.keyboard.press("Escape")
+  await expect(modal).toHaveCount(0)
+  await expect(opener).toBeFocused()
+})
+
+test("keeps a notebook draft while one tool at a time uses the dock", { tag: "@aside-fit" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/chat-workspace")
+  const notebook = page.getByTestId("notebook-panel")
+  const opener = page.getByRole("button", { name: "Open notebook", exact: true })
+  const host = page.getByTestId("workspace-tool-host")
+  await opener.click()
+  await expect(host).toHaveAttribute("data-docked", "notebook")
+  await notebook.getByRole("button", { name: "Rename notebook" }).click()
+  const title = notebook.getByRole("textbox", { name: "Notebook title" })
+  await title.fill("Operations handover")
+  await title.press("Enter")
+  await page.getByRole("button", { name: "Ask Lumière", exact: true }).last().click()
+  await expect(host).toHaveAttribute("data-docked", "assistant")
+  await expect(notebook).toHaveCount(0)
+  await opener.click()
+  await expect(host).toHaveAttribute("data-docked", "notebook")
+  await expect(page.getByTestId("erp-ai-chat-panel")).toHaveCount(0)
+  await expect(notebook.getByRole("button", { name: "Rename notebook" })).toHaveText("Operations handover")
+  await page.setViewportSize({ width: 768, height: 640 })
+  await expect(page.getByRole("dialog", { name: "Notebook" })).toBeVisible()
+  await expect(notebook.getByRole("button", { name: "Rename notebook" })).toHaveText("Operations handover")
+})
 
 for (const width of [390, 1440]) {
   test(`scrolls skills into view and keeps multiple selections at ${width}px`, async ({ page }) => {

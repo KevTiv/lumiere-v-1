@@ -1,16 +1,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { ReactNode } from "react"
 
 const session = vi.hoisted(() => ({ identity: "alice", connected: true, organizationId: 1, companyIds: [2], activeCompanyId: 2, activeCompanyReady: true }))
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => session }))
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key, i18n: { language: "en" } }) }))
 vi.mock("@/lib/rbac-context", () => ({ useRBAC: () => ({ currentUser: { id: "alice", roles: [] } }) }))
-vi.mock("@/components/ui/scroll-area", () => ({ ScrollArea: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
 import { JournalPanel } from "./journal-panel"
 
 beforeEach(() => { localStorage.clear(); session.identity = "alice" })
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 function compose(value: string) {
   fireEvent.click(screen.getByRole("button", { name: "ui.journal.other" }))
@@ -40,5 +38,32 @@ describe("browser working notes UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "ui.journal.actions.saveNote" }))
     expect((editor as HTMLTextAreaElement).value).toBe("Do not lose this note")
     expect(screen.getByRole("alert").textContent).toContain("entries are retained")
+  })
+
+  it("fits the visible viewport and restores the preferred keyboard-resized bounds", () => {
+    vi.stubGlobal("innerWidth", 1440)
+    vi.stubGlobal("innerHeight", 950)
+    render(<JournalPanel open onClose={vi.fn()} />)
+    const panel = screen.getByTestId("journal-panel")
+    const geometry = screen.getByRole("button", { name: "Move or resize Journal" })
+    fireEvent.keyDown(geometry, { key: "ArrowLeft" })
+    fireEvent.keyDown(geometry, { key: "ArrowRight", shiftKey: true })
+    const preferred = { left: panel.style.left, width: panel.style.width }
+    expect(preferred).toEqual({ left: "920px", width: "496px" })
+
+    vi.stubGlobal("innerWidth", 390)
+    vi.stubGlobal("innerHeight", 340)
+    fireEvent(window, new Event("resize"))
+    expect(panel.style.left).toBe("8px")
+    expect(panel.style.top).toBe("8px")
+    expect(panel.style.width).toBe("374px")
+    expect(panel.style.height).toBe("324px")
+
+    fireEvent.click(screen.getByRole("button", { name: "ui.journal.actions.maximize" }))
+    fireEvent.click(screen.getByRole("button", { name: "ui.journal.actions.restore" }))
+    vi.stubGlobal("innerWidth", 1440)
+    vi.stubGlobal("innerHeight", 950)
+    fireEvent(window, new Event("resize"))
+    expect({ left: panel.style.left, width: panel.style.width }).toEqual(preferred)
   })
 })

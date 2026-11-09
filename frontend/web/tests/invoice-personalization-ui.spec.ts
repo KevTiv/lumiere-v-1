@@ -122,10 +122,18 @@ for (const width of [320, 390, 768, 1440]) {
       } finally { await publisher.close() }
     })
 
-    test("long content, managed logo and light paper remain usable and issued snapshots ignore later defaults", async ({ page }, testInfo) => {
+    test("long content, managed logo and light paper remain usable and issued snapshots ignore later defaults", { tag: "@aside-fit" }, async ({ page }, testInfo) => {
       await page.getByRole("button", { name: "Load long synthetic content", exact: true }).click()
       const settings = page.getByTestId("invoice-profile-settings")
       await expect(settings.getByTestId("invoice-profile-notice")).toHaveText(/LONG-UNBROKEN-REFERENCE/)
+      if (width === 1440) {
+        await settings.evaluate((node) => { node.style.maxWidth = "40rem" })
+      }
+      const [fields, settingsPreview] = await Promise.all([
+        settings.locator("fieldset").boundingBox(),
+        settings.locator("aside").boundingBox(),
+      ])
+      expect(settingsPreview!.y).toBeGreaterThanOrEqual(fields!.y + fields!.height - 1)
       await noOverflow(page)
       await page.getByRole("button", { name: "Dark workspace", exact: true }).click()
       await expect(page.locator("html")).toHaveClass(/dark/)

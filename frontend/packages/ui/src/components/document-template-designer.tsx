@@ -593,6 +593,10 @@ export function DocumentTemplateDesigner({
   const translationRef = React.useRef(t)
   translationRef.current = t
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const blockLibraryToggleRef = React.useRef<HTMLButtonElement>(null)
+  const propertiesToggleRef = React.useRef<HTMLButtonElement>(null)
+  const blockLibraryId = React.useId()
+  const propertiesId = React.useId()
   const editButtonRef = React.useRef<HTMLButtonElement>(null)
   const editorRef = React.useRef<Editor | null>(null)
   const endDragRef = React.useRef<((cancel?: boolean) => void) | null>(null)
@@ -1115,10 +1119,12 @@ export function DocumentTemplateDesigner({
             variant="ghost"
             size="icon-sm"
             className="template-studio-blocks-toggle"
+            ref={blockLibraryToggleRef}
             aria-label={t("documents.studio.toggleBlockLibrary", {
               defaultValue: "Toggle block library",
             })}
             aria-expanded={panel === "blocks"}
+            aria-controls={blockLibraryId}
             onClick={() => setPanel(panel === "blocks" ? "canvas" : "blocks")}
           >
             <PanelLeft />
@@ -1246,10 +1252,12 @@ export function DocumentTemplateDesigner({
             variant="ghost"
             size="icon-sm"
             className="template-studio-properties-toggle"
+            ref={propertiesToggleRef}
             aria-label={t("documents.studio.togglePropertiesPanel", {
               defaultValue: "Toggle properties panel",
             })}
             aria-expanded={panel === "properties"}
+            aria-controls={propertiesId}
             onClick={() =>
               setPanel(panel === "properties" ? "canvas" : "properties")
             }
@@ -1268,6 +1276,7 @@ export function DocumentTemplateDesigner({
       ) : null}
       <div className="template-studio-body">
         <aside
+          id={blockLibraryId}
           className="template-studio-library"
           aria-label={t("documents.studio.templateBlocks", {
             defaultValue: "Template blocks",
@@ -1286,7 +1295,10 @@ export function DocumentTemplateDesigner({
               aria-label={t("documents.studio.closeBlockLibrary", {
                 defaultValue: "Close block library",
               })}
-              onClick={() => setPanel("canvas")}
+              onClick={() => {
+                setPanel("canvas")
+                blockLibraryToggleRef.current?.focus()
+              }}
             >
               <X />
             </Button>
@@ -1551,6 +1563,7 @@ export function DocumentTemplateDesigner({
           </div>
         </div>
         <aside
+          id={propertiesId}
           className="template-studio-inspector"
           aria-label={t("documents.studio.blockProperties", {
             defaultValue: "Block properties",
@@ -1569,7 +1582,10 @@ export function DocumentTemplateDesigner({
               aria-label={t("documents.studio.closePropertiesPanel", {
                 defaultValue: "Close properties panel",
               })}
-              onClick={() => setPanel("canvas")}
+              onClick={() => {
+                setPanel("canvas")
+                propertiesToggleRef.current?.focus()
+              }}
             >
               <X />
             </Button>

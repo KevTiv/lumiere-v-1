@@ -47,15 +47,27 @@ test.describe("Phase 9 edge modules smoke", { tag: "@phase-9" }, () => {
     await expectNoAppError(page)
   })
 
-  test("map loads, map view appears, and layer legend is visible", async ({ page }) => {
+  test("map loads and keeps fleet controls reachable in a narrow workspace", { tag: "@aside-fit" }, async ({ page }) => {
     await page.goto("/map")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
 
     await expect(page.getByText(/loading map/i)).toBeHidden({ timeout: 30_000 })
-    await expect(page.getByTestId("map-view")).toBeVisible()
+    const map = page.getByTestId("map-view")
+    await expect(map).toBeVisible()
+    const mapNode = await map.elementHandle()
 
     await expect(page.getByTestId("map-layer-warehouse")).toBeVisible()
-    await expect(page.getByText(/summary|warehouse|vehicle|pos/i).first()).toBeVisible()
+    await page.setViewportSize({ width: 390, height: 720 })
+    const trigger = page.getByRole("button", { name: "Map controls" })
+    await trigger.press("Enter")
+    const panel = page.getByRole("complementary", { name: "Summary", exact: true })
+    await expect(panel.getByRole("heading", { name: "Summary", exact: true })).toBeFocused()
+    await expect(panel.getByRole("button", { name: "Add vehicle" })).toBeVisible()
+    await expect(map).toBeHidden()
+    await page.keyboard.press("Escape")
+    await expect(trigger).toBeFocused()
+    await expect(map).toBeVisible()
+    expect(await mapNode?.evaluate((element) => element.isConnected)).toBe(true)
     await expectNoAppError(page)
   })
 })

@@ -21,7 +21,7 @@ export function FinanceReviewWorkspace({ editor, preview, context, editorLabel, 
   const { t } = useTranslation()
   const [mode, setMode] = useState<ReviewMode>(initialView)
   return (
-    <section className="flex min-w-0 flex-col gap-4" data-testid="finance-review-workspace">
+    <section className="@container/finance-review flex min-w-0 flex-col gap-4" data-testid="finance-review-workspace">
       {context}
       <Tabs className="flex-col" value={mode} onValueChange={(value) => setMode(value as ReviewMode)}>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -33,9 +33,9 @@ export function FinanceReviewWorkspace({ editor, preview, context, editorLabel, 
         </TabsList>
         </div>
         <TabsContent value={mode} keepMounted>
-          <div className={cn("grid min-w-0 items-start gap-5", mode === "review" && "xl:grid-cols-2")}>
+          <div className={cn("grid min-w-0 items-start gap-5", mode === "review" && "@min-[58rem]/finance-review:grid-cols-2")}>
             <div hidden={mode === "document"} className="min-w-0" data-testid="finance-review-editor">{editor}</div>
-            <aside hidden={mode === "edit"} className="min-w-0 xl:sticky xl:top-0" data-testid="finance-review-document">{preview}</aside>
+            <aside hidden={mode === "edit"} className={cn("min-w-0", mode === "review" && "@min-[58rem]/finance-review:sticky @min-[58rem]/finance-review:top-0")} data-testid="finance-review-document">{preview}</aside>
           </div>
         </TabsContent>
       </Tabs>

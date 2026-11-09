@@ -218,83 +218,85 @@ export function SettingsModule({
   }
 
   return (
-    <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start", className)}>
-      <nav aria-label={t("settings.page.title")} className="min-w-0 lg:sticky lg:top-4">
-        {active ? (
-          <div className="space-y-1 lg:hidden">
-            <label htmlFor={sectionId} className="text-sm font-medium">
-              {t("settings.selectSection", { defaultValue: "Settings section" })}
-            </label>
-            <Select value={active.id} onValueChange={selectSection}>
-              <SelectTrigger id={sectionId} className="h-10 rounded-md">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {groups.map((group) => (
-                  <SelectGroup key={group.id}>
-                    <SelectLabel>
-                      {t(`settings.groups.${group.id}`, {
-                        defaultValue: group.title,
-                      })}
-                    </SelectLabel>
-                    {group.sections.map((section) => (
-                      <SelectItem key={section.id} value={section.id}>
-                        {section.title}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-        {isAdmin() && (
-          <Badge variant="outline" className="mb-3 hidden gap-1 border-border text-muted-foreground lg:inline-flex">
-            <Shield className="h-3 w-3" />
-            {t("settings.adminAccess")}
-          </Badge>
-        )}
-        <div className="hidden max-h-[calc(100dvh-6rem)] flex-col gap-5 overflow-y-auto p-1 lg:flex">
-          {groups.map((group) => (
-            <div key={group.id} className="flex flex-col gap-1">
-              <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">
-                {t(`settings.groups.${group.id}`, { defaultValue: group.title })}
-              </p>
-              {group.sections.map((section) => {
-                const isActive = section.id === active?.id
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    data-testid={`settings-section-${section.id}`}
-                    aria-current={isActive ? "page" : undefined}
-                    className={cn(
-                      "flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isActive
-                        ? "bg-muted font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                    )}
-                    onClick={() => selectSection(section.id)}
-                  >
-                    <section.Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 [overflow-wrap:anywhere]">{section.title}</span>
-                  </button>
-                )
-              })}
+    <div className={cn("@container/settings min-w-0", className)} data-testid="settings-module">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 @min-[56rem]/settings:grid-cols-[220px_minmax(0,1fr)] @min-[56rem]/settings:items-start">
+        <nav aria-label={t("settings.page.title")} className="min-w-0 @min-[56rem]/settings:sticky @min-[56rem]/settings:top-4">
+          {active ? (
+            <div className="space-y-1 @min-[56rem]/settings:hidden">
+              <label htmlFor={sectionId} className="text-sm font-medium">
+                {t("settings.selectSection", { defaultValue: "Settings section" })}
+              </label>
+              <Select value={active.id} onValueChange={selectSection}>
+                <SelectTrigger id={sectionId} className="h-10 rounded-md">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((group) => (
+                    <SelectGroup key={group.id}>
+                      <SelectLabel>
+                        {t(`settings.groups.${group.id}`, {
+                          defaultValue: group.title,
+                        })}
+                      </SelectLabel>
+                      {group.sections.map((section) => (
+                        <SelectItem key={section.id} value={section.id}>
+                          {section.title}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ))}
-        </div>
-      </nav>
+          ) : null}
+          {isAdmin() && (
+            <Badge variant="outline" className="mb-3 hidden gap-1 border-border text-muted-foreground @min-[56rem]/settings:inline-flex">
+              <Shield className="h-3 w-3" />
+              {t("settings.adminAccess")}
+            </Badge>
+          )}
+          <div className="hidden max-h-[calc(100dvh-6rem)] flex-col gap-5 overflow-y-auto p-1 @min-[56rem]/settings:flex">
+            {groups.map((group) => (
+              <div key={group.id} className="flex flex-col gap-1">
+                <p className="px-2 pb-1 text-xs font-medium text-muted-foreground">
+                  {t(`settings.groups.${group.id}`, { defaultValue: group.title })}
+                </p>
+                {group.sections.map((section) => {
+                  const isActive = section.id === active?.id
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      data-testid={`settings-section-${section.id}`}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isActive
+                          ? "bg-muted font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                      )}
+                      onClick={() => selectSection(section.id)}
+                    >
+                      <section.Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 [overflow-wrap:anywhere]">{section.title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </nav>
 
-      {active ? (
-        <section aria-labelledby={headingId} className="min-w-0 space-y-6">
-          <header>
-            <h2 id={headingId} className="text-xl font-semibold tracking-[-0.02em]">{active.title}</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{active.description}</p>
-          </header>
-          {renderSectionContent()}
-        </section>
-      ) : null}
+        {active ? (
+          <section aria-labelledby={headingId} className="min-w-0 space-y-6">
+            <header>
+              <h2 id={headingId} className="text-xl font-semibold tracking-[-0.02em]">{active.title}</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{active.description}</p>
+            </header>
+            {renderSectionContent()}
+          </section>
+        ) : null}
+      </div>
     </div>
   )
 }

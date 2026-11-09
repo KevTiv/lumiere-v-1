@@ -12,7 +12,7 @@ for (const width of [320, 390]) {
     test.use({ viewport: { width, height: 844 } })
     test.describe.configure({ timeout: 60_000 })
 
-    test("opens a loaded run and keeps technical lookup drafts through keyboard disclosure", async ({ page }, testInfo) => {
+    test("opens a loaded run and keeps technical lookup drafts through keyboard disclosure", { tag: "@aside-fit" }, async ({ page }, testInfo) => {
       const requests: Array<{ path: string; body: Record<string, unknown> }> = []
       await page.route("**/api/ai/**", async (route) => {
         const request = route.request()
@@ -46,6 +46,8 @@ for (const width of [320, 390]) {
       await diagnostics.focus()
       await page.keyboard.press("Enter")
       await expect(page.locator("code").filter({ hasText: checkpointHash })).toBeVisible()
+      const checkpoint = page.getByTestId("harness-inspector").filter({ has: diagnostics })
+      expect(await checkpoint.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
       await noPageOverflow(page)
       expect(requests.every((request) => request.path.endsWith("/history") || request.path.endsWith("/runs/inspect") || (request.body.intent as { kind?: string })?.kind === "inspect")).toBe(true)
       await page.screenshot({ path: testInfo.outputPath(`run-inspector-${width}.png`) })

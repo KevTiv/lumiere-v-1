@@ -180,7 +180,7 @@ export function InvoicePersonalizationEditor(props: InvoicePersonalizationEditor
 
   return <Card className={cn(workspaceStyles.surface, "min-w-0")} data-testid="invoice-profile-settings">
     <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>Invoice appearance and content</CardTitle><CardDescription className={workspaceStyles.sectionDescription}>Publish organization defaults or overrides for one company. Omitted fields inherit; an empty customized field clears its content. Issued invoices keep their frozen document.</CardDescription></CardHeader>
-    <CardContent className="min-w-0 space-y-5">
+    <CardContent className="@container/invoice-settings min-w-0 space-y-5">
       <div className="grid min-w-0 gap-3 sm:grid-cols-2"><div className="min-w-0 space-y-2"><Label htmlFor={`${formId}-scope`}>Settings scope</Label><Select
         value={String(mode ?? "")}
         onValueChange={(nextValue) => void changeMode(nextValue as "company" | "organization")}
@@ -202,7 +202,7 @@ export function InvoicePersonalizationEditor(props: InvoicePersonalizationEditor
       {scopeChanged ? <div role="alert" className="space-y-3 rounded-lg border p-4"><p>The selected company changed. Unpublished edits and any pending result still belong to {boundScope.name}.</p><Button className={actionClass} variant="outline" disabled={busy || uncertain !== null} onClick={async () => { if (!dirty || await confirmDiscard()) adopt(desired, currentVersion) }}>Discard edits and use selected company</Button></div> : null}
       {!allowed ? <p role="status" className="text-sm text-muted-foreground">Publishing requires document template creation and write access to this {boundScope.companyId === null ? "organization" : "company"}.</p> : null}
       {newerVersion && dirty ? <div role="alert" className="space-y-3 rounded-lg border p-4"><p>A newer version was published while you were editing. Your edits are retained. Reload the current version before publishing.</p><Button className={actionClass} variant="outline" disabled={busy || uncertain !== null} onClick={async () => { if (await confirmDiscard()) adopt(desired, currentVersion) }}>Reload latest version</Button></div> : null}
-      {state.status === "ready" && !scopeChanged ? <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      {state.status === "ready" && !scopeChanged ? <div className="grid min-w-0 gap-6 @min-[58rem]/invoice-settings:grid-cols-2">
         <fieldset disabled={!editable} className={workspaceStyles.formSection}>
           {INVOICE_PROFILE_FIELDS.map((key) => {
             const overridden = Object.prototype.hasOwnProperty.call(values, key)

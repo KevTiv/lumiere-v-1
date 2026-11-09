@@ -9,6 +9,7 @@ import { KanbanCardContent } from "@lumiere/ui/kanban/kanban-card"
 import { Badge } from "@lumiere/ui/components/badge"
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -679,7 +680,7 @@ export function WorkflowWorkContent({
           }
         }}
       >
-        <SheetContent size="record">
+        <SheetContent size="record" layout="bounded">
           <SheetHeader>
             <SheetTitle>
               {current ? taskTitle(current) : t("workBoard.assignment")}
@@ -689,7 +690,7 @@ export function WorkflowWorkContent({
             </SheetDescription>
           </SheetHeader>
           {review && current && (
-            <div className="space-y-4 p-4">
+            <SheetBody className="space-y-4">
               <p className="text-sm">{current.nodeKey ?? current.node_key}</p>
               <Badge variant="secondary">
                 {t(`workBoard.status.${workStatus(current) ?? "Open"}`)}
@@ -817,7 +818,7 @@ export function WorkflowWorkContent({
                 </p>
               )}
               {!online && <p role="alert">{t("workBoard.offline")}</p>}
-            </div>
+            </SheetBody>
           )}
         </SheetContent>
       </Sheet>
