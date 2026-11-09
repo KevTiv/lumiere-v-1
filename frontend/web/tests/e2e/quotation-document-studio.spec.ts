@@ -155,8 +155,12 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
 
       await staffPage.setViewportSize({ width: 390, height: 340 })
       const saveQuotation = dialog.getByRole("button", { name: "Save quotation PDF", exact: true })
-      await saveQuotation.scrollIntoViewIfNeeded()
-      await expect(saveQuotation).toBeInViewport()
+      // Chromium can finish the resize after the first scroll. Recheck the
+      // reachable action against the settled layout, including the whole button.
+      await expect(async () => {
+        await saveQuotation.scrollIntoViewIfNeeded()
+        await expect(saveQuotation).toBeInViewport({ ratio: 1, timeout: 1_000 })
+      }).toPass({ timeout: 10_000 })
       await expect(saveQuotation).toBeEnabled()
       await staffPage.setViewportSize({ width: 1440, height: 900 })
 

@@ -81,6 +81,8 @@ interface ModularFormProps {
   renderPreview?: FormPreviewRenderer
   /** Keep actions outside the scrolling body when embedded in a constrained dialog. */
   scrollable?: boolean
+  /** Additional context above the fields, inside their scroll area. */
+  bodyIntro?: React.ReactNode
   /**
    * Autosave unsaved values to this browser and restore them when the form
    * reopens. Set `false` for credential or otherwise sensitive forms.
@@ -105,6 +107,7 @@ export function ModularForm({
   onDirtyChange,
   renderPreview,
   scrollable = false,
+  bodyIntro,
   draft = true,
   draftKey,
 }: ModularFormProps) {
@@ -424,13 +427,22 @@ export function ModularForm({
     const field = Array.from(body.querySelectorAll<HTMLElement>("[data-form-field]"))
       .find((element) => element.dataset.formField === name)
     if (!field) return
-    field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
+    const control = field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')
+    control?.focus({ preventScroll: true })
     if (scrollable && body.scrollHeight > body.clientHeight) {
-      const fieldRect = field.getBoundingClientRect()
       const bodyRect = body.getBoundingClientRect()
-      if (fieldRect.top < bodyRect.top || fieldRect.bottom > bodyRect.bottom) {
-        body.scrollTop += fieldRect.top - bodyRect.top - 16
+      let { top, bottom } = field.getBoundingClientRect()
+      if (bottom - top > body.clientHeight && control) {
+        const controlRect = control.getBoundingClientRect()
+        const messageRect = field.querySelector('[role="alert"]')?.getBoundingClientRect()
+        // If a long label fills the scrollport, keep the focused control and its error together.
+        top = controlRect.top
+        bottom = messageRect && messageRect.bottom - top <= body.clientHeight
+          ? Math.max(controlRect.bottom, messageRect.bottom)
+          : controlRect.bottom
       }
+      if (top < bodyRect.top) body.scrollTop += top - bodyRect.top
+      else if (bottom > bodyRect.bottom) body.scrollTop += bottom - bodyRect.bottom
     } else {
       field.scrollIntoView?.({ block: "nearest" })
     }
@@ -672,6 +684,7 @@ export function ModularForm({
               {onExplainError ? <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => onExplainError(visibleSubmitError)}>{t("aiChat.errorHelp.explain", { defaultValue: "Explain this error" })}</Button> : null}
             </div>
           ) : null}
+          {bodyIntro}
           {fieldsContent}
         </div>
         {hasPreview ? (

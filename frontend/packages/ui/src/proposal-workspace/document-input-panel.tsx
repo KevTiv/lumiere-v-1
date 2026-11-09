@@ -13,13 +13,21 @@ interface DocumentInputPanelProps {
   dispatch: React.Dispatch<WorkspaceAction>
   onAnalyze: () => void
   isAnalyzing: boolean
+  onRenameSource: (source: SourceDocument, name: string) => void
+  onSaveSource: (source: SourceDocument) => void
+  savingSourceId: string | null
+  dirtySourceIds: string[]
+  saveError: string | null
 }
 
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length
 }
 
-export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }: DocumentInputPanelProps) {
+export function DocumentInputPanel({
+  sources, dispatch, onAnalyze, isAnalyzing, onRenameSource, onSaveSource,
+  savingSourceId, dirtySourceIds, saveError,
+}: DocumentInputPanelProps) {
   const { t } = useTranslation()
   const [activeSourceId, setActiveSourceId] = useState<string | null>(
     sources.length > 0 ? sources[0].id : null
@@ -28,9 +36,10 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeSource = sources.find((s) => s.id === activeSourceId) ?? null
+  const isSavingActiveSource = savingSourceId !== null && savingSourceId === activeSourceId
 
   const addBlankSource = () => {
-    const id = `src-${Date.now()}`
+    const id = `src-${crypto.randomUUID()}`
     const newSource: SourceDocument = {
       id,
       name: t("proposalWorkspace.documentInputPanel.documentName", { count: sources.length + 1 }),
@@ -47,7 +56,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
     try {
       const text = await navigator.clipboard.readText()
       if (!activeSourceId) {
-        const id = `src-${Date.now()}`
+        const id = `src-${crypto.randomUUID()}`
         dispatch({
           type: "ADD_SOURCE",
           source: { id, name: t("proposalWorkspace.documentInputPanel.documentName", { count: sources.length + 1 }), content: text, type: "pasted", wordCount: countWords(text), addedAt: new Date() },
@@ -83,7 +92,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
       const reader = new FileReader()
       reader.onload = (ev) => {
         const content = ev.target?.result as string
-        const id = `src-${Date.now()}`
+        const id = `src-${crypto.randomUUID()}`
         dispatch({
           type: "ADD_SOURCE",
           source: { id, name: file.name, content, type: "uploaded", wordCount: countWords(content), addedAt: new Date() },
@@ -101,7 +110,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
     const reader = new FileReader()
     reader.onload = (ev) => {
       const content = ev.target?.result as string
-      const id = `src-${Date.now()}`
+      const id = `src-${crypto.randomUUID()}`
       dispatch({
         type: "ADD_SOURCE",
         source: { id, name: file.name, content, type: "uploaded", wordCount: countWords(content), addedAt: new Date() },
@@ -162,6 +171,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
                 variant="ghost"
                 aria-label={`${t("common.delete")} ${src.name}`}
                 onClick={() => handleRemoveSource(src.id)}
+                disabled={savingSourceId === src.id}
               >
                 <X aria-hidden="true" />
               </Button>
@@ -211,25 +221,20 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
             <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
               <input
                 value={activeSource.name}
-                onChange={(e) => {
-                  const updated = { ...activeSource, name: e.target.value }
-                  dispatch({ type: "UPDATE_SOURCE_CONTENT", id: activeSource.id, content: activeSource.content })
-                  // Update name via a workaround — re-add with same id
-                  dispatch({ type: "REMOVE_SOURCE", id: activeSource.id })
-                  dispatch({ type: "ADD_SOURCE", source: { ...updated, name: e.target.value } })
-                  setActiveSourceId(activeSource.id)
-                }}
+                onChange={(e) => onRenameSource(activeSource, e.target.value)}
+                disabled={isSavingActiveSource}
                 className="min-w-0 flex-1 border-0 bg-transparent text-xs font-medium text-foreground outline-none"
               />
               <span className="text-xs text-muted-foreground shrink-0">
                 {t("proposalWorkspace.documentInputPanel.wordCount", { count: activeSource.wordCount })}
               </span>
-              <Button size="sm" variant="ghost" onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title={t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}>
+              <Button size="sm" variant="ghost" disabled={isSavingActiveSource} onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title={t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}>
                 <Clipboard className="h-3.5 w-3.5" />
               </Button>
             </div>
             <Textarea variant="plain"
               value={activeSource.content}
+              disabled={isSavingActiveSource}
               onChange={(e) => handleContentChange(e.target.value)}
               placeholder={t("proposalWorkspace.documentInputPanel.pasteRfp")}
               className="field-sizing-fixed min-h-32 flex-1 resize-none rounded-none border-0 p-3 font-mono text-xs leading-relaxed text-foreground shadow-none focus-visible:ring-0 md:text-xs"
@@ -239,8 +244,21 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
         )}
       </div>
 
-      {/* Analyze button */}
-      <div className="px-4 py-3 border-t border-border bg-background shrink-0">
+      {saveError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{saveError}</p>}
+
+      {/* Saving a draft and analysing its contents are separate actions. */}
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-border bg-background px-4 py-3">
+        {activeSource && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-auto min-h-8 w-full whitespace-normal"
+            disabled={savingSourceId !== null || !dirtySourceIds.includes(activeSource.id)}
+            onClick={() => onSaveSource(activeSource)}
+          >
+            {isSavingActiveSource ? t("common.saving") : t("common.save")}
+          </Button>
+        )}
         <Button
           className="h-auto min-h-8 w-full gap-2 whitespace-normal"
           size="sm"

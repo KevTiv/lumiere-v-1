@@ -169,7 +169,7 @@ export interface ProposalWorkspaceHooks {
     aiSuggestion?: string | null
   }>
   useDeleteProposalSection: () => MutationResult<{ sectionId: bigint | number | string }>
-  useAddProposalSourceDoc: () => MutationResult<{
+  useAddProposalSourceDoc: () => AsyncMutationResult<{
     proposalId: bigint | number | string
     name: string
     content: string
@@ -177,7 +177,7 @@ export interface ProposalWorkspaceHooks {
     wordCount: number
   }>
   useDeleteProposalSourceDoc: () => MutationResult<{ docId: bigint | number | string }>
-  useUpdateProposalSourceDoc: () => MutationResult<{
+  useUpdateProposalSourceDoc: () => AsyncMutationResult<{
     docId: bigint | number | string
     name?: string
     content?: string
@@ -481,11 +481,48 @@ export function ProposalWorkspace({
     [procurementScoreList, proposalId],
   )
 
-  const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
+  // Keep editable drafts separate from query snapshots. Creating a source has no
+  // returned ID, so a new draft is saved explicitly and never guessed onto a row.
+  const sourceScope = `${organizationId}:${_companyId}:${proposalId}`
+  const currentSourceScope = useRef(sourceScope)
+  currentSourceScope.current = sourceScope
+  const [sourceDraftState, setSourceDraftState] = useState<{
+    scope: string
+    drafts: Record<string, { source: SourceDocument; saved: boolean }>
+  }>({ scope: sourceScope, drafts: {} })
+  const [savingSource, setSavingSource] = useState<{ scope: string; id: string } | null>(null)
+  const sourceSaveInFlight = useRef(false)
+  const [sourceSaveError, setSourceSaveError] = useState<{ scope: string; message: string } | null>(null)
+  const persistedSources = useMemo(() => proposalSourceDocs.map(mapSourceDocRow), [proposalSourceDocs])
+  const sourceDrafts = useMemo(
+    () => sourceDraftState.scope === sourceScope ? sourceDraftState.drafts : {},
+    [sourceDraftState, sourceScope],
+  )
+  const draftSources = useMemo(() => [
+    ...persistedSources.map((source) => sourceDrafts[source.id]?.source ?? source),
+    ...Object.values(sourceDrafts)
+      .filter(({ source }) => !persistedSources.some((row) => row.id === source.id))
+      .map(({ source }) => source),
+  ], [persistedSources, sourceDrafts])
 
   useEffect(() => {
-    setDraftSources(proposalSourceDocs.map(mapSourceDocRow))
-  }, [proposalSourceDocs])
+    // A successful update can finish before the refreshed query arrives. Keep its
+    // content until the saved row is read back, without clearing newer local edits.
+    const acknowledged = persistedSources.filter((row) => {
+      const draft = sourceDrafts[row.id]
+      return draft?.saved && draft.source.name === row.name
+        && draft.source.content === row.content && draft.source.type === row.type
+    })
+    if (acknowledged.length === 0) return
+    setSourceDraftState((previous) => {
+      if (previous.scope !== sourceScope) return previous
+      const drafts = { ...previous.drafts }
+      for (const row of acknowledged) {
+        if (drafts[row.id] === sourceDrafts[row.id]) delete drafts[row.id]
+      }
+      return { scope: sourceScope, drafts }
+    })
+  }, [persistedSources, sourceDrafts, sourceScope])
 
   // Active section data
   const activeSection = activeSectionId
@@ -576,59 +613,70 @@ export function ProposalWorkspace({
     [templatesList, _companyId],
   )
 
-  const sourceDispatch = useCallback(
-    (action: WorkspaceAction) => {
-      switch (action.type) {
-        case "ADD_SOURCE":
-          addSourceDoc.mutate({
-            proposalId: proposalIdBig,
-            name: action.source.name,
-            content: action.source.content,
-            docType: action.source.type,
-            wordCount: action.source.wordCount,
-          })
-          break
-        case "REMOVE_SOURCE": {
-          const id = action.id
-          if (/^\d+$/.test(id)) {
-            deleteSourceDoc.mutate({ docId: BigInt(id) })
-          }
-          break
-        }
-        case "UPDATE_SOURCE_CONTENT": {
-          const id = action.id
-          if (/^\d+$/.test(id)) {
-            updateSourceDoc.mutate({
-              docId: BigInt(id),
-              content: action.content,
-              wordCount: countWords(action.content),
-            })
-          }
-          break
-        }
-        default:
-          break
-      }
+  const editSource = useCallback((source: SourceDocument) => {
+    setSourceDraftState((previous) => ({
+      scope: sourceScope,
+      drafts: {
+        ...(previous.scope === sourceScope ? previous.drafts : {}),
+        [source.id]: { source, saved: false },
+      },
+    }))
+  }, [sourceScope])
 
-      setDraftSources((prev) => {
-        switch (action.type) {
-          case "ADD_SOURCE":
-            return [...prev, action.source]
-          case "REMOVE_SOURCE":
-            return prev.filter((s) => s.id !== action.id)
-          case "UPDATE_SOURCE_CONTENT":
-            return prev.map((s) =>
-              s.id === action.id
-                ? { ...s, content: action.content, wordCount: countWords(action.content) }
-                : s,
-            )
-          default:
-            return prev
-        }
+  const sourceDispatch = useCallback((action: WorkspaceAction) => {
+    if (action.type === "ADD_SOURCE") {
+      editSource(action.source)
+    } else if (action.type === "REMOVE_SOURCE") {
+      if (/^\d+$/.test(action.id)) deleteSourceDoc.mutate({ docId: BigInt(action.id) })
+      setSourceDraftState((previous) => {
+        if (previous.scope !== sourceScope) return previous
+        const drafts = { ...previous.drafts }
+        delete drafts[action.id]
+        return { scope: sourceScope, drafts }
       })
-    },
-    [addSourceDoc, deleteSourceDoc, updateSourceDoc, proposalIdBig],
-  )
+    } else if (action.type === "UPDATE_SOURCE_CONTENT") {
+      const source = draftSources.find((row) => row.id === action.id)
+      if (source) editSource({ ...source, content: action.content, wordCount: countWords(action.content) })
+    }
+  }, [deleteSourceDoc, draftSources, editSource, sourceScope])
+
+  const handleSaveSource = useCallback(async (source: SourceDocument) => {
+    if (sourceSaveInFlight.current) return
+    sourceSaveInFlight.current = true
+    setSavingSource({ scope: sourceScope, id: source.id })
+    setSourceSaveError(null)
+    const isPersisted = /^\d+$/.test(source.id)
+    const params = {
+      name: source.name,
+      content: source.content,
+      docType: source.type,
+      wordCount: source.wordCount,
+    }
+    try {
+      if (isPersisted) {
+        await updateSourceDoc.mutateAsync({ docId: BigInt(source.id), ...params })
+      } else {
+        await addSourceDoc.mutateAsync({ proposalId: proposalIdBig, ...params })
+      }
+      setSourceDraftState((previous) => {
+        if (previous.scope !== sourceScope || previous.drafts[source.id]?.source !== source) return previous
+        const drafts = { ...previous.drafts }
+        if (isPersisted) drafts[source.id] = { source, saved: true }
+        else delete drafts[source.id]
+        return { scope: sourceScope, drafts }
+      })
+      if (currentSourceScope.current === sourceScope) {
+        showWorkflowToast({ kind: "success", title: t("common.actionCompleted", { action: t("common.save") }) })
+      }
+    } catch (error) {
+      if (currentSourceScope.current === sourceScope) {
+        setSourceSaveError({ scope: sourceScope, message: error instanceof Error ? error.message : t("common.error.generic") })
+      }
+    } finally {
+      sourceSaveInFlight.current = false
+      setSavingSource(null)
+    }
+  }, [addSourceDoc, updateSourceDoc, proposalIdBig, sourceScope, t])
 
   // ── Presence cleanup on unmount ─────────────────────────────────────────────
   const clearPresenceMutateRef = useRef(clearPresence.mutate)
@@ -1568,6 +1616,11 @@ export function ProposalWorkspace({
                   dispatch={sourceDispatch}
                   onAnalyze={handleAnalyze}
                   isAnalyzing={isAnalyzing}
+                  onRenameSource={(source, name) => editSource({ ...source, name })}
+                  onSaveSource={(source) => void handleSaveSource(source)}
+                  savingSourceId={savingSource?.scope === sourceScope ? savingSource.id : null}
+                  dirtySourceIds={Object.keys(sourceDrafts).filter((id) => !sourceDrafts[id].saved)}
+                  saveError={sourceSaveError?.scope === sourceScope ? sourceSaveError.message : null}
                 />
               )}
 

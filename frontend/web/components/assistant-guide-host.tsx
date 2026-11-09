@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AssistantGuideModal } from "@lumiere/ui"
-import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import { isSavedGuide, type GuideDraft, type GuideDocument, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
@@ -36,14 +34,17 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loadRetry, setLoadRetry] = useState(0)
+  const [activeLoad, setActiveLoad] = useState<{ request: OpenGuideRequest | null; scope: string } | null>(null)
   const [verificationUnavailable, setVerificationUnavailable] = useState(false)
   const retryVerification = useRef<(() => void) | null>(null)
   const verificationRead = useRef(0)
-  const document = state?.scope === scope ? state.document : null
+  const sameLoad = activeLoad !== null && activeLoad.request === request && activeLoad.scope === scope
+  const document = sameLoad && state?.scope === scope ? state.document : null
 
   useEffect(() => {
     const epoch = ++generation.current
     const controller = new AbortController()
+    setActiveLoad({ request, scope })
     setState(null)
     setHistory([])
     setError(null)
@@ -141,15 +142,9 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
   }
 
   if (!request) return null
-  if (!document) return <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-    <DialogContent size="confirmation">
-      <DialogHeader>
-        <DialogTitle>{t("aiChat.guide.document", { defaultValue: "ERP guide" })}</DialogTitle>
-        <DialogDescription>{busy ? t("aiChat.guide.loading", { defaultValue: "Loading the guide in your current access scope…" }) : error ?? t("aiChat.guide.unavailable", { defaultValue: "This guide is unavailable in the current company." })}</DialogDescription>
-      </DialogHeader>
-      {error ? <DialogFooter><Button variant="outline" disabled={busy} onClick={() => setLoadRetry((attempt) => attempt + 1)}>{t("aiChat.guide.retryAccess", { defaultValue: "Retry access check" })}</Button></DialogFooter> : null}
-    </DialogContent>
-  </Dialog>
+  if (!document) return <AssistantGuideModal open onOpenChange={(open) => { if (!open) onClose() }}
+    document={null} loading={!sameLoad || busy} loadError={sameLoad ? error : null}
+    onRetryLoad={sameLoad && error ? () => setLoadRetry((attempt) => attempt + 1) : undefined} />
 
   return <AssistantGuideModal open onOpenChange={(open) => { if (!open) onClose() }}
     document={document} onSave={save} busy={busy} error={error} history={history}

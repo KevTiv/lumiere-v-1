@@ -11,6 +11,7 @@ import {
   gotoModule,
   openEntityCreate,
   selectModuleTab,
+  scalarQueryId,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -112,6 +113,18 @@ test.describe("ERP module smoke", () => {
     await expect(ai).toBeFocused()
     await ai.click()
     await expect(sourceDraft).toHaveValue("Local source document draft")
+    const [saveSourceResponse] = await Promise.all([
+      page.waitForResponse((response) => matchesOperationResponse(response, "add_proposal_source_doc")),
+      aiPanel.getByRole("button", { name: "Save", exact: true }).click(),
+    ])
+    expect(saveSourceResponse.ok()).toBe(true)
+    await expect.poll(async () => {
+      const response = await page.request.get("/api/query/proposal-source-docs")
+      expect(response.ok()).toBe(true)
+      const body = await response.json() as { data: Array<{ proposalId: unknown; content: string }> }
+      return body.data.filter((row) => String(scalarQueryId(row.proposalId)) === String(proposalId))
+        .map((row) => row.content)
+    }).toEqual(["Local source document draft"])
     expect(await aiPanel.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
     await workspace.getByRole("button", { name: "Version History", exact: true }).click()
     await expect(workspace.getByRole("complementary", { name: "Version History", exact: true })).toBeVisible()

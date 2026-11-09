@@ -52,6 +52,29 @@ const edit = (value: string) =>
 const cancel = () => fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
 
 describe("FormModal unsaved-changes guard", () => {
+  it("keeps one dialog through initial loading, retry and editing", async () => {
+    const onRetry = vi.fn()
+    const props = { open: true, onOpenChange: vi.fn(), config, onSubmit: vi.fn(), draft: false as const }
+    const { rerender } = render(<FormModal {...props} initialState={{ status: "loading", label: "Loading saved note" }} />)
+    const dialog = screen.getByRole("dialog", { name: "New note" })
+    expect(screen.getByRole("status").textContent).toBe("Loading saved note")
+    expect(screen.queryByTestId("form-submit-new-note")).toBeNull()
+
+    rerender(<FormModal {...props} initialState={{ status: "error", message: "Could not load the note", onRetry }} />)
+    expect(screen.getByRole("dialog", { name: "New note" })).toBe(dialog)
+    expect(screen.getByRole("alert").textContent).toBe("Could not load the note")
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }))
+    expect(onRetry).toHaveBeenCalledOnce()
+
+    rerender(<FormModal {...props} />)
+    expect(screen.getByRole("dialog", { name: "New note" })).toBe(dialog)
+    expect(screen.queryByRole("status")).toBeNull()
+    edit("Keep these edits")
+    rerender(<FormModal {...props} isPending />)
+    expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("Keep these edits")
+    expect(dialog.querySelector('[data-slot="dialog-skeleton"]')).toBeNull()
+  })
+
   it("opens help for a displayed error while preserving the failed form and unsaved-change protection", async () => {
     const onExplainError = vi.fn()
     const onSubmit = vi.fn(async () => { throw new Error("The period is closed") })

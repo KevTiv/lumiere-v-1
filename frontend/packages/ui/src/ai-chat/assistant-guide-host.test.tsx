@@ -39,6 +39,18 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+it("replaces the loading skeleton inside the same guide dialog", async () => {
+  let resolveGuide!: (guide: GuideDocument) => void
+  controls.read.mockReturnValueOnce(new Promise<GuideDocument>((resolve) => { resolveGuide = resolve }))
+  render(<AssistantGuideHost request={request} companyId={7} organizationId={1} onClose={vi.fn()} onSaved={vi.fn()} onAsk={controls.ask} />)
+  const dialog = screen.getByRole("dialog", { name: "ERP guide" })
+  expect(dialog.querySelector('[data-slot="dialog-skeleton"]')).toBeTruthy()
+
+  await act(async () => { resolveGuide(saved) })
+  expect(screen.getByRole("dialog", { name: "Original guide" })).toBe(dialog)
+  expect(dialog.querySelector('[data-slot="dialog-skeleton"]')).toBeNull()
+})
+
 for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalidation`, () => {
   const tree = () => owner === "modal"
     ? <AssistantGuideHost request={request} companyId={controls.companyId} organizationId={1} onClose={vi.fn()} onSaved={vi.fn()} onAsk={controls.ask} />

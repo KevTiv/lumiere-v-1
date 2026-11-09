@@ -6,6 +6,8 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@lumiere/ui/lib/utils"
 import { Button } from "@lumiere/ui/components/button"
 import { XIcon } from "lucide-react"
+import { useTranslation } from "@lumiere/i18n"
+import { Skeleton } from "./skeleton"
 import { constrainOverlayStyle, mergeOverlayClassName, overlayWidths, type OverlaySize } from "./overlay-sizes"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
@@ -137,6 +139,40 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+function DialogSkeleton({ label, variant = "form", className }: {
+  label?: string
+  variant?: "form" | "document"
+  className?: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <div role="status" data-slot="dialog-skeleton" className={cn("min-w-0 flex-1", className)}>
+      <span className="sr-only">{label ?? t("common.loading", { defaultValue: "Loading…" })}</span>
+      <div aria-hidden="true" className="space-y-4 [&_[data-slot=skeleton]]:motion-reduce:animate-none">
+        {variant === "document" ? (
+          <>
+            <Skeleton className="h-5 w-1/3" />
+            <Skeleton className="h-[min(40dvh,20rem)] w-full" />
+          </>
+        ) : (
+          <>
+            {[0, 1, 2].map((field) => (
+              <div key={field} className="space-y-2">
+                <Skeleton className="h-3 w-24 max-w-full" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))}
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Skeleton className="h-9 w-20 max-w-[40%]" />
+              <Skeleton className="h-9 w-28 max-w-[50%]" />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DialogFooter({
   className,
   showCloseButton = false,
@@ -202,6 +238,7 @@ export {
   DialogFooter,
   DialogHeader,
   DialogOverlay,
+  DialogSkeleton,
   DialogPortal,
   DialogTitle,
   DialogTrigger,

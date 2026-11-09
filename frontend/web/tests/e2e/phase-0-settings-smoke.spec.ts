@@ -50,7 +50,7 @@ test.describe("ERP phase-0 settings smoke @phase-0", () => {
     await settings.evaluate((element) => { element.style.maxWidth = "560px" })
     const picker = settings.getByRole("combobox", { name: "Settings section", exact: true })
     await expect(picker).toBeVisible()
-    await expect(picker).toContainText("Users")
+    await expect(picker).toHaveText("User Management")
     await expect(users).toBeHidden()
     await expect(page).toHaveURL(/[?&]section=users(?:&|$)/)
     await settings.evaluate((element) => { element.style.maxWidth = "" })

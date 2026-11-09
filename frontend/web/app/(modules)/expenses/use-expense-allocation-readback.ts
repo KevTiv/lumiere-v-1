@@ -59,6 +59,7 @@ export function useExpenseAllocationReadback(scope: ExpenseAllocationsScope, inv
   return {
     rows: activeSnapshot?.rows,
     initialized: Boolean(activeSnapshot),
+    loading: admitted && query.isFetching,
     state,
     ready,
     error: decodeError ?? (changed ? changedMessage : null),

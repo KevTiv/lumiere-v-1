@@ -41,7 +41,7 @@ test("conversation selection and reply survive a narrow container at desktop wid
   await reply.fill("Draft from the narrow layout")
   await workspace.evaluate((element) => { element.style.maxWidth = "" })
   await expect(list).toBeVisible()
-  await expect(reply).toHaveValue("Draft from the narrow layout")
+  await expect(reply).toHaveText("Draft from the narrow layout")
 
   await workspace.evaluate((element) => { element.style.maxWidth = "560px" })
   await expect(back).toBeVisible()
@@ -49,7 +49,7 @@ test("conversation selection and reply survive a narrow container at desktop wid
   await expect(thread).toBeFocused()
   await expect(search).toHaveValue("INV-0041")
   await thread.click()
-  await expect(reply).toHaveValue("Draft from the narrow layout")
+  await expect(reply).toHaveText("Draft from the narrow layout")
   await contained(page)
 })
 
@@ -74,7 +74,7 @@ test("blanket detail stacks in a narrow host without discarding release quantiti
   }).toBe(true)
   await expect(agreement).toHaveAttribute("aria-pressed", "true")
   await expect(quantity).toHaveValue("3")
-  await expect(form.getByRole("button", { name: "Release to PO", exact: true })).toBeEnabled()
+  await expect(form.getByRole("button", { name: "Release to purchase order", exact: true })).toBeEnabled()
   await contained(page)
 })
 
@@ -268,11 +268,11 @@ test("Journal geometry and a working draft survive a short viewport", { tag: "@a
   const save = panel.getByRole("button", { name: "Save Note", exact: true })
   await save.scrollIntoViewIfNeeded()
   await expect(save).toBeInViewport()
-  await expect(editor).toHaveValue("Retain this draft while resizing")
+  await expect(editor).toHaveText("Retain this draft while resizing")
 
   await panel.getByRole("button", { name: "Maximize", exact: true }).click()
   await panel.getByRole("button", { name: "Restore", exact: true }).click()
   await page.setViewportSize({ width: 1440, height: 950 })
   await expect(panel).toHaveCSS("width", "496px")
-  await expect(editor).toHaveValue("Retain this draft while resizing")
+  await expect(editor).toHaveText("Retain this draft while resizing")
 })

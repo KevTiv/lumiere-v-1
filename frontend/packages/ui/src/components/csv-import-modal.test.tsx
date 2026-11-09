@@ -26,10 +26,11 @@ vi.mock("./dialog", () => ({
   DialogBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogSkeleton: () => <div role="status">Loading…</div>,
   DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
 }))
-const config = { title: "Import employees", submitLabel: "Import", fields: [] } as FormConfig
+const config: FormConfig = { id: "import-employees", title: "Import employees", submitLabel: "Import", sections: [] }
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 async function chooseFile() {

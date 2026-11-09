@@ -38,6 +38,9 @@ const theirRow = { ...baseRow, content: "their text", revision: 4 }
 const EMPTY_QUERY = { data: [] as Record<string, unknown>[] }
 let sections: Record<string, unknown>[]
 let lineItems: Record<string, unknown>[]
+let sourceDocs: Record<string, unknown>[]
+let addSourceAsync: ReturnType<typeof vi.fn>
+let updateSourceAsync: ReturnType<typeof vi.fn>
 let upsertMutate: ReturnType<typeof vi.fn>
 let resolveAsync: ReturnType<typeof vi.fn>
 
@@ -48,6 +51,9 @@ function makeHooks(): ProposalWorkspaceHooks {
       get: (_target, name: string) => {
         if (name === "useProposalSections") return () => ({ data: sections })
         if (name === "useProposalLineItems") return () => ({ data: lineItems })
+        if (name === "useProposalSourceDocs") return () => ({ data: sourceDocs })
+        if (name === "useAddProposalSourceDoc") return () => ({ mutateAsync: addSourceAsync, isPending: false })
+        if (name === "useUpdateProposalSourceDoc") return () => ({ mutateAsync: updateSourceAsync, isPending: false })
         if (QUERY_HOOKS.has(name)) return () => EMPTY_QUERY
         if (name === "useUpsertProposalSection") return () => ({ mutate: upsertMutate, isPending: false })
         if (name === "useResolveProposalSectionConflict") return () => ({ mutateAsync: resolveAsync, isPending: false })
@@ -80,6 +86,9 @@ beforeEach(() => {
   toasts.show.mockClear()
   sections = [baseRow]
   lineItems = []
+  sourceDocs = []
+  addSourceAsync = vi.fn().mockResolvedValue(undefined)
+  updateSourceAsync = vi.fn().mockResolvedValue(undefined)
   upsertMutate = vi.fn((_params, options?: { onError?: (e: unknown) => void; onSettled?: () => void }) => {
     sections = [theirRow] // the invalidated sections query now holds the server's version
     options?.onError?.(conflictError)
@@ -263,5 +272,79 @@ describe("proposal totals", () => {
     )
 
     expect(displayedValue()).toBe("$4,500")
+  })
+})
+
+
+describe("proposal source drafts", () => {
+  const sourceRow = { id: 41n, proposalId: "1", name: "RFP", content: "Saved source", docType: "pasted", wordCount: 2, addedAt: 1000 }
+  const sourceEditor = () => screen.getByPlaceholderText("proposalWorkspace.documentInputPanel.pasteRfp") as HTMLTextAreaElement
+  const openSources = () => fireEvent.click(screen.getByRole("button", { name: "proposalWorkspace.sourceDocs" }))
+  const refresh = (view: ReturnType<typeof renderWorkspace>) => view.rerender(
+    <ProposalWorkspace proposalId="1" proposalTitle="Bid" organizationId={1n} companyId={1n} onAnalyze={vi.fn()} hooks={makeHooks()} />,
+  )
+
+  it("keeps a new source local through query refreshes and compact panel changes", () => {
+    const view = renderWorkspace()
+    openSources()
+    fireEvent.click(screen.getByRole("button", { name: "proposalWorkspace.documentInputPanel.addDoc" }))
+    fireEvent.change(sourceEditor(), { target: { value: "Local source document draft" } })
+    expect(addSourceAsync).not.toHaveBeenCalled()
+
+    sourceDocs = [sourceRow] // Another author added a source; it must not receive this draft.
+    refresh(view)
+    const editor = sourceEditor()
+    fireEvent.click(screen.getAllByRole("button", { name: "proposalWorkspace.hideAiPanel" })[1])
+    fireEvent.click(screen.getByRole("button", { name: "proposalWorkspace.aiPanel.aiAnalysis" }))
+    expect(sourceEditor()).toBe(editor)
+    expect(editor.value).toBe("Local source document draft")
+    expect(updateSourceAsync).not.toHaveBeenCalled()
+  })
+
+  it("retains failed drafts and saves the full source once without duplicating its readback", async () => {
+    renderWorkspace()
+    openSources()
+    fireEvent.click(screen.getByRole("button", { name: "proposalWorkspace.documentInputPanel.addDoc" }))
+    fireEvent.change(sourceEditor(), { target: { value: "Complete source document" } })
+    addSourceAsync.mockRejectedValueOnce(new Error("Source save rejected"))
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "common.save" })) })
+    expect(screen.getByRole("alert").textContent).toBe("Source save rejected")
+    expect(sourceEditor().value).toBe("Complete source document")
+    expect(sourceEditor().disabled).toBe(false)
+
+    let completeSave!: () => void
+    addSourceAsync.mockImplementationOnce(() => new Promise<void>((resolve) => { completeSave = resolve }))
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }))
+    expect(sourceEditor().disabled).toBe(true)
+    expect(addSourceAsync).toHaveBeenLastCalledWith(expect.objectContaining({ content: "Complete source document", wordCount: 3 }))
+    await act(async () => {
+      sourceDocs = [{ ...sourceRow, name: "proposalWorkspace.documentInputPanel.documentName", content: "Complete source document", wordCount: 3 }]
+      completeSave()
+    })
+    const savedTab = screen.getByRole("button", { name: "proposalWorkspace.documentInputPanel.documentName" })
+    fireEvent.click(savedTab) // Selection is explicit; no client/server ID guessing.
+    expect(sourceEditor().value).toBe("Complete source document")
+    expect((screen.getByRole("button", { name: "common.save" }) as HTMLButtonElement).disabled).toBe(true)
+    expect(addSourceAsync).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  it("keeps persisted-source edits through stale readback and later typing", async () => {
+    sourceDocs = [sourceRow]
+    const view = renderWorkspace()
+    openSources()
+    fireEvent.change(sourceEditor(), { target: { value: "First edit" } })
+    sourceDocs = [{ ...sourceRow }]
+    refresh(view)
+    expect(sourceEditor().value).toBe("First edit")
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "common.save" })) })
+    expect(updateSourceAsync).toHaveBeenCalledWith(expect.objectContaining({ docId: 41n, content: "First edit" }))
+    expect(sourceEditor().value).toBe("First edit")
+
+    fireEvent.change(sourceEditor(), { target: { value: "Later edit" } })
+    sourceDocs = [{ ...sourceRow, content: "First edit" }]
+    refresh(view)
+    expect(sourceEditor().value).toBe("Later edit")
+    expect((screen.getByRole("button", { name: "common.save" }) as HTMLButtonElement).disabled).toBe(false)
   })
 })
