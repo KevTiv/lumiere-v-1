@@ -118,8 +118,8 @@ export function ModularForm({
     if (!visibleSubmitError) return
     const body = formBodyRef.current
     if (body && body.scrollHeight > body.clientHeight) body.scrollTop = 0
-    else submitErrorRef.current?.scrollIntoView?.({ block: "nearest" })
-  }, [visibleSubmitError])
+    else if (scrollable) submitErrorRef.current?.scrollIntoView?.({ block: "nearest" })
+  }, [scrollable, visibleSubmitError])
   useEffect(() => { setSubmissionError(null) }, [config.id])
   const aiSuggest = useAiFormSuggest()
   const aiRequestInFlight = useRef(false)
@@ -695,7 +695,7 @@ export function ModularForm({
           data-form-actions
           className={cn(
             workspaceStyles.formActions,
-            scrollable && "mt-0 shrink-0 bg-card",
+            scrollable && "mt-0 shrink-0 bg-card [&_button]:h-auto [&_button]:min-h-9 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:[overflow-wrap:anywhere] pointer-coarse:[&_button]:min-h-11",
             leadingActions ? "justify-between" : "justify-end",
           )}
         >

@@ -229,6 +229,9 @@ for (const viewport of [
     await expectContained(body)
     await expectInViewport(page, save)
     await expectInViewport(page, close)
+    for (const action of await dialog.locator("[data-form-actions] button").all()) {
+      await expect.poll(() => action.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1)
+    }
 
     const first = dialog.getByTestId("form-field-reference-0")
     await first.fill("Unsaved commercial reference")
