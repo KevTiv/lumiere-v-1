@@ -3151,6 +3151,16 @@
       },
       "evidence": "crm/relationship_intel.rs: receipt/key or deterministic update returns before duplicate writes"
     },
+    "settle_bank_line_with_payment_transaction": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_transaction_settlement.rs: exact reviewed input and persisted receipt prevent duplicate allocation and bank matching"
+    },
     "reconcile_account_bank_statement_line": {
       "semantic_kind": "command",
       "client_facing": true,

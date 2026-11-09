@@ -1113,6 +1113,12 @@ pub fn post_payment_transaction_impl(
         .find(&transaction.payment_account_id)
         .ok_or("Payment account not found")?;
 
+    super::bank_transaction_settlement::validate_bank_transaction_posting(
+        ctx,
+        &transaction,
+        &account,
+    )?;
+
     let fees: Vec<PaymentFee> = ctx
         .db
         .payment_fee()
@@ -1771,6 +1777,15 @@ pub fn allocate_payment_transaction(
     organization_id: u64,
     params: AllocatePaymentParams,
 ) -> Result<(), String> {
+    allocate_payment_transaction_impl(ctx, organization_id, params, false)
+}
+
+pub(super) fn allocate_payment_transaction_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: AllocatePaymentParams,
+    settling_bank_line: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment_reconciliation", "create")?;
     require_company_in_organization(ctx, organization_id, params.company_id)?;
     validate_pilot_money_amount("allocated amount", params.allocated_amount)?;
@@ -1792,12 +1807,22 @@ pub fn allocate_payment_transaction(
     {
         return Err("payment transaction does not match organization and company".to_string());
     }
+    let matched_bank_transaction =
+        super::bank_transaction_settlement::is_matched_bank_transaction(ctx, &transaction);
+    if transaction.source_entity.as_deref() == Some(super::bank_transaction_settlement::BANK_SOURCE)
+        && !settling_bank_line
+        && !matched_bank_transaction
+    {
+        return Err("apply this transaction from its original bank line".to_string());
+    }
     if let Some(payment_id) = transaction.account_payment_id {
-        crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
-            ctx,
-            organization_id,
-            payment_id,
-        )?;
+        if !matched_bank_transaction {
+            super::bank_reconciliation::require_payment_not_bank_linked(
+                ctx,
+                organization_id,
+                payment_id,
+            )?;
+        }
     }
     let payload_fingerprint = format!("{params:?}");
     if replayed_result(

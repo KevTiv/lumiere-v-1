@@ -102,6 +102,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "process_intercompany_transaction",
   "recognize_amortization_line",
   "reconcile_account_bank_statement_line",
+  "settle_bank_line_with_payment_transaction",
   "reconcile_payment_with_invoice",
   "allocate_payment_transaction",
   "archive_payment_account",

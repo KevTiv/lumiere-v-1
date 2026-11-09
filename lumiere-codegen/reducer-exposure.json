@@ -3245,6 +3245,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "settle_bank_line_with_payment_transaction",
+      "exposure": "session",
+      "reason": "explicit reviewed bank settlement through the accounting workbench"
+    },
+    {
       "name": "reconcile_account_bank_statement_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
