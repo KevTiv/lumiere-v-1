@@ -22,7 +22,7 @@ import {
   accountJournalRowsToSelectOptions,
 } from "@/lib/form-lookup";
 import type { FleetVehicle } from "@lumiere/stdb/types";
-import { fleetVehicleTypes } from "./fleet-workspace";
+import { fleetVehicleChoiceLabel, fleetVehicleTypes } from "./fleet-workspace";
 import { fleetVehicleRecordHref } from "./fleet-record";
 import { useFleetActions } from "./fleet-actions";
 import { useFleetWorkspace } from "./use-fleet-workspace";
@@ -69,7 +69,7 @@ function FleetClientLoaded({
 
   const config = useMemo<ModuleConfig>(() => {
     const base = fleetModuleConfig(t, {
-      vehicles: options(vehicles),
+      vehicles: vehicles.map((row) => ({ value: String(row.id), label: fleetVehicleChoiceLabel(row) })),
       employees: options(employees),
       serviceTypes: options(activeServiceTypes),
       journals: accountJournalRowsToSelectOptions(journals),
@@ -128,10 +128,11 @@ function FleetClientLoaded({
                             key: "driver_name",
                             label: t("fleet.table.driverName"),
                           },
-                          { key: "status", label: t("fleet.table.status") },
+                          { key: "status", label: t("fleet.table.status"), type: "badge" as const },
                           {
                             key: "odometer_km",
                             label: t("fleet.table.odometer"),
+                            type: "number" as const,
                           },
                         ],
                       },

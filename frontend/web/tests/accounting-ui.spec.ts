@@ -57,7 +57,50 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
       await expect(page.locator("html")).toHaveClass(/dark/)
       await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable")
       await page.getByTestId("module-workspace-accounting-ledger").click()
+      await page.getByTestId("module-tab-accounting-move-lines").click()
       await expect(page.getByTestId("fixture-density-cell")).toHaveCSS("padding-top", "10px")
+    })
+
+    test("journal review keeps typed values and actions readable at the viewport", async ({ page }) => {
+      await page.getByTestId("module-workspace-accounting-ledger").click()
+      const invoice = page.getByRole("button", { name: "INV/2026/0901" })
+      if (viewport.width < 1024) await invoice.tap()
+      else await invoice.press("Enter")
+
+      const invoiceDialog = page.getByRole("dialog", { name: "INV/2026/0901" })
+      await expect(invoiceDialog.getByText("Partial", { exact: true })).toBeVisible()
+      await expect(invoiceDialog.locator("dt").filter({ hasText: /^Partner$/ }).locator("xpath=following-sibling::dd")).toHaveText("—")
+      await invoiceDialog.getByRole("button", { name: "Close", exact: true }).click()
+
+      const bill = page.getByRole("button", { name: "BILL/2026/0902" })
+      await bill.press("Enter")
+      const dialog = page.getByRole("dialog", { name: "BILL/2026/0902" })
+      const close = dialog.getByRole("button", { name: "Close", exact: true })
+      const heading = dialog.getByRole("heading", { name: "BILL/2026/0902" })
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByText("Acme Corporation")).toBeVisible()
+      await expect(dialog.getByRole("button", { name: "Cancel entry" })).toBeInViewport()
+      await expect(dialog.getByRole("button", { name: "Post", exact: true })).toBeInViewport()
+      const geometry = await dialog.evaluate((node) => ({
+        width: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+        height: node.clientHeight,
+        scrollHeight: node.scrollHeight,
+      }))
+      expect(geometry.width).toBeLessThanOrEqual(viewport.width - 16)
+      if (viewport.width >= 768) expect(geometry.width).toBeGreaterThan(600)
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.width)
+      expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.height)
+      const [headingBox, closeBox] = await Promise.all([heading.boundingBox(), close.boundingBox()])
+      expect(headingBox).not.toBeNull()
+      expect(closeBox).not.toBeNull()
+      expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(closeBox!.x)
+      await expectNoHorizontalOverflow(page)
+
+      await page.keyboard.press("Escape")
+      await expect(dialog).toBeHidden()
+      await expect(bill).toBeFocused()
+      await expect(page.getByText("Synthetic posting requested")).toHaveCount(0)
     })
 
     test("accountant queues preserve currency and permission boundaries and target exact bank records", async ({ page }, testInfo) => {

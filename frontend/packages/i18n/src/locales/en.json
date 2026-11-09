@@ -358,7 +358,13 @@
         "empty": "No matches",
         "remove": "Remove {{value}}"
       },
-      "setupOpensNewTab": "opens in a new tab"
+      "setupOpensNewTab": "opens in a new tab",
+      "file": {
+        "chooseMultiple": "Choose files",
+        "remove": "Remove {{name}}",
+        "selected": "Selected for submission",
+        "choose": "Choose file"
+      }
     },
     "formPreview": {
       "label": "Preview"
@@ -503,7 +509,9 @@
         "description": "Try a different search or clear the filters.",
         "title": "No matching records"
       },
-      "groupBy": "Group by"
+      "groupBy": "Group by",
+      "showFullValue": "Show full value",
+      "records": "Records"
     },
     "retry": "Retry",
     "recordsDenied": "You do not have access to these records.",
@@ -1439,7 +1447,8 @@
         "debit": "Debit",
         "credit": "Credit",
         "balance": "Running balance"
-      }
+      },
+      "viewMove": "View {{move}}"
     },
     "periodClose": {
       "tab": "Period close",
@@ -1562,8 +1571,14 @@
         "inInvoice": "Vendor Bill",
         "inRefund": "Vendor Credit",
         "outInvoice": "Customer Invoice",
-        "outRefund": "Credit Note"
-      }
+        "outRefund": "Credit Note",
+        "internalTransfer": "Internal transfer"
+      },
+      "partnerId": "Partner #{{id}}",
+      "statusUnavailable": "Status unavailable",
+      "entriesInView": "Entries in this view",
+      "cancelEntryAction": "Cancel entry",
+      "cancelEntryConfirm": "Cancel this journal entry?"
     },
     "invoices": {
       "title": "Invoices",
@@ -1646,7 +1661,9 @@
         "paid": "Paid",
         "partial": "Partial",
         "reversed": "Reversed",
-        "unpaid": "Unpaid"
+        "unpaid": "Unpaid",
+        "inPayment": "In payment",
+        "invoicingLegacy": "Legacy invoicing"
       },
       "noReconcilablePayments": "No posted payments available",
       "reconcilePaymentHint": "Match a posted payment entry to this document. The lesser of the two open balances is applied.",
@@ -3970,7 +3987,9 @@
       },
       "attachFiles": "Attach files",
       "attachmentsFailed": "Some files failed to upload. Remove them or retry.",
-      "removeAttachment": "Remove"
+      "removeAttachment": "Remove",
+      "chooseFiles": "Choose files",
+      "removeNamedAttachment": "Remove {{name}}"
     },
     "csvImport": {
       "contactsTitle": "Import contacts (CSV)",
@@ -4469,7 +4488,7 @@
       },
       "convertToSaleOrder": {
         "title": "Convert to sale order",
-        "description": "Choose pricelist and warehouse for the new order.",
+        "description": "Create a draft sales order from this opportunity and mark the opportunity as Won. Review the order before confirming it.",
         "sections": {
           "fulfillment": "Pricing & warehouse"
         },
@@ -4557,11 +4576,12 @@
         "title": "Merge contacts",
         "description": "Choose which contact record to keep. The other will be archived and related records repointed.",
         "sections": {
-          "survivor": "Survivor contact"
+          "survivor": "Contact to keep"
         },
         "fields": {
           "targetContactId": "Keep this contact"
-        }
+        },
+        "chooseContact": "Choose a contact from this pair to keep."
       },
       "newContactTag": {
         "title": "New contact tag",
@@ -7103,7 +7123,8 @@
         "title": "New product category",
         "description": "Create a category for organizing products",
         "sections": {
-          "main": "Category details"
+          "main": "Category details",
+          "stockValuation": "Stock and valuation"
         },
         "fields": {
           "name": "Category name",
@@ -8552,7 +8573,7 @@
       "emptyState": {
         "title": "No sales orders yet",
         "description": "Create your first sales order to start tracking revenue.",
-        "actionLabel": "New sales order",
+        "actionLabel": "New quotation",
         "hint": "Start with a quotation: confirming it turns it into a sales order, deliveries and an invoice."
       },
       "columns": {
@@ -9364,9 +9385,11 @@
     },
     "kpi": {
       "quotations": "Quotations",
-      "revenueOrders": "Orders: {{count}}",
-      "revenueThisMonth": "Revenue this month",
-      "toInvoice": "Orders to invoice"
+      "revenueOrders": "Confirmed orders: {{count}} · Current calendar month",
+      "revenueThisMonth": "Confirmed order value this month",
+      "toInvoice": "Orders to invoice",
+      "missingAmounts": "{{count}} orders have no valid amount",
+      "unresolvedCurrencies": "{{count}} orders excluded because their currency is unavailable"
     },
     "quotationDocument": {
       "action": "Create quotation PDF",
@@ -10325,7 +10348,10 @@
         "invalidSetting": "Your saved timezone is not recognised. The labelled fallback is in use. Review your timezone in Settings.",
         "missingSetting": "No account timezone is saved. The browser timezone is in use.",
         "browserUnavailable": "Your account and browser timezone are unavailable. UTC is in use."
-      }
+      },
+      "attendeeCount": "{{count}} attendees",
+      "detailTimezone": "Times shown in {{timezone}}",
+      "listTimezone": "Event times use {{timezone}}. All-day events display dates."
     }
   },
   "documents": {
@@ -10854,7 +10880,13 @@
       "signatureProviderRequired": "A provider is required",
       "signatureSigners": "Signers (optional)",
       "signatureSignersHint": "One e-mail address per line.",
-      "signatureSignersInvalid": "Enter valid e-mail addresses, one per line"
+      "signatureSignersInvalid": "Enter valid e-mail addresses, one per line",
+      "folderUnavailable": "Folder unavailable",
+      "folder": "Folder",
+      "manage": "Manage",
+      "deleteAction": "Move to recycle bin",
+      "versionChanges": "Changes",
+      "standalone": "Standalone file"
     },
     "knowledgeActions": {
       "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
@@ -10905,7 +10937,10 @@
       "foldersDenied": "You do not have access to folders. You can still inspect the available files.",
       "foldersUnavailable": "Folders could not be loaded. You can still inspect the available files. Retry folders to restore upload and new-folder actions.",
       "created": "Created {{date}}",
-      "date": "Date"
+      "date": "Date",
+      "uploadFiles": "Upload files",
+      "uploadHint": "Uploads start as soon as you choose or drop files. PDF up to 16 MiB; PNG, JPEG or WebP up to 20 MiB; XLSX up to 5 MB; CSV, text or JSON up to 2 MB.",
+      "uploadUnconfirmed": "Upload not confirmed"
     },
     "studio": {
       "templateDesignActions": "Template design actions",
@@ -11142,7 +11177,8 @@
       "empty": "This file contains no records.",
       "csv": "CSV preview",
       "rows": "Rows {{start}}–{{end}} of {{total}}",
-      "pages": "Page {{page}} of {{total}}"
+      "pages": "Page {{page}} of {{total}}",
+      "details": "Document details"
     },
     "fileManagement": {
       "move": "Move",
@@ -11157,10 +11193,40 @@
       "restoreDescription": "Restore a folder to make its retained files available again. Choose its original location or another permitted destination.",
       "folderActions": "Actions for {{name}}",
       "scopeChanged": "Your file workspace or permissions changed. Reopen this action.",
-      "unavailableDestination": "Choose an available destination."
+      "unavailableDestination": "Choose an available destination.",
+      "moveFile": "Move file",
+      "moveFolder": "Move folder"
     },
     "attachments": {
-      "readFailed": "Attachments could not be loaded. Refresh before uploading."
+      "readFailed": "Attachments could not be loaded. Refresh before uploading.",
+      "choose": "Choose file",
+      "loading": "Loading attachments…",
+      "unavailable": "File unavailable",
+      "denied": "Attachments are not available in this workspace or with your current permissions."
+    },
+    "fileIdentity": {
+      "untitled": "Untitled file",
+      "reveal": "Show original filename: {{name}}",
+      "revealTitle": "Show full title: {{name}}",
+      "original": "Original filename",
+      "fullTitle": "Full title",
+      "displayTitle": "Display title",
+      "type": "File type",
+      "kind": {
+        "pdf": "PDF",
+        "image": "Image",
+        "spreadsheet": "Spreadsheet",
+        "document": "Document",
+        "presentation": "Presentation",
+        "archive": "Archive",
+        "video": "Video",
+        "audio": "Audio",
+        "code": "Code or data",
+        "other": "File"
+      }
+    },
+    "relatedRecord": {
+      "generic": "Related record"
     }
   },
   "helpdesk": {
@@ -11420,7 +11486,8 @@
         "dateStart": "Start Date",
         "dateEnd": "End Date",
         "recurringNextDate": "Next billing",
-        "recurringTotal": "Recurring Total"
+        "recurringTotal": "Recurring Total",
+        "customer": "Customer"
       },
       "filters": {
         "state": {
@@ -12189,7 +12256,10 @@
       "operatorNeeded": "An authorized operator is needed for the next action. You can review the subscription and its billing records.",
       "openCatalog": "Open sales catalog (new tab)",
       "planSetup": "A plan needs a product, a price list and an active invoice journal. Complete the missing setup in the catalog and accounting, then refresh. Your entries are retained.",
-      "inheritedCustomer": "Inherited from the selected sales order"
+      "inheritedCustomer": "Inherited from the selected sales order",
+      "statusUnavailable": "Status unavailable",
+      "contractMrrHistory": "Estimated MRR and churn · last 12 months ({{currency}})",
+      "contractMrrByPlan": "Current contract MRR by plan ({{currency}})"
     },
     "lifecycle": {
       "title": "Dates & renewal",
@@ -12384,7 +12454,11 @@
         "pdfLabel": "Selected receipt PDF",
         "pdfFallback": "PDF selected. Your browser cannot display its preview.",
         "rejected": "The server rejected this capture. Retry after the cause is corrected, or discard it and capture corrected values.",
-        "retryRejected": "Retry rejected capture"
+        "retryRejected": "Retry rejected capture",
+        "choose": "Choose receipt",
+        "selectedLocal": "Selected on this device. Not yet attached.",
+        "fileLimits": "Choose one PDF up to 16 MiB, or one PNG, JPEG or WebP up to 20 MiB.",
+        "chooseOriginal": "Choose original receipt"
       }
     },
     "tabs": {
@@ -13580,7 +13654,9 @@
       "files": "Files",
       "addFiles": "Add CSV or XLSX files",
       "noFiles": "No files attached.",
-      "noSkills": "No skills selected."
+      "noSkills": "No skills selected.",
+      "noModule": "No active module",
+      "contextSelect": "Assistant context"
     },
     "deck": {
       "hint": "Type / to find skills",
@@ -13740,7 +13816,8 @@
       "reviewOutcome": "Review outcome",
       "chooseOutcome": "Choose a verdict",
       "reviewNote": "Review note",
-      "saveReview": "Save review"
+      "saveReview": "Save review",
+      "navigation": "Guide navigation"
     },
     "title": "AI Assistant",
     "subtitle": "Type @ for commands",
@@ -13833,7 +13910,8 @@
       "pageReady": "Open the page editor to arrange your widgets.",
       "widgetReady": "Review the widget in the page editor, then save your layout.",
       "pageUnavailable": "The page editor could not be opened. Check your current module, company and access, then try again.",
-      "pageBusy": "Finish opening the current page editor before requesting another."
+      "pageBusy": "Finish opening the current page editor before requesting another.",
+      "proposed": "Suggested next step"
     },
     "starters": {
       "pageHelp": {
@@ -13928,6 +14006,18 @@
         "label": "Use saved guides",
         "prompt": "Explain how to find, review and use saved guides in this workspace."
       }
+    },
+    "draft": {
+      "outcomeUnconfirmed": "Outcome unconfirmed",
+      "checkRequired": "Saved status needs checking",
+      "submitting": "Submitting decision…",
+      "saving": "Saving parameters…",
+      "awaitingReview": "Awaiting review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "failed": "Failed",
+      "expired": "Expired",
+      "parameters": "Draft parameters"
     }
   },
   "aiHarness": {
@@ -14688,7 +14778,9 @@
         "total": "Total",
         "inProgress": "In Progress",
         "done": "Done",
-        "overdue": "Overdue"
+        "overdue": "Overdue",
+        "summary": "Project task summary",
+        "scope": "Counts cover loaded project tasks, before board filters."
       },
       "columns": {
         "InProgress": "In Progress",
@@ -14860,7 +14952,9 @@
       "meaning": "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today.",
       "noOverdueBalance": "No known overdue balance",
       "selectedOrderTrend": "Confirmed orders · selected period",
-      "historyLink": "Inspect imported dates and source records awaiting review."
+      "historyLink": "Inspect imported dates and source records awaiting review.",
+      "companyContext": "Overview for {{company}}",
+      "dataNotes": "How figures are calculated"
     }
   },
   "settings": {
@@ -15842,7 +15936,10 @@
       "rollbackEffect": "This removes records created by this import when the server confirms they are still eligible. Changed or dependent records can prevent rollback. Review the import and its row errors before continuing.",
       "rollbackReadFailed": "The import could not be refreshed. No rollback was submitted. Retry the job source.",
       "rollbackChanged": "The import changed or is no longer eligible. Review its current status before requesting rollback again.",
-      "errorsLoading": "Loading import row errors…"
+      "errorsLoading": "Loading import row errors…",
+      "unknownStatus": "Status unavailable",
+      "backToResults": "Back to ERP results",
+      "backToImports": "Back to Data import"
     },
     "importReview": {
       "sourceMeaning": "Interpret source notes",
@@ -16178,7 +16275,17 @@
       "cardNativeJob": "Job #{{job}} · {{state}}",
       "cardNativeCounts": "Job reports {{imported}} of {{total}} rows imported · {{errors}} row errors",
       "cardNativeAwaiting": "Request saved; the native job receipt is not available yet.",
-      "cardMoreNative": "Native requests shown: {{shown}}. Open task Results for more saved receipts and row errors."
+      "cardMoreNative": "Native requests shown: {{shown}}. Open task Results for more saved receipts and row errors.",
+      "downloadNamed": "Download {{fileName}}",
+      "download": "Download",
+      "companyRequired": "Select an operating company to start or review an import.",
+      "reviewHistory": "Review source history",
+      "shortcuts": "Data import shortcuts",
+      "startShortcut": "Start import",
+      "continueShortcut": "Continue saved import",
+      "guidedShortcut": "Guided import and review",
+      "originalFiles": "{{count}} original files",
+      "sourceSaved": "Original saved"
     },
     "importPreparation": {
       "addAlias": "Add a label alias",
@@ -16345,7 +16452,8 @@
       "transformField": "Text field",
       "trim": "Remove surrounding spaces",
       "uppercase": "Use uppercase letters"
-    }
+    },
+    "selectSection": "Settings section"
   },
   "reports": {
     "workspace": {
@@ -17090,7 +17198,8 @@
       "noReports": "No profit and loss, balance sheet or cash flow reports yet. Generate one in Financial Reports first.",
       "report": "Report",
       "subtotal": "Total {{name}}",
-      "viewJournalItems": "View current journal items for this report scope"
+      "viewJournalItems": "View current journal items for this report scope",
+      "lines": "Statement lines"
     },
     "periodContext": {
       "title": "Period close report review",
@@ -18539,7 +18648,8 @@
         "action": "Review reports"
       }
     },
-    "layout": "Layout"
+    "layout": "Layout",
+    "openOwnerReports": "Review owner reports"
   },
   "workBoard": {
     "source": "Work type",
@@ -18551,7 +18661,7 @@
     "followUpCompleted": "Follow-up completed and confirmed.",
     "title": "My work",
     "tab": "Work",
-    "kanban": "Kanban",
+    "kanban": "Work queue",
     "description": "Track assignments across Finance in your active company.",
     "scope": "Workspace",
     "finance": "Finance",
@@ -18629,7 +18739,9 @@
     "teamKind": {
       "workflow-group": "Workflow group #{{id}}",
       "department": "Department #{{id}}"
-    }
+    },
+    "assigned": "Assigned",
+    "moduleAssignment": "{{module}} assignment"
   },
   "approvals": {
     "errors": {
@@ -18665,16 +18777,26 @@
       "provenance": "Review provenance",
       "taskRevision": "Task revision",
       "workflowRevision": "Workflow revision",
-      "sourceRevision": "Reviewed source revision"
+      "sourceRevision": "Reviewed source revision",
+      "clearRecordFilter": "Show all requests",
+      "actingAsSelf": "Acting as yourself",
+      "comment": "Evidence comment",
+      "rejectReason": "Reason for rejection",
+      "inboxSummary": "Approval inbox summary"
     },
     "empty": {
-      "noTasks": "No requests are waiting for approval in this company. New requests appear here when a business action needs review."
+      "noTasks": "No requests are waiting for approval in this company. New requests appear here when a business action needs review.",
+      "target": "No open approval task matches this record.",
+      "invalidTarget": "This request link does not identify a valid record. Show all requests to browse the company inbox."
     },
     "policy": {
       "title": "Approval rules",
       "description": "Approval rules determine which business actions need review.",
       "link": "Manage approval rules"
-    }
+    },
+    "countFiltered": "{{shown}} of {{total}} open tasks",
+    "count": "{{count}} open tasks",
+    "companyTaskCount": "{{open}} open and {{claimed}} claimed tasks in this company, across all source records."
   },
   "productivity": {
     "navigation": {
@@ -18785,7 +18907,8 @@
     "current": "Current interpretation",
     "revision": "Review revision {{revision}}",
     "importRow": "Import row {{row}}",
-    "sourceRow": "Source row {{row}}"
+    "sourceRow": "Source row {{row}}",
+    "filterRows": "Filter source rows"
   },
   "forms": {
     "aiAssist": {
@@ -18904,6 +19027,11 @@
     "moveLater": "Move {{title}} later",
     "configure": "Configure {{title}}",
     "remove": "Remove {{title}}",
-    "alreadyAdded": "{{title}} is already on this page. You can move or resize it in the editor."
+    "alreadyAdded": "{{title}} is already on this page. You can move or resize it in the editor.",
+    "editInsights": "Customize insights",
+    "insights": "Page insights",
+    "savedWidgetScope": "Saved widgets follow the operating company and date range, with their own model, date field and filters. Currency and queue selections above apply to the built-in insights.",
+    "insightScope": "Widgets use the operating company and their own filters. A date range applies to each widget’s configured date field.",
+    "overviewScope": "Saved widgets follow the operating company and selected date range. Open work and other current-state totals use the period stated on each built-in section."
   }
 }

@@ -1,5 +1,7 @@
 "use client"
 
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
+import { FileUploadField } from "@lumiere/ui/components/file-upload-field"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useReducer, useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
@@ -185,7 +187,6 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const [busy, setBusy] = useState(false)
   const [readingFile, setReadingFile] = useState(false)
   const readingFileRef = useRef(false)
-  const fileInput = useRef<HTMLInputElement>(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
@@ -371,7 +372,6 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       setWizardKey(source.targetEntity)
       setCsvText(source.csv); setHeaders(parsed.headers); setRows(parsed.rows)
       setSourceFileName(source.fileName); setSourceFormat("csv"); setSourceSheetName(undefined)
-      if (fileInput.current) fileInput.current.value = ""
       return true
     },
   }), [confirm, resetFlow, t])
@@ -425,7 +425,6 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         setRows([])
         setSourceFileName("")
         setSourceSheetName(undefined)
-        if (fileInput.current) fileInput.current.value = ""
       } finally { readingFileRef.current = false; if (mounted.current) setReadingFile(false) }
     },
     [resetFlow, selectedTemplateId, sourceScopeKey, companyId, csvDelimiter],
@@ -870,30 +869,24 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
           </Select>
         </div>
 
-        <label className="text-sm space-y-1">
-          <span className="block text-muted-foreground">
-            {t("settings.import.file", "CSV or Excel file")}
-          </span>
-          <input
-            ref={fileInput}
-            type="file"
-            disabled={operationBusy || !!importRequest}
-            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-            data-testid="guided-import-file"
-          />
-        </label>
+        <FileUploadField
+          disabled={operationBusy || !!importRequest}
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          chooseLabel={t("settings.import.file", "CSV or Excel file")}
+          onSelect={(files) => void onFile(files[0] ?? null)}
+          data-testid="guided-import-file"
+        />
       </div>
 
       {sourceFileName ? (
         <div className="rounded border bg-muted/30 p-3 text-sm" data-testid="guided-import-source-summary">
-          <span className="font-medium">{sourceFileName}</span>
-          <span className="ml-2 text-muted-foreground">
+          <FileIdentity fileName={sourceFileName} />
+          <p className="mt-2 text-muted-foreground [overflow-wrap:anywhere]">
             {sourceFormat.toUpperCase()}
             {sourceDelimiter ? ` · ${delimiterLabels[sourceDelimiter]}` : ""}
             {sourceSheetName ? ` · ${sourceSheetName}` : ""} · {rows.length}{" "}
             {t("settings.import.dataRows", "data rows")}
-          </span>
+          </p>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">

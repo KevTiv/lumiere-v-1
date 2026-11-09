@@ -221,7 +221,8 @@ describe("FormModal authoring preview", () => {
     expect(alert.getAttribute("tabindex")).toBe("-1")
     expect(onOpenChange).not.toHaveBeenCalled()
     expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("Expense to correct")
-    expect(fileInput.files?.[0]).toBe(receipt)
+    expect(screen.getByRole("button", { name: "Show original filename: receipt.pdf" })).toBeTruthy()
+    expect(screen.getByText("Selected for submission")).toBeTruthy()
     expect(onSubmit.mock.calls[0]?.[0].receipt).toEqual([receipt])
 
     rerender(<FormModal {...props} config={{ ...receiptConfig }} />)
@@ -359,6 +360,30 @@ describe("FormModal dependent fields", () => {
 
 
 describe("FormModal conditional file selection", () => {
+  it("removes a pending receipt, restores chooser focus, and accepts reselection", async () => {
+    const onSubmit = vi.fn()
+    const receiptConfig: FormConfig = { id: "receipt", title: "Receipt", sections: [{ id: "main", fields: [
+      { id: "receiptFile", name: "receiptFile", label: "Receipt", type: "file", accept: ".pdf", required: true },
+    ] }] }
+    render(<FormModal open onOpenChange={vi.fn()} config={receiptConfig} onSubmit={onSubmit} showSubmitSuccessToast={false} />)
+    const receipt = new File(["receipt"], "receipt.pdf", { type: "application/pdf" })
+    const input = screen.getByTestId("form-field-receiptFile")
+    expect(input.getAttribute("accept")).toBe(".pdf")
+    fireEvent.change(input, { target: { files: [receipt] } })
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove receipt.pdf" }))
+    expect(screen.queryByRole("button", { name: "Show original filename: receipt.pdf" })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Choose file: Receipt" }))
+    fireEvent.click(screen.getByTestId("form-submit-receipt"))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(input.getAttribute("aria-invalid")).toBe("true")
+
+    fireEvent.change(input, { target: { files: [receipt] } })
+    fireEvent.click(screen.getByTestId("form-submit-receipt"))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ receiptFile: [receipt] }))
+  })
+
   it("clears a file when its input is hidden and requires a new choice when shown again", async () => {
     const onSubmit = vi.fn()
     const fileConfig: FormConfig = { id: "receipt", title: "Receipt", sections: [{ id: "main", fields: [

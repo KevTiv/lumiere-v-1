@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import { activeTabEntityTable, fetchDefaultCompanyId, gotoModule, smokeName } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQaPj/HwAFAgKfdqhGyQAAAABJRU5ErkJggg==", "base64")
@@ -54,6 +54,51 @@ async function openSavedBillSource(page: Page) {
   return review.getByTestId("finance-source-preview")
 }
 
+async function expectPreviewBytes(
+  page: Page,
+  preview: Locator,
+  attribute: "src" | "data",
+  expected: Buffer,
+) {
+  await expect(preview).toBeVisible()
+  await expect(preview).toHaveAttribute(attribute, /^blob:/)
+  const url = (await preview.getAttribute(attribute))!
+  const bytes = await page.evaluate(async (url) => {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error(`Preview fetch failed: ${response.status}`)
+    return Array.from(new Uint8Array(await response.arrayBuffer()))
+  }, url)
+  expect(Buffer.from(bytes)).toEqual(expected)
+  if (attribute === "src") {
+    await expect
+      .poll(() => preview.evaluate((node) => (node as HTMLImageElement).naturalWidth))
+      .toBe(1)
+  }
+}
+
+async function expectSavedBillSource(
+  page: Page,
+  name: string,
+  kind: "png" | "pdf",
+  bytes: Buffer,
+) {
+  const source = await openSavedBillSource(page)
+  const displayedName = source.getByTestId("finance-source-file").getByText(name, { exact: true })
+  // A bill can already have other source documents. Wait for this exact source before selecting.
+  const select = source.getByRole("button", { name, exact: true })
+  await expect(select.or(displayedName).first()).toBeVisible()
+  if (await select.isVisible()) await select.click()
+  await expect(displayedName).toBeVisible()
+  if (kind === "png") {
+    await expectPreviewBytes(page, source.getByRole("img", { name, exact: true }), "src", bytes)
+  } else {
+    const preview = source.getByTestId("finance-source-pdf")
+    await expect(preview).toHaveAttribute("aria-label", name)
+    await expect(preview).toHaveAttribute("type", "application/pdf")
+    await expectPreviewBytes(page, preview, "data", bytes)
+  }
+}
+
 test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, () => {
   for (const width of [1440, 390]) {
     test(`bill draft keeps inputs and document review at ${width}px`, async ({ page }) => {
@@ -93,43 +138,33 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
   }
 
   for (const kind of ["png", "pdf"] as const) {
-  test(`reviews a saved bill's real source ${kind} after upload and refresh`, async ({ page }) => {
-    const companyId = String(await fetchDefaultCompanyId(page))
-    const bill = (await queryRows(page, "account-moves")).find((row) => String(row.companyId ?? row.company_id) === companyId
-      && String(typeof row.moveType === "object" && row.moveType ? (row.moveType as { tag: string }).tag : row.moveType) === "InInvoice")
-    expect(bill, "Seeded vendor bill required").toBeTruthy()
-    const id = String(bill!.id)
-    await gotoModule(page, `/accounting/invoices/${id}?tab=discussion`)
-    const attachment = page.locator('[data-testid="record-attachments-panel"]:visible')
-    const name = smokeName("bill-source-review") + `.${kind}`
-    await attachment.getByTestId("record-attachments-file").setInputFiles({ name, mimeType: kind === "png" ? "image/png" : "application/pdf", buffer: kind === "png" ? png : tinyPdf() })
-    await attachment.getByRole("button", { name: "Upload", exact: true }).click()
-    await expect(attachment.getByText(name, { exact: true })).toBeVisible()
-    await page.goto(`/accounting/invoices/${id}`)
-    const source = await openSavedBillSource(page)
-    // Multiple sources can be attached to this exact bill across test runs.
-    await expect(source.getByText(name, { exact: true }).first()).toBeVisible()
-    const select = source.getByRole("button", { name, exact: true })
-    if (await select.count()) await select.click()
-    const preview = kind === "png" ? source.getByRole("img", { name, exact: true }) : source.getByTestId("finance-source-pdf")
-    await expect(preview).toBeVisible()
-    if (kind === "png") await expect.poll(() => preview.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBe(1)
-    else {
-      await expect(preview).toHaveAttribute("data", /^blob:/)
-      await expect(preview).toHaveAttribute("aria-label", name)
-      await expect(preview).toHaveAttribute("type", "application/pdf")
-    }
-    await page.reload()
-    const saved = await openSavedBillSource(page)
-    await expect(saved.getByText(name, { exact: true }).first()).toBeVisible()
-    const selectAfterReload = saved.getByRole("button", { name, exact: true })
-    if (await selectAfterReload.count()) await selectAfterReload.click()
-    await expect(kind === "png" ? saved.getByRole("img", { name, exact: true }) : saved.getByTestId("finance-source-pdf")).toBeVisible()
-    const before = await queryRows(page, "account-moves")
-    expect(before.find((row) => String(row.id) === id)?.amountTotal).toBe(bill!.amountTotal)
-    await page.screenshot({ path: test.info().outputPath(`saved-bill-source-${kind}.png`) })
-  })
-
+    test(`reviews a saved bill's real source ${kind} after upload and refresh`, async ({ page }) => {
+      const companyId = String(await fetchDefaultCompanyId(page))
+      const bill = (await queryRows(page, "account-moves")).find((row) => String(row.companyId ?? row.company_id) === companyId
+        && String(typeof row.moveType === "object" && row.moveType ? (row.moveType as { tag: string }).tag : row.moveType) === "InInvoice")
+      expect(bill, "Seeded vendor bill required").toBeTruthy()
+      const id = String(bill!.id)
+      await gotoModule(page, `/accounting/invoices/${id}?tab=discussion`)
+      const attachment = page.locator('[data-testid="record-attachments-panel"]:visible')
+      const name = `${smokeName("bill-source-review")}.${kind}`
+      const bytes = kind === "png" ? png : tinyPdf()
+      await attachment.getByTestId("record-attachments-file").setInputFiles({
+        name,
+        mimeType: kind === "png" ? "image/png" : "application/pdf",
+        buffer: bytes,
+      })
+      await attachment.getByRole("button", { name: "Upload", exact: true }).click()
+      // The staged filename is already visible. The saved attachment's open button
+      // appears only after registration, when it is safe to leave the upload tab.
+      await expect(attachment.getByRole("button", { name, exact: true })).toBeVisible({ timeout: 30_000 })
+      await page.goto(`/accounting/invoices/${id}`)
+      await expectSavedBillSource(page, name, kind, bytes)
+      await page.reload()
+      await expectSavedBillSource(page, name, kind, bytes)
+      const after = await queryRows(page, "account-moves")
+      expect(after.find((row) => String(row.id) === id)?.amountTotal).toBe(bill!.amountTotal)
+      await page.screenshot({ path: test.info().outputPath(`saved-bill-source-${kind}.png`) })
+    })
   }
   test("keeps the capture file across view changes and opens its exact saved expense receipt", async ({ page }) => {
     test.setTimeout(120_000)
@@ -142,10 +177,12 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
     await panel.getByTestId("expenses-capture-amount").fill("19.73")
     await panel.getByTestId("expenses-capture-file").setInputFiles({ name: `${name}.png`, mimeType: "image/png", buffer: png })
     await panel.getByRole("tab", { name: "Receipt", exact: true }).click()
-    await expect(panel.getByRole("img", { name: "Selected receipt", exact: true })).toBeVisible()
+    await expectPreviewBytes(page, panel.getByRole("img", { name: "Selected receipt", exact: true }), "src", png)
     await panel.getByRole("tab", { name: "Expense details", exact: true }).click()
     await expect(panel.getByTestId("expenses-capture-name")).toHaveValue(name)
-    expect(await panel.getByTestId("expenses-capture-file").evaluate((node) => (node as HTMLInputElement).files?.[0]?.name)).toBe(`${name}.png`)
+    await expect(
+      panel.getByRole("button", { name: `Show original filename: ${name}.png`, exact: true }),
+    ).toBeVisible()
     const create = page.waitForRequest((request) => request.method() === "POST" && matchesOperationResponse(request, "create_expense"))
     await panel.getByTestId("expenses-capture-submit").click()
     const command = (await create).postDataJSON() as { params: { client_request_id: string | { some: string } } }
@@ -155,10 +192,9 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
     await expect.poll(async () => (await queryRows(page, "expenses")).filter((row) => (row.clientRequestId ?? row.client_request_id) === key).length).toBe(1)
     const expense = (await queryRows(page, "expenses")).find((row) => (row.clientRequestId ?? row.client_request_id) === key)!
     await gotoModule(page, `/expenses?tab=expenses&filter=${encodeURIComponent(`id:${String(expense.id)}`)}`, "expenses")
-    await activeTabEntityTable(page).getByTestId(`entity-row-${String(expense.id)}`).click()
+    await activeTabEntityTable(page).getByTestId(`entity-row-${String(expense.id)}`).press("Enter")
     const review = page.getByRole("dialog").filter({ has: page.getByTestId("finance-review-workspace") })
-    await expect(review.getByRole("img", { name: `${name}.png`, exact: true })).toBeVisible()
-    await expect.poll(() => review.getByRole("img", { name: `${name}.png`, exact: true }).evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBe(1)
+    await expectPreviewBytes(page, review.getByRole("img", { name: `${name}.png`, exact: true }), "src", png)
     await page.screenshot({ path: test.info().outputPath("saved-expense-source.png") })
   })
 

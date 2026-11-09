@@ -12,9 +12,10 @@ export interface AccountMove {
   companyId?: bigint | number | string
   currencyId?: bigint | number | string
   name?: string | null
-  state?: unknown          // stringified: "Draft" | "Posted" | "Cancelled"
-  paymentState?: unknown   // stringified: "Paid" | "InPayment" | "Partial" | "NotPaid"
-  moveType?: unknown       // stringified: "OutInvoice" | "InInvoice" | etc.
+  /** Generated projection tags, with string and SATS support at the presentation boundary. */
+  state?: unknown
+  paymentState?: unknown
+  moveType?: unknown
   amountTotal?: number
   amountResidual?: number
   amountUntaxed?: number

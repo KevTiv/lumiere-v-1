@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, type MouseEvent } from "react"
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, type MouseEvent } from "react"
 import { useTableDensity } from "../hooks/use-table-density"
 import { TableDensityControl } from "../composed/table-density-control"
 import { ListToolbar, ListToolbarFields, ListToolbarField, ListToolbarActions, ListToolbarSettings, ListToolbarSettingsTrigger } from "../composed/list-toolbar"
@@ -71,6 +71,8 @@ import {
   formatEntityFieldValue,
   getRowField,
 } from "../lib/entity-row-utils"
+import { unwrapEntityValue } from "../lib/entity-row-values"
+import { markdownToPlainText } from "../lib/markdown"
 import { useEntityTableExport } from "./use-entity-table-export"
 import { rowFilterValue } from "../lib/entity-table-engine"
 import { useEntityTable } from "./use-entity-table"
@@ -91,11 +93,14 @@ import {
   type SavedTableFilter,
 } from "../lib/entity-table-view"
 import { Popover, PopoverContent, PopoverTrigger } from "../components/popover"
+import { asEntityCellTextLink, EntityCellText } from "./entity-cell-text"
+import { ACTION_COLUMN_REM, allocateEntityColumnWidths, SELECTION_COLUMN_REM } from "./entity-table-layout"
 
 const PAGE_SIZE = TABLE_PAGE_SIZE
 /** Rows-per-page choices offered under every table. */
 export const ENTITY_TABLE_PAGE_SIZES = [10, 25, 50, 100] as const
 const LOADING_ROW_COUNT = 5
+const BOUNDED_ROW_COUNT = 15
 
 interface EntityTableProps {
   config: EntityTableConfig
@@ -243,7 +248,13 @@ export function EntityTable({
     () => (config.filters ?? []).filter((filter) => (filter.options?.length ?? 0) > 0),
     [config.filters],
   )
-  const [view, setView] = useState<EntityTableViewState>(EMPTY_TABLE_VIEW)
+  const defaultView = useMemo((): EntityTableViewState => {
+    const hiddenColumns = permittedColumns.filter((column) => column.defaultHidden).map((column) => column.key)
+    return hiddenColumns.length > 0 && hiddenColumns.length < permittedColumns.length
+      ? { ...EMPTY_TABLE_VIEW, hiddenColumns }
+      : EMPTY_TABLE_VIEW
+  }, [permittedColumns])
+  const [view, setView] = useState<EntityTableViewState>(defaultView)
   const [loadedViewKey, setLoadedViewKey] = useState<string | null>(null)
   const permittedColumnKeys = useMemo(() => permittedColumns.map((col) => col.key), [permittedColumns])
   const groupKeys = useMemo(() => groupableFilters.map((filter) => filter.key), [groupableFilters])
@@ -251,11 +262,11 @@ export function EntityTable({
   useEffect(() => {
     const key = config.listViewKey
     if (!key || typeof window === "undefined") {
-      setView(EMPTY_TABLE_VIEW)
+      setView(defaultView)
       setLoadedViewKey(key ?? "")
       return
     }
-    let saved: EntityTableViewState = EMPTY_TABLE_VIEW
+    let saved = defaultView
     try {
       const raw = window.localStorage.getItem(tableViewStorageKey(key))
       if (raw) saved = readTableView(JSON.parse(raw) as unknown, permittedColumnKeys, groupKeys)
@@ -264,7 +275,7 @@ export function EntityTable({
     }
     setView(saved)
     setLoadedViewKey(key)
-  }, [config.listViewKey, permittedColumnKeys, groupKeys])
+  }, [config.listViewKey, defaultView, permittedColumnKeys, groupKeys])
 
   useEffect(() => {
     const key = config.listViewKey
@@ -330,9 +341,12 @@ export function EntityTable({
     const groupKey = view.groupBy
     if (!groupKey) return null
     return new Map(
-      currencyColumns.map((col) => [col.key, sumRowsByCurrency(sorted, groupKey, col.key, col.currencyKey)] as const),
+      currencyColumns.map((col) => [
+        col.key,
+        sumRowsByCurrency(sorted, groupKey, col.key, col.currencyKey ?? currencyFormat.rowCurrencyKey),
+      ] as const),
     )
-  }, [sorted, view.groupBy, currencyColumns])
+  }, [sorted, view.groupBy, currencyColumns, currencyFormat.rowCurrencyKey])
   // Rows of the group on top of this page that began on the previous one.
   const continuedGroup = useMemo(() => {
     const groupKey = view.groupBy
@@ -473,6 +487,34 @@ export function EntityTable({
   const showSelectColumn = selectionActions.length > 0 || config.selectable === true
   const selectColumnCount = showSelectColumn ? 1 : 0
   const rowActionColumnCount = rowActions.length > 0 ? 1 : 0
+  const fixedTracks = columns.some((column) => column.layout) && (isLoading || pageRows.length > 0)
+  const bounded = pageRows.length >= BOUNDED_ROW_COUNT
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [viewportRem, setViewportRem] = useState<number>()
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!fixedTracks || !viewport) return
+    const update = () => {
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+      if (rem > 0 && viewport.clientWidth > 0) setViewportRem(viewport.clientWidth / rem)
+    }
+    update()
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(update)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [fixedTracks])
+
+  useLayoutEffect(() => {
+    if (viewportRef.current) viewportRef.current.scrollTop = 0
+  }, [currentPage, pageSize])
+
+  const controlsRem = selectColumnCount * SELECTION_COLUMN_REM + rowActionColumnCount * ACTION_COLUMN_REM
+  const trackWidths = useMemo(() =>
+    fixedTracks ? allocateEntityColumnWidths(columns, viewportRem == null ? undefined : viewportRem - controlsRem) : [],
+  [columns, controlsRem, fixedTracks, viewportRem])
+  const tableWidth = trackWidths.reduce((total, width) => total + width, controlsRem)
 
   const activateRow = (tableRow: (typeof pageRows)[number]) => {
     // A click on the only selected row keeps it selected; untick it with its checkbox.
@@ -894,7 +936,21 @@ export function EntityTable({
         )}
 
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-          <Table pagination={false}>
+          <Table
+            pagination={false}
+            bounded={bounded}
+            viewportRef={viewportRef}
+            viewportLabel={bounded || fixedTracks ? t("common.entityView.records", { defaultValue: "Records" }) : undefined}
+            className={fixedTracks ? "table-fixed" : undefined}
+            style={fixedTracks ? { width: `${tableWidth}rem` } : undefined}
+          >
+            {fixedTracks ? (
+              <colgroup>
+                {showSelectColumn && <col style={{ width: `${SELECTION_COLUMN_REM}rem` }} />}
+                {columns.map((col, index) => <col key={col.key} style={{ width: `${trackWidths[index]}rem` }} />)}
+                {rowActionColumnCount > 0 && <col style={{ width: `${ACTION_COLUMN_REM}rem` }} />}
+              </colgroup>
+            ) : null}
             <TableHeader className="bg-muted/25">
               <TableRow>
                 {showSelectColumn && (
@@ -918,7 +974,8 @@ export function EntityTable({
                         : "none"
                       : undefined}
                     className={cn(
-                      col.width,
+                      !fixedTracks && col.width,
+                      (fixedTracks || col.layout) && "whitespace-normal [overflow-wrap:anywhere]",
                       col.align === "right" && "text-right",
                       col.align === "center" && "text-center",
                       col.sortable && "select-none",
@@ -928,13 +985,13 @@ export function EntityTable({
                       <button
                         type="button"
                         className={cn(
-                          "inline-flex items-center font-medium",
+                          "inline-flex max-w-full items-center font-medium [&>svg]:shrink-0",
                           col.align === "right" && "ml-auto",
                           col.align === "center" && "mx-auto",
                         )}
                         onClick={() => handleSort(col.key, col.sortable)}
                       >
-                        {col.label}
+                        <span className="min-w-0">{col.label}</span>
                         {getSortIcon(col.key, col.sortable)}
                       </button>
                     ) : (
@@ -959,7 +1016,7 @@ export function EntityTable({
                       </TableCell>
                     )}
                     {columns.map((col) => (
-                      <TableCell key={col.key}>
+                      <TableCell key={col.key} className={!fixedTracks ? col.width : undefined}>
                         <Skeleton className="h-4 w-full max-w-32" />
                       </TableCell>
                     ))}
@@ -1008,7 +1065,7 @@ export function EntityTable({
                 renderGroups.flatMap((group) => [
                   view.groupBy ? (
                     <TableRow key={`group-${group.value}`} className="bg-muted/40 hover:bg-muted/40" data-testid="entity-group-row">
-                      <TableCell colSpan={selectColumnCount + 1} className="py-2 text-sm font-medium">
+                      <TableCell colSpan={selectColumnCount + 1} className="py-2 text-sm font-medium whitespace-normal [overflow-wrap:anywhere]">
                         {groupLabel(group.value)}
                         <span className="ml-2 font-normal text-muted-foreground">
                           {groupCounts?.get(group.value) ?? group.rows.length}
@@ -1022,6 +1079,8 @@ export function EntityTable({
                             key={col.key}
                             className={cn(
                               "py-2 text-sm font-medium tabular-nums",
+                              !fixedTracks && col.width,
+                              fixedTracks && "whitespace-normal [overflow-wrap:anywhere]",
                               col.align === "right" && "text-right",
                             )}
                             data-testid={sum === undefined ? undefined : `entity-group-sum-${col.key}`}
@@ -1041,7 +1100,7 @@ export function EntityTable({
                                 col.type,
                                 undefined,
                                 undefined,
-                                (col.currencyKey ? currencyFormat.codeFor(sum.currency) : undefined) ??
+                                currencyFormat.codeFor(sum.currency) ??
                                   currencyFormat.defaultCode,
                                 currencyFormat.locale,
                               )
@@ -1100,20 +1159,37 @@ export function EntityTable({
                           <TableCell
                             key={col.key}
                             className={cn(
+                              !fixedTracks && col.width,
+                              (col.layout?.wrap !== "nowrap" && (fixedTracks || col.layout?.wrap)) &&
+                                "whitespace-normal [overflow-wrap:anywhere] [&_[data-slot=badge]]:h-auto [&_[data-slot=badge]]:max-w-full [&_[data-slot=badge]]:whitespace-normal",
                               (col.type === "currency" || col.type === "number") && "tabular-nums",
                               col.align === "right" && "text-right",
                               col.align === "center" && "text-center",
                             )}
                           >
                             {(() => {
+                              const lines = typeof col.layout?.wrap === "number" ? col.layout.wrap : undefined
+                              const markdown = col.type === "markdown" && lines ? unwrapEntityValue(value) : undefined
                               const content = col.render
                                 ? col.render(value, row)
+                                : typeof markdown === "string" && markdown
+                                  ? markdownToPlainText(markdown)
                                 : formatEntityFieldValue(
                                     value,
                                     col.type,
                                     col.badgeVariants,
                                     col.badgeLabels,
+                                    col.type === "currency"
+                                      ? currencyFormat.codeFor(getRowField(row, col.currencyKey ?? currencyFormat.rowCurrencyKey ?? "")) ??
+                                        currencyFormat.defaultCode
+                                      : undefined,
+                                    currencyFormat.locale,
                                   )
+                              const link = lines ? asEntityCellTextLink(content) : undefined
+                              const text = link ? link.props.children : content
+                              const preview = typeof text === "string" && lines
+                                ? <EntityCellText label={col.label} text={text} lines={lines} editable={Boolean(col.inlineEdit)} link={link} />
+                                : content
                               return col.inlineEdit ? (
                                 <InlineEditCell
                                   edit={col.inlineEdit}
@@ -1122,11 +1198,9 @@ export function EntityTable({
                                   label={col.label}
                                   value={value}
                                 >
-                                  {content}
+                                  {preview}
                                 </InlineEditCell>
-                              ) : (
-                                content
-                              )
+                              ) : preview
                             })()}
                           </TableCell>
                         )

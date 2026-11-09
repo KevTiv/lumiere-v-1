@@ -66,8 +66,12 @@ export interface ModuleTab {
   type: "dashboard" | "entity" | "custom"
   /** Subtitle shown in the page header while this tab is active. */
   description?: string
+  /** Domain-owned action for a workbench without a generated create form. */
+  primaryAction?: ReactNode
   /** For type='dashboard': sections rendered by DashboardGrid */
   sections?: DashboardSection[]
+  /** Optional widgets for a collection or workbench. They appear only when added. */
+  insightSections?: readonly DashboardSection[]
   /** For type='entity': EntityView config */
   entityConfig?: EntityViewConfig
   /** Optional 'New X' button that opens a FormModal */

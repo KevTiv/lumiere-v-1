@@ -1,6 +1,12 @@
 "use client"
 
 import { useId, useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
+import { FileUploadField } from "../components/file-upload-field"
+import { FileIdentity } from "../components/file-identity"
+import { documentRelatedRecordLabel } from "../lib/file-metadata"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 import { DOCUMENT_FILE_ACCEPT } from "@lumiere/erp-shared/document-file-profile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +18,8 @@ export type RecordAttachmentRow = {
   fileName?: string | null
   file_name?: string | null
   mimetype?: string | null
+  fileSize?: unknown
+  file_size?: unknown
   url?: string | null
   resModel?: string | null
   res_model?: string | null
@@ -31,6 +39,7 @@ export type RecordAttachmentsPanelProps = {
   emptyLabel?: string
   uploadLabel?: string
   disabled?: boolean
+  dataState?: ModuleDataState
 }
 
 function rowResModel(row: RecordAttachmentRow): string {
@@ -59,7 +68,9 @@ export function RecordAttachmentsPanel({
   emptyLabel = "No attachments yet",
   uploadLabel = "Upload",
   disabled,
+  dataState,
 }: RecordAttachmentsPanelProps) {
+  const { t } = useTranslation()
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState("")
   const [pending, setPending] = useState(false)
@@ -84,50 +95,37 @@ export function RecordAttachmentsPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{title}</h3>
         <span className="text-xs text-muted-foreground">
-          {resModel} #{String(resId)}
+          {documentRelatedRecordLabel(resModel, t)} #{String(resId)}
         </span>
       </div>
 
-      {linked.length === 0 ? (
+      {dataState && dataState.status !== "ready" ? (
+        dataState.status === "loading"
+          ? <p role="status" className="text-sm text-muted-foreground">{t("documents.attachments.loading", { defaultValue: "Loading attachments…" })}</p>
+          : <ModuleDataNotice state={dataState} />
+      ) : linked.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
-        <ul className="space-y-1 text-sm">
-          {linked.map((d) => {
-            const label = d.name || d.fileName || d.file_name || `Document ${String(d.id)}`
-            const href = d.url || undefined
-            return (
-              <li
-                key={String(d.id)}
-                className="flex min-w-0 flex-wrap items-start justify-between gap-2 [overflow-wrap:anywhere]"
-              >
-                {onOpen ? (
-                  <button
-                    type="button"
-                    className="min-w-0 max-w-full text-left text-primary underline-offset-2 hover:underline"
-                    onClick={() => onOpen(String(d.id))}
-                  >
-                    {label}
-                  </button>
-                ) : href ? (
-                  <a
-                    className="min-w-0 max-w-full text-primary underline-offset-2 hover:underline"
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {label}
-                  </a>
-                ) : (
-                  <span className="min-w-0 max-w-full">{label}</span>
-                )}
-                <span className="text-xs text-muted-foreground">{d.mimetype || ""}</span>
-              </li>
-            )
-          })}
+        <ul className="divide-y divide-border text-sm">
+          {linked.map((document) => (
+            <li key={String(document.id)} className="min-w-0 py-2">
+              <FileIdentity
+                title={document.name}
+                fileName={document.fileName || document.file_name}
+                mimetype={document.mimetype}
+                size={document.fileSize ?? document.file_size}
+                status={!onOpen && !document.url ? t("documents.attachments.unavailable", { defaultValue: "File unavailable" }) : undefined}
+                onOpen={onOpen ? () => onOpen(String(document.id)) : undefined}
+                href={document.url || undefined}
+                linkTarget="_blank"
+                linkRel="noreferrer"
+              />
+            </li>
+          ))}
         </ul>
       )}
 
-      <div className="grid gap-2 @lg/attachments:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] @lg/attachments:items-end">
+      <div className="grid gap-2 @lg/attachments:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] @lg/attachments:items-start">
         <div className="min-w-0 space-y-1">
           <Label htmlFor={`${inputId}-name`}>Name</Label>
           <Input
@@ -140,18 +138,20 @@ export function RecordAttachmentsPanel({
         </div>
         <div className="min-w-0 space-y-1">
           <Label htmlFor={`${inputId}-file`}>File</Label>
-          <Input
+          <FileUploadField
             id={`${inputId}-file`}
-            type="file"
             accept={DOCUMENT_FILE_ACCEPT}
             data-testid="record-attachments-file"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            chooseLabel={t("documents.attachments.choose", { defaultValue: "Choose file" })}
             disabled={disabled || pending}
+            files={file ? [{ id: "selected", name: file.name, mimetype: file.type, size: file.size }] : []}
+            onSelect={([picked]) => { if (picked) { setFile(picked); setError(null) } }}
+            onRemove={() => { setFile(null); setError(null) }}
           />
         </div>
         <Button
           type="button"
-          className="h-auto min-h-8 max-w-full whitespace-normal"
+          className="h-auto min-h-8 max-w-full whitespace-normal @lg/attachments:mt-6"
           disabled={disabled || pending || !file}
           onClick={async () => {
             if (!file) return

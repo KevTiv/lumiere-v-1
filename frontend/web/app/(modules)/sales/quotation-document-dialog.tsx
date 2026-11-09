@@ -133,7 +133,7 @@ export function QuotationDocumentDialog({ organizationId, companyId, identity, o
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !submitLock.current) onClose() }}>
-      <DialogContent className="flex h-[94dvh] max-w-[min(96vw,1280px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(96vw,1280px)]" data-testid="quotation-document-dialog">
+      <DialogContent size="document" className="flex h-[94dvh] flex-col gap-0 overflow-hidden p-0" data-testid="quotation-document-dialog">
         <header className="min-w-0 shrink-0 border-b px-6 py-5 pr-12">
           <DialogTitle className="flex items-center gap-2"><FileText className="size-5 text-primary" />{t("sales.quotationDocument.title")}</DialogTitle>
           <DialogDescription className="mt-2">{t("sales.quotationDocument.description")}</DialogDescription>

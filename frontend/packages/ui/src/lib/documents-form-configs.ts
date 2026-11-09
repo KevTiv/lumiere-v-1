@@ -546,6 +546,7 @@ export const uploadDocumentVersionForm = (t: TFunction): FormConfig => ({
           id: "changesDescription",
           name: "changesDescription",
           type: "textarea",
+          format: "plain",
           label: "Change notes",
           rows: 2,
           width: "full",

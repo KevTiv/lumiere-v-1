@@ -25,6 +25,12 @@ for (const width of [320, 390, 768, 1024, 1440]) {
       expect(bounds.width).toBe(width)
     }
     await input.fill("Keep this question")
+    await panel.getByRole("button", { name: "Workspace context" }).click()
+    const context = page.getByRole("dialog", { name: "Workspace context" })
+    await expect(context.getByText("Accounting", { exact: true })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(context).toBeHidden()
+    await expect(input).toHaveValue("Keep this question")
     await expect(panel.getByRole("group", { name: "ERP quick actions" })).toBeHidden()
     await expect(panel.locator("header")).toHaveCSS("border-bottom-width", "0px")
     await panel.getByRole("button", { name: "Skills", exact: true }).click()

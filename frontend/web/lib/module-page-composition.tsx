@@ -287,6 +287,10 @@ function ScopedModulePageHost({
   pageId,
   title,
   sections,
+  placement = "dashboard",
+  historyBounds,
+  savedWidgetScopeNote,
+  actionTarget,
   children,
   isLoading,
   scope,
@@ -394,6 +398,7 @@ function ScopedModulePageHost({
   const rawPeriod = searchParams?.get("period");
   const periodTimeZone = searchParams?.get("periodTimeZone") ?? "UTC";
   const bounds = useMemo(() => {
+    if (historyBounds !== undefined) return historyBounds;
     const period = parseHistoryPeriod(rawPeriod);
     if (rawPeriod && !period) return null;
     try {
@@ -403,7 +408,7 @@ function ScopedModulePageHost({
     } catch {
       return null;
     }
-  }, [rawPeriod, periodTimeZone]);
+  }, [historyBounds, rawPeriod, periodTimeZone]);
   const resolution = useMemo(
     () =>
       resolveStoredDashboard(
@@ -424,7 +429,7 @@ function ScopedModulePageHost({
   );
   const builtinCatalog = useMemo(() => {
     if (sections) return createBuiltinWidgetCatalog(sections);
-    if (!children) return [];
+    if (placement === "insights" || !children) return [];
     const widget: CustomWidget = {
       id: "module-content",
       type: "custom",
@@ -443,18 +448,20 @@ function ScopedModulePageHost({
         widget,
       },
     ];
-  }, [sections, children, title]);
+  }, [sections, children, title, placement]);
   const defaultValue = useMemo(
     () =>
-      sections
-        ? createDefaultPageLayout(sections)
-        : builtinCatalog.map((item) => ({
-            id: `builtin:${item.widgetId}`,
-            source: item.source,
-            widgetId: item.widgetId,
-            width: item.defaultWidth ?? 12,
-          })),
-    [sections, builtinCatalog],
+      placement === "insights"
+        ? []
+        : sections
+          ? createDefaultPageLayout(sections)
+          : builtinCatalog.map((item) => ({
+              id: `builtin:${item.widgetId}`,
+              source: item.source,
+              widgetId: item.widgetId,
+              width: item.defaultWidth ?? 12,
+            })),
+    [sections, builtinCatalog, placement],
   );
   const savedCatalog = useMemo<PageWidgetCatalogItem[]>(
     () =>
@@ -620,92 +627,107 @@ function ScopedModulePageHost({
         }
       : null;
   if (!permitted) return <>{children}</>;
+  const insights = placement === "insights";
   return (
-    <div
-      className="space-y-4"
-      data-testid={`module-page-composition-${moduleId}-${pageId}`}
-    >
-      {layout.error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
-        >
-          <p>
-            {t("pageComposition.serviceUnavailable", {
-              defaultValue:
-                "Page customization is temporarily unavailable. Your module remains available.",
-            })}
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void layout.refetch()}
+    <>
+      {insights ? children : null}
+      <div
+        className={insights ? "contents" : "min-w-0 space-y-4"}
+        data-testid={`module-page-composition-${moduleId}-${pageId}`}
+      >
+        {layout.error && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
           >
-            {t("common.retry")}
-          </Button>
-        </div>
-      )}
-      <PageComposition
-        value={layout.error ? null : (layout.data?.layout?.widgets ?? null)}
-        defaultValue={defaultValue}
-        catalog={catalog}
-        revision={layout.data?.revision ?? null}
-        canEdit={permitted && !layout.error && layout.isSuccess}
-        isLoading={isLoading || layout.isPending}
-        onSave={onSave}
-        onDraftChange={setDraft}
-        onCreateWidget={canCreateWidgets ? () => openEditor() : undefined}
-        onConfigureWidget={
-          canCreateWidgets
-            ? (placement: PageWidgetPlacement) => {
-                const row = savedById.get(placement.widgetId);
-                const initial = row ? queryBuilderDraftFromWidget(row) : null;
-                return initial ? openEditor(initial) : Promise.resolve(null);
-              }
-            : undefined
-        }
-        request={request}
-        onRequestHandled={settle}
-      >
-        {children}
-      </PageComposition>
-      <Sheet
-        open={editor !== null}
-        onOpenChange={(open) => {
-          if (!open) closeEditor();
-        }}
-      >
-        <SheetContent className="w-full overflow-y-auto sm:max-w-5xl">
-          <SheetHeader>
-            <SheetTitle>
-              {t("pageComposition.buildWidget", {
-                defaultValue: "Build a widget",
-              })}
-            </SheetTitle>
-            <SheetDescription>
-              {t("pageComposition.buildWidgetDescription", {
+            <p>
+              {t("pageComposition.serviceUnavailable", {
                 defaultValue:
-                  "Choose a metric, its filters and a display. Preview the result before adding it to this page.",
+                  "Page customization is temporarily unavailable. Your module remains available.",
               })}
-            </SheetDescription>
-          </SheetHeader>
-          {editor && (
-            <div className="px-4 pb-6">
-              <QueryBuilder
-                key={editor.id}
-                organizationId={BigInt(scope.organizationId)}
-                companyId={BigInt(scope.companyId)}
-                dashboards={[]}
-                initialDraft={editor.initialDraft}
-                pageTitle={title}
-                status={editorStatus}
-                onStatusChange={setEditorStatus}
-                onCreated={onCreated}
-              />
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void layout.refetch()}
+            >
+              {t("common.retry")}
+            </Button>
+          </div>
+        )}
+        <PageComposition
+          value={layout.error ? null : (layout.data?.layout?.widgets ?? null)}
+          defaultValue={defaultValue}
+          catalog={catalog}
+          revision={layout.data?.revision ?? null}
+          canEdit={permitted && !layout.error && layout.isSuccess}
+          isLoading={isLoading || layout.isPending}
+          onSave={onSave}
+          onDraftChange={setDraft}
+          onCreateWidget={canCreateWidgets ? () => openEditor() : undefined}
+          onConfigureWidget={
+            canCreateWidgets
+              ? (placement: PageWidgetPlacement) => {
+                  const row = savedById.get(placement.widgetId);
+                  const initial = row ? queryBuilderDraftFromWidget(row) : null;
+                  return initial ? openEditor(initial) : Promise.resolve(null);
+                }
+              : undefined
+          }
+          request={request}
+          onRequestHandled={settle}
+          actionTarget={actionTarget}
+          insights={insights}
+          scopeNote={
+            savedWidgetScopeNote ??
+            (insights
+              ? t("pageComposition.insightScope", {
+                  defaultValue:
+                    "Widgets use the operating company and their own filters. A date range applies to each widget’s configured date field.",
+                })
+              : undefined)
+          }
+        >
+          {insights ? undefined : children}
+        </PageComposition>
+        <Sheet
+          open={editor !== null}
+          onOpenChange={(open) => {
+            if (!open) closeEditor();
+          }}
+        >
+          <SheetContent size="review">
+            <SheetHeader>
+              <SheetTitle>
+                {t("pageComposition.buildWidget", {
+                  defaultValue: "Build a widget",
+                })}
+              </SheetTitle>
+              <SheetDescription>
+                {t("pageComposition.buildWidgetDescription", {
+                  defaultValue:
+                    "Choose a metric, its filters and a display. Preview the result before adding it to this page.",
+                })}
+              </SheetDescription>
+            </SheetHeader>
+            {editor && (
+              <div className="px-4 pb-6">
+                <QueryBuilder
+                  key={editor.id}
+                  organizationId={BigInt(scope.organizationId)}
+                  companyId={BigInt(scope.companyId)}
+                  dashboards={[]}
+                  initialDraft={editor.initialDraft}
+                  pageTitle={title}
+                  status={editorStatus}
+                  onStatusChange={setEditorStatus}
+                  onCreated={onCreated}
+                />
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }

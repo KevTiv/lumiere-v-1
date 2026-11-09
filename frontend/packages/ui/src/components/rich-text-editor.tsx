@@ -152,7 +152,7 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }
           </ToolbarButton>
         }
       />
-      <PopoverContent align="start" className="w-80" initialFocus={inputRef}>
+      <PopoverContent align="start" className="w-80 max-w-[min(var(--available-width),calc(100vw-1rem))]" initialFocus={inputRef}>
         <form
           className="flex items-center gap-2"
           onSubmit={(event) => {
@@ -228,7 +228,7 @@ function RichTextToolbar({
     <div
       role="toolbar"
       aria-label="Text formatting"
-      className="flex min-h-10 items-center gap-0.5 overflow-x-auto border-b border-border/60 bg-muted/20 px-2 py-1"
+      className="flex min-h-10 min-w-0 items-center gap-0.5 overflow-x-auto border-b border-border/60 bg-muted/20 px-2 py-1"
     >
       <RichTextTemplatePicker
         editor={editor}
@@ -352,12 +352,13 @@ function RichTextEditor({
     [placeholder, maxLength]
   )
 
+  const minContentHeight = `min(${rows * LINE_HEIGHT_REM + VERTICAL_PADDING_REM}rem, 22rem, 50dvh)`
   const attributes = React.useMemo(() => {
     const attrs: Record<string, string> = {
-      class: cn("min-w-0 px-4 py-3 outline-none", richTextContentClassName, contentClassName),
+      class: cn("max-h-[min(22rem,50dvh)] min-w-0 overflow-auto overscroll-contain px-4 py-3 outline-none [overflow-wrap:anywhere]", richTextContentClassName, contentClassName),
       role: "textbox",
       "aria-multiline": "true",
-      style: `min-height: ${rows * LINE_HEIGHT_REM + VERTICAL_PADDING_REM}rem`,
+      style: `min-height: ${minContentHeight}`,
     }
     Object.assign(attrs, editorAttributes)
     if (id) attrs.id = id
@@ -368,7 +369,7 @@ function RichTextEditor({
       if (attrValue !== undefined && attrValue !== null) attrs[key] = String(attrValue)
     }
     return attrs
-  }, [ariaAttributes, editorAttributes, contentClassName, disabled, id, readOnly, rows, testId])
+  }, [ariaAttributes, editorAttributes, contentClassName, disabled, id, minContentHeight, readOnly, testId])
 
   const editor = useEditor(
     {
@@ -424,7 +425,7 @@ function RichTextEditor({
       data-slot="rich-text-panel"
       data-disabled={disabled || undefined}
       className={cn(
-        "group/rich-text w-full overflow-hidden rounded-xl border border-border/80 bg-background shadow-xs transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20 data-disabled:cursor-not-allowed data-disabled:bg-input/30 data-disabled:opacity-60 has-[[aria-invalid=true]]:border-destructive has-[[aria-invalid=true]]:ring-3 has-[[aria-invalid=true]]:ring-destructive/20 dark:bg-input/20 dark:data-disabled:bg-input/50 dark:has-[[aria-invalid=true]]:border-destructive/50 dark:has-[[aria-invalid=true]]:ring-destructive/40",
+        "group/rich-text w-full min-w-0 overflow-hidden rounded-xl border border-border/80 bg-background shadow-xs transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20 data-disabled:cursor-not-allowed data-disabled:bg-input/30 data-disabled:opacity-60 has-[[aria-invalid=true]]:border-destructive has-[[aria-invalid=true]]:ring-3 has-[[aria-invalid=true]]:ring-destructive/20 dark:bg-input/20 dark:data-disabled:bg-input/50 dark:has-[[aria-invalid=true]]:border-destructive/50 dark:has-[[aria-invalid=true]]:ring-destructive/40",
         className
       )}
     >
@@ -440,8 +441,8 @@ function RichTextEditor({
       ) : (
         <div
           aria-hidden="true"
-          className={cn("px-4 py-3 whitespace-pre-wrap text-muted-foreground", richTextContentClassName)}
-          style={{ minHeight: `${rows * LINE_HEIGHT_REM + VERTICAL_PADDING_REM}rem` }}
+          className={cn("max-h-[min(22rem,50dvh)] overflow-hidden px-4 py-3 whitespace-pre-wrap text-muted-foreground [overflow-wrap:anywhere]", richTextContentClassName)}
+          style={{ minHeight: minContentHeight }}
         >
           {value ?? defaultValue ?? placeholder}
         </div>

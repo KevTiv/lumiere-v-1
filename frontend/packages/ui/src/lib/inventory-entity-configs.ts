@@ -6,6 +6,7 @@ import {
 } from "@lumiere/erp-workflows"
 import type { EntityAction, EntityDetailConfig, EntityRow, EntityViewConfig } from "./entity-view-types"
 import { unwrapEntityValue } from "./entity-row-values"
+import { entityColumnLayouts as layout } from "./entity-column-layouts"
 
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const productTypeBadges = (t: TFunction) => ({
@@ -241,7 +242,7 @@ export const productsTableConfig = (
   const nameColumn = {
     key: "name",
     label: t("inventory.products.columns.name"),
-    width: "min-w-48",
+    layout: layout.identity,
     sortable: true,
     ...(formatName
       ? {
@@ -288,13 +289,14 @@ export const productsTableConfig = (
         {
           key: "defaultCode",
           label: t("inventory.products.columns.defaultCode"),
-          width: "min-w-24",
+          layout: layout.reference,
           sortable: true,
         },
         nameColumn,
         {
           key: "type",
           label: t("inventory.products.columns.type"),
+          layout: layout.status,
           type: "status",
           sortable: true,
           ...productTypeBadges(t),
@@ -302,6 +304,7 @@ export const productsTableConfig = (
         {
           key: "standardPrice",
           label: t("inventory.products.columns.standardPrice"),
+          layout: layout.amount,
           type: "currency",
           align: "right",
           sortable: true,
@@ -309,11 +312,13 @@ export const productsTableConfig = (
         {
           key: "saleOk",
           label: t("inventory.products.columns.saleOk"),
+          layout: layout.flag,
           type: "boolean",
         },
         {
           key: "purchaseOk",
           label: t("inventory.products.columns.purchaseOk"),
+          layout: layout.flag,
           type: "boolean",
         },
       ],
@@ -351,18 +356,19 @@ export const stockQuantsTableConfig = (
       {
         key: "productId",
         label: t("inventory.stockOnHand.columns.productId"),
-        width: "min-w-24",
+        layout: layout.reference,
         sortable: true,
       },
       {
         key: "locationId",
         label: t("inventory.stockOnHand.columns.locationId"),
-        width: "min-w-32",
+        layout: layout.reference,
         sortable: true,
       },
       {
         key: "availableQuantity",
         label: t("inventory.stockOnHand.columns.availableQuantity"),
+        layout: layout.quantity,
         type: "number",
         align: "right",
         sortable: true,
@@ -370,12 +376,14 @@ export const stockQuantsTableConfig = (
       {
         key: "reservedQuantity",
         label: t("inventory.stockOnHand.columns.reservedQuantity"),
+        layout: layout.quantity,
         type: "number",
         align: "right",
       },
       {
         key: "inventoryQuantity",
         label: t("inventory.stockOnHand.columns.inventoryQuantity"),
+        layout: layout.quantity,
         type: "number",
         align: "right",
         sortable: true,
@@ -383,6 +391,7 @@ export const stockQuantsTableConfig = (
       {
         key: "value",
         label: t("inventory.stockOnHand.columns.value"),
+        layout: layout.amount,
         type: "currency",
         align: "right",
         sortable: true,
@@ -481,13 +490,14 @@ export const transfersTableConfig = (
       {
         key: "name",
         label: t("inventory.transfers.columns.name"),
-        width: "min-w-28",
+        layout: layout.identity,
         sortable: true,
       },
-      { key: "origin", label: t("inventory.transfers.columns.origin"), width: "min-w-28" },
+      { key: "origin", label: t("inventory.transfers.columns.origin"), layout: layout.reference },
       {
         key: "state",
         label: t("inventory.transfers.columns.state"),
+        layout: layout.status,
         type: "status",
         sortable: true,
         ...pickingStateBadges(t),
@@ -495,15 +505,17 @@ export const transfersTableConfig = (
       {
         key: "scheduledDate",
         label: t("inventory.transfers.columns.scheduledDate"),
+        layout: layout.date,
         type: "relative-date",
         sortable: true,
       },
       {
         key: "dateDone",
         label: t("inventory.transfers.columns.dateDone"),
+        layout: layout.date,
         type: "relative-date",
       },
-      { key: "moveType", label: t("inventory.transfers.columns.moveType"), type: "text" },
+      { key: "moveType", label: t("inventory.transfers.columns.moveType"), layout: layout.status, type: "text" },
     ],
     emptyMessage: t("inventory.transfers.emptyMessage"),
     emptyState: {
@@ -529,9 +541,9 @@ export const warehousesTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("inventory.warehouses.searchPlaceholder"),
     searchKeys: ["name", "code"],
     columns: [
-      { key: "name", label: t("inventory.warehouses.columns.name"), width: "min-w-40" },
-      { key: "code", label: t("inventory.warehouses.columns.code"), width: "min-w-20" },
-      { key: "active", label: t("inventory.warehouses.columns.active"), type: "boolean" },
+      { key: "name", label: t("inventory.warehouses.columns.name"), layout: layout.identity },
+      { key: "code", label: t("inventory.warehouses.columns.code"), layout: layout.reference },
+      { key: "active", label: t("inventory.warehouses.columns.active"), layout: layout.flag, type: "boolean" },
     ],
     emptyMessage: t("inventory.warehouses.emptyMessage"),
   },
@@ -562,10 +574,10 @@ export const inventoryAdjustmentsTableConfig = (t: TFunction): EntityViewConfig 
       },
     ],
     columns: [
-      { key: "name", label: t("inventory.inventoryAdjustments.columns.name"), width: "min-w-32" },
-      { key: "state", label: t("inventory.inventoryAdjustments.columns.state"), type: "badge", ...adjustmentStateBadges(t) },
-      { key: "date", label: t("inventory.inventoryAdjustments.columns.date"), type: "date" },
-      { key: "accountingDate", label: t("inventory.inventoryAdjustments.columns.accountingDate"), type: "date" },
+      { key: "name", label: t("inventory.inventoryAdjustments.columns.name"), layout: layout.identity },
+      { key: "state", label: t("inventory.inventoryAdjustments.columns.state"), layout: layout.status, type: "badge", ...adjustmentStateBadges(t) },
+      { key: "date", label: t("inventory.inventoryAdjustments.columns.date"), layout: layout.date, type: "date" },
+      { key: "accountingDate", label: t("inventory.inventoryAdjustments.columns.accountingDate"), layout: layout.date, type: "date" },
     ],
     emptyMessage: t("inventory.inventoryAdjustments.emptyMessage"),
   },
@@ -614,12 +626,12 @@ export const stockLocationsTableConfig = (t: TFunction): EntityViewConfig => ({
       {
         key: "completeName",
         label: t("inventory.stockLocations.columns.completeName"),
-        width: "min-w-48",
+        layout: layout.identity,
         render: (value, row) => String(unwrapEntityValue(value) || unwrapEntityValue(row.name) || "—"),
       },
-      { key: "usage", label: t("inventory.stockLocations.columns.usage"), type: "badge", ...locationTypeBadges(t) },
-      { key: "barcode", label: t("inventory.stockLocations.columns.barcode"), width: "min-w-28" },
-      { key: "active", label: t("inventory.stockLocations.columns.active"), type: "boolean" },
+      { key: "usage", label: t("inventory.stockLocations.columns.usage"), layout: layout.status, type: "badge", ...locationTypeBadges(t) },
+      { key: "barcode", label: t("inventory.stockLocations.columns.barcode"), layout: layout.reference, defaultHidden: true },
+      { key: "active", label: t("inventory.stockLocations.columns.active"), layout: layout.flag, type: "boolean" },
     ],
     emptyMessage: t("inventory.stockLocations.emptyMessage"),
   },
@@ -637,11 +649,11 @@ export const productionLotsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("inventory.productionLots.searchPlaceholder"),
     searchKeys: ["name", "ref"],
     columns: [
-      { key: "name", label: t("inventory.productionLots.columns.name"), width: "min-w-36" },
-      { key: "productId", label: t("inventory.productionLots.columns.productId"), width: "min-w-40" },
-      { key: "ref", label: t("inventory.productionLots.columns.ref"), width: "min-w-28" },
-      { key: "createDate", label: t("inventory.productionLots.columns.createDate"), type: "date" },
-      { key: "expirationDate", label: t("inventory.productionLots.columns.expirationDate"), type: "date" },
+      { key: "name", label: t("inventory.productionLots.columns.name"), layout: layout.reference },
+      { key: "productId", label: t("inventory.productionLots.columns.productId"), layout: layout.reference },
+      { key: "ref", label: t("inventory.productionLots.columns.ref"), layout: layout.reference },
+      { key: "createDate", label: t("inventory.productionLots.columns.createDate"), layout: layout.date, type: "date" },
+      { key: "expirationDate", label: t("inventory.productionLots.columns.expirationDate"), layout: layout.date, type: "date" },
     ],
     emptyMessage: t("inventory.productionLots.emptyMessage"),
   },
@@ -658,12 +670,12 @@ export const stockProductionSerialsTableConfig = (t: TFunction): EntityViewConfi
     searchPlaceholder: t("inventory.productionSerials.searchPlaceholder"),
     searchKeys: ["name", "ref"],
     columns: [
-      { key: "name", label: t("inventory.productionSerials.columns.name"), width: "min-w-36" },
-      { key: "productId", label: t("inventory.productionSerials.columns.productId"), width: "min-w-32" },
-      { key: "state", label: t("inventory.productionSerials.columns.state"), type: "badge", ...serialStateBadges(t) },
-      { key: "isLocked", label: t("inventory.productionSerials.columns.isLocked"), type: "boolean" },
-      { key: "locationId", label: t("inventory.productionSerials.columns.locationId"), width: "min-w-24" },
-      { key: "createDate", label: t("inventory.productionSerials.columns.createDate"), type: "date" },
+      { key: "name", label: t("inventory.productionSerials.columns.name"), layout: layout.reference },
+      { key: "productId", label: t("inventory.productionSerials.columns.productId"), layout: layout.reference },
+      { key: "state", label: t("inventory.productionSerials.columns.state"), layout: layout.status, type: "badge", ...serialStateBadges(t) },
+      { key: "isLocked", label: t("inventory.productionSerials.columns.isLocked"), layout: layout.flag, type: "boolean" },
+      { key: "locationId", label: t("inventory.productionSerials.columns.locationId"), layout: layout.reference },
+      { key: "createDate", label: t("inventory.productionSerials.columns.createDate"), layout: layout.date, type: "date" },
     ],
     emptyMessage: t("inventory.productionSerials.emptyMessage"),
   },
@@ -751,11 +763,11 @@ export const cycleCountsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("inventory.cycleCounts.title"),
     searchKeys: ["name", "state"],
     columns: [
-      { key: "name", label: t("inventory.cycleCounts.columns.name"), width: "min-w-40" },
-      { key: "state", label: t("inventory.cycleCounts.columns.state"), type: "badge" },
-      { key: "locationId", label: t("inventory.cycleCounts.columns.locationId"), width: "min-w-24" },
-      { key: "frequency", label: t("inventory.cycleCounts.columns.frequency"), width: "min-w-24" },
-      { key: "nextCountDate", label: t("inventory.cycleCounts.columns.nextCountDate"), type: "date" },
+      { key: "name", label: t("inventory.cycleCounts.columns.name"), layout: layout.identity },
+      { key: "state", label: t("inventory.cycleCounts.columns.state"), layout: layout.status, type: "badge" },
+      { key: "locationId", label: t("inventory.cycleCounts.columns.locationId"), layout: layout.reference },
+      { key: "frequency", label: t("inventory.cycleCounts.columns.frequency"), layout: layout.status },
+      { key: "nextCountDate", label: t("inventory.cycleCounts.columns.nextCountDate"), layout: layout.date, type: "date" },
     ],
     emptyMessage: t("inventory.cycleCounts.emptyMessage"),
   },
@@ -887,14 +899,15 @@ export const stockMovesTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("inventory.stockMoves.columns.name"), width: "min-w-32" },
-      { key: "state", label: t("inventory.stockMoves.columns.state"), type: "badge" },
-      { key: "productId", label: t("inventory.stockMoves.columns.productId"), width: "min-w-20" },
-      { key: "locationId", label: t("inventory.stockMoves.columns.locationId"), width: "min-w-20" },
-      { key: "locationDestId", label: t("inventory.stockMoves.columns.locationDestId"), width: "min-w-20" },
+      { key: "name", label: t("inventory.stockMoves.columns.name"), layout: layout.reference },
+      { key: "state", label: t("inventory.stockMoves.columns.state"), layout: layout.status, type: "badge" },
+      { key: "productId", label: t("inventory.stockMoves.columns.productId"), layout: layout.reference },
+      { key: "locationId", label: t("inventory.stockMoves.columns.locationId"), layout: layout.reference },
+      { key: "locationDestId", label: t("inventory.stockMoves.columns.locationDestId"), layout: layout.reference },
       {
         key: "productUomQty",
         label: t("inventory.stockMoves.columns.productUomQty"),
+        layout: layout.quantity,
         type: "number",
         align: "right",
       },
@@ -937,11 +950,12 @@ export const replenishmentRulesTableConfig = (t: TFunction): EntityViewConfig =>
     searchable: true,
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("inventory.replenishmentRules.columns.name"), width: "min-w-40" },
-      { key: "active", label: t("inventory.replenishmentRules.columns.active"), type: "boolean" },
+      { key: "name", label: t("inventory.replenishmentRules.columns.name"), layout: layout.identity },
+      { key: "active", label: t("inventory.replenishmentRules.columns.active"), layout: layout.flag, type: "boolean" },
       {
         key: "sequence",
         label: t("inventory.replenishmentRules.columns.sequence"),
+        layout: layout.quantity, defaultHidden: true,
         type: "number",
         align: "right",
       },
@@ -961,9 +975,9 @@ export const productCategoriesTableConfig = (t: TFunction): EntityViewConfig => 
     searchPlaceholder: t("inventory.productCategories.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("inventory.productCategories.columns.name"), width: "min-w-48" },
-      { key: "parentId", label: t("inventory.productCategories.columns.parentId"), width: "min-w-24" },
-      { key: "active", label: t("inventory.productCategories.columns.active"), type: "boolean" },
+      { key: "name", label: t("inventory.productCategories.columns.name"), layout: layout.identity },
+      { key: "parentId", label: t("inventory.productCategories.columns.parentId"), layout: layout.reference },
+      { key: "active", label: t("inventory.productCategories.columns.active"), layout: layout.flag, type: "boolean" },
     ],
     emptyMessage: t("inventory.productCategories.emptyMessage"),
   },

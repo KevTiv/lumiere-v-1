@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import { ChatDecisionCard } from "@lumiere/ui"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
 import {
   Tabs,
@@ -210,8 +211,8 @@ export function SavedImportWorkspace({
           >
             {t("settings.importTask.title", { defaultValue: "Saved import" })}
           </h2>
-          <p className="break-words text-sm text-muted-foreground">
-            {task.files.map((file) => file.fileName).join(" · ")}
+          <p className="text-sm text-muted-foreground">
+            {t("settings.importTask.originalFiles", { defaultValue: "{{count}} original files", count: task.files.length })}
           </p>
           <a
             className="text-sm underline underline-offset-4"
@@ -259,10 +260,10 @@ export function SavedImportWorkspace({
         <div>
           <dt className="text-muted-foreground">
             {t("settings.importTask.reviewRows", {
-              defaultValue: "Review rows",
+              defaultValue: "Source rows in review",
             })}
           </dt>
-          <dd className="font-medium">{counts.total}</dd>
+          <dd className="font-medium tabular-nums">{counts.total}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">
@@ -270,7 +271,7 @@ export function SavedImportWorkspace({
               defaultValue: "Needs a decision",
             })}
           </dt>
-          <dd className="font-medium">{counts.pending}</dd>
+          <dd className="font-medium tabular-nums">{counts.pending}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">
@@ -278,7 +279,7 @@ export function SavedImportWorkspace({
               defaultValue: "Confirmed review rows",
             })}
           </dt>
-          <dd className="font-medium">{counts.confirmed}</dd>
+          <dd className="font-medium tabular-nums">{counts.confirmed}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">
@@ -286,10 +287,10 @@ export function SavedImportWorkspace({
               defaultValue: "Excluded with a reason",
             })}
           </dt>
-          <dd className="font-medium">{counts.excluded}</dd>
+          <dd className="font-medium tabular-nums">{counts.excluded}</dd>
         </div>
       </dl>
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-prose text-sm text-muted-foreground">
         {t("settings.importTask.confirmationBoundary", {
           defaultValue:
             "Confirmed source facts are ready for review. ERP creation and verified results are tracked separately.",
@@ -338,26 +339,23 @@ export function SavedImportWorkspace({
                 key={file.ordinal}
                 className="min-w-0 rounded-lg border p-3 text-sm"
               >
-                <a
-                  className="break-words font-medium underline underline-offset-4"
-                  href={
-                    "/api/import-tasks/" +
-                    taskId +
-                    "/files/" +
-                    file.ordinal +
-                    "?companyId=" +
-                    scope.companyId
-                  }
-                  download={file.fileName}
-                >
-                  {file.fileName}
-                </a>
-                <p className="text-xs text-muted-foreground">
-                  {t("settings.importTask.savedBytes", {
-                    defaultValue: "Original file saved · {{bytes}} bytes",
-                    bytes: file.size,
-                  })}
-                </p>
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <FileIdentity
+                    fileName={file.fileName}
+                    size={file.size}
+                    status={t("settings.importTask.sourceSaved", { defaultValue: "Original saved" })}
+                    className="flex-1 basis-48"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    nativeButton={false}
+                    render={<a href={`/api/import-tasks/${taskId}/files/${file.ordinal}?companyId=${scope.companyId}`} download={file.fileName} />}
+                    aria-label={t("settings.importTask.downloadNamed", { defaultValue: "Download {{fileName}}", fileName: file.fileName })}
+                  >
+                    {t("settings.importTask.download", { defaultValue: "Download" })}
+                  </Button>
+                </div>
                 <details className="mt-1">
                   <summary className="cursor-pointer text-xs text-muted-foreground">
                     {t("settings.importTask.sourceFingerprint", {

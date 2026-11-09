@@ -5,6 +5,7 @@ import { cn } from "../lib/utils"
 import type { FormField, FormValues } from "../lib/form-types"
 import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
 import { Input } from "../components/input"
+import { FileUploadField } from "../components/file-upload-field"
 import { Textarea } from "../components/textarea"
 import { NumericInput } from "../components/numeric-input"
 import { Checkbox } from "../components/checkbox"
@@ -175,9 +176,10 @@ export function FormFieldRenderer({
           return (
             <RecordPicker
               id={field.id}
-              value={String(value ?? "")}
+              value={typeof value === "string" || typeof value === "number" || typeof value === "bigint" ? String(value) : ""}
               onChange={onChange}
               options={field.options}
+              unavailableLabel={(missing) => t("common.form.unavailableSelection", { value: missing, defaultValue: "Unavailable selection: {{value}}" })}
               placeholder={field.placeholder}
               disabled={field.disabled}
               invalid={!!error}
@@ -368,27 +370,38 @@ export function FormFieldRenderer({
           />
         )
 
-      case "file":
+      case "file": {
+        const selected: File[] = Array.isArray(value)
+          ? value
+          : typeof FileList !== "undefined" && value instanceof FileList ? Array.from(value) : []
         return (
-          <Input
+          <FileUploadField
             id={field.id}
             name={field.name}
+            aria-label={field.label}
             data-testid={`form-field-${field.name}`}
-            type="file"
             accept={field.accept}
             multiple={field.multiple}
-            onChange={(e) => onChange(e.target.files)}
+            onSelect={onChange}
+            files={selected.map((file, index) => ({ id: String(index), name: file.name, size: file.size, mimetype: file.type }))}
+            onRemove={(id) => {
+              const remaining = selected.filter((_, index) => String(index) !== id)
+              onChange(remaining.length ? remaining : field.defaultValue)
+            }}
+            chooseLabel={field.multiple
+              ? t("common.form.file.chooseMultiple", { defaultValue: "Choose files" })
+              : t("common.form.file.choose", { defaultValue: "Choose file" })}
+            removeLabel={(name) => t("common.form.file.remove", { name, defaultValue: "Remove {{name}}" })}
+            status={selected.length
+              ? t("common.form.file.selected", { defaultValue: "Selected for submission" })
+              : undefined}
             disabled={field.disabled}
             required={field.required}
             aria-invalid={!!error}
             aria-describedby={describedBy}
-            className={cn(
-              inputBase,
-              "file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1 file:text-foreground",
-              error && "border-destructive"
-            )}
           />
         )
+      }
 
       case "hidden":
         return (

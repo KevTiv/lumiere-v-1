@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FormFieldRenderer } from "./form-field-renderer"
 import type { ParsedFormField, MergedFormConfiguration } from "../config/types"
 import { isCustomField } from "../config/types"
+import { fieldWidthClasses, type FieldWidth } from "../../lib/form-types"
 import { Loader2 } from "lucide-react"
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -281,33 +282,23 @@ interface FormFieldsGridProps {
   layout?: "vertical" | "horizontal"
 }
 
+const configuredFieldWidths: Partial<Record<ParsedFormField["width"], FieldWidth>> = {
+  Half: "1/2",
+  Third: "1/3",
+  TwoThirds: "2/3",
+  Quarter: "1/4",
+}
+
 const FormFieldsGrid = React.memo(function FormFieldsGrid({ 
   fields, 
   form, 
   disabled, 
   layout: _layout = "vertical" 
 }: FormFieldsGridProps) {
-  const getWidthClass = React.useCallback((width: string): string => {
-    switch (width) {
-      case "Full":
-        return "col-span-12"
-      case "Half":
-        return "col-span-12 md:col-span-6"
-      case "Third":
-        return "col-span-12 md:col-span-4"
-      case "TwoThirds":
-        return "col-span-12 md:col-span-8"
-      case "Quarter":
-        return "col-span-12 md:col-span-3"
-      default:
-        return "col-span-12"
-    }
-  }, [])
-
   return (
-    <div className="grid grid-cols-12 gap-4">
+    <div className="@container/form-fields grid min-w-0 grid-cols-12 gap-4 [&>div]:min-w-0">
       {fields.map((field) => (
-        <div key={field.fieldId} className={getWidthClass(field.width)}>
+        <div key={field.fieldId} className={fieldWidthClasses[configuredFieldWidths[field.width] ?? "full"]}>
           <FormField
             control={form.control}
             name={field.fieldId}

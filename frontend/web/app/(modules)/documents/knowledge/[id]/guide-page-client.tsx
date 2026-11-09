@@ -97,7 +97,7 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
 
   return <div className="flex min-h-[calc(100dvh-5rem)] min-w-0 flex-col p-4 sm:p-6">
     {navigationGuard}
-    <nav className="mb-4 flex flex-wrap items-center gap-4 text-sm">
+    <nav className="mb-4 flex flex-wrap items-center gap-4 text-sm" aria-label={t("aiChat.guide.navigation", { defaultValue: "Guide navigation" })}>
       <Link href={backHref} className="text-primary underline underline-offset-4">{t("aiChat.guide.backToTask", { defaultValue: "Back to task" })}</Link>
       <Link href={companyId ? guideLibraryHref(String(companyId), guide?.module) : "/documents"} className="text-muted-foreground underline underline-offset-4">{t("aiChat.guide.savedGuides", { defaultValue: "Saved guides" })}</Link>
     </nav>

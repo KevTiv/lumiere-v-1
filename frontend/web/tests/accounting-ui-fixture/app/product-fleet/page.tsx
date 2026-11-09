@@ -86,6 +86,15 @@ const products = [
     active: false,
   },
 ];
+const denseProducts = Array.from({ length: 29 }, (_, index) => ({
+  ...products[0]!,
+  id: String(index + 100),
+  name: index === 28
+    ? "日本語の工業製品 – Société internationale de composants pour systèmes hydrauliques professionnels et accessoires"
+    : `Component ${index + 1}`,
+  defaultCode: index === 28 ? "SKU-".repeat(24) : `SKU-${index + 1}`,
+  standardPrice: index === 28 ? -1_234_567 : 0,
+}));
 const categories = [
   { id: "12", name: "Beverages" },
   { id: "14", name: "Packaging" },
@@ -196,11 +205,18 @@ function Preview() {
   const { t } = useTranslation();
   const params = useSearchParams();
   const module = params.get("module") ?? "products";
+  const dense = params.get("dense") === "1";
   const [retryCount, setRetryCount] = useState(0);
   const inventory = inventoryModuleConfig(t);
   const catalog = productCatalogWorkspace(inventory, t);
   const rows = fleetVehicleRows(vehicles);
   const fleet = fleetModuleConfig(t);
+  const productTable = productCatalogTable(productsTableConfig(t), categories, t);
+  if (dense && productTable.view.mode === "table") {
+    productTable.view.columns = productTable.view.columns.map((column) => column.key === "standardPrice"
+      ? { ...column, layout: undefined, label: "Anschaffungskosten einschließlich Nebenkosten" }
+      : column);
+  }
   const config =
     module === "fleet"
       ? {
@@ -224,11 +240,7 @@ function Preview() {
               tab.id === "products"
                 ? {
                     ...tab,
-                    entityConfig: productCatalogTable(
-                      productsTableConfig(t),
-                      categories,
-                      t,
-                    ),
+                    entityConfig: productTable,
                   }
                 : tab,
             ),
@@ -254,7 +266,7 @@ function Preview() {
     ? { status: requestedLocationState as ModuleDataState["status"] }
     : state;
   const data: Record<string, EntityRow[]> = {
-    products: productCatalogRows(products, categories, units),
+    products: productCatalogRows(dense ? denseProducts : products, categories, units),
     "product-categories": productCatalogCategoryRows(categories),
     "fleet-vehicles": rows,
     "fleet-driver-assignment": rows,

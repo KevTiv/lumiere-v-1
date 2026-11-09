@@ -82,13 +82,15 @@ export function CalendarView({
       key={event.id}
       onClick={() => onSelectEvent(event.id)}
       aria-pressed={event.id === selectedEventId}
+      aria-haspopup="dialog"
       className={cn("flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring", event.id === selectedEventId && "border-primary", event.status === "cancelled" && "text-muted-foreground")}
       data-testid={`calendar-agenda-event-${event.id}`}
     >
       <span className="min-w-0 space-y-1">
         <span className={cn("block break-words text-sm font-medium", event.status === "cancelled" && "line-through")}>{event.title}</span>
         <span className="block text-xs text-muted-foreground">{timeLabel(event)}</span>
-        {event.location && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3 shrink-0" />{event.location}</span>}
+        {event.location && <span className="flex items-center gap-1 text-xs text-muted-foreground [overflow-wrap:anywhere]"><MapPin className="size-3 shrink-0" aria-hidden="true" />{event.location}</span>}
+        {event.attendees.length > 0 && <span className="block text-xs text-muted-foreground">{t("calendar.workspace.attendeeCount", { defaultValue: "{{count}} attendees", count: event.attendees.length })}</span>}
       </span>
       {event.status === "cancelled" && <Badge variant="secondary">{t("calendar.workspace.cancelled", { defaultValue: "Cancelled" })}</Badge>}
     </button>
@@ -110,7 +112,7 @@ export function CalendarView({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1" role="group" aria-label={t("calendar.workspace.view", { defaultValue: "Calendar view" })}>
+          <div className="flex flex-wrap gap-1" role="group" aria-label={t("calendar.workspace.view", { defaultValue: "Calendar view" })}>
             {modes.map(({ mode, label }) => <Button key={mode} size="sm" className="min-h-11" variant={viewMode === mode ? "default" : "outline"} aria-pressed={viewMode === mode} onClick={() => onViewModeChange(mode)}>{label}</Button>)}
           </div>
           <div className="flex gap-1">
@@ -131,7 +133,7 @@ export function CalendarView({
               return (
                 <div key={dayKey(date)} className={cn("min-h-28 min-w-0 space-y-1 rounded-md border p-2", selectedDate && dayKey(selectedDate) === dayKey(date) && "border-primary")}>
                   <button type="button" className="flex size-11 items-center justify-center rounded-md text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" aria-label={labelDate(date)} aria-pressed={selectedDate != null && dayKey(selectedDate) === dayKey(date)} onClick={() => onSelectDate(date)}>{zonedCalendarParts(date, timezone).day}</button>
-                  {dayEvents.slice(0, 2).map((event) => <button key={event.id} type="button" onClick={() => onSelectEvent(event.id)} className={cn("block min-h-11 w-full truncate rounded bg-muted p-1 text-left text-xs hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring", event.status === "cancelled" && "line-through text-muted-foreground")}>{event.title}</button>)}
+                  {dayEvents.slice(0, 2).map((event) => <button key={event.id} type="button" onClick={() => onSelectEvent(event.id)} aria-haspopup="dialog" className={cn("block min-h-11 w-full rounded bg-muted p-1 text-left text-xs hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring", event.status === "cancelled" && "line-through text-muted-foreground")}><span className="block truncate">{event.title}</span><span className="block text-muted-foreground">{timeLabel(event)}</span></button>)}
                   {dayEvents.length > 2 && <button type="button" className="min-h-11 text-xs text-primary underline" onClick={() => onSelectDate(date)}>{t("calendar.view.moreEvents", { count: dayEvents.length - 2 })}</button>}
                 </div>
               )

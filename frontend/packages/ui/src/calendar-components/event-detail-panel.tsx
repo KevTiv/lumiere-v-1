@@ -8,7 +8,14 @@ import { cn } from "@/lib/utils"
 import type { CalendarEvent } from "../lib/calendar-types"
 import { eventTypeConfig } from "../lib/calendar-types"
 import { useTranslation } from "@lumiere/i18n"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../components/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "../components/sheet"
 
 interface EventDetailPanelProps {
   event: CalendarEvent
@@ -20,87 +27,160 @@ interface EventDetailPanelProps {
   openHref?: string
 }
 
-export function EventDetailPanel({ event, timeZone, onClose, onEdit, onDelete, openHref }: EventDetailPanelProps) {
+export function EventDetailPanel({
+  event,
+  timeZone,
+  onClose,
+  onEdit,
+  onDelete,
+  openHref,
+}: EventDetailPanelProps) {
   const { t, i18n } = useTranslation()
   const config = eventTypeConfig[event.type]
-  const displayedEnd = event.allDay && event.endTime > event.startTime ? new Date(event.endTime.getTime() - 1) : event.endTime
+  const displayedEnd =
+    event.allDay && event.endTime > event.startTime
+      ? new Date(event.endTime.getTime() - 1)
+      : event.endTime
+  const formatDate = (date: Date) =>
+    event.allDay
+      ? date.toLocaleDateString(i18n.language, { timeZone })
+      : date.toLocaleString(i18n.language, { timeZone })
+  const startLabel = formatDate(event.startTime)
+  const endLabel = formatDate(displayedEnd)
 
   return (
-    <Sheet open onOpenChange={(open) => { if (!open) onClose() }}>
-      <SheetContent className="data-[side=right]:w-full overflow-y-auto p-4 sm:max-w-lg" showCloseButton={false}>
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={cn("w-3 h-3 rounded-full", config.color)}></div>
-            <Badge variant="outline">{config.label}</Badge>
-            {event.status === "cancelled" && <Badge variant="secondary">{t("calendar.workspace.cancelled", { defaultValue: "Cancelled" })}</Badge>}
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <SheetContent size="record" className="gap-0">
+        <SheetHeader className="shrink-0 border-b">
+          <SheetTitle className="text-xl [overflow-wrap:anywhere]">
+            {event.title}
+          </SheetTitle>
+          <SheetDescription>
+            {timeZone
+              ? t("calendar.workspace.detailTimezone", {
+                  defaultValue: "Times shown in {{timezone}}",
+                  timezone: timeZone,
+                })
+              : t("calendar.workspace.eventDetails", {
+                  defaultValue: "Event details",
+                })}
+          </SheetDescription>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge variant="outline">
+              <span
+                className={cn("size-2 rounded-full", config.color)}
+                aria-hidden="true"
+              />
+              {config.label}
+            </Badge>
+            {event.status === "cancelled" && (
+              <Badge variant="secondary">
+                {t("calendar.workspace.cancelled", {
+                  defaultValue: "Cancelled",
+                })}
+              </Badge>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("calendar.eventDetail.closeAria")}
-            className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            ✕
-          </button>
-        </div>
-
-        <SheetHeader className="p-0">
-          <SheetTitle className="break-words text-xl">{event.title}</SheetTitle>
-          <SheetDescription>{event.description || t("calendar.workspace.eventDetails", { defaultValue: "Event details" })}</SheetDescription>
         </SheetHeader>
-
-        <div className="space-y-3 text-sm mb-4">
+        <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 text-sm [overflow-wrap:anywhere]">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
+            <Clock
+              className="size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
             <span>
-              {event.allDay ? t("calendar.workspace.allDay", { defaultValue: "All day" }) : null}
-              {event.allDay ? " · " : ""}
-              {event.allDay ? event.startTime.toLocaleDateString(i18n.language, { timeZone }) : event.startTime.toLocaleString(i18n.language, { timeZone })} - {event.allDay ? displayedEnd.toLocaleDateString(i18n.language, { timeZone }) : event.endTime.toLocaleString(i18n.language, { timeZone })}
+              {event.allDay && (
+                <>
+                  {t("calendar.workspace.allDay", { defaultValue: "All day" })}{" "}
+                  ·{" "}
+                </>
+              )}
+              {startLabel}
+              {startLabel !== endLabel && ` – ${endLabel}`}
             </span>
           </div>
           {event.location && (
             <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
+              <MapPin
+                className="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
               <span>{event.location}</span>
             </div>
           )}
           {event.attendees.length > 0 && (
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span>{event.attendees.join(", ")}</span>
+              <Users
+                className="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {t("calendar.eventDetail.attendees", {
+                    defaultValue: "Attendees",
+                  })}
+                </p>
+                <p>{event.attendees.join(", ")}</p>
+              </div>
+            </div>
+          )}
+          {event.description && (
+            <div className="space-y-1">
+              <h3 className="font-medium">
+                {t("calendar.forms.newEvent.fields.description", {
+                  defaultValue: "Description",
+                })}
+              </h3>
+              <p className="whitespace-pre-wrap">{event.description}</p>
+            </div>
+          )}
+          {event.relatedTo && (
+            <div className="space-y-1">
+              <h3 className="font-medium">
+                {t("calendar.eventDetail.relatedTo", {
+                  type: event.relatedTo.type,
+                })}
+              </h3>
+              <p>{event.relatedTo.id}</p>
             </div>
           )}
         </div>
-
-        {event.relatedTo && (
-          <div className="bg-muted/50 rounded p-3 mb-4 text-sm">
-            <div className="font-semibold text-xs text-muted-foreground uppercase mb-1">
-              {t("calendar.eventDetail.relatedTo", { type: event.relatedTo.type })}
-            </div>
-            <div className="font-medium">{event.relatedTo.id}</div>
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <Button size="sm" className="min-h-11 flex-1" onClick={onEdit} disabled={!onEdit}>
+        <SheetFooter className="shrink-0 flex-row flex-wrap items-center border-t">
+          {openHref && (
+            <Button
+              size="sm"
+              className="min-h-11"
+              nativeButton={false}
+              render={<Link href={openHref} />}
+              data-testid="calendar-event-open"
+            >
+              {t("calendar.eventDetail.open", { defaultValue: "Open event" })}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant={openHref ? "outline" : "default"}
+            className="min-h-11"
+            onClick={onEdit}
+            disabled={!onEdit}
+          >
             {t("calendar.eventDetail.edit")}
           </Button>
-          <Button size="sm" variant="outline" className="min-h-11 flex-1" onClick={onDelete} disabled={!onDelete}>
-            {t("calendar.eventDetail.delete")}
-          </Button>
-        </div>
-        {openHref ? (
           <Button
             size="sm"
             variant="ghost"
-            className="mt-2 min-h-11 w-full"
-            nativeButton={false}
-            render={<Link href={openHref} />}
-            data-testid="calendar-event-open"
+            className="min-h-11"
+            onClick={onDelete}
+            disabled={!onDelete}
           >
-            {t("calendar.eventDetail.open", { defaultValue: "Open" })}
+            {t("calendar.eventDetail.delete")}
           </Button>
-        ) : null}
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   )

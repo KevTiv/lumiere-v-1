@@ -151,7 +151,10 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
       <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status." })} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link></p>
       <p className="text-xs leading-5 text-muted-foreground">{label("basis")}</p>
     </section>
-    <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}>
+    <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}
+      historyBounds={invalidPeriod ? null : model.bounds}
+      savedWidgetScopeNote={t("pageComposition.savedWidgetScope", { defaultValue: "Saved widgets follow the operating company and date range, with their own model, date field and filters. Currency and queue selections above apply to the built-in insights." })}
+    >
       <div className="space-y-6">
         <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "insights", "actions"].map((key) => <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>)}</nav>
         <div className="space-y-4">

@@ -6,6 +6,7 @@ import {
   type RowValueMap,
 } from "@lumiere/erp-shared/row-values"
 import { isoToDate, millisToDate } from "@lumiere/erp-shared/timestamp-values"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 export function getRowField(row: RowValueMap, key: string): unknown {
   // Entity config historically accepts PascalCase keys as well as camelCase.
@@ -42,6 +43,47 @@ export function unwrapEntityValue(value: unknown): unknown {
   if ("some" in value) return unwrapEntityValue(value.some)
   if ("none" in value) return null
   return value
+}
+
+/** Read an enum from a generated tag, a string projection, or a SATS unit variant. */
+export function entityEnumTag(value: unknown): string | null {
+  const raw = unwrapEntityValue(value)
+  if (typeof raw === "string") return raw.trim() || null
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw) || "tag" in raw) return null
+  const entries = Object.entries(raw)
+  if (entries.length !== 1) return null
+  const [key, payload] = entries[0]!
+  const unit = Array.isArray(payload) ? payload.length === 0 :
+    payload != null && typeof payload === "object" && Object.keys(payload).length === 0
+  return unit && /^[A-Za-z][A-Za-z0-9_]*$/.test(key)
+    ? key.charAt(0).toUpperCase() + key.slice(1)
+    : null
+}
+
+/** Render scalar data without inventing an identifier or coercing objects to text. */
+export function entityScalarText(value: unknown): string | null {
+  const raw = unwrapEntityValue(value)
+  if (typeof raw === "string") return raw.trim() || null
+  if (typeof raw === "bigint" || typeof raw === "boolean" ||
+    (typeof raw === "number" && Number.isFinite(raw))) return String(raw)
+  return null
+}
+
+/** Resolve a numeric relation through its saved label, then its live label, then its exact ID. */
+export function formatEntityReference(
+  id: unknown,
+  options?: {
+    label?: string | null
+    labels?: ReadonlyMap<string, string>
+    formatId?: (id: string) => string
+    missing?: string
+  },
+): string {
+  const savedLabel = options?.label?.trim()
+  if (savedLabel) return savedLabel
+  const key = parseStrictU64(id)?.toString()
+  if (key == null) return options?.missing ?? "—"
+  return options?.labels?.get(key)?.trim() || options?.formatId?.(key) || `#${key}`
 }
 
 /** Readable label for an internal enum/status value: "in_progress" → "In progress". */

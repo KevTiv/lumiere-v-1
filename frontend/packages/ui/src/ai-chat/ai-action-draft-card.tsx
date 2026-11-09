@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { isAiActionDraftOutcomeUnknown } from "@lumiere/query-hooks/hooks/ai-action-draft-result"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -55,6 +56,8 @@ export function AiActionDraftCard({
   onUpdateDraft,
   onRefresh,
 }: AiActionDraftCardProps) {
+  const { t } = useTranslation()
+  const parametersId = useId()
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editJson, setEditJson] = useState("")
@@ -148,6 +151,21 @@ export function AiActionDraftCard({
 
   const status = draft.status ?? "pending"
   const isPending = status === "pending"
+  const statusLabel = outcomeUnknown
+    ? t("aiChat.draft.outcomeUnconfirmed", { defaultValue: "Outcome unconfirmed" })
+    : readbackRequired
+      ? t("aiChat.draft.checkRequired", { defaultValue: "Saved status needs checking" })
+      : busy === "approve" || busy === "reject"
+        ? t("aiChat.draft.submitting", { defaultValue: "Submitting decision…" })
+        : busy === "save"
+          ? t("aiChat.draft.saving", { defaultValue: "Saving parameters…" })
+          : {
+              pending: t("aiChat.draft.awaitingReview", { defaultValue: "Awaiting review" }),
+              approved: t("aiChat.draft.approved", { defaultValue: "Approved" }),
+              rejected: t("aiChat.draft.rejected", { defaultValue: "Rejected" }),
+              failed: t("aiChat.draft.failed", { defaultValue: "Failed" }),
+              expired: t("aiChat.draft.expired", { defaultValue: "Expired" }),
+            }[status]
   const paramsPreview = JSON.stringify(draft.paramsJson, null, 2)
 
   useEffect(() => {
@@ -196,19 +214,21 @@ export function AiActionDraftCard({
     <div
       data-testid={`ai-action-draft-card-${draft.draftId}`}
       className={cn(
-        "rounded-lg border text-xs",
+        "min-w-0 rounded-lg border text-sm [overflow-wrap:anywhere]",
         draft.elevated ? "border-warning/40 bg-warning/5" : "border-border bg-muted/30",
       )}
     >
       <div className="flex items-start gap-2 p-2.5">
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="outline" className="text-[9px] h-4 px-1.5 capitalize">
+            <Badge variant="outline" className="max-w-full whitespace-normal capitalize">
               {reducerLabel(draft.reducerName)}
             </Badge>
             <Badge
               variant={
-                status === "approved"
+                outcomeUnknown || readbackRequired
+                  ? "outline"
+                  : status === "approved"
                   ? "default"
                   : status === "rejected"
                     ? "secondary"
@@ -216,39 +236,40 @@ export function AiActionDraftCard({
                       ? "destructive"
                       : "outline"
               }
-              className="text-[9px] h-4 px-1.5 capitalize"
+              className="max-w-full whitespace-normal"
+              role="status"
             >
-              {status}
+              {statusLabel}
             </Badge>
             {draft.confidence > 0 ? (
-              <span className="text-[9px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {Math.round(draft.confidence * 100)}% confidence
               </span>
             ) : null}
           </div>
 
-          <p className="text-xs leading-snug">{draft.summary}</p>
+          <p className="text-sm leading-5">{draft.summary}</p>
 
           {draft.sourceQuery ? (
-            <p className="text-[10px] text-muted-foreground line-clamp-2">
+            <p className="text-xs text-muted-foreground line-clamp-2">
               Request: {draft.sourceQuery}
             </p>
           ) : null}
 
           {draft.expiresAt && (draft.status ?? "pending") === "pending" ? (
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Expires {new Date(draft.expiresAt).toLocaleString()}
             </p>
           ) : null}
 
           {draft.elevated ? (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1 text-[10px] text-warning">
+              <div className="flex items-center gap-1 text-xs text-warning">
                 <ShieldAlert className="h-3 w-3 shrink-0" />
                 <span>Elevated action — review parameters carefully before approving.</span>
               </div>
               {isPending ? (
-                <label className="flex items-start gap-2 text-[10px] text-muted-foreground cursor-pointer">
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
                   <Checkbox
                     checked={confirmedElevated}
                     onCheckedChange={(checked) => setConfirmedElevated(checked === true)}
@@ -261,7 +282,7 @@ export function AiActionDraftCard({
           ) : null}
 
           {draft.warnings.length > 0 ? (
-            <ul className="space-y-0.5 text-[10px] text-muted-foreground">
+            <ul className="space-y-0.5 text-xs text-muted-foreground">
               {draft.warnings.map((warning) => (
                 <li key={warning} className="flex items-start gap-1">
                   <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5 text-warning" />
@@ -271,15 +292,15 @@ export function AiActionDraftCard({
             </ul>
           ) : null}
 
-          {draft.executionRecordId != null && status === "approved" && !readbackRequired ? (
+          {draft.executionRecordId != null && status === "approved" && !readbackRequired && !outcomeUnknown ? (
             <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Created record #{draft.executionRecordId}
               </p>
               {draft.executionRecordHref ? (
                 <a
                   href={draft.executionRecordHref}
-                  className="inline-flex text-[10px] font-medium text-primary hover:underline"
+                  className="inline-flex text-xs font-medium text-primary hover:underline"
                 >
                   Open created record
                 </a>
@@ -288,11 +309,11 @@ export function AiActionDraftCard({
           ) : null}
 
           {draft.executionError ? (
-            <p className="text-[10px] text-destructive">{draft.executionError}</p>
+            <p className="text-xs text-destructive">{draft.executionError}</p>
           ) : null}
 
-          {error ? <p role="alert" className="text-[10px] text-destructive">{error}</p> : null}
-          {onRefresh ? <Button type="button" size="sm" variant="outline" className="h-7 text-[10px]" disabled={busy != null} onClick={() => void handleRefresh()} data-testid="ai-action-draft-check-outcome">{busy === "refresh" ? "Checking saved draft…" : "Check outcome"}</Button> : null}
+          {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+          {onRefresh ? <Button type="button" size="sm" variant="outline" className="min-h-8 text-xs" disabled={busy != null} onClick={() => void handleRefresh()} data-testid="ai-action-draft-check-outcome">{busy === "refresh" ? "Checking saved draft…" : "Check outcome"}</Button> : null}
         </div>
       </div>
 
@@ -311,7 +332,9 @@ export function AiActionDraftCard({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="flex flex-1 items-center justify-between text-[10px] text-muted-foreground hover:text-foreground"
+            aria-expanded={expanded}
+            aria-controls={parametersId}
+            className="flex min-h-9 flex-1 items-center justify-between rounded-sm text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span>Parameters</span>
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -321,7 +344,7 @@ export function AiActionDraftCard({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-6 px-2 text-[10px] gap-1"
+              className="h-6 px-2 text-xs gap-1"
               disabled={busy != null || outcomeUnknown || readbackRequired}
               onClick={() => {
                 setEditing((v) => !v)
@@ -334,20 +357,22 @@ export function AiActionDraftCard({
             </Button>
           ) : null}
         </div>
+        <div id={parametersId} hidden={!expanded}>
         {expanded ? (
           editing ? (
             <div className="mt-1 space-y-1.5">
               <Textarea variant="plain"
                 value={editJson}
                 onChange={(event) => setEditJson(event.target.value)}
-                className="field-sizing-fixed min-h-32 rounded border-border bg-background/80 p-2 font-mono text-[10px] leading-relaxed shadow-none md:text-[10px]"
+                className="field-sizing-fixed min-h-32 rounded border-border bg-background/80 p-2 font-mono text-xs leading-relaxed shadow-none md:text-xs"
                 spellCheck={false}
+                aria-label={t("aiChat.draft.parameters", { defaultValue: "Draft parameters" })}
               />
-              {editError ? <p className="text-[10px] text-destructive">{editError}</p> : null}
+              {editError ? <p className="text-xs text-destructive">{editError}</p> : null}
               <Button
                 type="button"
                 size="sm"
-                className="h-7 text-[10px]"
+                className="min-h-8 text-xs"
                 disabled={busy != null || outcomeUnknown || readbackRequired}
                 onClick={() => void handleSaveParams()}
               >
@@ -355,19 +380,20 @@ export function AiActionDraftCard({
               </Button>
             </div>
           ) : (
-            <pre className="mt-1 max-h-40 overflow-auto rounded bg-background/80 p-2 text-[10px] leading-relaxed">
+            <pre className="mt-1 max-h-40 overflow-auto rounded bg-background/80 p-2 text-xs leading-relaxed">
               {paramsPreview}
             </pre>
           )
         ) : null}
+        </div>
       </div>
 
       {isPending && (onApprove || onReject) ? (
-        <div className="flex items-center gap-2 border-t border-border/60 p-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 p-2">
           {onApprove ? (
             <Button
               size="sm"
-              className="h-7 text-[10px] gap-1"
+              className="min-h-8 text-xs gap-1"
               data-testid="ai-action-draft-approve"
               disabled={busy != null || !canApprove}
               onClick={() => void handleApprove()}
@@ -384,7 +410,7 @@ export function AiActionDraftCard({
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-[10px] gap-1"
+              className="min-h-8 text-xs gap-1"
               data-testid="ai-action-draft-reject"
               disabled={busy != null || outcomeUnknown || readbackRequired}
               onClick={() => void handleReject()}

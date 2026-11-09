@@ -42,7 +42,7 @@ test('mrr and churn follow start and close dates', () => {
     3,
   );
   assert.deepEqual(rows, [
-    { month: 'Aug', mrr: 200, newMrr: 200, churnRate: 0 },
+    { month: 'Aug', mrr: 200, newMrr: 200 },
     { month: 'Sep', mrr: 150, newMrr: 50, churnRate: 50 },
     { month: 'Oct', mrr: 150, newMrr: 0, churnRate: 0 },
   ]);
@@ -70,4 +70,11 @@ test('draft subscriptions do not produce historical or active MRR', () => {
   const draft = sub({ state: 'draft' });
   assert.equal(mrrAndChurnByMonth([draft], now, 1)[0]!.mrr, 0);
   assert.deepEqual(planMix([draft], [], now).rows, []);
+});
+
+
+test('MRR preserves fractional contract amounts and does not invent a churn percentage without opening MRR', () => {
+  const started = sub({ recurringMrr: 12.75, dateStart: at(2026, 9, 5) });
+  assert.deepEqual(mrrAndChurnByMonth([started], now, 1), [{ month: 'Oct', mrr: 12.75, newMrr: 12.75 }]);
+  assert.deepEqual(planMix([started], [], now).rows[0]?.values, { 'plan-1': 12.75 });
 });

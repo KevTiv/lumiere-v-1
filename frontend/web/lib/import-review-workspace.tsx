@@ -21,7 +21,8 @@ import { resolveIdentityLabel } from "@lumiere/ui/lib/identity-label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { FileUploadField } from "@lumiere/ui/components/file-upload-field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Select,
@@ -592,24 +593,15 @@ function ReviewWorkspace({
             {t("settings.importReview.description")}
           </p>
         </div>
-        {allowUpload ? <FieldGroup className="max-w-xs">
-          <Field>
-            <FieldLabel htmlFor="source-review-upload">
-              {t("settings.importReview.upload")}
-            </FieldLabel>
-            <Input
-              id="source-review-upload"
-              type="file"
-              accept=".json,application/json"
-              disabled={unavailable || !!selected}
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) void upload(file)
-                event.target.value = ""
-              }}
-            />
-          </Field>
-        </FieldGroup> : null}
+        {allowUpload ? (
+          <FileUploadField
+            id="source-review-upload"
+            accept=".json,application/json"
+            chooseLabel={t("settings.importReview.upload")}
+            disabled={unavailable || !!selected}
+            onSelect={([file]) => { if (file) void upload(file) }}
+          />
+        ) : null}
       </div>
       {error || list.error || detail.error ? (
         <Alert variant="destructive">

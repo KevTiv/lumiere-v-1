@@ -93,6 +93,8 @@ import { useProjects } from "@lumiere/query-hooks/hooks/projects"
 import { useAccountTaxes, useAccountAnalyticAccounts } from "@lumiere/query-hooks/hooks/accounting"
 import { allocationLookupRows, expenseAllocationLines } from "./expense-allocation-input"
 import { useExpenseAllocationReadback } from "./use-expense-allocation-readback"
+import { CurrencyFormatProvider } from "@lumiere/ui"
+import { formatEntityReference } from "@lumiere/ui/lib/entity-row-values"
 import { expenseVariantTag } from "@/lib/expense-state"
 import { useExplainErpError } from "@/lib/erp-ai-context"
 import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseDefaultEmployee, expenseEmployeeDefaultForm, expensePricelistLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
@@ -780,8 +782,7 @@ function ExpensesClientLoaded({
     )
     const withEmployeeName = (rows: Record<string, unknown>[]) =>
       rows.map((row) => {
-        const name = employeeNames.get(String(row.employeeId ?? ""))
-        return { ...row, employeeName: name || String(row.employeeId ?? "") }
+        return { ...row, employeeName: formatEntityReference(row.employeeId, { labels: employeeNames }) }
       })
     return {
       expenses: withEmployeeName(expenses as unknown as Record<string, unknown>[]),
@@ -1073,7 +1074,7 @@ function ExpensesClientLoaded({
   ].filter(Boolean).join(" ") || null : null
 
   return (
-    <>
+    <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
       {visibleToolbarError ? (
         <p className="text-sm text-destructive mb-2" role="alert">
           {visibleToolbarError}
@@ -1170,7 +1171,7 @@ function ExpensesClientLoaded({
       ) : null}
 
       <Dialog open={rowAction !== null && rowActionUsable} onOpenChange={(open) => !open && setRowAction(null)}>
-        <DialogContent className={rowAction?.tabId === "expenses" ? "max-h-[90dvh] overflow-y-auto sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-md"}>
+        <DialogContent size={rowAction?.tabId === "expenses" ? "review" : "record"}>
           <DialogHeader>
             <DialogTitle>
               {rowAction?.tabId === "expenses"
@@ -1197,7 +1198,7 @@ function ExpensesClientLoaded({
       {decision.modal}
       {finance.modal}
       {workflowForm?.kind === "setAllocations" && expensesUsable && !allocationReadback.initialized ? <Dialog open onOpenChange={(open) => !open && setWorkflowForm(null)}>
-        <DialogContent><DialogHeader><DialogTitle>{t("expenses.forms.setAllocations.title")}</DialogTitle>
+        <DialogContent size="record"><DialogHeader><DialogTitle>{t("expenses.forms.setAllocations.title")}</DialogTitle>
           <DialogDescription>{t("expenses.allocations.loadBeforeEdit", { defaultValue: "Load this expense's saved allocations before making changes." })}</DialogDescription></DialogHeader>
           <p role={allocationReadback.state.status === "loading" ? "status" : "alert"}>{allocationReadback.error ?? t(`expenses.allocations.read.${allocationReadback.state.status}`, { defaultValue: allocationReadback.state.status === "loading" ? "Loading saved allocations…" : allocationReadback.state.status === "denied" ? "Access to this expense's allocations is restricted." : "Saved allocations could not be verified." })}</p>
           <DialogFooter><Button variant="outline" onClick={() => setWorkflowForm(null)}>{t("common.close")}</Button><Button variant="outline" onClick={allocationReadback.retry}>{t("common.retry")}</Button></DialogFooter>
@@ -1221,6 +1222,6 @@ function ExpensesClientLoaded({
           onSubmit={(fd) => handleWorkflowSubmit(fd)}
         />
       )}
-    </>
+    </CurrencyFormatProvider>
   )
 }

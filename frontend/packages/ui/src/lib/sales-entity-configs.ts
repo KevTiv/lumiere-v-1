@@ -1,3 +1,4 @@
+import { entityColumnLayouts } from "./entity-column-layouts"
 import type { TFunction } from "i18next"
 import { withReadOnlyStateBoard } from "./entity-state-board"
 import Link from "next/link"
@@ -153,7 +154,7 @@ export const saleOrdersTableConfig = (
   const referenceColumn = {
     key: "reference",
     label: t("sales.salesOrders.columns.reference"),
-    width: "min-w-28",
+    layout: entityColumnLayouts.reference,
     sortable: true,
     ...(formatName || recordHref
       ? {
@@ -220,13 +221,14 @@ export const saleOrdersTableConfig = (
         {
           key: "partnerName",
           label: t("sales.salesOrders.columns.partnerName"),
-          width: "min-w-40",
+          layout: entityColumnLayouts.identity,
           sortable: true,
         },
         {
           key: "clientOrderRef",
+          defaultHidden: true,
           label: t("sales.salesOrders.columns.clientOrderRef"),
-          width: "min-w-28",
+          layout: entityColumnLayouts.reference,
         },
         {
           key: "state",
@@ -274,6 +276,7 @@ export const saleOrdersTableConfig = (
         },
         {
           key: "deliveryCount",
+          defaultHidden: true,
           label: t("sales.salesOrders.columns.deliveryCount"),
           type: "number",
           align: "right",
@@ -311,8 +314,8 @@ export const saleOrderLinesTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("sales.orderLines.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "orderId", label: t("sales.orderLines.columns.orderId"), width: "min-w-20" },
-      { key: "name", label: t("sales.orderLines.columns.name"), width: "min-w-48" },
+      { key: "orderId", label: t("sales.orderLines.columns.orderId"), layout: entityColumnLayouts.reference },
+      { key: "name", label: t("sales.orderLines.columns.name"), layout: entityColumnLayouts.identity },
       { key: "productUomQty", label: t("sales.orderLines.columns.productUomQty"), type: "number", align: "right" },
       { key: "qtyDelivered", label: t("sales.orderLines.columns.qtyDelivered"), type: "number", align: "right" },
       { key: "qtyInvoiced", label: t("sales.orderLines.columns.qtyInvoiced"), type: "number", align: "right" },
@@ -336,8 +339,8 @@ export const pricelistsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("sales.pricelists.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("sales.pricelists.columns.name"), width: "min-w-40" },
-      { key: "currencyId", label: t("sales.pricelists.columns.currencyId"), width: "min-w-20" },
+      { key: "name", label: t("sales.pricelists.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "currencyId", label: t("sales.pricelists.columns.currencyId"), layout: entityColumnLayouts.reference },
       { key: "discountPolicy", label: t("sales.pricelists.columns.discountPolicy"), type: "badge", ...discountPolicyBadges(t) },
       { key: "active", label: t("sales.pricelists.columns.active"), type: "boolean" },
     ],
@@ -358,11 +361,11 @@ export const pricelistItemsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["pricelistId", "productId"],
     columns: [
       { key: "id", label: t("sales.pricelistItems.columns.id"), width: "min-w-16" },
-      { key: "pricelistId", label: t("sales.pricelistItems.columns.pricelistId"), width: "min-w-20" },
+      { key: "pricelistId", label: t("sales.pricelistItems.columns.pricelistId"), layout: entityColumnLayouts.reference },
       { key: "sequence", label: t("sales.pricelistItems.columns.sequence"), type: "number", align: "right" },
       { key: "appliedOn", label: t("sales.pricelistItems.columns.appliedOn"), type: "text" },
       { key: "computePrice", label: t("sales.pricelistItems.columns.computePrice"), type: "text" },
-      { key: "productId", label: t("sales.pricelistItems.columns.productId"), width: "min-w-20" },
+      { key: "productId", label: t("sales.pricelistItems.columns.productId"), layout: entityColumnLayouts.identity },
       { key: "minQuantity", label: t("sales.pricelistItems.columns.minQuantity"), type: "number", align: "right" },
       { key: "fixedPrice", label: t("sales.pricelistItems.columns.fixedPrice"), type: "currency", align: "right" },
       { key: "percentPrice", label: t("sales.pricelistItems.columns.percentPrice"), type: "percent", align: "right" },
@@ -396,7 +399,7 @@ export const deliveriesTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("sales.deliveries.columns.name"), width: "min-w-28" },
+      { key: "name", label: t("sales.deliveries.columns.name"), layout: entityColumnLayouts.reference },
       { key: "state", label: t("sales.deliveries.columns.state"), type: "badge", ...batchStateBadges(t) },
       { key: "scheduledDate", label: t("sales.deliveries.columns.scheduledDate"), type: "date" },
       { key: "pickingType", label: t("sales.deliveries.columns.pickingType"), type: "text" },
@@ -418,8 +421,8 @@ export const deliveryPriceRulesTableConfig = (t: TFunction): EntityViewConfig =>
     searchKeys: ["variable", "operator"],
     columns: [
       { key: "id", label: t("sales.deliveryPriceRules.columns.id"), width: "min-w-16" },
-      { key: "carrierId", label: t("sales.deliveryPriceRules.columns.carrierId"), width: "min-w-20" },
-      { key: "variable", label: t("sales.deliveryPriceRules.columns.variable"), width: "min-w-28" },
+      { key: "carrierId", label: t("sales.deliveryPriceRules.columns.carrierId"), layout: entityColumnLayouts.reference },
+      { key: "variable", label: t("sales.deliveryPriceRules.columns.variable"), layout: entityColumnLayouts.reference },
       { key: "operator", label: t("sales.deliveryPriceRules.columns.operator"), width: "min-w-16" },
       { key: "maxValue", label: t("sales.deliveryPriceRules.columns.maxValue"), type: "number", align: "right" },
       { key: "listPrice", label: t("sales.deliveryPriceRules.columns.listPrice"), type: "currency", align: "right" },
@@ -439,11 +442,11 @@ export const deliveryCarriersTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("sales.deliveryCarriers.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("sales.deliveryCarriers.columns.name"), width: "min-w-40" },
-      { key: "deliveryType", label: t("sales.deliveryCarriers.columns.deliveryType"), width: "min-w-24" },
+      { key: "name", label: t("sales.deliveryCarriers.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "deliveryType", label: t("sales.deliveryCarriers.columns.deliveryType"), layout: entityColumnLayouts.status },
       { key: "active", label: t("sales.deliveryCarriers.columns.active"), type: "boolean" },
-      { key: "currencyId", label: t("sales.deliveryCarriers.columns.currencyId"), width: "min-w-20" },
-      { key: "productId", label: t("sales.deliveryCarriers.columns.productId"), width: "min-w-20" },
+      { key: "currencyId", label: t("sales.deliveryCarriers.columns.currencyId"), layout: entityColumnLayouts.reference },
+      { key: "productId", label: t("sales.deliveryCarriers.columns.productId"), layout: entityColumnLayouts.identity },
     ],
     emptyMessage: t("sales.deliveryCarriers.emptyMessage"),
   },
@@ -460,9 +463,9 @@ export const shippingMethodsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("sales.shippingMethods.searchPlaceholder"),
     searchKeys: ["name", "provider"],
     columns: [
-      { key: "name", label: t("sales.shippingMethods.columns.name"), width: "min-w-40" },
-      { key: "provider", label: t("sales.shippingMethods.columns.provider"), width: "min-w-28" },
-      { key: "deliveryType", label: t("sales.shippingMethods.columns.deliveryType"), width: "min-w-24" },
+      { key: "name", label: t("sales.shippingMethods.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "provider", label: t("sales.shippingMethods.columns.provider"), layout: entityColumnLayouts.reference },
+      { key: "deliveryType", label: t("sales.shippingMethods.columns.deliveryType"), layout: entityColumnLayouts.status },
       { key: "active", label: t("sales.shippingMethods.columns.active"), type: "boolean" },
       { key: "fixedPrice", label: t("sales.shippingMethods.columns.fixedPrice"), type: "currency", align: "right" },
     ],
@@ -481,7 +484,7 @@ export const posPaymentMethodsTableConfig = (t: TFunction): EntityViewConfig => 
     searchPlaceholder: t("sales.posPaymentMethods.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("sales.posPaymentMethods.columns.name"), width: "min-w-40" },
+      { key: "name", label: t("sales.posPaymentMethods.columns.name"), layout: entityColumnLayouts.identity },
       { key: "sequence", label: t("sales.posPaymentMethods.columns.sequence"), type: "number", align: "right" },
       { key: "active", label: t("sales.posPaymentMethods.columns.active"), type: "boolean" },
     ],
@@ -500,9 +503,9 @@ export const posLoyaltyProgramsTableConfig = (t: TFunction): EntityViewConfig =>
     searchPlaceholder: t("sales.loyaltyPrograms.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("sales.loyaltyPrograms.columns.name"), width: "min-w-40" },
-      { key: "currencyId", label: t("sales.loyaltyPrograms.columns.currencyId"), width: "min-w-20" },
-      { key: "programType", label: t("sales.loyaltyPrograms.columns.programType"), width: "min-w-24" },
+      { key: "name", label: t("sales.loyaltyPrograms.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "currencyId", label: t("sales.loyaltyPrograms.columns.currencyId"), layout: entityColumnLayouts.reference },
+      { key: "programType", label: t("sales.loyaltyPrograms.columns.programType"), layout: entityColumnLayouts.status },
       { key: "isActive", label: t("sales.loyaltyPrograms.columns.isActive"), type: "boolean" },
     ],
     emptyMessage: t("sales.loyaltyPrograms.emptyMessage"),
@@ -520,10 +523,10 @@ export const posLoyaltyCardsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("sales.loyaltyCards.searchPlaceholder"),
     searchKeys: ["code"],
     columns: [
-      { key: "code", label: t("sales.loyaltyCards.columns.code"), width: "min-w-32" },
+      { key: "code", label: t("sales.loyaltyCards.columns.code"), layout: entityColumnLayouts.reference },
       { key: "points", label: t("sales.loyaltyCards.columns.points"), type: "number", align: "right" },
-      { key: "partnerId", label: t("sales.loyaltyCards.columns.partnerId"), width: "min-w-20" },
-      { key: "currencyId", label: t("sales.loyaltyCards.columns.currencyId"), width: "min-w-20" },
+      { key: "partnerId", label: t("sales.loyaltyCards.columns.partnerId"), layout: entityColumnLayouts.identity },
+      { key: "currencyId", label: t("sales.loyaltyCards.columns.currencyId"), layout: entityColumnLayouts.reference },
       { key: "isActive", label: t("sales.loyaltyCards.columns.isActive"), type: "boolean" },
     ],
     emptyMessage: t("sales.loyaltyCards.emptyMessage"),
@@ -548,7 +551,7 @@ export const salesFulfillmentTableConfig = (t: TFunction): EntityViewConfig => {
         {
           key: "backorderId",
           label: t("sales.fulfillment.columns.backorder"),
-          width: "min-w-24",
+          layout: entityColumnLayouts.reference,
         },
       ],
     },
@@ -586,38 +589,38 @@ export const salesReturnsTableConfig = (t: TFunction): EntityViewConfig => {
       searchKeys: ["name", "state", "returnReason", "return_reason"],
       emptyMessage: t("sales.returnOrders.emptyMessage"),
       columns: [
-        { key: "name", label: t("sales.returnOrders.columns.name"), width: "min-w-32" },
+        { key: "name", label: t("sales.returnOrders.columns.name"), layout: entityColumnLayouts.reference },
         {
           key: "state",
           label: t("sales.returnOrders.columns.state"),
           type: "badge",
-          width: "min-w-24",
+          layout: entityColumnLayouts.status,
           ...returnStateBadges,
         },
         {
           key: "partnerId",
           label: t("sales.returnOrders.columns.partnerId"),
-          width: "min-w-24",
+          layout: entityColumnLayouts.identity,
         },
         {
           key: "saleOrderId",
           label: t("sales.returnOrders.columns.saleOrderId"),
-          width: "min-w-24",
+          layout: entityColumnLayouts.reference,
         },
         {
           key: "pickingId",
           label: t("sales.returnOrders.columns.pickingId"),
-          width: "min-w-24",
+          layout: entityColumnLayouts.reference,
         },
         {
           key: "creditMoveId",
           label: t("sales.returnOrders.columns.creditMoveId"),
-          width: "min-w-24",
+          layout: entityColumnLayouts.reference,
         },
         {
           key: "returnReason",
           label: t("sales.returnOrders.columns.returnReason"),
-          width: "min-w-40",
+          layout: entityColumnLayouts.description,
         },
       ],
     },
@@ -635,29 +638,29 @@ export const returnOrderLinesTableConfig = (t: TFunction): EntityViewConfig => (
     searchable: false,
     emptyMessage: t("sales.returnOrderLines.emptyMessage"),
     columns: [
-      { key: "productId", label: t("sales.returnOrderLines.columns.productId"), width: "min-w-24" },
+      { key: "productId", label: t("sales.returnOrderLines.columns.productId"), layout: entityColumnLayouts.identity },
       {
         key: "productUomQty",
         label: t("sales.returnOrderLines.columns.quantity"),
         type: "number",
-        width: "min-w-20",
+        layout: entityColumnLayouts.quantity,
       },
       {
         key: "priceUnit",
         label: t("sales.returnOrderLines.columns.priceUnit"),
         type: "currency",
-        width: "min-w-24",
+        layout: entityColumnLayouts.amount,
       },
       {
         key: "toRefund",
         label: t("sales.returnOrderLines.columns.toRefund"),
         type: "boolean",
-        width: "min-w-20",
+        layout: entityColumnLayouts.flag,
       },
       {
         key: "saleOrderLineId",
         label: t("sales.returnOrderLines.columns.saleOrderLineId"),
-        width: "min-w-24",
+        layout: entityColumnLayouts.reference,
       },
     ],
   },

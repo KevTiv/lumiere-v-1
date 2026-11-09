@@ -728,7 +728,7 @@ function NativeResult({
           </p>
           <a
             className="inline-flex min-h-8 items-center underline"
-            href={`/settings/import-jobs/${receipt.jobId}?companyId=${companyId}`}
+            href={`/settings/import-jobs/${receipt.jobId}?${new URLSearchParams({ companyId: String(companyId), fromTask: taskId })}`}
           >
             {t("settings.importWorkflow.openNativeJob", {
               defaultValue: "Open import job and row errors",

@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Download, RefreshCw } from "lucide-react"
+import { Download, ExternalLink, RefreshCw } from "lucide-react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export type DocumentViewerDialogProps = {
   organizationId: bigint
   documentId: string | null
   versionId?: string
+  recordHref?: string
   onOpenChange(open: boolean): void
 }
 
@@ -44,6 +46,7 @@ export function DocumentViewerDialog({
   organizationId,
   documentId,
   versionId,
+  recordHref,
   onOpenChange,
 }: DocumentViewerDialogProps) {
   const session = useErpSession()
@@ -98,7 +101,8 @@ export function DocumentViewerDialog({
   return (
     <Dialog open={documentId !== null} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[min(90dvh,56rem)] max-h-[calc(100dvh-1rem)] min-w-0 flex-col overflow-hidden sm:max-w-5xl"
+        size="document"
+        className="flex h-[min(90dvh,56rem)] min-w-0 flex-col overflow-hidden"
         initialFocus={titleRef}
         finalFocus={() =>
           returnFocusRef.current?.isConnected ? returnFocusRef.current : true
@@ -137,6 +141,7 @@ export function DocumentViewerDialog({
             documentId={documentId}
             initialVersionId={versionId}
             includeVersions={includeVersions}
+            recordHref={recordHref}
             scope={{
               organizationId,
               companyId:
@@ -206,11 +211,13 @@ function DocumentViewerBody({
   documentId,
   initialVersionId,
   includeVersions,
+  recordHref,
 }: {
   scope: DocumentViewerScope
   documentId: string
   initialVersionId?: string
   includeVersions: boolean
+  recordHref?: string
 }) {
   const { t } = useTranslation()
   const [selectedVersion, setSelectedVersion] = useState(
@@ -365,19 +372,23 @@ function DocumentViewerBody({
       data-testid="document-viewer"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          {active.status === "ready" ? (
-            <>
-              <h3 className="break-words font-medium">
-                {active.manifest.name}
-              </h3>
-              <p className="break-all text-xs text-muted-foreground">
-                {active.manifest.source.fileName}
-              </p>
-            </>
-          ) : null}
-        </div>
+        {active.status === "ready" ? (
+          <FileIdentity
+            variant="header"
+            className="min-w-0 flex-1 basis-48"
+            title={active.manifest.name}
+            fileName={active.manifest.source.fileName}
+            mimetype={active.manifest.source.mimeType}
+            size={active.manifest.source.size}
+          />
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
+          {recordHref && active.status === "ready" ? (
+            <Button variant="outline" size="sm" render={<a href={recordHref} />} nativeButton={false}>
+              <ExternalLink aria-hidden />
+              {t("documents.viewer.details", { defaultValue: "Document details" })}
+            </Button>
+          ) : null}
           {active.status === "error" && selectedVersion !== "current" ? (
             <Button
               type="button"

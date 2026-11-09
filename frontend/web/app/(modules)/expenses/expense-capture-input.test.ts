@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { expenseReceiptContentType } from "./expense-receipt-file"
 import type { FormConfig } from "@lumiere/ui/lib/form-types"
 import type { TFunction } from "i18next"
 import { newExpenseForm, editExpenseForm } from "@lumiere/ui/lib/expenses-form-configs"
@@ -289,4 +290,13 @@ test("edit lookups retain current unavailable IDs as disabled visible choices wi
   const sourceProduct = config.sections[0].fields[0]
   assert.ok(sourceProduct.type === "select")
   assert.equal(sourceProduct.options.length, 2)
+})
+
+
+test("receipt preflight uses the supported format and per-format upload limit", () => {
+  assert.equal(expenseReceiptContentType({ name: "travel.RECEIPT.pdf", size: 16 * 1024 * 1024, type: "" }), "application/pdf")
+  assert.equal(expenseReceiptContentType({ name: "restaurant.webp", size: 20 * 1024 * 1024, type: "image/webp" }), "image/webp")
+  assert.throws(() => expenseReceiptContentType({ name: "invoice.pdf", size: 16 * 1024 * 1024 + 1, type: "application/pdf" }), /size limit/)
+  assert.throws(() => expenseReceiptContentType({ name: "receipt.gif", size: 200, type: "image/gif" }), /PDF, PNG, JPEG or WebP/)
+  assert.throws(() => expenseReceiptContentType({ name: "receipt.png", size: 200, type: "application/pdf" }), /does not match/)
 })

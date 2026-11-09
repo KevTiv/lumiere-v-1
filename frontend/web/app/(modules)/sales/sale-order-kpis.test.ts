@@ -29,14 +29,41 @@ test('orders to invoice are confirmed orders not yet fully invoiced', () => {
   assert.deepEqual(ids('toInvoice'), [3, 5]);
 });
 
-test('revenue this month is confirmed orders of the month, per currency', () => {
+test('confirmed order value names its fixed month and keeps currencies separate', () => {
   const revenue = tile(saleOrderKpis(rows, ctx), 'revenue');
   assert.equal(revenue.value, '€50.00 · $100.00');
-  assert.equal(revenue.hint, 'Orders: {{count}}');
+  assert.equal(revenue.label, 'Confirmed order value this month');
+  assert.equal(revenue.hint, 'Confirmed orders: {{count}} · Current calendar month');
   assert.deepEqual(ids('revenue'), [3, 4]);
 });
 
-test('revenue without a known currency is a plain number, never a guessed symbol', () => {
+test('order value without a known currency is excluded with an explanation', () => {
   const tiles = saleOrderKpis([{ state: 'Sale', dateOrder: past, amountTotal: 7 }], ctx);
-  assert.equal(tile(tiles, 'revenue').value, '7.00');
+  assert.equal(tile(tiles, 'revenue').value, '—');
+  assert.match(tile(tiles, 'revenue').hint!, /currency is unavailable/);
+});
+
+
+test('missing amounts are disclosed instead of becoming a confirmed zero', () => {
+  const result = tile(saleOrderKpis([
+    { state: 'Sale', dateOrder: past, amountTotal: null, currencyId: 1 },
+    { state: 'Sale', dateOrder: past, amountTotal: '', currencyId: 1 },
+  ], ctx), 'revenue');
+  assert.equal(result.value, '—');
+  assert.match(result.hint!, /no valid amount/);
+  const zero = tile(saleOrderKpis([{ state: 'Sale', dateOrder: past, amountTotal: 0, currencyId: 1 }], ctx), 'revenue');
+  assert.equal(zero.value, '$0.00');
+  assert.doesNotMatch(zero.hint!, /no valid amount/);
+});
+
+
+test('unresolved currency identities never merge into one unlabeled amount', () => {
+  const unknown = [
+    { state: 'Sale', dateOrder: past, amountTotal: 100, currencyId: 3 },
+    { state: 'Sale', dateOrder: past, amountTotal: 200, currencyId: 4 },
+  ];
+  assert.equal(tile(saleOrderKpis(unknown, ctx), 'revenue').value, '—');
+  const mixed = tile(saleOrderKpis([...unknown, { state: 'Sale', dateOrder: past, amountTotal: 50, currencyId: 1 }], ctx), 'revenue');
+  assert.equal(mixed.value, '$50.00');
+  assert.match(mixed.hint!, /currency is unavailable/);
 });

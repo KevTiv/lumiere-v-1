@@ -1324,6 +1324,7 @@ function CrmClientLoaded({
       titleKey: "name",
       actions: (record) => renderRecordActions("contact", record),
       detailConfig: contactDetailConfig(t),
+      wide: true,
       auditTableName: "contact",
       discussion: {},
       customTabs: [
@@ -1743,7 +1744,11 @@ function CrmClientLoaded({
       },
     }
 
-    const contactCategoriesBase = contactCategoriesTableConfig(t)
+    const contactCategoriesBase = contactCategoriesTableConfig(t, new Map(
+      contactCategories.flatMap((row) => typeof row.name === "string" && row.name.trim()
+        ? [[String(row.id), row.name] as const]
+        : []),
+    ))
     const contactCategoriesEntity: EntityViewConfig = {
       ...contactCategoriesBase,
       view: {
@@ -1844,6 +1849,7 @@ function CrmClientLoaded({
             // update_contact takes each of these on its own; omitted fields stay as they are.
             name: {
               kind: "text",
+              canEdit: () => checkPermission("contact", "write").allowed,
               save: async (row, value) => {
                 const name = requiredInlineText(
                   value,
@@ -1854,6 +1860,7 @@ function CrmClientLoaded({
             },
             email: {
               kind: "text",
+              canEdit: () => checkPermission("contact", "write").allowed,
               save: async (row, value) => {
                 const email = requiredInlineEmail(
                   value,
@@ -1864,6 +1871,7 @@ function CrmClientLoaded({
             },
             phone: {
               kind: "text",
+              canEdit: () => checkPermission("contact", "write").allowed,
               save: async (row, value) => {
                 const phone = requiredInlineText(
                   value,
@@ -2286,18 +2294,25 @@ function CrmClientLoaded({
     [moduleConfig, liveSections],
   )
 
+  const opportunityNames = useMemo(
+    () => new Map(enrichedOpportunities.map((row) => [String(row.id), row.name])),
+    [enrichedOpportunities],
+  )
   const data = useMemo(
     () => ({
       leads: leads.map((row) => crmLeadListRow(row, contactNamesForLists)) as unknown as Record<string, unknown>[],
       opportunities: enrichedOpportunities,
-      "opportunity-lines": opportunityLines as unknown as Record<string, unknown>[],
+      "opportunity-lines": opportunityLines.map((row) => ({
+        ...row,
+        opportunityName: opportunityNames.get(String(row.opportunityId ?? row.opportunity_id ?? "")),
+      })),
       contacts: contacts.map((row) => crmContactListRow(row, contactNamesForLists)) as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
       "contact-tags": contactTags as unknown as Record<string, unknown>[],
       "contact-categories": contactCategories as unknown as Record<string, unknown>[],
       "contact-segments": contactSegments as unknown as Record<string, unknown>[],
     }),
-    [leads, enrichedOpportunities, opportunityLines, contacts, contactNamesForLists, activities, contactTags, contactCategories, contactSegments],
+    [leads, enrichedOpportunities, opportunityLines, opportunityNames, contacts, contactNamesForLists, activities, contactTags, contactCategories, contactSegments],
   )
 
   const currenciesQuery = useCurrencies()

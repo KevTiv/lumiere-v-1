@@ -59,6 +59,51 @@ async function chooseFacet(page: Page, label: string, option: string) {
   await page.keyboard.press("Escape");
 }
 
+test("dense tables keep aligned headings, full amounts, and keyboard disclosure", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 660 });
+  await openWorkspace(page, "products", "&dense=1");
+  const table = page.getByRole("table");
+  const longRow = table.getByTestId("entity-row-128");
+  const heading = table.getByRole("columnheader", { name: "Anschaffungskosten einschließlich Nebenkosten" });
+  await expect(heading).toBeVisible();
+  await expect(longRow).toContainText("1,234,567");
+  const measurements = await table.evaluate((element) => {
+    const table = element as HTMLTableElement;
+    const viewport = table.parentElement!;
+    const header = table.tHead!.rows[0]!;
+    const firstRow = table.tBodies[0]!.rows[0]!;
+    const cells = Array.from(header.cells).map((head, index) => {
+      const body = firstRow.cells[index]!;
+      return {
+        offset: Math.abs(head.getBoundingClientRect().left - body.getBoundingClientRect().left),
+        overflows: head.scrollWidth > head.clientWidth + 1,
+      };
+    });
+    const before = header.getBoundingClientRect().top;
+    viewport.scrollTop = 120;
+    const after = header.getBoundingClientRect().top;
+    const verticalScroll = viewport.scrollTop;
+    viewport.scrollTop = 0;
+    return { cells, before, after, verticalScroll, horizontalScroll: viewport.scrollWidth - viewport.clientWidth };
+  });
+  expect(measurements.cells.every(({ offset, overflows }) => offset < 1 && !overflows)).toBe(true);
+  expect(measurements.verticalScroll).toBeGreaterThan(0);
+  expect(Math.abs(measurements.after - measurements.before)).toBeLessThan(2);
+  expect(measurements.horizontalScroll).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+
+  const discloseName = longRow.getByRole("button", { name: /Société internationale/ });
+  await discloseName.focus();
+  await page.keyboard.press("Enter");
+  const popup = page.getByRole("dialog");
+  await expect(popup).toContainText("systèmes hydrauliques professionnels et accessoires");
+  await page.keyboard.press("Escape");
+  await expect(discloseName).toBeFocused();
+  await page.getByRole("button", { name: "Go to next page" }).click();
+  await expect(table.getByText("Component 1", { exact: true })).toBeVisible();
+});
+
 for (const width of [390, 1440]) {
   test(`product catalog filters and scope at ${width}px`, async ({ page }) => {
     test.setTimeout(60_000);

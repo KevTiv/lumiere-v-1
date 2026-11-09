@@ -14,6 +14,8 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { Button } from "@lumiere/ui/components/button"
+import { FileUploadField } from "@lumiere/ui/components/file-upload-field"
+import { Textarea } from "@lumiere/ui/components/textarea"
 import { Input } from "@lumiere/ui/components/input"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
 import {
@@ -58,6 +60,7 @@ import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
+import { EXPENSE_RECEIPT_ACCEPT, expenseReceiptContentType } from "./expense-receipt-file"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
 import { DatePicker } from "@lumiere/ui/components/date-picker"
 import { useExplainErpError } from "@/lib/erp-ai-context"
@@ -96,7 +99,6 @@ export function ExpensesCapturePanel({
   const [status, setStatus] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const [files] = useState(() => new Map<string, File>())
-  const fileInput = useRef<HTMLInputElement>(null)
   useEffect(() => {
     try {
       setDeviceId(getOrCreateExpenseCaptureDeviceId())
@@ -129,6 +131,7 @@ export function ExpensesCapturePanel({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [hasReceipt, setHasReceipt] = useState(true)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptError, setReceiptError] = useState<string>()
   const [paymentMode, setPaymentMode] = useState<
     "OutOfPocket" | "CorporateCard"
   >("OutOfPocket")
@@ -267,21 +270,10 @@ export function ExpensesCapturePanel({
       setError(t("expenses.capture.validation"))
       return
     }
-    if (
-      hasReceipt &&
-      (!receiptFile ||
-        receiptFile.size === 0 ||
-        !(
-          receiptFile.type.startsWith("image/") ||
-          receiptFile.type === "application/pdf"
-        ))
-    ) {
-      setError(
-        t("expenses.capture.attachments.fileRequired", {
-          defaultValue:
-            "Choose a non-empty image or PDF receipt, or clear the receipt checkbox.",
-        }),
-      )
+    if (hasReceipt && !receiptFile) {
+      setReceiptError(t("expenses.capture.attachments.fileRequired", {
+        defaultValue: "Choose a non-empty image or PDF receipt, or clear the receipt checkbox.",
+      }))
       return
     }
     setError(null)
@@ -311,7 +303,7 @@ export function ExpensesCapturePanel({
       setAmount("")
       setReceiptNote("")
       setReceiptFile(null)
-      if (fileInput.current) fileInput.current.value = ""
+      setReceiptError(undefined)
       setStatus(
         t("expenses.capture.attachments.queued", {
           defaultValue: "Capture queued on this device.",
@@ -437,7 +429,7 @@ export function ExpensesCapturePanel({
                 setHasReceipt(checked === true)
                 if (!checked) {
                   setReceiptFile(null)
-                  if (fileInput.current) fileInput.current.value = ""
+                  setReceiptError(undefined)
                 }
               }}
               data-testid="expenses-capture-has-receipt"
@@ -451,20 +443,37 @@ export function ExpensesCapturePanel({
               <FieldLabel htmlFor="capture-file">
                 {t("expenses.forms.newExpense.fields.receiptFile")}
               </FieldLabel>
-              <Input
-                ref={fileInput}
+              <FileUploadField
                 id="capture-file"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(event) =>
-                  setReceiptFile(event.target.files?.[0] ?? null)
-                }
+                accept={EXPENSE_RECEIPT_ACCEPT}
+                disabled={busy}
+                chooseLabel={t("expenses.capture.attachments.choose", { defaultValue: "Choose receipt" })}
+                aria-describedby="capture-file-hint"
+                onSelect={([file]) => {
+                  if (!file) return
+                  try {
+                    expenseReceiptContentType(file)
+                    setReceiptFile(file)
+                    setReceiptError(undefined)
+                  } catch (cause) {
+                    setReceiptFile(null)
+                    setReceiptError(cause instanceof Error ? cause.message : t("expenses.capture.attachments.fileRequired"))
+                  }
+                }}
+                files={receiptFile ? [{
+                  id: "receipt",
+                  name: receiptFile.name,
+                  size: receiptFile.size,
+                  mimetype: expenseReceiptContentType(receiptFile),
+                }] : []}
+                onRemove={() => setReceiptFile(null)}
+                status={receiptFile ? t("expenses.capture.attachments.selectedLocal", { defaultValue: "Selected on this device. Not yet attached." }) : undefined}
+                error={receiptError}
                 data-testid="expenses-capture-file"
               />
-              <FieldDescription>
-                {t("expenses.capture.attachments.fileHint", {
-                  defaultValue:
-                    "Attach an image or PDF. A note alone is not a receipt.",
+              <FieldDescription id="capture-file-hint">
+                {t("expenses.capture.attachments.fileLimits", {
+                  defaultValue: "Choose one PDF up to 16 MiB, or one PNG, JPEG or WebP up to 20 MiB.",
                 })}
               </FieldDescription>
             </Field>
@@ -722,8 +731,9 @@ export function ExpensesCapturePanel({
             <FieldLabel htmlFor="capture-note">
               {t("expenses.forms.newExpense.fields.description")}
             </FieldLabel>
-            <Input
+            <Textarea
               id="capture-note"
+              rows={3}
               value={receiptNote}
               onChange={(event) => setReceiptNote(event.target.value)}
             />
@@ -732,7 +742,7 @@ export function ExpensesCapturePanel({
           preview={<div className="flex flex-col gap-4">
             <Card>
               <CardHeader>
-                <CardTitle>{name || t("financeReview.expenseDraft", { defaultValue: "Expense draft" })}</CardTitle>
+                <CardTitle className="[overflow-wrap:anywhere]">{name || t("financeReview.expenseDraft", { defaultValue: "Expense draft" })}</CardTitle>
                 <CardDescription>{t("financeReview.unsaved", { defaultValue: "Unsaved input. The server confirms the saved result." })}</CardDescription>
               </CardHeader>
               <CardContent><dl className="grid grid-cols-2 gap-3 text-sm">
@@ -817,7 +827,7 @@ export function ExpensesCapturePanel({
                     ) : null}
                   </div>
                   {item.receipt ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
                       {item.receipt.fileName}
                     </p>
                   ) : null}
@@ -857,14 +867,12 @@ export function ExpensesCapturePanel({
                           defaultValue: "Reattach the original receipt",
                         })}
                       </FieldLabel>
-                      <Input
+                      <FileUploadField
                         id={`reattach-${item.clientRequestId}`}
-                        type="file"
                         accept="image/*,application/pdf"
                         disabled={busy || !item.receipt}
-                        onChange={(event) =>
-                          reattach(item, event.target.files?.[0])
-                        }
+                        chooseLabel={t("expenses.capture.attachments.chooseOriginal", { defaultValue: "Choose original receipt" })}
+                        onSelect={([file]) => reattach(item, file)}
                         data-testid="expenses-capture-reattach"
                       />
                     </Field>

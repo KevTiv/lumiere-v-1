@@ -1,6 +1,7 @@
 import type { AccountMove } from "../lib/accounting-types"
 import { microsSinceEpochToDate, stbEnumTag } from "../lib/accounting-move-utils"
 import { formatInvoiceMoney } from "./invoice-document"
+import { entityScalarText } from "../lib/entity-row-values"
 
 export interface AccountingListCurrencyOption { value: string; code?: string; label?: string }
 export interface AccountingListDisplayProps {
@@ -37,7 +38,8 @@ export function matchesAccountingListFilters(move: AccountMove, filters: Record<
     if (key === "status") return accountingListStatus(move, kind, now) === value.toLowerCase()
     const fields: Record<string, keyof AccountMove> = { payment_state: "paymentState", move_type: "moveType", partner_id: "partnerId" }
     const actual = move[(fields[key] ?? key) as keyof AccountMove]
-    return stbEnumTag(actual).toLowerCase() === value.toLowerCase()
+    const keyValue = stbEnumTag(actual) || entityScalarText(actual)
+    return keyValue?.toLowerCase() === value.toLowerCase()
   })
 }
 

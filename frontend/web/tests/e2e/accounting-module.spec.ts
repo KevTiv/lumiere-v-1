@@ -93,10 +93,12 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
     case "payments":
       await expect(page.getByTestId("module-create-accounting-payments")).toBeVisible()
       break
-    case "payment-operations":
-      await expect(page.getByText("Payment accounts", { exact: true })).toBeVisible()
-      await expect(page.getByText("Transactions & reconciliation", { exact: true })).toBeVisible()
+    case "payment-operations": {
+      const operations = page.getByRole("region", { name: "Payment operations", exact: true })
+      // The first card should start below the tabs without a blank screen of space.
+      await expect(operations.getByText("Payment accounts", { exact: true })).toBeInViewport()
       break
+    }
     case "tax-groups":
     case "tax-jurisdictions":
     case "tax-schedules":
@@ -156,9 +158,9 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "work": {
-      const workTabPanel = page.getByRole("tabpanel", { name: "Kanban", exact: true })
+      const workTabPanel = page.getByRole("tabpanel", { name: "Work queue", exact: true })
       await expect(workTabPanel).toBeVisible()
-      const workspace = workTabPanel.getByRole("region", { name: "Kanban", exact: true })
+      const workspace = workTabPanel.getByRole("region", { name: "Work queue", exact: true })
       await expect(workspace).toBeVisible()
       await expect(workspace.getByRole("combobox", { name: "Work type", exact: true })).toHaveText("Workflow assignments")
       await expect(workspace.getByRole("group", { name: "View layout", exact: true })).toBeVisible()
