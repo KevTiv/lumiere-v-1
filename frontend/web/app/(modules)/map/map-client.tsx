@@ -1,5 +1,8 @@
 "use client"
 
+import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
+import { OperationalPageComposition } from "../../../components/operational-page-composition"
+
 import dynamic from "next/dynamic"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -114,6 +117,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
     () => new Set(defaultMapLayers.filter((l) => l.defaultVisible !== false).map((l) => l.id))
   )
   const { t } = useTranslation()
+  const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
   const vehiclesQuery = useFleetVehicles(orgId)
   const posTerminalsQuery = usePosTerminals(orgId)
   const warehouseGeosQuery = useWarehouseGeo(orgId)
@@ -333,11 +337,14 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           <MapPin className="size-4 text-muted-foreground" />
           <h1 className="text-sm font-semibold">{t("map.title")}</h1>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        {compositionSlot}
         <MapLayerLegend
           layers={defaultMapLayers}
           visibleLayers={visibleLayers}
           onToggle={toggleLayer}
         />
+        </div>
       </div>
 
       {/* Body */}
@@ -481,6 +488,7 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           onSubmit={handleFleetSubmit}
         />
       ) : null}
+      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget} />
     </div>
   )
 }

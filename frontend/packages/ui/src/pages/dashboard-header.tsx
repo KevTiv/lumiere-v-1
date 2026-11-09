@@ -36,6 +36,7 @@ interface DashboardHeaderProps {
   description?: string
   breadcrumbs?: BreadcrumbItemConfig[]
   primaryAction?: ReactNode
+  secondaryAction?: ReactNode
   onRefresh?: () => void
   onExport?: () => void
   actions?: ActionItem[]
@@ -55,6 +56,7 @@ export function DashboardHeader({
   description,
   breadcrumbs,
   primaryAction,
+  secondaryAction,
   onRefresh,
   onExport,
   actions,
@@ -130,6 +132,7 @@ export function DashboardHeader({
             <Download className="h-4 w-4" />
           </Button>
         ) : null}
+        {secondaryAction}
         {trailing}
       </div>
     </header>

@@ -150,7 +150,7 @@ function UtmColumn({
                   !r.isActive && "opacity-60",
                 )}
               >
-                <span className="truncate font-medium">{r.name}</span>
+                <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{r.name}</span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Switch
                     checked={r.isActive}

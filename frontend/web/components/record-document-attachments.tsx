@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
+import { moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { RecordAttachmentsPanel } from "@lumiere/ui/documents/record-attachments-panel"
 import { useDocuments } from "@lumiere/query-hooks/hooks/documents"
 import { useOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -31,20 +32,24 @@ function ScopedRecordDocumentAttachments({ organizationId, companyId, resModel, 
     enabled: documents.isSuccess && !documents.isError,
     contextKey: `${resModel}:${resId}`,
   })
+  const queryState = moduleQueryState(documents)
+  const dataState: ModuleDataState = queryState.status !== "ready" || uploads.canRead
+    ? queryState
+    : { status: "denied", message: t("documents.attachments.denied", { defaultValue: "Attachments are not available in this workspace or with your current permissions." }) }
   const [documentId, setDocumentId] = useState<string | null>(null)
   const receipts = uploads.rows.filter(({ receipt, pointer }) => {
     const target = receipt?.registration ?? pointer.target
     return target?.resModel === resModel && target.resId === String(resId)
   })
   return <>
-    {documents.isError ? <p role="alert" className="text-sm text-destructive">{t("documents.attachments.readFailed", { defaultValue: "Attachments could not be loaded. Refresh before uploading." })}</p> : null}
     <RecordAttachmentsPanel
       title={title}
       resModel={resModel}
       resId={resId}
+      dataState={dataState}
       documents={uploads.canRead ? (documents.data ?? []).map((document) => ({
         id: document.id, name: document.name, fileName: document.fileName,
-        mimetype: document.mimetype, resModel: document.resModel,
+        mimetype: document.mimetype, fileSize: document.fileSize, resModel: document.resModel,
         resId: document.resId, isDeleted: document.isDeleted,
       })) : []}
       disabled={!uploads.canCreate || uploads.pending}

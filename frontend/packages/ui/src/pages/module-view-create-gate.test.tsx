@@ -48,7 +48,7 @@ vi.mock("../forms/runtime-form-modal", () => ({
     : null,
 }))
 vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => <div data-testid="legacy-dashboard-grid" /> }))
-vi.mock("./dashboard-header", () => ({ DashboardHeader: ({ timeRange, onExport }: { timeRange?: string; onExport?: () => void }) => <div data-testid="dashboard-header-contract" data-time-range={timeRange ?? "none"} data-has-export={String(Boolean(onExport))} /> }))
+vi.mock("./dashboard-header", () => ({ DashboardHeader: ({ timeRange, onExport, primaryAction }: { timeRange?: string; onExport?: () => void; primaryAction?: ReactNode }) => <header data-testid="dashboard-header-contract" data-time-range={timeRange ?? "none"} data-has-export={String(Boolean(onExport))}>{primaryAction}</header> }))
 vi.mock("../lib/export-dashboard-png", () => ({ exportDashboardToPng: vi.fn() }))
 
 import type { ModuleDataState } from "../lib/module-data-state"
@@ -173,7 +173,7 @@ describe("ModuleView header create button", () => {
 
   it("shows the button when the user may create", () => {
     renderView({ permissions: [rule("sale_order", "create")] })
-    expect(screen.getByTestId(testId)).toBeTruthy()
+    expect(screen.getByTestId("dashboard-header-contract").contains(screen.getByTestId(testId))).toBe(true)
   })
 
   it("hides the button when the user lacks the create permission", () => {

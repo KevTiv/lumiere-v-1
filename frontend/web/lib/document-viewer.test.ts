@@ -5,6 +5,7 @@ import {
   DocumentViewerError,
   documentPreview,
   parseDocumentCsv,
+  readDocumentOfficePreview,
   readDocumentViewerFile,
   readDocumentViewerManifest,
   resolveDocumentViewerManifest,
@@ -379,4 +380,64 @@ test("Markdown and JSON stay plain text while unknown formats have no active ren
     () => documentPreview("text/plain", new Uint8Array([0xff])),
     errorCode("invalid"),
   )
+})
+
+test("Office preview requests the exact historical source and validates its response binding", async () => {
+  const selected = {
+    ...resolve({ versionId: "10" }).source,
+    fileName: "records.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }
+  const signal = new AbortController().signal
+  const preview = {
+    kind: "xlsx",
+    sheets: [
+      { name: "Ledger", columns: 1, rows: [["<img>"]], truncated: false },
+    ],
+  }
+  const body = {
+    preview,
+    sourceSha256: selected.checksum,
+    sourceSize: selected.size,
+  }
+  assert.deepEqual(
+    await readDocumentOfficePreview(
+      selected,
+      scope,
+      async (path, init) => {
+        assert.equal(
+          path,
+          `${oldVersion.url}?sha256=${checksum}&preview=true&documentId=1&versionId=10&companyId=3`,
+        )
+        assert.equal(init.cache, "no-store")
+        assert.equal(init.signal, signal)
+        return Response.json(body)
+      },
+      signal,
+    ),
+    preview,
+  )
+  for (const [response, code] of [
+    [Response.json({ ...body, sourceSha256: "a".repeat(64) }), "integrity"],
+    [Response.json({ ...body, sourceSize: selected.size + 1 }), "integrity"],
+    [
+      Response.json({ ...body, preview: { kind: "docx", blocks: [] } }),
+      "invalid",
+    ],
+    [
+      Response.json({
+        ...body,
+        preview: { ...preview, sheets: [{ ...preview.sheets[0], columns: 2 }] },
+      }),
+      "invalid",
+    ],
+    [new Response("revoked", { status: 403 }), "denied"],
+    [new Response("malformed", { status: 422 }), "invalid"],
+  ] as const) {
+    await assert.rejects(
+      readDocumentOfficePreview(selected, scope, async () => response, signal),
+      errorCode(code),
+    )
+  }
 })

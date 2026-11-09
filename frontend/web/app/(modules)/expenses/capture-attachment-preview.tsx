@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { expenseReceiptContentType } from "./expense-receipt-file"
 import { useTranslation } from "@lumiere/i18n"
 import {
   Card,
@@ -20,6 +21,12 @@ export function CaptureAttachmentPreview({
 }) {
   const { t } = useTranslation()
   const [url, setUrl] = useState<string | null>(null)
+  let mimeType = file.type
+  try {
+    mimeType = expenseReceiptContentType(file)
+  } catch {
+    // Previously queued receipts may have declarations from older versions.
+  }
   useEffect(() => {
     const next = URL.createObjectURL(file)
     setUrl(next)
@@ -45,7 +52,7 @@ export function CaptureAttachmentPreview({
         </CardDescription>
       </CardHeader>
       <CardContent className="min-w-0 max-w-full">
-        {url && file.type.startsWith("image/") ? (
+        {url && mimeType.startsWith("image/") ? (
           <img
             src={url}
             alt={t("expenses.capture.attachments.imageAlt", {
@@ -54,7 +61,7 @@ export function CaptureAttachmentPreview({
             className="max-h-64 w-full min-w-0 max-w-full object-contain"
           />
         ) : null}
-        {url && file.type === "application/pdf" ? (
+        {url && mimeType === "application/pdf" ? (
           <object
             data={url}
             type="application/pdf"

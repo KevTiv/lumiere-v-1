@@ -51,6 +51,18 @@ export function fleetVehicleRows(rows: readonly EntityRow[]): EntityRow[] {
   }));
 }
 
+function vehiclePlate(row: EntityRow): string | undefined {
+  const plate = optionalValue(field(row, "license_plate", "licensePlate"));
+  return typeof plate === "string" && plate.trim() ? plate.trim() : undefined;
+}
+
+/** Disambiguate vehicles with the same name in record pickers. */
+export function fleetVehicleChoiceLabel(row: EntityRow): string {
+  const name = typeof row.name === "string" ? row.name.trim() : "";
+  return [name, vehiclePlate(row)].filter(Boolean).join(" · ") ||
+    (row.id == null ? "—" : `#${String(row.id)}`);
+}
+
 function rowNames(
   rows: readonly EntityRow[],
   field = "name",
@@ -77,6 +89,11 @@ export function fleetHistoryRows(
   },
 ): EntityRow[] {
   const vehicles = rowNames(lookups.vehicles);
+  const plates = new Map(lookups.vehicles.flatMap((vehicle) => {
+    const id = parseStrictU64(vehicle.id);
+    const plate = vehiclePlate(vehicle);
+    return id != null && plate ? [[id.toString(), plate] as const] : [];
+  }));
   const serviceTypes = rowNames(lookups.serviceTypes);
   const employees = rowNames(lookups.employees);
   const currencies = rowNames(lookups.currencies, "code");
@@ -87,6 +104,7 @@ export function fleetHistoryRows(
   return rows.map((row) => ({
     ...row,
     vehicle_name: named(row.vehicle_id ?? row.vehicleId, vehicles),
+    vehicle_plate: plates.get(parseStrictU64(optionalValue(row.vehicle_id ?? row.vehicleId))?.toString() ?? ""),
     service_type_name: named(
       row.service_type_id ?? row.serviceTypeId,
       serviceTypes,

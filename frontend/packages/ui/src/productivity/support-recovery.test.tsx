@@ -16,7 +16,7 @@ vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({
     return text.replace(/\{\{(\w+)\}\}/g, (_all, name: string) => typeof options === "object" ? String(options[name] ?? "") : "")
   }, i18n: { language: "en" },
 }) }))
-vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ identity: "accountant", organizationId: 1 }) }))
+vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ identity: "accountant", organizationId: 1, activeCompanyId: 2, activeCompanyReady: true }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-forms", () => ({ useAiFormSuggest: () => ({ isPending: false }) }))
 vi.mock("next/link", () => ({ default: ({ children, href, ...props }: { children: ReactNode; href: string }) => <a href={href} {...props}>{children}</a> }))
 vi.mock("@lumiere/ui", async () => {
@@ -187,6 +187,18 @@ describe("Supporting workspace source and recovery states", () => {
     expect(screen.queryByText("common.importAssistant.jobNotFound")).toBeNull()
     expect(hooks.rollback.mutateAsync).not.toHaveBeenCalled()
   })
+  it("returns a native receipt to the original saved task only in its company", () => {
+    hooks.jobs.data = [{ id: "42", tableName: "product", fileName: "products.csv", status: "partial", totalRows: 2, importedRows: 1, errorRows: 1 }]
+    const fromTask = "a".repeat(32)
+    const { rerender } = render(<ImportJobPageClient organizationId={1} jobId="42" fromTask={fromTask} fromCompanyId="2" />)
+    const back = screen.getByText("Back to ERP results").closest("a")!
+    expect(back.getAttribute("href")).toBe(`/settings?section=imports&importTask=${fromTask}&importCompany=2&importView=results#import-task`)
+    expect(screen.getByText("Partial")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Show original filename: products.csv" })).toBeTruthy()
+    rerender(<ImportJobPageClient organizationId={1} jobId="42" fromTask={fromTask} fromCompanyId="3" />)
+    expect(screen.getByText("Back to Data import").closest("a")?.getAttribute("href")).toBe("/settings?section=imports")
+  })
+
   it("confirms the import scope and refreshes before dispatching exact rollback", async () => {
     const job = { id: "9007199254740993", tableName: "contact", fileName: "customers.csv", status: "success", importedRows: 3 }
     hooks.jobs.data = [job]; hooks.jobs.refetch.mockResolvedValue({ data: [job], isError: false })

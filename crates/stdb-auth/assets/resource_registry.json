@@ -6376,7 +6376,8 @@
       "next_run",
       "is_active",
       "last_run",
-      "run_count"
+      "run_count",
+      "company_id"
     ],
     "mandatory": [
       "id",

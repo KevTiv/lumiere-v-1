@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  activeTabEntityTable,
   expectNoAppError,
   expectRecordAbsentFromQuery,
   fetchLeadIdByName,
@@ -32,7 +33,9 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
     await submitForm(page, "new-lead")
 
     await selectModuleTab(page, "crm", "leads")
-    await page.getByText(leadName, { exact: true }).first().click()
+    await activeTabEntityTable(page).getByRole("row").filter({
+      has: page.getByText(leadName, { exact: true }),
+    }).press("Enter")
     const leadSheet = page.getByRole("dialog", { name: leadName, exact: true })
     await expect(leadSheet.getByRole("button", { name: "Qualify lead", exact: true })).toBeEnabled()
     await Promise.all([
@@ -49,7 +52,9 @@ test.describe("CRM update/delete mutations", { tag: ["@p0", "@phase-1"] }, () =>
     await page.keyboard.press("Escape")
     await selectModuleTab(page, "crm", "opportunities")
     const opportunityName = `${leadName} - Opportunity`
-    await page.getByText(opportunityName, { exact: true }).first().click()
+    await activeTabEntityTable(page).getByRole("row").filter({
+      has: page.getByText(opportunityName, { exact: true }),
+    }).press("Enter")
     const opportunitySheet = page.getByRole("dialog", { name: opportunityName, exact: true })
     await opportunitySheet.getByRole("button", { name: "Schedule follow-up", exact: true }).click()
     await fillField(page, "summary", followUp)

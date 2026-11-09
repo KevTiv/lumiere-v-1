@@ -57,6 +57,7 @@ export function moduleTabHref(pathname: string, search: string, tabId: string, d
   const params = new URLSearchParams(search)
   params.delete("filter")
   params.delete("highlight")
+  params.delete("ownerQueue")
   if (tabId === defaultTab) params.delete("tab")
   else params.set("tab", tabId)
   const query = params.toString()

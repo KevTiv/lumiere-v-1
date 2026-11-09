@@ -52,7 +52,7 @@ export function useExpenseReportDecision(orgId: bigint, companyId: bigint, enabl
   }
   const label = active ? t(`expenses.workflow.${active.kind === "submit" ? "submitReport" : active.kind === "approve" ? "approveReport" : "refuseReport"}`) : ""
   const modal = <Dialog open={active !== null && enabled} onOpenChange={open => { if (!open) close() }}>
-    <DialogContent data-testid="expense-report-confirm">
+    <DialogContent size="confirmation" data-testid="expense-report-confirm">
       <DialogHeader><DialogTitle>{label}</DialogTitle>
         <DialogDescription>{String(active?.row.name ?? "")} · {active ? t(`expenses.workflowUi.${active.kind}Effect`) : ""}</DialogDescription>
       </DialogHeader>

@@ -656,7 +656,7 @@ function LocationTreeRow({
           <span className="w-4" />
         )}
         <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="flex-1 truncate font-medium">{label}</span>
+        <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{label}</span>
         {usage ? (
           <span className="text-xs text-muted-foreground capitalize">
             {usage}

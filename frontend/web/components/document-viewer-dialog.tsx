@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Download, RefreshCw } from "lucide-react"
+import { Download, ExternalLink, RefreshCw } from "lucide-react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import {
   Dialog,
   DialogContent,
@@ -25,17 +26,20 @@ import {
   DocumentViewerError,
   documentPreview,
   documentPreviewKind,
+  readDocumentOfficePreview,
   readDocumentViewerFile,
   readDocumentViewerManifest,
   type DocumentPreview,
   type DocumentViewerManifest,
   type DocumentViewerScope,
+  type OfficeDocumentPreview,
 } from "../lib/document-viewer"
 
 export type DocumentViewerDialogProps = {
   organizationId: bigint
   documentId: string | null
   versionId?: string
+  recordHref?: string
   onOpenChange(open: boolean): void
 }
 
@@ -44,6 +48,7 @@ export function DocumentViewerDialog({
   organizationId,
   documentId,
   versionId,
+  recordHref,
   onOpenChange,
 }: DocumentViewerDialogProps) {
   const session = useErpSession()
@@ -98,7 +103,8 @@ export function DocumentViewerDialog({
   return (
     <Dialog open={documentId !== null} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[min(90dvh,56rem)] max-h-[calc(100dvh-1rem)] min-w-0 flex-col overflow-hidden sm:max-w-5xl"
+        size="document"
+        className="flex h-[min(90dvh,56rem)] min-w-0 flex-col overflow-hidden"
         initialFocus={titleRef}
         finalFocus={() =>
           returnFocusRef.current?.isConnected ? returnFocusRef.current : true
@@ -137,6 +143,7 @@ export function DocumentViewerDialog({
             documentId={documentId}
             initialVersionId={versionId}
             includeVersions={includeVersions}
+            recordHref={recordHref}
             scope={{
               organizationId,
               companyId:
@@ -206,11 +213,13 @@ function DocumentViewerBody({
   documentId,
   initialVersionId,
   includeVersions,
+  recordHref,
 }: {
   scope: DocumentViewerScope
   documentId: string
   initialVersionId?: string
   includeVersions: boolean
+  recordHref?: string
 }) {
   const { t } = useTranslation()
   const [selectedVersion, setSelectedVersion] = useState(
@@ -243,7 +252,15 @@ function DocumentViewerBody({
         signal: controller.signal,
       })
       let preview: DocumentPreview = { kind: "unsupported" }
-      if (documentPreviewKind(manifest.source.mimeType) !== "unsupported") {
+      const kind = documentPreviewKind(manifest.source.mimeType)
+      if (kind === "xlsx" || kind === "docx") {
+        preview = await readDocumentOfficePreview(
+          manifest.source,
+          scope,
+          apiFetch,
+          controller.signal,
+        )
+      } else if (kind !== "unsupported") {
         const file = await readDocumentViewerFile(
           manifest.source,
           apiFetch,
@@ -365,19 +382,30 @@ function DocumentViewerBody({
       data-testid="document-viewer"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          {active.status === "ready" ? (
-            <>
-              <h3 className="break-words font-medium">
-                {active.manifest.name}
-              </h3>
-              <p className="break-all text-xs text-muted-foreground">
-                {active.manifest.source.fileName}
-              </p>
-            </>
-          ) : null}
-        </div>
+        {active.status === "ready" ? (
+          <FileIdentity
+            variant="header"
+            className="min-w-0 flex-1 basis-48"
+            title={active.manifest.name}
+            fileName={active.manifest.source.fileName}
+            mimetype={active.manifest.source.mimeType}
+            size={active.manifest.source.size}
+          />
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
+          {recordHref && active.status === "ready" ? (
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={recordHref} />}
+              nativeButton={false}
+            >
+              <ExternalLink aria-hidden />
+              {t("documents.viewer.details", {
+                defaultValue: "Document details",
+              })}
+            </Button>
+          ) : null}
           {active.status === "error" && selectedVersion !== "current" ? (
             <Button
               type="button"
@@ -533,6 +561,8 @@ function FilePreview({
         </p>
       </object>
     )
+  if (preview.kind === "xlsx") return <WorkbookPreview preview={preview} />
+  if (preview.kind === "docx") return <WordPreview preview={preview} />
   if (preview.kind === "unsupported")
     return (
       <p role="status">
@@ -563,58 +593,13 @@ function FilePreview({
           <pre className="m-0 whitespace-pre-wrap break-words p-4 font-mono text-xs">
             {preview.text.slice(start, start + TEXT_PAGE_SIZE)}
           </pre>
-        ) : preview.rows.length === 0 ? (
-          <p className="p-4">
-            {t("documents.viewer.empty", {
-              defaultValue: "This file contains no records.",
-            })}
-          </p>
         ) : (
-          <table
-            className="w-full border-collapse text-left text-xs"
-            aria-label={t("documents.viewer.csv", {
-              defaultValue: "CSV preview",
-            })}
-          >
-            <thead className="sticky top-0 bg-muted">
-              <tr>
-                <th className="border-b border-r px-2 py-1" scope="col">
-                  #
-                </th>
-                {Array.from({ length: preview.columns }, (_, index) => (
-                  <th
-                    key={index}
-                    className="min-w-28 border-b border-r px-2 py-1"
-                    scope="col"
-                  >
-                    {columnLabel(index)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {preview.rows
-                .slice(start, start + CSV_PAGE_SIZE)
-                .map((row, rowIndex) => (
-                  <tr key={start + rowIndex}>
-                    <th
-                      className="border-b border-r bg-muted/50 px-2 py-1 align-top font-normal tabular-nums text-muted-foreground"
-                      scope="row"
-                    >
-                      {start + rowIndex + 1}
-                    </th>
-                    {Array.from({ length: preview.columns }, (_, column) => (
-                      <td
-                        key={column}
-                        className="max-w-80 whitespace-pre-wrap break-words border-b border-r px-2 py-1 align-top"
-                      >
-                        {row[column] ?? ""}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+          <RecordsPreview
+            rows={preview.rows.slice(start, start + CSV_PAGE_SIZE)}
+            columns={preview.columns}
+            start={start}
+            label={t("documents.viewer.csv", { defaultValue: "CSV preview" })}
+          />
         )}
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -653,6 +638,193 @@ function FilePreview({
           </Button>
         </div>
       </div>
+    </>
+  )
+}
+
+function RecordsPreview({
+  rows,
+  columns,
+  start = 0,
+  label,
+}: {
+  rows: string[][]
+  columns: number
+  start?: number
+  label: string
+}) {
+  const { t } = useTranslation()
+  if (rows.length === 0)
+    return (
+      <p className="p-4 text-sm text-muted-foreground">
+        {t("documents.viewer.empty", {
+          defaultValue: "This file contains no records.",
+        })}
+      </p>
+    )
+  return (
+    <table
+      className="w-full border-collapse text-left text-xs"
+      aria-label={label}
+    >
+      <thead className="sticky top-0 bg-muted">
+        <tr>
+          <th className="border-b border-r px-2 py-1" scope="col">
+            #
+          </th>
+          {Array.from({ length: columns }, (_, index) => (
+            <th
+              key={index}
+              className="min-w-28 border-b border-r px-2 py-1"
+              scope="col"
+            >
+              {columnLabel(index)}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, rowIndex) => (
+          <tr key={start + rowIndex}>
+            <th
+              className="border-b border-r bg-muted/50 px-2 py-1 align-top font-normal tabular-nums text-muted-foreground"
+              scope="row"
+            >
+              {start + rowIndex + 1}
+            </th>
+            {Array.from({ length: columns }, (_, column) => (
+              <td
+                key={column}
+                className="max-w-80 whitespace-pre-wrap break-words border-b border-r px-2 py-1 align-top"
+              >
+                {row[column] ?? ""}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function WorkbookPreview({
+  preview,
+}: {
+  preview: Extract<OfficeDocumentPreview, { kind: "xlsx" }>
+}) {
+  const { t } = useTranslation()
+  const [selection, setSelection] = useState("0")
+  const sheet = preview.sheets[Number(selection)]
+  if (!sheet) return null
+  const label = t("documents.viewer.sheet", { defaultValue: "Worksheet" })
+  return (
+    <>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">{label}</span>
+        <Select
+          value={selection}
+          onValueChange={setSelection}
+        >
+          <SelectTrigger
+            className="w-auto min-w-32 max-w-full gap-2"
+            aria-label={label}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {preview.sheets.map((item, index) => (
+              <SelectItem key={index} value={String(index)}>
+                {item.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div
+        key={selection}
+        className="min-h-0 min-w-0 flex-1 overflow-auto rounded-md border"
+        tabIndex={0}
+        aria-label={sheet.name}
+      >
+        <RecordsPreview
+          rows={sheet.rows}
+          columns={sheet.columns}
+          label={sheet.name}
+        />
+      </div>
+      {sheet.truncated && (
+        <p role="status" className="shrink-0 text-xs text-muted-foreground">
+          {t("documents.viewer.sheetTruncated", {
+            defaultValue:
+              "This worksheet preview is limited. Download the file for the full sheet.",
+          })}
+        </p>
+      )}
+    </>
+  )
+}
+
+function WordPreview({
+  preview,
+}: {
+  preview: Extract<OfficeDocumentPreview, { kind: "docx" }>
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div
+        className="min-h-0 min-w-0 flex-1 overflow-auto rounded-md border"
+        tabIndex={0}
+        aria-label={t("documents.viewer.wordContent", {
+          defaultValue: "Word document text and tables",
+        })}
+      >
+        <div className="mx-auto max-w-[75ch] space-y-4 p-4 text-sm leading-relaxed sm:p-6">
+          {preview.blocks.length === 0 && (
+            <p className="text-muted-foreground">
+              {t("documents.viewer.wordEmpty", {
+                defaultValue: "No document text or tables to preview.",
+              })}
+            </p>
+          )}
+          {preview.blocks.map((block, index) =>
+            block.kind === "paragraph" ? (
+              <p key={index} className="whitespace-pre-wrap break-words">
+                {block.text}
+              </p>
+            ) : (
+              <div key={index} className="overflow-auto rounded-sm border">
+                <table className="w-full border-collapse text-left text-sm">
+                  <tbody>
+                    {block.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="odd:bg-muted/30">
+                        {row.map((cell, column) => (
+                          <td
+                            key={column}
+                            className="min-w-24 max-w-72 whitespace-pre-wrap break-words border-b border-r px-3 py-2 align-top last:border-r-0"
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ),
+          )}
+        </div>
+      </div>
+      <p role="status" className="shrink-0 text-xs text-muted-foreground">
+        {preview.truncated
+          ? t("documents.viewer.wordTruncated", {
+              defaultValue:
+                "Some content is omitted. Download the file for the full document.",
+            })
+          : t("documents.viewer.wordPreviewNote", {
+              defaultValue: "Shows text and tables from the document body.",
+            })}
+      </p>
     </>
   )
 }

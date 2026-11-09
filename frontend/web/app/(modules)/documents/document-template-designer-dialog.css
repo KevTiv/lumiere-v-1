@@ -1,8 +1,6 @@
 .document-template-dialog {
   display: flex;
   flex-direction: column;
-  width: min(96vw, 1680px);
-  max-width: none;
   height: 94dvh;
   gap: 0;
   overflow: hidden;
@@ -200,7 +198,6 @@
 
 @media (max-width: 640px) {
   .document-template-dialog {
-    width: 100vw;
     height: 100dvh;
     border-radius: 0;
   }

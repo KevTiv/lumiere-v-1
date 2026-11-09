@@ -8,6 +8,10 @@ function positiveId(value: string | null): number | null {
 
 export type ApprovalInboxTarget = { model: string; resId: number }
 
+export function approvalInboxHref(model: string, resId: string): string {
+  return `/approvals?${new URLSearchParams({ model, resId })}`
+}
+
 export function approvalInboxTarget(model: string | null, resId: string | null): ApprovalInboxTarget | null {
   const normalizedModel = model?.trim()
   const id = positiveId(resId)

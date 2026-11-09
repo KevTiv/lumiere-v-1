@@ -55,19 +55,23 @@ export function AiNativeActionCard({
 
   return (
     <div
-      className="min-w-0 rounded-lg border border-border p-3"
+      className="min-w-0 space-y-2 rounded-lg border border-border p-3 [overflow-wrap:anywhere]"
+      aria-busy={busy}
       data-testid="assistant-native-action"
     >
+      <p className="text-xs font-medium text-muted-foreground">
+        {t("aiChat.native.proposed", { defaultValue: "Suggested next step" })}
+      </p>
       <Button
         type="button"
         variant="outline"
         disabled={!onOpen || busy}
         onClick={() => void open()}
-        className="max-w-full whitespace-normal text-left"
+        className="h-auto min-h-9 max-w-full whitespace-normal py-2 text-left"
       >
         {busy ? t("aiChat.native.opening") : label}
       </Button>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         {t("aiChat.native.reviewHint")}
       </p>
       {failed ? (

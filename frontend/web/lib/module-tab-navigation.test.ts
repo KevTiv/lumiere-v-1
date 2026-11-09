@@ -20,3 +20,9 @@ test("unknown destinations cannot be written to history", () => {
   assert.equal(moduleTabDestination({ ...base, query: "", tab: "missing" }), null)
   assert.equal(moduleTabDestination({ ...base, query: "tab=missing", tab: "invoices" }), "/accounting?tab=invoices")
 })
+
+test("changing tabs leaves the owner queue on the previous history entry", () => {
+  const query = "tab=invoices&ownerQueue=overdue-invoices&company=7"
+  assert.equal(moduleTabDestination({ ...base, query, tab: "bills" }), "/accounting?tab=bills&company=7")
+  assert.equal(moduleTabDestination({ ...base, query, tab: "invoices" }), null)
+})

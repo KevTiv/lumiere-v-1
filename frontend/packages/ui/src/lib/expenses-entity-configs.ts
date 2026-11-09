@@ -1,3 +1,5 @@
+import { entityColumnLayouts as layout } from "./entity-column-layouts"
+import { recordCurrencyColumn } from "./record-currency-column"
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
@@ -66,12 +68,12 @@ export const expensesTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("expenses.expenses.columns.name"), width: "min-w-48" },
-      { key: "employeeName", label: t("expenses.expenses.columns.employeeId"), width: "min-w-36" },
-      { key: "date", label: t("expenses.expenses.columns.date"), type: "date" },
-      { key: "totalAmount", label: t("expenses.expenses.columns.totalAmount"), type: "currency", align: "right" },
-      { key: "quantity", label: t("expenses.expenses.columns.quantity"), type: "number", align: "right" },
-      { key: "state", label: t("expenses.expenses.columns.state"), type: "badge", ...expenseStateBadges(t) },
+      { key: "name", label: t("expenses.expenses.columns.name"), layout: layout.identity },
+      { key: "employeeName", label: t("expenses.expenses.columns.employeeId"), layout: layout.location },
+      { key: "date", label: t("expenses.expenses.columns.date"), type: "date", layout: layout.date },
+      recordCurrencyColumn("totalAmount", t("expenses.expenses.columns.totalAmount")),
+      { key: "quantity", label: t("expenses.expenses.columns.quantity"), type: "number", align: "right", layout: layout.quantity },
+      { key: "state", label: t("expenses.expenses.columns.state"), type: "badge", layout: layout.status, ...expenseStateBadges(t) },
     ],
     emptyMessage: t("expenses.expenses.emptyMessage"),
     emptyState: {
@@ -111,12 +113,12 @@ export const expenseSheetsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("expenses.expenseReports.columns.name"), width: "min-w-48" },
-      { key: "employeeName", label: t("expenses.expenseReports.columns.employeeId"), width: "min-w-36" },
-      { key: "totalAmount", label: t("expenses.expenseReports.columns.totalAmount"), type: "currency", align: "right" },
-      { key: "state", label: t("expenses.expenseReports.columns.state"), type: "badge", ...sheetStateBadges(t) },
-      { key: "accountingDate", label: t("expenses.expenseReports.columns.accountingDate"), type: "date" },
-      { key: "createdAt", label: t("expenses.expenseReports.columns.createdAt"), type: "date" },
+      { key: "name", label: t("expenses.expenseReports.columns.name"), layout: layout.identity },
+      { key: "employeeName", label: t("expenses.expenseReports.columns.employeeId"), layout: layout.location },
+      recordCurrencyColumn("totalAmount", t("expenses.expenseReports.columns.totalAmount")),
+      { key: "state", label: t("expenses.expenseReports.columns.state"), type: "badge", layout: layout.status, ...sheetStateBadges(t) },
+      { key: "accountingDate", label: t("expenses.expenseReports.columns.accountingDate"), type: "date", layout: layout.date },
+      { key: "createdAt", label: t("expenses.expenseReports.columns.createdAt"), type: "date", layout: layout.date },
     ],
     emptyMessage: t("expenses.expenseReports.emptyMessage"),
   },

@@ -49,7 +49,7 @@ describe("renderer-owned form styling", () => {
     expect(input.classList.contains("focus-visible:ring-ring/20")).toBe(false)
     const fieldContainer = input.parentElement!
     expect(fieldContainer.classList.contains("col-span-12")).toBe(true)
-    expect(fieldContainer.classList.contains("md:col-span-6")).toBe(true)
+    expect(fieldContainer.classList.contains("@min-[32rem]/form-fields:col-span-6")).toBe(true)
     if (layout === "card") expectStyle(container.querySelector('[data-slot="card"]')!, workspaceStyles.surface)
   })
 

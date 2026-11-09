@@ -102,17 +102,25 @@ async function assertOrdinarySession(page: Page, identity: string, canWriteTempl
   expect(access.fieldAccess.rolePermissions.includes("document_template:write")).toBe(canWriteTemplates)
 }
 
+function templatePanel(page: Page): Locator {
+  return page.getByTestId("module-panel-documents-document-templates")
+}
+
 async function openTemplates(page: Page): Promise<Locator> {
   await gotoModule(page, "/documents?tab=document-templates", "documents")
   await selectModuleTab(page, "documents", "document-templates")
-  const panel = page.getByTestId("module-panel-documents-document-templates")
+  const panel = templatePanel(page)
   await expect(panel.getByRole("textbox", { name: "Search records", exact: true })).toBeVisible()
   return panel
 }
 
+async function searchTemplates(panel: Locator, name: string) {
+  await panel.getByRole("textbox", { name: "Search records", exact: true }).fill(name)
+}
+
 async function chooseTemplate(page: Page, row: DocumentTemplateRow): Promise<Locator> {
-  const panel = page.getByTestId("module-panel-documents-document-templates")
-  await panel.getByRole("textbox", { name: "Search records", exact: true }).fill(row.name ?? "")
+  const panel = templatePanel(page)
+  await searchTemplates(panel, row.name ?? "")
   await selectEntityRowById(page, row.id)
   return panel
 }
@@ -388,7 +396,14 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       })
       expect(deniedCreate.status, deniedCreate.error).toBe(403)
       const panel = await openTemplates(page)
-      await chooseTemplate(page, before)
+      await searchTemplates(panel, ownName)
+      const row = panel.getByTestId(`entity-row-${ownId}`)
+      await expect(row).toBeVisible()
+      await expect(row.getByRole("cell", { name: ownName, exact: true })).toBeVisible()
+      // Readers have no checkbox because they have no actions that require selection.
+      await expect(row.getByRole("checkbox", { name: "Select row" })).toHaveCount(0)
+      await row.press("Enter")
+      await expect(row).toHaveAttribute("aria-selected", "true")
       for (const action of ["design", "edit", "duplicate", "deactivate", "reactivate"]) {
         await expect(panel.getByTestId(`entity-action-${action}-document-template`)).toHaveCount(0)
       }

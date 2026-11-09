@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { purchaseDiscrepancies, purchaseDiscrepancyHandoffs, scopedPurchaseReviewRows } from "./purchase-discrepancies"
+import {
+  purchaseDiscrepancies, purchaseDiscrepancyBills, purchaseDiscrepancyHandoffs, purchaseDiscrepancyReceipts,
+  purchaseHandoffSectionData, scopedPurchaseReviewRows,
+} from "./purchase-discrepancies"
 
 const scope = { organizationId: 1n, companyId: 2n }
 const order = { ...scope, id: "9007199254740993", state: "Purchase", name: "PO Exact", receiptStatus: "partial", invoiceIds: ["21"] }
@@ -44,4 +47,32 @@ test("order handoffs verify receipt kind, exact bill IDs/type and scope, with un
   const { pickingCode: _masked, ...masked } = picking
   assert.equal(purchaseDiscrepancyHandoffs(order, scope, [masked], [bill]).status, "unavailable")
   assert.equal(purchaseDiscrepancyHandoffs(order, scope, [], [{ ...bill, companyId: 3n }]).status, "unavailable")
+})
+
+test("handoff failures discard only that section's cached links and retry its source", () => {
+  const receipt = { ...scope, id: "31", purchaseId: order.id, pickingCode: "incoming", state: "Done" }
+  const bill = { ...scope, id: "21", moveType: "InInvoice", state: "Draft" }
+  let receiptRetries = 0
+  let billRetries = 0
+  const pickings = { isError: false, isLoading: false, data: [receipt], refetch: () => { receiptRetries++ } }
+  const moves = { isError: false, isLoading: false, data: [bill], refetch: () => { billRetries++ } }
+  const receipts = purchaseHandoffSectionData(pickings, (rows) => purchaseDiscrepancyReceipts(order, scope, rows))
+  const failedBills = purchaseHandoffSectionData({ ...moves, isError: true, error: { status: 503 } },
+    (rows) => purchaseDiscrepancyBills(order, scope, rows))
+  assert.deepEqual(receipts.result?.links.map((link) => link.id), ["31"])
+  assert.equal(failedBills.result, undefined)
+  assert.equal(failedBills.state.status, "error")
+  if (failedBills.state.status === "error") failedBills.state.onRetry?.()
+  assert.equal(billRetries, 1)
+  assert.equal(receiptRetries, 0)
+
+  const deniedReceipts = purchaseHandoffSectionData({ ...pickings, isError: true, error: { status: 403 } },
+    (rows) => purchaseDiscrepancyReceipts(order, scope, rows))
+  const bills = purchaseHandoffSectionData(moves, (rows) => purchaseDiscrepancyBills(order, scope, rows))
+  assert.deepEqual(deniedReceipts, { state: { status: "denied" } })
+  assert.deepEqual(bills.result?.links.map((link) => link.id), ["21"])
+
+  const loadingReceipts = purchaseHandoffSectionData({ ...pickings, isLoading: true },
+    (rows) => purchaseDiscrepancyReceipts(order, scope, rows))
+  assert.deepEqual(loadingReceipts, { state: { status: "loading" } })
 })

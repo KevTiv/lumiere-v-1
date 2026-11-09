@@ -80,20 +80,29 @@ function targets(
 }
 
 /** Receipt cardinality is 0..N (including backorders); every exact child is linked. */
-export function purchaseOrderLinks(parent: PurchaseOrderRow, scope: OrderToCashScope, pickings: readonly PickingRow[], moves: readonly ScopedRow[]): CrossRecordLinks {
+export function purchaseOrderReceiptLinks(parent: PurchaseOrderRow, scope: OrderToCashScope, pickings: readonly PickingRow[]): CrossRecordLinks {
   const id = parseStrictU64(parent.id)
   if (id == null || !scoped(parent, scope)) return unavailable("Purchase order is outside the current scope")
-  const billIds = ids(parent.invoiceIds ?? parent.invoice_ids)
-  if (billIds == null) return unavailable("Purchase order invoice relation is unavailable")
   const receipts = pickings.filter((row) =>
     scoped(row, scope) && parseStrictU64(row.purchaseId ?? row.purchase_id) === id &&
     (row.isReturn ?? row.is_return) !== true && !["cancel", "cancelled"].includes(stateName(row.state)),
   )
   const receiptIds = ids(receipts.map((row) => row.id))
   if (receiptIds == null) return invariant("Receipt has no canonical ID")
-  const receiptLinks = targets(receiptIds, receipts, scope, "receipt", stockPickingHref)
+  return targets(receiptIds, receipts, scope, "receipt", stockPickingHref)
+}
+
+export function purchaseOrderBillLinks(parent: PurchaseOrderRow, scope: OrderToCashScope, moves: readonly ScopedRow[]): CrossRecordLinks {
+  if (parseStrictU64(parent.id) == null || !scoped(parent, scope)) return unavailable("Purchase order is outside the current scope")
+  const billIds = ids(parent.invoiceIds ?? parent.invoice_ids)
+  if (billIds == null) return unavailable("Purchase order invoice relation is unavailable")
+  return targets(billIds, moves, scope, "bill", accountMoveHref)
+}
+
+export function purchaseOrderLinks(parent: PurchaseOrderRow, scope: OrderToCashScope, pickings: readonly PickingRow[], moves: readonly ScopedRow[]): CrossRecordLinks {
+  const receiptLinks = purchaseOrderReceiptLinks(parent, scope, pickings)
   if (receiptLinks.status !== "ready") return receiptLinks
-  const billLinks = targets(billIds, moves, scope, "bill", accountMoveHref)
+  const billLinks = purchaseOrderBillLinks(parent, scope, moves)
   return billLinks.status === "ready" ? { status: "ready", links: [...receiptLinks.links, ...billLinks.links] } : billLinks
 }
 

@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useId, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query"
 import { useErpSession } from "@lumiere/erp-session"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useTranslation } from "@lumiere/i18n"
 import { HistoryPeriodSelect } from "@lumiere/ui/components/history-period-select"
 import { Button } from "@lumiere/ui/components/button"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
+import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
@@ -46,12 +48,15 @@ async function readHistory<T>(url: string, parse: (value: unknown) => T, signal:
 }
 
 /** Settings host: source history always uses the current authenticated actor and company. */
-export function CompanyAvailableHistory({ organizationId, timeZone }: { organizationId: number; timeZone?: string }) {
+export function CompanyAvailableHistory({ organizationId, timeZone, urlSearch }: { organizationId: number; timeZone?: string; urlSearch?: string }) {
   const companyId = useOperatingCompanyId(organizationId)
   const { identity, organizationId: sessionOrganizationId, activeCompanyReady } = useErpSession()
   const { t } = useTranslation()
-  const [search, setSearch] = useState<string | null>(null)
-  useEffect(() => { setSearch(window.location.search) }, [companyId])
+  const [browserSearch, setBrowserSearch] = useState<string | null>(null)
+  useEffect(() => {
+    if (urlSearch === undefined) setBrowserSearch(window.location.search)
+  }, [companyId, urlSearch])
+  const search = urlSearch ?? browserSearch
   if (!activeCompanyReady || search === null) return <p role="status">{t("availableHistory.loadingCompany", { defaultValue: "Loading the current company…" })}</p>
   if (!companyId || !identity || sessionOrganizationId !== organizationId) return <p>{t("availableHistory.companyRequired", { defaultValue: "Select an operating company to inspect its history." })}</p>
   const selection = sourceHistorySelection(search, companyId)
@@ -66,6 +71,7 @@ function ScopedAvailableHistory({ organizationId, companyId, actorIdentity, time
   const { t, i18n } = useTranslation()
   const cache = useQueryClient()
   const controlId = useId()
+  const rowFilters = useRef<HTMLHeadingElement>(null)
   const scope: HistoryScope = { organizationId, companyId, actorIdentity }
   const [filters, setFilters] = useState<HistoryFilters>({ batchId: initialBatchId, period: "all", timeZone, dateMode: "all", state: "all", verifiedOnly: initialVerifiedOnly })
   const enabled = Number.isSafeInteger(organizationId) && organizationId > 0 && Number.isSafeInteger(companyId) && companyId > 0 && actorIdentity.length > 0
@@ -86,6 +92,8 @@ function ScopedAvailableHistory({ organizationId, companyId, actorIdentity, time
   })
   const datasets = coverageQuery.data?.pages.flatMap((page) => page.datasets) ?? []
   const rows = rowsQuery.data?.pages.flatMap((page) => page.data) ?? []
+  const datasetPager = usePagedRows(datasets, coverage?.snapshot, 8)
+  const rowPager = usePagedRows(rows, filters, 10)
   // Cached data stays hidden until the current scope has been revalidated.
   const coverageLoading = coverageQuery.isPending || (coverageQuery.isFetching && !coverageQuery.isFetchingNextPage)
   const rowsLoading = rowsQuery.isPending || (rowsQuery.isFetching && !rowsQuery.isFetchingNextPage)
@@ -135,28 +143,39 @@ function ScopedAvailableHistory({ organizationId, companyId, actorIdentity, time
           <p className="text-xs text-muted-foreground">{t("availableHistory.calendarDates", { defaultValue: "Source dates retain their calendar day. Upload dates do not replace unknown business dates. A gap means no dated source was found; it does not establish a zero balance." })}</p>
           <p className="text-xs text-muted-foreground">{t("availableHistory.bucketMeaning", { defaultValue: "Year and month counts use each observation's starting date. Period observations are counted once. Coverage describes all saved source rows for this company." })}</p>
         </div>
-        {coverage.totals.total === 0 && datasets.length === 0 ? <p role="status" className="rounded-lg border p-4 text-sm">{t("availableHistory.empty", { defaultValue: "No saved source history is available for this company yet. Load a review document or save an import preview below." })}</p> : <details className="rounded-lg border p-3" open>
+        {coverage.totals.total === 0 && datasets.length === 0 ? <p role="status" className="rounded-lg border p-4 text-sm">{t("availableHistory.empty", { defaultValue: "No saved source history is available for this company yet. Save source files or an import preview to begin." })}</p> : <details className="min-w-0 rounded-lg border p-3" open>
           <summary className="cursor-pointer font-medium">{t("availableHistory.datasets", { defaultValue: "Source datasets" })}</summary>
-          <Table><TableHeader><TableRow>
-            <TableHead>{t("availableHistory.dataset", { defaultValue: "Dataset" })}</TableHead>
+          <Table pagination={false} className="mt-3 [&_td:nth-child(n+3):nth-child(-n+7)]:text-right [&_td:nth-child(n+3):nth-child(-n+7)]:tabular-nums [&_th:nth-child(n+3):nth-child(-n+7)]:text-right">
+            <TableHeader><TableRow>
+            <TableHead className="min-w-64">{t("availableHistory.dataset", { defaultValue: "Dataset" })}</TableHead>
             <TableHead>{t("availableHistory.coverage", { defaultValue: "Known business dates" })}</TableHead>
-            <TableHead>{t("availableHistory.rows", { defaultValue: "Rows" })}</TableHead>
+            <TableHead>{t("availableHistory.rows", { defaultValue: "Source rows" })}</TableHead>
             <TableHead>{stateLabel("needs_review")}</TableHead>
             <TableHead>{stateLabel("confirmed")}</TableHead>
             <TableHead>{stateLabel("excluded")}</TableHead>
             <TableHead>{t("availableHistory.undated", { defaultValue: "Undated" })}</TableHead>
             <TableHead><span className="sr-only">{t("availableHistory.inspect", { defaultValue: "Inspect rows" })}</span></TableHead>
-          </TableRow></TableHeader><TableBody>{datasets.map((dataset) => <TableRow key={dataset.id}>
-            <TableCell className="max-w-sm whitespace-normal break-words"><p className="font-medium">{dataset.title}</p><p className="text-xs text-muted-foreground">{dataset.sourceFile}</p></TableCell>
+          </TableRow></TableHeader><TableBody>{datasetPager.pageRows.map((dataset) => <TableRow key={dataset.id}>
+            <TableCell className="min-w-64 max-w-sm whitespace-normal">
+              <p className="font-medium [overflow-wrap:anywhere]">{dataset.title}</p>
+              <FileIdentity fileName={dataset.sourceFile} />
+            </TableCell>
             <TableCell className="whitespace-normal">{rangeLabel(dataset.minDate, dataset.maxDate)}</TableCell>
             <TableCell>{dataset.total}</TableCell><TableCell>{dataset.states.needs_review}</TableCell><TableCell>{dataset.states.confirmed}</TableCell><TableCell>{dataset.states.excluded}</TableCell><TableCell>{dataset.undated}</TableCell>
-            <TableCell><Button size="sm" variant={filters.batchId === dataset.id ? "secondary" : "outline"} aria-pressed={filters.batchId === dataset.id} onClick={() => setFilter("batchId", dataset.id)}>{t("availableHistory.inspect", { defaultValue: "Inspect rows" })}</Button></TableCell>
+            <TableCell><Button size="sm" variant={filters.batchId === dataset.id ? "secondary" : "outline"} aria-pressed={filters.batchId === dataset.id} onClick={() => {
+              setFilter("batchId", dataset.id)
+              rowFilters.current?.focus()
+            }}>{t("availableHistory.inspect", { defaultValue: "Inspect rows" })}</Button></TableCell>
           </TableRow>)}</TableBody></Table>
+          <TablePager {...datasetPager} />
           {coverageQuery.hasNextPage ? <Button variant="outline" className="mt-3" disabled={coverageQuery.isFetchingNextPage} onClick={() => void coverageQuery.fetchNextPage()}>{t("availableHistory.moreDatasets", { defaultValue: "Load more datasets" })}</Button> : null}
         </details>}
       </> : null}
 
       {!coverageError ? <div className="grid min-w-0 gap-3 rounded-lg border p-3 sm:grid-cols-2 xl:grid-cols-3">
+        <h3 ref={rowFilters} tabIndex={-1} className="scroll-mt-6 font-medium sm:col-span-2 xl:col-span-3">
+          {t("availableHistory.filterRows", { defaultValue: "Filter source rows" })}
+        </h3>
         <label className="flex items-center gap-2 text-sm sm:col-span-2 xl:col-span-3" htmlFor={`${controlId}-verified`}>
           <Checkbox id={`${controlId}-verified`} aria-label={t("availableHistory.verifiedOnly", { defaultValue: "Only rows with confirmed facts" })} checked={filters.verifiedOnly === true} onCheckedChange={(value) => setFilter("verifiedOnly", value === true)} />
           {t("availableHistory.verifiedOnly", { defaultValue: "Only rows with confirmed facts" })}
@@ -193,9 +212,10 @@ function ScopedAvailableHistory({ organizationId, companyId, actorIdentity, time
 
       {coverageError ? null : coverageLoading || rowsLoading ? <p role="status">{t("availableHistory.loadingRows", { defaultValue: "Loading source rows…" })}</p> : rowsError ? errorNotice(rowsError) : rowsQuery.data ? <div className="space-y-3">
         <h3 className="font-medium">{t("availableHistory.loadedRows", { defaultValue: "{{count}} source rows loaded", count: rows.length })}</h3>
-        {!rows.length ? <p role="status" className="text-sm text-muted-foreground">{t("availableHistory.noMatches", { defaultValue: "No saved source rows match these filters." })}</p> : <Table><TableHeader><TableRow>
+        {!rows.length ? <p role="status" className="text-sm text-muted-foreground">{t("availableHistory.noMatches", { defaultValue: "No saved source rows match these filters." })}</p> : <Table pagination={false}><TableHeader><TableRow>
           <TableHead>{t("availableHistory.businessDate", { defaultValue: "Business date" })}</TableHead><TableHead>{t("availableHistory.item", { defaultValue: "Item" })}</TableHead><TableHead>{t("availableHistory.reviewState", { defaultValue: "Review status" })}</TableHead><TableHead>{t("availableHistory.source", { defaultValue: "Source" })}</TableHead><TableHead>{t("availableHistory.interpretation", { defaultValue: "Interpretation" })}</TableHead>
-        </TableRow></TableHeader><TableBody>{rows.map((row) => <HistoryRowView key={row.id} row={row} stateLabel={stateLabel(row.state)} dateLabel={dateLabel} verifiedOnly={filters.verifiedOnly === true} />)}</TableBody></Table>}
+        </TableRow></TableHeader><TableBody>{rowPager.pageRows.map((row) => <HistoryRowView key={row.id} row={row} stateLabel={stateLabel(row.state)} dateLabel={dateLabel} verifiedOnly={filters.verifiedOnly === true} />)}</TableBody></Table>}
+        <TablePager {...rowPager} />
         {rowsQuery.hasNextPage ? <Button variant="outline" disabled={rowsQuery.isFetchingNextPage} onClick={() => void rowsQuery.fetchNextPage()}>{t("availableHistory.moreRows", { defaultValue: "Load more rows" })}</Button> : null}
       </div> : null}
     </>}
@@ -215,7 +235,7 @@ function HistoryRowView({ row, stateLabel, dateLabel, verifiedOnly }: { row: His
     <TableCell className="whitespace-normal"><p>{dateText}</p>{businessDate.raw ? <p className="mt-1 max-w-xs break-words text-xs text-muted-foreground">{businessDate.raw}</p> : null}</TableCell>
     <TableCell className="max-w-sm whitespace-normal break-words"><p className="font-medium">{row.label}</p><p className="text-xs text-muted-foreground">{row.title}</p></TableCell>
     <TableCell className="whitespace-normal">{stateLabel}</TableCell>
-    <TableCell className="max-w-xs whitespace-normal break-words">{row.source.file}<span className="block text-xs text-muted-foreground">{t(row.source.rowBasis === "import_row" ? "availableHistory.importRow" : "availableHistory.sourceRow", { defaultValue: row.source.rowBasis === "import_row" ? "Import row {{row}}" : "Source row {{row}}", row: row.source.row })}</span></TableCell>
+    <TableCell className="min-w-48 max-w-xs whitespace-normal"><FileIdentity fileName={row.source.file} /><span className="block text-xs text-muted-foreground">{t(row.source.rowBasis === "import_row" ? "availableHistory.importRow" : "availableHistory.sourceRow", { defaultValue: row.source.rowBasis === "import_row" ? "Import row {{row}}" : "Source row {{row}}", row: row.source.row })}</span></TableCell>
     <TableCell className="max-w-lg whitespace-normal"><details><summary className="cursor-pointer text-sm font-medium">{t("availableHistory.inspectValues", { defaultValue: "Inspect source and values" })}</summary><div className="mt-3 space-y-3">
       {row.issue ? <p className="text-sm text-muted-foreground">{row.issue}</p> : null}
       <Table><TableHeader><TableRow><TableHead>{t("availableHistory.field", { defaultValue: "Field" })}</TableHead><TableHead>{t("availableHistory.original", { defaultValue: "Original source" })}</TableHead><TableHead>{t("availableHistory.current", { defaultValue: "Current interpretation" })}</TableHead><TableHead>{t("availableHistory.confirmedValue", { defaultValue: "Value confirmed" })}</TableHead></TableRow></TableHeader><TableBody>{fields.map((field) => <TableRow key={field.key}><TableCell>{field.label}</TableCell><TableCell className="max-w-xs whitespace-normal break-words">{field.sourceValue ?? unknown}</TableCell><TableCell className="max-w-xs whitespace-normal break-words">{verifiedOnly && !isConfirmed(field.key) ? t("availableHistory.unconfirmed", { defaultValue: "Unconfirmed" }) : row.values[field.key] ?? unknown}</TableCell><TableCell>{isConfirmed(field.key) ? t("common.yes", { defaultValue: "Yes" }) : t("common.no", { defaultValue: "No" })}</TableCell></TableRow>)}</TableBody></Table>

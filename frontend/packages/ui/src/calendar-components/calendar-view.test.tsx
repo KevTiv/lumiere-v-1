@@ -31,6 +31,16 @@ describe("calendar working views", () => {
     expect(input.onViewModeChange).toHaveBeenCalledWith("day")
   })
 
+  it("shows participants and the source event in the selected event details", () => {
+    const input = props()
+    render(<CalendarView {...input} events={[{ ...event, attendees: ["Ada Lovelace", "Grace Hopper"] }]} selectedEventId="7" eventHref={() => "/calendar/events/7?returnTo=%2Fcalendar%3Ftab%3Devents"} timeZone="UTC" />)
+    const detail = screen.getByRole("dialog")
+    expect(detail.textContent).toContain("Ada Lovelace, Grace Hopper")
+    expect(screen.getByTestId("calendar-event-open").getAttribute("href")).toBe("/calendar/events/7?returnTo=%2Fcalendar%3Ftab%3Devents")
+    fireEvent.click(screen.getByRole("button", { name: "Close" }))
+    expect(input.onSelectEvent).toHaveBeenCalledWith(null)
+  })
+
   it("keeps month date and event controls independent and ignores missing selected rows", () => {
     const input = props()
     const { container } = render(<CalendarView {...input} viewMode="month" selectedEventId="unavailable" />)
@@ -38,7 +48,7 @@ describe("calendar working views", () => {
     fireEvent.click(screen.getByRole("button", { name: "Wednesday, October 28" }))
     expect(input.onSelectDate).toHaveBeenCalledTimes(1)
     expect(input.onSelectEvent).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole("button", { name: "Supplier review" }))
+    fireEvent.click(screen.getByRole("button", { name: "Supplier review All day" }))
     expect(input.onSelectEvent).toHaveBeenCalledWith("7")
     expect(screen.queryByRole("dialog")).toBeNull()
   })

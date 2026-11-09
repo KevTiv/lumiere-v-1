@@ -1360,9 +1360,15 @@ export const newProductCategoryForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("inventory.forms.newProductCategory.fields.parentId"),
           placeholder: t("inventory.forms.newProductCategory.fields.parentPlaceholder"),
-          width: "1/2",
+          width: "full",
           options: emptySelect,
         },
+      ],
+    },
+    {
+      id: "category-stock-valuation",
+      title: t("inventory.forms.newProductCategory.sections.stockValuation", { defaultValue: "Stock and valuation" }),
+      fields: [
         {
           id: "removalStrategyId",
           name: "removalStrategyId",

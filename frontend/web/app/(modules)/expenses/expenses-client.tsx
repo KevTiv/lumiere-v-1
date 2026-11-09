@@ -4,6 +4,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
 import { useGenericExpenseCreate } from "./use-generic-expense-create"
 import { retainedExpenseForm } from "./generic-expense-attempt"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -25,7 +26,7 @@ import {
   requiredInlineText,
 } from "@/lib/inline-edit-params"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   EntityDetail,
@@ -93,6 +94,8 @@ import { useProjects } from "@lumiere/query-hooks/hooks/projects"
 import { useAccountTaxes, useAccountAnalyticAccounts } from "@lumiere/query-hooks/hooks/accounting"
 import { allocationLookupRows, expenseAllocationLines } from "./expense-allocation-input"
 import { useExpenseAllocationReadback } from "./use-expense-allocation-readback"
+import { CurrencyFormatProvider } from "@lumiere/ui"
+import { formatEntityReference } from "@lumiere/ui/lib/entity-row-values"
 import { expenseVariantTag } from "@/lib/expense-state"
 import { useExplainErpError } from "@/lib/erp-ai-context"
 import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseDefaultEmployee, expenseEmployeeDefaultForm, expensePricelistLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
@@ -197,6 +200,8 @@ function ExpensesClientLoaded({
   useExpensesModuleSubscription()
   const { t } = useTranslation()
   const router = useRouter()
+  const nativeForms = useAssistantNativeForms()
+  const activationRequestId = useRef<string | undefined>(undefined)
   const { identity } = useErpSession()
   const explainError = useExplainErpError()
   const { checkPermission, permissionsReady } = useRBAC()
@@ -263,15 +268,25 @@ function ExpensesClientLoaded({
   const expenseCreate = useGenericExpenseCreate({
     organizationId: orgId, companyId: operatingCompanyId, actorIdentity: identity,
     create: (params) => createExpense.mutateAsync(params),
-    onConfirmed: () => setQuickActionForm(null),
+    onConfirmed: (recordId) => {
+      setQuickActionForm(null)
+      if (activationRequestId.current) {
+        nativeForms?.finishActivation(activationRequestId.current, { status: "saved", recordId })
+        activationRequestId.current = undefined
+      }
+    },
     canWrite: () => expensesUsable && permissionsReady !== false && checkPermission("hr_expense", "create").allowed,
   })
   const openExpenseCreate = useCallback(() => {
-    if (!expensesUsable || permissionsReady === false || !checkPermission("hr_expense", "create").allowed) return
+    if (!expensesUsable || permissionsReady === false || !checkPermission("hr_expense", "create").allowed) return false
     setToolbarError(null)
     try {
-      if (expenseCreate.open()) setQuickActionForm({ action: "createExpense" })
+      if (expenseCreate.open()) {
+        setQuickActionForm({ action: "createExpense" })
+        return true
+      }
     } catch (cause) { setToolbarError(cause instanceof Error ? cause.message : String(cause)) }
+    return false
   }, [expensesUsable, permissionsReady, checkPermission, expenseCreate.open])
 
   const resolveAttachmentIds = useCallback(
@@ -780,8 +795,7 @@ function ExpensesClientLoaded({
     )
     const withEmployeeName = (rows: Record<string, unknown>[]) =>
       rows.map((row) => {
-        const name = employeeNames.get(String(row.employeeId ?? ""))
-        return { ...row, employeeName: name || String(row.employeeId ?? "") }
+        return { ...row, employeeName: formatEntityReference(row.employeeId, { labels: employeeNames }) }
       })
     return {
       expenses: withEmployeeName(expenses as unknown as Record<string, unknown>[]),
@@ -1073,7 +1087,7 @@ function ExpensesClientLoaded({
   ].filter(Boolean).join(" ") || null : null
 
   return (
-    <>
+    <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
       {visibleToolbarError ? (
         <p className="text-sm text-destructive mb-2" role="alert">
           {visibleToolbarError}
@@ -1093,7 +1107,7 @@ function ExpensesClientLoaded({
       <ModuleWorkView
         organizationId={organizationId}
         assistantFormBlocked={quickActionForm !== null || workflowForm !== null || rowAction !== null || expenseCreate.attempt !== null}
-        onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined) }}
+        onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined); activationRequestId.current = undefined }}
         config={config}
         dashboardCompositionOwned
         dashboardContent={<CompanyModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
@@ -1101,7 +1115,10 @@ function ExpensesClientLoaded({
         dataState={dataState}
         onOpenCreateForm={(tabId, assistant) => {
           setAssistantPrompt(assistant?.prompt)
-          if (tabId === "expenses") openExpenseCreate()
+          if (tabId === "expenses") {
+            if (!openExpenseCreate()) return false
+            activationRequestId.current = assistant?.activationRequestId
+          }
           else if (tabId === "expense-sheets") setQuickActionForm({ action: "createSheet" })
         }}
         onFormSubmit={handleFormSubmit}
@@ -1114,6 +1131,10 @@ function ExpensesClientLoaded({
         onOpenChange={(open) => {
           if (!open) {
             setQuickActionForm(null)
+            if (activationRequestId.current) {
+              nativeForms?.finishActivation(activationRequestId.current, { status: "cancelled" })
+              activationRequestId.current = undefined
+            }
             if (reportContinuation) { setWorkflowForm(reportContinuation); setReportContinuation(null) }
           }
         }}
@@ -1170,7 +1191,7 @@ function ExpensesClientLoaded({
       ) : null}
 
       <Dialog open={rowAction !== null && rowActionUsable} onOpenChange={(open) => !open && setRowAction(null)}>
-        <DialogContent className={rowAction?.tabId === "expenses" ? "max-h-[90dvh] overflow-y-auto sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-md"}>
+        <DialogContent size={rowAction?.tabId === "expenses" ? "review" : "record"}>
           <DialogHeader>
             <DialogTitle>
               {rowAction?.tabId === "expenses"
@@ -1197,7 +1218,7 @@ function ExpensesClientLoaded({
       {decision.modal}
       {finance.modal}
       {workflowForm?.kind === "setAllocations" && expensesUsable && !allocationReadback.initialized ? <Dialog open onOpenChange={(open) => !open && setWorkflowForm(null)}>
-        <DialogContent><DialogHeader><DialogTitle>{t("expenses.forms.setAllocations.title")}</DialogTitle>
+        <DialogContent size="record"><DialogHeader><DialogTitle>{t("expenses.forms.setAllocations.title")}</DialogTitle>
           <DialogDescription>{t("expenses.allocations.loadBeforeEdit", { defaultValue: "Load this expense's saved allocations before making changes." })}</DialogDescription></DialogHeader>
           <p role={allocationReadback.state.status === "loading" ? "status" : "alert"}>{allocationReadback.error ?? t(`expenses.allocations.read.${allocationReadback.state.status}`, { defaultValue: allocationReadback.state.status === "loading" ? "Loading saved allocations…" : allocationReadback.state.status === "denied" ? "Access to this expense's allocations is restricted." : "Saved allocations could not be verified." })}</p>
           <DialogFooter><Button variant="outline" onClick={() => setWorkflowForm(null)}>{t("common.close")}</Button><Button variant="outline" onClick={allocationReadback.retry}>{t("common.retry")}</Button></DialogFooter>
@@ -1221,6 +1242,6 @@ function ExpensesClientLoaded({
           onSubmit={(fd) => handleWorkflowSubmit(fd)}
         />
       )}
-    </>
+    </CurrencyFormatProvider>
   )
 }

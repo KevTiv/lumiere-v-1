@@ -14,6 +14,7 @@ import {
 import { Button } from "@lumiere/ui/components/button"
 import { FormModal } from "@lumiere/ui/forms/form-modal"
 import { mergeContactsForm } from "@lumiere/ui/lib/crm-form-configs"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { useCallback, useMemo, useState } from "react"
 
 type Props = {
@@ -28,6 +29,9 @@ function pairKey(pair: ContactDuplicatePair): string {
 
 export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Props) {
   const { t } = useTranslation()
+  const { checkPermission } = useRBAC()
+  const canScan = checkPermission("contact", "read").allowed
+  const canMerge = checkPermission("contact", "write").allowed
   const orgId = BigInt(organizationId)
   const findDuplicates = useFindDuplicateContacts(orgId)
   const mergeContacts = useMergeContacts(orgId, { companyId })
@@ -59,13 +63,16 @@ export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Pr
   )
 
   const handleScan = useCallback(() => {
-    findDuplicates.mutate(companyId)
-  }, [findDuplicates, companyId])
+    if (canScan && companyId > 0n) findDuplicates.mutate(companyId)
+  }, [findDuplicates, companyId, canScan])
 
   const handleMergeSubmit = useCallback(
     async (data: Record<string, unknown>) => {
-      if (!mergePair) return
+      if (!mergePair || !canMerge) return
       const targetId = String(data.targetContactId ?? "")
+      if (targetId !== mergePair.contactIdA && targetId !== mergePair.contactIdB) {
+        throw new Error(t("crm.forms.mergeContacts.chooseContact", { defaultValue: "Choose a contact from this pair to keep." }))
+      }
       const sourceId =
         targetId === mergePair.contactIdA
           ? mergePair.contactIdB
@@ -76,7 +83,7 @@ export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Pr
       })
       setMergePair(null)
     },
-    [mergeContacts, mergePair],
+    [mergeContacts, mergePair, canMerge, t],
   )
 
   return (
@@ -89,7 +96,7 @@ export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Pr
         <Button
           variant="outline"
           onClick={handleScan}
-          disabled={findDuplicates.isPending || companyId === 0n}
+          disabled={!canScan || findDuplicates.isPending || companyId === 0n}
           data-testid="crm-duplicates-scan"
         >
           {findDuplicates.isPending
@@ -111,7 +118,7 @@ export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Pr
               data-testid={`crm-duplicate-pair-${pair.contactIdA}-${pair.contactIdB}`}
             >
               <div className="min-w-0 space-y-1">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium [overflow-wrap:anywhere]">
                   {contactPrimaryLabel(pair.contactA)} ↔ {contactPrimaryLabel(pair.contactB)}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -120,6 +127,7 @@ export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Pr
               </div>
               <Button
                 size="sm"
+                disabled={!canMerge}
                 onClick={() => setMergePair(pair)}
                 data-testid={`crm-duplicate-merge-${pair.contactIdA}-${pair.contactIdB}`}
               >
@@ -131,7 +139,7 @@ export function CrmDuplicateContacts({ organizationId, companyId, contacts }: Pr
       )}
 
       <FormModal
-        open={mergePair != null}
+        open={canMerge && mergePair != null}
         onOpenChange={(open) => !open && setMergePair(null)}
         config={mergeForm}
         isPending={mergeContacts.isPending}

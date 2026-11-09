@@ -62,6 +62,17 @@ export type BadgeVariant = "default" | "secondary" | "destructive" | "outline" |
 
 // ─── Column (table view) ────────────────────────────────────────────────────
 
+/** Column allocations in rem, including cell padding. */
+export interface EntityColumnLayout {
+  min?: number
+  preferred?: number
+  max?: number
+  /** Relative share of space left after preferred widths are met. */
+  grow?: number
+  /** Numeric values limit the preview to this many lines and disclose the full text if clipped. */
+  wrap?: "nowrap" | "wrap" | 1 | 2 | 3
+}
+
 export interface EntityColumn extends EntityPermissioned {
   key: string
   label: string
@@ -69,6 +80,9 @@ export interface EntityColumn extends EntityPermissioned {
   align?: "left" | "center" | "right"
   /** Tailwind min-width class e.g. "min-w-32" */
   width?: string
+  layout?: EntityColumnLayout
+  /** Start hidden in a new view; users can enable it through the Columns menu. */
+  defaultHidden?: boolean
   sortable?: boolean
   /** Map raw value → badge variant key (semantic names resolved in the table renderer) */
   badgeVariants?: Record<string, string>

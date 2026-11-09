@@ -1,5 +1,8 @@
 "use client"
 
+import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
+import { OperationalPageComposition } from "../../../components/operational-page-composition"
+
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
@@ -294,42 +297,28 @@ function TasksClientLoaded({
   const isPending =
     createTask.isPending || updateTask.isPending || updateTaskState.isPending
   const assignmentTask = tasks.find((task) => String(task.id) === assignmentTaskId)
+  const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
 
   return (
     <div className="flex min-h-[calc(100vh-12rem)] flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <DashboardHeader title={t("tasks.page.title")} description={t("tasks.page.description")} />
-        <div className="flex items-center gap-2">
-          <Link
-            href="/projects?tab=tasks"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
+      <DashboardHeader
+        title={t("tasks.page.title")}
+        description={t("tasks.page.description")}
+        primaryAction={canCreate ? <Button
+          size="sm"
+          onClick={() => setModal({ type: "create", form: taskFormConfig, action: "createTask" })}
+        >
+          <Plus aria-hidden="true" />
+          {t("tasks.board.createTask")}
+        </Button> : undefined}
+        secondaryAction={<>
+          <Link href="/projects?tab=tasks" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            <ExternalLink aria-hidden="true" />
             {t("tasks.board.viewProjects")}
           </Link>
-          {canCreate ? <Button
-            size="sm"
-            onClick={() => setModal({ type: "create", form: taskFormConfig, action: "createTask" })}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {t("tasks.board.createTask")}
-          </Button> : null}
-        </div>
-      </div>
-
-      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
-        {[
-          { label: t("tasks.board.stats.total"), value: stats.total },
-          { label: t("tasks.board.stats.inProgress"), value: stats.inProgress },
-          { label: t("tasks.board.stats.done"), value: stats.done },
-          { label: t("tasks.board.stats.overdue"), value: stats.overdue },
-        ].map((item) => (
-          <div key={item.label} className="rounded-lg border border-border bg-card p-3">
-            <p className="text-2xl font-semibold">{item.value}</p>
-            <p className="text-xs text-muted-foreground">{item.label}</p>
-          </div>
-        ))}
-      </div>
+          {compositionSlot}
+        </>}
+      />
 
       <TaskBoardView
         className="min-h-0 flex-1"
@@ -371,6 +360,24 @@ function TasksClientLoaded({
       {assignmentTask && canAssign ? (
         <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => setAssignmentTaskId(null)} />
       ) : null}
+      <details className="border-t pt-3">
+        <summary className="w-fit cursor-pointer rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">
+          {t("tasks.board.stats.summary", { defaultValue: "Project task summary" })}
+        </summary>
+        <p className="mt-2 text-sm text-muted-foreground">{t("tasks.board.stats.scope", { defaultValue: "Counts cover loaded project tasks, before board filters." })}</p>
+        <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            ["total", stats.total],
+            ["inProgress", stats.inProgress],
+            ["done", stats.done],
+            ["overdue", stats.overdue],
+          ] as const).map(([key, value]) => <div key={key} className="min-w-0">
+            <dt className="text-sm text-muted-foreground">{t(`tasks.board.stats.${key}`)}</dt>
+            <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
+          </div>)}
+        </dl>
+      </details>
+      <OperationalPageComposition moduleId="tasks" title={t("tasks.page.title")} actionTarget={compositionTarget} />
     </div>
   )
 }

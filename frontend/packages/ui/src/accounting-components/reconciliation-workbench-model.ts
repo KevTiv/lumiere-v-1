@@ -41,9 +41,12 @@ export interface ReconciliationSource {
   suggestions?: readonly ReconciliationSuggestionSource[]
   partners?: readonly ReconciliationPartnerSource[]
 }
-export interface ReconciliationCandidate {
-  id: string; moveId: string; partnerId: string; accountId: string; documentLabel: string; description: string; partner: string
-  accountLabel: string; amount: number; suggested: boolean; href: string
+export interface ReconciliationDocumentItem {
+  id: string; moveId: string; documentLabel: string; href: string
+}
+export interface ReconciliationCandidate extends ReconciliationDocumentItem {
+  partnerId: string; accountId: string; description: string; partner: string
+  accountLabel: string; amount: number; suggested: boolean
 }
 export interface ReconciliationContext {
   key: string; organizationId: string; companyId: string; statementId: string; lineId: string
@@ -52,8 +55,8 @@ export interface ReconciliationContext {
 }
 export type ReconciliationProjection =
   | { status: "unavailable"; state: ModuleDataState }
-  | { status: "blocked"; message: string }
-  | { status: "ready"; context: ReconciliationContext; candidates: ReconciliationCandidate[] }
+  | { status: "blocked"; message: string; currencyException?: { context: ReconciliationContext; foreignCurrencies: string[]; items: ReconciliationDocumentItem[] } }
+  | { status: "ready"; context: ReconciliationContext; candidates: ReconciliationCandidate[]; foreignItems: ReconciliationDocumentItem[] }
 export interface ReconciliationRequest {
   readonly organizationId: string; readonly companyId: string; readonly statementId: string; readonly lineId: string
   readonly moveLineIds: readonly string[]; readonly amountResidual: 0
@@ -94,6 +97,13 @@ function uniqueRows<Row extends { id?: unknown }>(rows: readonly Row[]): Map<str
     if (result.has(id)) { result.delete(id); duplicate.add(id) } else result.set(id, row)
   }
   return result
+}
+function currencyCode(currency: ReconciliationCurrencySource | undefined): string | undefined {
+  const code = text(currency?.code).trim().toUpperCase()
+  return /^[A-Z]{3}$/.test(code) ? code : undefined
+}
+function documentItem(id: string, moveId: string, move: ReconciliationMoveSource): ReconciliationDocumentItem {
+  return { id, moveId, documentLabel: text(move.name).trim() || `Journal entry #${moveId}`, href: `/accounting/invoices/${encodeURIComponent(moveId)}` }
 }
 
 /** Recovery context is independent of new-match eligibility and includes posted statements. */
@@ -141,7 +151,40 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
   if (line.isReconciled !== false) return { status: "blocked", message: line.isReconciled === true ? "This bank line is already matched." : "The bank line’s matching status is unavailable." }
   const bankAmount = amount(line.amount)
   if (bankAmount === null || bankAmount === 0) return { status: "blocked", message: "A known, non-zero bank amount is required. Missing amounts are not treated as zero." }
-  const currency = uniqueRows(source.currencies).get(currencyId)
+  const currencies = uniqueRows(source.currencies)
+  const currency = currencies.get(currencyId)
+  const bankCurrencyId = reconciliationId(line.journalCurrencyId)
+  const foreignIds = [...new Set([statement.currencyId, line.journalCurrencyId, line.currencyId, line.foreignCurrencyId]
+    .map(reconciliationId).filter((id): id is string => id !== null && id !== currencyId))]
+  const date = formatTimestampLike(line.date)
+  const bankContext = {
+    key: [organizationId, companyId, statementId, lineId].join(":"), organizationId, companyId, statementId, lineId,
+    statementLabel: text(statement.name) || text(statement.reference) || `Statement #${statementId}`,
+    lineLabel: text(line.transactionType) || text(line.accountNumber) || `Bank line #${lineId}`, amount: bankAmount,
+    ...(date ? { dateLabel: date.toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" }) } : {}),
+  }
+  if (foreignIds.length && bankCurrencyId && reconciliationId(statement.currencyId) && Array.isArray(line.moveIds)
+    && line.moveIds.length === 0 && !line.paymentIds?.length) {
+    const bankCurrency = currencies.get(bankCurrencyId)
+    const precision = amount(bankCurrency?.decimalPlaces)
+    const decimalPlaces = precision !== null && Number.isInteger(precision) && precision >= 0 && precision <= 6 ? precision : 6
+    // Current references let a selected document survive an FX classification change.
+    // They are read-only and never enter the settlement candidate set.
+    const moves = uniqueRows(source.moves)
+    const items: ReconciliationDocumentItem[] = []
+    for (const [id, row] of uniqueRows(source.moveLines)) {
+      const moveId = reconciliationId(row.moveId)
+      const move = moveId ? moves.get(moveId) : undefined
+      if (moveId && move && inScope(row, organizationId, companyId) && inScope(move, organizationId, companyId)
+        && tag(move.state) === "Posted" && tag(move.moveType) === (bankAmount > 0 ? "OutInvoice" : "InInvoice")) {
+        items.push(documentItem(id, moveId, move))
+      }
+    }
+    return { status: "blocked", message: "This desk supports base-currency matches only. Foreign-currency lines require expert review.", currencyException: {
+      context: { ...bankContext, currencyId: bankCurrencyId, currencyCode: currencyCode(bankCurrency), decimalPlaces },
+      foreignCurrencies: foreignIds.map((id) => currencyCode(currencies.get(id)) ?? `#${id}`), items,
+    } }
+  }
   const decimalPlaces = amount(currency?.decimalPlaces)
   if (decimalPlaces === null || !Number.isInteger(decimalPlaces) || decimalPlaces < 0 || decimalPlaces > 6 || amount(currency?.roundingFactor) !== 10 ** -decimalPlaces) return { status: "blocked", message: "Supported currency precision is unavailable. Expert review is required before matching." }
   const bankMinor = minorUnits(bankAmount, decimalPlaces)
@@ -163,9 +206,11 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
   const accounts = uniqueRows(source.accounts)
   const suggestions = new Set((source.suggestions ?? []).filter((row) => reconciliationId(row.organizationId) === organizationId && reconciliationId(row.statementLineId) === lineId).map((row) => reconciliationId(row.entityId)))
   const candidates: ReconciliationCandidate[] = []
+  const foreignItems: ReconciliationDocumentItem[] = []
   for (const [id, row] of uniqueRows(source.moveLines)) {
     if (!inScope(row, organizationId, companyId) || linkedIds.has(id) || row.blocked !== false || row.isMatching === true || tag(row.parentState) !== "Posted") continue
-    if (reconciliationId(row.companyCurrencyId) !== currencyId || reconciliationId(row.currencyId) !== currencyId) continue
+    const itemCurrency = reconciliationId(row.currencyId)
+    if (reconciliationId(row.companyCurrencyId) !== currencyId || !itemCurrency) continue
     const moveId = reconciliationId(row.moveId)
     const accountId = reconciliationId(row.accountId)
     const move = moveId ? moves.get(moveId) : undefined
@@ -180,37 +225,50 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
     if (balance === null || debit === null || credit === null || residual === null || debit < 0 || credit < 0 || residual === 0 || Math.sign(residual) !== Math.sign(bankAmount) || Math.sign(residual) !== Math.sign(balance)) continue
     const balanceMinor = minorUnits(balance, decimalPlaces), debitMinor = minorUnits(debit, decimalPlaces), creditMinor = minorUnits(credit, decimalPlaces), residualMinor = minorUnits(residual, decimalPlaces)
     if (balanceMinor === null || debitMinor === null || creditMinor === null || residualMinor === null || debitMinor - creditMinor !== balanceMinor || Math.abs(residualMinor) > Math.abs(balanceMinor)) continue
+    const document = documentItem(id, moveId, move)
+    if (itemCurrency !== currencyId) {
+      foreignItems.push(document)
+      continue
+    }
     if (row.amountCurrency != null) {
       const amountCurrency = amount(row.amountCurrency)
       if (amountCurrency == null || minorUnits(amountCurrency, decimalPlaces) !== balanceMinor) continue
     }
-    const documentLabel = text(move.name).trim() || `Journal entry #${moveId}`
-    candidates.push({ id, moveId, partnerId, accountId, documentLabel, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || "Journal item", partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || `Account #${accountId}`, amount: residual, suggested: suggestions.has(id), href: `/accounting/invoices/${encodeURIComponent(moveId)}` })
+    candidates.push({ ...document, partnerId, accountId, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || "Journal item", partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || `Account #${accountId}`, amount: residual, suggested: suggestions.has(id) })
   }
   candidates.sort((a, b) => Number(b.suggested) - Number(a.suggested) || a.documentLabel.localeCompare(b.documentLabel) || a.id.localeCompare(b.id))
-  const code = text(currency?.code).trim().toUpperCase()
+  foreignItems.sort((a, b) => a.documentLabel.localeCompare(b.documentLabel) || a.id.localeCompare(b.id))
   const partnerId = reconciliationId(line.partnerId)
   const partner = partnerId ? uniqueRows(source.partners ?? []).get(partnerId) : undefined
   const partnerLabel = partner && reconciliationId(partner.organizationId) === organizationId && (partner.companyId === null || reconciliationId(partner.companyId) === companyId) ? text(partner.name) : ""
-  const date = formatTimestampLike(line.date)
-  return { status: "ready", context: { key: [organizationId, companyId, statementId, lineId].join(":"), organizationId, companyId, statementId, lineId, statementLabel: text(statement.name) || text(statement.reference) || `Statement #${statementId}`, lineLabel: text(line.transactionType) || text(line.accountNumber) || `Bank line #${lineId}`, amount: bankAmount, currencyId, decimalPlaces, ...(/^[A-Z]{3}$/.test(code) ? { currencyCode: code } : {}), ...(date ? { dateLabel: date.toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" }) } : {}), ...(partnerLabel ? { partnerLabel } : {}) }, candidates }
+  return { status: "ready", context: { ...bankContext, currencyId, decimalPlaces, currencyCode: currencyCode(currency), ...(partnerLabel ? { partnerLabel } : {}) }, candidates, foreignItems }
 }
 
+export type ReconciliationIssue = "stale_selection" | "mixed_partners" | "mixed_accounts" | "incomplete_document" | "foreign_document" | "unavailable_amount" | "short_payment" | "excess_payment"
+
 export function reconciliationSelection(projection: ReconciliationProjection, selectedIds: readonly string[]) {
-  if (projection.status !== "ready") return { selected: [] as ReconciliationCandidate[], total: null, difference: null, request: null }
+  if (projection.status !== "ready") return { selected: [] as ReconciliationCandidate[], total: null, difference: null, request: null, issue: null }
   const selected = projection.candidates.filter((row) => selectedIds.includes(row.id))
-  const valid = selected.length > 0 && selected.length === selectedIds.length && new Set(selectedIds).size === selectedIds.length
-    && new Set(selected.map((row) => row.partnerId)).size === 1
-    && new Set(selected.map((row) => row.accountId)).size === 1
-    && projection.candidates.every((row) => !selected.some((chosen) => chosen.moveId === row.moveId) || selectedIds.includes(row.id))
+  const documents = new Set(selected.map((row) => row.moveId))
   const scale = 10 ** projection.context.decimalPlaces
   const totalMinor = selected.reduce((sum, row) => sum + minorUnits(row.amount, projection.context.decimalPlaces)!, 0)
-  const differenceMinor = minorUnits(projection.context.amount, projection.context.decimalPlaces)! - totalMinor
+  const bankMinor = minorUnits(projection.context.amount, projection.context.decimalPlaces)!
+  const differenceMinor = bankMinor - totalMinor
   const total = Number.isSafeInteger(totalMinor) ? totalMinor / scale : null
   const difference = Number.isSafeInteger(differenceMinor) ? differenceMinor / scale : null
+  let issue: ReconciliationIssue | null = null
+  if (selectedIds.length > 0) {
+    if (projection.foreignItems.some((row) => documents.has(row.moveId) || selectedIds.includes(row.id))) issue = "foreign_document"
+    else if (selected.length !== selectedIds.length || new Set(selectedIds).size !== selectedIds.length) issue = "stale_selection"
+    else if (new Set(selected.map((row) => row.partnerId)).size !== 1) issue = "mixed_partners"
+    else if (new Set(selected.map((row) => row.accountId)).size !== 1) issue = "mixed_accounts"
+    else if (projection.candidates.some((row) => documents.has(row.moveId) && !selectedIds.includes(row.id))) issue = "incomplete_document"
+    else if (total === null || difference === null) issue = "unavailable_amount"
+    else if (differenceMinor !== 0) issue = Math.abs(totalMinor) > Math.abs(bankMinor) ? "short_payment" : "excess_payment"
+  }
   const { organizationId, companyId, statementId, lineId } = projection.context
-  const request: ReconciliationRequest | null = valid && total !== null && differenceMinor === 0
+  const request: ReconciliationRequest | null = selected.length > 0 && issue === null && differenceMinor === 0
     ? { organizationId, companyId, statementId, lineId, moveLineIds: selected.map((row) => row.id), amountResidual: 0 }
     : null
-  return { selected, total, difference, request }
+  return { selected, total, difference, request, issue }
 }

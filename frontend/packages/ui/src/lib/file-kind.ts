@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next"
+
 /** What sort of file a document is, for its icon and colour; from its MIME type, else its extension. */
 export type FileKind = "pdf" | "image" | "spreadsheet" | "document" | "presentation" | "archive" | "video" | "audio" | "code" | "other"
 
@@ -25,11 +27,36 @@ export function fileKindOf(mimetype: string | null | undefined, fileName: string
   if (mime.includes("zip") || mime.includes("compressed") || mime.includes("tar")) return "archive"
   if (mime === "application/json" || mime.includes("xml") || mime === "text/html") return "code"
 
-  const name = (fileName ?? "").toLowerCase()
-  const dot = name.lastIndexOf(".")
-  const extension = dot >= 0 ? name.slice(dot + 1) : ""
+  const extension = fileName ? splitFileName(fileName).extension.slice(1).toLowerCase() : ""
   if (!extension) return "other"
   return EXTENSION_KINDS.find(([, extensions]) => extensions.includes(extension))?.[0] ?? "other"
+}
+
+const FILE_KIND_LABELS: Record<FileKind, string> = {
+  pdf: "PDF",
+  image: "Image",
+  spreadsheet: "Spreadsheet",
+  document: "Document",
+  presentation: "Presentation",
+  archive: "Archive",
+  video: "Video",
+  audio: "Audio",
+  code: "Code or data",
+  other: "File",
+}
+
+export function fileKindLabel(kind: FileKind, t: TFunction): string {
+  return t(`documents.fileIdentity.kind.${kind}`, { defaultValue: FILE_KIND_LABELS[kind] })
+}
+
+/** Keep the original extension visible when the filename stem needs truncation. */
+export function splitFileName(name: string): { stem: string; extension: string } {
+  const dot = name.lastIndexOf(".")
+  const separator = Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\"))
+  if (dot <= separator + 1 || dot === name.length - 1 || name.length - dot > 16) {
+    return { stem: name, extension: "" }
+  }
+  return { stem: name.slice(0, dot), extension: name.slice(dot) }
 }
 
 /** Plain-language size: 1536 → "1.5 KB". */

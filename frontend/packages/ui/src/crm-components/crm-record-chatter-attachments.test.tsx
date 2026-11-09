@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 const post = vi.hoisted(() => vi.fn(async (_: unknown) => undefined))
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock("@lumiere/i18n", () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { defaultValue?: string; name?: string }) =>
+      (options?.defaultValue ?? key).replace("{{name}}", options?.name ?? ""),
+  }),
+}))
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ identity: "abc" }) }))
 vi.mock("@lumiere/erp-shared/stb-timestamp", () => ({ stbTimestampFromDate: () => 0 }))
 vi.mock("@lumiere/stdb/browser-http", () => ({ stdbBrowserQuery: async () => [] }))
@@ -65,7 +70,10 @@ describe("CrmRecordChatter file attachments", () => {
     fireEvent.change(screen.getByTestId("record-chatter-note"), { target: { value: "hello" } })
     pick(new File(["a"], "a.txt"), new File(["b"], "b.txt"))
     expect(screen.getAllByTestId("record-chatter-attachment-queued")).toHaveLength(2)
-    fireEvent.click(screen.getAllByTestId("record-chatter-attachment-remove")[1])
+    const removeB = screen.getByRole("button", { name: "Remove b.txt", exact: true })
+    removeB.focus()
+    fireEvent.click(removeB)
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Choose files/ }))
     expect(screen.getAllByTestId("record-chatter-attachment-queued")).toHaveLength(1)
     pick(new File(["c"], "c.txt"))
 

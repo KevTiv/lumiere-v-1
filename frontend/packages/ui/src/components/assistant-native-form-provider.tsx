@@ -18,6 +18,8 @@ export interface AssistantNativeFormRequest {
   tabId: string
   /** User-authored input for the existing advisory form assistant. */
   prompt?: string
+  /** Return to the initiating checklist after the native form closes. */
+  onActivationReturn?: (result: NativeFormActivationResult) => void
 }
 
 export type AssistantNativeFormStatus =
@@ -31,6 +33,10 @@ export interface AssistantNativeFormOutcome {
   status: AssistantNativeFormStatus
 }
 
+export type NativeFormActivationResult =
+  | { status: "saved"; recordId: string }
+  | { status: "cancelled" | "denied" | "unavailable" | "busy" | "scope_changed" }
+
 interface PendingNativeFormRequest extends AssistantNativeFormRequest {
   expiresAt: number
 }
@@ -40,12 +46,22 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
   currentScope.current = scopeKey
   const [pending, setPending] = useState<PendingNativeFormRequest | null>(null)
   const pendingRef = useRef<PendingNativeFormRequest | null>(null)
+  const activationRef = useRef<AssistantNativeFormRequest | null>(null)
   const [outcome, setOutcome] = useState<AssistantNativeFormOutcome | null>(
     null,
   )
 
   useEffect(() => {
-    if (pendingRef.current?.scopeKey !== scopeKey) pendingRef.current = null
+    const request = pendingRef.current
+    if (request && request.scopeKey !== scopeKey) {
+      pendingRef.current = null
+      request.onActivationReturn?.({ status: "scope_changed" })
+    }
+    const activation = activationRef.current
+    if (activation && activation.scopeKey !== scopeKey) {
+      activationRef.current = null
+      activation.onActivationReturn?.({ status: "scope_changed" })
+    }
     setPending((value) => (value?.scopeKey === scopeKey ? value : null))
     setOutcome((value) => (value?.scopeKey === scopeKey ? value : null))
   }, [scopeKey])
@@ -56,7 +72,7 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
     ): "pending" | "busy" | "scope_changed" => {
       if (!currentScope.current || request.scopeKey !== currentScope.current)
         return "scope_changed"
-      if (pendingRef.current?.scopeKey === currentScope.current) return "busy"
+      if (pendingRef.current?.scopeKey === currentScope.current || activationRef.current?.scopeKey === currentScope.current) return "busy"
       if (
         !request.requestId ||
         !request.moduleId ||
@@ -93,6 +109,11 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
         return
       pendingRef.current = null
       setPending(null)
+      if (request.onActivationReturn) {
+        if (status === "opened") activationRef.current = request
+        else request.onActivationReturn({ status })
+        return
+      }
       setOutcome({ requestId, scopeKey: request.scopeKey, status })
     },
     [],
@@ -102,6 +123,17 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
     if (pendingRef.current?.requestId !== requestId) return
     pendingRef.current = null
     setPending(null)
+  }, [])
+
+  const finishActivation = useCallback((requestId: string, result: NativeFormActivationResult) => {
+    const request = activationRef.current
+    if (!request || request.requestId !== requestId || request.scopeKey !== currentScope.current) return
+    activationRef.current = null
+    request.onActivationReturn?.(result)
+  }, [])
+
+  const abandonActivation = useCallback((requestId: string) => {
+    if (activationRef.current?.requestId === requestId) activationRef.current = null
   }, [])
 
   useEffect(() => {
@@ -121,6 +153,8 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
     isCurrent,
     settle,
     cancel,
+    finishActivation,
+    abandonActivation,
   }
 }
 
