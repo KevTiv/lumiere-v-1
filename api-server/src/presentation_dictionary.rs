@@ -9,7 +9,7 @@ use stdb_auth::{has_resource_read_permission, resolve_http_sql_columns, FieldAcc
 use thiserror::Error;
 
 const RESOURCE: &str = "account-moves";
-const CONTRACT_PIN: &str = "v0.3.173";
+const CONTRACT_PIN: &str = "v0.3.174";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,7 +132,7 @@ mod tests {
         assert_eq!(capability.acquisition_route, "/v1/query/account-moves");
         assert_eq!(capability.company_scope_input, "companyId");
         assert_eq!(capability.acquisition_authorization, "reauthorize-on-read");
-        assert_eq!(capability.contract_pin, "v0.3.173");
+        assert_eq!(capability.contract_pin, "v0.3.174");
         assert_eq!(capability.field_naming, "sql-column");
         assert!(capability.fields.contains(&"id".into()));
         assert!(capability.fields.contains(&"organization_id".into()));
@@ -160,7 +160,7 @@ mod tests {
             "lumiere-contracts = { path = \"vendor/lumiere-contracts/crates/lumiere-contracts\""
         ));
         let release = include_str!("../../release-compatibility-manifest.json");
-        assert!(release.contains("\"version\": \"0.3.173\""));
-        assert!(release.contains("\"revision\": \"76855dea1c5d8f3899e77224f338a19df4367aa7\""));
+        assert!(release.contains("\"version\": \"0.3.174\""));
+        assert!(release.contains("\"revision\": \"5ae7191aef212a92e84724e40c7b5f6c3c68eb6c\""));
     }
 }
