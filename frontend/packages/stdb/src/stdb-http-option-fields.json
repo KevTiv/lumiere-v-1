@@ -618,6 +618,9 @@
   "AiOwnerConfigurationReceiptRead": [
     "company_id"
   ],
+  "AiPlatformDefault": [
+    "template_id"
+  ],
   "AiPrepaidAccount": [
     "enabled_by",
     "enabled_at"

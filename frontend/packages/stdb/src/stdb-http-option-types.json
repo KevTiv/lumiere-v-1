@@ -618,6 +618,9 @@
   "AiOwnerConfigurationReceiptRead": {
     "company_id": "u64"
   },
+  "AiPlatformDefault": {
+    "template_id": "u64"
+  },
   "AiPrepaidAccount": {
     "enabled_by": "identity",
     "enabled_at": "timestamp"

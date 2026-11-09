@@ -2422,6 +2422,14 @@
       "name": "enqueue_job",
       "shape_fingerprint": "sha256:11d79f8bc0e1a747cecde88af2ddc22c5e9dfd4e6b85abf568ff3ef3214df128"
     },
+    "erp.enroll_ai_company_defaults": {
+      "name": "enroll_ai_company_defaults",
+      "shape_fingerprint": "sha256:e36f1b0a57db537789d543659726ea97de76921cb5c513608707de89dd6cd2c1"
+    },
+    "erp.ensure_ai_managed_allowance": {
+      "name": "ensure_ai_managed_allowance",
+      "shape_fingerprint": "sha256:366d62ab08bf96a1ad6cc00826b5928d745e79553e513b06a352a1ff9bd204df"
+    },
     "erp.ensure_dev_admin": {
       "name": "ensure_dev_admin",
       "shape_fingerprint": "sha256:7da72710a63d492ec23775ee96b9a8626b35364f29e33e24e5f1f0e7b2a5e9dd"
@@ -3186,6 +3194,10 @@
       "name": "provision_ai_company_defaults",
       "shape_fingerprint": "sha256:86f6dbc032f7ce095eac2313f32164328de185058b73120f28bb579fe9845a8a"
     },
+    "erp.publish_ai_platform_skill": {
+      "name": "publish_ai_platform_skill",
+      "shape_fingerprint": "sha256:70e99e5641cb187f7b99a74c66e388872d045bf9b68a3020a648bd91ccd6a099"
+    },
     "erp.publish_form_configuration": {
       "name": "publish_form_configuration",
       "shape_fingerprint": "sha256:e77d804e42c073d2b3b2b03a60aba13a7b714b969a3e97ea768df8b92494a328"
@@ -3541,6 +3553,10 @@
     "erp.register_ai_model_profile": {
       "name": "register_ai_model_profile",
       "shape_fingerprint": "sha256:c21e44f0b76278baddc7eaa6f08597a9c2c59d76763b53ef73848ff47883b2d6"
+    },
+    "erp.register_ai_platform_template": {
+      "name": "register_ai_platform_template",
+      "shape_fingerprint": "sha256:d4452ab3b8bd8d7c52ef69b55ba5a4df67831d6da7cc9496fe76b3628ae0008a"
     },
     "erp.register_ai_skill_certification_runtime_profile": {
       "name": "register_ai_skill_certification_runtime_profile",
@@ -4961,6 +4977,10 @@
     "erp.set_ai_owner_limit": {
       "name": "set_ai_owner_limit",
       "shape_fingerprint": "sha256:c9b84d50d2e919fff3935ecb186d93e8f2aef095d0dc6e44ce23777ef047d3c2"
+    },
+    "erp.set_ai_platform_default": {
+      "name": "set_ai_platform_default",
+      "shape_fingerprint": "sha256:9d41b4c7aef620a9b94ea851ea994eea7f2117765705c3f9793908f55ea1585d"
     },
     "erp.set_ai_reducer_allowlist_enabled": {
       "name": "set_ai_reducer_allowlist_enabled",
@@ -6476,6 +6496,14 @@
       "current_operations_fingerprint": "sha256:6687491ba52bd8d9cf634ae737627dec2d1924f088ab6867a2aaf3876c7910af",
       "operation_count": 1523,
       "reason": "release on top of v0.3.171: add provision_ai_company_defaults; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.175",
+      "previous_ir_sha256": "sha256:e99b6fae71aa732827c9c227944ced4f6e24373f603a58faa6cb681c74bfcc4f",
+      "previous_operations_fingerprint": "sha256:6687491ba52bd8d9cf634ae737627dec2d1924f088ab6867a2aaf3876c7910af",
+      "current_operations_fingerprint": "sha256:d0417740e2d77583323e992302a8ada2dffe2eb2dd0c812cb3612d09db6116ad",
+      "operation_count": 1528,
+      "reason": "release on top of v0.3.175: add enroll_ai_company_defaults, ensure_ai_managed_allowance, publish_ai_platform_skill, register_ai_platform_template, set_ai_platform_default; change the shape of none"
     }
   ]
 }
