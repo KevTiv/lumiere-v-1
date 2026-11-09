@@ -235,7 +235,13 @@
         "empty": "Aucun résultat",
         "remove": "Retirer {{value}}"
       },
-      "setupOpensNewTab": "s’ouvre dans un nouvel onglet"
+      "setupOpensNewTab": "s’ouvre dans un nouvel onglet",
+      "file": {
+        "choose": "Choisir un fichier",
+        "chooseMultiple": "Choisir des fichiers",
+        "remove": "Retirer {{name}}",
+        "selected": "Sélectionné pour l’envoi"
+      }
     },
     "formPreview": {
       "label": "Aperçu"
@@ -380,7 +386,9 @@
         "description": "Essayez une autre recherche ou effacez les filtres.",
         "title": "Aucun enregistrement correspondant"
       },
-      "groupBy": "Regrouper par"
+      "groupBy": "Regrouper par",
+      "records": "Enregistrements",
+      "showFullValue": "Afficher la valeur complète"
     },
     "retry": "Réessayer",
     "recordsDenied": "Vous n’avez pas accès à ces enregistrements.",

@@ -9,6 +9,8 @@ import {
   MissingOrganization,
 } from "@lumiere/ui"
 import { Button } from "@lumiere/ui/components/button"
+import { useErpSession } from "@lumiere/erp-session"
+import { importTaskHref } from "../../../../../lib/import-task-navigation"
 import {
   useImportJobErrors,
   useImportJobs,
@@ -27,19 +29,28 @@ import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 interface ImportJobPageClientProps {
   jobId: string
   organizationId?: number
+  fromTask?: string
+  fromCompanyId?: string
 }
 
-export function ImportJobPageClient({ jobId, organizationId }: ImportJobPageClientProps) {
+export function ImportJobPageClient({ jobId, organizationId, fromTask, fromCompanyId }: ImportJobPageClientProps) {
   const { t } = useTranslation()
+  const { activeCompanyId, activeCompanyReady } = useErpSession()
+  const operatingCompanyId = Number(activeCompanyId)
 
   if (!hasValidOrganizationId(organizationId)) {
     return <MissingOrganization />
   }
 
+  const savedTaskHref = activeCompanyReady && Number.isSafeInteger(operatingCompanyId) && operatingCompanyId > 0 &&
+    fromCompanyId === String(operatingCompanyId) && fromTask && /^[a-f0-9]{32}$/.test(fromTask)
+    ? importTaskHref({ taskId: fromTask, companyId: operatingCompanyId, view: "results" })
+    : undefined
   return (
     <ImportJobPageLoaded
       jobId={jobId}
       organizationId={BigInt(organizationId)}
+      savedTaskHref={savedTaskHref}
       title={t("common.importAssistant.jobStatusTitle", { defaultValue: "Import job status" })}
     />
   )
@@ -49,10 +60,12 @@ function ImportJobPageLoaded({
   jobId,
   organizationId,
   title,
+  savedTaskHref,
 }: {
   jobId: string
   organizationId: bigint
   title: string
+  savedTaskHref?: string
 }) {
   const jobs = useImportJobs(organizationId)
   const errors = useImportJobErrors(organizationId)
@@ -109,7 +122,7 @@ function ImportJobPageLoaded({
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl space-y-6 p-6">
+    <main className="mx-auto w-full min-w-0 max-w-4xl space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{title}</h1>
@@ -117,10 +130,12 @@ function ImportJobPageLoaded({
         </div>
         <Button
           variant="outline"
-          render={<Link href="/settings" />}
+          render={<Link href={savedTaskHref ?? "/settings?section=imports"} />}
           nativeButton={false}
         >
-          Back to settings
+          {savedTaskHref
+            ? t("settings.importJob.backToResults", { defaultValue: "Back to ERP results" })
+            : t("settings.importJob.backToImports", { defaultValue: "Back to Data import" })}
         </Button>
       </div>
       {rollbackError ? <p role="alert" className="text-sm text-destructive">{rollbackError}</p> : null}

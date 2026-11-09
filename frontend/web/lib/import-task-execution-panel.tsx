@@ -27,15 +27,16 @@ import {
 import { operatingCompanyCurrencyCode } from "./operating-company-currency"
 import type { ReviewDetail } from "./import-review-model"
 import {
-  readImportWorkflow,
   transitionImportProposal,
   type DistinctExpenseDecision,
+  type ImportCapability,
   type ImportNativeResult,
   type ImportProposal,
   type ImportWorkflow,
 } from "./import-workflow"
 import { useImportProposalAttempt } from "./use-import-proposal-attempt"
 import { importTaskHref } from "./import-task-navigation"
+import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
 
 interface Props {
   organizationId: number
@@ -44,6 +45,7 @@ interface Props {
   reviewId?: string
   view: "preview" | "results"
   onChanged?: () => void
+  onReviewSource?: (reviewId: string) => void
 }
 
 export function ImportTaskExecutionPanel(props: Props) {
@@ -72,23 +74,14 @@ function ExecutionPanel({
   reviewId,
   view,
   onChanged,
+  onReviewSource,
   actor,
 }: Props & { actor: string }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const scope = { organizationId, companyId, taskId }
-  const queryKey = [
-    "import-workflow",
-    actor,
-    organizationId,
-    companyId,
-    taskId,
-  ] as const
-  const workflow = useQuery({
-    queryKey,
-    queryFn: () => readImportWorkflow(apiFetch, scope),
-    staleTime: 0,
-  })
+  const queryKey = importWorkflowKey(actor, scope)
+  const workflow = useImportWorkflow(actor, scope)
   const review = useQuery({
     queryKey: [
       "import-workflow-source",
@@ -361,7 +354,22 @@ function ExecutionPanel({
         <>
           {!reviewId && <p>{t("settings.importWorkflow.chooseSource")}</p>}
           {review.error && <p role="alert">{review.error.message}</p>}
-          {nativeHandoff && <p>{t("settings.importWorkflow.nativeHandoff")}</p>}
+          {nativeHandoff && (
+            <div className="space-y-2">
+              <p>{t("settings.importWorkflow.nativeHandoff")}</p>
+              {reviewId && onReviewSource && (
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => onReviewSource(reviewId)}
+                >
+                  {t("settings.importWorkflow.reviewForNativePreview", {
+                    defaultValue: "Open source decisions for native preview",
+                  })}
+                </Button>
+              )}
+            </div>
+          )}
           {review.data && !expenseSource && !nativeHandoff && (
             <p>{t("settings.importWorkflow.unsupportedSource")}</p>
           )}
@@ -550,10 +558,13 @@ function ExecutionPanel({
             onChange={setSelectedProposalId}
             options={proposals.map((item) => ({
               value: item.id,
-              label: t("settings.importWorkflow.previewOption", {
-                count: item.summary.recordCount,
-                from: item.summary.dateFrom ?? "—",
+              label: t("settings.importWorkflow.savedPreviewCounts", {
+                defaultValue:
+                  "{{date}} · {{status}} · {{drafts}} previewed drafts · {{held}} held",
+                date: item.summary.dateFrom ?? "—",
                 status: t(`settings.importWorkflow.status.${item.status}`),
+                drafts: item.summary.recordCount,
+                held: item.summary.blockedCount,
               }),
             }))}
           />
@@ -588,6 +599,7 @@ function ExecutionPanel({
           }
           busy={busy || preparationLocked}
           action={(action) => transition.mutate({ proposal, action })}
+          onReviewSource={onReviewSource}
           onResolve={(decisions) => {
             const configuration = proposal.configuration
             const distinct = new Map(
@@ -644,6 +656,11 @@ function ExecutionPanel({
             <NativeResult
               key={result.requestId}
               result={result}
+              capability={workflow.data?.capabilities.find(
+                (item) =>
+                  item.readiness === "native_preview" &&
+                  item.targetEntities.includes(result.entity),
+              )}
               companyId={companyId}
               taskId={taskId}
             />
@@ -662,21 +679,17 @@ function ExecutionPanel({
                   defaultValue: "Open related modules",
                 })}
               >
-                <a className="underline" href="/products">
-                  {t("settings.importWorkflow.openProducts", {
-                    defaultValue: "Open Products",
-                  })}
-                </a>
-                <a className="underline" href="/sales">
-                  {t("settings.importWorkflow.openSales", {
-                    defaultValue: "Open Sales",
-                  })}
-                </a>
-                <a className="underline" href="/warehouse">
-                  {t("settings.importWorkflow.openWarehouse", {
-                    defaultValue: "Open Warehouse",
-                  })}
-                </a>
+                {workflow.data.capabilities
+                  .filter((item) => item.readiness === "native_preview")
+                  .map((item) => (
+                    <a
+                      key={item.key}
+                      className="underline"
+                      href={item.destination}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
               </nav>
             </div>
           )}
@@ -693,10 +706,12 @@ function ExecutionPanel({
 
 function NativeResult({
   result,
+  capability,
   companyId,
   taskId,
 }: {
   result: ImportNativeResult
+  capability?: ImportCapability
   companyId: number
   taskId: string
 }) {
@@ -728,12 +743,26 @@ function NativeResult({
           </p>
           <a
             className="inline-flex min-h-8 items-center underline"
-            href={`/settings/import-jobs/${receipt.jobId}?companyId=${companyId}`}
+            href={`/settings/import-jobs/${receipt.jobId}?${new URLSearchParams({ companyId: String(companyId), fromTask: taskId })}`}
           >
             {t("settings.importWorkflow.openNativeJob", {
               defaultValue: "Open import job and row errors",
             })}
           </a>
+          {capability &&
+            receipt.rowsImported > 0 &&
+            (receipt.status === "success" || receipt.status === "partial") && (
+              <a
+                className="ml-0 inline-flex min-h-8 items-center underline sm:ml-3"
+                href={capability.destination}
+              >
+                {t("settings.importWorkflow.openNativeCorrection", {
+                  defaultValue:
+                    "Review or correct {{destination}} in the owning module",
+                  destination: capability.label,
+                })}
+              </a>
+            )}
         </>
       ) : (
         <p role="status">
@@ -783,6 +812,7 @@ function ProposalDetails({
   busy,
   action,
   onResolve,
+  onReviewSource,
 }: {
   proposal: ImportProposal
   companyId: number
@@ -793,6 +823,7 @@ function ProposalDetails({
   busy: boolean
   action: (action: "approve" | "execute" | "verify") => void
   onResolve: (decisions: DistinctExpenseDecision[]) => void
+  onReviewSource?: (reviewId: string) => void
 }) {
   const { t } = useTranslation()
   const { summary, result } = proposal
@@ -891,21 +922,34 @@ function ProposalDetails({
                 >
                   <p>{issue.message}</p>
                   {source && (
-                    <a
-                      className="inline-flex min-h-8 items-center underline"
-                      href={sourceReviewHistoryHref(String(companyId), {
-                        batchId: source.batchId,
-                        itemId: source.itemId,
-                        revision: source.revision,
-                      })}
-                    >
-                      {t("settings.importWorkflow.openHeldSource", {
-                        defaultValue:
-                          "Inspect source row #{{id}}, revision {{revision}}",
-                        id: source.itemId,
-                        revision: source.revision,
-                      })}
-                    </a>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <a
+                        className="inline-flex min-h-8 items-center underline"
+                        href={sourceReviewHistoryHref(String(companyId), {
+                          batchId: source.batchId,
+                          itemId: source.itemId,
+                          revision: source.revision,
+                        })}
+                      >
+                        {t("settings.importWorkflow.openHeldSource", {
+                          defaultValue:
+                            "Inspect source row #{{id}}, revision {{revision}}",
+                          id: source.itemId,
+                          revision: source.revision,
+                        })}
+                      </a>
+                      {onReviewSource && (
+                        <button
+                          type="button"
+                          className="min-h-8 text-left text-primary underline underline-offset-4"
+                          onClick={() => onReviewSource(source.batchId)}
+                        >
+                          {t("settings.importWorkflow.reviewHeldGroup", {
+                            defaultValue: "Review current source decisions",
+                          })}
+                        </button>
+                      )}
+                    </div>
                   )}
                   {!!issue.candidates?.length && (
                     <ul className="max-h-72 space-y-2 overflow-auto">
@@ -1141,6 +1185,12 @@ function ProposalDetails({
           </p>
           <p className="text-sm text-muted-foreground">
             {t("settings.importWorkflow.unposted")}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {t("settings.importWorkflow.correctInAccounting", {
+              defaultValue:
+                "Open a record in Accounting to make corrections. This import keeps its original approval and receipt.",
+            })}
           </p>
           <details>
             <summary className="cursor-pointer">

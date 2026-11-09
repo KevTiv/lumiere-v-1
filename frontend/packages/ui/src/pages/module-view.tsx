@@ -19,7 +19,7 @@ import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardGrid } from "./dashboard-grid"
-import { ModulePageComposition } from "./page-composition-host"
+import { ModulePageComposition, PageCompositionActionTargetProvider, usePageCompositionActionSlot } from "./page-composition-host"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
@@ -38,9 +38,10 @@ import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from ".
 import { WorkspaceNav } from "./workspace-nav"
 import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
 import { HistoryPeriodSelect } from "../components/history-period-select"
-import { serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { parseHistoryPeriod, resolveHistoryPeriod, serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
 import { configuredModuleHistoryField, filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
 import { useAssistantNativeForms, type AssistantNativeFormStatus } from "../components/assistant-native-form-provider"
+import { cn } from "../lib/utils"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -51,6 +52,8 @@ export interface ModuleViewRuntimeForms {
 
 interface ModuleViewProps {
   config: ModuleConfig
+  /** Let a sibling workspace surface follow the module without a full-height gap. */
+  fillHeight?: boolean
   /** Live data keyed by tab id — entity tabs receive data[tab.id] */
   data?: Record<string, Record<string, unknown>[]>
   /** Called when a create form is submitted: tabId, createAction, form values */
@@ -58,6 +61,7 @@ interface ModuleViewProps {
     tabId: string,
     action: string,
     data: Record<string, unknown>,
+    onActivationSaved?: (recordId: string) => void,
   ) => void | Promise<void>
   /** Forwarded to tab create {@link FormModal} — e.g. parent mutation `isPending`. */
   isPending?: boolean
@@ -78,7 +82,7 @@ interface ModuleViewProps {
   /** Opt in to retaining an open create form and its source workspace across tab changes. */
   onOpenFormChange?: (tab: string | null) => void
   /** Route existing gated create controls to a domain-owned instance of FormModal. */
-  onOpenCreateForm?: (tabId: string, assistant?: { prompt?: string; scopeKey: string }) => void
+  onOpenCreateForm?: (tabId: string, assistant?: { prompt?: string; scopeKey: string; activationRequestId?: string }) => void | boolean
   /** Custom native editors (for example invoices) keep their existing domain owner. */
   assistantCreate?: {
     tabIds: readonly string[]
@@ -137,6 +141,7 @@ function liveSheetRecord(
 
 export function ModuleView({
   config,
+  fillHeight = true,
   data = {},
   onFormSubmit,
   onRowClick,
@@ -260,15 +265,50 @@ export function ModuleView({
   const [assistantFormPrompt, setAssistantFormPrompt] = useState<{ tabId: string; text: string } | null>(null)
   const [assistantEditorScope, setAssistantEditorScope] = useState<string | null>(null)
   const assistantForms = useAssistantNativeForms()
+  const [activationEditor, setActivationEditor] = useState<{ requestId: string; tabId: string } | null>(null)
+  const activationRecord = useRef<{ requestId: string; recordId: string } | null>(null)
+  const finishActivation = assistantForms?.finishActivation
+  const abandonActivation = assistantForms?.abandonActivation
   const assistantScopeCurrent = !assistantEditorScope || assistantEditorScope === assistantForms?.scopeKey
-  const openCreateForm = (tabId: string, prompt?: string, scopeKey?: string) => {
+  const openCreateForm = (tabId: string, prompt?: string, scopeKey?: string, activationRequestId?: string) => {
+    if (onOpenCreateForm && !useRuntimeCreate) {
+      const opened = scopeKey
+        ? onOpenCreateForm(tabId, { prompt, scopeKey, ...(activationRequestId ? { activationRequestId } : {}) })
+        : onOpenCreateForm(tabId)
+      if (opened === false) return false
+    } else setOpenForm(tabId)
     setAssistantFormPrompt(prompt ? { tabId, text: prompt } : null)
     setAssistantEditorScope(scopeKey ?? null)
-    if (onOpenCreateForm && !useRuntimeCreate) {
-      if (scopeKey) onOpenCreateForm(tabId, { prompt, scopeKey })
-      else onOpenCreateForm(tabId)
-    } else setOpenForm(tabId)
+    if (activationRequestId) setActivationEditor({ requestId: activationRequestId, tabId })
+    return true
   }
+  const closeCreateForm = () => {
+    setOpenForm(null)
+    setAssistantEditorScope(null)
+    setAssistantFormPrompt(null)
+    if (!activationEditor) return
+    const { requestId } = activationEditor
+    const saved = activationRecord.current
+    finishActivation?.(requestId, saved?.requestId === requestId
+      ? { status: "saved", recordId: saved.recordId }
+      : { status: "cancelled" })
+    setActivationEditor(null)
+    activationRecord.current = null
+  }
+  const submitCreateForm = async (tab: ModuleTab, formData: FormValues) => {
+    const activation = activationEditor?.tabId === tab.id ? activationEditor : null
+    const action = tab.createAction ?? tab.id
+    if (!activation) {
+      await onFormSubmit?.(tab.id, action, formData)
+      return
+    }
+    await onFormSubmit?.(tab.id, action, formData, (recordId) => {
+      activationRecord.current = { requestId: activation.requestId, recordId }
+    })
+  }
+  useEffect(() => {
+    if (activationEditor) return () => abandonActivation?.(activationEditor.requestId)
+  }, [activationEditor, abandonActivation])
   useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
@@ -306,19 +346,54 @@ export function ModuleView({
   }, [activeTabUsable])
 
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
+  const activationReadAllowed = (tab: ModuleTab | undefined) =>
+    tab?.createPermission != null && checkPermission(tab.createPermission.resource, "read").allowed
+  useEffect(() => {
+    if (!activationEditor || !assistantScopeCurrent) return
+    const tab = config.tabs.find((candidate) => candidate.id === activationEditor.tabId)
+    const denied = permissionsReady === false || createGate(tab?.createPermission) !== "allowed"
+      || !activationReadAllowed(tab) || dataState?.[activationEditor.tabId]?.status === "denied"
+    if (!denied && tabUsable(activationEditor.tabId)) return
+    finishActivation?.(activationEditor.requestId, { status: denied ? "denied" : "unavailable" })
+    setOpenForm(null)
+    setActivationEditor(null)
+    onAssistantFormScopeChange?.()
+  })
+  const { target: compositionActionTarget, slot: compositionActionSlot } = usePageCompositionActionSlot()
+  const showHeaderCreate = activeTabConfig?.type === "entity" &&
+    activeTabConfig.createForm &&
+    activeTabConfig.entityConfig &&
+    !showAltView(activeTabConfig) &&
+    dataState?.[activeTab]?.status !== "error" &&
+    dataState?.[activeTab]?.status !== "denied" &&
+    createGate(activeTabConfig.createPermission) !== "denied"
+  const dashboardHistoryBounds = useMemo(() => {
+    if (rawHistoryPeriod != null && !parseHistoryPeriod(rawHistoryPeriod)) return null
+    if (dashboardTimeRange === undefined) return undefined
+    try {
+      return resolveHistoryPeriod(dashboardTimeRange, { timeZone: periodTimeZone })
+    } catch {
+      return null
+    }
+  }, [dashboardTimeRange, periodTimeZone, rawHistoryPeriod])
   useEffect(() => {
     if (!assistantEditorScope || assistantEditorScope === assistantForms?.scopeKey) return
     setOpenForm(null)
     setAssistantFormPrompt(null)
     setAssistantEditorScope(null)
+    setActivationEditor(null)
     onAssistantFormScopeChange?.()
   }, [assistantEditorScope, assistantForms?.scopeKey, onAssistantFormScopeChange])
   // Consume a shell-owned, scope-bound presentation request through the very same
   // create controls as the user. Never submit, replace an editor, or invent a form.
   useEffect(() => {
     const request = assistantForms?.pending
-    if (!request || request.moduleId !== config.id || request.tabId !== activeTab) return
+    if (!request || request.moduleId !== config.id) return
+    if (request.onActivationReturn && searchParams?.get("activationForm") !== request.requestId) return
     const settle = (status: AssistantNativeFormStatus) => assistantForms.settle(request.requestId, status)
+    const tab = config.tabs.find((candidate) => candidate.id === request.tabId)
+    if (request.onActivationReturn && permissionsReady !== false && !activationReadAllowed(tab)) { settle("denied"); return }
+    if (request.tabId !== activeTab) return
     if (!assistantForms.isCurrent(request.requestId)) { settle("unavailable"); return }
     if (openForm || selectedRecord || assistantFormBlocked || assistantCreate?.blocked || isPending) { settle("busy"); return }
     if (permissionsReady === false) return
@@ -328,14 +403,13 @@ export function ModuleView({
       if (status !== "loading") settle(status)
       return
     }
-    const tab = config.tabs.find((candidate) => candidate.id === request.tabId)
     const state = dataState?.[request.tabId]
     if (state?.status === "loading" || dataLoading?.[request.tabId]) return
     if (state?.status === "denied") { settle("denied"); return }
     if (!tab?.createForm || !tab.createPermission || !tabUsable(request.tabId) || (!onFormSubmit && !(!useRuntimeCreate && onOpenCreateForm))) { settle("unavailable"); return }
     if (createGate(tab.createPermission) !== "allowed") { settle("denied"); return }
-    openCreateForm(tab.id, request.prompt, request.scopeKey)
-    settle("opened")
+    const opened = openCreateForm(tab.id, request.prompt, request.scopeKey, request.onActivationReturn ? request.requestId : undefined)
+    settle(opened ? "opened" : "unavailable")
   })
   const showDashboardTimeRange =
     dashboardContent == null && activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
@@ -343,7 +417,7 @@ export function ModuleView({
 
   return (
     <div
-      className="flex min-h-full min-w-0 flex-col gap-2"
+      className={cn("flex min-w-0 flex-col gap-2", fillHeight && "min-h-full")}
       data-testid={`module-view-${config.id}`}
       data-hydrated={isHydrated ? "true" : "false"}
     >
@@ -353,12 +427,20 @@ export function ModuleView({
           activeTabConfig?.description ??
           (activeTabConfig?.type === "dashboard" || activeTabConfig == null ? config.description : undefined)
         }
+        primaryAction={showHeaderCreate ? (
+          <Button onClick={() => openCreateForm(activeTab)} data-testid={`module-create-${config.id}-${activeTab}`}>
+            <Plus className="h-4 w-4" />
+            {activeTabConfig.createLabel ?? "New"}
+          </Button>
+        ) : activeTabUsable ? activeTabConfig?.primaryAction : undefined}
+        secondaryAction={compositionActionSlot}
         timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
         onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
         timeZone={historyTimeZone}
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
+      <PageCompositionActionTargetProvider value={compositionActionTarget}>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-w-0 flex-col">
         {currentArea ? (
           <>
@@ -412,7 +494,7 @@ export function ModuleView({
             key={tab.id}
             value={tab.id}
             keepMounted={onOpenFormChange != null && openForm === tab.id}
-            className="mt-6"
+            className="mt-3 space-y-4"
             aria-label={tab.label}
             aria-busy={dataState?.[tab.id]?.status === "loading"}
             data-testid={`module-panel-${config.id}-${tab.id}`}
@@ -426,6 +508,7 @@ export function ModuleView({
                 pageId={tab.id}
                 title={`${config.title} · ${tab.label}`}
                 sections={dashboardContent == null ? tab.sections : undefined}
+                historyBounds={showDashboardTimeRange ? dashboardHistoryBounds : undefined}
                 isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
               >
                 {dashboardContent ?? (tab.sections && <DashboardGrid
@@ -435,10 +518,6 @@ export function ModuleView({
                 />)}
               </ModulePageComposition>
             )}
-            {tab.type !== "dashboard" && activeTab === tab.id && (
-              <ModulePageComposition moduleId={config.id} pageId={tab.id} title={`${config.title} · ${tab.label}`} />
-            )}
-
             {tab.type === "custom" && tab.customContent}
 
             {tab.type === "entity" && tab.entityConfig && tab.entityAltView && (
@@ -534,17 +613,6 @@ export function ModuleView({
                 )}
                 <EntityView
                   useCard={false}
-                  headerAction={
-                    tab.createForm && createGate(tab.createPermission) !== "denied" ? (
-                      <Button
-                        onClick={() => openCreateForm(tab.id)}
-                        data-testid={`module-create-${config.id}-${tab.id}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                        {tab.createLabel ?? "New"}
-                      </Button>
-                    ) : undefined
-                  }
                   config={
                     tab.createForm
                       ? {
@@ -619,8 +687,8 @@ export function ModuleView({
                   (useRuntimeCreate && runtimeForms ? (
                     <RuntimeFormModal
                       open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
-                      draftKey={assistantEditorScope ? `assistant:${assistantEditorScope}` : undefined}
-                      onOpenChange={(open) => !open && setOpenForm(null)}
+                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
+                      onOpenChange={(open) => !open && closeCreateForm()}
                       staticConfig={tab.createForm}
                       renderPreview={renderCreatePreview
                         ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
@@ -644,19 +712,13 @@ export function ModuleView({
                             }
                           : undefined
                       }
-                      onSubmit={async (formData) => {
-                        await onFormSubmit?.(
-                          tab.id,
-                          tab.createAction ?? tab.id,
-                          formData,
-                        )
-                      }}
+                      onSubmit={(formData) => submitCreateForm(tab, formData)}
                     />
                   ) : (
                     <FormModal
                       open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
-                      draftKey={assistantEditorScope ? `assistant:${assistantEditorScope}` : undefined}
-                      onOpenChange={(open) => !open && setOpenForm(null)}
+                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
+                      onOpenChange={(open) => !open && closeCreateForm()}
                       config={tab.createForm}
                       renderPreview={renderCreatePreview
                         ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
@@ -674,21 +736,26 @@ export function ModuleView({
                             }
                           : undefined
                       }
-                      onSubmit={async (formData) => {
-                        await onFormSubmit?.(
-                          tab.id,
-                          tab.createAction ?? tab.id,
-                          formData,
-                        )
-                      }}
+                      onSubmit={(formData) => submitCreateForm(tab, formData)}
                     />
                   ))}
               </div>
+            )}
+            {tab.type !== "dashboard" && activeTab === tab.id && (
+              <ModulePageComposition
+                moduleId={config.id}
+                pageId={tab.id}
+                title={`${config.title} · ${tab.label}`}
+                placement="insights"
+                sections={tab.insightSections}
+                historyBounds={historyFilter.status === "active" ? historyFilter.bounds : historyFilter.status === "invalid" ? null : undefined}
+              />
             )}
             </>)}
           </TabsContent>
         ))}
       </Tabs>
+      </PageCompositionActionTargetProvider>
     </div>
   )
 }

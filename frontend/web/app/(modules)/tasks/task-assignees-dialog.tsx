@@ -74,12 +74,12 @@ export function TaskAssigneesDialog({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !assign.isPending) onClose() }}>
-      <DialogContent className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-lg" showCloseButton={!assign.isPending}>
+      <DialogContent size="form" className="flex flex-col overflow-hidden" showCloseButton={!assign.isPending}>
         <DialogHeader className="shrink-0">
           <DialogTitle>Assign task</DialogTitle>
           <DialogDescription>Select active members of this company. Clear the selection to leave the task unassigned.</DialogDescription>
         </DialogHeader>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain" data-testid="task-assignees-body">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain [overflow-wrap:anywhere]" data-testid="task-assignees-body">
         <p className="break-words text-sm font-medium">{task.name}</p>
         <Input aria-label="Find an assignee" placeholder="Find a person" value={search} onChange={(event) => setSearch(event.target.value)} />
         {canAssign && online && !ready && !directory.isError ? <p role="status">Loading eligible people…</p> : null}

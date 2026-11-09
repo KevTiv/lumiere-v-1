@@ -1,7 +1,13 @@
 import type { TFunction } from "i18next"
 import { createElement } from "react"
 import { resolveAccountingRelationLabel } from "@lumiere/stdb/read-models"
-import type { EntityColumn, EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+import { entityColumnLayouts } from "./entity-column-layouts"
+import { unwrapEntityValue } from "./entity-row-values"
+import type { EntityColumn, EntityColumnLayout, EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
+
+const identityColumn = entityColumnLayouts.identity
+const relatedColumn = entityColumnLayouts.location
+const currencyColumn = entityColumnLayouts.amount
 
 /** Prebuilt ID→label maps from already-subscribed tables (build once — avoid N+1). */
 export type AccountingRelationLabelMaps = {
@@ -19,12 +25,12 @@ function relationFkColumn(
   key: string,
   label: string,
   labelMap: ReadonlyMap<string, string> | undefined,
-  width?: string,
+  sizing?: string | EntityColumnLayout,
 ): EntityColumn {
   return {
     key,
     label,
-    width,
+    ...(typeof sizing === "string" ? { width: sizing } : { layout: sizing }),
     render: (value) => {
       const shown = resolveAccountingRelationLabel(value, labelMap)
       if (shown === "—") {
@@ -174,7 +180,7 @@ export const bankStatementsTableConfig = (
       {
         key: "name",
         label: t("accounting.entities.bankStatements.columns.name"),
-        width: "min-w-32",
+        layout: identityColumn,
         sortable: true,
       },
       relationFkColumn(
@@ -211,7 +217,15 @@ export const bankStatementsTableConfig = (
         currencyKey: "currencyId",
         align: "right",
       },
-      { key: "lineIds", label: t("accounting.entities.bankStatements.columns.lineIds"), type: "number", align: "right" },
+      {
+        key: "lineIds",
+        label: t("accounting.entities.bankStatements.columns.lineIds"),
+        align: "right",
+        render: (value) => {
+          const ids = unwrapEntityValue(value)
+          return Array.isArray(ids) ? ids.length : "—"
+        },
+      },
     ],
     emptyMessage: t("accounting.entities.bankStatements.emptyMessage"),
     emptyState: {
@@ -246,7 +260,7 @@ export const fixedAssetsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("accounting.entities.fixedAssets.columns.name"), width: "min-w-48" },
+      { key: "name", label: t("accounting.entities.fixedAssets.columns.name"), layout: identityColumn },
       { key: "active", label: t("accounting.entities.fixedAssets.columns.active"), type: "boolean", align: "center" },
       { key: "state", label: t("accounting.entities.fixedAssets.columns.state"), type: "badge", ...assetStateBadges(t) },
       { key: "acquisitionDate", label: t("accounting.entities.fixedAssets.columns.acquisitionDate"), type: "date" },
@@ -411,7 +425,7 @@ export const accountPaymentsTableConfig = (
       {
         key: "name",
         label: t("accounting.entities.payments.columns.name"),
-        width: "min-w-28",
+        layout: identityColumn,
         sortable: true,
       },
       {
@@ -439,7 +453,7 @@ export const accountPaymentsTableConfig = (
         "partnerId",
         t("accounting.entities.payments.columns.partnerId"),
         options?.partnerLabelMap,
-        "min-w-24",
+        relatedColumn,
       ),
       relationFkColumn(
         "journalId",
@@ -660,7 +674,7 @@ export const analyticLinesTableConfig = (
     searchPlaceholder: t("accounting.entities.analyticLines.searchPlaceholder"),
     searchKeys: ["name", "description"],
     columns: [
-      { key: "name", label: t("accounting.entities.analyticLines.columns.name"), width: "min-w-40" },
+      { key: "name", label: t("accounting.entities.analyticLines.columns.name"), layout: identityColumn },
       relationFkColumn(
         "accountId",
         t("accounting.entities.analyticLines.columns.accountId"),
@@ -768,7 +782,7 @@ export const accountJournalsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["name", "code"],
     columns: [
       { key: "code", label: t("accounting.entities.journals.columns.code"), width: "min-w-20" },
-      { key: "name", label: t("accounting.entities.journals.columns.name"), width: "min-w-36" },
+      { key: "name", label: t("accounting.entities.journals.columns.name"), layout: identityColumn },
       { key: "type", label: t("accounting.entities.journals.columns.type"), width: "min-w-24" },
       { key: "active", label: t("accounting.entities.journals.columns.active"), type: "boolean", align: "center" },
     ],
@@ -800,17 +814,17 @@ export const accountMoveLinesTableConfig = (
         "moveId",
         t("accounting.entities.moveLines.columns.moveId"),
         options?.sourceDocumentLabelMap,
-        "min-w-20",
+        relatedColumn,
       ),
       relationFkColumn(
         "accountId",
         t("accounting.entities.moveLines.columns.accountId"),
         options?.accountLabelMap,
-        "min-w-20",
+        relatedColumn,
       ),
-      { key: "name", label: t("accounting.entities.moveLines.columns.name"), width: "min-w-40" },
-      { key: "debit", label: t("accounting.entities.moveLines.columns.debit"), type: "currency", currencyKey: "companyCurrencyId", align: "right" },
-      { key: "credit", label: t("accounting.entities.moveLines.columns.credit"), type: "currency", currencyKey: "companyCurrencyId", align: "right" },
+      { key: "name", label: t("accounting.entities.moveLines.columns.name"), layout: identityColumn },
+      { key: "debit", label: t("accounting.entities.moveLines.columns.debit"), layout: currencyColumn, type: "currency", currencyKey: "companyCurrencyId", align: "right" },
+      { key: "credit", label: t("accounting.entities.moveLines.columns.credit"), layout: currencyColumn, type: "currency", currencyKey: "companyCurrencyId", align: "right" },
     ],
     emptyMessage: t("accounting.entities.moveLines.emptyMessage"),
   },

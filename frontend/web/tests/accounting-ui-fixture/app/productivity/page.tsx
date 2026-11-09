@@ -20,7 +20,7 @@ import type { MessageRow } from "../../../../app/(modules)/messages/message-conv
 import { UnconfirmedPostedMessageError } from "@lumiere/query-hooks/hooks/mail-message-post"
 
 const events: CalendarEvent[] = [
-  { id: "41", title: "Invoice review", description: "Review customer invoice INV-0041", startTime: new Date(2026, 9, 28, 10), endTime: new Date(2026, 9, 28, 11), type: "meeting", status: "confirmed", createdBy: "Alpha accountant", attendees: [], visibility: "team", location: "Finance desk" },
+  { id: "41", title: "Invoice review", description: "Review customer invoice INV-0041.\n".repeat(75), startTime: new Date(2026, 9, 28, 10), endTime: new Date(2026, 9, 28, 11), type: "meeting", status: "confirmed", createdBy: "Alpha accountant", attendees: ["Ada Lovelace", "Grace Hopper"], visibility: "team", location: "Finance desk" },
   { id: "42", title: "Month end close", startTime: new Date(2026, 9, 28, 18), endTime: new Date(2026, 9, 30, 12), type: "meeting", status: "scheduled", createdBy: "Alpha accountant", attendees: [], visibility: "team" },
   { id: "43", title: "Cancelled vendor meeting", startTime: new Date(2026, 9, 29, 9), endTime: new Date(2026, 9, 29, 10), type: "meeting", status: "cancelled", createdBy: "Alpha accountant", attendees: [], visibility: "team" },
   { id: "44", title: "Finance planning day", startTime: new Date(2026, 9, 29), endTime: new Date(2026, 9, 30), allDay: true, type: "meeting", status: "confirmed", createdBy: "Alpha accountant", attendees: [], visibility: "team" },

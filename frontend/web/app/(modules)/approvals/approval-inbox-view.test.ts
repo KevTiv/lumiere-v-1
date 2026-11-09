@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { approvalInboxTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
+import { approvalInboxHref, approvalInboxTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
 
 test("approval inbox target accepts only an exact model and positive record id", () => {
   assert.deepEqual(approvalInboxTarget("purchase_order", "42"), { model: "purchase_order", resId: 42 })
@@ -25,4 +25,14 @@ test("approval target matches canonical, snake-case and summary task subjects", 
   assert.equal(approvalTaskMatchesTarget({ id: 2, subject_model: "purchase_order", subject_id: 42 }, target), true)
   assert.equal(approvalTaskMatchesTarget({ id: 3, summary: { subjectModel: "purchase_order", subjectId: 42 } }, target), true)
   assert.equal(approvalTaskMatchesTarget({ id: 4, subjectModel: "purchase_order", subjectId: 43 }, target), false)
+})
+
+test("sales approval handoff matches only that sales order", () => {
+  const url = new URL(approvalInboxHref("sale_order", "42"), "https://workspace.example")
+  assert.equal(url.pathname, "/approvals")
+  const target = approvalInboxTarget(url.searchParams.get("model"), url.searchParams.get("resId"))
+  assert.ok(target)
+  assert.equal(approvalTaskMatchesTarget({ id: 1, subjectModel: "sale_order", subjectId: 42 }, target), true)
+  assert.equal(approvalTaskMatchesTarget({ id: 2, subjectModel: "sale_order", subjectId: 43 }, target), false)
+  assert.equal(approvalTaskMatchesTarget({ id: 3, subjectModel: "purchase_order", subjectId: 42 }, target), false)
 })

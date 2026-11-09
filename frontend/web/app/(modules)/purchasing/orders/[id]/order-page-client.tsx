@@ -55,8 +55,9 @@ import {
 import type { StockPicking } from '@lumiere/stdb/types';
 import { useAccountMoves } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
-import { moduleQueryState, mergeModuleStates } from '@lumiere/ui/lib/module-data-state';
+import { moduleQueryState, type ModuleDataState } from '@lumiere/ui/lib/module-data-state';
 import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
+import type { CrossRecordLinks as HandoffLinksResult } from '@lumiere/query-hooks/hooks/cross-record-links';
 import { useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
 import {
   useComputePurchaseOrderTotals,
@@ -94,7 +95,7 @@ import {
   linesOfOrder,
 } from '../../purchase-order-forms';
 import { purchaseOrderStatusBar } from '../../purchase-order-status';
-import { purchaseDiscrepancyHandoffs, scopedPurchaseReviewRows } from '../../purchase-discrepancies';
+import { purchaseDiscrepancyBills, purchaseDiscrepancyReceipts, purchaseHandoffSectionData, scopedPurchaseReviewRows } from '../../purchase-discrepancies';
 
 interface PurchaseOrderPageClientProps {
   orderId: string;
@@ -119,6 +120,29 @@ const PRIMARY_ACTION_IDS: ReadonlySet<string> = new Set([
 
 const TAB_IDS = ['overview', 'lines', 'handoffs', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
+
+function PurchaseHandoffSection({ title, emptyLabel, state, result, id }: {
+  title: string;
+  emptyLabel: string;
+  state: ModuleDataState;
+  result?: HandoffLinksResult;
+  id: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section aria-labelledby={`${id}-title`} className="space-y-2">
+      <h3 id={`${id}-title`} className="text-sm font-semibold">{title}</h3>
+      {state.status === 'loading' ? (
+        <p role="status" className="text-sm text-muted-foreground">{t('common.loading')}</p>
+      ) : result ? (
+        <CrossRecordLinks testIdPrefix={id} result={result} emptyLabel={emptyLabel} />
+      ) : (
+        <ModuleDataNotice state={state} />
+      )}
+    </section>
+  );
+}
+
 
 export function PurchaseOrderPageClient(props: PurchaseOrderPageClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
@@ -149,12 +173,9 @@ function PurchaseOrderPageLoaded({
   const movesQuery = useAccountMoves(orgId);
   const ordersState = moduleQueryState(ordersQuery);
   const linesState = moduleQueryState(linesQuery);
-  const handoffsState = mergeModuleStates([moduleQueryState(pickingsQuery), moduleQueryState(movesQuery)]);
   const scope = useMemo(() => ({ organizationId: orgId, companyId: operatingCompanyId }), [orgId, operatingCompanyId]);
   const orders = useMemo(() => ordersState.status === 'ready' ? scopedPurchaseReviewRows(ordersQuery.data ?? [], scope) : [], [ordersState.status, ordersQuery.data, scope]);
   const orderLines = useMemo(() => linesState.status === 'ready' ? scopedPurchaseReviewRows(linesQuery.data ?? [], scope) : [], [linesState.status, linesQuery.data, scope]);
-  const stockPickings = handoffsState.status === 'ready' ? pickingsQuery.data ?? [] : [];
-  const accountMoves = handoffsState.status === 'ready' ? movesQuery.data ?? [] : [];
   const contactsQuery = useContacts(orgId, initialContacts);
   const contacts = moduleQueryState(contactsQuery).status === 'ready' ? contactsQuery.data ?? [] : [];
 
@@ -306,15 +327,10 @@ function PurchaseOrderPageLoaded({
   const stateTag = variantTag(order.state);
   const badges = purchaseOrderStatusBadges(t);
 
-  const links = purchaseDiscrepancyHandoffs(
-    order as never,
-    { organizationId: orgId, companyId: operatingCompanyId },
-    stockPickings as never,
-    accountMoves as never,
-  );
-  const linksReady = links.status === 'ready';
-  const receiptCount = linksReady ? links.links.filter((link) => link.kind === 'receipt').length : 0;
-  const billCount = linksReady ? links.links.filter((link) => link.kind === 'bill').length : 0;
+  const receipts = purchaseHandoffSectionData(pickingsQuery, (rows) => purchaseDiscrepancyReceipts(order, scope, rows));
+  const bills = purchaseHandoffSectionData(movesQuery, (rows) => purchaseDiscrepancyBills(order, scope, rows));
+  const receiptCount = receipts.result?.links.length ?? 0;
+  const billCount = bills.result?.links.length ?? 0;
 
   const detail = purchaseOrderDetailConfig(t);
   const detailConfig = {
@@ -601,17 +617,22 @@ function PurchaseOrderPageLoaded({
           {
             id: 'handoffs',
             label: t('purchasing.order.handoffs', { defaultValue: 'Receipts & vendor bills' }),
-            content:
-              handoffsState.status === 'loading' ? (
-                <p>{t('common.loading', { defaultValue: 'Loading…' })}</p>
-              ) : handoffsState.status !== 'ready' ? (
-                <ModuleDataNotice state={handoffsState} />
-              ) : (
-                <CrossRecordLinks
-                  testIdPrefix="purchase-order-handoff"
-                  result={links}
+            content: (
+              <div className="space-y-6" data-testid="purchase-order-handoff-sections">
+                <PurchaseHandoffSection
+                  id="purchase-order-handoff-receipts"
+                  title={t('purchasing.order.receipts', { defaultValue: 'Receipts' })}
+                  emptyLabel={t('purchasing.order.noReceipts', { defaultValue: 'No linked receipts yet' })}
+                  {...receipts}
                 />
-              ),
+                <PurchaseHandoffSection
+                  id="purchase-order-handoff-bills"
+                  title={t('purchasing.order.bills', { defaultValue: 'Vendor bills' })}
+                  emptyLabel={t('purchasing.order.noBills', { defaultValue: 'No linked vendor bills yet' })}
+                  {...bills}
+                />
+              </div>
+            ),
           },
           {
             id: 'discussion',

@@ -268,6 +268,84 @@ describe("shared saved-file viewer", () => {
     expect(screen.getByText("Rows 51–61 of 61")).toBeTruthy()
   })
 
+  it("switches inspected worksheets and displays cells as literal text", async () => {
+    setupFile(
+      "workbook bytes",
+      "ledger.xlsx",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    const source = fixture.documents[0]!
+    fixture.fetcher.mockImplementation(async (url: string) =>
+      url.includes("preview=true")
+        ? Response.json({
+            sourceSha256: source.checksum,
+            sourceSize: source.fileSize,
+            preview: {
+              kind: "xlsx",
+              sheets: [
+                {
+                  name: "Ledger",
+                  columns: 1,
+                  rows: [["Rent"]],
+                  truncated: false,
+                },
+                {
+                  name: "Notes",
+                  columns: 1,
+                  rows: [["<script>"]],
+                  truncated: true,
+                },
+              ],
+            },
+          })
+        : responseFor(url),
+    )
+    render(<DocumentViewerDialog {...props} />)
+    const ledger = await screen.findByRole("table", { name: "Ledger" })
+    expect(within(ledger).getByRole("cell", { name: "Rent" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("combobox", { name: "Worksheet" }))
+    fireEvent.click(await screen.findByRole("option", { name: "Notes" }))
+    const notes = await screen.findByRole("table", { name: "Notes" })
+    expect(within(notes).getByRole("cell", { name: "<script>" })).toBeTruthy()
+    expect(notes.querySelector("script")).toBeNull()
+    expect(screen.getByText(/worksheet preview is limited/)).toBeTruthy()
+    expect(blobRequests()).toHaveLength(1)
+    expect(blobRequests()[0]?.[0]).toBe(
+      `${currentUrl}?sha256=${source.checksum}&preview=true&documentId=1&companyId=3`,
+    )
+  })
+
+  it("renders inspected Word paragraphs and tables without active markup", async () => {
+    setupFile(
+      "word bytes",
+      "records.docx",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    const source = fixture.documents[0]!
+    fixture.fetcher.mockImplementation(async (url: string) =>
+      url.includes("preview=true")
+        ? Response.json({
+            sourceSha256: source.checksum,
+            sourceSize: source.fileSize,
+            preview: {
+              kind: "docx",
+              truncated: false,
+              blocks: [
+                { kind: "paragraph", text: "<img src=x onerror=alert(1)>" },
+                { kind: "table", rows: [["Rent", "1200"]] },
+              ],
+            },
+          })
+        : responseFor(url),
+    )
+    const { container } = render(<DocumentViewerDialog {...props} />)
+    await screen.findByText("<img src=x onerror=alert(1)>")
+    const table = screen.getByRole("table")
+    expect(within(table).getByRole("cell", { name: "1200" })).toBeTruthy()
+    expect(container.querySelector("img")).toBeNull()
+    expect(screen.queryByRole("img")).toBeNull()
+  })
+
   it("displays Markdown as plain text without creating HTML or clickable links", async () => {
     setupFile(
       "<script>window.secret=1</script>\n[remote](https://example.com)",
@@ -389,11 +467,7 @@ describe("shared saved-file viewer", () => {
   })
 
   it("does not render unsupported documents or fetch their bytes automatically", async () => {
-    setupFile(
-      "workbook",
-      "book.xlsx",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    setupFile("legacy workbook", "book.xls", "application/vnd.ms-excel")
     render(<DocumentViewerDialog {...props} />)
     await screen.findByText(/A preview is not available for this format yet/)
     expect(blobRequests()).toHaveLength(0)

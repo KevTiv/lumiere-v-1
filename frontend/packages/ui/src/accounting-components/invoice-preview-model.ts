@@ -1,4 +1,5 @@
 import { moveTypeIsInvoiceOrRefund, microsSinceEpochToDate, stbEnumTag } from "../lib/accounting-move-utils"
+import { formatEntityReference } from "../lib/entity-row-values"
 import type { AccountMove } from "../lib/accounting-types"
 import type { InvoicePreviewLine, InvoicePreviewModel } from "./invoice-preview"
 
@@ -20,7 +21,7 @@ export function invoicePreviewModelFromMove(
     kind: moveType === "InInvoice" || moveType === "InRefund" ? "bill" : "invoice",
     number: move.name || undefined,
     statusLabel: options.statusLabel,
-    partnerName: move.invoicePartnerDisplayName ?? (move.partnerId != null ? `Partner #${String(move.partnerId)}` : undefined),
+    partnerName: formatEntityReference(move.partnerId, { label: move.invoicePartnerDisplayName, formatId: (id) => `Partner #${id}`, missing: "" }) || undefined,
     invoiceDate: dayInput(move.invoiceDate ?? move.date),
     dueDate: dayInput(move.invoiceDateDue),
     reference: move.ref ?? undefined,

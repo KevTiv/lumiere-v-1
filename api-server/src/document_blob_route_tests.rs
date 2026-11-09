@@ -629,6 +629,96 @@ async fn current_and_historical_blobs_recheck_trash_and_ancestor_access() {
 }
 
 #[tokio::test]
+async fn office_preview_request_requires_exact_parent_version_company_and_checksum() {
+    let fixture = Fixture::new().await;
+    let current = fixture
+        .completed("document", "text/plain", b"current revision")
+        .await;
+    let previous = fixture
+        .completed("document", "text/plain", b"previous revision")
+        .await;
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.documents = vec![current.document(ACTOR)];
+        rows.versions = vec![json!({
+            "id":31, "organization_id":7, "document_id":21, "version_number":1,
+            "url":previous.url, "checksum":previous.checksum, "created_by":ACTOR
+        })];
+    }
+    let current_url = format!("{}&preview=true", current.pinned_url());
+    let history_url = format!(
+        "{}&preview=true&documentId=21&companyId=3",
+        previous.pinned_url()
+    );
+    for (token, url, status) in [
+        (
+            "actor-token",
+            format!("{current_url}&companyId=3"),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            "actor-token",
+            format!("{current_url}&documentId=21&companyId=4"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            "actor-token",
+            format!("{current_url}&documentId=22&companyId=3"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            "actor-token",
+            format!("{current_url}&documentId=21&companyId=3&versionId=31"),
+            StatusCode::NOT_FOUND,
+        ),
+        ("actor-token", history_url.clone(), StatusCode::NOT_FOUND),
+        (
+            "actor-token",
+            format!("{history_url}&versionId=32"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            "other-token",
+            format!("{history_url}&versionId=31"),
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            "actor-token",
+            format!(
+                "{}?sha256={}&preview=true&documentId=21&companyId=3",
+                current.url,
+                "f".repeat(64)
+            ),
+            StatusCode::CONFLICT,
+        ),
+        // These text fixtures reach the parser gate only when the exact
+        // requested registration and current actor authorize delivery.
+        (
+            "actor-token",
+            format!("{current_url}&documentId=21&companyId=3"),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "actor-token",
+            format!("{history_url}&versionId=31"),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        fixture.get(token, &url).await.expect_status(status);
+    }
+    fixture
+        .rows
+        .lock()
+        .unwrap()
+        .actor_permissions
+        .retain(|permission| permission != "document_version:read");
+    fixture
+        .get("actor-token", &format!("{history_url}&versionId=31"))
+        .await
+        .expect_status(StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn completion_rejects_spoofed_bytes_before_the_blob_becomes_readable() {
     let fixture = Fixture::new().await;
     let bytes = b"uploaded text disguised as a PDF";

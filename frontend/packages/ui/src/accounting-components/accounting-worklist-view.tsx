@@ -70,6 +70,8 @@ import {
 export interface AccountingWorklistProps extends AccountingListDisplayProps {
   worklistScope?: AccountingWorklistScope
   sourceState?: ModuleDataState
+  /** Separates saved filters for a prefiltered list from the broad worklist. */
+  preferenceContext?: string
 }
 interface AccountingWorklistViewProps extends AccountingWorklistProps {
   viewSettings?: ReactNode
@@ -173,7 +175,8 @@ function useWorklistPreferences(key: string | null) {
 function ReadyAccountingWorklist(props: AccountingWorklistViewProps) {
   const { t } = useTranslation()
   const storageKey = accountingWorklistKey(props.worklistScope, props.kind)
-  const { preferences, update, persistent } = useWorklistPreferences(storageKey)
+  const preferenceKey = storageKey && props.preferenceContext ? `${storageKey}:${props.preferenceContext}` : storageKey
+  const { preferences, update, persistent } = useWorklistPreferences(preferenceKey)
   // Mount the table owner only after its effective saved filters are known.
   if (!preferences) return <p role="status" className="p-4 text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
   return <AccountingWorklistTable {...props} preferences={preferences} update={update} persistent={persistent} storageKey={storageKey} />

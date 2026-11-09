@@ -44,7 +44,7 @@ export function ApplyPostedPaymentDialog({ options, sourceState, canApply, isPen
   }
   return <>
     <Dialog open onOpenChange={(open) => { if (!open && !busy.current && !isPending) onClose() }}>
-      <DialogContent className="flex max-h-[86dvh] flex-col overflow-hidden" data-testid="apply-posted-payment-dialog">
+      <DialogContent size="form" className="flex flex-col overflow-hidden" data-testid="apply-posted-payment-dialog">
         <DialogHeader>
           <DialogTitle>{tr("title", "Apply existing payment")}</DialogTitle>
           <DialogDescription>{tr("description", "Choose a payment already posted in Payments. This links it to this document and updates the outstanding balance. It does not charge a customer or transfer money.")}</DialogDescription>

@@ -9,6 +9,7 @@ import { Button } from "../../../../../packages/ui/src/components/button"
 import { CreateInvoiceModal } from "../../../../../packages/ui/src/accounting-components/create-invoice-modal"
 import { FormModal } from "../../../../../packages/ui/src/forms/form-modal"
 import { newExpenseForm } from "../../../../../packages/ui/src/lib/expenses-form-configs"
+import { firstFileFromFormValue } from "../../../../lib/document-blob-upload"
 
 const options: Record<string, Array<{ value: string; label: string }>> = {
   employeeId: [{ value: "7", label: "Synthetic employee Jane Example" }],
@@ -27,6 +28,7 @@ function AuthoringRefinement() {
   const [invoiceOpen, setInvoiceOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [expenseError, setExpenseError] = useState<string | null>(null)
+  const [expenseSubmission, setExpenseSubmission] = useState("")
   const [attempts, setAttempts] = useState(0)
   const [longInvoiceError, setLongInvoiceError] = useState(false)
   useEffect(() => setHydrated(true), [])
@@ -46,6 +48,7 @@ function AuthoringRefinement() {
       <Button variant="outline" onClick={() => setLongInvoiceError(true)}>Use long synthetic invoice rejection</Button>
     </div>
     <output data-testid="authoring-refinement-attempts">Synthetic rejected save attempts: {attempts}</output>
+    <output hidden data-testid="authoring-refinement-expense-submission">{expenseSubmission}</output>
     <CreateInvoiceModal
       open={invoiceOpen}
       kind={invoiceKind}
@@ -66,7 +69,24 @@ function AuthoringRefinement() {
       draft={false}
       showSubmitSuccessToast={false}
       submitError={expenseError}
-      onSubmit={async () => { setAttempts((count) => count + 1); setExpenseError("Synthetic expense save rejected. The selected receipt and expense entries are still available."); throw new Error("Synthetic expense save rejected") }}
+      onSubmit={async (data) => {
+        const file = firstFileFromFormValue(data.receiptFile)
+        const digest = file && await crypto.subtle.digest("SHA-256", await file.arrayBuffer())
+        const sha256 = digest && Array.from(new Uint8Array(digest), (byte) =>
+          byte.toString(16).padStart(2, "0"),
+        ).join("")
+        setExpenseSubmission(JSON.stringify({
+          name: data.name,
+          employeeId: String(data.employeeId ?? ""),
+          pricelistId: String(data.pricelistId ?? ""),
+          totalAmount: String(data.totalAmount ?? ""),
+          quantity: String(data.quantity ?? ""),
+          receipt: file && { name: file.name, type: file.type, sha256 },
+        }))
+        setAttempts((count) => count + 1)
+        setExpenseError("Synthetic expense save rejected. The selected receipt and expense entries are still available.")
+        throw new Error("Synthetic expense save rejected")
+      }}
     />
   </main>
 }

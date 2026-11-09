@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AvailableHistory } from "../../../../web/components/available-history"
@@ -59,6 +59,36 @@ describe("Available source history", () => {
     expect(screen.getByText("January")).toBeTruthy()
     expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0)
     expect(screen.getByText(/Confirmed source values still need their business import/)).toBeTruthy()
+  })
+
+  it("bounds each history table and keeps exact long filenames and later records reachable", async () => {
+    const name = `2022-${"reconciled-original-".repeat(7)}.xlsx`
+    request.mockImplementation(async (input) => {
+      if (queryUrl(input).pathname.endsWith("coverage")) {
+        const fixture = sourceHistoryCoverage()
+        return json({ ...fixture, datasets: Array.from({ length: 17 }, (_, index) => ({
+          ...fixture.datasets[0], id: String(index + 11), title: `Dataset ${index + 1}`, sourceFile: name,
+        })) })
+      }
+      const fixture = sourceHistoryRows()
+      return json({ ...fixture, data: Array.from({ length: 22 }, (_, index) => ({
+        ...fixture.data[0], id: String(index + 101), label: `Observation ${index + 1}`,
+      })) })
+    })
+    mount()
+    await screen.findByText("Observation 1")
+    expect(screen.getAllByRole("button", { name: "Inspect rows" })).toHaveLength(8)
+    expect(screen.getAllByText("Inspect source and values")).toHaveLength(10)
+    expect(screen.queryByText("Dataset 9")).toBeNull()
+    expect(screen.queryByText("Observation 11")).toBeNull()
+    const [datasets, rows] = screen.getAllByTestId("table-pager")
+    fireEvent.click(within(datasets!).getByRole("button", { name: "Page 2" }))
+    fireEvent.click(within(rows!).getByRole("button", { name: "Page 2" }))
+    expect(screen.getByText("Dataset 9")).toBeTruthy()
+    expect(screen.getByText("Observation 11")).toBeTruthy()
+    const firstDataset = screen.getByText("Dataset 9").closest("tr")!
+    fireEvent.click(within(firstDataset).getByRole("button", { name: `Show original filename: ${name}` }))
+    expect(within(await screen.findByRole("dialog", { name: "Original filename" })).getByText(name)).toBeTruthy()
   })
 
   it("shows only confirmed values for partially reviewed historical facts", async () => {

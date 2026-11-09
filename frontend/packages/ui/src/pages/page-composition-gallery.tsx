@@ -123,10 +123,11 @@ export function PageCompositionGallery({
       }}
     >
       <DialogContent
-        className="gap-5 sm:max-w-5xl"
+        size="review"
+        className="gap-5"
         data-testid="page-composition-gallery"
       >
-        <DialogHeader className="pr-8">
+        <DialogHeader>
           <DialogTitle>
             {t("pageComposition.add", { defaultValue: "Add widget" })}
           </DialogTitle>

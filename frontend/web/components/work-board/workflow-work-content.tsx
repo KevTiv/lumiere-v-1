@@ -69,13 +69,6 @@ type FrozenCommand =
   | { kind: "decision"; input: DecideHumanTaskInput }
   | { kind: "resubmit"; input: ResubmitHumanTaskInput }
 
-function taskTitle(row: WorkTaskRow): string {
-  return (
-    row.workSourceTitle ||
-    `${row.subjectModel ?? row.subject_model ?? ""} #${row.subjectId ?? row.subject_id ?? row.id}`
-  )
-}
-
 export function WorkflowWorkContent({
   scope,
   online,
@@ -96,6 +89,14 @@ export function WorkflowWorkContent({
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
+  const taskTitle = (row: WorkTaskRow) => {
+    if (row.workSourceTitle?.trim()) return row.workSourceTitle
+    const subjectId = row.subjectId ?? row.subject_id
+    const moduleName = t(`workBoard.module.${row.workModule}`)
+    return typeof subjectId === "number" && Number.isSafeInteger(subjectId) && subjectId > 0
+      ? `${moduleName} #${subjectId}`
+      : t("workBoard.moduleAssignment", { defaultValue: "{{module}} assignment", module: moduleName })
+  }
   const query = useWorkBoard(scope, online)
   const claim = useClaimHumanTask(scope.organizationId, scope)
   const decide = useDecideHumanTask(scope.organizationId, scope)
@@ -621,12 +622,13 @@ export function WorkflowWorkContent({
                     <tr key={String(row.id)} className="border-b last:border-0">
                       <td className="p-3">
                         <button
-                          className="text-left font-medium underline-offset-4 hover:underline"
+                          type="button"
+                          className="min-h-11 text-left font-medium underline-offset-4 hover:underline [overflow-wrap:anywhere]"
                           onClick={() => openReview(row)}
                         >
                           {taskTitle(row)}
                         </button>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
                           {row.nodeKey ?? row.node_key}
                         </p>
                       </td>
@@ -677,7 +679,7 @@ export function WorkflowWorkContent({
           }
         }}
       >
-        <SheetContent className="overflow-y-auto sm:max-w-lg">
+        <SheetContent size="record">
           <SheetHeader>
             <SheetTitle>
               {current ? taskTitle(current) : t("workBoard.assignment")}

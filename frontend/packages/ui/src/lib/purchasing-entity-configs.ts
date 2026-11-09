@@ -1,3 +1,4 @@
+import { entityColumnLayouts } from "./entity-column-layouts"
 import type { TFunction } from "i18next"
 import Link from "next/link"
 import { createElement } from "react"
@@ -157,7 +158,7 @@ export const purchaseOrdersTableConfig = (
       {
         key: "name",
         label: t("purchasing.purchaseOrders.columns.name"),
-        width: "min-w-32",
+        layout: entityColumnLayouts.reference,
         sortable: true,
         ...(options?.recordHref
           ? {
@@ -177,14 +178,14 @@ export const purchaseOrdersTableConfig = (
             }
           : {}),
       },
-      { key: "partnerId", label: t("purchasing.purchaseOrders.columns.partnerId"), width: "min-w-32" },
+      { key: "partnerId", label: t("purchasing.purchaseOrders.columns.partnerId"), layout: entityColumnLayouts.identity },
       {
         key: "fulfillmentLabel",
         label: t("purchasing.purchaseOrders.columns.fulfillment", {
           defaultValue: "Fulfillment",
         }),
         type: "badge",
-        width: "min-w-28",
+        layout: entityColumnLayouts.reference,
         badgeVariants: {
           Dropship: "outline",
           Standard: "secondary",
@@ -212,7 +213,7 @@ export const purchaseOrdersTableConfig = (
         sortable: true,
       },
       { key: "datePlanned", label: t("purchasing.purchaseOrders.columns.datePlanned"), type: "relative-date" },
-      { key: "amountUntaxed", label: t("purchasing.purchaseOrders.columns.amountUntaxed"), type: "currency", align: "right" },
+      { key: "amountUntaxed", defaultHidden: true, label: t("purchasing.purchaseOrders.columns.amountUntaxed"), type: "currency", align: "right" },
       {
         key: "amountTotal",
         label: t("purchasing.purchaseOrders.columns.amountTotal"),
@@ -250,8 +251,8 @@ export const purchaseOrderLinesTableConfig = (t: TFunction): EntityViewConfig =>
     mode: "table",
     rowKey: "id",
     columns: [
-      { key: "orderId", label: t("purchasing.orderLines.columns.orderId"), width: "min-w-24" },
-      { key: "productId", label: t("purchasing.orderLines.columns.productId"), width: "min-w-40" },
+      { key: "orderId", label: t("purchasing.orderLines.columns.orderId"), layout: entityColumnLayouts.reference },
+      { key: "productId", label: t("purchasing.orderLines.columns.productId"), layout: entityColumnLayouts.identity },
       { key: "productQty", label: t("purchasing.orderLines.columns.productQty"), type: "number", align: "right" },
       { key: "qtyReceived", label: t("purchasing.orderLines.columns.qtyReceived"), type: "number", align: "right" },
       { key: "qtyToInvoice", label: t("purchasing.orderLines.columns.qtyToInvoice"), type: "number", align: "right" },
@@ -291,8 +292,8 @@ export const purchaseRequisitionsTableConfig = (t: TFunction): EntityViewConfig 
       },
     ],
     columns: [
-      { key: "origin", label: t("purchasing.purchaseAgreements.columns.origin"), width: "min-w-36" },
-      { key: "vendorId", label: t("purchasing.purchaseAgreements.columns.vendorId"), width: "min-w-32" },
+      { key: "origin", label: t("purchasing.purchaseAgreements.columns.origin"), layout: entityColumnLayouts.identity },
+      { key: "vendorId", label: t("purchasing.purchaseAgreements.columns.vendorId"), layout: entityColumnLayouts.identity },
       { key: "state", label: t("purchasing.purchaseAgreements.columns.state"), type: "badge", ...requisitionStateBadges(t) },
       { key: "orderingDate", label: t("purchasing.purchaseAgreements.columns.orderingDate"), type: "date" },
       { key: "dateEnd", label: t("purchasing.purchaseAgreements.columns.dateEnd"), type: "date" },
@@ -314,11 +315,11 @@ export const purchaseRfqsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("purchasing.rfqs.searchPlaceholder"),
     searchKeys: ["name", "notes"],
     columns: [
-      { key: "name", label: t("purchasing.rfqs.columns.name"), width: "min-w-36" },
-      { key: "state", label: t("purchasing.rfqs.columns.state"), width: "min-w-24" },
-      { key: "requisitionId", label: t("purchasing.rfqs.columns.requisitionId"), width: "min-w-28" },
-      { key: "purchaseOrderId", label: t("purchasing.rfqs.columns.purchaseOrderId"), width: "min-w-28" },
-      { key: "notes", type: "markdown", label: t("purchasing.rfqs.columns.notes"), width: "min-w-40" },
+      { key: "name", label: t("purchasing.rfqs.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "state", label: t("purchasing.rfqs.columns.state"), layout: entityColumnLayouts.status },
+      { key: "requisitionId", label: t("purchasing.rfqs.columns.requisitionId"), layout: entityColumnLayouts.reference },
+      { key: "purchaseOrderId", label: t("purchasing.rfqs.columns.purchaseOrderId"), layout: entityColumnLayouts.reference },
+      { key: "notes", type: "markdown", label: t("purchasing.rfqs.columns.notes"), layout: entityColumnLayouts.description },
     ],
     emptyMessage: t("purchasing.rfqs.emptyMessage"),
   },
@@ -335,11 +336,11 @@ export const purchaseRfqBidsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("purchasing.rfqBids.searchPlaceholder"),
     searchKeys: ["notes"],
     columns: [
-      { key: "rfqId", label: t("purchasing.rfqBids.columns.rfqId"), width: "min-w-20" },
-      { key: "partnerId", label: t("purchasing.rfqBids.columns.partnerId"), width: "min-w-28" },
+      { key: "rfqId", label: t("purchasing.rfqBids.columns.rfqId"), layout: entityColumnLayouts.reference },
+      { key: "partnerId", label: t("purchasing.rfqBids.columns.partnerId"), layout: entityColumnLayouts.identity },
       { key: "priceUnit", label: t("purchasing.rfqBids.columns.priceUnit"), type: "number", align: "right" },
       { key: "amountTotal", label: t("purchasing.rfqBids.columns.amountTotal"), type: "number", align: "right" },
-      { key: "state", label: t("purchasing.rfqBids.columns.state"), width: "min-w-24" },
+      { key: "state", label: t("purchasing.rfqBids.columns.state"), layout: entityColumnLayouts.status },
     ],
     emptyMessage: t("purchasing.rfqBids.emptyMessage"),
   },
@@ -375,14 +376,14 @@ export const purchaseReturnsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("purchasing.purchaseReturns.columns.name", { defaultValue: "Return" }), width: "min-w-32", sortable: true },
-      { key: "purchaseOrderId", label: t("purchasing.purchaseReturns.columns.purchaseOrderId", { defaultValue: "Purchase order" }), width: "min-w-28" },
-      { key: "partnerId", label: t("purchasing.purchaseReturns.columns.partnerId", { defaultValue: "Vendor" }), width: "min-w-24" },
+      { key: "name", label: t("purchasing.purchaseReturns.columns.name", { defaultValue: "Return" }), layout: entityColumnLayouts.reference, sortable: true },
+      { key: "purchaseOrderId", label: t("purchasing.purchaseReturns.columns.purchaseOrderId", { defaultValue: "Purchase order" }), layout: entityColumnLayouts.reference },
+      { key: "partnerId", label: t("purchasing.purchaseReturns.columns.partnerId", { defaultValue: "Vendor" }), layout: entityColumnLayouts.identity },
       {
         key: "state",
         label: t("purchasing.purchaseReturns.columns.state", { defaultValue: "State" }),
         type: "badge",
-        width: "min-w-24",
+        layout: entityColumnLayouts.status,
         badgeVariants: { draft: "secondary", confirmed: "default", refunded: "outline" },
         badgeLabels: {
           draft: t("purchasing.purchaseReturns.states.draft", { defaultValue: "Draft" }),
@@ -390,9 +391,9 @@ export const purchaseReturnsTableConfig = (t: TFunction): EntityViewConfig => ({
           refunded: t("purchasing.purchaseReturns.states.refunded", { defaultValue: "Refunded" }),
         },
       },
-      { key: "returnReason", label: t("purchasing.purchaseReturns.columns.returnReason", { defaultValue: "Reason" }), width: "min-w-40" },
-      { key: "pickingId", label: t("purchasing.purchaseReturns.columns.pickingId", { defaultValue: "Return picking" }), width: "min-w-28" },
-      { key: "creditMoveId", label: t("purchasing.purchaseReturns.columns.creditMoveId", { defaultValue: "Vendor credit" }), width: "min-w-28" },
+      { key: "returnReason", label: t("purchasing.purchaseReturns.columns.returnReason", { defaultValue: "Reason" }), layout: entityColumnLayouts.description },
+      { key: "pickingId", label: t("purchasing.purchaseReturns.columns.pickingId", { defaultValue: "Return picking" }), layout: entityColumnLayouts.reference },
+      { key: "creditMoveId", label: t("purchasing.purchaseReturns.columns.creditMoveId", { defaultValue: "Vendor credit" }), layout: entityColumnLayouts.reference },
       { key: "createDate", label: t("purchasing.purchaseReturns.columns.createDate", { defaultValue: "Created" }), type: "relative-date", sortable: true },
     ],
     emptyMessage: t("purchasing.purchaseReturns.emptyMessage", { defaultValue: "No purchase returns yet." }),
@@ -411,12 +412,12 @@ export const vendorsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("purchasing.vendors.searchPlaceholder"),
     searchKeys: ["name", "email", "taxId"],
     columns: [
-      { key: "name", label: t("purchasing.vendors.columns.name"), width: "min-w-48" },
+      { key: "name", label: t("purchasing.vendors.columns.name"), layout: entityColumnLayouts.identity },
       { key: "email", label: t("purchasing.vendors.columns.email"), width: "min-w-44" },
-      { key: "phone", label: t("purchasing.vendors.columns.phone"), width: "min-w-28" },
-      { key: "city", label: t("purchasing.vendors.columns.city"), width: "min-w-24" },
-      { key: "countryId", label: t("purchasing.vendors.columns.countryId"), width: "min-w-20" },
-      { key: "taxId", label: t("purchasing.vendors.columns.taxId"), width: "min-w-28" },
+      { key: "phone", label: t("purchasing.vendors.columns.phone"), layout: entityColumnLayouts.reference },
+      { key: "city", label: t("purchasing.vendors.columns.city"), layout: entityColumnLayouts.location },
+      { key: "countryId", label: t("purchasing.vendors.columns.countryId"), layout: entityColumnLayouts.location },
+      { key: "taxId", label: t("purchasing.vendors.columns.taxId"), layout: entityColumnLayouts.reference },
     ],
     emptyMessage: t("purchasing.vendors.emptyMessage"),
   },
@@ -434,13 +435,13 @@ export const partnerBanksTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["sanitizedAccNumber", "accHolderName"],
     columns: [
       { key: "id", label: t("purchasing.partnerBanks.columns.id"), width: "min-w-16" },
-      { key: "partnerId", label: t("purchasing.partnerBanks.columns.partnerId"), width: "min-w-20" },
+      { key: "partnerId", label: t("purchasing.partnerBanks.columns.partnerId"), layout: entityColumnLayouts.identity },
       {
         key: "sanitizedAccNumber",
         label: t("purchasing.partnerBanks.columns.account"),
-        width: "min-w-36",
+        layout: entityColumnLayouts.identity,
       },
-      { key: "accHolderName", label: t("purchasing.partnerBanks.columns.holder"), width: "min-w-32" },
+      { key: "accHolderName", label: t("purchasing.partnerBanks.columns.holder"), layout: entityColumnLayouts.identity },
       { key: "active", label: t("purchasing.partnerBanks.columns.active"), type: "boolean" },
       { key: "allowOutPayment", label: t("purchasing.partnerBanks.columns.allowOutPayment"), type: "boolean" },
     ],

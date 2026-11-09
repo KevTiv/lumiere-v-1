@@ -1,5 +1,6 @@
 import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
+import { expectCanonicalPickingFocus } from "./inventory-picking-fixtures"
 
 import {
   selectModuleTab,
@@ -18,6 +19,7 @@ import {
   gotoModule,
   openEntityCreate,
   postDraftInvoiceViaUi,
+  scalarQueryId,
   selectEntityRowById,
   selectEntityRowByText,
   smokeName,
@@ -272,6 +274,12 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       page.getByTestId("entity-action-confirm-return").click(),
     ])
     await waitForReturnOrderState(page, returnOrderId, "confirmed")
+    const returnsResponse = await page.request.get("/api/query/return-orders")
+    expect(returnsResponse.ok()).toBe(true)
+    const returns = (await returnsResponse.json()) as { data: Record<string, unknown>[] }
+    const exactReturn = returns.data.find((row) => scalarQueryId(row.id) === returnOrderId)
+    const returnPickingId = scalarQueryId(exactReturn?.pickingId ?? exactReturn?.picking_id)
+    if (returnPickingId == null) throw new Error(`Return ${returnOrderId} has no linked picking`)
 
     await selectEntityRowById(page, returnOrderId)
     await waitForEntityActionEnabled(page, "entity-action-receive-return")
@@ -283,7 +291,10 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       page.getByTestId("entity-action-receive-return").click(),
     ])
     await waitForReturnOrderState(page, returnOrderId, "received")
+    await expectCanonicalPickingFocus(page, returnPickingId)
 
+    await gotoModule(page, `/sales?tab=returns&filter=id:${returnOrderId}`, "sales")
+    await selectModuleTab(page, "sales", "returns")
     await selectEntityRowById(page, returnOrderId)
     await waitForEntityActionEnabled(page, "entity-action-create-exchange-order")
     const [exchangeResponse] = await Promise.all([

@@ -123,12 +123,15 @@ test.describe("Alpha assisted organization activation", { tag: ["@p0", "@aa08", 
       await expect(checklist.locator('[data-check="fiscal"]')).toHaveAttribute("data-state", "ready")
       await checklist.getByRole("radio", { name: "Add a contact", exact: true }).check()
       await expect(checklist.locator('[data-check="contact"]')).toHaveAttribute("data-state", "missing")
-      const returnUrl = page.url()
+      const returnUrl = new URL(page.url())
+      returnUrl.searchParams.set("activation", "contact")
+      returnUrl.searchParams.delete("activationStatus")
       await checklist.getByRole("button", { name: "Add a contact", exact: true }).click()
       await expect(page).toHaveURL(/\/crm\?tab=contacts/)
       await expect(page.getByTestId("module-view-crm")).toBeVisible()
-      await page.getByTestId("module-create-crm-contacts").click()
-      await expect(page.getByTestId("form-modal-new-contact")).toBeVisible()
+      // The checklist opens the native form itself; clicking the background
+      // create button would wait behind this modal until the test times out.
+      await expect(page.getByTestId("form-modal-new-contact")).toBeVisible({ timeout: 30_000 })
       const contactName = `First useful contact ${suffix}`
       const contactEmail = `contact-${suffix}@example.test`
       await fillField(page, "name", contactName)
@@ -158,7 +161,8 @@ test.describe("Alpha assisted organization activation", { tag: ["@p0", "@aa08", 
       expect(scalarQueryId(saved.companyId)).toBe(companyId)
       expect(contactCreates).toBe(1)
 
-      await page.goto(returnUrl)
+      await expect(page).toHaveURL(returnUrl.toString(), { timeout: 30_000 })
+      await expect(checklist.getByText("Contact saved in this company.", { exact: true })).toBeVisible({ timeout: 30_000 })
       await expect(checklist.locator('[data-check="contact"]')).toHaveAttribute("data-state", "ready", { timeout: 30_000 })
       await page.reload()
       await expect(checklist.locator('[data-check="contact"]')).toHaveAttribute("data-state", "ready", { timeout: 30_000 })

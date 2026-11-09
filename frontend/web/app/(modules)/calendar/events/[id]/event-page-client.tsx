@@ -65,7 +65,8 @@ import {
   eventAttendees,
   calendarReturnHref,
   eventInputValue,
-  eventTimestampLabel,
+  eventBoundaryLabel,
+  eventText,
   eventMicros,
   eventStateActions,
   eventStateParams,
@@ -201,7 +202,7 @@ function CalendarEventPageLoaded({
   }
 
   const id = BigInt(eventId);
-  const label = String(event.name || '').trim() || `#${eventId}`;
+  const label = eventText(event.name)?.trim() || `#${eventId}`;
   const status = eventStatusBar(event, t);
   const stateActions = eventStateActions(event);
   const attendees = eventAttendees(event, contacts as unknown as Row[]);
@@ -213,10 +214,12 @@ function CalendarEventPageLoaded({
         onError: (error) => showWorkflowToast({ kind: 'error', title, description: error.message }),
       },
     );
-  const when = (value: unknown) => eventTimestampLabel(value, i18n.language, timeZone);
+  const when = (boundary: 'start' | 'stop') => eventBoundaryLabel(event, boundary, i18n.language, timeZone);
+  const startLabel = when('start');
+  const endLabel = when('stop');
   const subtitle = event.allday
-    ? `${new Date(eventMicros(event.start) / 1000).toLocaleDateString(i18n.language, { timeZone })} · ${t('calendar.events.columns.allday')}`
-    : `${when(event.start)} — ${when(event.stop)}`;
+    ? `${startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`} · ${t('calendar.events.columns.allday')}`
+    : `${startLabel} – ${endLabel}`;
 
   const detailConfig = {
     mode: 'detail' as const,
@@ -224,9 +227,9 @@ function CalendarEventPageLoaded({
       {
         id: 'event',
         fields: [
-          { key: 'start', label: t('calendar.events.columns.start'), type: 'datetime' as const, render: (value: unknown) => when(value) },
-          { key: 'stop', label: t('calendar.events.columns.stop'), type: 'datetime' as const, render: (value: unknown) => when(value) },
-          { key: 'location', label: t('calendar.events.columns.location') },
+          { key: 'start', label: t('calendar.events.columns.start'), type: 'datetime' as const, render: () => startLabel },
+          { key: 'stop', label: t('calendar.events.columns.stop'), type: 'datetime' as const, render: () => endLabel },
+          { key: 'location', label: t('calendar.events.columns.location'), render: (value: unknown) => eventText(value) ?? '—' },
           { key: 'allday', label: t('calendar.events.columns.allday'), type: 'boolean' as const },
           { key: 'privacy', label: t('calendar.events.columns.privacy') },
           { key: 'recurrency', label: t('calendar.events.columns.recurrency'), type: 'boolean' as const },
@@ -366,7 +369,7 @@ function CalendarEventPageLoaded({
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {attendees.map((attendee) => (
-                        <Badge key={attendee.id} variant="secondary">
+                        <Badge key={attendee.id} variant="secondary" className="h-auto max-w-full whitespace-normal [overflow-wrap:anywhere]">
                           {attendee.label}
                         </Badge>
                       ))}
@@ -408,8 +411,8 @@ function CalendarEventPageLoaded({
             stop: eventInputValue(event.stop, formTimezone ?? timeZone),
             allday: Boolean(event.allday),
             privacy: variantTag(event.privacy).toLowerCase() || 'public',
-            location: event.location ? String(event.location) : '',
-            description: event.description ? String(event.description) : '',
+            location: eventText(event.location) ?? '',
+            description: eventText(event.description) ?? '',
           }, 'edit', formTimezone ?? timeZone)}
           isPending={updateEvent.isPending || !calendarTimezone.ready}
           closeOnSubmit={false}
@@ -446,8 +449,8 @@ function CalendarEventPageLoaded({
             stop: eventInputValue(event.stop, formTimezone ?? timeZone),
             allday: Boolean(event.allday),
             privacy: variantTag(event.privacy).toLowerCase() || 'public',
-            location: event.location ? String(event.location) : '',
-            description: event.description ? String(event.description) : '',
+            location: eventText(event.location) ?? '',
+            description: eventText(event.description) ?? '',
           }, 'create', formTimezone ?? timeZone)}
           isPending={createEvent.isPending || !calendarTimezone.ready}
           closeOnSubmit={false}
@@ -533,7 +536,7 @@ function CalendarEventPageLoaded({
               onClick={() => {
                 setConfirmDelete(false);
                 deleteEvent.mutate(id, {
-                  onSuccess: () => router.push(returnHref),
+                  onSuccess: () => router.push(calendarReturnHref(returnHref, true)),
                   onError: (error) =>
                     showWorkflowToast({ kind: 'error', title: t('calendar.eventDetail.delete'), description: error.message }),
                 });

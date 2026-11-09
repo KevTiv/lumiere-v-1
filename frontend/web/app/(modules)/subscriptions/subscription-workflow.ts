@@ -1,3 +1,4 @@
+import { parseStrictU64 } from "@lumiere/erp-shared/u64";
 import { kpiDate } from '@lumiere/ui/lib/kpi-tiles';
 import { subscriptionStateOf } from './subscription-status';
 import type { SubscriptionActionId } from './subscription-actions';
@@ -20,6 +21,15 @@ export function inSubscriptionScope(row: WorkflowRow, scope: SubscriptionScope):
   return scope.companyId > 0n && scope.organizationId > 0n
     && String(row.organizationId ?? row.organization_id) === String(scope.organizationId)
     && String(row.companyId ?? row.company_id) === String(scope.companyId);
+}
+
+export function subscriptionQueueHref(
+  row: WorkflowRow, scope: SubscriptionScope, availableIds: ReadonlySet<string>, tab: 'overview' | 'billing',
+): string | undefined {
+  if (!inSubscriptionScope(row, scope)) return undefined;
+  const id = parseStrictU64(row.subscriptionId ?? row.subscription_id);
+  if (!id || !availableIds.has(String(id))) return undefined;
+  return `/subscriptions/${id}${tab === 'billing' ? '?tab=billing' : ''}`;
 }
 
 export function workflowTag(value: unknown): string {

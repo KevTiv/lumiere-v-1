@@ -660,6 +660,7 @@ export const setExpenseAllocationsForm = (t: TFunction, choices: ExpenseAllocati
   projectOptions: [], analyticAccountOptions: [], projectsState: { status: "loading" }, analyticAccountsState: { status: "loading" },
 }, disabled = false, savedRows?: readonly ExpenseAllocationDraft[]): FormConfig => ({
   id: "set-expense-allocations",
+  size: "lg",
   title: t("expenses.forms.setAllocations.title"),
   description: savedRows === undefined
     ? t("expenses.allocations.replacementHint", { defaultValue: "Existing allocations are not loaded here. Saving replaces all allocations on this expense with the rows below. Review every row before saving." })

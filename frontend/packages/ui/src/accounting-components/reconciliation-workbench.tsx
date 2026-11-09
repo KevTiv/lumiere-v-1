@@ -9,7 +9,8 @@ import { ModuleDataNotice } from "../pages/module-data-notice"
 import { workspaceStyles } from "../lib/workspace-styles"
 import { cn } from "../lib/utils"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
-import { projectReconciliation, reconciliationId, reconciliationLifecycleContext, reconciliationSelection, type ReconciliationContext, type ReconciliationProjection, type ReconciliationRequest, type ReconciliationSource } from "./reconciliation-workbench-model"
+import { projectReconciliation, reconciliationId, reconciliationLifecycleContext, reconciliationSelection, type ReconciliationContext, type ReconciliationDocumentItem, type ReconciliationProjection, type ReconciliationRequest, type ReconciliationSource } from "./reconciliation-workbench-model"
+import { ReconciliationExceptionReview, type ReconciliationExceptionCopy } from "./reconciliation-workbench-exception"
 import { DatePicker } from "../components/date-picker"
 
 export type ReconciliationOutcome = { status: "awaiting_approval"; paymentId: string } | { status: "confirmed" } | { status: "rejected"; message: string } | { status: "unknown"; message?: string } | { status: "lifecycle"; attempt: BankSettlementAttempt }
@@ -19,6 +20,7 @@ export interface ReconciliationWorkbenchProps {
   /** Stable authenticated actor identity; recovery never transfers to a new login. */
   actorKey: string | null
   canReconcile: boolean
+  canApplyExistingPayment?: boolean
   canRecover?: (action: BankSettlementRecoveryAction) => boolean
   onConfirm: (request: ReconciliationRequest) => Promise<ReconciliationOutcome>
   onRecover?: (request: BankSettlementRecoveryRequest) => Promise<ReconciliationOutcome>
@@ -62,9 +64,10 @@ function money(value: number | null, context: ReconciliationContext): string {
 const touchButton = "min-h-11 h-auto whitespace-normal px-3 py-2 text-left [overflow-wrap:anywhere]"
 
 /** A reviewed exact-amount settlement, preserving payment approval boundaries. */
-export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRecover, onConfirm, onRecover, onCheckStatus, onFindMatches, onApplyRules, onOperationLockChange, createRecoveryKey = () => crypto.randomUUID() }: ReconciliationWorkbenchProps) {
+export function ReconciliationWorkbench({ source, actorKey, canReconcile, canApplyExistingPayment = false, canRecover, onConfirm, onRecover, onCheckStatus, onFindMatches, onApplyRules, onOperationLockChange, createRecoveryKey = () => crypto.randomUUID() }: ReconciliationWorkbenchProps) {
   const { t } = useTranslation()
   const text = (key: string, defaultValue: string) => t(`accounting.bankRecovery.${key}`, { defaultValue })
+  const exceptionText: ReconciliationExceptionCopy = (key, defaultValue, values) => t(`accounting.bankMatchingExceptions.${key}`, { defaultValue, ...values })
   const live = projectReconciliation(source)
   const liveContext = reconciliationLifecycleContext(source)
   const observedAttempt = bankSettlementAttempt(source.bankLines.find((row) => reconciliationId(row.id) === reconciliationId(source.line?.id))?.metadata)
@@ -89,8 +92,12 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
   const currentActor = useRef(actorKey)
   currentActor.current = actorKey
   const projection = operation?.projection ?? live
-  const selectedIds = operation?.selectedIds ?? (projection.status === "ready" && selection.key === projection.context.key ? selection.ids : [])
+  const currencyException = projection.status === "blocked" ? projection.currencyException : undefined
+  const contextKey = projection.status === "ready" ? projection.context.key : currencyException?.context.key
+  const selectionKey = contextKey ? JSON.stringify([actorKey, contextKey]) : ""
+  const selectedIds = operation?.selectedIds ?? (selection.key === selectionKey ? selection.ids : [])
   const review = reconciliationSelection(projection, selectedIds)
+  const canSelect = canReconcile || canApplyExistingPayment
   const signature = projection.status === "ready" ? JSON.stringify([actorKey, projection.context, review.selected]) : ""
   const reviewed = reviewedSignature === signature
   const locked = operation !== null || suggestionBusy
@@ -102,6 +109,9 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
   const recoverySignature = operation && recoveryAction ? JSON.stringify([actorKey, operation.attempt, recoveryAction, recoveryReason, recoveryDate, resubmitReview?.selected]) : ""
   const searchValue = search.trim().toLocaleLowerCase()
   const candidates = projection.status === "ready" ? projection.candidates.filter((row) => [row.documentLabel, row.description, row.partner, row.accountLabel].some((value) => value.toLocaleLowerCase().includes(searchValue))) : []
+  const reviewItems = projection.status === "ready" ? review.selected.map((item) => ({ ...item, openAmount: money(item.amount, projection.context) })) : []
+  const selectedForeignItems = projection.status === "ready" && review.issue === "foreign_document"
+    ? projection.foreignItems.filter((item) => selectedIds.includes(item.id) || review.selected.some((selected) => selected.moveId === item.moveId)) : []
   // A persisted hint can resume a review, but must be checked against canonical
   // financial records before it becomes a confirmed result or an enabled action.
   const observedKey = observedAttempt ? `${observedAttempt.attemptId}:${observedAttempt.status}` : null
@@ -112,9 +122,9 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
     setOperation({ actorKey, request, context: liveContext, projection: null, selectedIds: request.moveLineIds, status: "observed", attempt: observedAttempt, paymentId: observedAttempt.paymentId })
   }, [operation, actorKey, liveContext?.key, observedKey, dismissedAttempt])
   const toggle = (id: string) => {
-    if (locked || !canReconcile || !actorMatches || live.status !== "ready") return
+    if (locked || !canSelect || !actorMatches || live.status !== "ready") return
     setReviewedSignature(null)
-    setSelection({ key: live.context.key, ids: selectedIds.includes(id) ? selectedIds.filter((selected) => selected !== id) : [...selectedIds, id] })
+    setSelection({ key: selectionKey, ids: selectedIds.includes(id) ? selectedIds.filter((selected) => selected !== id) : [...selectedIds, id] })
   }
   const applyResult = (captured: ReviewedOperation, result: ReconciliationOutcome) => {
     if (currentActor.current !== captured.actorKey) {
@@ -203,7 +213,7 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
     {!operation && live.status === "ready" ? <p role="status" className="rounded-lg border bg-muted/30 p-3 text-sm" data-testid="bank-matching-next-step">
       {!canReconcile ? t("accounting.bankMatchingGuide.permission", { defaultValue: "You can review matches. An authorized accountant must confirm the settlement." })
         : selectedIds.length === 0 ? t("accounting.bankMatchingGuide.select", { defaultValue: "Next: select the invoices or bills covered by this bank transaction. Selecting records does not post a payment." })
-        : !review.request ? t("accounting.bankMatchingGuide.balance", { defaultValue: "Next: resolve the difference below. Select all open items for one partner so the total exactly matches the bank amount." })
+        : !review.request ? exceptionText("reviewBlocked", "Review the reason and next step below before confirming this bank line.")
         : !reviewed ? t("accounting.bankMatchingGuide.review", { defaultValue: "Next: check the selected documents and amounts, then tick the review confirmation. The settlement button becomes available after review." })
         : t("accounting.bankMatchingGuide.confirm", { defaultValue: "Ready to confirm. This creates a payment subject to any required approval; the bank line is matched only when settlement completes." })}
     </p> : null}
@@ -263,7 +273,17 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
     </div> : null}
     {source.state.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">Loading the current statement and eligible journal items…</p> : <ModuleDataNotice state={source.state} />}
     {message ? <p role="alert" className="rounded-lg border p-3 text-sm">{message}</p> : null}
-    {!operation && projection.status === "blocked" ? <p role="status" className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">{projection.message}</p> : null}
+    {!operation && projection.status === "blocked" ? currencyException && mayDisplayReview ? (
+      <ReconciliationExceptionReview
+        key={JSON.stringify([selectionKey, currencyException.context.amount, currencyException.foreignCurrencies, selectedIds])}
+        context={currencyException.context}
+        bankAmount={money(currencyException.context.amount, currencyException.context)}
+        foreignCurrencies={currencyException.foreignCurrencies}
+        items={currencyException.items.filter((item) => selectedIds.includes(item.id))}
+        issue="foreign_bank_line"
+        text={exceptionText}
+      />
+    ) : <p role="status" className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">{projection.message}</p> : null}
     {projection.status === "ready" && mayDisplayReview && (!operation || operation.projection != null) ? <div className="grid min-w-0 gap-4 @min-[56rem]:grid-cols-[minmax(0,1.4fr)_minmax(17rem,1fr)]">
       <div className="min-w-0 space-y-4">
         <section className={cn(workspaceStyles.surface, "min-w-0 p-4")} aria-label="Current bank line">
@@ -280,22 +300,39 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
           <div className="max-h-[28rem] space-y-2 overflow-y-auto p-0.5">
             {candidates.length ? candidates.map((candidate) => <div key={candidate.id} className={cn("min-w-0 rounded-lg border p-3", selectedIds.includes(candidate.id) && "border-primary/50 bg-primary/5")} data-testid={`reconciliation-candidate-${candidate.id}`}>
               <div className="flex min-w-0 items-start gap-2">
-                <label className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-md focus-within:ring-2 focus-within:ring-ring"><input type="checkbox" aria-label={`Select ${candidate.documentLabel}, ${candidate.description}`} className="size-4 accent-primary" checked={selectedIds.includes(candidate.id)} disabled={locked || !canReconcile} onChange={() => toggle(candidate.id)} /></label>
+                <label className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-md focus-within:ring-2 focus-within:ring-ring"><input type="checkbox" aria-label={`Select ${candidate.documentLabel}, ${candidate.description}`} className="size-4 accent-primary" checked={selectedIds.includes(candidate.id)} disabled={locked || !canSelect} onChange={() => toggle(candidate.id)} /></label>
                 <div className="min-w-0 flex-1"><a className="inline-flex min-h-11 max-w-full items-center py-2 font-medium text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href={candidate.href} aria-disabled={operationLocked || undefined} onClick={(event) => { if (operationLocked) event.preventDefault() }}>{candidate.documentLabel}</a><p className="text-sm">{candidate.description}</p>{candidate.partner ? <p className="mt-1 text-xs text-muted-foreground">{candidate.partner}</p> : null}<p className="mt-1 text-xs text-muted-foreground">{candidate.accountLabel} · Item #{candidate.id}</p></div>
               </div>
               <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t pt-2"><span className="text-sm font-medium tabular-nums">{money(candidate.amount, projection.context)}</span>{candidate.suggested ? <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">Suggested · review required</span> : null}</div>
             </div>) : <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{searchValue ? "No records match this search. Clear the search to see all eligible records." : "No eligible journal items are available. Check posting, currency and account setup before continuing."}</p>}
           </div>
+          {!locked && projection.foreignItems.length ? (
+            <details className="mt-3 border-t pt-2 text-sm" open={projection.candidates.length === 0 || undefined}>
+              <summary className="min-h-11 cursor-pointer rounded-md py-3 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{exceptionText("foreignItems", "Review journal items in another currency")}</summary>
+              <p className="text-muted-foreground">{exceptionText("foreignItemsNote", "These items are excluded from exact matching. Open the document to review its currency and balance for FX review.")}</p>
+              <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+                {projection.foreignItems.map((item) => <li key={item.id} className="flex flex-wrap items-center gap-x-2"><DocumentReviewLink item={item} text={exceptionText} /><span className="text-muted-foreground">{exceptionText("itemRef", "Item #{{id}}", { id: item.id })}</span></li>)}
+              </ul>
+            </details>
+          ) : null}
         </section>
       </div>
       <section className={cn(workspaceStyles.surface, "min-w-0 self-start space-y-4 p-4")} aria-label="Review selected matches">
         <div><h4 className={workspaceStyles.sectionTitle}>3 · Review and confirm</h4><p className={workspaceStyles.sectionDescription}>This posts a bank payment and settles the selected invoices or bills after any required approval. Only exact, complete amounts for one partner are supported.</p></div>
         <p className="text-sm">{review.selected.length} selected {review.selected.length === 1 ? "journal item" : "journal items"}</p>
-        {selectedIds.length ? <Button variant="ghost" className={touchButton} disabled={locked} onClick={() => { setSelection({ key: projection.context.key, ids: [] }); setReviewedSignature(null) }}>Clear selection</Button> : null}
+        {selectedIds.length ? <Button variant="ghost" className={touchButton} disabled={locked} onClick={() => { setSelection({ key: selectionKey, ids: [] }); setReviewedSignature(null) }}>Clear selection</Button> : null}
         {review.selected.length ? <ul className="space-y-2 text-sm">{review.selected.map((row) => <li key={row.id} className="flex min-w-0 flex-wrap justify-between gap-2"><span>{row.documentLabel} · Item #{row.id}</span><span className="tabular-nums">{money(row.amount, projection.context)}</span></li>)}</ul> : null}
-        {review.selected.length !== selectedIds.length ? <p role="alert" className="text-sm text-destructive">A selected item is no longer eligible. Clear it by selecting current records and review again.</p> : null}
-        <dl className="space-y-3 border-y py-4 text-sm"><Amount label="Bank amount" value={money(projection.context.amount, projection.context)} /><Amount label="Selected open amount" value={money(review.total, projection.context)} /><Amount label="Difference" value={money(review.difference, projection.context)} /></dl>
-        {!review.request && selectedIds.length > 0 ? <p className="text-sm text-muted-foreground">Select all open items of each invoice for one partner. Their total must exactly match the signed bank amount at the currency’s precision.</p> : null}
+        <dl className="space-y-3 border-y py-4 text-sm"><Amount label="Bank amount" value={money(projection.context.amount, projection.context)} /><Amount label="Selected open amount" value={money(review.issue === "foreign_document" ? null : review.total, projection.context)} /><Amount label="Difference" value={money(review.issue === "foreign_document" ? null : review.difference, projection.context)} /></dl>
+        {!locked && review.issue ? <ReconciliationExceptionReview
+          key={JSON.stringify([selectionKey, review.issue, review.difference, selectedIds])}
+          context={projection.context}
+          bankAmount={money(projection.context.amount, projection.context)}
+          difference={review.difference === null ? undefined : money(Math.abs(review.difference), projection.context)}
+          items={[...reviewItems, ...selectedForeignItems]}
+          issue={review.issue}
+          canApplyExistingPayment={canApplyExistingPayment}
+          text={exceptionText}
+        /> : null}
         {!canReconcile ? <p role="status" className="text-sm text-muted-foreground">You can review this statement, but do not have permission to post payments and settle this bank line.</p> : null}
         <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md py-2 text-sm"><input type="checkbox" className="mt-1 size-4 shrink-0 accent-primary" checked={reviewed} disabled={locked || !review.request || !canReconcile} onChange={(event) => setReviewedSignature(event.target.checked ? signature : null)} /><span>I reviewed the statement, partner, selected invoices and exact amounts. I authorize the payment and settlement, subject to required approval.</span></label>
         <Button className={cn(touchButton, "w-full justify-center")} data-testid="reconciliation-confirm" disabled={locked || !canReconcile || !review.request || !reviewed} onClick={() => void submit()}>Confirm bank settlement</Button>
@@ -303,6 +340,9 @@ export function ReconciliationWorkbench({ source, actorKey, canReconcile, canRec
     </div> : null}
     {navigationDialog}
   </section>
+}
+function DocumentReviewLink({ item, text }: { item: ReconciliationDocumentItem; text: ReconciliationExceptionCopy }) {
+  return <a className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href={item.href} target="_blank" rel="noopener noreferrer" aria-label={text("openDocument", "Open {{document}} in a new tab", { document: item.documentLabel })}>{item.documentLabel}</a>
 }
 function Amount({ label, value }: { label: string; value: string }) {
   return <div className="flex min-w-0 flex-wrap justify-between gap-2"><dt className="text-muted-foreground">{label}</dt><dd className="max-w-full font-medium tabular-nums">{value}</dd></div>

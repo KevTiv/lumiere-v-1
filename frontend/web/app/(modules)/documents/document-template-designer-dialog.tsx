@@ -6,7 +6,6 @@ import {
   Check,
   FileText,
   LoaderCircle,
-  Upload,
   X,
 } from "lucide-react"
 import { useErpSession } from "@lumiere/erp-session"
@@ -34,6 +33,7 @@ import {
 import { isManagedInvoiceLogoUrl } from "@lumiere/erp-shared/invoice-personalization"
 import { validateInvoiceLogoFile } from "@lumiere/ui/settings/invoice-personalization-settings"
 import { uploadDocumentBlob } from "../../../lib/document-blob-upload"
+import { FileUploadField } from "@lumiere/ui/components/file-upload-field"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
 import { useUnsavedChangesGuard } from "@lumiere/ui/forms/use-unsaved-changes-guard"
@@ -157,7 +157,6 @@ export function DocumentTemplateDesignerDialog({
   const [logoUrl, setLogoUrl] = useState(initialLogo)
   const [logoUploading, setLogoUploading] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
-  const logoInput = useRef<HTMLInputElement>(null)
   const uploading = useRef(false)
   const [designDirty, setDesignDirty] = useState(false)
   const [designError, setDesignError] = useState<string | null>(null)
@@ -373,7 +372,6 @@ export function DocumentTemplateDesignerDialog({
     } finally {
       uploading.current = false
       if (mounted.current) setLogoUploading(false)
-      if (logoInput.current) logoInput.current.value = ""
     }
   }
 
@@ -553,6 +551,7 @@ export function DocumentTemplateDesignerDialog({
         }}
       >
         <DialogContent
+          size="document"
           className="document-template-dialog"
           showCloseButton={false}
         >
@@ -807,36 +806,15 @@ export function DocumentTemplateDesignerDialog({
           </div>
           {kind === "document" ? (
             <div className="document-template-dialog__branding">
-              <input
-                ref={logoInput}
-                type="file"
-                accept="image/png,image/jpeg"
-                className="sr-only"
-                aria-label={t("documents.designer.uploadLogo", {
-                  defaultValue: "Upload brand logo",
-                })}
+              <FileUploadField
+                accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                aria-label={t("documents.designer.uploadLogo", { defaultValue: "Upload brand logo" })}
+                chooseLabel={logoUploading
+                  ? t("documents.designer.logoUploading", { defaultValue: "Uploading logo…" })
+                  : t("documents.designer.uploadLogo", { defaultValue: "Upload brand logo" })}
                 disabled={pending || !canSave}
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) void uploadLogo(file)
-                }}
+                onSelect={([file]) => { if (file) void uploadLogo(file) }}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={pending || !canSave}
-                onClick={() => logoInput.current?.click()}
-              >
-                <Upload />
-                {logoUploading
-                  ? t("documents.designer.logoUploading", {
-                      defaultValue: "Uploading logo…",
-                    })
-                  : t("documents.designer.uploadLogo", {
-                      defaultValue: "Upload brand logo",
-                    })}
-              </Button>
               {logoUrl ? (
                 <>
                   <span>

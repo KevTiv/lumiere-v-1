@@ -21,6 +21,7 @@ function Fixture() {
   const [mode, setMode] = useState<'quotation' | 'posting' | 'message'>('quotation');
   const [saved, setSaved] = useState('');
   const [openedReport, setOpenedReport] = useState('');
+  const [submittedReports, setSubmittedReports] = useState('');
   const config = useMemo<FormConfig>(() => {
     const base = mode === 'quotation' ? newSaleOrderForm(t) : mode === 'posting' ? postExpenseReportForm(t) : newMailMessageForm(t);
     const accountOptions = [{ value: '1168', label: '2000 — Accounts Payable' }, ...Array.from({ length: 100 }, (_, i) => ({ value: String(i + 1), label: `${4000 + i} — Expense account ${i + 1}` }))];
@@ -44,11 +45,15 @@ function Fixture() {
     <Button onClick={() => { setMode('message'); setOpen(true); }}>Message</Button>
     <output data-testid="saved-fixture">{saved}</output>
     <output data-testid="opened-report">{openedReport}</output>
+    <output data-testid="submitted-reports">{submittedReports}</output>
     <section role="tabpanel" aria-label="Expense reports">
       <EntityTable config={{ mode: 'table', rowKey: 'id', rowSelectionToggleOnClick: false,
-        columns: [{ key: 'name', label: 'Report' }],
-        actions: [{ id: 'submit-sheets', label: 'Submit reports', requiresSelection: true, onClick: () => {} }],
-      }} data={[{ id: 'report-1', name: 'Synthetic expense report' }]}
+        columns: [{ key: 'name', label: 'Report', layout: { min: 10, max: 10, wrap: 1 } }],
+        actions: [{ id: 'submit-sheets', label: 'Submit reports', requiresSelection: true, selection: 'multiple', onClick: (rows) => setSubmittedReports(rows.map((row) => row.id).join(',')) }],
+      }} data={[
+        { id: 'report-1', name: 'Synthetic expense report' },
+        { id: 'report-0', name: 'A long synthetic expense report name that requires text disclosure' },
+      ]}
         onRowClick={(row) => setOpenedReport(String(row.id))} />
     </section>
     <FormModal config={config} open={open} onOpenChange={setOpen} draft={false}

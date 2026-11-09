@@ -656,7 +656,7 @@ function ReportsClientLoaded({
             successMessage: t("common.actionCompleted", { action: t("reports.actions.archive") }),
             onClick: async (rows) => {
               for (const r of rows) {
-                if (String(r.state) === "exported") {
+                if (reportTag(r.state) === "exported") {
                   await archiveFinancialReport.mutateAsync(r.id as string | number | bigint)
                 }
               }
@@ -917,8 +917,8 @@ function ReportsClientLoaded({
     } : column) } }
   }, [t, locale, currencies, currenciesQuery])
   const liveSections = useMemo(() => {
-    const generated = reports.filter((r) => String(r.state) === "generated").length
-    const exported = reports.filter((r) => String(r.state) === "exported").length
+    const generated = reports.filter((r) => reportTag(r.state) === "generated").length
+    const exported = reports.filter((r) => reportTag(r.state) === "exported").length
 
     const now = new Date()
     const chartSourceState = mergeModuleStates([moduleQueryState(accountAccountsQuery), moduleQueryState(accountMovesQuery), moduleQueryState(accountMoveLinesQuery), moduleQueryState(currenciesQuery)])
@@ -1588,7 +1588,7 @@ function ReportsClientLoaded({
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+        <DialogContent size="review" className="overflow-y-auto">
           <DialogHeader className="pr-10">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 space-y-1">

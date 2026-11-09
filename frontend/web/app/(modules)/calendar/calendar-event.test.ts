@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, calendarReturnHref, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
+import { calendarEventCreationDefaults, calendarEventForView, calendarEventHref, calendarReturnHref, eventBoundaryLabel, eventInputValue, eventMicros, eventStatusBar, updateCalendarEventParams, eventStateActions, eventStateParams, eventAttendees, recurrenceParams } from './calendar-event';
 
 const t = (_key: string, options?: Record<string, unknown>) => String(options?.defaultValue ?? _key);
 
@@ -13,6 +13,11 @@ test('new events keep a selected date and refuse invalid date defaults', () => {
 test('an event links to its own page by id', () => {
   assert.equal(calendarEventHref({ id: 12 }), '/calendar/events/12');
   assert.equal(calendarEventHref({}), undefined);
+  assert.equal(calendarEventHref({ id: '12/other' }), undefined);
+  const href = calendarEventHref({ id: '9007199254740993' }, '/calendar?tab=events&filter=state%3Aconfirmed');
+  const url = new URL(href!, 'https://fixture.invalid');
+  assert.equal(url.pathname, '/calendar/events/9007199254740993');
+  assert.equal(url.searchParams.get('returnTo'), '/calendar?tab=events&filter=state%3Aconfirmed');
 });
 
 test('timestamps read from micros, a bigint or a wrapped cell', () => {
@@ -20,7 +25,7 @@ test('timestamps read from micros, a bigint or a wrapped cell', () => {
   assert.equal(eventMicros(5n), 5);
   assert.equal(eventMicros({ microsSinceUnixEpoch: 7n }), 7);
   assert.equal(eventMicros(null), 0);
-  assert.equal(eventInputValue(Date.UTC(2026, 9, 6, 14, 30) * 1000), '2026-10-06T14:30');
+  assert.equal(eventInputValue(Date.UTC(2026, 9, 6, 14, 30) * 1000, 'UTC'), '2026-10-06T14:30');
 });
 
 test('the edit form becomes update parameters, or nothing when it is incomplete', () => {
@@ -67,6 +72,9 @@ test('attendees resolve to contact names, else the id', () => {
 
   assert.deepEqual(attendees, [{ id: '1', label: 'Ada' }, { id: '2', label: '#2' }]);
   assert.deepEqual(eventAttendees({}, []), []);
+  assert.deepEqual(eventAttendees({ partnerIds: [null, 0, { some: '9007199254740993' }, '9007199254740993'] }, [
+    { id: 9007199254740993n, displayName: { some: 'Ada Lovelace' } },
+  ]), [{ id: '9007199254740993', label: 'Ada Lovelace' }]);
 });
 
 test('recurrenceParams leaves empty rule text out', () => {
@@ -91,6 +99,8 @@ test('calendar projection preserves all-day, wrapped timestamps and cancelled en
   assert.equal(projected?.visibility, 'private');
   assert.equal(calendarEventForView({ id: 8, start: 'invalid', stop: start }), null);
   assert.equal(calendarEventForView({ id: 8, stop: start }), null);
+  assert.equal(calendarEventForView({ id: 8, start: false, stop: start }), null);
+  assert.equal(eventInputValue(undefined), '');
 });
 
 test('editing a local datetime preserves the original instant outside UTC', () => {
@@ -109,7 +119,15 @@ test('editing a local datetime preserves the original instant outside UTC', () =
 test('return navigation accepts calendar state only', () => {
   const source = '/calendar?tab=calendar&calendarView=agenda&calendarDate=2026-10-28&calendarEvent=7';
   assert.equal(calendarReturnHref(source), source);
+  assert.equal(calendarReturnHref(source, true), '/calendar?tab=calendar&calendarView=agenda&calendarDate=2026-10-28');
   for (const value of ['https://example.com', '//example.com/calendar', '/calendar/events/7', '/calendar\\evil', null]) {
     assert.equal(calendarReturnHref(value), '/calendar?tab=calendar');
   }
+});
+
+test('all-day start and stop show the occupied date in the active zone', () => {
+  const event = { allday: true, start: '2026-10-28T04:00:00Z', stop: '2026-10-29T04:00:00Z' };
+  assert.equal(eventBoundaryLabel(event, 'start', 'en-US', 'America/New_York'), '10/28/2026');
+  assert.equal(eventBoundaryLabel(event, 'stop', 'en-US', 'America/New_York'), '10/28/2026');
+  assert.equal(eventBoundaryLabel({ allday: true }, 'stop', 'en-US', 'UTC'), '—');
 });

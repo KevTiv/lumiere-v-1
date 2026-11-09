@@ -141,12 +141,26 @@ describe("AI chat workspace", () => {
     expect(screen.getByTitle("Mugisha Farm")).toBeTruthy()
   })
 
+  it("opens current context in side chat without resetting the composer", async () => {
+    render(<AIChatPanel open docked onClose={vi.fn()} context={{
+      activeView: "Sales",
+      selectedData: { selectionSummary: "Quotation SO-023" },
+    }} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Keep my question" } })
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.workspace.context" }))
+    const popover = await screen.findByRole("dialog", { name: "aiChat.workspace.context" })
+    expect(within(popover).getByText("Quotation SO-023")).toBeTruthy()
+    fireEvent.keyDown(popover, { key: "Escape" })
+    expect(input.value).toBe("Keep my question")
+  })
+
   it("accepts multiple files from the picker and clears it for future selection", async () => {
     const onImportFiles = vi.fn(async () => {})
     render(<AIChatPanel open docked onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} importFileNames={["saved-counts.csv"]} />)
     expect(screen.queryByRole("button", { name: "aiChat.workspace.addFiles" })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
-    expect(screen.getByRole("listitem").textContent).toBe("saved-counts.csv")
+    expect(screen.getByRole("listitem").textContent).toContain("saved-counts.csv")
     const files = [new File(["name\nEggs"], "products.csv"), new File(["workbook"], "counts.XLSX")]
     const input = screen.getByTestId("erp-ai-chat-file-input") as HTMLInputElement
     const click = vi.spyOn(input, "click")
@@ -365,7 +379,7 @@ describe("AI chat workspace", () => {
 
     expect(screen.getByTestId("erp-ai-chat-panel").getAttribute("data-mode")).toBe("full")
     chooseSelectValue(
-      screen.getByRole("combobox", { name: "Assistant context" }),
+      screen.getByRole("combobox", { name: "aiChat.workspace.contextSelect" }),
       "module:inventory",
     )
     expect(onContextChange).toHaveBeenCalledWith("module:inventory")

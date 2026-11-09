@@ -177,7 +177,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                   className="flex items-center justify-between gap-3 border-b border-border/50 pb-2"
                 >
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{String(s.name ?? "—")}</div>
+                    <div className="min-w-0 font-medium [overflow-wrap:anywhere]">{String(s.name ?? "—")}</div>
                     <div className="text-muted-foreground text-xs">
                       {Number(s.probability ?? 0)}% · seq {Number(s.sequence ?? 0)}
                     </div>
@@ -269,7 +269,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                   key={String(s.id)}
                   className="flex items-center justify-between gap-3 border-b border-border/50 pb-2"
                 >
-                  <span className="truncate font-medium">{String(s.name ?? "—")}</span>
+                  <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{String(s.name ?? "—")}</span>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge variant={active ? "default" : "secondary"}>
                       {active
@@ -344,7 +344,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                   key={String(r.id)}
                   className="flex items-center justify-between gap-3 border-b border-border/50 pb-2"
                 >
-                  <span className="truncate font-medium">{String(r.name ?? "—")}</span>
+                  <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{String(r.name ?? "—")}</span>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge variant={active ? "default" : "secondary"}>
                       {active
@@ -421,7 +421,7 @@ export function CrmPipelineAdminPanel({ organizationId }: CrmPipelineAdminPanelP
                   className="flex items-center justify-between gap-3 border-b border-border/50 pb-2"
                 >
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{String(r.name ?? "—")}</div>
+                    <div className="min-w-0 font-medium [overflow-wrap:anywhere]">{String(r.name ?? "—")}</div>
                     <div className="text-muted-foreground text-xs">
                       {String(r.model ?? "")} · {String(r.assignType ?? r.assign_type ?? "")}
                     </div>

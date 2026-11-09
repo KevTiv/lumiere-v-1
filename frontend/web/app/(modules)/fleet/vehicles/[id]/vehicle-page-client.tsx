@@ -47,6 +47,7 @@ import { VehicleLocationMap } from './vehicle-location-map';
 import { useFleetActions } from '../../fleet-actions';
 import { fleetEnumTag, rowsOfVehicle } from '../../fleet-record';
 import { useFleetWorkspace } from '../../use-fleet-workspace';
+import { fleetVehicleChoiceLabel } from '../../fleet-workspace';
 import { FleetRecoveryNotice } from '../../fleet-recovery-notice';
 import { FleetServiceSetupNotice } from '../../fleet-service-setup-notice';
 
@@ -161,7 +162,7 @@ function VehiclePageLoaded({
 
   const option = (rows: unknown[], fallback: string) =>
     (rows as Row[]).map((row) => ({ value: String(row.id), label: String(row.name ?? row.display_name ?? row.displayName ?? `${fallback} ${row.id}`) }));
-  const thisVehicle = [{ value: vehicleId, label }];
+  const thisVehicle = [{ value: vehicleId, label: fleetVehicleChoiceLabel(vehicle) }];
   const forms: Record<FormKind, FormConfig> = {
     assign: mergeFieldDefaultValues(assignFleetDriverForm(t, thisVehicle, option(employees as unknown[], 'Employee')), {
       vehicle_id: vehicleId,
@@ -190,7 +191,7 @@ function VehiclePageLoaded({
   const columns = table.view.mode === 'table' ? table.view.columns : [];
   const detailConfig = {
     mode: 'detail' as const,
-    sections: [{ id: 'vehicle', fields: columns.filter((column) => column.key !== 'id').map(({ width: _width, ...field }) => field) }],
+    sections: [{ id: 'vehicle', fields: columns.filter((column) => column.key !== 'id').map(({ layout: _layout, width: _width, ...field }) => field) }],
   };
 
   return (

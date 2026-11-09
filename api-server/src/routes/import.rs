@@ -717,7 +717,7 @@ async fn submit_import(
             spec,
             request_id,
             company_id,
-            params.currency_id,
+            ReceiptCurrency::Exact(params.currency_id),
             Some(&expected_hash),
         )
         .await?;
@@ -796,13 +796,20 @@ pub(crate) async fn read_workflow_import(
     let spec = resolve_import_entity(&request.entity)
         .ok_or_else(|| ApiError::NotFound("Import request not found".into()))?;
     authorize_reducer_company_scope(context, vec![request.company_id]).await?;
-    validate_currency(spec, None)?;
+    // Saved task associations predate storing the product currency. The native
+    // reducer binds currency to the unique actor-scoped request on creation.
+    let currency = if spec.job_table == "product" {
+        ReceiptCurrency::RecordedProduct
+    } else {
+        validate_currency(spec, None)?;
+        ReceiptCurrency::Exact(None)
+    };
     read_exact_outcome(
         context,
         spec,
         &request.request_id,
         request.company_id,
-        None,
+        currency,
         Some(content_sha256),
     )
     .await
@@ -884,7 +891,7 @@ async fn import_request_get(
             spec,
             &request_id,
             query.company_id,
-            query.currency_id,
+            ReceiptCurrency::Exact(query.currency_id),
             query.content_sha256.as_deref(),
         )
         .await?,
@@ -967,6 +974,21 @@ fn actor_matches(row: &Value, actor: &str) -> bool {
     })
 }
 
+#[derive(Clone, Copy)]
+enum ReceiptCurrency {
+    Exact(Option<u64>),
+    RecordedProduct,
+}
+
+impl ReceiptCurrency {
+    fn matches(self, value: Option<u64>) -> bool {
+        match self {
+            Self::Exact(expected) => value == expected,
+            Self::RecordedProduct => value.is_some_and(|id| id > 0),
+        }
+    }
+}
+
 fn match_receipt<'a>(
     rows: &'a [Value],
     organization_id: u64,
@@ -974,7 +996,7 @@ fn match_receipt<'a>(
     spec: &ImportEntity,
     request_id: &str,
     company_id: u64,
-    currency_id: Option<u64>,
+    currency: ReceiptCurrency,
 ) -> Result<&'a Value, ApiError> {
     let mut matched = None;
     for row in rows {
@@ -1013,7 +1035,7 @@ fn match_receipt<'a>(
             || metadata.get("correlation_version").and_then(Value::as_u64) != Some(1)
             || metadata.get("request_id").and_then(Value::as_str) != Some(request_id)
             || metadata.get("company_id").and_then(Value::as_u64) != Some(company_id)
-            || metadata.get("currency_id").and_then(Value::as_u64) != currency_id
+            || !currency.matches(metadata.get("currency_id").and_then(Value::as_u64))
         {
             continue;
         }
@@ -1104,7 +1126,7 @@ async fn read_exact_outcome(
     spec: &ImportEntity,
     request_id: &str,
     company_id: u64,
-    currency_id: Option<u64>,
+    currency: ReceiptCurrency,
     expected_hash: Option<&str>,
 ) -> Result<Value, ApiError> {
     let access = context.field_access();
@@ -1125,7 +1147,7 @@ async fn read_exact_outcome(
         spec,
         request_id,
         company_id,
-        currency_id,
+        currency,
     )?;
     if let Some(expected_hash) = expected_hash {
         let metadata = receipt
@@ -1630,10 +1652,28 @@ mod tests {
         newer["metadata"]=json!(json!({"correlation_version":1,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","request_id":"ffffffffffffffffffffffffffffffff","company_id":42,"currency_id":3}).to_string());
         let rows = vec![newer, receipt(1, 42), receipt(500, 43)];
         assert_eq!(
-            match_receipt(&rows, 7, ACTOR, spec, TOKEN, 42, Some(3)).unwrap()["id"],
+            match_receipt(
+                &rows,
+                7,
+                ACTOR,
+                spec,
+                TOKEN,
+                42,
+                ReceiptCurrency::Exact(Some(3))
+            )
+            .unwrap()["id"],
             json!(1)
         );
-        assert!(match_receipt(&rows, 8, ACTOR, spec, TOKEN, 42, Some(3)).is_err());
+        assert!(match_receipt(
+            &rows,
+            8,
+            ACTOR,
+            spec,
+            TOKEN,
+            42,
+            ReceiptCurrency::Exact(Some(3))
+        )
+        .is_err());
         assert!(match_receipt(
             &rows,
             7,
@@ -1641,10 +1681,19 @@ mod tests {
             spec,
             TOKEN,
             42,
-            Some(3)
+            ReceiptCurrency::Exact(Some(3))
         )
         .is_err());
-        assert!(match_receipt(&rows, 7, ACTOR, spec, TOKEN, 42, Some(4)).is_err());
+        assert!(match_receipt(
+            &rows,
+            7,
+            ACTOR,
+            spec,
+            TOKEN,
+            42,
+            ReceiptCurrency::Exact(Some(4))
+        )
+        .is_err());
         assert!(match_receipt(
             &rows,
             7,
@@ -1652,7 +1701,41 @@ mod tests {
             resolve_import_entity("account").unwrap(),
             TOKEN,
             42,
-            Some(3)
+            ReceiptCurrency::Exact(Some(3))
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn saved_product_receipt_uses_the_currency_on_the_unique_native_request() {
+        let spec = resolve_import_entity("product").unwrap();
+        let matching = receipt(1, 42);
+        let other_company = receipt(2, 43);
+        let rows = [matching.clone(), other_company];
+        let currency = ReceiptCurrency::RecordedProduct;
+        assert_eq!(
+            match_receipt(&rows, 7, ACTOR, spec, TOKEN, 42, currency).unwrap()["id"],
+            json!(1)
+        );
+        assert!(match_receipt(&rows, 8, ACTOR, spec, TOKEN, 42, currency).is_err());
+        assert!(match_receipt(
+            &[matching.clone(), receipt(3, 42)],
+            7,
+            ACTOR,
+            spec,
+            TOKEN,
+            42,
+            currency
+        )
+        .is_err());
+        assert!(match_receipt(
+            &[matching],
+            7,
+            ACTOR,
+            spec,
+            TOKEN,
+            42,
+            ReceiptCurrency::Exact(None)
         )
         .is_err());
     }
@@ -1695,13 +1778,22 @@ mod tests {
                 spec,
                 TOKEN,
                 42,
-                Some(3)
+                ReceiptCurrency::Exact(Some(3))
             ),
             Err(ApiError::Conflict(_))
         ));
         let mut invalid = receipt(1, 42);
         invalid["metadata"] = json!("not json");
-        assert!(match_receipt(&[invalid], 7, ACTOR, spec, TOKEN, 42, Some(3)).is_err());
+        assert!(match_receipt(
+            &[invalid],
+            7,
+            ACTOR,
+            spec,
+            TOKEN,
+            42,
+            ReceiptCurrency::Exact(Some(3))
+        )
+        .is_err());
     }
 
     #[test]

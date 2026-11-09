@@ -6,6 +6,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@lumiere/ui/lib/utils"
 import { Button } from "@lumiere/ui/components/button"
 import { XIcon } from "lucide-react"
+import { constrainOverlayStyle, overlayWidths, type OverlaySize } from "./overlay-sizes"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -43,9 +44,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size,
+  style,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  size?: OverlaySize
 }) {
   const popupRef = React.useRef<HTMLDivElement>(null)
   return (
@@ -56,13 +60,23 @@ function DialogContent({
         initialFocus={(interactionType) => {
           const popup = popupRef.current
           // Read long dialogs from their heading rather than jumping to a footer action.
+          if (size === "record" || size === "review" || size === "document") {
+            return popup?.querySelector<HTMLElement>('[data-slot="dialog-title"]') ?? popup ?? true
+          }
           return popup && (interactionType === "touch" || popup.scrollHeight > popup.clientHeight) ? popup : true
         }}
         data-slot="dialog-content"
+        data-size={size}
+        data-reserve-close={size && showCloseButton ? "" : undefined}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-background p-4 text-sm [overflow-wrap:anywhere] ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-background p-4 text-sm [overflow-wrap:anywhere] ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          size ? "group/dialog min-h-0" : "sm:max-w-sm",
           className
         )}
+        style={size ? constrainOverlayStyle(style, {
+          maxWidth: `min(${overlayWidths[size]}, calc(100% - 2rem))`,
+          maxHeight: "calc(100dvh - 2rem)",
+        }) : style}
         {...props}
       >
         {children}
@@ -72,7 +86,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2 z-20"
+                className="absolute end-2 top-2 z-20"
                 size="icon-sm"
               />
             }
@@ -91,7 +105,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex min-w-0 flex-col gap-2 group-data-[reserve-close]/dialog:pe-9", className)}
       {...props}
     />
   )
@@ -128,6 +142,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
+      tabIndex={-1}
       className={cn("text-base leading-none font-medium", className)}
       {...props}
     />

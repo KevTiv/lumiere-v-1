@@ -13,9 +13,17 @@ afterEach(cleanup)
 describe("Finance work queue", () => {
   it("prioritizes open work, counts queues rather than adding unlike records, and links to task areas", () => {
     render(queue())
-    expect(screen.getByText("2 queues need attention")).toBeTruthy()
+    expect(screen.getByText("3 queues need attention")).toBeTruthy()
     expect(screen.getByRole("link", { name: "Reconcile payments" }).getAttribute("href")).toBe("/accounting?tab=payment-operations")
-    expect(screen.queryByTestId("finance-queue-lowStockProducts")).toBeNull()
+    expect(screen.getByRole("link", { name: "Open stock" }).getAttribute("href")).toBe(
+      "/warehouse?tab=stock&ownerQueue=low-stock",
+    )
+    expect(screen.getByRole("link", { name: "Open invoices" }).getAttribute("href")).toBe(
+      "/accounting?tab=invoices&ownerQueue=overdue-invoices",
+    )
+    expect(screen.getByRole("link", { name: "Review bills" }).getAttribute("href")).toBe(
+      "/accounting?tab=bills&ownerQueue=draft-bills",
+    )
     const rows = document.querySelectorAll('[data-testid^="finance-queue-"]')
     expect(rows[0]?.getAttribute("data-testid")).toBe("finance-queue-unreconciledPayments")
   })

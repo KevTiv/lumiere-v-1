@@ -113,9 +113,11 @@ import {
   toUpdateDocumentFolderParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
-import { documentRecordHref, formatFileSize } from "./document-record"
+import { documentRecordHref } from "./document-record"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
+import { documentAttachmentLabel, documentFileIdentity, withDocumentsTablePresentation } from "./document-presentation"
 import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-browser-rows"
-import { documentBrowserHref, documentBrowserState } from "./document-browser-navigation"
+import { documentBrowserHref, documentBrowserRecordHref, documentBrowserState } from "./document-browser-navigation"
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { useAuthorizedPeople } from "@/lib/use-authorized-people"
@@ -616,7 +618,11 @@ function DocumentsClientLoaded({
   const locationOptions = documentFolderDestinations(folders, locationDialog?.kind === "moveDocument" ? undefined : locationDialog?.id)
   const locationForm: FormConfig = {
     id: "document-location",
-    title: locationDialog?.kind === "restoreFolder" ? t("documents.fileManagement.restoreFolder", { defaultValue: "Restore folder" }) : t("documents.fileManagement.move", { defaultValue: "Move" }),
+    title: locationDialog?.kind === "restoreFolder"
+      ? t("documents.fileManagement.restoreFolder", { defaultValue: "Restore folder" })
+      : locationDialog?.kind === "moveDocument"
+        ? t("documents.fileManagement.moveFile", { defaultValue: "Move file" })
+        : t("documents.fileManagement.moveFolder", { defaultValue: "Move folder" }),
     description: locationDialog?.name,
     submitLabel: locationDialog?.kind === "restoreFolder" ? t("common.restore", { defaultValue: "Restore" }) : t("documents.fileManagement.move", { defaultValue: "Move" }),
     sections: [{ id: "destination", fields: [{
@@ -822,7 +828,10 @@ function DocumentsClientLoaded({
   const config = useMemo(
     () => ({
       ...moduleConfig,
-      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+      tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((baseTab) => {
+        const tab = baseTab.entityConfig
+          ? { ...baseTab, entityConfig: withDocumentsTablePresentation(baseTab.entityConfig, t) }
+          : baseTab
         if (tab.id === "documents" && tab.entityConfig) {
           // Selection-on-click is forced explicitly: `selectionToggleOnRowClick`
           // (EntityTable) defaults to false, so a row click would otherwise
@@ -840,11 +849,11 @@ function DocumentsClientLoaded({
                   {
                     id: "document",
                     fields: [
-                      { key: "fileName", label: t("documents.documents.columns.fileName") },
-                      { key: "mimetype", label: t("documents.documents.columns.mimetype") },
-                      { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
-                      { key: "resName", label: "Attached to" },
-                      { key: "description", type: "markdown" as const, label: "Description" },
+                      { key: "fileName", width: "full" as const, label: t("documents.documents.columns.fileName"),
+                        render: (_value: unknown, row: EntityRow) => <FileIdentity {...documentFileIdentity(row)} showTitle={false} /> },
+                      { key: "resName", label: t("documents.documents.columns.resName", { defaultValue: "Attached to" }),
+                        render: (_value: unknown, row: EntityRow) => documentAttachmentLabel(row, t) },
+                      { key: "description", width: "full" as const, type: "markdown" as const, label: t("documents.documents.columns.description", { defaultValue: "Description" }) },
                     ],
                   },
                 ],
@@ -962,7 +971,7 @@ function DocumentsClientLoaded({
               detailConfig: {
                 mode: "detail" as const,
                 sections: [{ id: "article", fields: [
-                  { key: "description", type: "markdown" as const, label: t("documents.knowledgeBase.columns.content", { defaultValue: "Article" }) },
+                  { key: "description", width: "full" as const, type: "markdown" as const, label: t("documents.knowledgeBase.columns.content", { defaultValue: "Article" }) },
                   { key: "isPublished", type: "boolean" as const, label: t("documents.knowledgeBase.columns.published", { defaultValue: "Published" }) },
                 ] }],
               },
@@ -1631,6 +1640,7 @@ function DocumentsClientLoaded({
       <DocumentViewerDialog
         organizationId={orgId}
         documentId={viewer?.scopeKey === templateScopeKey ? viewer.documentId : null}
+        recordHref={viewer?.scopeKey === templateScopeKey ? documentBrowserRecordHref(viewer.documentId, browserViewState, browserQuery) : undefined}
         onOpenChange={(open) => { if (!open) setViewer(null) }}
       />
       {promptsUsable && formDialog}
