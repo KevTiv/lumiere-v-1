@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
 interface CustomSectionDialogProps {
@@ -16,6 +16,7 @@ interface CustomSectionDialogProps {
 export function CustomSectionDialog({ open, onOpenChange, onSubmit }: CustomSectionDialogProps) {
   const { t } = useTranslation()
   const [title, setTitle] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) setTitle("")
@@ -32,22 +33,24 @@ export function CustomSectionDialog({ open, onOpenChange, onSubmit }: CustomSect
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="custom-section-dialog">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogContent size="confirmation" layout="bounded" initialFocus={inputRef} data-testid="custom-section-dialog">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-auto flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{t("proposalWorkspace.sectionSidebar.customSectionTitle", { defaultValue: "Section title" })}</DialogTitle>
             <DialogDescription>
               {t("proposalWorkspace.sectionSidebar.customSectionDescription", { defaultValue: "Name the new proposal section." })}
             </DialogDescription>
           </DialogHeader>
-          <Input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t("proposalWorkspace.sectionSidebar.customSectionPlaceholder", { defaultValue: "Section title" })}
-            aria-label={t("proposalWorkspace.sectionSidebar.customSectionTitle", { defaultValue: "Section title" })}
-            data-testid="custom-section-title-input"
-          />
+          <DialogBody>
+            <Input
+              ref={inputRef}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t("proposalWorkspace.sectionSidebar.customSectionPlaceholder", { defaultValue: "Section title" })}
+              aria-label={t("proposalWorkspace.sectionSidebar.customSectionTitle", { defaultValue: "Section title" })}
+              data-testid="custom-section-title-input"
+            />
+          </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t("common.cancel", { defaultValue: "Cancel" })}

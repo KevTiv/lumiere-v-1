@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/select"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -725,13 +726,13 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
       </Tabs>
 
       <Dialog open={isFieldDialogOpen} onOpenChange={setIsFieldDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{t("settings.formConfig.fieldDialog.title")}</DialogTitle>
             <DialogDescription>{t("settings.formConfig.fieldDialog.descriptionCustom")}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+          <DialogBody className="@container space-y-4 py-4">
+            <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
               <div className="space-y-2">
                 <Label>{t("settings.formConfig.fieldDialog.fieldKey")}</Label>
                 <Input
@@ -771,7 +772,7 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
                 <Label htmlFor="required">{t("settings.formConfig.fieldDialog.required")}</Label>
               </div>
             </div>
-          </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)} type="button">
               {t("common.cancel")}

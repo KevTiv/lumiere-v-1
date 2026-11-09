@@ -61,7 +61,7 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
       await expect(page.getByTestId("fixture-density-cell")).toHaveCSS("padding-top", "10px")
     })
 
-    test("journal review keeps typed values and actions readable at the viewport", async ({ page }) => {
+    test("journal review keeps typed values and actions readable at the viewport", { tag: "@dialog-fit" }, async ({ page }) => {
       await page.getByTestId("module-workspace-accounting-ledger").click()
       const invoice = page.getByRole("button", { name: "INV/2026/0901" })
       if (viewport.width < 1024) await invoice.tap()
@@ -189,6 +189,63 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
         await expect(page.locator('[data-slot="sidebar"][data-state="collapsed"]')).toBeVisible()
       })
     }
+  })
+}
+
+for (const viewport of [{ width: 320, height: 560 }, { width: 1440, height: 640 }]) {
+  test(`historical journal entry keeps amounts and actions contained at ${viewport.width}×${viewport.height}`, { tag: "@dialog-fit" }, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await page.goto("/")
+    await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
+    if (viewport.width === 320) {
+      await page.evaluate(() => { document.documentElement.style.fontSize = "125%" })
+    }
+    await page.getByTestId("module-workspace-accounting-ledger").click()
+
+    const historicalJournalName = "Historical shop sales and cash receipts, 29 May to 4 June 2023"
+    const opener = page.getByRole("button", { name: historicalJournalName, exact: true })
+    await opener.press("Enter")
+    const dialog = page.getByRole("dialog", { name: historicalJournalName, exact: true })
+    const heading = dialog.getByRole("heading", { name: historicalJournalName, exact: true })
+    const close = dialog.getByRole("button", { name: "Close", exact: true })
+    const post = dialog.getByRole("button", { name: "Post", exact: true })
+    const cancel = dialog.getByRole("button", { name: "Cancel entry", exact: true })
+    const valueFor = (label: string) => dialog.getByText(label, { exact: true }).locator("xpath=following-sibling::dd")
+
+    await expect(dialog).toBeInViewport({ ratio: 1 })
+    await expect(valueFor("Partner")).toHaveText("—")
+    await expect(valueFor("Total")).toHaveText("RWF 3,541,923,100")
+    for (const label of ["Untaxed", "Residual", "Payment", "Recalculate totals"]) {
+      await expect(dialog.getByText(label, { exact: true })).toHaveCount(0)
+    }
+    await expect(dialog).not.toContainText("[object Object]")
+    await expect(dialog).not.toContainText("Partner #undefined")
+    for (const action of [close, post, cancel]) {
+      await expect(action).toBeInViewport({ ratio: 1 })
+      await expect(action).toBeEnabled()
+    }
+
+    const [headingBox, closeBox] = await Promise.all([heading.boundingBox(), close.boundingBox()])
+    expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(closeBox!.x + 1)
+    const lines = dialog.getByRole("table", { name: "Move lines", exact: true })
+    await expect(lines.getByRole("row", { name: /Cash receipts/ })).toBeAttached()
+    await expect(lines.getByRole("row", { name: /Shop sales/ })).toBeAttached()
+    const lineViewport = lines.locator("..")
+    await expect(lineViewport).toHaveAccessibleName("Move lines")
+    if (viewport.width === 320) {
+      await expect.poll(() => lineViewport.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeGreaterThan(0)
+      await lineViewport.focus()
+      await lineViewport.press("ArrowRight")
+      await expect.poll(() => lineViewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0)
+    }
+    await expect.poll(() => dialog.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1)
+    await expect(post).toBeInViewport({ ratio: 1 })
+    await expect(cancel).toBeInViewport({ ratio: 1 })
+
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+    await expect(opener).toBeFocused()
+    await expect(page.getByText("Synthetic posting requested")).toHaveCount(0)
   })
 }
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AssistantGuideModal } from "@lumiere/ui"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import { isSavedGuide, type GuideDraft, type GuideDocument, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
@@ -142,10 +142,12 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
 
   if (!request) return null
   if (!document) return <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-    <DialogContent>
-      <DialogTitle>{t("aiChat.guide.document", { defaultValue: "ERP guide" })}</DialogTitle>
-      <DialogDescription>{busy ? t("aiChat.guide.loading", { defaultValue: "Loading the guide in your current access scope…" }) : error ?? t("aiChat.guide.unavailable", { defaultValue: "This guide is unavailable in the current company." })}</DialogDescription>
-      {error ? <Button variant="outline" disabled={busy} onClick={() => setLoadRetry((attempt) => attempt + 1)}>{t("aiChat.guide.retryAccess", { defaultValue: "Retry access check" })}</Button> : null}
+    <DialogContent size="confirmation">
+      <DialogHeader>
+        <DialogTitle>{t("aiChat.guide.document", { defaultValue: "ERP guide" })}</DialogTitle>
+        <DialogDescription>{busy ? t("aiChat.guide.loading", { defaultValue: "Loading the guide in your current access scope…" }) : error ?? t("aiChat.guide.unavailable", { defaultValue: "This guide is unavailable in the current company." })}</DialogDescription>
+      </DialogHeader>
+      {error ? <DialogFooter><Button variant="outline" disabled={busy} onClick={() => setLoadRetry((attempt) => attempt + 1)}>{t("aiChat.guide.retryAccess", { defaultValue: "Retry access check" })}</Button></DialogFooter> : null}
     </DialogContent>
   </Dialog>
 

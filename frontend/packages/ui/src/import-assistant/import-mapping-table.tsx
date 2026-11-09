@@ -45,6 +45,7 @@ export type ImportMappingTableProps = {
   analysis: ImportAnalyzeResponse
   mapping: Record<string, string>
   onMappingChange: (mapping: Record<string, string>) => void
+  viewportLabel?: string
 }
 
 export function ImportMappingTable({
@@ -52,6 +53,7 @@ export function ImportMappingTable({
   analysis,
   mapping,
   onMappingChange,
+  viewportLabel,
 }: ImportMappingTableProps) {
   const { t } = useTranslation()
   const targetFieldOptions = targetOptions(analysis)
@@ -65,7 +67,7 @@ export function ImportMappingTable({
           ))}
         </ul>
       ) : null}
-      <Table>
+      <Table viewportLabel={viewportLabel ?? t("common.importAssistant.stepMap")}>
         <TableHeader>
           <TableRow>
             <TableHead>{t("common.importAssistant.sourceColumn")}</TableHead>

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   FileText,
   Plus,
@@ -131,23 +130,23 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0">
-        <DialogHeader className="p-6 pb-4 border-b border-border">
+      <DialogContent size="form" layout="bounded" className="gap-0 p-0">
+        <DialogHeader className="border-b border-border p-4 sm:px-6">
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
+            <FileText className="size-5 shrink-0 text-primary" />
             {step === "template" ? t("forensics.createModal.titleTemplate") : t("forensics.createModal.titleDetails")}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh]">
+        <DialogBody className="@container">
           {step === "template" ? (
-            <div className="p-6 space-y-6">
+            <div className="space-y-6 p-4 sm:p-6">
               <div>
                 <h3 className="text-sm font-semibold mb-1">{t("forensics.createModal.startFromTemplate")}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   {t("forensics.createModal.templateHint")}
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
                   {reportTemplates.map((template) => {
                     const categoryConfig = incidentCategories[template.category]
                     return (
@@ -194,7 +193,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               </Button>
             </div>
           ) : (
-            <div className="p-6 space-y-6">
+            <div className="space-y-6 p-4 sm:p-6">
               {template && (
                 <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 mb-4">
                   <div className="flex items-center gap-2 text-sm">
@@ -243,7 +242,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               </div>
 
               {/* Classification */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 @md:grid-cols-2 @xl:grid-cols-3">
                 <div>
                   <Label>{t("forensics.createModal.labelCategory")}</Label>
                   <Select
@@ -290,7 +289,7 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               </div>
 
               {/* Assignment */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 @md:grid-cols-2 @xl:grid-cols-3">
                 <div>
                   <Label htmlFor="reportedBy">{t("forensics.createModal.labelReportedBy")}</Label>
                   <Input
@@ -423,9 +422,9 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
               </div>
             </div>
           )}
-        </ScrollArea>
+        </DialogBody>
 
-        <DialogFooter className="p-4 border-t border-border">
+        <DialogFooter className="mx-0 mb-0">
           {step === "details" && (
             <Button variant="ghost" onClick={() => setStep("template")}>
               {t("forensics.createModal.back")}

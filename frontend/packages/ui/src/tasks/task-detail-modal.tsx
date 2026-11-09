@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -152,9 +153,9 @@ export function TaskDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
-          <div className="flex items-center justify-between">
+      <DialogContent size="record" layout="bounded">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className={cn("", taskTypeConfig[currentTask.type].color.replace("bg-", "text-"))}>
                 {typeIcons[currentTask.type]}
@@ -163,7 +164,7 @@ export function TaskDetailModal({
                 {currentTask.key}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {isEditing ? (
                 <>
                   <Button size="sm" variant="ghost" onClick={handleCancel}>
@@ -196,10 +197,10 @@ export function TaskDetailModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-3 gap-6 py-4">
+        <DialogBody className="@container">
+          <div className="grid grid-cols-1 gap-6 py-4 @2xl:grid-cols-3">
             {/* Main Content */}
-            <div className="col-span-2 space-y-4">
+            <div className="min-w-0 space-y-4 @2xl:col-span-2">
               {/* Description */}
               <div>
                 <h4 className="text-sm font-medium mb-2">{t("tasks.fields.description")}</h4>
@@ -470,7 +471,7 @@ export function TaskDetailModal({
               </div>
             </div>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )

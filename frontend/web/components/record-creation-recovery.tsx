@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
 import { Button } from '@lumiere/ui/components/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@lumiere/ui/components/dialog';
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@lumiere/ui/components/dialog';
 import { useRecordCreationRecovery, type CreationRecoveryAccess } from '@lumiere/query-hooks/hooks/record-creation-recovery';
 import type { ConfigurableCreationModel, PendingRecordCreation } from '@lumiere/query-hooks/hooks/record-creation-invocation';
 import { moduleTabHref } from '@lumiere/erp-shared/record-links';
@@ -46,6 +46,7 @@ export function RecordCreationRecovery({ organizationId, companyId, models, refr
 }) {
   const { t } = useTranslation();
   const recovery = useRecordCreationRecovery(organizationId, companyId, models, refreshKey);
+  const reviewTrigger = useRef<HTMLButtonElement>(null);
   const [selected, setSelected] = useState<{ stamp: string; model: ConfigurableCreationModel; operationKey: string }>();
   const active = selected?.stamp === recovery.scopeStamp ? recovery.items.find((item) => item.model === selected.model && item.pending?.operationKey === selected.operationKey) : undefined;
   let fields: Array<{ label: string; value: string }> = [];
@@ -60,18 +61,23 @@ export function RecordCreationRecovery({ organizationId, companyId, models, refr
     {recovery.items.map((item) => <div key={item.model} className="flex min-w-0 flex-wrap items-center justify-between gap-3">
       <p className="text-sm">{t(`common.creationRecovery.models.${item.model}`)} · {t(`common.creationRecovery.status.${item.status}`)}</p>
       <div className="flex flex-wrap gap-2">
-        {item.pending && <Button type="button" variant="outline" disabled={recovery.busy} onClick={() => setSelected({ stamp: recovery.scopeStamp, model: item.model, operationKey: item.pending!.operationKey })}>{t('common.creationRecovery.review')}</Button>}
+        {item.pending && <Button type="button" variant="outline" disabled={recovery.busy} onClick={(event) => {
+          reviewTrigger.current = event.currentTarget;
+          setSelected({ stamp: recovery.scopeStamp, model: item.model, operationKey: item.pending!.operationKey });
+        }}>{t('common.creationRecovery.review')}</Button>}
         <Button type="button" variant="outline" disabled={recovery.busy} onClick={() => { void recovery.check(item.model); }}>{t('common.creationRecovery.check')}</Button>
       </div>
     </div>)}
     <Dialog open={Boolean(active?.pending)} onOpenChange={(open) => { if (!open) setSelected(undefined); }}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto" data-testid="record-creation-review">
+      <DialogContent size="record" layout="bounded" finalFocus={() => reviewTrigger.current?.isConnected ? reviewTrigger.current : true} data-testid="record-creation-review">
         <DialogHeader><DialogTitle>{t('common.creationRecovery.review')}</DialogTitle><DialogDescription>{t('common.creationRecovery.reviewHint')}</DialogDescription></DialogHeader>
         {active && <>
-          <p className="font-medium">{t(`common.creationRecovery.models.${active.model}`)}</p>
-          <p role="status" className="text-sm">{t(`common.creationRecovery.status.${active.status}`)}</p>
-          {invalidEntries ? <p role="alert">{t('common.creationRecovery.entriesUnavailable')}</p> : <dl className="space-y-3 text-sm">{fields.map((field, index) => <div key={`${field.label}:${index}`}><dt className="capitalize text-muted-foreground">{field.label}</dt><dd className="whitespace-pre-wrap break-words">{field.value === '' ? t('common.creationRecovery.emptyValue') : field.value}</dd></div>)}</dl>}
-          {active.recordId && <a href={creationResultHref(active.model, active.recordId)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4">{t('common.creationRecovery.openSaved')}</a>}
+          <DialogBody className="space-y-4">
+            <p className="font-medium">{t(`common.creationRecovery.models.${active.model}`)}</p>
+            <p role="status" className="text-sm">{t(`common.creationRecovery.status.${active.status}`)}</p>
+            {invalidEntries ? <p role="alert">{t('common.creationRecovery.entriesUnavailable')}</p> : <dl className="space-y-3 text-sm">{fields.map((field, index) => <div key={`${field.label}:${index}`}><dt className="capitalize text-muted-foreground">{field.label}</dt><dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">{field.value === '' ? t('common.creationRecovery.emptyValue') : field.value}</dd></div>)}</dl>}
+            {active.recordId && <a href={creationResultHref(active.model, active.recordId)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4">{t('common.creationRecovery.openSaved')}</a>}
+          </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setSelected(undefined)}>{t('common.close')}</Button>
             <Button type="button" variant="outline" disabled={recovery.busy} onClick={() => { void recovery.check(active.model); }}>{t('common.creationRecovery.check')}</Button>

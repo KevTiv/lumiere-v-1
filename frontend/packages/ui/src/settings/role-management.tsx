@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -412,7 +413,7 @@ export function RoleManagement() {
       ) : null}
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!isSaving) setIsDialogOpen(open) }}>
-        <DialogContent className="flex max-h-[86dvh] min-h-0 flex-col overflow-hidden sm:max-w-2xl" showCloseButton={!isSaving}>
+        <DialogContent size="form" layout="bounded" showCloseButton={!isSaving}>
           <DialogHeader className="shrink-0">
             <DialogTitle>
               {editingRole ? t("settings.roles.editTitle", { name: editingRole.name }) : t("settings.roles.createTitle")}
@@ -426,9 +427,9 @@ export function RoleManagement() {
               event.preventDefault()
               void handleSaveRole(new FormData(event.currentTarget))
             }}
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            className="flex min-h-0 flex-auto flex-col gap-4"
           >
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            <DialogBody>
             <fieldset disabled={isSaving} className="flex min-w-0 flex-col gap-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -540,8 +541,8 @@ export function RoleManagement() {
 
             {roleError && <p role="alert" className="break-words text-sm text-destructive">{roleError}</p>}
             </fieldset>
-            </div>
-            <DialogFooter className="shrink-0 pt-4">
+            </DialogBody>
+            <DialogFooter>
               <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>
@@ -555,13 +556,13 @@ export function RoleManagement() {
 
       {sodModalOpen ? (
         <Dialog open onOpenChange={setSodModalOpen}>
-          <DialogContent>
+          <DialogContent size="form" layout="bounded">
             <DialogHeader>
               <DialogTitle>{t("settings.roles.sod.addTitle")}</DialogTitle>
               <DialogDescription>{t("settings.roles.sod.addDescription")}</DialogDescription>
             </DialogHeader>
             <form
-              className="space-y-4"
+              className="flex min-h-0 flex-auto flex-col gap-4"
               onSubmit={async (event) => {
                 event.preventDefault()
                 setSodError(null)
@@ -577,36 +578,38 @@ export function RoleManagement() {
                 }
               }}
             >
-              <div className="space-y-2">
-                <Label htmlFor="sod-permission-a">{t("settings.roles.sod.permissionA")}</Label>
-                <Input
-                  id="sod-permission-a"
-                  value={sodPermissionA}
-                  onChange={(e) => setSodPermissionA(e.target.value)}
-                  placeholder="account_payment:create"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sod-permission-b">{t("settings.roles.sod.permissionB")}</Label>
-                <Input
-                  id="sod-permission-b"
-                  value={sodPermissionB}
-                  onChange={(e) => setSodPermissionB(e.target.value)}
-                  placeholder="account_payment:post"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sod-description">{t("settings.roles.sod.description")}</Label>
-                <Textarea
-                  id="sod-description"
-                  value={sodDescription}
-                  onChange={(e) => setSodDescription(e.target.value)}
-                  rows={2}
-                />
-              </div>
-              {sodError ? <p className="text-sm text-destructive">{sodError}</p> : null}
+              <DialogBody className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sod-permission-a">{t("settings.roles.sod.permissionA")}</Label>
+                  <Input
+                    id="sod-permission-a"
+                    value={sodPermissionA}
+                    onChange={(e) => setSodPermissionA(e.target.value)}
+                    placeholder="account_payment:create"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sod-permission-b">{t("settings.roles.sod.permissionB")}</Label>
+                  <Input
+                    id="sod-permission-b"
+                    value={sodPermissionB}
+                    onChange={(e) => setSodPermissionB(e.target.value)}
+                    placeholder="account_payment:post"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sod-description">{t("settings.roles.sod.description")}</Label>
+                  <Textarea
+                    id="sod-description"
+                    value={sodDescription}
+                    onChange={(e) => setSodDescription(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+                {sodError ? <p className="text-sm text-destructive">{sodError}</p> : null}
+              </DialogBody>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setSodModalOpen(false)}>
                   {t("common.cancel")}

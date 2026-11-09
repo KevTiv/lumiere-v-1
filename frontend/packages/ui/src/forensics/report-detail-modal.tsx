@@ -5,13 +5,12 @@ import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ContextTabsList as TabsList, ContextTabsTrigger as TabsTrigger } from "../components/context-tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   AlertTriangle,
   AlertCircle,
@@ -110,12 +109,12 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0">
+      <DialogContent size="record" layout="bounded" className="gap-0 p-0">
         {/* Header */}
-        <DialogHeader className="p-6 pb-4 border-b border-border">
+        <DialogHeader className="border-b border-border p-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm font-mono text-muted-foreground">{report.reportNumber}</span>
                 <Badge
                   variant="outline"
@@ -142,7 +141,6 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                 </Badge>
               </div>
               <DialogTitle className="text-xl font-semibold">{report.title}</DialogTitle>
-              <p className="text-sm text-muted-foreground mt-1">{report.summary}</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -156,9 +154,11 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               </Button>
             </div>
           </div>
+        </DialogHeader>
 
-          {/* Quick Stats */}
-          <div className="flex items-center gap-6 mt-4 pt-4 border-t border-border">
+        <DialogBody className="@container">
+          <p className="px-4 pt-4 text-sm text-muted-foreground sm:px-6">{report.summary}</p>
+          <div className="grid grid-cols-1 gap-4 p-4 @xs:grid-cols-2 @2xl:grid-cols-4 sm:px-6">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
@@ -188,32 +188,28 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               </div>
             </div>
           </div>
-        </DialogHeader>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <div className="px-4 sm:px-6">
+              <TabsList scrollable>
+                <TabsTrigger value="overview">
+                  {t("forensics.detailModal.tabOverview")}
+                </TabsTrigger>
+                <TabsTrigger value="timeline">
+                  {t("forensics.detailModal.tabTimeline")}
+                </TabsTrigger>
+                <TabsTrigger value="analysis">
+                  {t("forensics.detailModal.tabRootCause")}
+                </TabsTrigger>
+                <TabsTrigger value="actions">
+                  {t("forensics.detailModal.tabActions")}
+                </TabsTrigger>
+                <TabsTrigger value="impact">
+                  {t("forensics.detailModal.tabImpact")}
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-        {/* Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-          <div className="px-6">
-            <TabsList scrollable>
-              <TabsTrigger value="overview">
-                {t("forensics.detailModal.tabOverview")}
-              </TabsTrigger>
-              <TabsTrigger value="timeline">
-                {t("forensics.detailModal.tabTimeline")}
-              </TabsTrigger>
-              <TabsTrigger value="analysis">
-                {t("forensics.detailModal.tabRootCause")}
-              </TabsTrigger>
-              <TabsTrigger value="actions">
-                {t("forensics.detailModal.tabActions")}
-              </TabsTrigger>
-              <TabsTrigger value="impact">
-                {t("forensics.detailModal.tabImpact")}
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <ScrollArea className="h-[400px]">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Overview Tab */}
               <TabsContent value="overview" className="mt-0 space-y-6">
                 <div>
@@ -221,7 +217,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                   <p className="text-sm text-muted-foreground leading-relaxed">{report.description}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6 @md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold mb-3">{t("forensics.detailModal.teamMembers")}</h4>
                     <div className="space-y-2">
@@ -405,7 +401,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
 
               {/* Impact Tab */}
               <TabsContent value="impact" className="mt-0">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
                   {report.impact.financial && (
                     <Card>
                       <CardHeader className="pb-2">
@@ -526,15 +522,15 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
                 </div>
               </TabsContent>
             </div>
-          </ScrollArea>
-        </Tabs>
+          </Tabs>
+        </DialogBody>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 flex items-center justify-between">
-          <div className="text-xs text-muted-foreground">
+        <DialogFooter className="mx-0 mb-0 items-start sm:items-center sm:justify-between">
+          <div className="min-w-0 text-xs text-muted-foreground">
             {t("forensics.detailModal.lastUpdated", { date: formatDate(report.updatedAt) })}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {onUpdateStatus && report.status !== "closed" && (
               <Button
                 variant="outline"
@@ -552,7 +548,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               {t("forensics.detailModal.close")}
             </Button>
           </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

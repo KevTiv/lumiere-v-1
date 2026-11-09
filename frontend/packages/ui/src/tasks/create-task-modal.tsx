@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -139,12 +140,12 @@ export function CreateTaskModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent size="form" layout="bounded">
         <DialogHeader>
           <DialogTitle>{t("tasks.create.title")}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <DialogBody className="@container space-y-4 py-4">
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title">{t("tasks.fields.requiredTitle")}</Label>
@@ -169,7 +170,7 @@ export function CreateTaskModal({
           </div>
 
           {/* Type and Priority */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("tasks.fields.type")}</Label>
               <Select value={type} onValueChange={(v) => setType(v as TaskType)}>
@@ -214,7 +215,7 @@ export function CreateTaskModal({
           </div>
 
           {/* Status and Assignee */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("tasks.fields.status")}</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
@@ -263,7 +264,7 @@ export function CreateTaskModal({
           </div>
 
           {/* Due Date and Story Points */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="dueDate">{t("tasks.fields.dueDate")}</Label>
               <DatePicker
@@ -296,7 +297,7 @@ export function CreateTaskModal({
               onChange={(e) => setLabels(e.target.value)}
             />
           </div>
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

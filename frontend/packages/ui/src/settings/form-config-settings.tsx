@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -504,7 +505,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
 
       {/* Field Edit Dialog */}
       <Dialog open={isFieldDialogOpen} onOpenChange={setIsFieldDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{isNewField ? t("settings.formConfigSettings.dialog.addTitle") : t("settings.formConfigSettings.dialog.editTitle")}</DialogTitle>
             <DialogDescription>
@@ -513,7 +514,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
           </DialogHeader>
 
           {selectedField && (
-            <div className="space-y-6 py-4">
+            <DialogBody className="space-y-6 py-4">
               {/* Basic Info */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -738,7 +739,7 @@ export function FormConfigSettings({ className }: FormConfigSettingsProps) {
                   )}
                 </div>
               </div>
-            </div>
+            </DialogBody>
           )}
 
           <DialogFooter>

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { reconciliationModules } from "./reconciliation-modules"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@lumiere/ui/components/dialog"
 
 const labels = {
   review_candidate: "Ready for review",
@@ -113,23 +113,25 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
   const feedbackCount = Object.keys(feedback).length
 
   return (
-    <>
-      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button type="button" size="sm" variant="outline" />}>
         {proposals ? "Resume reconciliation preview" : "Open reconciliation preview"}
-      </Button>
+      </DialogTrigger>
       {proposals ? <p className="text-xs text-muted-foreground">
         {proposals.length} proposals · {feedbackCount} marked for follow-up or matched
       </p> : null}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent size="review" layout="bounded">
+        <DialogHeader>
           <DialogTitle>Review reconciliation preview</DialogTitle>
           <DialogDescription>
             Company #{companyId}. Load a prepared proposal export and review its matches.
             Your selections are temporary and do not update ERP records.
           </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4 [&_button]:h-auto [&_button]:min-h-8 [&_button]:max-w-full [&_button]:whitespace-normal">
           <label className="space-y-1 text-sm">
             <span className="block">Proposal export</span>
-            <input type="file" accept=".json,application/json" onChange={event => {
+            <input type="file" className="w-full min-w-0" accept=".json,application/json" onChange={event => {
               const file = event.currentTarget.files?.[0]
               event.currentTarget.value = ""
               if (file) void load(file)
@@ -195,7 +197,7 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
                   </li>
                 ))}
               </ul>
-              {filtered.length > 20 ? <div className="flex gap-2">
+              {filtered.length > 20 ? <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" disabled={page === 0}
                   onClick={() => setPage(page - 1)}>Previous</Button>
                 <Button size="sm" variant="outline" disabled={(page + 1) * 20 >= filtered.length}
@@ -203,8 +205,8 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
               </div> : null}
             </>
           ) : null}
-        </DialogContent>
-      </Dialog>
-    </>
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
   )
 }

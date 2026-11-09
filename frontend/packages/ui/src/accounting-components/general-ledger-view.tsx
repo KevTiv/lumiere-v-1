@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table"
 import {
   Dialog,
+  DialogBody,
   DialogFooter,
   DialogDescription,
   DialogContent,
@@ -400,12 +401,12 @@ export function GeneralLedgerView({
       >
         <DialogContent
           size="review"
+          layout="bounded"
           finalFocus={moveTrigger}
-          className="flex flex-col overflow-hidden"
         >
           {selectedMove && selected && (
             <>
-              <DialogHeader className="min-w-0 shrink-0">
+              <DialogHeader>
                 <DialogTitle className="text-lg leading-snug [overflow-wrap:anywhere]">
                   {selectedMove.name || `#${selectedMove.id}`}
                 </DialogTitle>
@@ -416,8 +417,8 @@ export function GeneralLedgerView({
                   </Badge>
                 </DialogDescription>
               </DialogHeader>
-              <div className="min-h-0 overflow-y-auto">
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t py-4 sm:grid-cols-3">
+              <DialogBody className="@container">
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-3 border-t py-4 @xs:grid-cols-2 @lg:grid-cols-3">
                   <LedgerDetail
                     label={t("accounting.journalEntries.date")}
                     value={formatTimestamp(selectedMove.date)}
@@ -431,7 +432,7 @@ export function GeneralLedgerView({
                     value={selected.partner}
                   />
                 </dl>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-4 sm:grid-cols-3">
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-3 rounded-lg border bg-muted/30 p-4 @xs:grid-cols-2 @lg:grid-cols-3">
                   {selected.paymentApplies ? (
                     <>
                       <LedgerDetail
@@ -485,7 +486,10 @@ export function GeneralLedgerView({
                     <h3 id="ledger-entry-lines" className="font-medium">
                       {t("accounting.tabs.moveLines")}
                     </h3>
-                    <Table aria-labelledby="ledger-entry-lines">
+                    <Table
+                      aria-labelledby="ledger-entry-lines"
+                      viewportLabel={t("accounting.tabs.moveLines")}
+                    >
                       <TableHeader>
                         <TableRow>
                           <TableHead>
@@ -535,12 +539,12 @@ export function GeneralLedgerView({
                     </Table>
                   </section>
                 ) : null}
-              </div>
+              </DialogBody>
               {(selected.draft &&
                 (onPostMove ||
                   (selected.paymentApplies && onComputeInvoiceTotals))) ||
               selected.cancellable ? (
-                <DialogFooter className="shrink-0 flex-col sm:flex-row sm:flex-wrap [&_button]:h-auto [&_button]:min-h-8 [&_button]:whitespace-normal">
+                <DialogFooter>
                   {selected.draft &&
                   selected.paymentApplies &&
                   onComputeInvoiceTotals ? (

@@ -15,9 +15,10 @@ import {
 
 export type ImportPreviewGridProps = {
   preview: ImportPreviewResponse
+  viewportLabel?: string
 }
 
-export function ImportPreviewGrid({ preview }: ImportPreviewGridProps) {
+export function ImportPreviewGrid({ preview, viewportLabel }: ImportPreviewGridProps) {
   const { t } = useTranslation()
   const previewErrors = preview.validation_errors.filter((item) => item.severity === "error")
   const previewColumns = Object.keys(preview.rows[0] ?? {}).slice(0, 6)
@@ -29,7 +30,7 @@ export function ImportPreviewGrid({ preview }: ImportPreviewGridProps) {
           <p className="text-sm font-medium text-destructive">
             {t("common.importAssistant.validationErrors", { count: previewErrors.length })}
           </p>
-          <Table>
+          <Table viewportLabel={t("common.importAssistant.validationErrors", { count: previewErrors.length })}>
             <TableHeader>
               <TableRow>
                 <TableHead>{t("common.importAssistant.row")}</TableHead>
@@ -56,8 +57,8 @@ export function ImportPreviewGrid({ preview }: ImportPreviewGridProps) {
       )}
 
       {preview.rows.length > 0 && previewColumns.length > 0 ? (
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
+        <div className="min-w-0 rounded-md border">
+          <Table viewportLabel={viewportLabel ?? t("common.importAssistant.preview")}>
             <TableHeader>
               <TableRow>
                 {previewColumns.map((key) => (
@@ -69,7 +70,7 @@ export function ImportPreviewGrid({ preview }: ImportPreviewGridProps) {
               {preview.rows.map((row, idx) => (
                 <TableRow key={idx}>
                   {previewColumns.map((key) => (
-                    <TableCell key={key} className="max-w-[180px] truncate">
+                    <TableCell key={key} className="max-w-44 whitespace-normal [overflow-wrap:anywhere]">
                       {String(row[key] ?? "")}
                     </TableCell>
                   ))}

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -397,7 +398,7 @@ export function UserManagement() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!isSaving) setIsDialogOpen(open) }}>
-        <DialogContent className="flex max-h-[86dvh] min-h-0 flex-col overflow-hidden sm:max-w-lg" showCloseButton={!isSaving}>
+        <DialogContent size="form" layout="bounded" showCloseButton={!isSaving}>
           <DialogHeader className="shrink-0">
             <DialogTitle>
               {editingUser ? t("settings.users.editUser") : t("settings.users.createUser")}
@@ -414,9 +415,9 @@ export function UserManagement() {
               event.preventDefault()
               void handleSaveUser(new FormData(event.currentTarget))
             }}
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            className="flex min-h-0 flex-auto flex-col gap-4"
           >
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            <DialogBody>
             <fieldset disabled={isSaving} className="flex min-w-0 flex-col gap-4">
             {editingUser && <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -492,8 +493,8 @@ export function UserManagement() {
             </div>
             {memberError && <p role="alert" className="break-words text-sm text-destructive">{memberError}</p>}
             </fieldset>
-            </div>
-            <DialogFooter className="shrink-0 pt-4">
+            </DialogBody>
+            <DialogFooter>
               <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>

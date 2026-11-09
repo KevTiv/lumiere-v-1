@@ -112,10 +112,13 @@ export function ModularForm({
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const visibleSubmitError = submitError || submissionError
   const formBodyRef = useRef<HTMLDivElement>(null)
+  const submitErrorRef = useRef<HTMLDivElement>(null)
   const invalidFieldRef = useRef<string | null>(null)
   useEffect(() => {
-    // Scroll only the field owner; scrolling ancestors can move the dialog header and close control.
-    if (visibleSubmitError && formBodyRef.current) formBodyRef.current.scrollTop = 0
+    if (!visibleSubmitError) return
+    const body = formBodyRef.current
+    if (body && body.scrollHeight > body.clientHeight) body.scrollTop = 0
+    else submitErrorRef.current?.scrollIntoView?.({ block: "nearest" })
   }, [visibleSubmitError])
   useEffect(() => { setSubmissionError(null) }, [config.id])
   const aiSuggest = useAiFormSuggest()
@@ -422,7 +425,7 @@ export function ModularForm({
       .find((element) => element.dataset.formField === name)
     if (!field) return
     field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
-    if (scrollable) {
+    if (scrollable && body.scrollHeight > body.clientHeight) {
       const fieldRect = field.getBoundingClientRect()
       const bodyRect = body.getBoundingClientRect()
       if (fieldRect.top < bodyRect.top || fieldRect.bottom > bodyRect.bottom) {
@@ -664,7 +667,7 @@ export function ModularForm({
       >
         <div className="flex min-w-0 flex-col gap-6">
           {visibleSubmitError ? (
-            <div tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
+            <div ref={submitErrorRef} tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
               <p>{visibleSubmitError}</p>
               {onExplainError ? <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => onExplainError(visibleSubmitError)}>{t("aiChat.errorHelp.explain", { defaultValue: "Explain this error" })}</Button> : null}
             </div>

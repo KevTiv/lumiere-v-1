@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react"
+import { cn } from "@lumiere/ui/lib/utils"
 
 // Widths express the task's needs; each surface applies its own viewport cap.
 export const overlayWidths = {
@@ -10,6 +11,15 @@ export const overlayWidths = {
 } as const
 
 export type OverlaySize = keyof typeof overlayWidths
+
+export function mergeOverlayClassName<State>(
+  base: string,
+  className: string | ((state: State) => string | undefined) | undefined,
+) {
+  return typeof className === "function"
+    ? (state: State) => cn(base, className(state))
+    : cn(base, className)
+}
 
 export function constrainOverlayStyle<State>(
   style:

@@ -189,7 +189,7 @@ for (const viewport of [
   { width: 1440, height: 720 },
   { width: 1440, height: 900 },
 ]) {
-  test(`plain dialog stress keeps content and confirmation reachable at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  test(`plain dialog stress keeps content and confirmation reachable at ${viewport.width}x${viewport.height}`, { tag: "@dialog-fit" }, async ({ page }) => {
     await openFixture(page, viewport.width)
     await page.setViewportSize(viewport)
     const opener = page.getByRole("button", { name: "Open stressed plain dialog", exact: true })
@@ -211,9 +211,12 @@ for (const viewport of [
     await expect(opener).toBeFocused()
   })
 
-  test(`form dialog stress retains edits and reachable actions after failed save at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+  test(`form dialog stress retains edits and reachable actions after failed save at ${viewport.width}x${viewport.height}`, { tag: "@dialog-fit" }, async ({ page }) => {
     await openFixture(page, viewport.width)
     await page.setViewportSize(viewport)
+    if (viewport.width === 390 && viewport.height === 600) {
+      await page.evaluate(() => { document.documentElement.style.fontSize = "150%" })
+    }
     const opener = page.getByRole("button", { name: "Open stressed form dialog", exact: true })
     await opener.click()
     const dialog = page.getByTestId("form-modal-overflow-stress")
@@ -222,14 +225,20 @@ for (const viewport of [
     const body = dialog.locator("[data-form-body]")
     await page.screenshot({ path: test.info().outputPath("form-dialog-initial.png") })
     await expectInViewport(page, dialog)
-    await expectContained(dialog)
+    await expectContained(dialog, dialog.locator("[data-slot=dialog-close], button[type=submit]"))
+    await expectContained(body)
     await expectInViewport(page, save)
     await expectInViewport(page, close)
 
     const first = dialog.getByTestId("form-field-reference-0")
     await first.fill("Unsaved commercial reference")
     const last = dialog.getByTestId("form-field-reference-19")
-    await last.scrollIntoViewIfNeeded()
+    await last.fill("")
+    await save.click()
+    await expect(last).toBeFocused()
+    await expect(last).toHaveAttribute("aria-invalid", "true")
+    await expect(last).toBeInViewport({ ratio: 1 })
+    await expect(body.getByText("This field is required", { exact: true })).toBeInViewport()
     await last.fill("Last field remains reachable")
     await expectInViewport(page, last)
     expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
@@ -238,7 +247,8 @@ for (const viewport of [
     await expect(dialog.getByRole("alert")).toContainText("The example save was rejected")
     await page.screenshot({ path: test.info().outputPath("form-dialog-rejected-save.png") })
     await expectInViewport(page, dialog)
-    await expectContained(dialog)
+    await expectContained(dialog, dialog.locator("[data-slot=dialog-close], button[type=submit]"))
+    await expectContained(body)
     await expectInViewport(page, save)
     await expectInViewport(page, close)
     await expect(save).toBeEnabled()
@@ -260,7 +270,102 @@ for (const viewport of [
   })
 }
 
-test("form picker stays in its own Escape layer and keeps the edited draft", async ({ page }) => {
+test("bounded dialog fallback keeps the body and footer reachable at 390x340", { tag: "@dialog-fit" }, async ({ page }) => {
+  await openFixture(page, 390)
+  await page.setViewportSize({ width: 390, height: 340 })
+  await page.evaluate(() => { document.documentElement.style.fontSize = "150%" })
+
+  const opener = page.getByRole("button", { name: "Open stressed bounded dialog", exact: true })
+  await opener.press("Enter")
+  const dialog = page.getByTestId("plain-stress-dialog")
+  const body = dialog.getByTestId("plain-stress-body")
+  await expectInViewport(page, dialog)
+  await expectContained(dialog)
+  await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeInViewport({ ratio: 1 })
+  await expect.poll(() => dialog.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeGreaterThan(0)
+  await expect.poll(() => body.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1)
+
+  const last = body.getByTestId("plain-stress-row-19")
+  await last.scrollIntoViewIfNeeded()
+  await expect(last).toBeInViewport()
+  const confirm = dialog.getByTestId("plain-stress-confirm")
+  await confirm.scrollIntoViewIfNeeded()
+  await expect(confirm).toBeInViewport({ ratio: 1 })
+  await confirm.press("Enter")
+  await expect(dialog).toBeHidden()
+  await expect(opener).toBeFocused()
+})
+
+test("wide import dialog scrolls preview columns locally and keeps confirmation reachable", { tag: "@dialog-fit" }, async ({ page }) => {
+  const headers = ["name", "registered_company_name", "primary_contact_email", "business_phone_number", "registered_business_address", "company_registration_reference"]
+  const values = ["Synthetic Contact", "Synthetic Trading Company", "contact@example.test", "5550123", "123 Example Street", "Historical registration 2023"]
+  const safety = { findings: [], blocked_cell_count: 0, is_safe_for_ai: true }
+  await openFixture(page, 390)
+  await page.setViewportSize({ width: 390, height: 560 })
+  await page.route("**/api/query/import-mapping-templates", (route) => route.fulfill({ json: { data: [] } }))
+  await page.route("**/api/ai/import/analyze", (route) => route.fulfill({
+    json: {
+      target_entity: "contact",
+      mappings: headers.map((header) => ({ source_column: header, target_field: header, confidence: 1 })),
+      unmapped_source_columns: [],
+      unmapped_target_fields: [],
+      metadata_suggestions: [],
+      structure: {
+        column_count: headers.length, sample_row_count: 1, duplicate_headers: [], empty_columns: [], delimiter_hint: ",",
+      },
+      safety,
+      warnings: [],
+    },
+  }))
+  await page.route("**/api/ai/import/preview", (route) => route.fulfill({
+    json: {
+      target_entity: "contact",
+      rows: [Object.fromEntries(headers.map((header, index) => [header, values[index]]))],
+      validation_errors: [],
+      safety,
+      warnings: [],
+    },
+  }))
+
+  const opener = page.getByRole("button", { name: "Open wide import wizard", exact: true })
+  await opener.press("Enter")
+  const dialog = page.getByRole("dialog", { name: "Review a wide historical contact import", exact: true })
+  const body = dialog.locator("[data-slot=dialog-body]")
+  await dialog.getByLabel("CSV file", { exact: true }).setInputFiles({
+    name: "synthetic-historical-contacts.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from([headers.join(","), values.join(",")].join("\n")),
+  })
+  await dialog.getByRole("button", { name: "Analyze columns", exact: true }).click()
+  await dialog.getByRole("button", { name: "Preview import", exact: true }).click()
+
+  const preview = dialog.getByRole("region", { name: "Preview import", exact: true })
+  const lastColumn = preview.getByRole("columnheader", { name: "company_registration_reference", exact: true })
+  const confirm = dialog.getByRole("button", { name: "Confirm import", exact: true })
+  const close = dialog.getByRole("button", { name: "Close", exact: true })
+  await expectInViewport(page, dialog)
+  await expectContained(dialog, dialog.locator("[data-slot=dialog-close], [data-slot=dialog-footer] button"))
+  await expectContained(body)
+  await expect(close).toBeInViewport({ ratio: 1 })
+  await expect(confirm).toBeInViewport({ ratio: 1 })
+  await expect(confirm).toBeEnabled()
+  await expect(lastColumn).not.toBeInViewport()
+  await expect.poll(() => preview.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeGreaterThan(0)
+
+  await preview.focus()
+  await preview.press("ArrowRight")
+  await expect.poll(() => preview.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0)
+  await lastColumn.scrollIntoViewIfNeeded()
+  await expect(lastColumn).toBeInViewport()
+  await expectContained(dialog)
+  await expect(confirm).toBeInViewport({ ratio: 1 })
+  await page.keyboard.press("Escape")
+  await expect(dialog).toBeHidden()
+  await expect(opener).toBeFocused()
+  await expect(page.getByTestId("last-action")).not.toContainText("import confirmed")
+})
+
+test("form picker stays in its own Escape layer and keeps the edited draft", { tag: "@dialog-fit" }, async ({ page }) => {
   await openFixture(page, 390)
   await page.setViewportSize({ width: 390, height: 600 })
   await page.getByRole("button", { name: "Open stressed form dialog", exact: true }).click()

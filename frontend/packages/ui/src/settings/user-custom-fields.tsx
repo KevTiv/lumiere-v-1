@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -355,13 +356,13 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{t("settings.customFields.addTitle")}</DialogTitle>
             <DialogDescription>{t("settings.customFields.createDescription")}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <DialogBody className="@container space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="field-label">{t("settings.customFields.fieldLabel")}</Label>
               <Input
@@ -410,7 +411,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
             </div>
 
             {(newField.type === "Slider" || newField.type === "Number") && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="min-value">{t("settings.customFields.minValue")}</Label>
                   <Input
@@ -445,7 +446,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
                 </div>
               </div>
             )}
-          </div>
+          </DialogBody>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>

@@ -45,6 +45,7 @@ import { aiReducerAllowlistCreateFormConfig } from "@/lib/ai-reducer-allowlist-f
 import { apiFetch } from "@/lib/api-fetch"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -1064,12 +1065,12 @@ export function AiSettings() {
       ) : null}
 
       <Dialog open={createMemberOpen} onOpenChange={setCreateMemberOpen}>
-        <DialogContent>
+        <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{t("settings.ai.createMemberTitle")}</DialogTitle>
             <DialogDescription>{t("settings.ai.createMemberDescription")}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
+          <DialogBody className="@container grid gap-3 py-2">
             <div className="grid gap-2">
               <Label>{t("settings.ai.agent")}</Label>
               <Select value={newMember.aiAgentId} onValueChange={(v) => setNewMember({ ...newMember, aiAgentId: v })}>
@@ -1089,7 +1090,7 @@ export function AiSettings() {
               <Label>{t("settings.ai.name")}</Label>
               <Input value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 @md:grid-cols-2">
               <div className="grid gap-2">
                 <Label>{t("settings.ai.role")}</Label>
                 <Input value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })} />
@@ -1118,7 +1119,7 @@ export function AiSettings() {
                 onChange={(e) => setNewMember({ ...newMember, expertiseAreas: e.target.value })}
               />
             </div>
-          </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateMemberOpen(false)}>
               {t("common.cancel")}
@@ -1155,12 +1156,12 @@ export function AiSettings() {
       />
 
       <Dialog open={sampleInsightOpen} onOpenChange={setSampleInsightOpen}>
-        <DialogContent>
+        <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{t("settings.ai.sampleInsightTitle")}</DialogTitle>
             <DialogDescription>{t("settings.ai.sampleInsightDescription")}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
+          <DialogBody className="@container grid gap-3 py-2">
             <div className="grid gap-2">
               <Label>{t("settings.ai.severity")}</Label>
               <Select value={sampleSeverity} onValueChange={setSampleSeverity}>
@@ -1184,7 +1185,7 @@ export function AiSettings() {
               <Label>{t("settings.ai.insightDescriptionField")}</Label>
               <Textarea rows={3} value={sampleDescription} onChange={(e) => setSampleDescription(e.target.value)} />
             </div>
-          </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSampleInsightOpen(false)}>
               {t("common.cancel")}

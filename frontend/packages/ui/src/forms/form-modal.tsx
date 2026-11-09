@@ -19,6 +19,7 @@ import {
 } from "../components/alert-dialog"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -188,13 +189,14 @@ export function FormModal({
       <DialogContent
         data-testid={`form-modal-${config.id}`}
         size={size}
+        layout="bounded"
         className={cn(
           workspaceStyles.surface,
-          "flex min-h-0 flex-col gap-0 overflow-hidden p-0",
+          "gap-0 p-0",
           className
         )}
       >
-        <DialogHeader className={cn(workspaceStyles.pageHeader, "sticky top-0 z-10 min-w-0 flex-shrink-0 bg-card/95 px-4 py-4 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
+        <DialogHeader className={cn(workspaceStyles.pageHeader, "bg-card/95 px-4 py-4 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(
@@ -217,7 +219,7 @@ export function FormModal({
           </div>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <DialogBody className="flex flex-col overflow-hidden">
           <ModularForm
             key={formRevision}
             config={{ ...config, title: "", description: "", layout: "default" }}
@@ -236,7 +238,7 @@ export function FormModal({
             draft={draft}
             draftKey={draftKey}
           />
-        </div>
+        </DialogBody>
         <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
           <AlertDialogContent data-testid="discard-changes-dialog">
             <AlertDialogHeader>
