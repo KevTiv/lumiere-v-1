@@ -846,7 +846,7 @@ export function PeriodCloseChecklist({
         }}
       >
         <DialogContent
-          className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
+          size="record"
           showCloseButton={!closing && !closePending}
         >
           <DialogHeader>

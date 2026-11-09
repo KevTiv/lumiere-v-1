@@ -1168,12 +1168,15 @@ async function importHandoffFixture(
     mimeType: "text/csv",
     buffer: Buffer.from("name,price,cost\nDraft product,12.50,8.25"),
   })
-  await expect(
-    wizard.getByTestId("guided-import-source-summary"),
-  ).toContainText("draft-products.csv")
+  const sourceName = (name: string) =>
+    wizard.getByTestId("guided-import-source-summary").getByRole("button", {
+      name: `Show original filename: ${name}`,
+      exact: true,
+    })
+  await expect(sourceName("draft-products.csv")).toBeVisible()
   return {
     wizard,
-    file,
+    sourceName,
     continuation,
     analyses,
     imports,
@@ -1187,7 +1190,7 @@ test("review handoff keeps the selected file and edited mapping on cancel, and r
   page,
 }) => {
   const fixture = await importHandoffFixture(page)
-  const { wizard, file, continuation } = fixture
+  const { wizard, sourceName, continuation } = fixture
   try {
     await wizard
       .getByRole("button", { name: "Analyze with AI", exact: true })
@@ -1207,26 +1210,29 @@ test("review handoff keeps the selected file and edited mapping on cancel, and r
     )
     await page.getByTestId("confirm-dialog-cancel").click()
     await expect(confirmation).toBeHidden()
-    expect(
-      await file.evaluate(
-        (input) => (input as HTMLInputElement).files?.[0]?.name,
-      ),
-    ).toBe("draft-products.csv")
+    await expect(sourceName("draft-products.csv")).toBeVisible()
     await expect(price).toContainText("metadata")
-    await expect(
-      wizard.getByTestId("guided-import-source-summary"),
-    ).toContainText("draft-products.csv")
+    const previewRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname === "/api/ai/import/preview",
+    )
+    await wizard
+      .getByRole("button", { name: "Preview import", exact: true })
+      .click()
+    expect((await previewRequest).postDataJSON()).toMatchObject({
+      headers: ["name", "price", "cost"],
+      rows: [["Draft product", "12.50", "8.25"]],
+      mapping: { price: "metadata" },
+    })
+    const preview = wizard.getByTestId("guided-import-preview")
+    await expect(preview).toBeVisible()
     expect(fixture.analyses).toHaveLength(1)
     expect(fixture.imports).toEqual([])
 
     await continuation.click()
     await page.getByTestId("confirm-dialog-confirm").click()
-    await expect(
-      wizard.getByTestId("guided-import-source-summary"),
-    ).toContainText("reviewed-1.csv")
-    expect(
-      await file.evaluate((input) => (input as HTMLInputElement).files?.length),
-    ).toBe(0)
+    await expect(sourceName("reviewed-1.csv")).toBeVisible()
+    await expect(sourceName("draft-products.csv")).toHaveCount(0)
+    await expect(preview).toBeHidden()
     await expect(mapping).toBeHidden()
     await wizard
       .getByRole("button", { name: "Analyze with AI", exact: true })
@@ -1250,7 +1256,7 @@ test("review handoff cannot replace a busy or unknown import and explicit recove
   page,
 }) => {
   const fixture = await importHandoffFixture(page, { deferAnalysis: true })
-  const { wizard, file, continuation } = fixture
+  const { wizard, sourceName, continuation } = fixture
   try {
     await wizard
       .getByRole("button", { name: "Analyze with AI", exact: true })
@@ -1271,6 +1277,7 @@ test("review handoff cannot replace a busy or unknown import and explicit recove
     await expect.poll(() => fixture.imports.length).toBe(1)
     const submitted = fixture.imports[0]!
     expect(submitted.requestId).toMatch(/^[a-f0-9]{32}$/)
+    expect(submitted.fileName).toBe("draft-products.csv")
     expect(submitted.sourceAdmissionId).toBe(SOURCE_ADMISSION_ID)
     expect(submitted.params).toEqual({ companyId: "9001", currencyId: "9102" })
     const submittedCsv = parseCsvText(submitted.csvData)
@@ -1292,11 +1299,7 @@ test("review handoff cannot replace a busy or unknown import and explicit recove
       page.getByTestId("import-review-handoff-status"),
     ).toContainText("Please wait")
     await expect(page.getByTestId("confirm-dialog")).toBeHidden()
-    expect(
-      await file.evaluate(
-        (input) => (input as HTMLInputElement).files?.[0]?.name,
-      ),
-    ).toBe("draft-products.csv")
+    await expect(sourceName("draft-products.csv")).toBeVisible()
 
     fixture.releaseImport()
     const check = wizard.getByRole("button", {
@@ -1322,9 +1325,7 @@ test("review handoff cannot replace a busy or unknown import and explicit recove
     expect(fixture.imports[1]).toEqual(submitted)
     await expect(check).toBeEnabled()
     await expect(continuation).toBeDisabled()
-    await expect(
-      wizard.getByTestId("guided-import-source-summary"),
-    ).toContainText("draft-products.csv")
+    await expect(sourceName("draft-products.csv")).toBeVisible()
     await expect(page.getByTestId("confirm-dialog")).toBeHidden()
   } finally {
     fixture.releaseAnalysis()

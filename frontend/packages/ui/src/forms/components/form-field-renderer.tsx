@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -21,10 +22,11 @@ import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, FileIcon, X, Sparkles } from "lucide-react"
+import { CalendarIcon, X, Sparkles } from "lucide-react"
 import { format } from "date-fns"
 import type { ParsedFormField, FieldOption } from "../config/types"
 import { isPlainTextareaField } from "../../lib/form-types"
+import { FileUploadField } from "../../components/file-upload-field"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -52,6 +54,8 @@ export function FormFieldRenderer({
   error,
   disabled,
 }: FormFieldRendererProps) {
+  const { t } = useTranslation()
+  const fileInputId = React.useId()
   const renderField = () => {
     switch (field.type) {
       case "Text":
@@ -248,14 +252,30 @@ export function FormFieldRenderer({
           />
         )
 
-      case "File":
+      case "File": {
+        const selected: File[] = Array.isArray(value) ? value : []
         return (
           <FileUploadField
-            value={(value as File[]) || []}
-            onChange={onChange}
+            id={fileInputId}
+            name={field.name}
+            aria-label={field.label}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${fileInputId}-error` : undefined}
+            multiple
+            required={field.validation?.required}
+            files={selected.map((file, index) => ({ id: String(index), name: file.name, size: file.size, mimetype: file.type }))}
+            onSelect={(files) => onChange([...selected, ...files])}
+            onRemove={(id) => onChange(selected.filter((_, index) => String(index) !== id))}
+            chooseLabel={t("common.form.file.chooseMultiple", { defaultValue: "Choose files" })}
+            removeLabel={(name) => t("common.form.file.remove", { name, defaultValue: "Remove {{name}}" })}
+            status={selected.length
+              ? t("common.form.file.selected", { defaultValue: "Selected for submission" })
+              : undefined}
+            onBlur={onBlur}
             disabled={disabled}
           />
         )
+      }
 
       case "UserSelect":
         return (
@@ -287,7 +307,7 @@ export function FormFieldRenderer({
           onSelect={(suggestion) => onChange(suggestion)}
         />
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p id={field.type === "File" ? `${fileInputId}-error` : undefined} className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }
@@ -532,69 +552,6 @@ function TagsField({
           />
           <Button type="button" variant="outline" onClick={addTag}>
             Add
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FileUploadField({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: File[]
-  onChange: (value: File[]) => void
-  disabled?: boolean
-}) {
-  const inputRef = React.useRef<HTMLInputElement>(null)
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files)
-      onChange([...value, ...newFiles])
-    }
-  }
-
-  const removeFile = (index: number) => {
-    onChange(value.filter((_, i) => i !== index))
-  }
-
-  return (
-    <div className="space-y-2">
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {value.map((file, index) => (
-            <Badge key={index} variant="secondary" className="gap-1">
-              <FileIcon className="h-3 w-3" />
-              {file.name}
-              {!disabled && (
-                <X
-                  className="h-3 w-3 cursor-pointer"
-                  onClick={() => removeFile(index)}
-                />
-              )}
-            </Badge>
-          ))}
-        </div>
-      )}
-      {!disabled && (
-        <div>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => inputRef.current?.click()}
-          >
-            <FileIcon className="mr-2 h-4 w-4" />
-            Upload Files
           </Button>
         </div>
       )}

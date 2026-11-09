@@ -231,6 +231,7 @@ export function TaskBoardView({
                 size="sm"
                 className="h-7 gap-1.5 px-2"
                 onClick={() => changeMode(mode)}
+                aria-label={modeLabel[mode]}
                 aria-pressed={viewMode === mode}
                 data-testid={`task-view-${mode}`}
               >
@@ -319,9 +320,9 @@ export function TaskBoardView({
                               data-testid={`task-list-row-${item.id}`}
                             >
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">{item.title}</span>
+                                <span className="block text-sm font-medium [overflow-wrap:anywhere]">{item.title}</span>
                                 {item.projectName ? (
-                                  <span className="block truncate text-xs text-muted-foreground">{item.projectName}</span>
+                                  <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">{item.projectName}</span>
                                 ) : null}
                               </span>
                               <Badge

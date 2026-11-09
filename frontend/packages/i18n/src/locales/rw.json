@@ -188,7 +188,13 @@
         "empty": "Nta bihuye",
         "remove": "Kuraho {{value}}"
       },
-      "setupOpensNewTab": "Bifungukira muri tab nshya"
+      "setupOpensNewTab": "Bifungukira muri tab nshya",
+      "file": {
+        "choose": "Hitamo dosiye",
+        "chooseMultiple": "Hitamo dosiye",
+        "remove": "Kuraho {{name}}",
+        "selected": "Byatoranyijwe koherezwa"
+      }
     },
     "formPreview": {
       "label": "Reba mbere"
@@ -333,7 +339,9 @@
         "description": "Gerageza gushakisha ukundi cyangwa ukureho ibiyungurura.",
         "title": "Nta nyandiko zihuye n’ibyo ushaka"
       },
-      "groupBy": "Gushyira mu matsinda hakurikijwe"
+      "groupBy": "Gushyira mu matsinda hakurikijwe",
+      "records": "Ibyanditswe",
+      "showFullValue": "Erekana agaciro kose"
     },
     "retry": "Ongera ugerageze",
     "recordsDenied": "Ntiwemerewe kureba izi nyandiko.",

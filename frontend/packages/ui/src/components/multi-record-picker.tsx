@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type KeyboardEvent } from "react"
+import { useRef, useState, type KeyboardEvent } from "react"
 import { Check, ChevronsUpDown, X } from "lucide-react"
 
 import { cn } from "../lib/utils"
@@ -12,6 +12,7 @@ import {
   CommandList,
 } from "./command"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
+import { recordPickerPopupClass } from "./record-picker-layout"
 import type { RecordPickerOption } from "./record-picker"
 
 export interface MultiRecordPickerProps {
@@ -22,6 +23,8 @@ export interface MultiRecordPickerProps {
   placeholder?: string
   searchPlaceholder?: string
   emptyText?: string
+  loadingText?: string
+  errorText?: string
   /** Label of the button that removes one chip; receives the chip's label. */
   removeLabel?: (label: string) => string
   /** Chip text for a chosen value that is no longer among the options. */
@@ -52,6 +55,8 @@ export function MultiRecordPicker({
   placeholder = "Select...",
   searchPlaceholder = "Search...",
   emptyText = "No matches",
+  loadingText,
+  errorText,
   removeLabel = (label) => `Remove ${label}`,
   unavailableLabel = (missing) => missing,
   disabled,
@@ -63,6 +68,7 @@ export function MultiRecordPicker({
 }: MultiRecordPickerProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const selected = new Set(value)
 
   const chips: Chip[] = value.map((item) => {
@@ -103,12 +109,15 @@ export function MultiRecordPicker({
                 chip.locked ? "pr-2 text-muted-foreground" : "pr-0.5",
               )}
             >
-              <span className="truncate">{chip.label}</span>
+              <span className="min-w-0 [overflow-wrap:anywhere]">{chip.label}</span>
               {chip.locked || disabled ? null : (
                 <button
                   type="button"
                   aria-label={removeLabel(chip.label)}
-                  onClick={() => remove(chip.value)}
+                  onClick={() => {
+                    triggerRef.current?.focus()
+                    remove(chip.value)
+                  }}
                   className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-coarse:size-8"
                 >
                   <X className="size-3.5" aria-hidden="true" />
@@ -126,6 +135,7 @@ export function MultiRecordPicker({
         }}
       >
         <PopoverTrigger
+          ref={triggerRef}
           disabled={disabled}
           render={
             <button
@@ -144,8 +154,8 @@ export function MultiRecordPicker({
           <span className="truncate">{placeholder}</span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden="true" />
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-(--anchor-width) min-w-64 p-0">
-          <Command>
+        <PopoverContent align="start" className={recordPickerPopupClass}>
+          <Command className="min-h-0">
             <CommandInput
               placeholder={searchPlaceholder}
               value={search}
@@ -153,7 +163,11 @@ export function MultiRecordPicker({
               onKeyDown={removeLast}
             />
             <CommandList aria-multiselectable="true">
-              <CommandEmpty>{emptyText}</CommandEmpty>
+              {errorText ? (
+                <p role="alert" className="px-3 py-2 text-sm text-destructive">{errorText}</p>
+              ) : loadingText ? (
+                <p role="status" className="px-3 py-2 text-sm text-muted-foreground">{loadingText}</p>
+              ) : <CommandEmpty>{emptyText}</CommandEmpty>}
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
@@ -176,7 +190,7 @@ export function MultiRecordPicker({
                   >
                     {selected.has(option.value) && <Check className="size-3.5" />}
                   </span>
-                  {option.label}
+                  <span className="min-w-0 flex-1 whitespace-normal [overflow-wrap:anywhere]">{option.label}</span>
                 </CommandItem>
               ))}
             </CommandList>

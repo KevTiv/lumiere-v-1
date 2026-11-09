@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { fileKindOf, formatFileSize } from "./file-kind"
+import { fileKindOf, formatFileSize, splitFileName } from "./file-kind"
 
 describe("fileKindOf", () => {
   it("reads the MIME type first", () => {
@@ -27,5 +27,13 @@ describe("formatFileSize", () => {
       expect(formatFileSize(missing)).toBe("—")
     }
     expect(formatFileSize(0)).toBe("0 B")
+  })
+})
+
+describe("splitFileName", () => {
+  it("keeps the last extension verbatim without inventing one for dotfiles", () => {
+    expect(splitFileName("Cierre.mensual.2026.PDF")).toEqual({ stem: "Cierre.mensual.2026", extension: ".PDF" })
+    expect(splitFileName(".env")).toEqual({ stem: ".env", extension: "" })
+    expect(splitFileName("folder.with.dots/readme")).toEqual({ stem: "folder.with.dots/readme", extension: "" })
   })
 })

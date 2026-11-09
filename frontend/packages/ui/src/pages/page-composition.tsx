@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import {
   DndContext,
   KeyboardSensor,
@@ -80,6 +81,9 @@ export interface PageCompositionProps {
   isLoading?: boolean
   /** The module's unchanged dashboard, rendered while following its default layout. */
   children?: ReactNode
+  actionTarget?: HTMLElement | null
+  insights?: boolean
+  scopeNote?: string
   className?: string
   testId?: string
 }
@@ -99,6 +103,9 @@ export function PageComposition({
   canEdit = true,
   isLoading = false,
   children,
+  actionTarget,
+  insights = false,
+  scopeNote,
   className,
   testId = "page-composition",
 }: PageCompositionProps) {
@@ -125,6 +132,24 @@ export function PageComposition({
   const [announcement, setAnnouncement] = useState("")
   const [focusRequest, setFocusRequest] = useState<{ id: string } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const launcherRef = useRef<HTMLButtonElement>(null)
+  const focusEditor = useRef(false)
+  const restoreLauncher = useRef(false)
+  useEffect(() => {
+    if (editing && focusEditor.current) {
+      focusEditor.current = false
+      const editor = rootRef.current
+      // A page can put its insights in a collapsed native disclosure. The header
+      // launcher and assistant requests must reveal it before moving focus.
+      for (let ancestor = editor?.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
+      }
+      editor?.focus()
+    } else if (!editing && restoreLauncher.current) {
+      restoreLauncher.current = false
+      launcherRef.current?.focus()
+    }
+  }, [editing])
   const pending = useRef(false)
   const mounted = useRef(true)
   const handledRequest = useRef<string | null>(null)
@@ -218,6 +243,7 @@ export function PageComposition({
   const startEditing = useCallback(() => {
     if (!canEdit || pending.current || isLoading) return false
     if (!editing) {
+      focusEditor.current = true
       dispatch({ type: "start", value })
       setBaseline({ value, revision })
       setEditing(true)
@@ -463,14 +489,46 @@ export function PageComposition({
     }
   }
 
+  const editLabel = insights
+    ? t("pageComposition.editInsights", { defaultValue: "Customize insights" })
+    : t("pageComposition.edit", { defaultValue: "Edit page" })
+  const launcher = canEdit && !editing ? (
+    <Button
+      ref={launcherRef}
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={isLoading}
+      onClick={() => {
+        if (startEditing()) {
+          restoreLauncher.current = true
+        }
+      }}
+    >
+      <Pencil aria-hidden="true" />
+      {editLabel}
+    </Button>
+  ) : null
+  const headerAction = actionTarget && launcher ? createPortal(launcher, actionTarget) : null
+  if (insights && !editing && widgets.length === 0 && actionTarget !== undefined) {
+    return <>{headerAction}<span role="status" className="sr-only">{announcement}</span></>
+  }
+  const showScopeNote = scopeNote && (editing || widgets.some((widget) => widget.source === "saved"))
+
   return (
     <div
       ref={rootRef}
       className={cn("space-y-4", className)}
       data-testid={testId}
       data-editing={editing || undefined}
+      tabIndex={editing ? -1 : undefined}
+      role={insights ? "region" : undefined}
+      aria-label={insights ? t("pageComposition.insights", { defaultValue: "Page insights" }) : undefined}
     >
-      {canEdit || editing ? (
+      {headerAction}
+      {insights ? <h2 className="text-lg font-semibold">{t("pageComposition.insights", { defaultValue: "Page insights" })}</h2> : null}
+      {showScopeNote ? <p className="text-sm text-muted-foreground">{scopeNote}</p> : null}
+      {editing || (launcher && actionTarget === undefined) ? (
         <div
           className={cn(
             "flex flex-wrap items-center justify-between gap-3",
@@ -569,17 +627,7 @@ export function PageComposition({
               </p>
             </>
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              disabled={isLoading}
-              onClick={startEditing}
-            >
-              <Pencil aria-hidden="true" />
-              {t("pageComposition.edit", { defaultValue: "Edit page" })}
-            </Button>
+            <div className="ml-auto">{launcher}</div>
           )}
         </div>
       ) : null}

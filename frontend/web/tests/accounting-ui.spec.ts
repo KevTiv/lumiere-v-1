@@ -57,7 +57,50 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
       await expect(page.locator("html")).toHaveClass(/dark/)
       await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable")
       await page.getByTestId("module-workspace-accounting-ledger").click()
+      await page.getByTestId("module-tab-accounting-move-lines").click()
       await expect(page.getByTestId("fixture-density-cell")).toHaveCSS("padding-top", "10px")
+    })
+
+    test("journal review keeps typed values and actions readable at the viewport", async ({ page }) => {
+      await page.getByTestId("module-workspace-accounting-ledger").click()
+      const invoice = page.getByRole("button", { name: "INV/2026/0901" })
+      if (viewport.width < 1024) await invoice.tap()
+      else await invoice.press("Enter")
+
+      const invoiceDialog = page.getByRole("dialog", { name: "INV/2026/0901" })
+      await expect(invoiceDialog.getByText("Partial", { exact: true })).toBeVisible()
+      await expect(invoiceDialog.locator("dt").filter({ hasText: /^Partner$/ }).locator("xpath=following-sibling::dd")).toHaveText("—")
+      await invoiceDialog.getByRole("button", { name: "Close", exact: true }).click()
+
+      const bill = page.getByRole("button", { name: "BILL/2026/0902" })
+      await bill.press("Enter")
+      const dialog = page.getByRole("dialog", { name: "BILL/2026/0902" })
+      const close = dialog.getByRole("button", { name: "Close", exact: true })
+      const heading = dialog.getByRole("heading", { name: "BILL/2026/0902" })
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByText("Acme Corporation")).toBeVisible()
+      await expect(dialog.getByRole("button", { name: "Cancel entry" })).toBeInViewport()
+      await expect(dialog.getByRole("button", { name: "Post", exact: true })).toBeInViewport()
+      const geometry = await dialog.evaluate((node) => ({
+        width: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+        height: node.clientHeight,
+        scrollHeight: node.scrollHeight,
+      }))
+      expect(geometry.width).toBeLessThanOrEqual(viewport.width - 16)
+      if (viewport.width >= 768) expect(geometry.width).toBeGreaterThan(600)
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.width)
+      expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.height)
+      const [headingBox, closeBox] = await Promise.all([heading.boundingBox(), close.boundingBox()])
+      expect(headingBox).not.toBeNull()
+      expect(closeBox).not.toBeNull()
+      expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(closeBox!.x)
+      await expectNoHorizontalOverflow(page)
+
+      await page.keyboard.press("Escape")
+      await expect(dialog).toBeHidden()
+      await expect(bill).toBeFocused()
+      await expect(page.getByText("Synthetic posting requested")).toHaveCount(0)
     })
 
     test("accountant queues preserve currency and permission boundaries and target exact bank records", async ({ page }, testInfo) => {
@@ -207,6 +250,40 @@ test("refined invoice settings preserve filters, selections, density and unfinis
   await list.getByRole("combobox", { name: "Saved views", exact: true }).click()
   await expect(page.getByRole("option", { name: "Unfinished receivables review", exact: true })).toHaveCount(1)
   await page.keyboard.press("Escape")
+})
+
+test("owner queue filters apply to the worklist and survive record navigation and clearing", async ({ page }) => {
+  const scope = page.getByTestId("owner-queue-scope")
+  const invoiceList = page.getByTestId("accounting-invoice-worklist")
+  const billList = page.getByTestId("accounting-bill-worklist")
+  const invoiceHref = "/accounting?tab=invoices&journey=owner-queue&ownerQueue=overdue-invoices"
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(invoiceHref)
+  await expect(scope).toContainText("Overdue customer balances")
+  await expect(invoiceList.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+  const overdue = invoiceList.getByRole("link", { name: "INV/SYNTHETIC/9007199254740993", exact: true })
+  await overdue.click()
+  await expect(page.getByTestId("return-record-ready")).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByTestId("invoice-page").getByRole("link", { name: "Invoices", exact: true })).toHaveAttribute("href", invoiceHref)
+  await page.goBack()
+  await expect(overdue).toBeVisible()
+  await expect(invoiceList.getByRole("link", { name: "INV/SYNTHETIC/9007199254740992", exact: true })).toHaveCount(0)
+  await scope.getByRole("link", { name: "Clear queue filter" }).click()
+  await expect(scope).toHaveCount(0)
+  await expect(invoiceList.getByRole("link", { name: "INV/SYNTHETIC/9007199254740992", exact: true })).toBeVisible()
+  await page.goBack()
+  await expect(scope).toContainText("Overdue customer balances")
+  await expect(invoiceList.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+
+  await page.goto("/accounting?tab=bills&journey=owner-queue&ownerQueue=draft-bills")
+  await expect(scope).toContainText("Draft vendor bills")
+  await expect(billList.locator('[data-testid^="entity-row-"]')).toHaveCount(1)
+  await expect(billList.getByRole("link", { name: "BILL/SYNTHETIC/DRAFT", exact: true })).toBeVisible()
+  await scope.getByRole("link", { name: "Clear queue filter" }).click()
+  await expect(billList.getByRole("link", { name: "BILL/SYNTHETIC/0201", exact: true })).toBeVisible()
+  await page.goBack()
+  await expect(billList.getByRole("link", { name: "BILL/SYNTHETIC/0201", exact: true })).toHaveCount(0)
+  await expect(scope).toContainText("Draft vendor bills")
 })
 
 for (const width of [390, 1440]) {

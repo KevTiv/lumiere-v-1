@@ -259,7 +259,15 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
       await expect(assignment.getByRole("button", { name: "Reject", exact: true })).toBeVisible()
       await expect(assignment.getByRole("button", { name: "Comment", exact: true })).toBeVisible()
     }
-    await expect(inbox.getByRole("link", { name: /workflow definitions/i })).toBeVisible()
+    const manageRules = inbox.getByRole("link", {
+      name: "Manage approval rules",
+      exact: true,
+    })
+    await expect(manageRules).toHaveAttribute("href", "/workflows")
+    await expectNoAppError(page)
+    await manageRules.click()
+    await expect(page).toHaveURL((url) => url.pathname === "/workflows")
+    await expect(page.getByTestId("module-view-workflows")).toBeVisible()
     await expectNoAppError(page)
   })
 

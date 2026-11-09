@@ -24,7 +24,7 @@ const config: EntityTableConfig = {
   rowKey: "id",
   listViewKey: LIST_VIEW_KEY,
   columns: [
-    { key: "id", label: "ID" },
+    { key: "id", label: "ID", defaultHidden: true },
     { key: "reference", label: "Reference" },
     { key: "status", label: "Status" },
   ],
@@ -85,8 +85,19 @@ describe("EntityTable saved view", () => {
     renderTable()
 
     expect(await screen.findByText("Status", { selector: "th" })).toBeTruthy()
+    expect(screen.getByText("ID", { selector: "th" })).toBeTruthy()
     expect(screen.queryByText("Reference", { selector: "th" })).toBeNull()
     expect(screen.queryByText("SO-001")).toBeNull()
+  })
+
+  it("applies the curated defaults to new lists and lets users show a secondary field", async () => {
+    renderTable()
+    expect(screen.queryByText("ID", { selector: "th" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "View settings", exact: true }))
+    fireEvent.keyDown(screen.getByTestId("entity-columns"), { key: "Enter" })
+    fireEvent.click(await screen.findByTestId("entity-column-toggle-id"))
+    expect(await screen.findByText("ID", { selector: "th" })).toBeTruthy()
+    expect(JSON.parse(window.localStorage.getItem(`${LIST_VIEW_KEY}:view`) ?? "{}").hiddenColumns).toEqual([])
   })
 
   it("groups rows with a header showing each group's total", async () => {

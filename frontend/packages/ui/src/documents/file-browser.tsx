@@ -2,34 +2,26 @@
 
 import { Table, TableBody } from "../components/table"
 
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { DOCUMENT_FILE_ACCEPT } from "@lumiere/erp-shared/document-file-profile"
 import {
   ChevronRight,
-  File,
-  FileArchive,
-  FileAudio,
-  FileCode,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FileVideo,
   Folder,
   FolderPlus,
   LayoutGrid,
   List,
-  Loader2,
   MoreHorizontal,
   Lock,
-  Presentation,
   Search,
   Share2,
   Star,
   Upload,
-  type LucideIcon,
 } from "lucide-react"
 import { cn } from "../lib/utils"
-import { fileKindOf, formatFileSize, type FileKind } from "../lib/file-kind"
+import { formatFileSize } from "../lib/file-kind"
+import { FileIdentity } from "../components/file-identity"
+import { FileUploadField } from "../components/file-upload-field"
 import { formatFileDate } from "../lib/file-metadata"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
@@ -99,19 +91,6 @@ export interface FileBrowserProps {
   className?: string
 }
 
-const KIND_STYLE: Record<FileKind, { icon: LucideIcon; tile: string }> = {
-  pdf: { icon: FileText, tile: "bg-destructive/10 text-destructive" },
-  image: { icon: FileImage, tile: "bg-category-3/10 text-category-3" },
-  spreadsheet: { icon: FileSpreadsheet, tile: "bg-success/10 text-success" },
-  document: { icon: FileText, tile: "bg-info/10 text-info" },
-  presentation: { icon: Presentation, tile: "bg-warning/15 text-warning" },
-  archive: { icon: FileArchive, tile: "bg-muted text-muted-foreground" },
-  video: { icon: FileVideo, tile: "bg-primary/10 text-primary" },
-  audio: { icon: FileAudio, tile: "bg-primary/10 text-primary" },
-  code: { icon: FileCode, tile: "bg-muted text-foreground" },
-  other: { icon: File, tile: "bg-muted text-muted-foreground" },
-}
-
 const FOLDER_TILES = [
   "bg-info/10 text-info",
   "bg-warning/15 text-warning",
@@ -120,16 +99,6 @@ const FOLDER_TILES = [
   "bg-destructive/10 text-destructive",
   "bg-primary/10 text-primary",
 ] as const
-
-export function FileTypeIcon({ mimetype, fileName, className }: { mimetype: string; fileName: string; className?: string }) {
-  const style = KIND_STYLE[fileKindOf(mimetype, fileName)]
-  const Icon = style.icon
-  return (
-    <span className={cn("flex shrink-0 items-center justify-center rounded-lg", style.tile, className ?? "h-9 w-9")}>
-      <Icon className="h-[55%] w-[55%]" aria-hidden />
-    </span>
-  )
-}
 
 function readLayout(key: string | undefined): FileBrowserLayout | null {
   if (!key) return null
@@ -189,10 +158,10 @@ export function FileBrowser({
   const [localState, setLocalState] = useState<FileBrowserState>({ folderId: null, search: "", layout: "grid" })
   const { folderId, search, layout, selectedFileId } = state ?? localState
   const [uploading, setUploading] = useState(false)
-  const [uploadResults, setUploadResults] = useState<Array<{ name: string; status: "uploaded" | "unconfirmed"; error?: string; fileId?: string }>>([])
+  const [uploadResults, setUploadResults] = useState<Array<{ file: File; status: "uploaded" | "unconfirmed"; error?: string; fileId?: string }>>([])
   const uploadBusy = useRef(false)
   const [dragging, setDragging] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const uploadHintId = useId()
 
   useEffect(() => {
     const stored = readLayout(storageKey)
@@ -272,10 +241,10 @@ export function FileBrowser({
       for (const file of picked) {
         try {
           const fileId = await onUpload([file], activeFolderId)
-          setUploadResults((results) => [...results, { name: file.name, status: "uploaded", fileId: fileId || undefined }])
+          setUploadResults((results) => [...results, { file, status: "uploaded", fileId: fileId || undefined }])
         } catch (error) {
           setUploadResults((results) => [...results, {
-            name: file.name, status: "unconfirmed", error: error instanceof Error ? error.message : String(error),
+            file, status: "unconfirmed", error: error instanceof Error ? error.message : String(error),
           }])
         }
       }
@@ -289,6 +258,13 @@ export function FileBrowser({
     event.preventDefault()
     setDragging(false)
     void upload(Array.from(event.dataTransfer.files))
+  }
+
+  const openFromContainer = (file: FileBrowserFile, event: MouseEvent<HTMLElement>) => {
+    const target = event.target
+    // Filename disclosure is an independent control, including when its popup is portaled.
+    if (!(target instanceof Element) || !event.currentTarget.contains(target) || target.closest("button,a")) return
+    onOpenFile?.(file.id)
   }
 
   const sectionTitle = openFolder ? openFolder.name : t("documents.browser.allFiles")
@@ -314,45 +290,48 @@ export function FileBrowser({
             </Button>
           ) : null}
           {onUpload ? (
-            <>
-              <Button
-                size="sm"
-                className="min-h-11 flex-1 sm:min-h-8 sm:flex-none"
-                disabled={uploading}
-                onClick={() => inputRef.current?.click()}
-                data-testid="file-browser-upload"
-              >
-                {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                {uploading ? t("documents.browser.uploading") : t("documents.browser.upload")}
-              </Button>
-              <input
-                ref={inputRef}
-                type="file"
-                multiple
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden
-                data-testid="file-browser-input"
-                onChange={(event) => {
-                  const picked = Array.from(event.target.files ?? [])
-                  event.target.value = ""
-                  void upload(picked)
-                }}
-              />
-            </>
+            <FileUploadField
+              multiple
+              accept={DOCUMENT_FILE_ACCEPT}
+              disabled={uploading}
+              data-testid="file-browser-input"
+              chooseTestId="file-browser-upload"
+              chooseClassName="min-h-11 w-full sm:min-h-8"
+              className="flex-1"
+              chooseLabel={uploading
+                ? t("documents.browser.uploading")
+                : t("documents.browser.uploadFiles", { defaultValue: "Upload files" })}
+              aria-describedby={uploadHintId}
+              onSelect={(files) => void upload(files)}
+            />
           ) : null}
         </div>
       </div>
+      {onUpload ? (
+        <p id={uploadHintId} className="-mt-3 text-xs text-muted-foreground">
+          {t("documents.browser.uploadHint", {
+            defaultValue: "Uploads start as soon as you choose or drop files. PDF up to 16 MiB; PNG, JPEG or WebP up to 20 MiB; XLSX up to 5 MB; CSV, text or JSON up to 2 MB.",
+          })}
+        </p>
+      ) : null}
       {uploadResults.length > 0 ? (
         <div className="space-y-2 rounded-lg border p-3 text-sm" aria-live="polite" data-testid="file-browser-upload-results">
           <ul className="space-y-1">
             {uploadResults.map((result, index) => (
               <li key={index} className="break-words" role={result.status === "unconfirmed" ? "alert" : undefined}>
-                <span className="font-medium">{result.name}</span>{" · "}
-                {result.status === "uploaded"
-                  ? t("documents.browser.uploaded", { defaultValue: "Uploaded" })
-                  : <span className="text-destructive">{result.error}</span>}
-                {result.fileId && onOpenFile ? <Button className="ml-2" variant="link" size="sm" onClick={() => onOpenFile(result.fileId!)}>{t("documents.browser.openUploaded", { defaultValue: "Open file" })}</Button> : null}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <FileIdentity
+                    className="flex-1"
+                    fileName={result.file.name}
+                    mimetype={result.file.type}
+                    size={result.file.size}
+                    status={result.status === "uploaded"
+                      ? t("documents.browser.uploaded", { defaultValue: "Uploaded" })
+                      : t("documents.browser.uploadUnconfirmed", { defaultValue: "Upload not confirmed" })}
+                  />
+                  {result.fileId && onOpenFile ? <Button variant="link" size="sm" onClick={() => onOpenFile(result.fileId!)}>{t("documents.browser.openUploaded", { defaultValue: "Open file" })}</Button> : null}
+                </div>
+                {result.error ? <p className="text-destructive">{result.error}</p> : null}
               </li>
             ))}
           </ul>
@@ -377,9 +356,9 @@ export function FileBrowser({
             <li key={folder.id} className="flex min-w-0 items-center gap-1">
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               {folder.id === activeFolderId ? (
-                <span className="truncate font-medium" aria-current="page">{folder.name}</span>
+                <span className="font-medium [overflow-wrap:anywhere]" aria-current="page">{folder.name}</span>
               ) : (
-                <button type="button" className="truncate text-muted-foreground hover:text-foreground" onClick={() => changeState({ folderId: folder.id })}>
+                <button type="button" className="min-w-0 text-left text-muted-foreground [overflow-wrap:anywhere] hover:text-foreground" onClick={() => changeState({ folderId: folder.id })}>
                   {folder.name}
                 </button>
               )}
@@ -414,7 +393,7 @@ export function FileBrowser({
                     type="button"
                     onClick={() => changeState({ folderId: folder.id })}
                     data-testid={`file-browser-folder-${folder.id}`}
-                    className="flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40"
+                    className="flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40"
                   >
                     <div className={cn("flex items-start justify-between gap-2", (onRenameFolder || onMoveFolder || onTrashFolder) && "pr-8")}>
                       <span className={cn("flex h-10 w-10 items-center justify-center rounded-lg", FOLDER_TILES[index % FOLDER_TILES.length])}>
@@ -423,7 +402,7 @@ export function FileBrowser({
                       {folder.isFavorite ? <Star className="h-4 w-4 fill-warning text-warning" aria-label="Favorite" /> : null}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{folder.name}</p>
+                      <p className="text-sm font-medium [overflow-wrap:anywhere]">{folder.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {t("documents.browser.filesLoaded", { count: folder.fileCount, defaultValue: "{{count}} loaded files" })} · {sizeLabel(folder.totalSize)}
                       </p>
@@ -469,7 +448,7 @@ export function FileBrowser({
       >
         <div className="flex items-center gap-2">
           <h3 id="file-browser-files" className="flex min-w-0 items-center gap-1 text-sm font-semibold">
-            <span className="truncate">{sectionTitle}</span>
+            <span className="[overflow-wrap:anywhere]">{sectionTitle}</span>
             <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal tabular-nums text-muted-foreground">
               {visibleFiles.length}
             </span>
@@ -507,34 +486,37 @@ export function FileBrowser({
             description={onUpload && !search ? t("documents.browser.dropHint") : undefined}
           />
         ) : layout === "grid" ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" data-testid="file-browser-grid">
+          <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,17rem),1fr))] gap-3" data-testid="file-browser-grid">
             {visibleFiles.map((file) => (
-              <button
+              <li
                 key={file.id}
-                type="button"
-                onClick={onOpenFile ? () => onOpenFile(file.id) : undefined}
-                className={cn("flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-xs transition-colors hover:border-primary/40", selectedFileId === file.id && "border-primary ring-1 ring-primary/20")}
+                className={cn("relative min-w-0 space-y-3 rounded-xl border border-border bg-card p-3 text-sm", selectedFileId === file.id && "border-primary ring-1 ring-primary/20")}
                 data-state={selectedFileId === file.id ? "selected" : undefined}
+                onClick={onOpenFile ? (event) => openFromContainer(file, event) : undefined}
                 data-testid={`file-browser-file-${file.id}`}
               >
-                <div className="flex items-start justify-between">
-                  <FileTypeIcon mimetype={file.mimetype} fileName={file.fileName} className="h-10 w-10" />
-                  <FileFlags file={file} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium" title={file.name}>
-                    {file.name}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {sizeLabel(file.size)} · {fileDateLabel(file)}
-                  </p>
-                </div>
-              </button>
+                <FileIdentity
+                  variant="card"
+                  title={file.name}
+                  fileName={file.fileName}
+                  mimetype={file.mimetype}
+                  size={file.size}
+                  onOpen={onOpenFile ? () => onOpenFile(file.id) : undefined}
+                />
+                <FileFlags file={file} className="absolute top-3 right-3" />
+                <p className="text-xs text-muted-foreground">{fileDateLabel(file)}</p>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-card" data-testid="file-browser-list">
-            <Table className="w-full min-w-[36rem] text-sm">
+            <Table className="w-full min-w-[36rem] table-fixed text-sm">
+              <colgroup>
+                <col />
+                <col className="w-20" />
+                <col className="w-28" />
+                <col className="w-40" />
+              </colgroup>
               <thead className="bg-muted/25 text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">{t("documents.browser.name")}</th>
@@ -548,24 +530,24 @@ export function FileBrowser({
                   <tr
                     key={file.id}
                     className={cn(onOpenFile && "cursor-pointer hover:bg-muted/40", selectedFileId === file.id && "bg-primary/5")}
+                    onClick={onOpenFile ? (event) => openFromContainer(file, event) : undefined}
                     data-state={selectedFileId === file.id ? "selected" : undefined}
-                    onClick={onOpenFile ? () => onOpenFile(file.id) : undefined}
                     data-testid={`file-browser-row-${file.id}`}
                   >
                     <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <FileTypeIcon mimetype={file.mimetype} fileName={file.fileName} className="h-8 w-8" />
-                        <div className="min-w-0">
-                          {onOpenFile ? (
-                            <button type="button" className="min-h-11 truncate text-left font-medium hover:underline sm:min-h-0" onClick={(event) => { event.stopPropagation(); onOpenFile(file.id) }}>{file.name}</button>
-                          ) : <p className="truncate font-medium">{file.name}</p>}
-                          <p className="truncate text-xs text-muted-foreground">{file.fileName}</p>
-                        </div>
+                      <div className="flex min-w-0 items-start gap-2">
+                        <FileIdentity
+                          className="flex-1"
+                          title={file.name}
+                          fileName={file.fileName}
+                          mimetype={file.mimetype}
+                          onOpen={onOpenFile ? () => onOpenFile(file.id) : undefined}
+                        />
                         <FileFlags file={file} />
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">{sizeLabel(file.size)}</td>
-                    <td className="truncate px-3 py-2 text-muted-foreground">{file.modifiedBy}</td>
+                    <td className="px-3 py-2 text-muted-foreground [overflow-wrap:anywhere]">{file.modifiedBy}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{fileDateLabel(file)}</td>
                   </tr>
                 ))}
@@ -578,10 +560,10 @@ export function FileBrowser({
   )
 }
 
-function FileFlags({ file }: { file: FileBrowserFile }) {
+function FileFlags({ file, className }: { file: FileBrowserFile; className?: string }) {
   if (!file.isLocked && !file.isShared && !file.isFavorite) return null
   return (
-    <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+    <span className={cn("flex shrink-0 items-center gap-1 text-muted-foreground", className)}>
       {file.isFavorite ? <Star className="h-3.5 w-3.5 fill-warning text-warning" aria-label="Favorite" /> : null}
       {file.isShared ? <Share2 className="h-3.5 w-3.5" aria-label="Shared" /> : null}
       {file.isLocked ? <Lock className="h-3.5 w-3.5" aria-label="Locked" /> : null}

@@ -16,13 +16,15 @@ import type { Role, User } from "../lib/rbac-types"
 import { RBACProvider } from "../lib/rbac-context"
 import {
   AssistantNativeFormProvider,
+  type NativeFormActivationResult,
   useAssistantNativeFormController,
 } from "../components/assistant-native-form-provider"
 
+const route = vi.hoisted(() => ({ search: "tab=orders" }))
 vi.mock("next/navigation", () => ({
   usePathname: () => "/sales",
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams("tab=orders"),
+  useSearchParams: () => new URLSearchParams(route.search),
 }))
 vi.mock("@lumiere/erp-session", () => ({
   useErpSession: () => ({
@@ -120,15 +122,13 @@ const role = (allowed: boolean): Role => ({
   createdAt: "",
   updatedAt: "",
   permissions: allowed
-    ? [
-        {
-          id: "create-order",
-          subject: "clerk",
-          resource: "sale_order",
-          action: "create",
-          effect: "allow",
-        },
-      ]
+    ? (["read", "create"] as const).map((action) => ({
+        id: `${action}-order`,
+        subject: "clerk",
+        resource: "sale_order",
+        action,
+        effect: "allow",
+      }))
     : [],
 })
 
@@ -167,6 +167,7 @@ function Fixture({
   state = { status: "ready" },
   submit = vi.fn(),
   bindSubmit = true,
+  onActivationReturn,
 }: {
   scope?: string
   allowed?: boolean
@@ -176,8 +177,10 @@ function Fixture({
     tabId: string,
     action: string,
     values: Record<string, unknown>,
-  ) => void
+    onActivationSaved?: (recordId: string) => void,
+  ) => void | Promise<void>
   bindSubmit?: boolean
+  onActivationReturn?: (result: NativeFormActivationResult) => void
 }) {
   const controller = useAssistantNativeFormController(scope)
   return (
@@ -192,6 +195,7 @@ function Fixture({
             moduleId: "sales",
             tabId: "orders",
             prompt: "Create an order with my reference",
+            onActivationReturn,
           })
         }
       >
@@ -250,7 +254,10 @@ beforeAll(() => {
       configurable: true,
     })
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  route.search = "tab=orders"
+})
 
 describe("assistant requests through the native module form owner", () => {
   it("retains native dialog focus and unsent text when a full chat action docks the assistant", async () => {
@@ -394,5 +401,42 @@ describe("assistant requests through the native module form owner", () => {
     expect(
       (screen.getByTestId("form-field-reference") as HTMLInputElement).value,
     ).toBe("My retained draft")
+  })
+})
+
+describe("onboarding returns through the native module form owner", () => {
+  it("returns the exact saved ID only after successful native submit", async () => {
+    route.search = "tab=orders&activationForm=first"
+    const onActivationReturn = vi.fn()
+    const submit = vi.fn<NonNullable<React.ComponentProps<typeof ModuleView>["onFormSubmit"]>>()
+      .mockRejectedValueOnce(new Error("Save failed"))
+      .mockImplementationOnce((_tab, _action, _values, saved) => saved?.("9007199254740993"))
+    render(<Fixture submit={submit} onActivationReturn={onActivationReturn} />)
+    fireEvent.click(screen.getByTestId("request-native-form"))
+    const field = await screen.findByTestId("form-field-reference") as HTMLInputElement
+    fireEvent.change(field, { target: { value: "My quotation" } })
+    fireEvent.click(screen.getByTestId("form-submit-assistant-test-order"))
+    expect(await screen.findByText("Save failed")).toBeTruthy()
+    expect(field.value).toBe("My quotation")
+    expect(onActivationReturn).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId("form-submit-assistant-test-order"))
+    await waitFor(() => expect(onActivationReturn).toHaveBeenCalledExactlyOnceWith({
+      status: "saved", recordId: "9007199254740993",
+    }))
+  })
+
+  it("waits for native discard confirmation before returning a cancellation", async () => {
+    route.search = "tab=orders&activationForm=first"
+    const onActivationReturn = vi.fn()
+    render(<Fixture onActivationReturn={onActivationReturn} />)
+    fireEvent.click(screen.getByTestId("request-native-form"))
+    fireEvent.change(await screen.findByTestId("form-field-reference"), {
+      target: { value: "Unsaved quotation" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
+    expect(await screen.findByTestId("discard-changes-dialog")).toBeTruthy()
+    expect(onActivationReturn).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId("discard-changes-confirm"))
+    await waitFor(() => expect(onActivationReturn).toHaveBeenCalledExactlyOnceWith({ status: "cancelled" }))
   })
 })

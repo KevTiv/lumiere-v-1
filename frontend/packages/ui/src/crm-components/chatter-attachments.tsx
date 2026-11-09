@@ -2,6 +2,10 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { X } from "lucide-react"
+import { Button } from "../components/button"
+import { FileUploadField } from "../components/file-upload-field"
+import { FileIdentity } from "../components/file-identity"
 
 /** Uploads one file as a document filed on the host record and resolves the created document id. */
 export type ChatterUploadFn = (file: File, host: { resModel: string; resId: bigint }) => Promise<bigint>
@@ -147,46 +151,52 @@ export function ChatterAttachmentPicker({
   disabled?: boolean
 }) {
   const { t } = useTranslation()
+  const chooserRef = useRef<HTMLDivElement>(null)
   return (
     <div className="space-y-1" data-testid="record-chatter-attachments">
-      <input
-        type="file"
-        multiple
-        disabled={disabled}
-        aria-label={t("crm.chatter.attachFiles", { defaultValue: "Attach files" })}
-        data-testid="record-chatter-attach-input"
-        className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1"
-        onChange={(e) => {
-          onAdd(Array.from(e.target.files ?? []))
-          e.target.value = ""
-        }}
-      />
+      <div ref={chooserRef}>
+        <FileUploadField
+          multiple
+          disabled={disabled}
+          aria-label={t("crm.chatter.attachFiles", { defaultValue: "Attach files" })}
+          chooseLabel={t("crm.chatter.chooseFiles", { defaultValue: "Choose files" })}
+          data-testid="record-chatter-attach-input"
+          onSelect={onAdd}
+        />
+      </div>
       {items.length > 0 ? (
         <ul className="space-y-1">
           {items.map((item) => (
             <li
               key={item.key}
-              className="flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-xs"
+              className="flex items-start justify-between gap-2 rounded-md border px-2 py-2 text-sm"
               data-testid={`record-chatter-attachment-${item.status}`}
             >
-              <span className="min-w-0 truncate">{item.file.name}</span>
-              <span className={item.status === "error" ? "text-destructive" : "text-muted-foreground"}>
-                {item.status === "error"
-                  ? item.error
-                  : t(`crm.chatter.attachmentStatus.${item.status}`, {
-                      defaultValue: { queued: "Ready", uploading: "Uploading…", done: "Uploaded" }[item.status],
-                    })}
-              </span>
-              <button
+              <div className="min-w-0 flex-1">
+                <FileIdentity
+                  fileName={item.file.name}
+                  mimetype={item.file.type}
+                  size={item.file.size}
+                  status={t(`crm.chatter.attachmentStatus.${item.status}`, {
+                    defaultValue: { queued: "Selected", uploading: "Uploading…", done: "Uploaded", error: "Upload failed" }[item.status],
+                  })}
+                />
+                {item.error ? <p role="alert" className="mt-1 text-xs text-destructive [overflow-wrap:anywhere]">{item.error}</p> : null}
+              </div>
+              <Button
                 type="button"
-                className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                variant="ghost"
+                size="icon-sm"
                 disabled={item.status === "uploading"}
-                aria-label={t("crm.chatter.removeAttachment", { defaultValue: "Remove" })}
+                aria-label={t("crm.chatter.removeNamedAttachment", { defaultValue: "Remove {{name}}", name: item.file.name })}
                 data-testid="record-chatter-attachment-remove"
-                onClick={() => onRemove(item.key)}
+                onClick={() => {
+                  chooserRef.current?.querySelector("button")?.focus()
+                  onRemove(item.key)
+                }}
               >
-                ×
-              </button>
+                <X aria-hidden />
+              </Button>
             </li>
           ))}
         </ul>

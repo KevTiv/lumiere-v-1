@@ -43,6 +43,9 @@ export function WorkActivitiesContent({
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
+  const ownership = (row: WorkActivityRow) => row.workAssignedToMe
+    ? t("workBoard.mineBadge")
+    : row.workIsAssigned ? t("workBoard.assigned", { defaultValue: "Assigned" }) : t("tasks.assignee.unassigned")
   const query = useWorkActivities(scope, online)
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -301,7 +304,7 @@ export function WorkActivitiesContent({
                     <th className="p-3">{t("workBoard.followUp")}</th>
                     <th className="p-3">{t("workBoard.scope")}</th>
                     <th className="p-3">{t("workspace.dailyWork.due", { defaultValue: "Due" })}</th>
-                    <th className="p-3">{t("workBoard.statusLabel")}</th>
+                    <th scope="col" className="p-3">{t("workBoard.statusLabel")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,14 +317,13 @@ export function WorkActivitiesContent({
                       <td className="p-3">
                         <button
                           type="button"
-                          className="min-h-11 text-left font-medium underline-offset-4 hover:underline"
+                          className="min-h-11 text-left font-medium underline-offset-4 hover:underline [overflow-wrap:anywhere]"
                           onClick={() => openReview(row)}
                         >
                           {title(row)}
                         </button>
-                        <p className="text-xs text-muted-foreground">
-                          {row.workSourceTitle}
-                        </p>
+                        <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{row.workSourceTitle}</p>
+                        <p className="text-xs text-muted-foreground">{ownership(row)}</p>
                       </td>
                       <td className="p-3">
                         {t(`workBoard.module.${row.workModule}`)}
@@ -357,7 +359,7 @@ export function WorkActivitiesContent({
           if (!open && !complete.isPending) setReview(null)
         }}
       >
-        <SheetContent className="overflow-y-auto sm:max-w-lg">
+        <SheetContent size="record">
           <SheetHeader>
             <SheetTitle>
               {current ? title(current) : t("workBoard.followUp")}
@@ -365,7 +367,12 @@ export function WorkActivitiesContent({
             <SheetDescription>{t("workBoard.followUpReview")}</SheetDescription>
           </SheetHeader>
           {review && current && (
-            <div className="space-y-4 p-4">
+            <div className="space-y-4 p-4 [overflow-wrap:anywhere]">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>{ownership(current)}</span>
+                <span aria-hidden="true">·</span>
+                <span>{current.dateDeadline || (current.dateDeadline === undefined ? groupLabels.unavailable : groupLabels.undated)}</span>
+              </div>
               <Badge variant="secondary">
                 {current.isDone
                   ? t("workBoard.status.Completed")

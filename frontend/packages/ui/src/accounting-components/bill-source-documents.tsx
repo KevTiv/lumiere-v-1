@@ -5,8 +5,9 @@ import { billDocumentContentType, BILL_DOCUMENT_FILE_HINT, BILL_DOCUMENT_IMAGE_H
 import { useTranslation } from "@lumiere/i18n"
 import type { ModuleDataState } from "../lib/module-data-state"
 import { ModuleDataNotice } from "../pages/module-data-notice"
+import { FileIdentity } from "../components/file-identity"
 import { Button } from "../components/button"
-import { Input } from "../components/input"
+import { FileUploadField } from "../components/file-upload-field"
 import { Label } from "../components/label"
 import { billSourceDocuments, documentId as id, documentOptional as optional, type BillSourceDocument } from "../lib/bill-source-document-model"
 
@@ -37,11 +38,41 @@ function ScopedBillSourceDocuments(props: BillSourceDocumentsProps) {
   return <section className="space-y-3 rounded-md border bg-muted/20 p-3" aria-label={t("accounting.billDocuments.title", { defaultValue: "Supplier documents and receipts" })}>
     <h4 className="text-sm font-medium">{t("accounting.billDocuments.title", { defaultValue: "Supplier documents and receipts" })}</h4>
     {props.sourceState.status !== "ready" ? props.sourceState.status === "loading" ? <p role="status" className="text-sm">{t("common.loading", { defaultValue: "Loading…" })}</p> : <ModuleDataNotice state={props.sourceState} /> : linked == null ? <p role="alert" className="text-sm text-destructive">{t("accounting.billDocuments.scopeUnavailable", { defaultValue: "Document links or ownership could not be verified. Refresh before attaching a file." })}</p> : <>
-      {linked.length ? <ul className="space-y-1 text-sm">{linked.map((document) => <li key={String(document.id)}>{props.onOpen ? <button type="button" className="text-left text-primary underline" onClick={() => props.onOpen?.(String(id(document.id)))}>{String(optional(document.name) ?? optional(document.fileName ?? document.file_name) ?? `#${String(document.id)}`)}</button> : <a className="text-primary underline" href={`/documents/${id(document.id)}`}>{String(optional(document.name) ?? optional(document.fileName ?? document.file_name) ?? `#${String(document.id)}`)}</a>}</li>)}</ul> : <p className="text-sm text-muted-foreground">{t("accounting.billDocuments.empty", { defaultValue: "No supplier documents linked to this bill." })}</p>}
+      {linked.length ? (
+        <ul className="divide-y divide-border text-sm">
+          {linked.map((document) => {
+            const documentId = id(document.id)
+            const name = optional(document.name)
+            const fileName = optional(document.fileName ?? document.file_name)
+            const mimetype = optional(document.mimetype)
+            if (!documentId) return null
+            return (
+              <li key={documentId} className="py-2">
+                <FileIdentity
+                  title={typeof name === "string" ? name : undefined}
+                  fileName={typeof fileName === "string" ? fileName : undefined}
+                  mimetype={typeof mimetype === "string" ? mimetype : undefined}
+                  size={optional(document.fileSize ?? document.file_size)}
+                  onOpen={props.onOpen ? () => props.onOpen?.(documentId) : undefined}
+                  href={`/documents/${documentId}`}
+                />
+              </li>
+            )
+          })}
+        </ul>
+      ) : <p className="text-sm text-muted-foreground">{t("accounting.billDocuments.empty", { defaultValue: "No supplier documents linked to this bill." })}</p>}
       {props.onUpload ? <div className="space-y-2">
         <Label htmlFor={`bill-source-file-${String(props.billId)}`}>{t("accounting.billDocuments.file", { defaultValue: BILL_DOCUMENT_FILE_HINT })}</Label>
         <p className="text-xs text-muted-foreground">{t("accounting.billDocuments.imageLimits", { defaultValue: BILL_DOCUMENT_IMAGE_HINT })}</p>
-        <Input id={`bill-source-file-${String(props.billId)}`} type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp" disabled={blocked} onChange={(event) => { setFile(event.target.files?.[0] ?? null); setLocalError(null) }} />
+        <FileUploadField
+          id={`bill-source-file-${String(props.billId)}`}
+          accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp"
+          chooseLabel={t("documents.attachments.choose", { defaultValue: "Choose file" })}
+          disabled={blocked}
+          files={file ? [{ id: "selected", name: file.name, mimetype: file.type, size: file.size }] : []}
+          onSelect={([picked]) => { if (picked) { setFile(picked); setLocalError(null) } }}
+          onRemove={() => { setFile(null); setLocalError(null) }}
+        />
         <Button type="button" variant="outline" size="sm" disabled={blocked || !file} onClick={async () => {
           if (!file || !props.onUpload || blocked) return
           try { billDocumentContentType(file) } catch (cause) { setLocalError(cause instanceof Error ? cause.message : String(cause)); return }

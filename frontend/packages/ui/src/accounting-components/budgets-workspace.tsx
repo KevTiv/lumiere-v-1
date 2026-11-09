@@ -495,7 +495,7 @@ export function BudgetsWorkspace({
       </Card>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent size="form" className="overflow-y-auto">
           {selected && (
             <>
               <SheetHeader>

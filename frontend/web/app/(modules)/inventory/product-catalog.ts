@@ -6,6 +6,7 @@ import type {
   EntityViewConfig,
 } from "@lumiere/ui/lib/entity-view-types";
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
+import { entityColumnLayouts as layout } from "@lumiere/ui/lib/entity-column-layouts";
 import {
   getRowField,
   unwrapEntityValue,
@@ -157,6 +158,7 @@ export function productCatalogWorkspace(
                         "inventory.forms.newProductCategory.fields.parentId",
                       ),
                       type: "text" as const,
+                      layout: layout.location,
                     }
                   : column,
               ),
@@ -220,19 +222,20 @@ export function productCatalogTable(
           key: "categoryName",
           label: t("inventory.forms.newProduct.fields.categId"),
           sortable: true,
-          width: "min-w-28",
+          layout: layout.location,
         },
         {
           key: "unitName",
           label: t("inventory.forms.newProduct.fields.uomId"),
           sortable: true,
-          width: "min-w-24",
+          layout: layout.unit,
         },
         ...remaining.slice(1),
         {
           key: "active",
           label: t("inventory.products.detail.active"),
           type: "status",
+          layout: layout.status,
           badgeLabels: {
             true: t("common.active"),
             false: t("common.inactive"),

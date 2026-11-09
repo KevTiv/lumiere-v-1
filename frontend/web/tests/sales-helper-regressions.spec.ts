@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { chooseSelectOptionByLabel, chooseSelectOptionByValue, expectRowActionsOffered, fillField, selectModuleTab, submitForm } from './e2e/helpers';
+import { chooseSelectOptionByLabel, chooseSelectOptionByValue, expectRowActionsOffered, fillField, selectEntityRowById, selectModuleTab, submitForm } from './e2e/helpers';
 
 test('row-action helper selects a report without opening its record', async ({ page }) => {
   await page.goto('/helper-regressions');
@@ -10,6 +10,23 @@ test('row-action helper selects a report without opening its record', async ({ p
   await expect(page.getByTestId('opened-report')).toHaveText('');
   await expectRowActionsOffered(page, ['submit-sheets']);
   await expect(page.getByTestId('entity-select-row-report-1')).toBeChecked();
+});
+
+test('exact row selection keeps one report selected across repeated and changed targets', async ({ page }) => {
+  await page.goto('/helper-regressions');
+  await expect(page.getByTestId('helper-fixture')).toHaveAttribute('data-hydrated', 'true');
+  const clippedReport = page.getByRole('button', { name: /long synthetic expense report/ });
+  await expect(clippedReport).toBeVisible();
+  await selectEntityRowById(page, 'report-1');
+  await selectEntityRowById(page, 'report-1');
+  await expect(page.getByTestId('entity-select-row-report-1')).toBeChecked();
+
+  await selectEntityRowById(page, 'report-0');
+  await expect(page.getByTestId('entity-select-row-report-1')).not.toBeChecked();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('opened-report')).toHaveText('');
+  await page.getByTestId('entity-action-submit-sheets').click();
+  await expect(page.getByTestId('submitted-reports')).toHaveText('report-0');
 });
 
 test('confirmed discard opens a fresh form when the same dialog is reopened', async ({ page }) => {

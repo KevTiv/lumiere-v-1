@@ -76,7 +76,7 @@ export function SubscriptionCreateDialog({ open, onClose, scope, orders, plans, 
   return <>
     {unsaved}
     <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <DialogContent className="flex max-h-[86dvh] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-[920px]" data-testid="subscription-create-dialog">
+      <DialogContent size="record" className="flex min-h-0 flex-col gap-0 overflow-hidden p-0" data-testid="subscription-create-dialog">
         <DialogHeader className="shrink-0 space-y-3 border-b px-6 py-5 pr-12">
           <DialogTitle>{t('subscriptions.workflow.newSubscription')}</DialogTitle>
           <DialogDescription>{t('subscriptions.workflow.stepProgress', { current: step + 1, total: STEPS.length, step: t(`subscriptions.workflow.steps.${STEPS[step]}`) })}</DialogDescription>

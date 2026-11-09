@@ -14,9 +14,15 @@ function tableChildren(children: React.ReactNode, prefix = ""): React.ReactNode[
 }
 
 /** Tables page at 25 rows unless their owner supplies its own pagination. */
-function Table({ className, children, pagination = true, ...props }: React.ComponentProps<"table"> & {
+interface TableProps extends React.ComponentProps<"table"> {
   pagination?: boolean
-}) {
+  /** Keeps dense collections within the viewport and pins their column headings. */
+  bounded?: boolean
+  viewportLabel?: string
+  viewportRef?: React.Ref<HTMLDivElement>
+}
+
+function Table({ className, children, pagination = true, bounded, viewportLabel, viewportRef, ...props }: TableProps) {
   const parts = tableChildren(children)
   const bodies = parts.filter((part): part is React.ReactElement<React.ComponentProps<typeof TableBody>> =>
     React.isValidElement(part) && part.type === TableBody,
@@ -38,12 +44,23 @@ function Table({ className, children, pagination = true, ...props }: React.Compo
   return (
     <>
       <div
+        ref={viewportRef}
         data-slot="table-container"
-        className="relative min-w-0 w-full max-w-full overflow-x-auto"
+        role={viewportLabel ? "region" : undefined}
+        aria-label={viewportLabel}
+        tabIndex={viewportLabel ? 0 : undefined}
+        className={cn(
+          "relative min-w-0 w-full max-w-full overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          bounded && "max-h-[min(36rem,60dvh)] overflow-auto [scroll-padding-top:var(--table-head-height,2.5rem)]",
+        )}
       >
         <table
           data-slot="table"
-          className={cn("w-full caption-bottom text-sm", className)}
+          className={cn(
+            "w-full caption-bottom text-sm",
+            bounded && "[&>thead]:sticky [&>thead]:top-0 [&>thead]:z-10 [&>thead]:bg-muted [&>thead]:shadow-[0_1px_0_var(--border)]",
+            className,
+          )}
           {...props}
         >
           {content}

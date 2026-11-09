@@ -39,6 +39,8 @@ import { ReconciliationMoveLineProvider } from "@lumiere/ui/forms/reconciliation
 import { reconciliationAccountChoices, reconciliationPartnerChoices, reconciliationSelectionIssue, type ReconciliationSelectionIssue } from "@lumiere/ui/lib/reconciliation-widget-choices"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { OwnerQueueScope } from "../../../components/owner-queue-scope"
+import { isDraftVendorBill, isOwnerQueue, overdueInvoiceInputsComplete, overduePostedInvoices } from "@/lib/owner-queues"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
 import { useErpSession } from "@lumiere/erp-session"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
@@ -1554,9 +1556,9 @@ function AccountingClientReady({
         Cancelled: "destructive",
       } as Record<string, BadgeVariant>,
       badgeLabels: {
-        Draft: "Draft",
-        Posted: "Posted",
-        Cancelled: "Cancelled",
+        Draft: t("accounting.states.draft"),
+        Posted: t("accounting.states.posted"),
+        Cancelled: t("accounting.states.cancelled"),
       },
     }
     const linesConfig = accountMoveLinesTableConfig(t, {
@@ -3828,14 +3830,28 @@ function AccountingClientReady({
   }, [selectedInvoice?.id, router])
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const invoices = useMemo(
-    () => allMoves.filter((m) => m.organizationId === orgId && m.companyId === operatingCompanyId && moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
+  const companyMoves = useMemo(
+    () => allMoves.filter((move) => move.organizationId === orgId && move.companyId === operatingCompanyId),
     [allMoves, orgId, operatingCompanyId],
+  )
+  const invoices = useMemo(
+    () => companyMoves.filter((move) => moveTypeTag(move as Record<string, unknown>) === "OutInvoice"),
+    [companyMoves],
   )
   const bills = useMemo(
-    () => allMoves.filter((m) => m.organizationId === orgId && m.companyId === operatingCompanyId && moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
-    [allMoves, orgId, operatingCompanyId],
+    () => companyMoves.filter((move) => moveTypeTag(move as Record<string, unknown>) === "InInvoice"),
+    [companyMoves],
   )
+
+  const queueParam = searchParams.get("ownerQueue")
+  const overdueQueue = isOwnerQueue("overdueInvoices", accountingActiveTab, queueParam)
+  const draftBillQueue = isOwnerQueue("draftBills", accountingActiveTab, queueParam)
+  const moveListState = mergeModuleStates([allMovesRead.state, currenciesRead.state])
+  const invoiceListState = overdueQueue && moveListState.status === "ready" && !overdueInvoiceInputsComplete(companyMoves)
+    ? { status: "error" as const, message: t("overview.financial.incompleteSource", { defaultValue: "Required financial fields unavailable" }) }
+    : moveListState
+  const invoiceListRows = useMemo(() => overdueQueue ? overduePostedInvoices(companyMoves) : invoices, [overdueQueue, companyMoves, invoices])
+  const billListRows = useMemo(() => draftBillQueue ? companyMoves.filter(isDraftVendorBill) : bills, [draftBillQueue, companyMoves, bills])
 
   const bankStatementMoney = (value: unknown) => formatInvoiceMoney(typeof value === "number" ? value : null, {
     id: currentBankStatement ? String(currentBankStatement.currencyId) : undefined,
@@ -4077,7 +4093,7 @@ function AccountingClientReady({
       journalsRead.state,
     ]),
     bills: mergeModuleStates([
-      allMovesRead.state,
+      draftBillQueue ? moveListState : allMovesRead.state,
       accountMoveLinesRead.state,
       accountsRead.state,
       saleOrdersRead.state,
@@ -4718,15 +4734,17 @@ function AccountingClientReady({
                 customContent: (
                   <div className="space-y-8">
                   <ListPivotSwitch
-                    storageId={`accounting-invoices-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}`}
+                    key={overdueQueue ? "overdue" : "all"}
+                    storageId={`accounting-invoices-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}${overdueQueue ? ":overdue" : ""}`}
                     t={t}
-                    rows={copyAsRecords(invoices)}
+                    rows={copyAsRecords(overdueQueue && invoiceListState.status !== "ready" ? [] : invoiceListRows)}
                     {...accountMovePivotSetup(t)}
                   >
                   <InvoiceListView
-                    invoices={invoices}
+                    invoices={invoiceListRows}
                     worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
-                    sourceState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
+                    preferenceContext={overdueQueue ? "overdue" : undefined}
+                    sourceState={invoiceListState}
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
@@ -4739,7 +4757,7 @@ function AccountingClientReady({
                     }
                   />
                   </ListPivotSwitch>
-                  <CollectionsWorkspace
+                  {!overdueQueue && <CollectionsWorkspace
                     invoices={invoices}
                     scope={{ organizationId, companyId: operatingCompanyId }}
                     dataState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
@@ -4747,7 +4765,7 @@ function AccountingClientReady({
                     canReview={checkPermission("account_move", "read").allowed && checkPermission("mail_template", "read").allowed
                       && checkPermission("mail_template", "write").allowed && checkPermission("mail_message", "read").allowed}
                     onReviewReminder={(invoice) => router.push(`/accounting/invoices/${invoice.id}?reminder=1`)}
-                  />
+                  />}
                   </div>
                 ),
               }
@@ -4759,17 +4777,19 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ListPivotSwitch
-                    storageId={`accounting-bills-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}`}
+                    key={draftBillQueue ? "draft" : "all"}
+                    storageId={`accounting-bills-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}${draftBillQueue ? ":draft" : ""}`}
                     t={t}
-                    rows={copyAsRecords(bills)}
+                    rows={copyAsRecords(draftBillQueue && moveListState.status !== "ready" ? [] : billListRows)}
                     {...accountMovePivotSetup(t)}
                   >
                   <BillsListView
-                    bills={bills}
+                    bills={billListRows}
+                    preferenceContext={draftBillQueue ? "draft" : undefined}
                     intake={{ lines: accountMoveLines, sourceState: mergeModuleStates([allMovesRead.state, accountMoveLinesRead.state]),
                       renderDocuments: (bill) => <BillDocumentIntake organizationId={orgId} companyId={operatingCompanyId} billId={bill.id} partnerId={bill.partnerId} /> }}
                     worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
-                    sourceState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
+                    sourceState={moveListState}
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
@@ -4821,6 +4841,8 @@ function AccountingClientReady({
                 customContent: (
                   <GeneralLedgerView
                     moves={allMoves}
+                    accountLabels={accountLabelMap}
+                    partnerLabels={partnerLabelMap}
                     moveLines={canUseModuleData(accountMoveLinesRead.state) ? accountMoveLines : undefined}
                     onImportMovesCsv={canImportCsv("accountMove") ? openAccountingMoveImport : undefined}
                     onImportOutstandingDocumentsCsv={
@@ -4839,14 +4861,23 @@ function AccountingClientReady({
                         : undefined
                     }
                     onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? openAccountingMoveLineImport : undefined}
-                    onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
-                    onPostMove={(move) => postDraft(move)}
-                    onCancelMove={(move) =>
-                      void runMutation(() => cancelMove.mutateAsync(move.id as string | number | bigint))
-                    }
-                    onComputeInvoiceTotals={(move) =>
-                      void runMutation(() => computeInvoiceTotals.mutateAsync(move.id as string | number | bigint))
-                    }
+                    onCreate={checkPermission("account_move", "create").allowed
+                      ? () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })
+                      : undefined}
+                    onPostMove={checkPermission("account_move", "write").allowed ? postDraft : undefined}
+                    onCancelMove={checkPermission("account_move", "write").allowed ? async (move) => {
+                      const label = t("accounting.journalEntries.cancelEntryAction", { defaultValue: "Cancel entry" })
+                      const confirmed = await confirmDialog({
+                        title: label,
+                        description: t("accounting.journalEntries.cancelEntryConfirm", { defaultValue: "Cancel this journal entry?" }),
+                        confirmLabel: label,
+                        cancelLabel: t("common.back"),
+                      })
+                      if (confirmed) await runMutation(() => cancelMove.mutateAsync(move.id))
+                    } : undefined}
+                    onComputeInvoiceTotals={checkPermission("account_move", "write").allowed
+                      ? (move) => void runMutation(() => computeInvoiceTotals.mutateAsync(move.id))
+                      : undefined}
                     postMovePending={postMove.isPending || invoiceToPayment.isPending}
                     cancelMovePending={cancelMove.isPending}
                     computeInvoiceTotalsPending={computeInvoiceTotals.isPending}
@@ -5370,10 +5401,18 @@ function AccountingClientReady({
       router,
       chartStructurePanel,
       invoices,
-      bills,
+      overdueQueue,
+      draftBillQueue,
+      invoiceListRows,
+      billListRows,
+      invoiceListState,
+      moveListState,
       accountTypes,
       accounts,
       allMoves,
+      accountLabelMap,
+      partnerLabelMap,
+      confirmDialog,
       accountMoveLines,
       bankStatements,
       bankStatementsActionsConfig,
@@ -5627,6 +5666,9 @@ function AccountingClientReady({
     />
   }
 
+  const showPaymentOperations = paymentOperationsLocked ||
+    (accountingActiveTab === "payment-operations" && dataState["payment-operations"].status === "ready")
+
   return (
     <CurrencyFormatProvider currencies={currencies} defaultCode={operatingCompanyCurrencyCode}>
     <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
@@ -5647,6 +5689,9 @@ function AccountingClientReady({
           <a className="inline-block font-medium text-primary underline" href={statementDrilldown.context.returnHref}>{t("reports.drilldown.return", { defaultValue: "Return to saved report" })}</a>
         </> : <p role="alert">{t("reports.drilldown.invalid", { defaultValue: "This report link is incomplete or invalid. No broader ledger has been displayed. Open the saved report and try its journal-items link again." })}</p>}
       </section> : null}
+      {companyAvailable && (overdueQueue || draftBillQueue) && (
+        <div className="mb-3"><OwnerQueueScope queue={overdueQueue ? "overdueInvoices" : "draftBills"} /></div>
+      )}
       {companyAvailable ? <ModuleWorkView
         organizationId={organizationId}
         assistantFormBlocked={quickActionForm !== null || showCreateInvoice || showCreateBill || paymentOperationsLocked || invoiceSheetRecord !== null}
@@ -5676,9 +5721,12 @@ function AccountingClientReady({
           },
         }}
         config={config}
+        fillHeight={!showPaymentOperations}
         data={data}
         dataLoading={accountingActiveTab === "dashboard" ? undefined : dataLoading}
-        dataState={dataState}
+        dataState={overdueQueue && dataState.invoices.status === "ready"
+          ? { ...dataState, invoices: invoiceListState }
+          : dataState}
         onFormSubmit={handleFormSubmit}
         renderCreatePreview={(_tabId, values, form) => renderAccountingAuthoringPreview(values, form)}
         onRowClick={handleEntityRowClick}
@@ -5691,7 +5739,7 @@ function AccountingClientReady({
         }}
       /> : null}
 
-      {(accountingActiveTab === "payment-operations" && dataState["payment-operations"].status === "ready") || paymentOperationsLocked ? (
+      {showPaymentOperations ? (
         <section className="mt-6 space-y-3" aria-label="Payment operations">
           {accountingActiveTab !== "payment-operations" ? <p role="status" className="rounded-lg border p-3 text-sm">The original payment operation is retained here until its result is confirmed.</p> : null}
           <PaymentOperationsPanel
@@ -5726,6 +5774,7 @@ function AccountingClientReady({
         account={glDrilldownAccount}
         moveLines={accountMoveLines}
         moves={allMoves}
+        partnerLabels={partnerLabelMap}
         open={glDrilldownAccount != null}
         onOpenChange={(open) => {
           if (!open) setGlDrilldownAccount(null)
@@ -5944,6 +5993,7 @@ function AccountingClientReady({
       <InvoiceDetailModal
         invoice={selectedInvoice}
         organizationId={organizationId}
+        partnerLabels={partnerLabelMap}
         draftPersonalization={draftInvoicePersonalization?.personalization}
         draftPersonalizationState={selectedInvoice && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType)
           ? draftInvoicePersonalization?.personalizationError ? { status: "error", message: draftInvoicePersonalization.personalizationError } : selectedDraftReviewState
@@ -6332,7 +6382,7 @@ function AccountingClientReady({
           }
         }}
       >
-        <DialogContent className="max-h-[94dvh] max-w-[calc(100%-1rem)] overflow-y-auto sm:max-w-6xl [&_button]:min-h-11 [&_button]:min-w-11">
+        <DialogContent size="review" className="[&_button]:min-h-11 [&_button]:min-w-11">
           <DialogHeader>
             <DialogTitle>
               {t("accounting.bankStatementDetail.title")}
@@ -6553,6 +6603,8 @@ function AccountingClientReady({
             actorKey={currentUser?.id ?? null}
             source={bankLinkSource}
             canReconcile={canLinkBankRecords}
+            canApplyExistingPayment={companyAvailable && checkPermission("account_move", "write").allowed
+              && checkPermission("account_payment", "write").allowed && checkPermission("payment", "reconcile").allowed}
             canRecover={(action: BankSettlementRecoveryAction) => bankRecoveryPermissions[action]}
             onConfirm={confirmBankLink}
             onRecover={recoverReviewedBankSettlement}

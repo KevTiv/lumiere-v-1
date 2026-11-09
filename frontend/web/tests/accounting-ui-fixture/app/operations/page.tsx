@@ -44,7 +44,7 @@ const bankSource: ReconciliationSource = {
   ...scope, companyCurrencyId: "1", state: { status: "ready" },
   statement: { ...scope, id: "201", name: "EUR statement for bank recovery", state: "Open", journalId: "5", currencyId: "1" },
   line: bankLine, bankLines: [bankLine],
-  currencies: [{ id: "1", code: "EUR", name: "Euro", decimalPlaces: 2, roundingFactor: 0.01 }],
+  currencies: [{ id: "1", code: "EUR", name: "Euro", decimalPlaces: 2, roundingFactor: 0.01 }, { id: "2", code: "USD", decimalPlaces: 2, roundingFactor: 0.01 }],
   accounts: [{ ...scope, id: "401", code: "1200", name: "Receivables", internalType: "receivable", reconcile: true, deprecated: false }],
   moves: [{ ...scope, id: "91", name: "INV/BANK/91", partnerId: "601", moveType: "OutInvoice", state: "Posted", invoicePartnerDisplayName: "Canonical customer" }],
   moveLines: [{ ...scope, id: "501", moveId: "91", accountId: "401", partnerId: "601", parentState: "Posted", name: "Open customer invoice", companyCurrencyId: "1", currencyId: "1", balance: 100, debit: 100, credit: 0, amountResidual: 100, blocked: false }],
@@ -84,6 +84,7 @@ function Operations() {
   const [actorKey, setActorKey] = useState("synthetic-accountant")
   const [bankDispatches, setBankDispatches] = useState(0)
   const [bankChecks, setBankChecks] = useState(0)
+  const [bankScenario, setBankScenario] = useState<"exact" | "partial" | "fx">("exact")
   const bankResolve = useRef<((outcome: ReconciliationOutcome) => void) | null>(null)
   const bankRequest = useRef<ReconciliationRequest | null>(null)
   const [reminder, setReminder] = useState<InvoiceEmailDocument | null>(null)
@@ -101,6 +102,7 @@ function Operations() {
     return () => control.close()
   }, [setActiveCompanyId])
   const sourceState: ModuleDataState = sourceStatus === "ready" ? { status: "ready" } : { status: sourceStatus, message: `Synthetic ${sourceStatus} source. Refresh canonical records before continuing.`, onRetry: () => setSourceStatus("ready") }
+  const focusedBankLine = bankScenario === "exact" ? bankLine : { ...bankLine, amount: 80, foreignCurrencyId: bankScenario === "fx" ? "2" : null, transactionType: "Synthetic receipt under review" }
   const activeDocument = reminder && String(reminder.companyId) === companyId ? reminder : null
   return <main className="mx-auto min-w-0 max-w-7xl space-y-6 p-4 sm:p-6">
     <p data-testid="operations-disclosure" data-hydrated={hydrated} className="text-xs text-muted-foreground">Synthetic operational acceptance fixture. Production components use fixed synthetic sources and controlled callbacks. Browser tests intercept every API request; no ERP writes, bank settlement, uploads or email delivery occur.</p>
@@ -122,7 +124,11 @@ function Operations() {
     {importOpen ? <CsvImportModal organizationId={7n} companyId={BigInt(companyId)} tableName="account_move_line" config={{ id: "synthetic-accounting-import", title: "Review accounting source import", submitLabel: "Import reviewed source", cancelLabel: "Close import review", sections: [] }} onClose={() => setImportOpen(false)} onImport={() => { setImports((count) => count + 1); setImportOpen(false) }} /> : null}
     {stage === "bank" || bankLocked ? <section className="space-y-3" aria-label="Retained bank recovery">
       {stage !== "bank" ? <p role="status">Original bank recovery remains mounted while its result is pending or unknown.</p> : null}
-      <ReconciliationWorkbench actorKey="synthetic-accountant" source={{ ...bankSource, companyId, state: sourceState }} canReconcile onOperationLockChange={setBankLocked} onConfirm={(request) => { bankRequest.current = request; setBankDispatches((count) => count + 1); return new Promise((resolve) => { bankResolve.current = resolve }) }} onCheckStatus={async (request) => {
+      {stage === "bank" && !bankLocked ? <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => setBankScenario("partial")}>Load partial bank payment</Button>
+        <Button variant="outline" onClick={() => setBankScenario("fx")}>Load FX bank line</Button>
+      </div> : null}
+      <ReconciliationWorkbench actorKey={actorKey} source={{ ...bankSource, companyId, state: sourceState, line: focusedBankLine, bankLines: [focusedBankLine] }} canReconcile canApplyExistingPayment onOperationLockChange={setBankLocked} onConfirm={(request) => { bankRequest.current = request; setBankDispatches((count) => count + 1); return new Promise((resolve) => { bankResolve.current = resolve }) }} onCheckStatus={async (request) => {
         if (JSON.stringify(request) !== JSON.stringify(bankRequest.current)) throw new Error("Original settlement request changed")
         setBankChecks((count) => count + 1); return companyId === request.companyId ? "confirmed" : "unconfirmed"
       }} />

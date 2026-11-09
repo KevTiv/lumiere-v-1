@@ -3,6 +3,7 @@ import { createElement } from "react"
 import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 import { formatTimestampLike, getRowField } from "./entity-row-utils"
 import { resolveIdentityLabel } from "./identity-label"
+import { entityColumnLayouts as layout } from "./entity-column-layouts"
 
 export const crmLeadListFieldAliases = {
   firstname: "contactName", lastname: "contactName", email: "emailFrom", company: "partnerName",
@@ -129,16 +130,17 @@ export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
       {
         key: "contactName",
         label: t("crm.leads.columns.contactName"),
-        width: "min-w-36",
+        layout: layout.identity,
         sortable: true,
       },
-      { key: "partnerName", label: t("crm.leads.columns.partnerName"), width: "min-w-36" },
-      { key: "emailFrom", label: t("crm.leads.columns.emailFrom"), width: "min-w-40" },
-      { key: "phone", label: t("crm.leads.columns.phone"), width: "min-w-28" },
-      { key: "state", label: t("crm.leads.columns.state"), type: "badge", ...leadStateBadges(t) },
+      { key: "partnerName", label: t("crm.leads.columns.partnerName"), layout: layout.location },
+      { key: "emailFrom", label: t("crm.leads.columns.emailFrom"), layout: layout.identity },
+      { key: "phone", label: t("crm.leads.columns.phone"), layout: layout.reference },
+      { key: "state", label: t("crm.leads.columns.state"), layout: layout.status, type: "badge", ...leadStateBadges(t) },
       {
         key: "expectedRevenue",
         label: t("crm.leads.columns.expectedRevenue"),
+        layout: layout.amount,
         type: "currency",
         align: "right",
         sortable: true,
@@ -146,6 +148,7 @@ export const leadsTableConfig = (t: TFunction): EntityViewConfig => ({
       {
         key: "createDate",
         label: t("crm.leads.columns.createDate"),
+        layout: layout.date,
         type: "relative-date",
         sortable: true,
       },
@@ -219,29 +222,32 @@ export const opportunitiesTableConfig = (
       rowKey: "id",
       searchable: true,
       searchPlaceholder: t("crm.opportunities.searchPlaceholder"),
-      searchKeys: ["name"],
+      searchKeys: ["name", "partnerName", "contactName"],
       columns: [
         {
           key: "name",
           label: t("crm.opportunities.columns.name"),
-          width: "min-w-48",
+          layout: layout.identity,
           sortable: true,
         },
+        { key: "partnerName", label: t("crm.contacts.columns.companyName"), layout: layout.location },
         {
           key: "stageName",
           label: t("crm.opportunities.columns.stageName"),
+          layout: layout.status,
           type: "status",
-          width: "min-w-28",
         },
         {
           key: "priority",
           label: t("crm.opportunities.columns.priority"),
+          layout: layout.status,
           type: "badge",
           ...opportunityPriorityBadges(t),
         },
         {
           key: "expectedRevenue",
           label: t("crm.opportunities.columns.expectedRevenue"),
+          layout: layout.amount,
           type: "currency",
           align: "right",
           sortable: true,
@@ -249,12 +255,14 @@ export const opportunitiesTableConfig = (
         {
           key: "probability",
           label: t("crm.opportunities.columns.probability"),
+          layout: layout.quantity,
           type: "progress",
           align: "right",
         },
         {
           key: "dateDeadline",
           label: t("crm.opportunities.columns.dateDeadline"),
+          layout: layout.date,
           type: "relative-date",
           sortable: true,
         },
@@ -284,7 +292,7 @@ export const opportunitiesTableConfig = (
             render: (_value, row) =>
               createElement(
                 "span",
-                { className: "text-xs text-muted-foreground truncate max-w-[5rem]" },
+                { className: "min-w-0 text-xs text-muted-foreground [overflow-wrap:anywhere]" },
                 resolveIdentityLabel(
                   getRowField(row, "userId") ?? getRowField(row, "createdBy"),
                   options?.ownerLabelMap,
@@ -378,7 +386,7 @@ export const contactsTableConfig = (
   const nameColumn = {
     key: "name",
     label: t("crm.contacts.columns.name"),
-    width: "min-w-40",
+    layout: layout.identity,
     sortable: true,
     ...(formatName
       ? {
@@ -421,32 +429,35 @@ export const contactsTableConfig = (
       ],
       columns: [
         nameColumn,
+        { key: "firstName", label: t("crm.forms.editContactDetails.fields.firstName"), layout: layout.location, defaultHidden: true },
+        { key: "lastName", label: t("crm.forms.editContactDetails.fields.lastName"), layout: layout.location, defaultHidden: true },
         {
           key: "companyName",
           label: t("crm.contacts.columns.companyName"),
-          width: "min-w-36",
+          layout: layout.identity,
         },
         {
           key: "email",
           label: t("crm.contacts.columns.email"),
-          width: "min-w-44",
+          layout: layout.identity,
           sortable: true,
         },
         {
           key: "phone",
           label: t("crm.contacts.columns.phone"),
-          width: "min-w-28",
+          layout: layout.reference,
         },
         {
           key: "isCompany",
           label: t("crm.contacts.columns.isCompany"),
+          layout: layout.status, defaultHidden: true,
           ...contactTypeBadges(t),
         },
-        { key: "city", label: t("crm.contacts.columns.city"), width: "min-w-24" },
+        { key: "city", label: t("crm.contacts.columns.city"), layout: layout.location, defaultHidden: true },
         {
           key: "countryCode",
           label: t("crm.contacts.columns.countryId"),
-          width: "min-w-20",
+          layout: layout.unit, defaultHidden: true,
         },
       ],
       emptyMessage: t("crm.contacts.emptyMessage"),
@@ -513,11 +524,11 @@ export const activitiesTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "summary", label: t("crm.activities.columns.summary"), width: "min-w-48" },
-      { key: "activityType", label: t("crm.activities.columns.activityType"), width: "min-w-28" },
-      { key: "state", label: t("crm.activities.columns.state"), type: "badge", badgeVariants: { planned: "outline", done: "default" }, badgeLabels: { planned: t("crm.activities.states.planned"), done: t("crm.activities.states.done") } },
-      { key: "dateDeadline", label: t("crm.activities.columns.dateDeadline"), type: "date" },
-      { key: "isDone", label: t("crm.activities.columns.isDone"), type: "boolean" },
+      { key: "summary", label: t("crm.activities.columns.summary"), layout: layout.identity },
+      { key: "activityType", label: t("crm.activities.columns.activityType"), layout: layout.status },
+      { key: "state", label: t("crm.activities.columns.state"), layout: layout.status, type: "badge", badgeVariants: { planned: "outline", done: "default" }, badgeLabels: { planned: t("crm.activities.states.planned"), done: t("crm.activities.states.done") } },
+      { key: "dateDeadline", label: t("crm.activities.columns.dateDeadline"), layout: layout.date, type: "date" },
+      { key: "isDone", label: t("crm.activities.columns.isDone"), layout: layout.flag, defaultHidden: true, type: "boolean" },
     ],
     emptyMessage: t("crm.activities.emptyMessage"),
   },
@@ -535,15 +546,18 @@ export const contactTagsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("crm.contactTags.searchPlaceholder"),
     searchKeys: ["name", "description"],
     columns: [
-      { key: "name", label: t("crm.contactTags.columns.name"), width: "min-w-36" },
-      { key: "color", label: t("crm.contactTags.columns.color"), width: "min-w-24" },
-      { key: "description", type: "markdown", label: t("crm.contactTags.columns.description"), width: "min-w-48" },
+      { key: "name", label: t("crm.contactTags.columns.name"), layout: layout.identity },
+      { key: "color", label: t("crm.contactTags.columns.color"), layout: layout.unit },
+      { key: "description", type: "markdown", label: t("crm.contactTags.columns.description"), layout: layout.description },
     ],
     emptyMessage: t("crm.contactTags.emptyMessage"),
   },
 })
 
-export const contactCategoriesTableConfig = (t: TFunction): EntityViewConfig => ({
+export const contactCategoriesTableConfig = (
+  t: TFunction,
+  parentLabels?: ReadonlyMap<string, string>,
+): EntityViewConfig => ({
   id: "contact-categories-table",
   title: t("crm.contactCategories.title"),
   description: t("crm.contactCategories.description"),
@@ -554,10 +568,15 @@ export const contactCategoriesTableConfig = (t: TFunction): EntityViewConfig => 
     searchPlaceholder: t("crm.contactCategories.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("crm.contactCategories.columns.name"), width: "min-w-36" },
-      { key: "color", label: t("crm.contactCategories.columns.color"), width: "min-w-24" },
-      { key: "parentId", label: t("crm.contactCategories.columns.parentId"), width: "min-w-24" },
-      { key: "isActive", label: t("crm.contactCategories.columns.isActive"), type: "boolean", align: "center" },
+      { key: "name", label: t("crm.contactCategories.columns.name"), layout: layout.identity },
+      { key: "color", label: t("crm.contactCategories.columns.color"), layout: layout.unit },
+      {
+        key: "parentId",
+        label: t("crm.contactCategories.columns.parentId"),
+        layout: layout.location,
+        render: (value) => resolveIdentityLabel(value, parentLabels),
+      },
+      { key: "isActive", label: t("crm.contactCategories.columns.isActive"), layout: layout.flag, type: "boolean", align: "center" },
     ],
     emptyMessage: t("crm.contactCategories.emptyMessage"),
   },
@@ -574,11 +593,11 @@ export const contactSegmentsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("crm.contactSegments.searchPlaceholder"),
     searchKeys: ["name", "description"],
     columns: [
-      { key: "name", label: t("crm.contactSegments.columns.name"), width: "min-w-36" },
-      { key: "isDynamic", label: t("crm.contactSegments.columns.isDynamic"), type: "boolean", align: "center" },
-      { key: "isActive", label: t("crm.contactSegments.columns.isActive"), type: "boolean", align: "center" },
-      { key: "memberCount", label: t("crm.contactSegments.columns.memberCount"), type: "number", align: "right" },
-      { key: "description", type: "markdown", label: t("crm.contactSegments.columns.description"), width: "min-w-48" },
+      { key: "name", label: t("crm.contactSegments.columns.name"), layout: layout.identity },
+      { key: "isDynamic", label: t("crm.contactSegments.columns.isDynamic"), layout: layout.flag, type: "boolean", align: "center" },
+      { key: "isActive", label: t("crm.contactSegments.columns.isActive"), layout: layout.flag, type: "boolean", align: "center" },
+      { key: "memberCount", label: t("crm.contactSegments.columns.memberCount"), layout: layout.quantity, type: "number", align: "right" },
+      { key: "description", type: "markdown", label: t("crm.contactSegments.columns.description"), layout: layout.description },
     ],
     emptyMessage: t("crm.contactSegments.emptyMessage"),
   },
@@ -594,14 +613,21 @@ export const opportunityLinesTableConfig = (t: TFunction): EntityViewConfig => (
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("crm.opportunityLines.searchPlaceholder"),
-    searchKeys: ["name"],
+    searchKeys: ["name", "opportunityName"],
     columns: [
-      { key: "opportunityId", label: t("crm.opportunityLines.columns.opportunityId"), width: "min-w-20" },
-      { key: "name", label: t("crm.opportunityLines.columns.name"), width: "min-w-48" },
-      { key: "quantity", label: t("crm.opportunityLines.columns.quantity"), type: "number", align: "right" },
-      { key: "priceUnit", label: t("crm.opportunityLines.columns.priceUnit"), type: "currency", align: "right" },
-      { key: "priceSubtotal", label: t("crm.opportunityLines.columns.priceSubtotal"), type: "currency", align: "right" },
-      { key: "discount", label: t("crm.opportunityLines.columns.discount"), type: "percent", align: "right" },
+      {
+        key: "opportunityId",
+        label: t("crm.opportunityLines.columns.opportunityId"),
+        layout: layout.location,
+        render: (value, row) => typeof row.opportunityName === "string" && row.opportunityName.trim()
+          ? row.opportunityName
+          : resolveIdentityLabel(value),
+      },
+      { key: "name", label: t("crm.opportunityLines.columns.name"), layout: layout.description },
+      { key: "quantity", label: t("crm.opportunityLines.columns.quantity"), layout: layout.quantity, type: "number", align: "right" },
+      { key: "priceUnit", label: t("crm.opportunityLines.columns.priceUnit"), layout: layout.amount, type: "currency", align: "right" },
+      { key: "priceSubtotal", label: t("crm.opportunityLines.columns.priceSubtotal"), layout: layout.amount, type: "currency", align: "right" },
+      { key: "discount", label: t("crm.opportunityLines.columns.discount"), layout: layout.quantity, type: "percent", align: "right" },
     ],
     emptyMessage: t("crm.opportunityLines.emptyMessage"),
   },

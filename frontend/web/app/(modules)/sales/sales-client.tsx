@@ -2592,6 +2592,7 @@ function SalesClientLoaded({
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
+    onActivationSaved?: (recordId: string) => void,
   ) => {
     const invalidInput = () => new Error(t('sales.forms.refinement.invalidInput', { defaultValue: 'Check the required choices and entered values. Your entries have been retained.' }));
     if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
@@ -2601,6 +2602,11 @@ function SalesClientLoaded({
       if (!p) throw new Error(t('sales.forms.refinement.requiredOrderContext', { defaultValue: 'Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.' }));
       const saved = await createSaleOrder.mutateAsync(p);
       phCapture('sale_order_created', { organization_id: organizationId });
+      if (onActivationSaved) {
+        if (!saved.orderId) throw new Error(t('common.formSubmit.failed'));
+        onActivationSaved(saved.orderId);
+        return;
+      }
       if (saved.orderId) router.push(`/sales/orders/${saved.orderId}?tab=lines&created=1`);
       else {
         setSavedQuotationNotice(true);

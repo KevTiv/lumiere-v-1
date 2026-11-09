@@ -8,11 +8,13 @@ import type { CrossRecordLinks as Result } from "@lumiere/query-hooks/hooks/cros
 
 export { saleOrderHref as orderHref, stockPickingHref as pickingHref, accountMoveHref as invoiceHref }
 /** Read-only cross-record navigation shares the handoff presentation owner. */
-export function CrossRecordLinks({ result, testIdPrefix }: { result: Result; testIdPrefix: string }) {
+export function CrossRecordLinks({
+  result, testIdPrefix, emptyLabel = "No linked records yet",
+}: { result: Result; testIdPrefix: string; emptyLabel?: string }) {
   if (result.status !== "ready") {
     return <p role="alert" data-testid={`${testIdPrefix}-${result.status}`}>{result.reason}</p>
   }
-  if (result.links.length === 0 && !result.paymentNotice) return <p data-testid={`${testIdPrefix}-none`}>No linked records yet</p>
+  if (result.links.length === 0 && !result.paymentNotice) return <p data-testid={`${testIdPrefix}-none`}>{emptyLabel}</p>
   return (
     <>
     {result.paymentNotice ? (

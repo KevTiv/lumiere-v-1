@@ -1,4 +1,6 @@
 import { onboardingFiscalYearEnd } from "@/lib/onboarding-config"
+import { moduleTabHref } from "@lumiere/erp-shared/record-links"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 type Id = string | number | bigint
 export type ActivationTask = "contact" | "quotation" | "expense" | "accounting" | "reports"
@@ -24,10 +26,65 @@ export interface ActivationRead<T> {
   data?: readonly T[]
 }
 
-function exactId(value: Id | null | undefined): string | null {
+function exactId(value: unknown): string | null {
   if (typeof value === "number" && (!Number.isSafeInteger(value) || value <= 0)) return null
-  if (value == null || !/^[1-9]\d*$/.test(String(value))) return null
+  if (!(typeof value === "string" || typeof value === "number" || typeof value === "bigint") || !/^[1-9]\d*$/.test(String(value))) return null
   return String(value)
+}
+
+const activationForms = {
+  contact: { moduleId: "crm", tabId: "contacts", permission: "contact", resource: "contacts" },
+  quotation: { moduleId: "sales", tabId: "orders", permission: "sale_order", resource: "sale-orders" },
+  expense: { moduleId: "expenses", tabId: "expenses", permission: "hr_expense", resource: "expenses" },
+} as const
+
+export type ActivationCreateTask = keyof typeof activationForms
+
+export function activationForm(task: ActivationTask | null) {
+  const createTask = activationCreateTask(task)
+  return createTask ? activationForms[createTask] : null
+}
+
+export function activationCreateTask(value: unknown): ActivationCreateTask | null {
+  return value === "contact" || value === "quotation" || value === "expense" ? value : null
+}
+
+export interface ActivationReceipt {
+  task: ActivationCreateTask
+  recordId: string
+}
+
+export function activationReceiptKey(scope: string): string {
+  return `lumiere:activation:first-outcome:v1:${scope}`
+}
+
+export function parseActivationReceipt(raw: string | null): ActivationReceipt | null {
+  try {
+    const value = raw ? JSON.parse(raw) : null
+    const task = activationCreateTask(value?.task)
+    const recordId = exactId(value?.recordId)
+    return task && recordId && parseStrictU64(recordId) ? { task, recordId } : null
+  } catch {
+    return null
+  }
+}
+
+export function matchesActivationRecord(row: unknown, receipt: ActivationReceipt, organizationId: Id, companyId: Id): boolean {
+  if (!row || typeof row !== "object" || !("id" in row)) return false
+  const rowOrganization = ("organizationId" in row ? row.organizationId : undefined)
+    ?? ("organization_id" in row ? row.organization_id : undefined)
+  const rowCompany = ("companyId" in row ? row.companyId : undefined)
+    ?? ("company_id" in row ? row.company_id : undefined)
+  const organization = exactId(organizationId)
+  const company = exactId(companyId)
+  return organization != null && company != null && exactId(row.id) === receipt.recordId
+    && exactId(rowOrganization) === organization && exactId(rowCompany) === company
+}
+
+export function activationRecordHref(receipt: ActivationReceipt): string {
+  if (receipt.task === "quotation") return `/sales/orders/${receipt.recordId}?tab=lines`
+  const { moduleId, tabId } = activationForms[receipt.task]
+  return moduleTabHref(moduleId, tabId, { id: receipt.recordId })
 }
 
 /** Availability checks only. The canonical forms still own workflow eligibility. */

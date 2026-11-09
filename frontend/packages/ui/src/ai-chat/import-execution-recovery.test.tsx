@@ -647,6 +647,18 @@ it("hard source duplicates do not offer distinct-expense assertions", async () =
 
 it("saved native receipts link their jobs without claiming full ERP verification", async () => {
   const saved = workflow([])
+  saved.capabilities = [
+    {
+      key: "products",
+      module: "products",
+      label: "Product master records",
+      targetEntities: ["product"],
+      requiredFacts: ["name"],
+      readiness: "native_preview",
+      blockingReason: null,
+      destination: "/products",
+    },
+  ]
   saved.nativeResults = [
     {
       requestId: "f".repeat(32),
@@ -676,7 +688,14 @@ it("saved native receipts link their jobs without claiming full ERP verification
         name: "Open import job and row errors",
       })
     ).getAttribute("href"),
-  ).toBe("/settings/import-jobs/90?companyId=3")
+  ).toBe(`/settings/import-jobs/90?companyId=3&fromTask=${taskId}`)
+  expect(
+    screen
+      .getByRole("link", {
+        name: "Review or correct Product master records in the owning module",
+      })
+      .getAttribute("href"),
+  ).toBe("/products")
   expect(
     screen.getByText(
       "Only the latest 20 native receipts for this task are shown. More saved receipts exist.",

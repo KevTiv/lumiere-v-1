@@ -79,6 +79,7 @@ import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
+import { approvalInboxHref } from '../../../approvals/approval-inbox-view';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload";
 import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
@@ -578,7 +579,7 @@ function SaleOrderPageLoaded({
   const continueStep = recommendedAction
     ? () => void runWorkflowAction(recommendedAction, record)
     : step === 'add-products' ? () => setActiveTab('lines')
-    : step === 'approval' ? () => router.push('/approvals')
+    : step === 'approval' ? () => router.push(approvalInboxHref('sale_order', orderId))
     : step === 'delivery' || step === 'review' ? () => setActiveTab('handoffs')
     : undefined;
   const nextAction = <SaleOrderNextAction step={step} actionLabel={recommendedAction?.label}

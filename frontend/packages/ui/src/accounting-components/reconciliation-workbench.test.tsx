@@ -4,7 +4,7 @@ import { ReconciliationWorkbench, type ReconciliationOutcome } from "./reconcili
 import type { ReconciliationRequest, ReconciliationSource } from "./reconciliation-workbench-model"
 import type { BankSettlementAttempt, BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
+vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: Record<string, string>) => (options?.defaultValue ?? key).replace(/\{\{(\w+)\}\}/g, (_, name: string) => options?.[name] ?? "") }) }))
 afterEach(cleanup)
 
 function fixture(): ReconciliationSource {
@@ -64,6 +64,72 @@ describe("bank matching desk", () => {
     expect(screen.getByText("1 selected journal item")).toBeTruthy()
     fireEvent.change(screen.getByRole("textbox", { name: "Search matching records" }), { target: { value: "" } })
     expect((screen.getByRole("checkbox", { name: "Select INV/001, Consulting" }) as HTMLInputElement).checked).toBe(true)
+  })
+  it("hands off a short payment to the exact document without dispatching a bank settlement", async () => {
+    const source = fixture()
+    source.bankLines = [{ ...source.line!, amount: 500 }]
+    const onConfirm = vi.fn()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    const priorClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard")
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } })
+    try {
+      render(<ReconciliationWorkbench actorKey="accountant" source={source} canReconcile={false} canApplyExistingPayment onConfirm={onConfirm} />)
+      fireEvent.click(screen.getByRole("checkbox", { name: "Select INV/001, Consulting" }))
+      const exception = screen.getByRole("region", { name: "Bank amount is below the selected balance" })
+      const handoff = within(exception).getByRole("link", { name: "Open INV/001 in a new tab" })
+      expect(handoff.getAttribute("href")).toBe("/accounting/invoices/20")
+      expect(handoff.getAttribute("target")).toBe("_blank")
+      expect(exception.textContent).toContain("Apply existing payment")
+      expect(exception.textContent).toContain("The bank line stays unmatched")
+      expect(exception.textContent).toContain("separate write-off in Payment Operations")
+      fireEvent.click(within(exception).getByRole("button", { name: "Copy review details" }))
+      await within(exception).findByText("Review details copied.")
+      const copied = writeText.mock.calls[0]![0]
+      expect(copied).toContain("January statement (#2) · Bank line #10 · Company #4")
+      expect(copied).toContain("INV/001 (#20) · Item #40")
+      expect(copied).toContain("100.00")
+      expect((screen.getByTestId("reconciliation-confirm") as HTMLButtonElement).disabled).toBe(true)
+      expect(onConfirm).not.toHaveBeenCalled()
+    } finally {
+      if (priorClipboard) Object.defineProperty(navigator, "clipboard", priorClipboard)
+      else Reflect.deleteProperty(navigator, "clipboard")
+    }
+  })
+  it("keeps write-off guidance scoped and hides the payment handoff when permission or scope changes", () => {
+    const source = fixture()
+    source.bankLines = [{ ...source.line!, amount: 500 }]
+    const props = { source, canReconcile: true, onConfirm: vi.fn() }
+    const { rerender } = render(<ReconciliationWorkbench actorKey="accountant" {...props} canApplyExistingPayment />)
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select INV/001, Consulting" }))
+    expect(screen.queryByRole("link", { name: "Open INV/001 in a new tab" })).toBeTruthy()
+    rerender(<ReconciliationWorkbench actorKey="accountant" {...props} />)
+    expect(screen.queryByRole("link", { name: "Open INV/001 in a new tab" })).toBeNull()
+    expect(screen.getByText(/ask an authorized accountant to verify and apply/)).toBeTruthy()
+    rerender(<ReconciliationWorkbench actorKey="other-accountant" {...props} canApplyExistingPayment />)
+    expect(screen.queryByRole("region", { name: "Bank amount is below the selected balance" })).toBeNull()
+    expect(screen.getByText("0 selected journal items")).toBeTruthy()
+  })
+  it("keeps FX bank lines unmatched and shows only scoped document references when items change currency", () => {
+    const source = fixture()
+    const props = { canReconcile: true, canApplyExistingPayment: true, onConfirm: vi.fn() }
+    const { rerender } = render(<ReconciliationWorkbench actorKey="accountant" source={source} {...props} />)
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select INV/001, Consulting" }))
+    rerender(<ReconciliationWorkbench actorKey="accountant" source={{ ...source, moveLines: [{ ...source.moveLines[0]!, currencyId: 8n }, source.moveLines[1]!] }} {...props} />)
+    const foreignDocument = screen.getByRole("region", { name: "FX review required" })
+    expect(foreignDocument.textContent).toContain("INV/001 (#20) · Item #40")
+    expect(within(foreignDocument).queryByRole("link")).toBeNull()
+    expect((screen.getByTestId("reconciliation-confirm") as HTMLButtonElement).disabled).toBe(true)
+    const foreignLine = { ...source, bankLines: [{ ...source.line!, foreignCurrencyId: 8n }] }
+    rerender(<ReconciliationWorkbench actorKey="accountant" source={foreignLine} {...props} />)
+    const foreignBank = screen.getByRole("region", { name: "FX review required" })
+    expect(foreignBank.textContent).toContain("January statement (#2) · Bank line #10 · Company #4")
+    expect(foreignBank.textContent).toContain("INV/001 (#20) · Item #40")
+    expect(foreignBank.textContent).toContain("This bank line stays unmatched")
+    expect(within(foreignBank).queryByRole("link")).toBeNull()
+    expect(screen.queryByTestId("reconciliation-confirm")).toBeNull()
+    rerender(<ReconciliationWorkbench actorKey="accountant" source={{ ...foreignLine, state: { status: "denied" } }} {...props} />)
+    expect(screen.queryByRole("region", { name: "FX review required" })).toBeNull()
+    expect(props.onConfirm).not.toHaveBeenCalled()
   })
   it("invalidates review on live amount changes and clears obsolete selected records explicitly", () => {
     const source = fixture()

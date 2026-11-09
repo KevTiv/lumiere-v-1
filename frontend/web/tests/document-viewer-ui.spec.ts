@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import { expect, test, type Page } from "@playwright/test"
+import type { OfficeDocumentPreview } from "../lib/document-viewer"
 
 test.describe.configure({ timeout: 60_000 })
 
@@ -73,27 +74,75 @@ const notes = managedFile(
   "text/markdown",
   "Field notes\n<script>window.fileExecuted = true</script>\n[External link](https://example.com)",
 )
-const documents = [current, pdf, image, notes].map(
-  ({ bytes: _bytes, ...source }) => ({
-    ...source,
-    organizationId: 7,
-    companyId: 3,
-    name: source.fileName,
-    isDeleted: false,
-    currentVersionId: Number(source.id) + 10,
-    versionCount: source.id === "1" ? 2 : 1,
-  }),
+const workbook = managedFile(
+  "7",
+  "supplier.xlsx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "XLSX fixture",
 )
-const versions = [current, pdf, image, notes].map(
-  ({ bytes: _bytes, ...source }) => ({
-    ...source,
-    id: String(Number(source.id) + 10),
-    organizationId: 7,
-    documentId: Number(source.id),
-    versionNumber: source.id === "1" ? 2 : 1,
-    isCurrent: true,
-  }),
+const word = managedFile(
+  "8",
+  "supplier.docx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "DOCX fixture",
 )
+const previews = new Map<string, OfficeDocumentPreview>([
+  [
+    workbook.url,
+    {
+      kind: "xlsx",
+      sheets: [
+        {
+          name: "Supplier ledger",
+          columns: 2,
+          rows: [["Coffee", "1200"]],
+          truncated: false,
+        },
+        {
+          name: "Reconciliation and supporting ledger for the distribution center",
+          columns: 4,
+          rows: [["Transport", "900", "Confirmed", "October"]],
+          truncated: true,
+        },
+      ],
+    },
+  ],
+  [
+    word.url,
+    {
+      kind: "docx",
+      truncated: false,
+      blocks: [
+        { kind: "paragraph", text: "Supplier statement for October" },
+        {
+          kind: "table",
+          rows: [
+            ["Account", "Balance"],
+            ["North distribution center", "1200"],
+          ],
+        },
+      ],
+    },
+  ],
+])
+const currentFiles = [current, pdf, image, notes, workbook, word]
+const documents = currentFiles.map(({ bytes: _bytes, ...source }) => ({
+  ...source,
+  organizationId: 7,
+  companyId: 3,
+  name: source.fileName,
+  isDeleted: false,
+  currentVersionId: Number(source.id) + 10,
+  versionCount: source.id === "1" ? 2 : 1,
+}))
+const versions = currentFiles.map(({ bytes: _bytes, ...source }) => ({
+  ...source,
+  id: String(Number(source.id) + 10),
+  organizationId: 7,
+  documentId: Number(source.id),
+  versionNumber: source.id === "1" ? 2 : 1,
+  isCurrent: true,
+}))
 versions.push({
   ...older,
   id: "10",
@@ -116,16 +165,28 @@ async function setup(page: Page) {
   await page.route("**/api/documents/blobs/object/**", (route) => {
     const url = new URL(route.request().url())
     state.blobReads.push(url.pathname)
-    const source = [current, older, pdf, image, notes].find(
+    const source = [...currentFiles, older].find(
       (file) => file.url === url.pathname,
     )
-    return !source || source.checksum !== url.searchParams.get("sha256")
-      ? route.fulfill({ status: 404 })
-      : route.fulfill({
-          body: source.bytes,
-          contentType: source.mimetype,
-          headers: { "cache-control": "private, no-store" },
-        })
+    if (!source || source.checksum !== url.searchParams.get("sha256"))
+      return route.fulfill({ status: 404 })
+    if (url.searchParams.get("preview") === "true") {
+      expect(url.searchParams.get("documentId")).toBe(source.id)
+      expect(url.searchParams.get("companyId")).toBe("3")
+      return route.fulfill({
+        json: {
+          sourceSha256: source.checksum,
+          sourceSize: source.fileSize,
+          preview: previews.get(source.url),
+        },
+        headers: { "cache-control": "private, no-store" },
+      })
+    }
+    return route.fulfill({
+      body: source.bytes,
+      contentType: source.mimetype,
+      headers: { "cache-control": "private, no-store" },
+    })
   })
   await page.goto("/document-viewer", { waitUntil: "domcontentloaded" })
   await expect(page.getByTestId("document-viewer-disclosure")).toHaveAttribute(
@@ -136,6 +197,57 @@ async function setup(page: Page) {
 }
 
 for (const width of [390, 1440]) {
+  test(`file cards keep distinct original names at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+    await setup(page)
+    await page.getByTestId("file-browser-layout-grid").click()
+    const signed = page.getByTestId("file-browser-file-5")
+    const exported = page.getByTestId("file-browser-file-6")
+    await expect(
+      signed.getByRole("button", { name: "Quarter-end evidence", exact: true }),
+    ).toBeVisible()
+    await expect(
+      exported.getByRole("button", {
+        name: "Quarter-end evidence",
+        exact: true,
+      }),
+    ).toBeVisible()
+    await expect(signed).toContainText("PDF · 1.5 KB")
+    await expect(exported).toContainText("Spreadsheet · 400 B")
+
+    const reveal = signed.getByRole("button", {
+      name: /^Show original filename:/,
+    })
+    const extension = reveal.getByText(".PDF", { exact: true })
+    const cardBounds = await signed.boundingBox()
+    const extensionBounds = await extension.boundingBox()
+    expect(
+      cardBounds &&
+        extensionBounds &&
+        extensionBounds.x + extensionBounds.width <=
+          cardBounds.x + cardBounds.width,
+    ).toBe(true)
+    await reveal.focus()
+    await page.keyboard.press("Enter")
+    const original = page.getByRole("dialog", { name: "Original filename" })
+    await expect(original).toContainText(
+      "Supplier reconciliation for the north distribution center ".repeat(4) +
+        " signed.PDF",
+    )
+    await expect(
+      page.getByRole("dialog", { name: "File preview" }),
+    ).toHaveCount(0)
+    await page.keyboard.press("Escape")
+    await expect(reveal).toBeFocused()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
+    ).toBeLessThanOrEqual(1)
+  })
+
   test(`Documents and ERP attachments share versioned CSV preview at ${width}px`, async ({
     page,
   }) => {
@@ -180,6 +292,58 @@ for (const width of [390, 1440]) {
     await expect(
       dialog.getByRole("cell", { name: "Coffee", exact: true }),
     ).toBeVisible()
+  })
+
+  test(`inspected Office previews fit the shared viewer at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 850 })
+    await setup(page)
+    const documents = page.getByRole("region", {
+      name: "Documents entry point",
+    })
+    await documents
+      .getByRole("button", { name: "Supplier workbook", exact: true })
+      .click()
+    const dialog = page.getByRole("dialog", { name: "File preview" })
+    await expect(
+      dialog.getByRole("cell", { name: "Coffee", exact: true }),
+    ).toBeVisible()
+    await dialog.getByRole("combobox", { name: "Worksheet" }).press("Enter")
+    await page
+      .getByRole("option", { name: /^Reconciliation and supporting ledger/ })
+      .click()
+    await expect(
+      dialog.getByRole("cell", { name: "Transport", exact: true }),
+    ).toBeVisible()
+    await expect(dialog.getByText(/worksheet preview is limited/)).toBeVisible()
+    await page.screenshot({
+      path: test.info().outputPath(`workbook-${width}.png`),
+    })
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
+
+    const attachments = page.getByRole("region", {
+      name: "ERP attachment entry point",
+    })
+    await attachments
+      .getByRole("button", { name: "Supplier letter", exact: true })
+      .click()
+    await expect(
+      dialog.getByText("Supplier statement for October"),
+    ).toBeVisible()
+    await expect(
+      dialog.getByRole("cell", { name: "North distribution center" }),
+    ).toBeVisible()
+    const bounds = await dialog.boundingBox()
+    expect(bounds?.x).toBeGreaterThanOrEqual(0)
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(width)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
+    ).toBeLessThanOrEqual(1)
+    await page.screenshot({ path: test.info().outputPath(`word-${width}.png`) })
   })
 }
 

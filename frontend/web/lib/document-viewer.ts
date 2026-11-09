@@ -1,10 +1,19 @@
 import { decodeQueryListResponse } from "@lumiere/api-client"
 import { CSV_IMPORT_LIMITS } from "@lumiere/erp-shared/csv-import-safety"
-import { documentFileContentType } from "@lumiere/erp-shared/document-file-profile"
+import {
+  DOCX_DOCUMENT_MIME,
+  XLSX_DOCUMENT_MIME,
+  documentFileContentType,
+} from "@lumiere/erp-shared/document-file-profile"
 import { financeSourceUrl } from "./finance-source-preview"
 
 export type DocumentViewerErrorCode =
-  "unavailable" | "denied" | "invalid" | "tooLarge" | "integrity" | "request"
+  | "unavailable"
+  | "denied"
+  | "invalid"
+  | "tooLarge"
+  | "integrity"
+  | "request"
 
 export class DocumentViewerError extends Error {
   constructor(readonly code: DocumentViewerErrorCode) {
@@ -37,12 +46,26 @@ export type DocumentViewerManifest = {
   source: DocumentViewerSource
   versions: DocumentViewerSource[]
 }
+export type OfficePreviewSheet = {
+  name: string
+  columns: number
+  rows: string[][]
+  truncated: boolean
+}
+type WordPreviewBlock =
+  | { kind: "paragraph"; text: string }
+  | { kind: "table"; rows: string[][] }
+export type OfficeDocumentPreview =
+  | { kind: "xlsx"; sheets: OfficePreviewSheet[] }
+  | { kind: "docx"; blocks: WordPreviewBlock[]; truncated: boolean }
+
 export type DocumentPreview =
   | { kind: "csv"; rows: string[][]; columns: number }
   | { kind: "text"; text: string }
   | { kind: "image" }
   | { kind: "pdf" }
   | { kind: "unsupported" }
+  | OfficeDocumentPreview
 
 function field(row: unknown, camel: string, snake = camel): unknown {
   if (row === null || typeof row !== "object" || Array.isArray(row))
@@ -341,11 +364,121 @@ export async function readDocumentViewerFile(
 }
 
 export function documentPreviewKind(mime: string): DocumentPreview["kind"] {
+  if (mime === XLSX_DOCUMENT_MIME) return "xlsx"
+  if (mime === DOCX_DOCUMENT_MIME) return "docx"
   if (mime === "text/csv" || mime === "application/csv") return "csv"
   if (["text/plain", "text/markdown", "application/json"].includes(mime))
     return "text"
   if (["image/png", "image/jpeg", "image/webp"].includes(mime)) return "image"
   return mime === "application/pdf" ? "pdf" : "unsupported"
+}
+
+function isPreviewText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && value.length <= maximum
+}
+
+function isPreviewRows(value: unknown, columns?: number): value is string[][] {
+  return (
+    Array.isArray(value) &&
+    value.length <= 100 &&
+    value.every(
+      (row: unknown) =>
+        Array.isArray(row) &&
+        row.length <= 20 &&
+        (columns === undefined ? row.length > 0 : row.length === columns) &&
+        row.every((cell: unknown) => isPreviewText(cell, 500)),
+    )
+  )
+}
+
+function isPreviewSheet(value: unknown): value is OfficePreviewSheet {
+  const name = field(value, "name")
+  const columns = field(value, "columns")
+  return (
+    isPreviewText(name, 255) &&
+    name.trim().length > 0 &&
+    typeof columns === "number" &&
+    Number.isInteger(columns) &&
+    columns >= 0 &&
+    columns <= 20 &&
+    isPreviewRows(field(value, "rows"), columns) &&
+    typeof field(value, "truncated") === "boolean"
+  )
+}
+
+function isWordPreviewBlock(value: unknown): value is WordPreviewBlock {
+  const kind = field(value, "kind")
+  return kind === "paragraph"
+    ? isPreviewText(field(value, "text"), 4_000)
+    : kind === "table" && isPreviewRows(field(value, "rows"))
+}
+
+/** Request bounded display data from the authorized blob route, without transferring Office bytes. */
+export async function readDocumentOfficePreview(
+  source: DocumentViewerSource,
+  scope: DocumentViewerScope,
+  fetcher: DocumentViewerFetch,
+  signal: AbortSignal,
+): Promise<OfficeDocumentPreview> {
+  const kind = documentPreviewKind(source.mimeType)
+  if (kind !== "xlsx" && kind !== "docx")
+    throw new DocumentViewerError("invalid")
+  if (source.size > 5_000_000) throw new DocumentViewerError("tooLarge")
+  const url = financeSourceUrl(source.url, scope.organizationId)
+  if (!url || !/^[a-f0-9]{64}$/.test(source.checksum))
+    throw new DocumentViewerError("invalid")
+  const query = new URLSearchParams({
+    sha256: source.checksum,
+    preview: "true",
+    documentId: source.documentId,
+  })
+  if (source.versionId !== undefined) query.set("versionId", source.versionId)
+  if (scope.companyId !== null) query.set("companyId", String(scope.companyId))
+  const response = await fetcher(`${url}?${query}`, requestOptions(signal))
+  if (response.status === 409) throw new DocumentViewerError("integrity")
+  if (response.status === 400 || response.status === 422)
+    throw new DocumentViewerError("invalid")
+  if (response.status === 413) throw new DocumentViewerError("tooLarge")
+  const bytes = await readBytes(response, 2_000_000, signal)
+  if (
+    response.headers.get("content-type")?.split(";")[0]?.trim() !==
+    "application/json"
+  )
+    throw new DocumentViewerError("invalid")
+  let body: unknown
+  try {
+    body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))
+  } catch {
+    throw new DocumentViewerError("invalid")
+  }
+  if (
+    field(body, "sourceSha256") !== source.checksum ||
+    field(body, "sourceSize") !== source.size
+  )
+    throw new DocumentViewerError("integrity")
+  const preview = field(body, "preview")
+  if (field(preview, "kind") !== kind) throw new DocumentViewerError("invalid")
+  if (kind === "xlsx") {
+    const sheets = field(preview, "sheets")
+    if (
+      Array.isArray(sheets) &&
+      sheets.length > 0 &&
+      sheets.length <= 24 &&
+      sheets.every(isPreviewSheet)
+    )
+      return { kind, sheets }
+  } else {
+    const blocks = field(preview, "blocks")
+    const truncated = field(preview, "truncated")
+    if (
+      typeof truncated === "boolean" &&
+      Array.isArray(blocks) &&
+      blocks.length <= 200 &&
+      blocks.every(isWordPreviewBlock)
+    )
+      return { kind, blocks, truncated }
+  }
+  throw new DocumentViewerError("invalid")
 }
 
 /** Display report records verbatim; import header, formula and mapping rules do not rewrite evidence. */
@@ -421,6 +554,7 @@ export function documentPreview(
   bytes: Uint8Array,
 ): DocumentPreview {
   const kind = documentPreviewKind(mime)
+  if (kind === "xlsx" || kind === "docx") return { kind: "unsupported" }
   if (kind !== "csv" && kind !== "text") return { kind }
   let content: string
   try {
