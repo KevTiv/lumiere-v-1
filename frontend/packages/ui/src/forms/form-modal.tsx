@@ -189,6 +189,9 @@ export function FormModal({
   const HeaderIcon = config.icon
     ? (Icons as Record<string, unknown>)[config.icon] as React.ComponentType<{ className?: string }> | undefined
     : undefined
+  const description = config.description
+    ? <DialogDescription className={workspaceStyles.sectionDescription}>{config.description}</DialogDescription>
+    : null
 
   return (
     <Dialog open={open} onOpenChange={requestOpenChange}>
@@ -202,7 +205,7 @@ export function FormModal({
           className
         )}
       >
-        <DialogHeader className={cn(workspaceStyles.pageHeader, "bg-card/95 px-4 py-4 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
+        <DialogHeader className={cn(workspaceStyles.pageHeader, "bg-card/95 px-4 py-3 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(
@@ -216,18 +219,14 @@ export function FormModal({
               <DialogTitle className={cn(workspaceStyles.sectionTitle, "[overflow-wrap:anywhere]")} data-testid="form-modal-title">
                 {config.title}
               </DialogTitle>
-              {config.description && (
-                <DialogDescription className={cn(workspaceStyles.sectionDescription, "mt-1")}>
-                  {config.description}
-                </DialogDescription>
-              )}
             </div>
           </div>
         </DialogHeader>
 
         {initialState ? (
           <>
-            <DialogBody className="px-6 py-5">
+            <DialogBody className="space-y-4 px-6 py-5">
+              {description}
               {initialState.status === "loading"
                 ? <DialogSkeleton label={initialState.label} />
                 : <p role="alert" className="text-destructive">{initialState.message}</p>}
@@ -244,6 +243,7 @@ export function FormModal({
             key={formRevision}
             config={{ ...config, title: "", description: "", layout: "default" }}
             scrollable
+            bodyIntro={description}
             onSubmit={handleSubmit}
             submitError={submitError}
             onExplainError={onExplainError}
