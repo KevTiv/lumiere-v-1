@@ -1,4 +1,5 @@
 import { recordPageHref } from '@/lib/record-page-href';
+import { parseStrictU64 } from '@lumiere/erp-shared/u64';
 
 export { formatFileSize } from '@lumiere/ui/lib/file-kind';
 
@@ -14,10 +15,11 @@ export function linkedRecordHref(document: Row): string | undefined {
   return recordPageHref(document.resModel ?? document.res_model, document.resId ?? document.res_id);
 }
 
-/** `update_document` params for a folder move; an empty choice is refused (the backend cannot clear a folder). */
-export function moveDocumentParams(folderValue: unknown): { folderId: string } | null {
+/** `move_document` uses an explicit null destination for root; missing choices are refused. */
+export function moveDocumentParams(folderValue: unknown): { folderId: string | null } | null {
+  if (folderValue === '__root__') return { folderId: null };
   const folderId = String(folderValue ?? '').trim();
-  return folderId ? { folderId } : null;
+  return parseStrictU64(folderId) ? { folderId } : null;
 }
 
 /** Trimmed legal-hold reason, or null when blank (the reducer requires one). */

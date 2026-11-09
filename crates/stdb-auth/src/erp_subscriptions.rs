@@ -484,57 +484,17 @@ pub fn subscription_queries_for_resource(
         )]));
     }
 
-    // Pilot ACL = owner-only on both WS and HTTP (not full `read_access_ids`).
-    // Folder: unrestricted OR caller is owner — SQL cannot express Vec<Identity> membership.
-    if r == "document-folders" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
-        let cols = resolve_http_sql_columns("document-folders", ctx.field_access)?.join(", ");
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM doc_folder WHERE organization_id = {org} AND (is_access_restricted = false OR owner_id = {id_lit})"
-        )]));
-    }
-
-    // Pilot ACL = owner-only on both WS and HTTP (match query_exec special-case).
-    if r == "documents" || r == "documents-deleted" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
-        let cols = resolve_http_sql_columns(r, ctx.field_access)?.join(", ");
-        let deleted = if r == "documents-deleted" {
-            "true"
-        } else {
-            "false"
-        };
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM document WHERE organization_id = {org} AND is_deleted = {deleted} AND owner_id = {id_lit}"
-        )]));
-    }
-
-    // Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL
-    // cannot JOIN/subquery parent `document.owner_id`. Filter by `created_by` (version
-    // author) — under owner-only docs the owner creates versions.
-    if r == "document-versions" {
-        let Some(org) = ctx.organization_id else {
-            return Ok(None);
-        };
-        let Some(id) = ctx.identity_hex.filter(|s| *s != "unknown") else {
-            return Ok(None);
-        };
-        let id_lit = crate::field_policy::identity_sql_literal(id)?;
-        let cols = resolve_http_sql_columns("document-versions", ctx.field_access)?.join(", ");
-        return Ok(Some(vec![format!(
-            "SELECT {cols} FROM document_version WHERE organization_id = {org} AND created_by = {id_lit}"
-        )]));
+    // Folder ancestry, lifecycle markers and current company membership require
+    // the authoritative HTTP read path; raw SQL subscriptions cannot apply them.
+    if matches!(
+        r,
+        "document-folders"
+            | "document-folders-deleted"
+            | "documents"
+            | "documents-deleted"
+            | "document-versions"
+    ) {
+        return Ok(None);
     }
 
     if r == "field-permissions" {
@@ -612,6 +572,28 @@ pub fn full_client_subscription_resources_vec() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_tree_reads_remain_behind_authoritative_http_filters() {
+        let context = SubscriptionQueryContext {
+            organization_id: Some(42),
+            identity_hex: Some("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"),
+            ..SubscriptionQueryContext::default()
+        };
+        for resource in [
+            "document-folders",
+            "document-folders-deleted",
+            "documents",
+            "documents-deleted",
+            "document-versions",
+        ] {
+            assert_eq!(
+                subscription_queries_for_resource(resource, &context).unwrap(),
+                None,
+                "{resource}"
+            );
+        }
+    }
 
     #[test]
     fn subscription_queries_fail_closed_without_organization_context() {

@@ -460,7 +460,9 @@
     },
     "listToolbar": {
       "viewSettings": "Paramètres d’affichage"
-    }
+    },
+    "restore": "Restaurer",
+    "previous": "Précédent"
   },
   "navigation": {
     "overview": "Vue d’ensemble",
@@ -3469,6 +3471,54 @@
         "table": "Tableau de données",
         "code": "Code"
       }
+    },
+    "viewer": {
+      "open": "Aperçu du fichier",
+      "title": "Aperçu du fichier",
+      "description": "Consultez un fichier enregistré et ses versions autorisées.",
+      "scopeChanged": "Votre espace de travail a changé. Fermez cet aperçu et rouvrez le fichier.",
+      "denied": "Vous n’avez pas accès à ce fichier.",
+      "unavailable": "Ce fichier ou cette version n’est pas disponible avec vos droits d’accès actuels.",
+      "changed": "Les informations du fichier enregistré ont changé. Rechargez l’aperçu avant de continuer.",
+      "tooLarge": "Ce fichier dépasse la limite de l’aperçu.",
+      "invalid": "L’aperçu du fichier n’a pas pu être vérifié.",
+      "failed": "Le fichier n’a pas pu être chargé. Réessayez.",
+      "currentVersion": "Version actuelle",
+      "version": "Version du fichier",
+      "versionNumber": "Version {{number}}",
+      "current": "actuelle",
+      "reload": "Recharger l’aperçu",
+      "downloading": "Préparation du téléchargement…",
+      "download": "Télécharger le fichier",
+      "loading": "Vérification des droits et chargement du fichier…",
+      "pdfFallback": "Votre navigateur ne peut pas afficher ce PDF. Utilisez Télécharger le fichier pour l’ouvrir.",
+      "unsupported": "L’aperçu de ce format n’est pas encore disponible.",
+      "content": "Contenu du fichier",
+      "empty": "Ce fichier ne contient aucun enregistrement.",
+      "csv": "Aperçu CSV",
+      "rows": "Lignes {{start}}–{{end}} sur {{total}}",
+      "pages": "Page {{page}} sur {{total}}"
+    },
+    "fileManagement": {
+      "move": "Déplacer",
+      "restoreFolder": "Restaurer le dossier",
+      "destination": "Destination",
+      "root": "Dossier racine",
+      "trashFolder": "Mettre le dossier à la corbeille ?",
+      "trashDescription": "Ce dossier et son contenu seront masqués jusqu’à sa restauration. Les versions existantes des fichiers sont conservées.",
+      "trash": "Mettre à la corbeille",
+      "editFolder": "Modifier le dossier",
+      "folderTrash": "Corbeille des dossiers",
+      "restoreDescription": "Restaurez un dossier pour rendre ses fichiers conservés à nouveau disponibles. Choisissez son emplacement d’origine ou une autre destination autorisée.",
+      "folderActions": "Actions pour {{name}}",
+      "scopeChanged": "Votre espace de fichiers ou vos autorisations ont changé. Rouvrez cette action.",
+      "unavailableDestination": "Choisissez une destination disponible."
+    },
+    "attachments": {
+      "readFailed": "Les pièces jointes n’ont pas pu être chargées. Actualisez avant de téléverser."
+    },
+    "receipts": {
+      "indexDisallowed": "L’indexation par IA n’est pas disponible pour ce fichier"
     }
   },
   "subscriptions": {

@@ -5154,6 +5154,26 @@
       "name": "claim_ai_metered_dispatch",
       "exposure": "denied",
       "reason": "Private atomic metered provider dispatch claim; exact service grant and durable reservation ownership, never generic session dispatch."
+    },
+    {
+      "name": "move_document",
+      "exposure": "session",
+      "reason": "reviewed document folder lifecycle action; current organization/company, ancestor access, descendant safety and destination checks remain reducer-enforced"
+    },
+    {
+      "name": "move_document_folder",
+      "exposure": "session",
+      "reason": "reviewed document folder lifecycle action; current organization/company, ancestor access, descendant safety and destination checks remain reducer-enforced"
+    },
+    {
+      "name": "restore_document_folder",
+      "exposure": "session",
+      "reason": "reviewed document folder lifecycle action; current organization/company, ancestor access, descendant safety and destination checks remain reducer-enforced"
+    },
+    {
+      "name": "trash_document_folder",
+      "exposure": "session",
+      "reason": "reviewed document folder lifecycle action; current organization/company, ancestor access, descendant safety and destination checks remain reducer-enforced"
     }
   ]
 }

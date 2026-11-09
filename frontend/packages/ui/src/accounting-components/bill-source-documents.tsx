@@ -19,6 +19,7 @@ export interface BillSourceDocumentsProps {
   uploadState?: { phase: "idle" | "pending" | "unknown" | "error"; message?: string }
   onUpload?: (file: File) => Promise<void>
   onRefresh?: () => void
+  onOpen?: (documentId: string) => void
 }
 
 export function BillSourceDocuments(props: BillSourceDocumentsProps) {
@@ -36,7 +37,7 @@ function ScopedBillSourceDocuments(props: BillSourceDocumentsProps) {
   return <section className="space-y-3 rounded-md border bg-muted/20 p-3" aria-label={t("accounting.billDocuments.title", { defaultValue: "Supplier documents and receipts" })}>
     <h4 className="text-sm font-medium">{t("accounting.billDocuments.title", { defaultValue: "Supplier documents and receipts" })}</h4>
     {props.sourceState.status !== "ready" ? props.sourceState.status === "loading" ? <p role="status" className="text-sm">{t("common.loading", { defaultValue: "Loading…" })}</p> : <ModuleDataNotice state={props.sourceState} /> : linked == null ? <p role="alert" className="text-sm text-destructive">{t("accounting.billDocuments.scopeUnavailable", { defaultValue: "Document links or ownership could not be verified. Refresh before attaching a file." })}</p> : <>
-      {linked.length ? <ul className="space-y-1 text-sm">{linked.map((document) => <li key={String(document.id)}><a className="text-primary underline" href={`/documents/${id(document.id)}`}>{String(optional(document.name) ?? optional(document.fileName ?? document.file_name) ?? `#${String(document.id)}`)}</a></li>)}</ul> : <p className="text-sm text-muted-foreground">{t("accounting.billDocuments.empty", { defaultValue: "No supplier documents linked to this bill." })}</p>}
+      {linked.length ? <ul className="space-y-1 text-sm">{linked.map((document) => <li key={String(document.id)}>{props.onOpen ? <button type="button" className="text-left text-primary underline" onClick={() => props.onOpen?.(String(id(document.id)))}>{String(optional(document.name) ?? optional(document.fileName ?? document.file_name) ?? `#${String(document.id)}`)}</button> : <a className="text-primary underline" href={`/documents/${id(document.id)}`}>{String(optional(document.name) ?? optional(document.fileName ?? document.file_name) ?? `#${String(document.id)}`)}</a>}</li>)}</ul> : <p className="text-sm text-muted-foreground">{t("accounting.billDocuments.empty", { defaultValue: "No supplier documents linked to this bill." })}</p>}
       {props.onUpload ? <div className="space-y-2">
         <Label htmlFor={`bill-source-file-${String(props.billId)}`}>{t("accounting.billDocuments.file", { defaultValue: BILL_DOCUMENT_FILE_HINT })}</Label>
         <p className="text-xs text-muted-foreground">{t("accounting.billDocuments.imageLimits", { defaultValue: BILL_DOCUMENT_IMAGE_HINT })}</p>

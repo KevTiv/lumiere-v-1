@@ -11,6 +11,10 @@
 pub mod documents;
 pub mod drive_sync;
 pub mod esign;
+mod folder_evidence;
+mod folder_hierarchy;
+mod folder_lifecycle;
+pub mod folder_operations;
 pub(crate) mod invoice_profile;
 pub mod knowledge;
 pub mod knowledge_guides;
@@ -23,6 +27,7 @@ pub mod templates;
 pub use documents::*;
 pub use drive_sync::*;
 pub use esign::*;
+pub use folder_operations::*;
 pub use knowledge::*;
 pub use knowledge_guides::*;
 pub use legal_hold::*;

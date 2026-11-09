@@ -1,5 +1,6 @@
 //! Durable upload receipts reuse the private blob store; no browser value proves a save.
 use super::*;
+use crate::query_exec::{read_document_versions, read_documents, DocumentReadProjection};
 use serde_json::Value;
 
 fn require_receipt_fields(access: &stdb_auth::FieldAccessContext) -> Result<(), ApiError> {
@@ -40,6 +41,7 @@ fn require_receipt_fields(access: &stdb_auth::FieldAccessContext) -> Result<(), 
         "checksum",
         "metadata",
         "created_by",
+        "changes_description",
     ];
     if documents.iter().any(|field| {
         !stdb_auth::has_resource_field_read_permission(Some(access), "documents", field)
@@ -70,6 +72,12 @@ pub(super) struct UploadRegistration {
     retention_days: Option<u32>,
     fiscal_kind: Option<String>,
     residency_region: Option<String>,
+    #[serde(default)]
+    metadata: Option<String>,
+    #[serde(default)]
+    pub(super) version_document_id: Option<String>,
+    #[serde(default)]
+    changes_description: Option<String>,
 }
 
 impl UploadRegistration {
@@ -92,6 +100,7 @@ impl UploadRegistration {
                 &self.res_id,
                 &self.partner_id,
                 &self.classification_id,
+                &self.version_document_id,
             ]
             .into_iter()
             .flatten()
@@ -100,13 +109,129 @@ impl UploadRegistration {
                 .into_iter()
                 .flatten()
                 .any(|value| value.len() > 100)
+            || self
+                .changes_description
+                .as_ref()
+                .is_some_and(|value| value.len() > 8_000)
+            || (self.version_document_id.is_none() && self.changes_description.is_some())
         {
             return Err(ApiError::Unprocessable(
                 "invalid document submission details".into(),
             ));
         }
+        if let Some(raw) = self.metadata.as_deref() {
+            if raw.len() > 8_000 {
+                return Err(ApiError::Unprocessable(
+                    "document metadata is too large".into(),
+                ));
+            }
+            let value: Value = serde_json::from_str(raw).map_err(|_| {
+                ApiError::Unprocessable("document metadata must be a JSON object".into())
+            })?;
+            let object = value.as_object().ok_or_else(|| {
+                ApiError::Unprocessable("document metadata must be a JSON object".into())
+            })?;
+            if ["uploadSubmissionId", "object_key", "uploaded_by"]
+                .iter()
+                .any(|key| object.contains_key(*key))
+            {
+                return Err(ApiError::Unprocessable(
+                    "document metadata contains reserved provenance fields".into(),
+                ));
+            }
+            if object.get("source").and_then(Value::as_str) == Some("accounting_bill_intake")
+                && (self.res_model.as_deref() != Some("account_move")
+                    || self.res_id.is_none()
+                    || self.version_document_id.is_some())
+            {
+                return Err(ApiError::Unprocessable(
+                    "bill intake metadata requires a linked accounting document".into(),
+                ));
+            }
+        }
         Ok(())
     }
+
+    /// Provenance belongs to the accepted actor and immutable reservation, not form values.
+    pub(super) fn with_provenance(
+        mut self,
+        actor: &str,
+        object_key: &str,
+    ) -> Result<Self, ApiError> {
+        self.validate()?;
+        if let Some(raw) = self.metadata.as_deref() {
+            let mut value: Value = serde_json::from_str(raw).map_err(ApiError::internal)?;
+            if value.get("source").and_then(Value::as_str) == Some("accounting_bill_intake") {
+                let object = value.as_object_mut().ok_or_else(|| {
+                    ApiError::Unprocessable("document metadata must be a JSON object".into())
+                })?;
+                object.insert("uploaded_by".into(), Value::String(actor.to_owned()));
+                object.insert("object_key".into(), Value::String(object_key.to_owned()));
+                let pinned = serde_json::to_string(&value).map_err(ApiError::internal)?;
+                if pinned.len() > 8_000 {
+                    return Err(ApiError::Unprocessable(
+                        "document metadata is too large after provenance binding".into(),
+                    ));
+                }
+                self.metadata = Some(pinned);
+            }
+        }
+        Ok(self)
+    }
+}
+
+/// Version writers can upload only for an exact currently readable parent in their company.
+pub(super) async fn require_version_upload(
+    state: &AppState,
+    session: &ApiSession,
+    company_id: Option<u64>,
+    registration: &UploadRegistration,
+) -> Result<(), ApiError> {
+    let target = registration
+        .version_document_id
+        .as_deref()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .ok_or_else(|| ApiError::Unprocessable("invalid version document ID".into()))?;
+    let organization_id = require_org(session)?;
+    let company_id = company_id
+        .filter(|value| *value > 0)
+        .ok_or_else(|| ApiError::Unprocessable("version uploads require a company".into()))?;
+    let trusted = TrustedOperationContext::for_resource_read(state, session)?;
+    if !stdb_auth::permission_allowed(trusted.field_access(), "document", "write") {
+        return Err(ApiError::Forbidden(
+            "document write permission is required for a version".into(),
+        ));
+    }
+    require_receipt_fields(trusted.field_access())?;
+    let documents = read_documents(
+        trusted.client(),
+        "documents",
+        organization_id,
+        trusted.actor_identity(),
+        Some(trusted.field_access()),
+        Some(company_id),
+        DocumentReadProjection::UploadReceipt,
+    )
+    .await?;
+    if !documents.iter().any(|row| {
+        crate::query_exec::row_u64(row, "id", "id").ok().flatten() == Some(target)
+            && crate::query_exec::row_u64(row, "organizationId", "organization_id")
+                .ok()
+                .flatten()
+                == Some(organization_id)
+            && crate::query_exec::row_u64(row, "companyId", "company_id")
+                .ok()
+                .flatten()
+                == Some(company_id)
+            && row.get("isDeleted").or_else(|| row.get("is_deleted")) == Some(&Value::Bool(false))
+    }) {
+        return Err(ApiError::Forbidden(
+            "the version document is not available in this company".into(),
+        ));
+    }
+    trusted.require_current_placement(&state.organization_placements)?;
+    Ok(())
 }
 
 pub(super) fn submission_object_id(
@@ -192,6 +317,7 @@ pub(super) struct UploadReceipt {
     registration: UploadRegistration,
     registration_state: &'static str,
     document_id: Option<String>,
+    version_id: Option<String>,
     indexing: &'static str,
     inspection: Option<BlobInspectionReceipt>,
 }
@@ -238,9 +364,13 @@ pub(super) async fn receipt(
     );
     // This private table is read only through its exact actor/company/model key.
     // It survives document deletion and purge, unlike the version snapshots.
-    let canonical = state.stdb.query_sql(&format!(
-        "SELECT id, organization_id, company_id, model, operation_key, payload_hash, record_id, created_by FROM record_creation_receipt WHERE id = '{receipt_id}' AND organization_id = {organization_id} AND company_id = {} AND model = 'document' AND created_by = {actor}", query.company_id,
-    )).await.map_err(ApiError::internal)?;
+    let canonical = if registration.version_document_id.is_some() {
+        Vec::new()
+    } else {
+        state.stdb.query_sql(&format!(
+            "SELECT id, organization_id, company_id, model, operation_key, payload_hash, record_id, created_by FROM record_creation_receipt WHERE id = '{receipt_id}' AND organization_id = {organization_id} AND company_id = {} AND model = 'document' AND created_by = {actor}", query.company_id,
+        )).await.map_err(ApiError::internal)?
+    };
     if canonical.len() > 1 {
         return Err(ApiError::Conflict(
             "the document submission receipt is ambiguous".into(),
@@ -279,22 +409,23 @@ pub(super) async fn receipt(
                 })
         })
         .transpose()?;
-    let rows = execute_resource_query_for_company(
+    let rows = read_documents(
         trusted.client(),
         "documents",
         organization_id,
         trusted.actor_identity(),
         access,
         Some(query.company_id),
+        DocumentReadProjection::UploadReceipt,
     )
     .await?;
-    let versions = execute_resource_query_for_company(
+    let versions = read_document_versions(
         trusted.client(),
-        "document-versions",
         organization_id,
         trusted.actor_identity(),
         access,
         Some(query.company_id),
+        DocumentReadProjection::UploadReceipt,
     )
     .await?;
     let checksum = meta
@@ -315,19 +446,35 @@ pub(super) async fn receipt(
     let matching: Vec<_> = versions
         .iter()
         .filter(|version| {
-            let submitted = version
-                .get("metadata")
-                .and_then(Value::as_str)
-                .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
-                .is_some_and(|metadata| {
-                    metadata.get("uploadSubmissionId").and_then(Value::as_str)
-                        == Some(query.submission_id.as_str())
-                });
-            submitted
-                && crate::query_exec::row_u64(version, "versionNumber", "version_number")
+            let submitted = if let Some(target) = registration.version_document_id.as_deref() {
+                crate::query_exec::row_u64(version, "documentId", "document_id")
                     .ok()
                     .flatten()
-                    == Some(1)
+                    .map(|id| id.to_string())
+                    .as_deref()
+                    == Some(target)
+                    && version
+                        .get("createdBy")
+                        .or_else(|| version.get("created_by"))
+                        .and_then(Value::as_str)
+                        .is_some_and(|creator| {
+                            creator_matches(Some(creator), &session.identity_hex)
+                        })
+            } else {
+                version
+                    .get("metadata")
+                    .and_then(Value::as_str)
+                    .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+                    .is_some_and(|metadata| {
+                        metadata.get("uploadSubmissionId").and_then(Value::as_str)
+                            == Some(query.submission_id.as_str())
+                    })
+                    && crate::query_exec::row_u64(version, "versionNumber", "version_number")
+                        .ok()
+                        .flatten()
+                        == Some(1)
+            };
+            submitted
                 && version.get("url").and_then(Value::as_str) == Some(url.as_str())
                 && version.get("checksum").and_then(Value::as_str) == Some(checksum.as_str())
         })
@@ -346,7 +493,7 @@ pub(super) async fn receipt(
                 .ok_or_else(|| {
                     ApiError::Conflict("the document submission identity is unavailable".into())
                 })?;
-            if canonical_id != Some(id) {
+            if registration.version_document_id.is_none() && canonical_id != Some(id) {
                 return Err(ApiError::Conflict(
                     "the document submission has no matching canonical save receipt".into(),
                 ));
@@ -356,7 +503,41 @@ pub(super) async fn receipt(
                     "the document submission is no longer accessible".into(),
                 ));
             }
+            if registration.version_document_id.is_some() {
+                let text = |camel: &str, snake: &str| {
+                    version
+                        .get(camel)
+                        .or_else(|| version.get(snake))
+                        .and_then(Value::as_str)
+                };
+                if text("fileName", "file_name") != Some(meta.file_name.as_str())
+                    || text("mimetype", "mimetype") != Some(meta.content_type.as_str())
+                    || crate::query_exec::row_u64(version, "fileSize", "file_size")
+                        .ok()
+                        .flatten()
+                        != Some(meta.expected_size)
+                    || text("changesDescription", "changes_description")
+                        != registration.changes_description.as_deref()
+                {
+                    return Err(ApiError::Conflict(
+                        "the saved document version does not match this submission".into(),
+                    ));
+                }
+            }
             Ok(id.to_string())
+        })
+        .transpose()?;
+    let version_id = matching
+        .first()
+        .map(|version| {
+            crate::query_exec::row_u64(version, "id", "id")
+                .ok()
+                .flatten()
+                .filter(|id| *id > 0)
+                .map(|id| id.to_string())
+                .ok_or_else(|| {
+                    ApiError::Conflict("the saved version identity is unavailable".into())
+                })
         })
         .transpose()?;
     if canonical_id.is_some() && document_id.is_none() {
@@ -372,13 +553,16 @@ pub(super) async fn receipt(
     } else {
         "unconfirmed"
     };
-    let still_current = canonical_id.is_some_and(|id| {
-        rows.iter().any(|row| {
-            crate::query_exec::row_u64(row, "id", "id").ok().flatten() == Some(id)
-                && row.get("url").and_then(Value::as_str) == Some(url.as_str())
-                && row.get("checksum").and_then(Value::as_str) == Some(checksum.as_str())
-        })
-    });
+    let still_current = document_id
+        .as_deref()
+        .and_then(|id| id.parse::<u64>().ok())
+        .is_some_and(|id| {
+            rows.iter().any(|row| {
+                crate::query_exec::row_u64(row, "id", "id").ok().flatten() == Some(id)
+                    && row.get("url").and_then(Value::as_str) == Some(url.as_str())
+                    && row.get("checksum").and_then(Value::as_str) == Some(checksum.as_str())
+            })
+        });
     let indexing = if document_id.is_some() && !still_current {
         "superseded"
     } else if document_id.is_some() {
@@ -431,6 +615,7 @@ pub(super) async fn receipt(
         registration,
         registration_state,
         document_id,
+        version_id,
         indexing,
         inspection: meta.inspection,
     }))

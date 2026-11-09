@@ -454,8 +454,22 @@ impl Config {
     }
 }
 
-/// Local remains the explicit-compatible default until an operator completes a
-/// checksum-verified migration and selects S3. Invalid S3 never falls back to disk.
+/// Load only the validated S3 settings for an operator-run migration.
+/// This never selects a backend for the running application.
+pub fn document_migration_s3_from_env() -> Result<DocumentBlobStoreConfig> {
+    parse_document_blob_store(
+        Some("s3".into()),
+        PathBuf::new(),
+        std::env::var("LUMIERE_DOCUMENT_S3_ENDPOINT").ok(),
+        std::env::var("LUMIERE_DOCUMENT_S3_BUCKET").ok(),
+        std::env::var("LUMIERE_DOCUMENT_S3_REGION").ok(),
+        std::env::var("LUMIERE_DOCUMENT_S3_ACCESS_KEY_ID").ok(),
+        std::env::var("LUMIERE_DOCUMENT_S3_SECRET_ACCESS_KEY").ok(),
+        std::env::var("LUMIERE_DOCUMENT_S3_PREFIX").ok(),
+        std::env::var("LUMIERE_DOCUMENT_S3_PATH_STYLE").ok(),
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn parse_document_blob_store(
     backend: Option<String>,

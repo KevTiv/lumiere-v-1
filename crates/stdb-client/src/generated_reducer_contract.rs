@@ -3410,6 +3410,16 @@ const PARAMS_MIGRATE_WORKFLOW_INSTANCE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("MigrateWorkflowInstanceParams") },
 ];
+const PARAMS_MOVE_DOCUMENT: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "document_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "folder_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+];
+const PARAMS_MOVE_DOCUMENT_FOLDER: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "folder_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "parent_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
+];
 const PARAMS_MOVE_STOCK_QUANT: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "quant_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4320,6 +4330,11 @@ const PARAMS_RESOLVE_PROPOSAL_SECTION_CONFLICT: &[ReducerParam] = &[
 const PARAMS_RESTORE_DOCUMENT: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "document_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_RESTORE_DOCUMENT_FOLDER: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "folder_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "parent_id", kind: ScalarKind::OptionalUnsignedInteger, ref_target: None },
 ];
 const PARAMS_RESTORE_PRODUCT_CATEGORY: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5531,6 +5546,10 @@ const PARAMS_TEST_WORKER_EDGE_CASES: &[ReducerParam] = &[
 const PARAMS_TOGGLE_PROJECT_FAVORITE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "project_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_TRASH_DOCUMENT_FOLDER: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "folder_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
 const PARAMS_UNASSIGN_TEAM_MEMBER_SKILL: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -7351,6 +7370,8 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "merge_contacts", contract_operation_id: "erp.merge_contacts", params: PARAMS_MERGE_CONTACTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "migrate_all_organizations", contract_operation_id: "erp.migrate_all_organizations", params: PARAMS_MIGRATE_ALL_ORGANIZATIONS, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "migrate_workflow_instance", contract_operation_id: "erp.migrate_workflow_instance", params: PARAMS_MIGRATE_WORKFLOW_INSTANCE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "move_document", contract_operation_id: "erp.move_document", params: PARAMS_MOVE_DOCUMENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "move_document_folder", contract_operation_id: "erp.move_document_folder", params: PARAMS_MOVE_DOCUMENT_FOLDER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "move_stock_quant", contract_operation_id: "erp.move_stock_quant", params: PARAMS_MOVE_STOCK_QUANT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "nominate_ai_knowledge_entry_version", contract_operation_id: "erp.nominate_ai_knowledge_entry_version", params: PARAMS_NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "nominate_ai_work_program_output", contract_operation_id: "erp.nominate_ai_work_program_output", params: PARAMS_NOMINATE_AI_WORK_PROGRAM_OUTPUT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7532,6 +7553,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "resolve_proposal_comment", contract_operation_id: "erp.resolve_proposal_comment", params: PARAMS_RESOLVE_PROPOSAL_COMMENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "resolve_proposal_section_conflict", contract_operation_id: "erp.resolve_proposal_section_conflict", params: PARAMS_RESOLVE_PROPOSAL_SECTION_CONFLICT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "restore_document", contract_operation_id: "erp.restore_document", params: PARAMS_RESTORE_DOCUMENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "restore_document_folder", contract_operation_id: "erp.restore_document_folder", params: PARAMS_RESTORE_DOCUMENT_FOLDER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "restore_product_category", contract_operation_id: "erp.restore_product_category", params: PARAMS_RESTORE_PRODUCT_CATEGORY, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "restore_proposal_version", contract_operation_id: "erp.restore_proposal_version", params: PARAMS_RESTORE_PROPOSAL_VERSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "resubmit_bank_statement_settlement", contract_operation_id: "erp.resubmit_bank_statement_settlement", params: PARAMS_RESUBMIT_BANK_STATEMENT_SETTLEMENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7909,6 +7931,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "test_queue_system", contract_operation_id: "erp.test_queue_system", params: PARAMS_TEST_QUEUE_SYSTEM, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "test_worker_edge_cases", contract_operation_id: "erp.test_worker_edge_cases", params: PARAMS_TEST_WORKER_EDGE_CASES, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "toggle_project_favorite", contract_operation_id: "erp.toggle_project_favorite", params: PARAMS_TOGGLE_PROJECT_FAVORITE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "trash_document_folder", contract_operation_id: "erp.trash_document_folder", params: PARAMS_TRASH_DOCUMENT_FOLDER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "unassign_team_member_skill", contract_operation_id: "erp.unassign_team_member_skill", params: PARAMS_UNASSIGN_TEAM_MEMBER_SKILL, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "unblock_workcenter", contract_operation_id: "erp.unblock_workcenter", params: PARAMS_UNBLOCK_WORKCENTER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "unenroll_benefit_enrollment", contract_operation_id: "erp.unenroll_benefit_enrollment", params: PARAMS_UNENROLL_BENEFIT_ENROLLMENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8858,6 +8881,8 @@ pub mod reducer_names {
     pub const MERGE_CONTACTS: ReducerName = ReducerName::new("merge_contacts");
     pub const MIGRATE_ALL_ORGANIZATIONS: ReducerName = ReducerName::new("migrate_all_organizations");
     pub const MIGRATE_WORKFLOW_INSTANCE: ReducerName = ReducerName::new("migrate_workflow_instance");
+    pub const MOVE_DOCUMENT: ReducerName = ReducerName::new("move_document");
+    pub const MOVE_DOCUMENT_FOLDER: ReducerName = ReducerName::new("move_document_folder");
     pub const MOVE_STOCK_QUANT: ReducerName = ReducerName::new("move_stock_quant");
     pub const NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION: ReducerName = ReducerName::new("nominate_ai_knowledge_entry_version");
     pub const NOMINATE_AI_WORK_PROGRAM_OUTPUT: ReducerName = ReducerName::new("nominate_ai_work_program_output");
@@ -9039,6 +9064,7 @@ pub mod reducer_names {
     pub const RESOLVE_PROPOSAL_COMMENT: ReducerName = ReducerName::new("resolve_proposal_comment");
     pub const RESOLVE_PROPOSAL_SECTION_CONFLICT: ReducerName = ReducerName::new("resolve_proposal_section_conflict");
     pub const RESTORE_DOCUMENT: ReducerName = ReducerName::new("restore_document");
+    pub const RESTORE_DOCUMENT_FOLDER: ReducerName = ReducerName::new("restore_document_folder");
     pub const RESTORE_PRODUCT_CATEGORY: ReducerName = ReducerName::new("restore_product_category");
     pub const RESTORE_PROPOSAL_VERSION: ReducerName = ReducerName::new("restore_proposal_version");
     pub const RESUBMIT_BANK_STATEMENT_SETTLEMENT: ReducerName = ReducerName::new("resubmit_bank_statement_settlement");
@@ -9416,6 +9442,7 @@ pub mod reducer_names {
     pub const TEST_QUEUE_SYSTEM: ReducerName = ReducerName::new("test_queue_system");
     pub const TEST_WORKER_EDGE_CASES: ReducerName = ReducerName::new("test_worker_edge_cases");
     pub const TOGGLE_PROJECT_FAVORITE: ReducerName = ReducerName::new("toggle_project_favorite");
+    pub const TRASH_DOCUMENT_FOLDER: ReducerName = ReducerName::new("trash_document_folder");
     pub const UNASSIGN_TEAM_MEMBER_SKILL: ReducerName = ReducerName::new("unassign_team_member_skill");
     pub const UNBLOCK_WORKCENTER: ReducerName = ReducerName::new("unblock_workcenter");
     pub const UNENROLL_BENEFIT_ENROLLMENT: ReducerName = ReducerName::new("unenroll_benefit_enrollment");
@@ -10350,6 +10377,8 @@ macro_rules! reducer_call {
     ("merge_contacts", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MERGE_CONTACTS, $args) };
     ("migrate_all_organizations", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MIGRATE_ALL_ORGANIZATIONS, $args) };
     ("migrate_workflow_instance", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MIGRATE_WORKFLOW_INSTANCE, $args) };
+    ("move_document", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MOVE_DOCUMENT, $args) };
+    ("move_document_folder", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MOVE_DOCUMENT_FOLDER, $args) };
     ("move_stock_quant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::MOVE_STOCK_QUANT, $args) };
     ("nominate_ai_knowledge_entry_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_AI_KNOWLEDGE_ENTRY_VERSION, $args) };
     ("nominate_ai_work_program_output", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::NOMINATE_AI_WORK_PROGRAM_OUTPUT, $args) };
@@ -10531,6 +10560,7 @@ macro_rules! reducer_call {
     ("resolve_proposal_comment", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESOLVE_PROPOSAL_COMMENT, $args) };
     ("resolve_proposal_section_conflict", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESOLVE_PROPOSAL_SECTION_CONFLICT, $args) };
     ("restore_document", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESTORE_DOCUMENT, $args) };
+    ("restore_document_folder", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESTORE_DOCUMENT_FOLDER, $args) };
     ("restore_product_category", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESTORE_PRODUCT_CATEGORY, $args) };
     ("restore_proposal_version", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESTORE_PROPOSAL_VERSION, $args) };
     ("resubmit_bank_statement_settlement", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::RESUBMIT_BANK_STATEMENT_SETTLEMENT, $args) };
@@ -10908,6 +10938,7 @@ macro_rules! reducer_call {
     ("test_queue_system", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::TEST_QUEUE_SYSTEM, $args) };
     ("test_worker_edge_cases", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::TEST_WORKER_EDGE_CASES, $args) };
     ("toggle_project_favorite", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::TOGGLE_PROJECT_FAVORITE, $args) };
+    ("trash_document_folder", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::TRASH_DOCUMENT_FOLDER, $args) };
     ("unassign_team_member_skill", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UNASSIGN_TEAM_MEMBER_SKILL, $args) };
     ("unblock_workcenter", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UNBLOCK_WORKCENTER, $args) };
     ("unenroll_benefit_enrollment", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UNENROLL_BENEFIT_ENROLLMENT, $args) };

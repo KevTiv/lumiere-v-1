@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { CreateDocumentParams } from "@lumiere/stdb/types"
+import type { AddDocumentVersionParams, CreateDocumentParams } from "@lumiere/stdb/types"
 import {
   documentReceiptStorageKey, findDocumentSubmission, loadDocumentSubmissionPointers,
   prepareDocumentSubmission, readDocumentUploadReceipt, resumeDocumentSubmission,
-  saveDocumentSubmissionPointer, uploadDocumentSubmission,
+  saveDocumentSubmissionPointer, settleDocumentSubmissionPointer, uploadDocumentSubmission,
   type DocumentRegistration, type DocumentSubmissionPointer, type DocumentUploadReceipt,
-  type DocumentUploadScope,
+  type DocumentUploadScope, type GeneratedDocumentSubmission,
 } from "./document-upload-receipts"
 
 export interface DocumentReceiptRow {
@@ -17,12 +17,17 @@ export interface DocumentReceiptRow {
   busy?: boolean
 }
 
+// Multiple ERP surfaces in one tab can archive the same record concurrently.
+// They share the in-flight attempt before PDF rendering produces file bytes.
+const generatedSubmissions = new Map<string, Promise<DocumentUploadReceipt>>()
+
 export function useDocumentUploadReceipts(options: {
   scope: DocumentUploadScope
   allowed: boolean
   assertCurrent(): void
   create(params: CreateDocumentParams): Promise<{ resource: string; id: string }>
-  index(documentId: string): Promise<unknown>
+  addVersion?(documentId: string, params: AddDocumentVersionParams): Promise<unknown>
+  index(documentId: string, receipt: DocumentUploadReceipt): Promise<unknown>
 }) {
   const { scope, allowed } = options
   const scopeKey = documentReceiptStorageKey(scope)
@@ -35,6 +40,7 @@ export function useDocumentUploadReceipts(options: {
   }, [])
   const [state, setState] = useState<{ scopeKey: string; rows: DocumentReceiptRow[]; error?: string }>({ scopeKey, rows: [] })
   const running = useRef(new Set<string>())
+  const [preparing, setPreparing] = useState({ scopeKey, count: 0 })
   const assertCurrent = () => {
     if (!current.current.mounted || current.current.scopeKey !== scopeKey || !current.current.allowed) throw new Error("Your document workspace or permissions changed. Reopen the current workspace to continue.")
     options.assertCurrent()
@@ -95,9 +101,18 @@ export function useDocumentUploadReceipts(options: {
         assertCurrent: assertRunCurrent,
         read: () => readDocumentUploadReceipt(scope, pointer),
         create: options.create,
+        addVersion: options.addVersion,
         index: options.index,
         changed: (receipt) => update(pointer, { receipt }),
       }, { retryIndexing })
+      if (receipt.documentId && pointer.intentKey) {
+        try { settleDocumentSubmissionPointer(window.localStorage, scope, pointer) }
+        catch {
+          // The save is authoritative. Retaining an unsettled pointer only makes
+          // the next click recover this same receipt rather than create a file.
+          update(pointer, { error: "The document is saved; browser storage could not mark its archive attempt complete." })
+        }
+      }
       return receipt
     } catch (error) {
       update(pointer, { error: error instanceof Error ? error.message : "The saved submission could not be checked" })
@@ -108,27 +123,73 @@ export function useDocumentUploadReceipts(options: {
     }
   }
 
-  return {
-    rows: allowed && state.scopeKey === scopeKey ? state.rows : [],
-    error: allowed && state.scopeKey === scopeKey ? state.error : undefined,
-    resume: (pointer: DocumentSubmissionPointer, retryIndexing = false) => run(pointer, undefined, retryIndexing),
-    submit: async (file: File, registration: DocumentRegistration, residency?: string) => {
+  const submit = async (file: File, registration: DocumentRegistration, residency?: string, intentKey?: string, retained?: DocumentSubmissionPointer) => {
       assertCurrent()
+      setPreparing((current) => ({ scopeKey, count: current.scopeKey === scopeKey ? current.count + 1 : 1 }))
       const generation = current.current.generation
       const assertSubmissionCurrent = () => {
         assertCurrent()
         if (current.current.generation !== generation) throw new Error("This upload belongs to an earlier workspace session. Reopen its saved receipt to continue.")
       }
-      const candidate = await prepareDocumentSubmission(file, registration, residency)
-      assertSubmissionCurrent()
-      const pointer = findDocumentSubmission(loadDocumentSubmissionPointers(window.localStorage, scope), candidate) ?? candidate
-      // Persist the recovery pointer before the first network side effect.
-      saveDocumentSubmissionPointer(window.localStorage, scope, pointer)
-      return run(pointer, async () => {
-        const existing = await readDocumentUploadReceipt(scope, pointer)
+      try {
+        const candidate = await prepareDocumentSubmission(file, registration, residency)
         assertSubmissionCurrent()
-        if (!existing?.fileSaved) await uploadDocumentSubmission(file, scope, pointer, registration)
-      })
+        const pointers = loadDocumentSubmissionPointers(window.localStorage, scope)
+        const retainedIntent = retained ?? (intentKey ? pointers.find((item) => item.intentKey === intentKey && !item.settled) : undefined)
+        if (retainedIntent && !findDocumentSubmission([retainedIntent], candidate)) throw new Error("The original generated file could not be reproduced. Check its saved receipt before starting another archive.")
+        const pointer = retainedIntent ?? (intentKey ? { ...candidate, intentKey } : findDocumentSubmission(pointers.filter((item) => !item.intentKey), candidate) ?? candidate)
+        // Persist the recovery pointer before the first network side effect.
+        saveDocumentSubmissionPointer(window.localStorage, scope, pointer)
+        return await run(pointer, async () => {
+          const existing = await readDocumentUploadReceipt(scope, pointer)
+          assertSubmissionCurrent()
+          if (!existing?.fileSaved) await uploadDocumentSubmission(file, scope, pointer, registration)
+        })
+      } finally {
+        setPreparing((current) => current.scopeKey === scopeKey ? { scopeKey, count: Math.max(0, current.count - 1) } : current)
+      }
+  }
+
+  return {
+    rows: allowed && state.scopeKey === scopeKey ? state.rows : [],
+    error: allowed && state.scopeKey === scopeKey ? state.error : undefined,
+    pending: allowed && ((state.scopeKey === scopeKey && state.rows.some((row) => row.busy)) || (preparing.scopeKey === scopeKey && preparing.count > 0)),
+    resume: (pointer: DocumentSubmissionPointer, retryIndexing = false) => run(pointer, undefined, retryIndexing),
+    submit,
+    submitGenerated: async (input: GeneratedDocumentSubmission) => {
+      assertCurrent()
+      if (!input.intentKey || input.intentKey.length > 200) throw new Error("A valid archive attempt key is required")
+      const generation = current.current.generation
+      const assertArchiveCurrent = () => {
+        assertCurrent()
+        if (current.current.generation !== generation) throw new Error("The archive belongs to an earlier workspace session")
+      }
+      const key = `${scopeKey}:${input.intentKey}`
+      const existing = generatedSubmissions.get(key)
+      if (existing) {
+        const receipt = await existing
+        assertArchiveCurrent()
+        return receipt
+      }
+      setPreparing((state) => ({ scopeKey, count: state.scopeKey === scopeKey ? state.count + 1 : 1 }))
+      const archive = (async () => {
+        const pointers = loadDocumentSubmissionPointers(window.localStorage, scope)
+        const retained = pointers.find((pointer) => pointer.intentKey === input.intentKey && !pointer.settled)
+        if (retained) {
+          const receipt = await readDocumentUploadReceipt(scope, retained)
+          assertArchiveCurrent()
+          if (receipt?.fileSaved || receipt?.bytesUploaded) return run(retained)
+        }
+        const file = await input.createFile()
+        assertArchiveCurrent()
+        return submit(file, input.registration, input.residency, input.intentKey, retained)
+      })()
+      generatedSubmissions.set(key, archive)
+      try { return await archive }
+      finally {
+        if (generatedSubmissions.get(key) === archive) generatedSubmissions.delete(key)
+        setPreparing((state) => state.scopeKey === scopeKey ? { scopeKey, count: Math.max(0, state.count - 1) } : state)
+      }
     },
   }
 }

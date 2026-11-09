@@ -22,19 +22,19 @@
   "inputs": [
     {
       "path": "lumiere-codegen/contract-operation-ids.json",
-      "sha256": "a1bde28d13eb548eb32d3bd15524189cfd0809e699292a7a3d19dccdbb62b04b"
+      "sha256": "a167fec328ecb7d32759ec5084683db2412e034b8fa9547c5671d82251c37de5"
     },
     {
       "path": "lumiere-codegen/reducer-exposure.json",
-      "sha256": "78fd1063a3364a73cee7166bf1fa82f2e4e692aadaf1bd6142e220dee96f8dc4"
+      "sha256": "789033bf9d09d754f5b57c25dae8916d1fe54ff01785f27d336dc463d3f9bec9"
     },
     {
       "path": "lumiere-codegen/business-history-owner-policy.json",
-      "sha256": "0390388f1e9aa9c315d494beef92878db2f8321229491ccd109ec61aabbd47b7"
+      "sha256": "81697adc80a8bc874bdf905d4e2803285df89db670e22835a3f4fc4a1f768328"
     },
     {
       "path": "lumiere-codegen/c2-commit-coverage.json",
-      "sha256": "a5c6090566bb46f059b98de6f44edf8db97a0b54439a6574588e946dddc66da9"
+      "sha256": "b0b10ccbb84bf479f2f2486d5ad41251fa5de85a8d98fa3f9fa84a5f39438464"
     },
     {
       "path": "docs/evidence/cov-00a-operation-census.json",
@@ -46,7 +46,7 @@
     },
     {
       "path": "lumiere-codegen/operation-contracts/operations.json",
-      "sha256": "918639079cbc37c27bd500a161c43d1a40fe4da9c1c42834809c0ee368e0eae5"
+      "sha256": "f74f1f5c8ce67c4dcf381f547255dd31f60dd30d1ae7c97b1b0d2e0f28ed06f7"
     },
     {
       "path": "lumiere-codegen/operation-contracts/people-platform.json",

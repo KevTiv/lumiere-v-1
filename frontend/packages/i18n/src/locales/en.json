@@ -630,7 +630,9 @@
     },
     "listToolbar": {
       "viewSettings": "View settings"
-    }
+    },
+    "restore": "Restore",
+    "previous": "Previous"
   },
   "navigation": {
     "overview": "Overview",
@@ -11112,7 +11114,53 @@
       "checking": "Checking…",
       "retryIndexing": "Retry indexing",
       "resumeIndexing": "Continue indexing",
-      "checkSave": "Check save receipt"
+      "checkSave": "Check save receipt",
+      "indexDisallowed": "AI indexing is unavailable for this file"
+    },
+    "viewer": {
+      "open": "Preview file",
+      "title": "File preview",
+      "description": "View a saved file and its permitted versions.",
+      "scopeChanged": "Your workspace changed. Close this preview and reopen the file.",
+      "denied": "You do not have access to this file.",
+      "unavailable": "This file or version is unavailable in your current access scope.",
+      "changed": "The saved file details changed. Reload the preview before continuing.",
+      "tooLarge": "This file exceeds the preview limit.",
+      "invalid": "The file preview could not be verified.",
+      "failed": "The file could not be loaded. Try again.",
+      "currentVersion": "Current version",
+      "version": "File version",
+      "versionNumber": "Version {{number}}",
+      "current": "current",
+      "reload": "Reload preview",
+      "downloading": "Preparing download…",
+      "download": "Download file",
+      "loading": "Checking access and loading the file…",
+      "pdfFallback": "Your browser cannot show this PDF. Use Download file to open it.",
+      "unsupported": "A preview is not available for this format yet.",
+      "content": "File content",
+      "empty": "This file contains no records.",
+      "csv": "CSV preview",
+      "rows": "Rows {{start}}–{{end}} of {{total}}",
+      "pages": "Page {{page}} of {{total}}"
+    },
+    "fileManagement": {
+      "move": "Move",
+      "restoreFolder": "Restore folder",
+      "destination": "Destination",
+      "root": "Root folder",
+      "trashFolder": "Move folder to trash?",
+      "trashDescription": "This folder and its contents will be hidden until the folder is restored. Existing file versions are retained.",
+      "trash": "Move to trash",
+      "editFolder": "Edit folder",
+      "folderTrash": "Folder trash",
+      "restoreDescription": "Restore a folder to make its retained files available again. Choose its original location or another permitted destination.",
+      "folderActions": "Actions for {{name}}",
+      "scopeChanged": "Your file workspace or permissions changed. Reopen this action.",
+      "unavailableDestination": "Choose an available destination."
+    },
+    "attachments": {
+      "readFailed": "Attachments could not be loaded. Refresh before uploading."
     }
   },
   "helpdesk": {

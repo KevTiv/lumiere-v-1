@@ -45,6 +45,9 @@
     "create_document": [
       "create_document"
     ],
+    "create_document_folder": [
+      "create_document_folder"
+    ],
     "create_expense_project_rebill": [
       "create_expense_project_rebill"
     ],
@@ -114,6 +117,12 @@
     "mark_mail_message_delivered": [
       "mark_mail_message_delivered"
     ],
+    "move_document": [
+      "move_document"
+    ],
+    "move_document_folder": [
+      "move_document_folder"
+    ],
     "move_stock_quant": [
       "move_stock_quant",
       "scrap_finished_manufacturing_output",
@@ -176,6 +185,9 @@
     "repair_cancelled_workflow_tasks": [
       "repair_cancelled_workflow_tasks"
     ],
+    "restore_document_folder": [
+      "restore_document_folder"
+    ],
     "resubmit_workflow_human_task": [
       "resubmit_workflow_human_task"
     ],
@@ -193,8 +205,14 @@
       "apply_org_migrations",
       "bootstrap_new_tenant"
     ],
+    "trash_document_folder": [
+      "trash_document_folder"
+    ],
     "update_account_move_line": [
       "update_account_move_line"
+    ],
+    "update_document_folder": [
+      "update_document_folder"
     ],
     "upsert_warehouse_geo": [
       "upsert_warehouse_geo"

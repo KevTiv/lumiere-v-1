@@ -51,10 +51,11 @@ Contract releases are automatic: pushing the registry or reducer change runs `.g
   auto-unlocks a row that reads back locked, because unlock no longer tolerates replay.
 ## Slice 2 — upload a new version (implemented)
 
-- **Reducer:** `add_document_version` rejects registering the blob that is already the
-  current version (same `url` and checksum) — "identical to the current version". A replay
-  previously created an empty duplicate revision. Drive sync and e-sign call this function
-  internally; an unchanged blob re-sync now errors instead of adding a duplicate.
+- **Reducer:** `add_document_version` recovers an exact retry by the original actor
+  using the immutable object URL and complete version payload. Recovery creates no
+  duplicate and never makes a historical version current. Reusing an object with
+  different details or a different actor is rejected. Authorization, folder visibility
+  and live locks are checked before recovery.
 - **Hook:** `useAddDocumentVersion` snapshots `/api/query/document-versions` before
   dispatch and after it resolves the one *new* row for the exact document + organization with
   the uploaded url + checksum and `is_current` (`resolveDocumentVersionEffect`,
@@ -63,8 +64,8 @@ Contract releases are automatic: pushing the registry or reducer change runs `.g
   the existing check-in form (blob upload → `add_document_version` → evidence ingest), and
   `Set retention` (`entity-action-set-document-retention`) opening the existing retention form.
 - **Spec:** second test in `cov18-document-lock-version.spec.ts` uploads a file through the UI,
-  asserts versions 1 (not current) and 2 (current), then stale replay 422 and reader 403 with the
-  version rows unchanged.
+  asserts versions 1 (not current) and 2 (current), then exact recovery 200,
+  conflicting-payload 422 and reader 403 with the version rows unchanged.
 - **Still not done:** legal-hold UI (no form config exists; the reducer/hook do), retention
   proof beyond the entry point, recycle-bin/purge proof, blob lifecycle, linked-record
   navigation. These remain COV-18 follow-ups.
@@ -77,10 +78,10 @@ Contract release pin for the new `documents` projection columns (automatic on pu
 
 | Gate | Required proof | State |
 | --- | --- | --- |
-| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | WRITTEN — `test_documents_create_and_lock` in `spacetimedb/tests/platform/platform_smoke.rs` (lock holder/time, replayed lock rejected, unlock clears holder, replayed unlock rejected, rows unchanged; identical version replay rejected in the Wave D document test); also version chain + deleted-document guards; RAN — release wasm published to a scratch local DB, `run_documents_wave_{a,b,c,d,e}_tests` all passed |
+| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | WRITTEN — `test_documents_create_and_lock` in `spacetimedb/tests/platform/platform_smoke.rs` (lock holder/time, replayed lock rejected, unlock clears holder, replayed unlock rejected, rows unchanged; conflicting version replay rejected in the Wave D document test; exact and historical version recovery covered by `test_historical_document_version_retry`); also version chain + deleted-document guards; RAN — release wasm published to a scratch local DB, `run_documents_wave_{a,b,c,d,e}_tests` all passed |
 | A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | WRITTEN — `check_permission(document, write)` + org match; reader replays asserted 403 in the spec; not yet run |
 | O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | WRITTEN — Documents tab `entity-action-lock-document` / `entity-action-unlock-document` in `frontend/web/tests/e2e/cov18-document-lock-version.spec.ts`; not yet run against a stack |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | DONE (resolver) — `document-lock-effect.test.ts`, `document-version-effect.test.ts` and `lib/documents-create-params.test.ts`; browser snapshot assertions written in the spec, not yet run |
+| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after exact version recovery (200), conflicting version replay (422), stale lock/unlock (422) and denied (403) replay | DONE (resolver) — `document-lock-effect.test.ts`, `document-version-effect.test.ts` and `lib/documents-create-params.test.ts`; browser snapshot assertions written in the spec, not yet run |
 
 ## Acceptance
 

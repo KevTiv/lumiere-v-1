@@ -460,7 +460,9 @@
     },
     "listToolbar": {
       "viewSettings": "Igenamiterere ry’uko bigaragara"
-    }
+    },
+    "restore": "Garura",
+    "previous": "Ibanje"
   },
   "navigation": {
     "overview": "Incamake",
@@ -3469,6 +3471,54 @@
         "table": "Imbonerahamwe",
         "code": "Kode"
       }
+    },
+    "viewer": {
+      "open": "Reba dosiye",
+      "title": "Igaragaza rya dosiye",
+      "description": "Reba dosiye yabitswe n’amaverisiyo yayo wemerewe.",
+      "scopeChanged": "Aho ukorera hahindutse. Funga iri garagaza wongere ufungure dosiye.",
+      "denied": "Ntabwo wemerewe kubona iyi dosiye.",
+      "unavailable": "Iyi dosiye cyangwa verisiyo ntiboneka mu byo wemerewe ubu.",
+      "changed": "Amakuru ya dosiye yabitswe yahindutse. Ongera ufungure igaragaza mbere yo gukomeza.",
+      "tooLarge": "Iyi dosiye irenze ingano ntarengwa yo kugaragazwa.",
+      "invalid": "Igaragaza rya dosiye ntiryashoboye kugenzurwa.",
+      "failed": "Dosiye ntiyashoboye gufungurwa. Ongera ugerageze.",
+      "currentVersion": "Verisiyo iriho",
+      "version": "Verisiyo ya dosiye",
+      "versionNumber": "Verisiyo {{number}}",
+      "current": "iriho",
+      "reload": "Ongera ufungure igaragaza",
+      "downloading": "Gutegura gukuramo dosiye…",
+      "download": "Kuramo dosiye",
+      "loading": "Kugenzura uburenganzira no gufungura dosiye…",
+      "pdfFallback": "Mushakisha yawe ntishobora kugaragaza iyi PDF. Kanda Kuramo dosiye kugira ngo uyifungure.",
+      "unsupported": "Igaragaza ry’ubu bwoko bwa dosiye ntiriraboneka.",
+      "content": "Ibiri muri dosiye",
+      "empty": "Iyi dosiye nta makuru irimo.",
+      "csv": "Igaragaza rya CSV",
+      "rows": "Imirongo {{start}}–{{end}} muri {{total}}",
+      "pages": "Urupapuro {{page}} muri {{total}}"
+    },
+    "fileManagement": {
+      "move": "Himura",
+      "restoreFolder": "Garura ububiko",
+      "destination": "Aho bijya",
+      "root": "Ububiko bw’ibanze",
+      "trashFolder": "Shyira ububiko mu myanda?",
+      "trashDescription": "Ubu bubiko n’iburimo bizahishwa kugeza igihe bugaruriwe. Amaverisiyo ya dosiye asanzwe azagumaho.",
+      "trash": "Shyira mu myanda",
+      "editFolder": "Hindura ububiko",
+      "folderTrash": "Imyanda y’ububiko",
+      "restoreDescription": "Garura ububiko kugira ngo dosiye zabugumyemo zongere kuboneka. Hitamo aho bwari buri cyangwa ahandi wemerewe.",
+      "folderActions": "Ibikorwa bya {{name}}",
+      "scopeChanged": "Aho ukorera dosiye cyangwa uburenganzira bwawe byahindutse. Ongera ufungure iki gikorwa.",
+      "unavailableDestination": "Hitamo ahantu haboneka."
+    },
+    "attachments": {
+      "readFailed": "Imigereka ntiyashoboye gufungurwa. Vugurura mbere yo kohereza."
+    },
+    "receipts": {
+      "indexDisallowed": "Gushyira iyi dosiye mu ishakiro rya AI ntibishoboka"
     }
   },
   "subscriptions": {

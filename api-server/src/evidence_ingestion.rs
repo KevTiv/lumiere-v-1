@@ -515,6 +515,13 @@ async fn ingest_document(
     .await?;
     let document_id = resolve_ingestion_document_id(&context, organization_id, &body).await?;
     let document = load_current_document(&context, organization_id, document_id).await?;
+    if let Some(object_key) = body.object_key.as_deref() {
+        if managed_blob_url(organization_id, object_key)? != document.url {
+            return Err(ApiError::Conflict(
+                "the requested document version changed before indexing".into(),
+            ));
+        }
+    }
     if document.company_id != requested_company || document.is_deleted {
         return Err(ApiError::NotFound("document not found".into()));
     }

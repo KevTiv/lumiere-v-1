@@ -443,6 +443,7 @@ export interface QueryRowMap {
   "direct-reports": HrEmployee
   "document-external-refs": DocumentExternalRef
   "document-folders": DocumentFolder
+  "document-folders-deleted": DocumentFolder
   "document-legal-holds": DocumentLegalHold
   "document-retention-purge-jobs": DocumentRetentionPurgeJob
   "document-signature-requests": DocumentSignatureRequest

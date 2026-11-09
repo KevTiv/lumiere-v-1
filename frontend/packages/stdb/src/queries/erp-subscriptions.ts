@@ -434,44 +434,10 @@ export function subscriptionQueriesForResource(
     ];
   }
 
-  // Pilot ACL = owner-only on both WS and HTTP (not full `read_access_ids`).
-  // Folder: unrestricted OR caller is owner — SQL cannot express Vec<Identity> membership.
-  if (r === "document-folders") {
-    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
-    const org = ctx.organizationId;
-    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
-    const idLit = identitySqlLiteral(ctx.identityHex);
-    const cols = resolveHttpSqlColumns("document-folders", ctx.fieldAccess).join(", ");
-    return [
-      `SELECT ${cols} FROM doc_folder WHERE organization_id = ${Number(org)} AND (is_access_restricted = false OR owner_id = ${idLit})`,
-    ];
-  }
-
-  // Pilot ACL = owner-only on both WS and HTTP (match query_exec / erp_subscriptions.rs).
-  if (r === "documents" || r === "documents-deleted") {
-    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
-    const org = ctx.organizationId;
-    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
-    const idLit = identitySqlLiteral(ctx.identityHex);
-    const cols = resolveHttpSqlColumns(r, ctx.fieldAccess).join(", ");
-    const deleted = r === "documents-deleted" ? "true" : "false";
-    return [
-      `SELECT ${cols} FROM document WHERE organization_id = ${Number(org)} AND is_deleted = ${deleted} AND owner_id = ${idLit}`,
-    ];
-  }
-
-  // Pilot ACL = owner-only. `document_version` has no `owner_id`; SpacetimeDB SQL
-  // cannot JOIN/subquery parent `document.owner_id`. Filter by `created_by` (version
-  // author) — under owner-only docs the owner creates versions.
-  if (r === "document-versions") {
-    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
-    const org = ctx.organizationId;
-    if (org === undefined || org === null || Number.isNaN(Number(org))) return null;
-    const idLit = identitySqlLiteral(ctx.identityHex);
-    const cols = resolveHttpSqlColumns("document-versions", ctx.fieldAccess).join(", ");
-    return [
-      `SELECT ${cols} FROM document_version WHERE organization_id = ${Number(org)} AND created_by = ${idLit}`,
-    ];
+  // Folder ancestry, trash state and current company membership are enforced
+  // by the HTTP read owner. A raw subscription cannot reproduce those checks.
+  if (["document-folders", "document-folders-deleted", "documents", "documents-deleted", "document-versions"].includes(r)) {
+    return null;
   }
 
   if (r === "field-permissions") {

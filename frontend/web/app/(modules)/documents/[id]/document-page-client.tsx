@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useErpSession } from '@lumiere/erp-session';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ExternalLink, Layers, Link2, PenLine } from 'lucide-react';
@@ -44,7 +45,6 @@ import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { optionalBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import {
-  useAddDocumentVersion,
   useDeleteDocument,
   useApplyDocumentLegalHold,
   useCreateDocumentSignatureRequest,
@@ -56,7 +56,6 @@ import {
   useDocumentFolders,
   useDocumentVersions,
   useDocuments,
-  useIngestDocumentEvidence,
   useLockDocument,
   useRestoreDocument,
   useSetDocumentRetention,
@@ -64,8 +63,12 @@ import {
   useUpdateDocument,
 } from '@lumiere/query-hooks/hooks/documents';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
-import { firstFileFromFormValue, uploadDocumentBlob } from '@/lib/document-blob-upload';
-import { toAddDocumentVersionParams, toSetDocumentRetentionParams } from '@/lib/documents-create-params';
+import { useDocumentLocationMutation } from '@lumiere/query-hooks/hooks/document-locations';
+import { firstFileFromFormValue } from '@/lib/document-blob-upload';
+import { useManagedDocumentUpload } from '@/lib/use-managed-document-upload';
+import { DocumentUploadReceipts } from '../../../../components/document-upload-receipts';
+import { DocumentViewerDialog } from '../../../../components/document-viewer-dialog';
+import { toSetDocumentRetentionParams } from '@/lib/documents-create-params';
 import { useDocumentsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { documentFolderRowsToSelectOptions } from '@/lib/form-lookup';
@@ -121,7 +124,7 @@ function editDocumentForm(row: Row): FormConfig {
   };
 }
 
-function moveDocumentForm(row: Row, folders: Array<{ value: string; label: string }>): FormConfig {
+function moveDocumentForm(row: Row, folders: Array<{ value: string; label: string }>, rootLabel: string): FormConfig {
   return {
     id: 'move-document',
     title: 'Move to folder',
@@ -136,8 +139,8 @@ function moveDocumentForm(row: Row, folders: Array<{ value: string; label: strin
             type: 'select',
             label: 'Folder',
             required: true,
-            defaultValue: row.folderId == null ? '' : String(row.folderId),
-            options: folders,
+            defaultValue: row.folderId == null ? '__root__' : String(row.folderId),
+            options: [{ value: '__root__', label: rootLabel }, ...folders],
             width: 'full',
           },
         ],
@@ -220,6 +223,7 @@ function DocumentPageLoaded({
   const searchParams = useSearchParams();
   const filesHref = documentBrowserReturnHref(searchParams.get('returnTo'));
   const { orgId } = orgBigInts(organizationId);
+  const session = useErpSession();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
   const { data: documents = [], isLoading } = useDocuments(orgId, initialDocuments as never);
@@ -235,8 +239,6 @@ function DocumentPageLoaded({
   const updateDocument = useUpdateDocument(orgId);
   const deleteDocument = useDeleteDocument(orgId);
   const restoreDocument = useRestoreDocument(orgId);
-  const addVersion = useAddDocumentVersion(orgId);
-  const ingestEvidence = useIngestDocumentEvidence(orgId);
   const setRetention = useSetDocumentRetention(orgId);
   const applyLegalHold = useApplyDocumentLegalHold(orgId);
   const releaseLegalHold = useReleaseDocumentLegalHold(orgId);
@@ -248,6 +250,7 @@ function DocumentPageLoaded({
   const [formAction, setFormAction] = useState<FormAction | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [preview, setPreview] = useState<{ versionId?: string } | null>(null);
 
   const document = useMemo(
     () =>
@@ -263,6 +266,22 @@ function DocumentPageLoaded({
         .sort((a, b) => Number(b.versionNumber ?? 0) - Number(a.versionNumber ?? 0)),
     [versions, documentId],
   );
+
+  const uploads = useManagedDocumentUpload(orgId, operatingCompanyId, { enabled: Boolean(document) && document?.isDeleted !== true, contextKey: documentId });
+  const versionReceipts = uploads.rows.filter(({ receipt, pointer }) => (receipt?.registration ?? pointer.target)?.versionDocumentId === documentId);
+  const moveDocument = useDocumentLocationMutation(orgId, operatingCompanyId, (action) => {
+    uploads.assertCurrent('version');
+    if (action.kind !== 'moveDocument' || String(action.id) !== documentId ||
+      String(document?.organizationId) !== String(orgId) ||
+      (document?.companyId != null && String(document.companyId) !== String(operatingCompanyId))) {
+      throw new Error('The document workspace changed. Reopen this action.');
+    }
+  });
+  useEffect(() => {
+    setFormAction(null);
+    setFormError(null);
+    setPreview(null);
+  }, [orgId, operatingCompanyId, documentId, session.identity, uploads.canVersion]);
 
   const activeHold = useMemo(
     () => activeLegalHold((holdsQuery.data ?? []) as unknown as Row[], documentId),
@@ -401,7 +420,7 @@ function DocumentPageLoaded({
         : formAction === 'setRetention'
           ? setDocumentRetentionForm(t)
           : formAction === 'move'
-            ? moveDocumentForm(document, documentFolderRowsToSelectOptions(folders as unknown as Row[]))
+            ? moveDocumentForm(document, documentFolderRowsToSelectOptions(folders as unknown as Row[]), t('documents.fileManagement.root', { defaultValue: 'Root folder' }))
             : formAction === 'legalHold'
               ? legalHoldForm()
               : formAction === 'requestSignature'
@@ -425,30 +444,19 @@ function DocumentPageLoaded({
         const file = firstFileFromFormValue(formData.file);
         if (!file) throw new Error('Select a file to upload');
         const residency = typeof document.residencyRegion === 'string' ? document.residencyRegion : undefined;
-        const uploaded = await uploadDocumentBlob({ file, companyId: operatingCompanyId, residency });
-        const params = toAddDocumentVersionParams({
-          ...formData,
-          fileName: uploaded.fileName,
-          fileSize: uploaded.fileSize,
-          mimetype: uploaded.mimetype,
-          url: uploaded.url,
-          checksum: uploaded.checksum,
-        });
-        if (!params) throw new Error('Version params incomplete after upload');
-        await addVersion.mutateAsync({ documentId: id, params });
-        await ingestEvidence.mutateAsync({
-          companyId: operatingCompanyId,
-          documentId: id,
-          language: typeof formData.language === 'string' ? formData.language : undefined,
-        });
-        // unlock_document rejects an already-unlocked document, so only release a lock held now.
-        if (formData.unlockAfter !== false && isLocked) await unlockDocument.mutateAsync(id);
+        uploads.assertCurrent("version");
+        const receipt = await uploads.submit(file, {
+          name: file.name, tagIds: [], isFavorite: false, versionDocumentId: String(id),
+          changesDescription: typeof formData.changesDescription === "string" ? formData.changesDescription.trim() || undefined : undefined,
+        }, residency);
+        if (formData.unlockAfter !== false) await uploads.releaseVersionLock(receipt);
       } else if (formAction === 'setRetention') {
         await setRetention.mutateAsync({ documentId: id, params: toSetDocumentRetentionParams(formData) });
       } else if (formAction === 'move') {
         const params = moveDocumentParams(formData.folderId);
         if (!params) throw new Error('Select a folder');
-        await updateDocument.mutateAsync({ documentId: id, params: { folderId: optionalBigIntU64(params.folderId) } });
+        if (params.folderId !== null && !folders.some((folder) => String(folder.id) === params.folderId)) throw new Error('Select an available folder');
+        await moveDocument.mutateAsync({ kind: 'moveDocument', id, folderId: params.folderId });
       } else if (formAction === 'legalHold') {
         const reason = legalHoldReason(formData.reason);
         if (!reason) throw new Error('A reason is required');
@@ -487,6 +495,8 @@ function DocumentPageLoaded({
 
   return (
     <>
+      <DocumentUploadReceipts rows={versionReceipts} error={uploads.error} onResume={uploads.resume} />
+      <DocumentViewerDialog organizationId={orgId} documentId={preview ? documentId : null} versionId={preview?.versionId} onOpenChange={(open) => { if (!open) setPreview(null); }} />
       <RecordPage
         testIdPrefix="document"
         breadcrumbs={[
@@ -548,8 +558,7 @@ function DocumentPageLoaded({
             {url ? (
               <Button
                 size="sm"
-                nativeButton={false}
-                render={<a href={url} target="_blank" rel="noreferrer" />}
+                onClick={() => setPreview({})}
                 data-testid="document-action-open"
               >
                 <ExternalLink className="mr-1 h-4 w-4" />
@@ -673,7 +682,7 @@ function DocumentPageLoaded({
                     rowKey: 'id',
                     columns: [
                       { key: 'versionNumber', label: '#', type: 'number', align: 'right' },
-                      { key: 'fileName', label: 'File name' },
+                      { key: 'fileName', label: 'File name', render: (value: unknown, row: Row) => <button type="button" className="text-primary underline" onClick={() => setPreview({ versionId: String(row.id) })}>{String(value ?? '')}</button> },
                       { key: 'fileSize', label: 'Size', align: 'right', render: (value: unknown) => formatFileSize(value) },
                       { key: 'changesDescription', label: 'Changes' },
                       { key: 'isCurrent', label: 'Current', type: 'boolean' },
@@ -755,7 +764,7 @@ function DocumentPageLoaded({
             }
           }}
           config={formConfig}
-          isPending={addVersion.isPending || updateDocument.isPending || setRetention.isPending || applyLegalHold.isPending || createSignatureRequest.isPending}
+          isPending={uploads.pending || moveDocument.isPending || updateDocument.isPending || setRetention.isPending || applyLegalHold.isPending || createSignatureRequest.isPending}
           closeOnSubmit={false}
           submitError={formError}
           onSubmit={submitForm}

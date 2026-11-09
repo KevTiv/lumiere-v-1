@@ -1698,8 +1698,8 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         },
     )
     .err()
-    .ok_or("expected identical version replay to be rejected")?;
-    if !replay_version.contains("identical to the current version") {
+    .ok_or("expected conflicting version replay to be rejected")?;
+    if !replay_version.contains("already registered with different version details") {
         return Err(format!("unexpected replay version error: {replay_version}"));
     }
     let versions_after = ctx

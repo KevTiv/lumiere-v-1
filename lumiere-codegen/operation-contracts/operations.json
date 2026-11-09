@@ -3389,6 +3389,46 @@
       "evidence": "Development-only native configured creation regression; never session exposed.",
       "idempotency": "non_idempotent",
       "semantic_kind": "test"
+    },
+    "move_document": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/: move_document authorizes current source/destination state and changes only existing stable records; retry never creates a new folder or document.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "move_document_folder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/: move_document_folder authorizes current source/destination state and changes only existing stable records; retry never creates a new folder or document.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "restore_document_folder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/: restore_document_folder authorizes current source/destination state and changes only existing stable records; retry never creates a new folder or document.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
+    "trash_document_folder": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/: trash_document_folder authorizes current source/destination state and changes only existing stable records; retry never creates a new folder or document.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     }
   },
   "version": 1

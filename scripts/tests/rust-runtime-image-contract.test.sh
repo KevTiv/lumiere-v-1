@@ -16,6 +16,7 @@ workflow = (root / ".github/workflows/build-rust-runtime-image.yml").read_text(e
 
 expected = {
     "api-server",
+    "document-blob-migrate",
     "expense-integration-worker",
     "gateway",
     "hr-integration-worker",

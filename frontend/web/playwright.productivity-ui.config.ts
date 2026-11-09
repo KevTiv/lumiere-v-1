@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test"
 // These checks do not authenticate, mutate ERP data, or certify backend effects.
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "productivity-workspace-ui.spec.ts",
+  testMatch: ["productivity-workspace-ui.spec.ts", "document-viewer-ui.spec.ts"],
   globalSetup: "./tests/productivity-ui-warmup.ts",
   workers: 1,
   use: {

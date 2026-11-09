@@ -472,8 +472,9 @@ import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { downloadDocumentPdf } from "@lumiere/query-hooks/hooks/templates"
-import { useCreateDocument } from "@lumiere/query-hooks/hooks/documents"
+
 import { archiveRenderedPdfAsDocument } from "@/lib/archive-document-pdf"
+import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload";
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
   enumTag,
@@ -1992,7 +1993,7 @@ function AccountingClientReady({
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId, operatingCompanyId)
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
-  const createDocument = useCreateDocument(orgId, operatingCompanyId)
+  const documentUploads = useManagedDocumentUpload(orgId, operatingCompanyId)
   const [invoiceDocBusy, setInvoiceDocBusy] = useState<"download" | "send" | "archive" | null>(null)
   const cancelMove = useCancelAccountMove(organizationId)
   const addAccountMoveLine = useAddAccountMoveLine(organizationId)
@@ -3798,13 +3799,12 @@ function AccountingClientReady({
     if (!selectedInvoice?.id) return
     try {
       setInvoiceDocBusy("archive")
-      const params = await archiveRenderedPdfAsDocument({
+      await archiveRenderedPdfAsDocument({
         kind: "account-move",
         recordId: Number(selectedInvoice.id),
-        companyId: operatingCompanyId,
+        saveGenerated: documentUploads.submitGenerated,
         name: String(selectedInvoice.name ?? `Invoice ${selectedInvoice.id}`),
       })
-      await createDocument.mutateAsync(params)
       toast({
         title: "Archived to Documents",
         description: "PDF stored as a linked document version.",
@@ -3818,7 +3818,7 @@ function AccountingClientReady({
     } finally {
       setInvoiceDocBusy(null)
     }
-  }, [selectedInvoice, operatingCompanyId, createDocument, toast])
+  }, [selectedInvoice, documentUploads, toast])
 
   const handleInvoiceSendEmail = useCallback((move?: { id?: unknown }) => {
     const id = optionalBigIntU64(move?.id ?? selectedInvoice?.id)

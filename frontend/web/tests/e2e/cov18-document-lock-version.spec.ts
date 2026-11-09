@@ -169,7 +169,7 @@ test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, (
     }
   })
 
-  test("uploads a new version through the UI and rejects an identical replay", async ({ browser, page }) => {
+  test("uploads a new version through the UI and recovers an identical replay without duplication", async ({ browser, page }) => {
     test.setTimeout(240_000)
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
@@ -210,9 +210,18 @@ test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, (
     expect(after[0]).toEqual({ versionNumber: 1, checksum: "b".repeat(64), isCurrent: false })
     expect(after[1]!.checksum).not.toBe("b".repeat(64))
 
-    // Re-registering the current blob is a stale replay: rejected, no new row.
-    const stale = await replay(page, accepted.request())
-    expect(stale.status()).toBe(422)
+    // Recovering the same actor's exact immutable upload is a no-op success.
+    const recovered = await replay(page, accepted.request())
+    expect(recovered.status()).toBe(200)
+    expect(await versionSnapshot(page, documentId)).toEqual(after)
+
+    // Reusing that object with changed details is still a conflicting write.
+    const conflictingBody = structuredClone(accepted.request().postDataJSON())
+    conflictingBody.params.file_size = Number(conflictingBody.params.file_size) + 1
+    const conflicting = await page.request.post(new URL(accepted.url()).pathname, {
+      data: conflictingBody,
+    })
+    expect(conflicting.status()).toBe(422)
     expect(await versionSnapshot(page, documentId)).toEqual(after)
 
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })

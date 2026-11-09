@@ -895,12 +895,26 @@ async fn require_blob_upload(
     {
         return Err(ApiError::NotFound("upload reservation not found".into()));
     }
-    require_upload_permission(
-        session.field_access.as_ref(),
-        organization_id,
-        &session.identity_hex,
-        meta.purpose,
-    )?;
+    if let Some(registration) = meta
+        .registration
+        .as_ref()
+        .filter(|registration| registration.version_document_id.is_some())
+    {
+        if meta.purpose != BlobPurpose::Document {
+            return Err(ApiError::Forbidden(
+                "version uploads require the document purpose".into(),
+            ));
+        }
+        upload_receipts::require_version_upload(state, session, meta.company_id, registration)
+            .await?;
+    } else {
+        require_upload_permission(
+            session.field_access.as_ref(),
+            organization_id,
+            &session.identity_hex,
+            meta.purpose,
+        )?;
+    }
     validate_upload_purpose(
         meta.purpose,
         &meta.content_type,
@@ -935,12 +949,27 @@ async fn presign(
             "file exceeds its inspection profile limit".into(),
         ));
     }
-    require_upload_permission(
-        session.field_access.as_ref(),
-        org_id,
-        &session.identity_hex,
-        body.purpose,
-    )?;
+    if let Some(registration) = body
+        .registration
+        .as_ref()
+        .filter(|registration| registration.version_document_id.is_some())
+    {
+        if body.purpose != BlobPurpose::Document {
+            return Err(ApiError::Forbidden(
+                "version uploads require the document purpose".into(),
+            ));
+        }
+        registration.validate()?;
+        upload_receipts::require_version_upload(&state, &session, body.company_id, registration)
+            .await?;
+    } else {
+        require_upload_permission(
+            session.field_access.as_ref(),
+            org_id,
+            &session.identity_hex,
+            body.purpose,
+        )?;
+    }
     validate_upload_purpose(
         body.purpose,
         body.content_type.trim(),
@@ -1004,7 +1033,11 @@ async fn presign(
         actual_size: None,
         actual_checksum: None,
         submission_id: body.submission_id.clone(),
-        registration: body.registration.clone(),
+        registration: body
+            .registration
+            .clone()
+            .map(|registration| registration.with_provenance(&session.identity_hex, &object_key))
+            .transpose()?,
         inspection: None,
     };
     // A submission reserves one exact request. Retrying a lost reply must not

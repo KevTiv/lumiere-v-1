@@ -383,14 +383,25 @@ async fn sql_fixture(
             let recorded = recorded.clone();
             let pending = pending.clone();
             async move {
-                recorded.lock().unwrap().push(sql);
-                Json(
-                    pending
-                        .lock()
-                        .unwrap()
-                        .pop_front()
-                        .expect("unexpected SQL query"),
-                )
+                recorded.lock().unwrap().push(sql.clone());
+                let internal_rows = if sql.contains(" FROM user_organization ") {
+                    Some(vec![json!({"id":1,"organization_id":7,"company_id":12,"role_id":3,"is_active":true})])
+                } else if sql.contains(" FROM user_role_assignment ") {
+                    Some(vec![])
+                } else if sql.contains(" FROM role ") {
+                    Some(vec![json!({"id":3,"name":"Document reader","permissions":["module:documents:read"],"is_active":true})])
+                } else if sql.starts_with("SELECT id, organization_id, company_id, parent_id, owner_id, is_access_restricted, metadata FROM doc_folder") {
+                    Some(vec![])
+                } else if sql.starts_with("SELECT id, organization_id, company_id, folder_id, owner_id, is_deleted FROM document") {
+                    Some(vec![json!({"id":19,"organization_id":7,"company_id":12,"folder_id":null,"owner_id":ACTOR,"is_deleted":false})])
+                } else { None };
+                Json(if let Some(rows) = internal_rows {
+                    let columns = sql.strip_prefix("SELECT ").unwrap().split_once(" FROM ").unwrap().0.split(", ").collect::<Vec<_>>();
+                    json!([{"schema":{"elements":columns.iter().map(|name|json!({"name":{"some":name}})).collect::<Vec<_>>()},
+                        "rows":rows.iter().map(|row|columns.iter().map(|column|row[column].clone()).collect::<Vec<_>>()).collect::<Vec<_>>() }])
+                } else {
+                    pending.lock().unwrap().pop_front().expect("unexpected SQL query")
+                })
             }
         }),
     );
@@ -523,9 +534,24 @@ async fn real_child_reader_returns_only_live_owned_parent_relations() {
             vec![3, 1]
         );
         let queries = queries.lock().unwrap();
-        assert_eq!(queries.len(), 2);
+        assert_eq!(
+            queries
+                .iter()
+                .filter(|query| query.contains(" FROM document WHERE "))
+                .count(),
+            2
+        );
         assert!(queries[0].contains("is_deleted = false AND owner_id ="));
-        assert!(queries[1].ends_with("WHERE organization_id = 7 AND (document_id = 19)"));
+        assert!(queries
+            .last()
+            .unwrap()
+            .ends_with("WHERE organization_id = 7 AND (document_id = 19)"));
+        assert!(queries
+            .iter()
+            .any(|query| query.contains(" FROM doc_folder WHERE ")));
+        assert!(queries
+            .iter()
+            .any(|query| query.contains(" FROM user_organization WHERE ")));
     }
 }
 
@@ -534,7 +560,7 @@ async fn no_visible_parent_means_no_child_query() {
     let (client, queries, server) =
         sql_fixture(vec![parent_response(vec![json!([19, 7, OTHER, false])])]).await;
     let fa = access(&["document:read"]);
-    let rows = read_document_child_rows(&client, RESOURCES[0], 7, ACTOR, Some(&fa))
+    let rows = read_document_child_rows(&client, RESOURCES[0], 7, ACTOR, Some(&fa), None)
         .await
         .unwrap();
     server.abort();
@@ -548,17 +574,17 @@ async fn denied_context_and_unknown_resource_issue_no_database_queries() {
     let denied = access(&["document:write"]);
     let allowed = access(&["document:read"]);
     assert!(
-        read_document_child_rows(&client, RESOURCES[0], 7, ACTOR, Some(&denied))
+        read_document_child_rows(&client, RESOURCES[0], 7, ACTOR, Some(&denied), None)
             .await
             .is_err()
     );
     assert!(
-        read_document_child_rows(&client, RESOURCES[0], 0, ACTOR, Some(&allowed))
+        read_document_child_rows(&client, RESOURCES[0], 0, ACTOR, Some(&allowed), None)
             .await
             .is_err()
     );
     assert!(
-        read_document_child_rows(&client, "documents", 7, ACTOR, Some(&allowed))
+        read_document_child_rows(&client, "documents", 7, ACTOR, Some(&allowed), None)
             .await
             .is_err()
     );
@@ -573,6 +599,10 @@ async fn owner_document_dispatch_keeps_empty_reads_handled_and_sql_actor_scoped(
     for (resource, scope) in [
         (
             "document-folders",
+            format!("WHERE organization_id = 7 AND (is_access_restricted = false OR owner_id = {actor})"),
+        ),
+        (
+            "document-folders-deleted",
             format!("WHERE organization_id = 7 AND (is_access_restricted = false OR owner_id = {actor})"),
         ),
         (
