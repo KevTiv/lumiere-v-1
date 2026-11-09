@@ -341,7 +341,8 @@
       },
       "groupBy": "Gushyira mu matsinda hakurikijwe",
       "records": "Ibyanditswe",
-      "showFullValue": "Erekana agaciro kose"
+      "showFullValue": "Erekana agaciro kose",
+      "record": "Inyandiko"
     },
     "retry": "Ongera ugerageze",
     "recordsDenied": "Ntiwemerewe kureba izi nyandiko.",

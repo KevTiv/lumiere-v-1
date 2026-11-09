@@ -115,6 +115,30 @@ and unposted state. A partial or uncertain execution remains recoverable under t
 same approved proposal. Source edits prevent further stale writes, while a
 read-only verification can still reconcile effects of the original approved work.
 
+## Paired opening balances and draft correction
+
+A saved source section mapped to Historical observations can prepare paired
+opening-balance drafts. Each row must have a confirmed `opening_balance` type,
+unique `document_reference`, description, matching positive debit and credit,
+cutover day, `debit_account_id`, `credit_account_id`, and `currency_id`.
+Choose the same cutover day and currently valid company accounts and currency in
+the preview. Each accepted pair becomes one draft entry and two journal lines
+through the existing approval and exact receipt/readback flow. A group uses one
+account pair and one date. Prepare separate groups for different account pairs.
+Signed, one-sided, or aggregate trial balances need their own balancing and
+cutover workflow. Source snapshots do not establish the company's opening ledger.
+
+After both native import stages have saved successful receipts, **Remove
+imported drafts** calls the existing atomic bundle rollback owner. The action
+also stays available if a later verification cannot read the ERP records. The
+owner accepts unchanged drafts with no downstream effects. The saved task confirms both exact native rollback receipts and reads
+the mapped headers and lines before releasing source claims. Both changes reuse
+the existing schema and promoted native contracts. The original proposal and
+receipts remain in history. Review current source decisions or
+mapping and approve a new preview to replace those drafts. Edited or posted
+records require Accounting's own correction workflow, and uncertain native
+outcomes keep the source claims until a terminal readback.
+
 The original product/contact/location paths expose `native_receipt_only` results.
 Their job receipt is deliberately separate from the historical Accounting
 adapter's full readback. Untrusted record metadata cannot manufacture source
@@ -149,8 +173,11 @@ Outstanding completion work from the broader feature plan:
   is an acceptance target, not a result produced by this branch's synthetic tests.
   Prove interrupted header/line execution and accounting-view totals there.
 - Add and certify historical sales, purchases, employee expense claims, stock
-  movements/counts, opening balances, and payments through their owning native
-  operations. Do not infer payment settlement or current stock from old reports.
+  movements/counts, signed trial balances, and payments through their owning
+  native operations. Generic sales, purchase, subscription and expense CSV jobs
+  do not supply exact per-row record identities or the full native relation
+  validation required for a saved workflow. Confirm settlement and stock effects
+  through their respective owners.
 - Extend preparation to approved joins, unpivoting, broader workbook support,
   cross-file control reconciliation, and processing beyond current bounded limits.
   Current XLSX preparation retains the existing single-worksheet limit.
@@ -159,9 +186,9 @@ Outstanding completion work from the broader feature plan:
   the expense adapter conservatively claims the original file hash and row. A
   second expense on that same row stays held as a source duplicate. Operator
   section names or mutable mapping identities must not bypass that protection.
-- Add operator-managed correction/supersession of already-created ERP effects.
-  This delivery retains receipts and uses the owning module's existing correction
-  workflow; changing a source decision does not rewrite prior ERP records.
+- Extend operator-managed correction to edited or posted ERP effects through
+  the owning reversal operations. Changing a source decision leaves prior ERP
+  records and receipts intact.
 - Add explicit cancellation or replacement of an approved proposal when the native
   owner can prove that no effects can still arrive. Changing an approved executable
   source row currently holds its execution and retains its claims. A missing reply

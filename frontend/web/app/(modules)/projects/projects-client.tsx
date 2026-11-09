@@ -1,8 +1,11 @@
 "use client"
-import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
-import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { accountMoveHref, projectTimesheetsHref,
+} from "@lumiere/erp-shared/record-links"
+import { mapDashboardWidgets, withDashboardSections,
+} from "@lumiere/ui/lib/dashboard-sections"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
-import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, mergeModuleStates, moduleCollection,
+} from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
@@ -31,7 +34,8 @@ import {
   projectsCsvImportForm,
   ImportAssistantWizard,
 } from "@lumiere/ui"
-import type { EntityAction, EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind } from "@lumiere/ui"
+import type { EntityAction, EntityRow, EntityViewConfig, FormConfig, ModuleConfig, ProjectsCsvImportKind,
+} from "@lumiere/ui"
 import {
   projectsParamsToJson,
   toCreateProjectParams,
@@ -106,10 +110,12 @@ import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
-import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
+import { usePricelists, type ProductPricelist,
+} from "@lumiere/query-hooks/hooks/sales"
 import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { taskAssigneeIds } from "@lumiere/query-hooks/hooks/task-assignment"
-import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountAccounts, useAccountJournals,
+} from "@lumiere/query-hooks/hooks/accounting"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
   pricelistRowsToSelectOptions,
@@ -130,12 +136,14 @@ import {
 } from "./projects-panels"
 import { AdvancedPsaPanel } from "./advanced-psa-panel"
 import { TimesheetCapturePanel } from "./timesheet-capture-panel"
+import { OperationRequestError } from "@lumiere/api-client"
+import { useBrowserOnline } from "@/hooks/use-browser-online"
 import {
-  enqueueTimesheetCapture,
   getOrCreateTimesheetCaptureDeviceId,
-  markTimesheetCaptureError,
-  markTimesheetCaptureSynced,
-  newTimesheetClientRequestId,
+  hasUnconfirmedTimesheetCapture,
+  listTimesheetCaptures,
+  writeTimesheetCapture,
+  type TimesheetCaptureOutboxItem,
 } from "@/lib/timesheet-capture-outbox"
 
 export { PROJECTS_UI_REDUCERS } from "@/lib/projects-ui-reducers"
@@ -155,23 +163,37 @@ type ProjectsClientLoadedProps = Omit<ProjectsClientProps, "organizationId"> & {
 
 type ModalState =
   | { type: null }
-  | { type: 'create'; form: FormConfig; action: string }
-  | { type: 'edit'; form: FormConfig; action: string; entityId: string | number }
-  | { type: 'timesheet'; form: FormConfig; action: string }
+  | { type: "create"; form: FormConfig; action: string }
+  | { type: "edit"
+      form: FormConfig
+      action: string
+      entityId: string | number
+    }
+  | { type: "timesheet"; form: FormConfig; action: string; scope: string }
 
 type LifecycleModalState =
   | { type: null }
   | { type: "taskState"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "taskParent"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "assignUsers"; rows: Record<string, unknown>[]; form: FormConfig }
-  | { type: "billTimesheets"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "billTimesheets"
+      rows: Record<string, unknown>[]
+      form: FormConfig }
   | { type: "expenseRebill"; rows: Record<string, unknown>[]; form: FormConfig }
   | { type: "rateCardLine"; rows: Record<string, unknown>[]; form: FormConfig }
-  | { type: "resourceAllocation"; rows: Record<string, unknown>[]; form: FormConfig }
-  | { type: "projectMilestone"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "resourceAllocation"
+      rows: Record<string, unknown>[]
+      form: FormConfig }
+  | { type: "projectMilestone"
+      rows: Record<string, unknown>[]
+      form: FormConfig }
   | { type: "changeOrder"; rows: Record<string, unknown>[]; form: FormConfig }
-  | { type: "subcontractorCost"; rows: Record<string, unknown>[]; form: FormConfig }
-  | { type: "integrationIntent"; rows: Record<string, unknown>[]; form: FormConfig }
+  | { type: "subcontractorCost"
+      rows: Record<string, unknown>[]
+      form: FormConfig }
+  | { type: "integrationIntent"
+      rows: Record<string, unknown>[]
+      form: FormConfig }
 
 const taskStateForm: FormConfig = {
   id: "projects-update-task-state",
@@ -200,7 +222,8 @@ const taskStateForm: FormConfig = {
   ],
 }
 
-const assignUsersForm = (userOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig => ({
+const assignUsersForm = (userOptions: Array<{ value: string; label: string; disabled?: boolean }>,
+): FormConfig => ({
   id: "projects-assign-task-users",
   title: "Assign Task Users",
   submitLabel: "Assign users",
@@ -236,17 +259,22 @@ function buildBillTimesheetsForm(
       {
         id: "billing",
         fields: [
-          { id: "journal", type: "select", name: "journalId", label: "Journal", required: true, width: "1/3", options: journalOptions },
-          { id: "income-account", type: "select", name: "incomeAccountId", label: "Income account", required: true, width: "1/3", options: accountOptions },
-          { id: "partner", type: "select", name: "partnerId", label: "Partner", required: true, width: "1/3", options: partnerOptions },
-          { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", required: true, width: "1/2" },
+          { id: "journal", type: "select", name: "journalId", label: "Journal", required: true, width: "1/3", options: journalOptions,
+          },
+          { id: "income-account", type: "select", name: "incomeAccountId", label: "Income account", required: true, width: "1/3", options: accountOptions,
+          },
+          { id: "partner", type: "select", name: "partnerId", label: "Partner", required: true, width: "1/3", options: partnerOptions,
+          },
+          { id: "invoice-date", type: "date", name: "invoiceDate", label: "Invoice date", required: true, width: "1/2",
+          },
         ],
       },
     ],
   }
 }
 
-function taskParentForm(taskOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig {
+function taskParentForm(taskOptions: Array<{ value: string; label: string; disabled?: boolean }>,
+): FormConfig {
   return {
     id: "projects-set-task-parent",
     title: "Set Task Parent",
@@ -269,17 +297,20 @@ function taskParentForm(taskOptions: Array<{ value: string; label: string; disab
   }
 }
 
-function selectedIds(rows: Record<string, unknown>[]): Array<string | number | bigint> {
+function selectedIds(rows: Record<string, unknown>[],
+): Array<string | number | bigint> {
   return rows
     .map((row) => row.id as string | number | bigint | undefined)
-    .filter((id): id is string | number | bigint => id != null && String(id).trim() !== "")
+    .filter((id): id is string | number | bigint => id != null && String(id).trim() !== "",
+    )
 }
 
 function timesheetStatus(row: Record<string, unknown>): string {
   return String(row.validationStatus ?? row.validation_status ?? "")
 }
 
-function withTimesheetLifecycleColumns(config: EntityViewConfig): EntityViewConfig {
+function withTimesheetLifecycleColumns(config: EntityViewConfig,
+): EntityViewConfig {
   if (config.view.mode !== "table") return config
   const existing = new Set(config.view.columns.map((column) => column.key))
   const columns = [...config.view.columns]
@@ -322,7 +353,9 @@ export function ProjectsClient(props: ProjectsClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
   }
-  return <ProjectsClientLoaded {...props} organizationId={props.organizationId} />
+  return (
+    <ProjectsClientLoaded {...props} organizationId={props.organizationId} />
+  )
 }
 
 function ProjectsClientLoaded({
@@ -342,24 +375,45 @@ function ProjectsClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [modal, setModal] = useState<ModalState>({ type: null })
-  const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
+  const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null,
+  })
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
   const assignmentScopeKey = `${organizationId}:${operatingCompanyId}:${session.identity}:${taskAuthorizationKey}`
   const previousAssignmentScope = useRef(assignmentScopeKey)
   const assigningTasks = useRef(false)
-  const [assignmentOnline, setAssignmentOnline] = useState(true)
+  const assignmentOnline = useBrowserOnline()
+  const timesheetOwner = {
+    actorIdentity:
+      session.organizationId === organizationId &&
+      session.activeCompanyReady !== false
+        ? (session.identity ?? "")
+        : "",
+    companyId: String(operatingCompanyId),
+  }
+  const timesheetCaptureScope = JSON.stringify([
+    organizationId,
+    timesheetOwner.companyId,
+    timesheetOwner.actorIdentity,
+  ])
+  const [timesheetSyncing, setTimesheetSyncing] = useState<{
+    scope: string
+    id: string
+  } | null>(null)
+  const timesheetSubmitting = useRef(false)
+  const liveTimesheetScope = useRef(timesheetCaptureScope)
+  liveTimesheetScope.current = timesheetCaptureScope
   useEffect(() => {
-    const update = () => setAssignmentOnline(navigator.onLine)
-    update()
-    window.addEventListener("online", update)
-    window.addEventListener("offline", update)
-    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update) }
-  }, [])
+    liveTimesheetScope.current = timesheetCaptureScope
+    return () => {
+      liveTimesheetScope.current = ""
+    }
+  }, [timesheetCaptureScope])
   useEffect(() => {
     if (previousAssignmentScope.current !== assignmentScopeKey) {
       previousAssignmentScope.current = assignmentScopeKey
-      setLifecycleModal((current) => current.type === "assignUsers" ? { type: null } : current)
+      setLifecycleModal((current) => current.type === "assignUsers" ? { type: null } : current,
+      )
     }
   }, [assignmentScopeKey])
 
@@ -367,9 +421,12 @@ function ProjectsClientLoaded({
   const projects = projectsRead.rows
   const tasksRead = moduleCollection(useTasks(orgId, initialTasks))
   const tasks = tasksRead.rows
-  const timesheetsRead = moduleCollection(useTimesheets(orgId, initialTimesheets))
+  const timesheetsQuery = useTimesheets(orgId, initialTimesheets)
+  const timesheetsRead = moduleCollection(timesheetsQuery)
   const timesheets = timesheetsRead.rows
-  const timesheetsToValidateRead = moduleCollection(useTimesheetsToValidate(orgId))
+  const timesheetsToValidateRead = moduleCollection(
+    useTimesheetsToValidate(orgId),
+  )
   const timesheetsToValidate = timesheetsToValidateRead.rows
   const timesheetsUnbilledRead = moduleCollection(useTimesheetsUnbilled(orgId))
   const timesheetsUnbilled = timesheetsUnbilledRead.rows
@@ -381,16 +438,21 @@ function ProjectsClientLoaded({
   const capacity = capacityRead.rows
   const projectMarginsRead = moduleCollection(useProjectMarginByProject(orgId))
   const projectMargins = projectMarginsRead.rows
-  const utilisationRead = moduleCollection(useResourceUtilisationByEmployee(orgId))
+  const utilisationRead = moduleCollection(
+    useResourceUtilisationByEmployee(orgId),
+  )
   const utilisation = utilisationRead.rows
   const { data: milestones = [] } = useProjectMilestones(orgId)
-  const capacityForecastRead = moduleCollection(useCapacityForecastByEmployee(orgId))
+  const capacityForecastRead = moduleCollection(useCapacityForecastByEmployee(orgId),
+  )
   const capacityForecast = capacityForecastRead.rows
   const changeOrdersRead = moduleCollection(useProjectChangeOrders(orgId))
   const changeOrders = changeOrdersRead.rows
-  const earnedValueRead = moduleCollection(useProjectEarnedValueByProject(orgId))
+  const earnedValueRead = moduleCollection(useProjectEarnedValueByProject(orgId),
+  )
   const earnedValue = earnedValueRead.rows
-  const projectIntentsRead = moduleCollection(useProjectIntegrationIntents(orgId))
+  const projectIntentsRead = moduleCollection(useProjectIntegrationIntents(orgId),
+  )
   const projectIntents = projectIntentsRead.rows
   const { data: hrResources = [] } = useHrResources(orgId)
   const { data: hrSkills = [] } = useHrSkills(orgId)
@@ -414,7 +476,9 @@ function ProjectsClientLoaded({
       : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
         ? "Unavailable"
         : "Loading"
-  const taskAssignees = useTaskAssignees(orgId, operatingCompanyId, undefined, canAssignTask && lifecycleModal.type === "assignUsers", { actorIdentity: session.identity ?? "", authorizationKey: taskAuthorizationKey })
+  const taskAssignees = useTaskAssignees(orgId, operatingCompanyId, undefined, canAssignTask && lifecycleModal.type === "assignUsers", { actorIdentity: session.identity ?? "", authorizationKey: taskAuthorizationKey,
+    },
+  )
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const currenciesQuery = useCurrencies()
@@ -423,10 +487,13 @@ function ProjectsClientLoaded({
   const createProject = useCreateProject(orgId, operatingCompanyId)
   const createTask = useCreateTask(orgId, operatingCompanyId)
   const createRateCard = useCreateProjectRateCard(orgId, operatingCompanyId)
-  const createRateCardLine = useCreateProjectRateCardLine(orgId, operatingCompanyId)
-  const createAllocation = useCreateResourceAllocation(orgId, operatingCompanyId)
+  const createRateCardLine = useCreateProjectRateCardLine(orgId, operatingCompanyId,
+  )
+  const createAllocation = useCreateResourceAllocation(orgId, operatingCompanyId,
+  )
   const createMilestone = useCreateProjectMilestone(orgId, operatingCompanyId)
-  const createChangeOrder = useCreateProjectChangeOrder(orgId, operatingCompanyId)
+  const createChangeOrder = useCreateProjectChangeOrder(orgId, operatingCompanyId,
+  )
   const linkSubcontractor = useLinkSubcontractorCost(orgId, operatingCompanyId)
   const createProjectIntent = useCreateProjectIntegrationIntent(orgId)
   const refreshForecast = useRefreshCapacityForecast(orgId, operatingCompanyId)
@@ -472,12 +539,15 @@ function ProjectsClientLoaded({
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
     if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
+    return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true },
+    ]
   }, [pricelists, t])
 
   const partnerFieldOptions = useMemo(() => {
     if (contactsReferenceStatus) {
-      return [{ value: "", label: `Contacts: ${contactsReferenceStatus}`, disabled: true }]
+      return [{ value: "", label: `Contacts: ${contactsReferenceStatus}`, disabled: true,
+        },
+      ]
     }
     const fromApi = contactRowsToPartnerSelectOptions(contacts)
     const optional = { value: "", label: "—" }
@@ -486,9 +556,11 @@ function ProjectsClientLoaded({
   }, [contacts, contactsReferenceStatus, t])
 
   const employeeFieldOptions = useMemo(() => {
-    const fromApi = employeeRowsToSelectOptions(employees as Record<string, unknown>[])
+    const fromApi = employeeRowsToSelectOptions(employees as Record<string, unknown>[],
+    )
     if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
+    return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true },
+    ]
   }, [employees, t])
 
   const currencyFieldOptions = useMemo(
@@ -509,13 +581,15 @@ function ProjectsClientLoaded({
   }, [accountJournals, t])
 
   const incomeAccountFieldOptions = useMemo(() => {
-    const fromApi = accountAccountRowsToSelectOptions(accountAccounts as Record<string, unknown>[])
+    const fromApi = accountAccountRowsToSelectOptions(accountAccounts as Record<string, unknown>[],
+    )
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noAccounts"), disabled: true }]
   }, [accountAccounts, t])
 
   const billTimesheetsFormConfig = useMemo(
-    () => buildBillTimesheetsForm(journalFieldOptions, incomeAccountFieldOptions, partnerFieldOptions),
+    () => buildBillTimesheetsForm(journalFieldOptions, incomeAccountFieldOptions, partnerFieldOptions,
+      ),
     [journalFieldOptions, incomeAccountFieldOptions, partnerFieldOptions],
   )
 
@@ -534,8 +608,10 @@ function ProjectsClientLoaded({
 
   const userFieldOptions = useMemo(() => {
     if (!canAssignTask || taskAssignees.isError || !taskAssignees.isSuccess) return []
-    return taskAssignees.data.map((option) => ({ value: option.id, label: option.name }))
-  }, [taskAssignees.data, taskAssignees.isError, taskAssignees.isSuccess, canAssignTask])
+    return taskAssignees.data.map((option) => ({ value: option.id, label: option.name,
+    }))
+  }, [taskAssignees.data, taskAssignees.isError, taskAssignees.isSuccess, canAssignTask,
+  ])
 
   const assignUsersFormConfig = useMemo(
     () => assignUsersForm(userFieldOptions),
@@ -571,7 +647,8 @@ function ProjectsClientLoaded({
         projectId: projectFieldOptions,
         taskId: taskFieldOptions,
       }),
-    [employeeFieldOptions, hrResources, projectFieldOptions, taskFieldOptions, t],
+    [employeeFieldOptions, hrResources, projectFieldOptions, taskFieldOptions, t,
+    ],
   )
 
   const changeOrderFormConfig = useMemo(
@@ -586,7 +663,8 @@ function ProjectsClientLoaded({
     const available = currenciesQuery.isSuccess && currencyFieldOptions.length > 0
     const unavailable = t("projects.forms.subcontractorCost.currencyUnavailable", {
       defaultValue: "Currencies are unavailable. Refresh currency data before linking this cost.",
-    })
+    },
+    )
     const form = mergeSelectOptionsForFields(linkSubcontractorCostForm(t), {
       projectId: projectFieldOptions,
       currencyId: available ? currencyFieldOptions : [{ value: "", label: unavailable, disabled: true }],
@@ -726,8 +804,7 @@ function ProjectsClientLoaded({
               }
             }}
           />
-          <TimesheetCapturePanel organizationId={organizationId} />
-        </div>
+          </div>
       ),
     }),
     [
@@ -768,7 +845,8 @@ function ProjectsClientLoaded({
                 reopened: "warning",
               },
             },
-            { key: "hours", label: "Hours", type: "number" as const, align: "right" as const },
+            { key: "hours", label: "Hours", type: "number" as const, align: "right" as const,
+            },
             { key: "reason", label: "Reason" },
             { key: "decidedAt", label: "Date", type: "datetime" as const },
           ],
@@ -786,7 +864,8 @@ function ProjectsClientLoaded({
       projects as Record<string, unknown>[],
     )
     if (fromPairs.length > 0) return [optional, ...fromPairs]
-    return [{ value: "", label: t("common.lookup.noTaskStages"), disabled: true }]
+    return [{ value: "", label: t("common.lookup.noTaskStages"), disabled: true },
+    ]
   }, [tasks, projects, t])
 
   const taskParentFormConfig = useMemo(
@@ -815,14 +894,28 @@ function ProjectsClientLoaded({
 
   const timesheetFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(logTimesheetForm(t), {
+      mergeSelectOptionsForFields(
+        {
+          ...logTimesheetForm(t),
+          ...(!assignmentOnline
+            ? {
+                description: t("captureSync.timesheetOffline", {
+                  defaultValue:
+                    "Reconnect to submit this timesheet. Keep this form open to preserve your current entries.",
+                }),
+              }
+            : {}),
+        }, {
         projectId: projectFieldOptions,
         taskId: taskFieldOptions,
         employeeId: employeeFieldOptions,
         currencyId: currencyFieldOptions,
         encodingUomId: uomFieldOptions,
-      }),
-    [t, projectFieldOptions, taskFieldOptions, employeeFieldOptions, currencyFieldOptions, uomFieldOptions],
+      },
+      ),
+    [t, projectFieldOptions, taskFieldOptions, employeeFieldOptions, currencyFieldOptions, uomFieldOptions,
+      assignmentOnline,
+    ],
   )
 
   const rateCardFormConfig = useMemo(
@@ -851,7 +944,8 @@ function ProjectsClientLoaded({
         employeeId: employeeFieldOptions,
         taskId: taskFieldOptions,
       }),
-    [t, rateCardSelectOptions, currencyFieldOptions, employeeFieldOptions, taskFieldOptions],
+    [t, rateCardSelectOptions, currencyFieldOptions, employeeFieldOptions, taskFieldOptions,
+    ],
   )
 
   const postedSheetOptions = useMemo(() => {
@@ -890,12 +984,14 @@ function ProjectsClientLoaded({
       sections: base.sections.map((section) => ({
         ...section,
         fields: section.fields.map((field) => {
-          const updatedField = { ...field, defaultValue: getProjectFieldValue(project, field.name) }
+          const updatedField = { ...field, defaultValue: getProjectFieldValue(project, field.name),
+            }
           return updatedField as typeof field
         }),
       })) as typeof base.sections,
     }
-  }, [t, pricelistFieldOptions, partnerFieldOptions])
+  }, [t, pricelistFieldOptions, partnerFieldOptions],
+  )
 
   const buildEditTaskForm = useCallback((task: Record<string, unknown>): FormConfig => {
     const base = mergeSelectOptionsForFields(editTaskForm(t), {
@@ -908,31 +1004,34 @@ function ProjectsClientLoaded({
       sections: base.sections.map((section) => ({
         ...section,
         fields: section.fields.map((field) => {
-          const updatedField = { ...field, defaultValue: getTaskFieldValue(task, field.name) }
+          const updatedField = { ...field, defaultValue: getTaskFieldValue(task, field.name),
+            }
           return updatedField as typeof field
         }),
       })) as typeof base.sections,
     }
-  }, [t, projectFieldOptions, taskStageFieldOptions, milestoneFieldOptions])
+  }, [t, projectFieldOptions, taskStageFieldOptions, milestoneFieldOptions],
+  )
 
   // Handle row click for edit
   const handleRowClick = useCallback((tabId: string, row: Record<string, unknown>) => {
-    if (tabId === 'projects') {
+    if (tabId === "projects") {
       setModal({
-        type: 'edit',
+        type: "edit",
         form: buildEditProjectForm(row),
         action: "updateProject",
         entityId: row.id as string | number,
       })
-    } else if (tabId === 'tasks') {
+    } else if (tabId === "tasks") {
       setModal({
-        type: 'edit',
+        type: "edit",
         form: buildEditTaskForm(row),
         action: "updateTask",
         entityId: row.id as string | number,
       })
     }
-  }, [buildEditProjectForm, buildEditTaskForm])
+  }, [buildEditProjectForm, buildEditTaskForm],
+  )
 
   const runForSelectedIds = useCallback(
     async (
@@ -950,7 +1049,8 @@ function ProjectsClientLoaded({
     const activeProjects = projects.filter(
       (p) => p.active !== false && String(p.lastUpdateStatus) !== "Cancelled",
     ).length
-    const totalHoursSpent = timesheets.reduce((s, ts) => s + Number(ts.unitAmount ?? 0), 0)
+    const totalHoursSpent = timesheets.reduce((s, ts) => s + Number(ts.unitAmount ?? 0), 0,
+    )
     const toValidateCount = timesheetsToValidate.length
     const unbilledHours = timesheetsUnbilled.reduce(
       (s, ts) => s + Number(ts.unitAmount ?? 0),
@@ -963,26 +1063,37 @@ function ProjectsClientLoaded({
             ...w,
             data: {
               stats: [
-                { label: t("projects.dashboard.activeProjects"), value: String(activeProjects), icon: "FolderKanban" },
-                { label: "To validate", value: String(toValidateCount), icon: "CheckSquare", testId: "proj-queue-to-validate" },
-                { label: "Unbilled hours", value: `${Math.round(unbilledHours * 10) / 10}h`, icon: "AlertCircle", testId: "proj-queue-unbilled" },
-                { label: t("projects.dashboard.hoursLogged"), value: `${Math.round(totalHoursSpent)}h`, icon: "Clock" },
+                { label: t("projects.dashboard.activeProjects"), value: String(activeProjects), icon: "FolderKanban",
+              },
+                { label: "To validate", value: String(toValidateCount), icon: "CheckSquare", testId: "proj-queue-to-validate",
+              },
+                { label: "Unbilled hours", value: `${Math.round(unbilledHours * 10) / 10}h`, icon: "AlertCircle", testId: "proj-queue-unbilled",
+              },
+                { label: t("projects.dashboard.hoursLogged"), value: `${Math.round(totalHoursSpent)}h`, icon: "Clock",
+              },
               ],
             },
           }
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            create_project: () => setModal({ type: 'create', form: projectFormConfig, action: "createProject" }),
-            create_task: () => setModal({ type: 'create', form: taskFormConfig, action: "createTask" }),
-            log_timesheet: () => setModal({ type: 'timesheet', form: timesheetFormConfig, action: "logTimesheet" }),
-            start_timer: () => setModal({ type: 'timesheet', form: timesheetFormConfig, action: "startTimer" }),
+            create_project: () => setModal({ type: "create", form: projectFormConfig, action: "createProject",
+            }),
+            create_task: () => setModal({ type: "create", form: taskFormConfig, action: "createTask",
+            }),
+            log_timesheet: () => setModal({ type: "timesheet", form: timesheetFormConfig, action: "logTimesheet",
+              scope: timesheetCaptureScope,
+            }),
+            start_timer: () => setModal({ type: "timesheet", form: timesheetFormConfig, action: "startTimer",
+              scope: timesheetCaptureScope,
+            }),
           }
           return {
             ...w,
             data: {
               ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] })),
+              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id],
+            })),
             },
           }
         }
@@ -993,7 +1104,8 @@ function ProjectsClientLoaded({
             const closed = Number(p.taskCountClosed ?? 0)
             const progress = total > 0 ? Math.round((closed / total) * 100) : 0
             return {
-              label: String(p.name ?? t("projects.dashboard.projectFallback", { number: i + 1 })),
+              label: String(p.name ?? t("projects.dashboard.projectFallback", { number: i + 1 }),
+            ),
               value: progress,
               max: 100,
               color: colors[i] ?? "#6366f1",
@@ -1037,11 +1149,13 @@ function ProjectsClientLoaded({
               const deadlineMs = Number(tk.dateDeadline ?? 0) / 1000
               return deadlineMs > nowMs && deadlineMs <= fourteenDaysMs
             })
-            .sort((a, b) => Number(a.dateDeadline ?? 0) - Number(b.dateDeadline ?? 0))
+            .sort((a, b) => Number(a.dateDeadline ?? 0) - Number(b.dateDeadline ?? 0),
+          )
             .slice(0, 5)
             .map((tk) => {
               const deadlineMs = Number(tk.dateDeadline ?? 0) / 1000
-              const dueStr = new Date(deadlineMs).toLocaleDateString("en", { month: "short", day: "numeric" })
+              const dueStr = new Date(deadlineMs).toLocaleDateString("en", { month: "short", day: "numeric",
+            })
               const proj = projects.find((p) => p.id === tk.projectId)
               return {
                 milestone: String(tk.name ?? ""),
@@ -1051,7 +1165,8 @@ function ProjectsClientLoaded({
                 status: String(tk.state ?? "Open"),
               }
             })
-          return { ...w, data: { ...(w.data as Record<string, unknown>), rows: upcomingTasks } }
+          return { ...w, data: { ...(w.data as Record<string, unknown>), rows: upcomingTasks },
+        }
         }
         return w
           })
@@ -1067,13 +1182,16 @@ function ProjectsClientLoaded({
     projectFormConfig,
     taskFormConfig,
     timesheetFormConfig,
+    timesheetCaptureScope,
   ])
 
   // "My work" widgets sit under the KPI tiles.
-  const productivitySections = useProductivitySections({ organizationId: orgId, tasks, projects, idPrefix: "proj-work" })
+  const productivitySections = useProductivitySections({ organizationId: orgId, tasks, projects, idPrefix: "proj-work",
+  })
   const dashboardSections = useMemo(() => {
     const at = liveSections.findIndex((section) => section.id === "proj-kpis") + 1
-    return [...liveSections.slice(0, at), ...productivitySections, ...liveSections.slice(at)]
+    return [...liveSections.slice(0, at), ...productivitySections, ...liveSections.slice(at),
+    ]
   }, [liveSections, productivitySections])
 
   const csvFormConfig = useMemo(() => {
@@ -1102,7 +1220,8 @@ function ProjectsClientLoaded({
                     {
                       id: "csv-project",
                       label: t("projects.toolbar.importProjectCsv"),
-                      permission: { resource: CSV_IMPORT_CONTRACTS.project.resource, action: "create" },
+                      permission: { resource: CSV_IMPORT_CONTRACTS.project.resource, action: "create",
+                            },
                       onClick: () => setCsvKind("project"),
                     },
                   ],
@@ -1110,7 +1229,8 @@ function ProjectsClientLoaded({
                     column.key === "name"
                       ? {
                           ...column,
-                          render: (_value: unknown, row: Record<string, unknown>) => {
+                          render: (_value: unknown, row: Record<string, unknown>,
+                                ) => {
                             const href = projectHref(row)
                             const shown = String(row.name ?? "").trim()
                             if (!href || !shown) return shown || "—"
@@ -1134,11 +1254,15 @@ function ProjectsClientLoaded({
                   kind: "text",
                   save: async (row, value) => {
                     const name = String(value).trim()
-                    if (!name) throw new Error(t("projects.inlineEdit.nameRequired", { defaultValue: "A project needs a name" }))
-                    await updateProject.mutateAsync({ projectId: row.id as string | number, params: { name } })
-                  },
-                },
-              }),
+                    if (!name) throw new Error(t("projects.inlineEdit.nameRequired", { defaultValue: "A project needs a name",
+                              }),
+                            )
+                    await updateProject.mutateAsync({ projectId: row.id as string | number, params: { name },
+                          })
+                        },
+                      },
+                    },
+                  ),
             }
           }
           if (tab.id === "rate-cards" && tab.entityConfig) {
@@ -1169,7 +1293,8 @@ function ProjectsClientLoaded({
                 {
                   id: "csv-task",
                   label: t("projects.toolbar.importTaskCsv"),
-                  permission: { resource: "project_task", action: "create" },
+                  permission: { resource: "project_task", action: "create",
+                      },
                   onClick: () => setCsvKind("task"),
                 },
                 {
@@ -1179,7 +1304,8 @@ function ProjectsClientLoaded({
                   selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
-                    setLifecycleModal({ type: "taskState", rows, form: taskStateForm })
+                    setLifecycleModal({ type: "taskState", rows, form: taskStateForm,
+                        })
                   },
                 },
                 {
@@ -1189,7 +1315,8 @@ function ProjectsClientLoaded({
                   selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
-                    setLifecycleModal({ type: "taskParent", rows, form: taskParentFormConfig })
+                    setLifecycleModal({ type: "taskParent", rows, form: taskParentFormConfig,
+                        })
                   },
                 },
                 {
@@ -1200,7 +1327,8 @@ function ProjectsClientLoaded({
                   selection: "multiple",
                   onClick: (rows) => {
                     setLifecycleError(null)
-                    setLifecycleModal({ type: "assignUsers", rows, form: assignUsersFormConfig })
+                    setLifecycleModal({ type: "assignUsers", rows, form: assignUsersFormConfig,
+                        })
                   },
                 },
               ]),
@@ -1210,12 +1338,14 @@ function ProjectsClientLoaded({
             return {
               ...tab,
               createForm: timesheetFormConfig,
+                  createDraftKey: `company:${operatingCompanyId}`,
               createAction: "logTimesheet",
               entityConfig: withTimesheetLifecycleColumns(addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-timesheet",
                   label: t("projects.toolbar.importTimesheetCsv"),
-                  permission: { resource: CSV_IMPORT_CONTRACTS.timesheet.resource, action: "create" },
+                  permission: { resource: CSV_IMPORT_CONTRACTS.timesheet.resource, action: "create",
+                          },
                   onClick: () => setCsvKind("timesheet"),
                 },
                 {
@@ -1224,17 +1354,22 @@ function ProjectsClientLoaded({
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) =>
-                    rows.every((row) => (row.isTimerRunning ?? row.is_timer_running) === true),
-                  successMessage: t("common.actionCompleted", { action: "Stop timer" }),
-                  onClick: (rows) => runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id)),
+                    rows.every((row) => (row.isTimerRunning ?? row.is_timer_running) === true,
+                            ),
+                  successMessage: t("common.actionCompleted", { action: "Stop timer",
+                          }),
+                  onClick: (rows) => runForSelectedIds(rows, (id) => stopTimer.mutateAsync(id),
+                            ),
                 },
                 {
                   id: "validate-timesheets",
                   label: "Validate",
                   requiresSelection: true,
                   selection: "multiple",
-                  isApplicable: (rows) => rows.every((row) => timesheetStatus(row) === "draft"),
-                  successMessage: t("common.actionCompleted", { action: "Validate" }),
+                  isApplicable: (rows) => rows.every((row) => timesheetStatus(row) === "draft",
+                            ),
+                  successMessage: t("common.actionCompleted", { action: "Validate",
+                          }),
                   onClick: (rows) =>
                     validateTimesheets.mutateAsync({
                       companyId: operatingCompanyId,
@@ -1249,9 +1384,12 @@ function ProjectsClientLoaded({
                   isApplicable: (rows) =>
                     rows.every((row) => {
                       const status = timesheetStatus(row)
-                      return status === "draft" || status === "submitted"
-                    }),
-                  successMessage: t("common.actionCompleted", { action: "Reject" }),
+                      return (
+                                status === "draft" || status === "submitted"
+                              )
+                            }),
+                  successMessage: t("common.actionCompleted", { action: "Reject",
+                          }),
                   variant: "destructive" as const,
                   onClick: (rows) =>
                     rejectTimesheets.mutateAsync({
@@ -1273,14 +1411,18 @@ function ProjectsClientLoaded({
                     ),
                   onClick: (rows) => {
                     setLifecycleError(null)
-                    setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
+                    setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig,
+                            })
                   },
                 },
-              ], { selectOnRowClick: true })),
+              ], { selectOnRowClick: true },
+                    ),
+                  ),
             }
           }
           return tab
-        }),
+        },
+          ),
           ganttTab,
           resourceTab,
           utilisationTab,
@@ -1340,8 +1482,10 @@ function ProjectsClientLoaded({
     resources: employeesRead.state,
     "timesheet-approvals": timesheetApprovalsRead.state,
     gantt: mergeModuleStates([projectsRead.state, tasksRead.state]),
-    "resource-allocation": mergeModuleStates([employeesRead.state, allocationsRead.state, capacityRead.state]),
-    utilisation: mergeModuleStates([employeesRead.state, utilisationRead.state]),
+    "resource-allocation": mergeModuleStates([employeesRead.state, allocationsRead.state, capacityRead.state,
+    ]),
+    utilisation: mergeModuleStates([employeesRead.state, utilisationRead.state,
+    ]),
     "advanced-psa": mergeModuleStates([
       capacityForecastRead.state, changeOrdersRead.state, earnedValueRead.state, projectIntentsRead.state,
     ]),
@@ -1358,8 +1502,11 @@ function ProjectsClientLoaded({
     resourceAllocation: "resource-allocation", changeOrder: "advanced-psa",
     subcontractorCost: "advanced-psa", integrationIntent: "advanced-psa",
   }
-  const csvTabs: Record<ProjectsCsvImportKind, ProjectsTab> = { project: "projects", task: "tasks", timesheet: "timesheets" }
-  const modalUsable = modal.type === null || tabUsable(actionTabs[modal.action])
+  const csvTabs: Record<ProjectsCsvImportKind, ProjectsTab> = { project: "projects", task: "tasks", timesheet: "timesheets",
+  }
+  const modalUsable = modal.type === null ||
+    (tabUsable(actionTabs[modal.action]) &&
+      (modal.type !== "timesheet" || modal.scope === timesheetCaptureScope))
   const lifecycleUsable = lifecycleModal.type === null || tabUsable(lifecycleTabs[lifecycleModal.type])
   const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
   useEffect(() => {
@@ -1374,61 +1521,141 @@ function ProjectsClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!tabUsable(actionTabs[action])) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
+    if (!tabUsable(actionTabs[action])) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded.",
+        }),
+      )
     if (action === "createProject") {
       const p = toCreateProjectParams(formData, pricelists, operatingCompanyId)
       if (p) await createProject.mutateAsync(projectsParamsToJson(p))
     } else if (action === "createTask") {
       const p = toCreateTaskParams(formData, operatingCompanyId)
       if (p) await createTask.mutateAsync(projectsParamsToJson(p))
-    } else if (action === "updateProject" && modal.type === 'edit') {
+    } else if (action === "updateProject" && modal.type === "edit") {
       const p = toUpdateProjectParams(formData)
-      if (p) await updateProject.mutateAsync({ projectId: modal.entityId, params: projectsParamsToJson(p) })
-    } else if (action === "updateTask" && modal.type === 'edit') {
+      if (p) await updateProject.mutateAsync({ projectId: modal.entityId, params: projectsParamsToJson(p),
+        })
+    } else if (action === "updateTask" && modal.type === "edit") {
       const p = toUpdateTaskParams(formData)
-      if (p) await updateTask.mutateAsync({ taskId: modal.entityId, params: projectsParamsToJson(p) })
+      if (p) await updateTask.mutateAsync({ taskId: modal.entityId, params: projectsParamsToJson(p),
+        })
     } else if (action === "logTimesheet") {
       const p = toLogTimesheetParams(
         formData,
         operatingCompanyId,
         projects as Record<string, unknown>[],
       )
-      if (p) {
-        const deviceId = getOrCreateTimesheetCaptureDeviceId()
-        const clientRequestId = newTimesheetClientRequestId()
-        const payload = {
-          projectId: String(formData.projectId ?? ""),
-          taskId: String(formData.taskId ?? ""),
-          employeeId: String(formData.employeeId ?? ""),
-          date: String(formData.date ?? new Date().toISOString().slice(0, 10)),
-          unitAmount: Number(formData.unitAmount ?? 0),
-          name: formData.name != null ? String(formData.name) : undefined,
-          description:
-            formData.description != null ? String(formData.description) : undefined,
-          timesheetInvoiceType:
-            formData.timesheetInvoiceType != null
-              ? String(formData.timesheetInvoiceType)
-              : undefined,
-          currencyId:
-            formData.currencyId != null ? String(formData.currencyId) : undefined,
+      if (!p)
+        throw new Error(
+          t("captureSync.timesheetInvalid", {
+            defaultValue:
+              "Complete the required timesheet details before submitting.",
+          }),
+        )
+      if (
+        !timesheetOwner.actorIdentity ||
+        !operatingCompanyId ||
+        permissionsReady === false ||
+        !checkPermission("project_timesheet", "create").allowed
+      ) {
+        throw new Error(
+          t("captureSync.timesheetScope", {
+            defaultValue:
+              "Select an active company and confirm your timesheet access before submitting.",
+          }),
+        )
+      }
+      if (!navigator.onLine) {
+        throw new Error(
+          t("captureSync.timesheetOffline", {
+            defaultValue:
+              "Reconnect to submit this timesheet. Keep this form open to preserve your current entries.",
+          }),
+        )
+      }
+      const inProgress = t("captureSync.timesheetInProgress", {
+        defaultValue:
+          "A timesheet is already being submitted. Wait for its result before trying again.",
+      })
+      if (timesheetSubmitting.current) throw new Error(inProgress)
+      const payload = {
+        projectId: String(p.projectId),
+        taskId: String(p.taskId ?? ""),
+        employeeId: String(p.employeeId),
+        date: String(formData.date ?? ""),
+        unitAmount: p.unitAmount,
+      }
+      const reviewMessage = t("captureSync.timesheetReview", {
+        defaultValue:
+          "Check Timesheets for this entry before submitting it again.",
+      })
+      const submit = async () => {
+        if (liveTimesheetScope.current !== timesheetCaptureScope) {
+          throw new Error(
+            t("captureSync.timesheetScope", {
+              defaultValue:
+                "Select an active company and confirm your timesheet access before submitting.",
+            }),
+          )
         }
+        if (!navigator.onLine) {
+          throw new Error(
+            t("captureSync.timesheetOffline", {
+              defaultValue:
+                "Reconnect to submit this timesheet. Keep this form open to preserve your current entries.",
+            }),
+          )
+        }
+        const deviceId = getOrCreateTimesheetCaptureDeviceId()
+        if (
+          hasUnconfirmedTimesheetCapture(
+            listTimesheetCaptures(organizationId, deviceId, timesheetOwner),
+            payload,
+          )
+        ) {
+          throw new Error(reviewMessage)
+        }
+        const attempt: TimesheetCaptureOutboxItem = {
+          ...timesheetOwner,
+          clientRequestId: crypto.randomUUID(),
+          payload,
+          syncState: "submitting",
+        }
+        writeTimesheetCapture(organizationId, deviceId, attempt)
+        setTimesheetSyncing({
+          scope: timesheetCaptureScope,
+          id: attempt.clientRequestId,
+        })
         try {
           await createTimesheet.mutateAsync(projectsParamsToJson(p))
-          markTimesheetCaptureSynced(organizationId, deviceId, clientRequestId)
-        } catch (err) {
-          enqueueTimesheetCapture(organizationId, {
-            clientRequestId,
-            deviceId,
-            payload,
+          writeTimesheetCapture(organizationId, deviceId, attempt, {
+            remove: true,
           })
-          markTimesheetCaptureError(
-            organizationId,
-            deviceId,
-            clientRequestId,
-            err instanceof Error ? err.message : String(err),
-          )
-          throw err
+        } catch (error) {
+          const rejected =
+            error instanceof OperationRequestError &&
+            error.retry !== "reconcile"
+          writeTimesheetCapture(organizationId, deviceId, {
+            ...attempt,
+            syncState: rejected ? "failed" : "conflict",
+          })
+          throw rejected ? error : new Error(reviewMessage)
         }
+      }
+      timesheetSubmitting.current = true
+      try {
+        if (navigator.locks) {
+          await navigator.locks.request(
+            `lumiere.timesheet-capture.${timesheetCaptureScope}`,
+            { ifAvailable: true },
+            (lock) => {
+              if (!lock) throw new Error(inProgress)
+              return submit()
+            },
+          )
+        } else await submit()
+      } finally {
+        timesheetSubmitting.current = false
+        setTimesheetSyncing(null)
       }
     } else if (action === "startTimer") {
       const p = toStartTimesheetTimerParams(
@@ -1489,7 +1716,26 @@ function ProjectsClientLoaded({
           Contacts reference data: {contactsReferenceStatus}. Partner selection requires CRM contact read access; project and timesheet workflows remain available.
         </p>
       )}
+      {timesheetOwner.actorIdentity &&
+      operatingCompanyId > 0n &&
+      permissionsReady !== false &&
+      checkPermission("project_timesheet", "read").allowed ? (
+        <TimesheetCapturePanel
+          key={timesheetCaptureScope}
+          organizationId={organizationId}
+          owner={timesheetOwner}
+          onReview={() => {
+            void timesheetsQuery.refetch()
+          }}
+          syncingId={
+            timesheetSyncing?.scope === timesheetCaptureScope
+              ? timesheetSyncing.id
+              : null
+          }
+        />
+      ) : null}
       <ModuleView
+        key={timesheetCaptureScope}
         config={config}
         data={data}
         dataState={dataState}
@@ -1500,18 +1746,28 @@ function ProjectsClientLoaded({
       <FormModal
         open={modal.type !== null && modalUsable}
         onOpenChange={(open) => !open && setModal({ type: null })}
-        config={modal.type ? modal.form : projectFormConfig}
+        config={modal.type === "timesheet"
+            ? timesheetFormConfig
+            : modal.type
+              ? modal.form
+              : projectFormConfig
+        }
+        draftKey={
+          modal.type === "timesheet"
+            ? `company:${operatingCompanyId}`
+            : undefined
+        }
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (!modal.type) return
           const tabId =
-            modal.type === 'create'
-              ? 'dashboard'
-              : modal.type === 'edit'
-                ? modal.action === 'updateProject'
-                  ? 'projects'
-                  : 'tasks'
-                : 'timesheets'
+            modal.type === "create"
+              ? "dashboard"
+              : modal.type === "edit"
+                ? modal.action === "updateProject"
+                  ? "projects"
+                  : "tasks"
+                : "timesheets"
           await handleFormSubmit(tabId, modal.action, formData)
           setModal({ type: null })
         }}
@@ -1534,7 +1790,9 @@ function ProjectsClientLoaded({
           closeOnSubmit={false}
           submitError={lifecycleError}
           onSubmit={async (formData) => {
-            if (!lifecycleUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
+            if (!lifecycleUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded.",
+                }),
+              )
             setLifecycleError(null)
             try {
               const ids = selectedIds(lifecycleModal.rows)
@@ -1564,14 +1822,19 @@ function ProjectsClientLoaded({
               } else if (lifecycleModal.type === "assignUsers") {
                 if (assigningTasks.current) return
                 if (!canAssignTask) throw new Error("Task assignment permission is required")
-                if (!navigator.onLine) throw new Error("Connect to the network to change assignments")
+                if (!navigator.onLine) throw new Error("Connect to the network to change assignments",
+                  )
                 if (operatingCompanyId <= 0n) throw new Error("Select an active company")
-                if (!taskAssignees.isSuccess || taskAssignees.isError || taskAssignees.isFetching) throw new Error("Eligible people could not be loaded. Close and reopen the form to retry.")
-                if (lifecycleModal.rows.some((row) => String(row.companyId ?? row.company_id) !== operatingCompanyId.toString())) {
+                if (!taskAssignees.isSuccess || taskAssignees.isError || taskAssignees.isFetching) throw new Error("Eligible people could not be loaded. Close and reopen the form to retry.",
+                  )
+                if (lifecycleModal.rows.some((row) => String(row.companyId ?? row.company_id) !== operatingCompanyId.toString(),
+                  )) {
                   throw new Error("Select tasks from the current company")
                 }
-                const userIds = taskAssigneeIds(Array.isArray(formData.userIds) ? formData.userIds : [])
-                const eligible = new Set(userFieldOptions.map((option) => option.value))
+                const userIds = taskAssigneeIds(Array.isArray(formData.userIds) ? formData.userIds : [],
+                )
+                const eligible = new Set(userFieldOptions.map((option) => option.value),
+                )
                 if (userIds.some((identity) => !eligible.has(identity))) {
                   throw new Error("Select active members of this company")
                 }
@@ -1624,7 +1887,8 @@ function ProjectsClientLoaded({
                   d == null ||
                   d === ""
                 ) {
-                  throw new Error("Sheet, journal, accounts, and invoice date are required")
+                  throw new Error("Sheet, journal, accounts, and invoice date are required",
+                  )
                 }
                 await projectRebill.mutateAsync({
                   sheetId: String(sheetId),
@@ -1664,7 +1928,8 @@ function ProjectsClientLoaded({
                 const from = formData.dateFrom
                 const to = formData.dateTo
                 if (!formData.projectId || from == null || from === "" || to == null || to === "") {
-                  throw new Error("Project, date from, and date to are required")
+                  throw new Error("Project, date from, and date to are required",
+                  )
                 }
                 const skillHint =
                   formData.skillHint != null && String(formData.skillHint).trim() !== ""
@@ -1737,11 +2002,13 @@ function ProjectsClientLoaded({
                 })
               } else if (lifecycleModal.type === "subcontractorCost") {
                 const currency = currenciesQuery.isSuccess
-                  ? currencyFieldOptions.find((option) => option.value === String(formData.currencyId ?? ""))
+                  ? currencyFieldOptions.find((option) => option.value === String(formData.currencyId ?? ""),
+                    )
                   : undefined
                 if (!currency) throw new Error(t("projects.forms.subcontractorCost.currencyRequired", {
                   defaultValue: "Choose an available currency before linking this cost. Your entries are retained.",
-                }))
+                }),
+                  )
                 const poRaw = formData.purchaseOrderId
                 const poLineRaw = formData.purchaseOrderLineId
                 await linkSubcontractor.mutateAsync({
@@ -1798,7 +2065,9 @@ function ProjectsClientLoaded({
           title={t("projects.csvImport.taskTitle")}
           isImportPending={csvImports.importTask.isPending}
           onImport={async (csvData) => {
-            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded.",
+                }),
+              )
             await csvImports.importTask.mutateAsync(csvData)
           }}
         />
@@ -1816,7 +2085,9 @@ function ProjectsClientLoaded({
           templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
-            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded.",
+                }),
+              )
             if (csvKind === "project") await csvImports.importProject.mutateAsync(text)
             else await csvImports.importTimesheet.mutateAsync(text)
           }}
@@ -1827,25 +2098,26 @@ function ProjectsClientLoaded({
 }
 
 // Helper functions to extract field values from entities
-function getTaskFieldValue(task: Record<string, unknown>, fieldName: string): unknown {
+function getTaskFieldValue(task: Record<string, unknown>, fieldName: string,
+): unknown {
   switch (fieldName) {
-    case 'name':
-      return task.name ?? ''
-    case 'projectId':
-      return String(task.projectId ?? '')
-    case 'stageId':
-      return task.stageId ? `${task.projectId}:${task.stageId}` : ''
-    case 'priority':
-      return String(task.priority ?? '0')
-    case 'plannedHours':
-      return task.plannedHours ?? ''
-    case 'dateDeadline':
-      return task.dateDeadline ? new Date(Number(task.dateDeadline) / 1000).toISOString().split('T')[0] : ''
-    case 'description':
-      return task.description ?? ''
-    case 'kanbanState':
-      return task.kanbanState ?? 'normal'
+    case "name":
+      return task.name ?? ""
+    case "projectId":
+      return String(task.projectId ?? "")
+    case "stageId":
+      return task.stageId ? `${task.projectId}:${task.stageId}` : ""
+    case "priority":
+      return String(task.priority ?? "0")
+    case "plannedHours":
+      return task.plannedHours ?? ""
+    case "dateDeadline":
+      return task.dateDeadline ? new Date(Number(task.dateDeadline) / 1000).toISOString().split("T")[0] : ""
+    case "description":
+      return task.description ?? ""
+    case "kanbanState":
+      return task.kanbanState ?? "normal"
     default:
-      return ''
+      return ""
   }
 }

@@ -55,6 +55,118 @@ describe("bank matching desk", () => {
     expect(onConfirm.mock.calls[0]![0]).toEqual({ organizationId: "1", companyId: "4", statementId: "2", lineId: "10", moveLineIds: ["40", "41"], amountResidual: 0 })
     expect(screen.getByText(/posted payment and selected invoice balances are settled/)).toBeTruthy()
   })
+  it.each([
+    { bank: 500, remaining: 10000n, credit: 0n },
+    { bank: 1000, remaining: 0n, credit: 40000n },
+  ])(
+    "checks the reviewed posted transaction for bank amount $bank",
+    async ({ bank, remaining, credit }) => {
+      const source = fixture()
+      const line = { ...source.line!, amount: bank }
+      source.line = line
+      source.bankLines = [line]
+      source.transactions = [
+        {
+          id: 71n,
+          organizationId: 1n,
+          companyId: 9n,
+          sourceEntity: "account_bank_statement_line",
+          sourceEntityId: 10n,
+          accountPaymentId: 85n,
+          partnerId: 50n,
+          currencyId: 7n,
+          direction: "Inbound",
+          status: "Posted",
+          externalReference: "Wrong company",
+          grossExternalAmount: bank,
+          settlementAmount: bank,
+          netAccountAmount: bank,
+        },
+        {
+          id: 72n,
+          organizationId: 1n,
+          companyId: 4n,
+          sourceEntity: "account_bank_statement_line",
+          sourceEntityId: 10n,
+          accountPaymentId: 86n,
+          partnerId: 50n,
+          currencyId: 7n,
+          direction: "Inbound",
+          status: "Posted",
+          externalReference: "Original bank transfer",
+          grossExternalAmount: bank,
+          settlementAmount: bank,
+          netAccountAmount: bank,
+        },
+      ]
+      const result = {
+        transactionId: "72",
+        paymentId: "86",
+        moveLineId: "40",
+        allocationId: "90",
+        allocatedMinor: BigInt(Math.min(bank, 600) * 100),
+        documentRemainingMinor: remaining,
+        unappliedCreditMinor: credit,
+      }
+      const onConfirm = vi.fn().mockResolvedValue(null)
+      const onCheck = vi.fn().mockResolvedValue(result)
+      const confirmExact = vi.fn()
+      render(
+        <ReconciliationWorkbench
+          actorKey="accountant"
+          source={source}
+          canReconcile
+          onConfirm={confirmExact}
+          transactionSettlement={{
+            ready: true,
+            canSettle: true,
+            canRecord: true,
+            onConfirm,
+            onCheck,
+          }}
+        />,
+      )
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "Select INV/001, Consulting" }),
+      )
+      expect(screen.queryByText(/Wrong company/)).toBeNull()
+      const confirm = screen.getByRole<HTMLButtonElement>("button", {
+        name: "Apply payment and match bank line",
+      })
+      expect(confirm.disabled).toBe(true)
+      fireEvent.click(
+        screen.getByRole("checkbox", {
+          name: /I reviewed the bank line, posted transaction/,
+        }),
+      )
+      fireEvent.click(confirm)
+      await screen.findByText(/could not be verified/)
+      expect(screen.queryByText("Bank line matched")).toBeNull()
+      const request = {
+        organizationId: "1",
+        companyId: "4",
+        statementId: "2",
+        lineId: "10",
+        transactionId: "72",
+        moveLineId: "40",
+        currencyId: "7",
+        decimalPlaces: 2,
+        bankAmount: bank,
+        openAmount: 600,
+        allocatedAmount: Math.min(bank, 600),
+      }
+      expect(onConfirm).toHaveBeenCalledExactlyOnceWith(request)
+      fireEvent.click(
+        screen.getByRole("button", { name: "Check the saved bank match" }),
+      )
+      await screen.findByText("Bank line matched")
+      expect(onCheck).toHaveBeenCalledWith(
+        expect.objectContaining({ transactionId: "72", lineId: "10" }),
+        request,
+      )
+      expect(confirmExact).not.toHaveBeenCalled()
+    },
+  )
   it("searches readable document, partner, account and item labels without losing selections", () => {
     render(<ReconciliationWorkbench actorKey="synthetic-accountant" source={fixture()} canReconcile onConfirm={vi.fn()} />)
     fireEvent.click(screen.getByRole("checkbox", { name: "Select INV/001, Consulting" }))

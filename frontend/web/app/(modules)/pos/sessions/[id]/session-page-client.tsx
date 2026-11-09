@@ -313,9 +313,14 @@ function PosSessionPageLoaded({
             ),
           },
           {
-            id: 'audit',
-            label: t('common.audit', { defaultValue: 'Audit' }),
-            content: <RecordAuditTab tableName="pos_session" recordId={sessionId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab tableName="pos_session" recordId={sessionId} />
+            ),
           },
         ]}
       />

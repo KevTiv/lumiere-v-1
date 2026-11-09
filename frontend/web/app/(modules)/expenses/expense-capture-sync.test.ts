@@ -610,3 +610,29 @@ test("local admission denial stays known unsent and resumes the original request
   assert.equal(result.syncState, "synced")
   assert.equal(result.clientRequestId, item.clientRequestId)
 })
+
+test("quick capture checks its actor before reading and never resends a conflict", async () => {
+  const h = harness()
+  const item = {
+    ...queued(),
+    actorIdentity: "original",
+    syncState: "conflict" as const,
+  }
+  await assert.rejects(
+    syncExpenseCapture(item, { ...scope, actorIdentity: "other" }, file, {
+      ...h.services,
+      readExpenses: () => {
+        assert.fail("another actor must not read this capture")
+      },
+    }),
+    CaptureReadbackError,
+  )
+  const result = await syncExpenseCapture(
+    item,
+    { ...scope, actorIdentity: "original" },
+    file,
+    h.services,
+  )
+  assert.equal(result.syncState, "conflict")
+  assert.deepEqual(h.calls, { upload: 0, register: 0, create: 0 })
+})

@@ -80,6 +80,9 @@ export const preparationFieldLabels = {
   reported_destination: "Reported payment destination",
   business_interpretation: "Business meaning",
   observation_kind: "Historical fact type",
+  debit_account_id: "Debit account ID",
+  credit_account_id: "Credit account ID",
+  currency_id: "Currency ID",
 } as const
 
 export type PreparationField = keyof typeof preparationFieldLabels
@@ -166,6 +169,9 @@ export const preparationTargetFields: Record<
     "reported_destination",
     "business_interpretation",
     "observation_kind",
+    "debit_account_id",
+    "credit_account_id",
+    "currency_id",
     "amount",
     "quantity",
     "pieces",

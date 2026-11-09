@@ -1,3 +1,6 @@
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import { entityScalarText } from "@lumiere/ui/lib/entity-row-values"
+
 /** The page of a record, by the model name notes and attachments are filed under. */
 const RECORD_PAGE: Record<string, (id: string) => string> = {
   sale_order: (id) => `/sales/orders/${id}`,
@@ -12,11 +15,15 @@ const RECORD_PAGE: Record<string, (id: string) => string> = {
   mrp_production: (id) => `/manufacturing/orders/${id}`,
   hr_expense_sheet: (id) => `/expenses/reports/${id}`,
   project_project: (id) => `/projects/${id}`,
-};
+}
 
 /** Where a record of `model` has a page of its own, or undefined when it has none. */
-export function recordPageHref(model: unknown, id: unknown): string | undefined {
-  const key = String(model ?? '');
-  if (!key || id == null || String(id) === '') return undefined;
-  return RECORD_PAGE[key]?.(String(id));
+export function recordPageHref(
+  model: unknown,
+  id: unknown,
+): string | undefined {
+  const key = entityScalarText(model)
+  if (!key || !Object.hasOwn(RECORD_PAGE, key)) return undefined
+  const recordId = parseStrictU64(id)
+  return recordId ? RECORD_PAGE[key]?.(recordId.toString()) : undefined
 }

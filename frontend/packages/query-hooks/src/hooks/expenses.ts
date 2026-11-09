@@ -238,6 +238,8 @@ export function useCreateExpenseReceipt(organizationId: bigint, companyId?: bigi
 export function useCreateExpense(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Partial<CreateExpenseParams>>({
+    networkMode: "always",
+    retry: false,
     mutationFn: async (params) => {
       const finalized = finalizeCreateExpenseParams({
         ...params,

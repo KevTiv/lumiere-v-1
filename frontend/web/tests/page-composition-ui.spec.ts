@@ -58,6 +58,11 @@ test("gallery preview, adding, sizing and drag reorder persist through reload", 
   const grid = page.getByTestId("page-composition-grid")
   const added = grid.locator('[data-widget-key="saved:101"]')
   await expect(added.locator(".recharts-bar").first()).toBeVisible()
+  await expect(added.getByText("Sample company", { exact: true })).toBeVisible()
+  await expect(
+    added.getByText("August–November 2026 via invoice_date"),
+  ).toBeVisible()
+  await expect(added.getByText("Records", { exact: true })).toBeVisible()
   await added
     .getByRole("combobox", { name: "Width of Invoices by month" })
     .click()
@@ -138,6 +143,10 @@ test("assistant additions use the same cancellable draft and reset restores the 
   await expect(
     grid.locator('[data-widget-key="saved:102"] .recharts-pie'),
   ).toBeVisible()
+  await page.getByRole("button", { name: "Work review", exact: true }).click()
+  await expect(grid.locator("[data-placement-id]")).toHaveCount(2)
+  await page.getByRole("button", { name: "Undo", exact: true }).click()
+  await expect(grid.locator('[data-widget-key="saved:102"]')).toHaveCount(1)
   await expect(page.getByTestId("fixture-saved-layout")).toHaveText(
     '{"value":null,"revision":null}',
   )

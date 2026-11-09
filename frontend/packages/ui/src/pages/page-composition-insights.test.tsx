@@ -75,6 +75,7 @@ function TestHost(props: PageCompositionMountProps) {
       value={value}
       defaultValue={createDefaultPageLayout(sections)}
       catalog={createBuiltinWidgetCatalog(sections)}
+      startingLayouts={props.startingLayouts}
       onSave={async (next) => {
         setValue(next)
       }}
@@ -130,10 +131,11 @@ describe("module insight composition integration", () => {
       const mount = mounted.mock.calls.at(-1)?.[0]
       expect(mount?.moduleId).toBe(module)
       expect(mount?.pageId).toBe("dashboard")
-      expect(mount?.sections).toHaveLength(8)
+      expect(mount?.sections).toHaveLength(7)
+      expect(mount?.fixedWidgetIds).toEqual([`${module}-insights-actions`])
       const defaults = createDefaultPageLayout(mount?.sections ?? [])
-      expect(defaults.slice(0, 4).map((widget) => widget.width)).toEqual([
-        3, 3, 3, 3,
+      expect(defaults.map((widget) => widget.width)).toEqual([
+        3, 3, 3, 3, 8, 4, 12,
       ])
       expect(
         createBuiltinWidgetCatalog(mount?.sections ?? []).every(
@@ -144,18 +146,26 @@ describe("module insight composition integration", () => {
         screen.getAllByTestId(`${module}-insights-currentValue`),
       ).toHaveLength(1)
       expect(screen.queryByText("FOREIGN COMPANY MUST STAY HIDDEN")).toBeNull()
+      const actions = screen.getByRole("region", {
+        name: "moduleInsights.actions",
+      })
 
       fireEvent.click(screen.getByRole("button", { name: "Edit page" }))
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: `Remove moduleInsights.modules.${module}.currentCount`,
-        }),
-      )
+      fireEvent.click(screen.getByRole("button", { name: "Period review" }))
+      expect(screen.queryByTestId(`${module}-insights-currentCount`)).toBeNull()
+      expect(
+        screen.getByRole("region", { name: "moduleInsights.actions" }),
+      ).toBe(actions)
+      fireEvent.click(screen.getByRole("button", { name: "Work review" }))
+      expect(screen.queryByTestId(`${module}-insights-periodCount`)).toBeNull()
       fireEvent.click(screen.getByRole("button", { name: "Done" }))
       await waitFor(() =>
         expect(screen.getByRole("button", { name: "Edit page" })).toBeTruthy(),
       )
-      expect(screen.queryByTestId(`${module}-insights-currentCount`)).toBeNull()
+      expect(screen.queryByTestId(`${module}-insights-periodCount`)).toBeNull()
+      expect(
+        screen.getByRole("region", { name: "moduleInsights.actions" }),
+      ).toBe(actions)
       expect(
         screen.getByRole("link", { name: "Available history" }),
       ).toBeTruthy()
@@ -179,7 +189,7 @@ describe("module insight composition integration", () => {
         expect(screen.getByRole("button", { name: "Edit page" })).toBeTruthy(),
       )
       expect(
-        screen.getAllByTestId(`${module}-insights-currentCount`),
+        screen.getAllByTestId(`${module}-insights-periodCount`),
       ).toHaveLength(1)
     },
   )

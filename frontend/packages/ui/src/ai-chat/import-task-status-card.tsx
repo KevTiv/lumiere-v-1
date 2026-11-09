@@ -138,6 +138,10 @@ export function ImportTaskStatusCard({
                 })}
               </p>
             </>
+          ) : proposal.status === "rolled_back" ? (
+            <p>
+              {t("settings.importTask.cardRolledBack", { id: proposal.id })}
+            </p>
           ) : (
             <p>
               {t("settings.importTask.cardPendingProposal", {

@@ -32,6 +32,8 @@ import { useExpenseSheets } from "@lumiere/query-hooks/hooks/expenses"
 import { useProjects } from "@lumiere/query-hooks/hooks/projects"
 import { CommandGroup, CommandItem } from "../components/command"
 import { readRowField, searchRecords } from "../lib/record-search"
+import { entityScalarText } from "../lib/entity-row-values"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 type Row = Record<string, unknown>
 type RowsQuery = { data?: unknown; isLoading?: boolean; isError?: boolean }
@@ -77,8 +79,8 @@ export const RECORD_MODEL_SPECS: readonly RecordModelSpec[] = [
 
 function firstText(row: Row, keys: readonly string[]): string {
   for (const key of keys) {
-    const value = readRowField(row, key)
-    if (value != null && String(value).trim()) return String(value).trim()
+    const value = entityScalarText(readRowField(row, key))
+    if (value !== null) return value
   }
   return ""
 }
@@ -135,7 +137,8 @@ function PartnerLabelsLoaded({
     const map = new Map<string, string>()
     for (const row of isError ? [] : asRows(data)) {
       const label = firstText(row, ["displayName", "name"])
-      if (label) map.set(String(row.id), label)
+      const id = (parseStrictU64(row.id) || undefined)?.toString()
+      if (label && id) map.set(id, label)
     }
     return map
   }, [data, isError])
@@ -163,12 +166,18 @@ function RecordModelResults({
   const { data, isLoading, isError } = spec.useRows(organizationId)
   const partnerOf = (row: Row): string =>
     spec.partnerField
-      ? (partnerLabels.get(String(readRowField(row, spec.partnerField) ?? "")) ?? "")
+      ? (partnerLabels.get(
+          (
+            parseStrictU64(readRowField(row, spec.partnerField)) || undefined
+          )?.toString() ?? "",
+        ) ?? "")
       : ""
   const hits = useMemo(
     () =>
       searchRecords(
-        isError ? [] : asRows(data),
+        isError
+          ? []
+          : asRows(data).filter((row) => Boolean(parseStrictU64(row.id))),
         query,
         (row) => [...spec.fields.map((key) => readRowField(row, key)), partnerOf(row)],
         RECORDS_PER_MODEL,
@@ -193,7 +202,7 @@ function RecordModelResults({
       data-testid={`erp-command-palette-records-${spec.model}`}
     >
       {hits.map(({ row }) => {
-        const id = String(row.id)
+        const id = parseStrictU64(row.id)!.toString()
         const href = recordHref(spec.model, id) ?? spec.fallbackHref?.(id)
         const title = firstText(row, spec.titleFields) || `#${id}`
         const subtitle = partnerOf(row) || firstText(row, spec.fields.filter((f) => !spec.titleFields.includes(f)))

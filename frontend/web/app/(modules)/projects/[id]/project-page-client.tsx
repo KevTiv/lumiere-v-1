@@ -396,9 +396,17 @@ function ProjectPageLoaded({
             ),
           },
           {
-            id: 'audit',
-            label: t('common.audit', { defaultValue: 'Audit' }),
-            content: <RecordAuditTab tableName="project_project" recordId={projectId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab
+                tableName="project_project"
+                recordId={projectId}
+              />
+            ),
           },
         ]}
       />

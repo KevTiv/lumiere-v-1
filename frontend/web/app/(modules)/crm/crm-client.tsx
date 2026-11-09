@@ -24,7 +24,16 @@ import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
 import { CrmMyWorkPanel } from "./crm-my-work-panel"
 import { CrmRecordActions } from "./crm-record-actions"
 import { EntityRecordSheet } from "@lumiere/ui/entity-views/entity-record-sheet"
-import { crmWorkflowActions, crmLeadState, crmOpportunityClosed, crmOpportunityStatus, type CrmRecordKind, type CrmActionContext, type CrmActionId } from "./crm-workflow"
+import { identityKey } from "./my-activities"
+import {
+  crmWorkflowActions,
+  crmLeadState,
+  crmOpportunityClosed,
+  crmOpportunityStatus,
+  type CrmRecordKind,
+  type CrmActionContext,
+  type CrmActionId,
+} from "./crm-workflow"
 import { useQuery } from "@tanstack/react-query"
 import { CrmPipelineAdminPanel } from "./crm-pipeline-admin-panel"
 import { CrmCountryPackPanel } from "./crm-country-pack-panel"
@@ -1224,6 +1233,19 @@ function CrmClientLoaded({
     <CrmRecordActions kind={kind} record={row} context={recordActionContext(kind)} onAction={(action, record) => handleRecordAction(kind, action, record)} />
   ), [recordActionContext, handleRecordAction])
 
+  const recordResponsibility = useCallback(
+    (record: EntityRow) => {
+      const id = identityKey(record.userId ?? record.user_id)
+      const name = id
+        ? (ownerLabelMap.get(id) ?? ownerLabelMap.get(`0x${id}`))
+        : undefined
+      return name
+        ? { label: t("crm.activities.columns.userId"), name }
+        : undefined
+    },
+    [ownerLabelMap, t],
+  )
+
   const leadRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "contactName",
@@ -1252,6 +1274,7 @@ function CrmClientLoaded({
         Lost: t("crm.leads.states.Lost"),
       },
       detailConfig: leadDetail,
+      responsibility: recordResponsibility,
       auditTableName: "lead",
       discussion: {},
       customTabs: [
@@ -1279,7 +1302,7 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId, leadDetail, renderRecordActions],
+    [t, organizationId, leadDetail, recordResponsibility, renderRecordActions],
   )
 
   const opportunityRecordSheet = useMemo(
@@ -1292,6 +1315,7 @@ function CrmClientLoaded({
         open: t("crm.workflow.status.open"), won: t("crm.workflow.status.won"), lost: t("crm.workflow.status.lost"),
       },
       detailConfig: opportunityDetail,
+      responsibility: recordResponsibility,
       auditTableName: "opportunity",
       discussion: {},
       customTabs: [
@@ -1316,7 +1340,13 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId, opportunityDetail, renderRecordActions],
+    [
+      t,
+      organizationId,
+      opportunityDetail,
+      recordResponsibility,
+      renderRecordActions,
+    ],
   )
 
   const contactRecordSheet = useMemo(

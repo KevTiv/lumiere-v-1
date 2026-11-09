@@ -123,7 +123,7 @@
   "packages/ui/src/entity-views/entity-board.tsx": 7,
   "packages/ui/src/entity-views/entity-detail.tsx": 1,
   "packages/ui/src/entity-views/entity-pivot.tsx": 1,
-  "packages/ui/src/entity-views/entity-record-sheet.tsx": 2,
+  "packages/ui/src/entity-views/entity-record-sheet.tsx": 1,
   "packages/ui/src/entity-views/entity-view.tsx": 7,
   "packages/ui/src/entity-views/sale-order-line-grid.tsx": 1,
   "packages/ui/src/entry-table/entry-detail-modal.tsx": 3,

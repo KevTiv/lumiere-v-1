@@ -10,7 +10,7 @@ use super::idempotency::{accounting_operation_receipt, record_result, replayed_r
 use super::journal_entries::{account_move, account_move_line, is_receivable_or_payable_line_type};
 use super::money::pilot_money_minor_units;
 use super::payment_management::{
-    allocate_payment_transaction_impl, payment_account, payment_reconciliation,
+    allocate_payment_transaction_impl, payment_account, payment_fee, payment_reconciliation,
     payment_transaction, AllocatePaymentParams, PaymentAccount, PaymentTransaction,
 };
 use super::payments::{account_payment, resolve_payment_liquidity_account};
@@ -65,6 +65,13 @@ pub(super) fn validate_bank_transaction_posting(
     if transaction.source_entity.as_deref() != Some(BANK_SOURCE) {
         return Ok(());
     }
+    require_workflow_company_access(
+        ctx,
+        transaction.organization_id,
+        transaction.company_id,
+        ctx.sender(),
+    )?;
+    require_fee_free_transaction(ctx, transaction.id)?;
     let line_id = transaction
         .source_entity_id
         .ok_or("bank source line is required")?;
@@ -155,6 +162,21 @@ pub(super) fn validate_bank_transaction_posting(
     Ok(())
 }
 
+fn require_fee_free_transaction(ctx: &ReducerContext, transaction_id: u64) -> Result<(), String> {
+    if ctx
+        .db
+        .payment_fee()
+        .payment_fee_by_transaction()
+        .filter(&transaction_id)
+        .any(|fee| fee.amount != 0.0 || fee.tax_amount != 0.0)
+    {
+        return Err(
+            "bank settlement requires a transaction with zero fees and fee tax".to_string(),
+        );
+    }
+    Ok(())
+}
+
 pub(super) fn has_posted_bank_transaction(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -193,10 +215,15 @@ pub(super) fn is_operational_bank_match(
     line.is_reconciled
         && ctx
             .db
-            .accounting_operation_receipt()
-            .accounting_operation_receipt_by_scope()
-            .filter((&organization_id, &company_id, &ACTION.to_string()))
-            .any(|receipt| receipt.result_id == line.id)
+            .payment_transaction()
+            .payment_transaction_by_company()
+            .filter(&company_id)
+            .any(|transaction| {
+                transaction.organization_id == organization_id
+                    && transaction.status == PaymentTransactionStatus::Posted
+                    && transaction.source_entity_id == Some(line.id)
+                    && is_matched_bank_transaction(ctx, &transaction)
+            })
 }
 
 /// A linked transaction can retain unapplied credit for a later allocation.
@@ -309,6 +336,7 @@ pub fn settle_bank_line_with_payment_transaction(
         .id()
         .find(&params.payment_transaction_id)
         .ok_or("posted payment transaction is unavailable")?;
+    require_fee_free_transaction(ctx, transaction.id)?;
     let payment_id = transaction
         .account_payment_id
         .ok_or("transaction has no posted ledger payment")?;
@@ -416,6 +444,15 @@ pub fn settle_bank_line_with_payment_transaction(
         } else {
             Err("the recorded bank match is no longer current".to_string())
         };
+    }
+    if has_posted_bank_transaction(
+        ctx,
+        organization_id,
+        company_id,
+        line_id,
+        Some(transaction.id),
+    ) {
+        return Err("more than one posted payment represents this bank line".to_string());
     }
     if statement.state != BankStatementState::Open
         || line.is_reconciled

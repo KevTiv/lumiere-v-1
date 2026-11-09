@@ -16,6 +16,7 @@ import { mergeSelectOptionsForFields } from "@/lib/form-config-merge"
 
 export interface FxRevaluationPanelProps {
   runs: Record<string, unknown>[]
+  bankReview?: { statementId: string; lineId: string; returnHref: string }
   onRunFxRevaluation: (params: Record<string, unknown>) => void | Promise<void>
   onRunFxRevaluationBatch?: (params: Record<string, unknown>) => void | Promise<void>
   onPostRealizedFx?: (params: Record<string, unknown>) => void | Promise<void>
@@ -32,6 +33,7 @@ export interface FxRevaluationPanelProps {
 
 export function FxRevaluationPanel({
   runs,
+  bankReview,
   onRunFxRevaluation,
   onRunFxRevaluationBatch,
   onPostRealizedFx,
@@ -95,6 +97,37 @@ export function FxRevaluationPanel({
 
   return (
     <div className="space-y-6">
+      {bankReview ? (
+        <section
+          className="space-y-2 rounded-lg border p-4 text-sm"
+          aria-label={t("accounting.bankMatchingExceptions.fxSource", {
+            defaultValue: "Bank line awaiting FX review",
+          })}
+        >
+          <p className="font-medium">
+            {t("accounting.bankMatchingExceptions.handoffScope", {
+              defaultValue:
+                "Statement #{{statementId}} · Bank line #{{lineId}}",
+              statementId: bankReview.statementId,
+              lineId: bankReview.lineId,
+            })}
+          </p>
+          <p>
+            {t("accounting.bankMatchingExceptions.fxHandoffNote", {
+              defaultValue:
+                "Verify the posted payment, document currency and approved functional amounts before posting a realized FX difference. The bank line stays unmatched after this FX entry.",
+            })}
+          </p>
+          <a
+            className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4"
+            href={bankReview.returnHref}
+          >
+            {t("accounting.bankMatchingExceptions.returnBankLine", {
+              defaultValue: "Return to original bank line",
+            })}
+          </a>
+        </section>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>{t("accounting.fxRevaluation.panelTitle")}</CardTitle>

@@ -74,8 +74,15 @@ const proposalSchema = z.object({
   requestKey: requestId,
   revision: z.number().int().positive(),
   digest,
-  kind: z.literal("historical_expense_journals"),
-  status: z.enum(["prepared", "approved", "executing", "verified", "blocked"]),
+  kind: z.enum(["historical_expense_journals", "opening_balances"]),
+  status: z.enum([
+    "prepared",
+    "approved",
+    "executing",
+    "verified",
+    "blocked",
+    "rolled_back",
+  ]),
   createdAt: z.string(),
   approvedAt: z.string().nullable(),
   summary: z.object({
@@ -120,6 +127,7 @@ const proposalSchema = z.object({
     }),
   ),
   configuration: z.object({
+    openingBalances: z.literal(true).optional(),
     journalId: positiveId,
     debitAccountId: positiveId,
     creditAccountId: positiveId,
@@ -138,6 +146,7 @@ const proposalSchema = z.object({
       "lines",
       "verification",
       "complete",
+      "rolled_back",
     ]),
     parentRequestId: requestId.nullable(),
     lineRequestId: requestId.nullable(),
@@ -158,11 +167,13 @@ const proposalSchema = z.object({
       postedCount: z.literal(0),
     })
     .nullable(),
+  canRollback: z.boolean().optional(),
   lastError: z.string().nullable(),
 })
 
 export type ImportCapability = z.infer<typeof importCapabilitySchema>
 export type ImportProposal = z.infer<typeof proposalSchema>
+export type ImportProposalAction = "approve" | "execute" | "verify" | "rollback"
 const nativeResultSchema = z
   .object({
     requestId,
@@ -226,6 +237,7 @@ export interface WorkflowScope {
 }
 export interface PrepareImportProposal {
   previousProposalId?: string
+  openingBalances?: true
   rows: { itemId: string; expectedRevision: number }[]
   journalId: string
   debitAccountId: string
@@ -242,6 +254,7 @@ export interface PrepareImportProposal {
 const prepareInputSchema = z
   .object({
     previousProposalId: positiveId.optional(),
+    openingBalances: z.literal(true).optional(),
     rows: z
       .array(
         z
@@ -322,7 +335,9 @@ export function parseImportProposal(
     units(summary.totalDebit) !==
       entries.reduce((total, entry) => total + units(entry.amount), 0n) ||
     units(summary.totalCredit) !== units(summary.totalDebit) ||
-    summary.currencyId !== proposal.configuration.currencyId
+    summary.currencyId !== proposal.configuration.currencyId ||
+    (proposal.kind === "opening_balances") !==
+      (proposal.configuration.openingBalances === true)
   ) {
     throw new Error(
       "The preview does not match its source rows. Reload the saved import before continuing.",
@@ -331,7 +346,15 @@ export function parseImportProposal(
   if (
     (proposal.status === "verified") !== (result !== null) ||
     (proposal.status === "verified") !==
-      (proposal.execution.phase === "complete")
+      (proposal.execution.phase === "complete") ||
+    (proposal.status === "rolled_back") !==
+      (proposal.execution.phase === "rolled_back") ||
+    (proposal.canRollback &&
+      (!proposal.approvedAt || proposal.status === "rolled_back")) ||
+    (proposal.status === "rolled_back" &&
+      (!proposal.approvedAt ||
+        !proposal.execution.parentJobId ||
+        !proposal.execution.lineJobId))
   ) {
     throw new Error(
       "The import result is incomplete. Check the saved execution before continuing.",
@@ -521,7 +544,7 @@ export async function transitionImportProposal(
   fetcher: WorkflowFetch,
   scope: WorkflowScope,
   proposal: Pick<ImportProposal, "id" | "revision" | "digest">,
-  action: "approve" | "execute" | "verify",
+  action: ImportProposalAction,
 ): Promise<ImportProposal> {
   const path =
     workflowPath(scope) +
@@ -541,7 +564,8 @@ export async function transitionImportProposal(
   if (
     result.id !== proposal.id ||
     result.revision !== proposal.revision ||
-    result.digest !== proposal.digest
+    result.digest !== proposal.digest ||
+    (action === "rollback" && result.status !== "rolled_back")
   )
     throw new Error("The response does not match the approved preview.")
   return result

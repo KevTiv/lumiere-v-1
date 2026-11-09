@@ -11,110 +11,227 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { Button } from "@lumiere/ui/components/button"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
-import type { DashboardSection, AreaChartWidget, BarChartWidget } from "@lumiere/ui/lib/dashboard-types"
+import type { DashboardSection, AreaChartWidget, BarChartWidget,
+} from "@lumiere/ui/lib/dashboard-types"
 import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { reportExportSourceProvenance } from "@lumiere/ui/lib/report-export-provenance"
 import { DashboardGrid } from "../../packages/ui/src/pages/dashboard-grid"
 import { ModulePageComposition } from "@lumiere/ui/pages/page-composition-host"
 import { DashboardWidgetRenderer } from "../../packages/ui/src/pages/dashboard-widget-renderer"
-import { buildModuleInsights, insightDefinitions, insightRecordHref, type ModuleInsightInput } from "../lib/module-insights-model"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
+import { buildModuleInsights, insightDefinitions, insightRecordHref, type ModuleInsightInput,
+} from "../lib/module-insights-model"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@lumiere/ui/components/select"
 
 function SourceNotice({ state }: { state: ModuleDataState }) {
   const { t } = useTranslation()
-  return <div role={state.status === "error" ? "alert" : "status"} className="flex min-h-24 flex-col items-start justify-center gap-3 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-    <p>{t(`moduleInsights.source.${state.status === "ready" ? "partial" : state.status}`)}</p>
-    {"onRetry" in state && state.onRetry && <Button variant="outline" onClick={state.onRetry}>{t("common.retry")}</Button>}
+  return (
+    <div role={state.status === "error" ? "alert" : "status"} className="flex min-h-24 flex-col items-start justify-center gap-3 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+    <p>{t(`moduleInsights.source.${state.status === "ready" ? "partial" : state.status}`,
+        )}</p>
+    {"onRetry" in state && state.onRetry && (
+        <Button variant="outline" onClick={state.onRetry}>{t("common.retry")}</Button>
+      )}
   </div>
+  )
 }
 
 /** One composition for module dashboards; figures are derived only from explicit read projections. */
-export interface InsightPeriodRange { startMs: number; endMs: number }
-interface ModuleInsightsProps { input: ModuleInsightInput; sections?: DashboardSection[]; now?: Date; onPeriodRangeChange?: (range: InsightPeriodRange) => void }
+export interface InsightPeriodRange { startMs: number
+  endMs: number }
+interface ModuleInsightsProps { input: ModuleInsightInput
+  sections?: DashboardSection[]
+  now?: Date
+  onPeriodRangeChange?: (range: InsightPeriodRange) => void }
 
 export function CompanyModuleInsights(props: ModuleInsightsProps) {
   const { input } = props
   const organizationId = Number(input.organizationId)
-  const companies = useCompanies(organizationId, input.module !== "reports" && Number.isSafeInteger(organizationId) && organizationId > 0)
-  const companyCurrencyId = companies.data?.find((company) => String(company.id) === String(input.companyId))?.currencyId
-  return <ModuleInsights {...props} input={{ ...input, companyCurrencyId: input.companyCurrencyId ?? companyCurrencyId }} />
+  const companies = useCompanies(organizationId, input.module !== "reports" && Number.isSafeInteger(organizationId) && organizationId > 0,
+  )
+  const companyCurrencyId = companies.data?.find((company) => String(company.id) === String(input.companyId),
+  )?.currencyId
+  return (
+    <ModuleInsights {...props} input={{ ...input, companyCurrencyId: input.companyCurrencyId ?? companyCurrencyId,
+      }}
+    />
+  )
 }
 
-export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange }: ModuleInsightsProps) {
+export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange,
+}: ModuleInsightsProps) {
   // A company switch remounts controls instead of retaining an old company's currency or queue.
-  return <ScopedModuleInsights key={`${input.module}:${input.organizationId}:${input.companyId}`} input={input} sections={sections} now={now} onPeriodRangeChange={onPeriodRangeChange} />
+  return (
+    <ScopedModuleInsights key={`${input.module}:${input.organizationId}:${input.companyId}`} input={input} sections={sections} now={now} onPeriodRangeChange={onPeriodRangeChange} />
+  )
 }
 
-function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }: ModuleInsightsProps) {
+function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange,
+}: ModuleInsightsProps) {
   const { t } = useTranslation()
   const [period, setPeriod, invalidPeriod] = useHistoryPeriod()
   const [currencyId, setCurrencyId] = useState<string>()
   const [queueKey, setQueueKey] = useState<string>()
-  const model = useMemo(() => buildModuleInsights(invalidPeriod ? { ...input, records: { rows: [], state: { status: "partial" } } } : input, period, currencyId, now), [input, period, currencyId, now, invalidPeriod])
+  const model = useMemo(() => buildModuleInsights(invalidPeriod ? { ...input, records: { rows: [], state: { status: "partial" } } } : input, period, currencyId, now,
+      ), [input, period, currencyId, now, invalidPeriod],
+  )
   useEffect(() => { onPeriodRangeChange?.({ startMs: model.startMs, endMs: model.endMs }) }, [model.startMs, model.endMs, onPeriodRangeChange])
   const label = (key: string) => t(`moduleInsights.modules.${input.module}.${key}`)
   const status = (key: string) => t(`moduleInsights.states.${key}`)
   const money = (value: number) => `${new Intl.NumberFormat(undefined, { minimumFractionDigits: model.currency?.decimals ?? 2, maximumFractionDigits: model.currency?.decimals ?? 2 }).format(value)} ${model.currency?.label ?? ""}`
   const formatValue = (value: number) => model.monetary ? money(value) : new Intl.NumberFormat().format(value)
-  const date = (value: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: model.timeZone }).format(value)
+  const date = (value: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: model.timeZone,
+    }).format(value)
   const unit = model.monetary ? `${model.currency?.label ?? t("moduleInsights.unknownCurrency")} (#${model.selectedId || "—"})` : t("moduleInsights.records")
   const sectionId = (key: string) => `${input.module}-insights-${key}`
-  const quickSections = sections.map((section) => ({ ...section, widgets: section.widgets.filter((widget) => widget.type === "quick-actions") })).filter((section) => section.widgets.length)
-  const hasCompanyForecast = quickSections.some((section) => section.widgets.some((widget) => widget.type === "quick-actions" && widget.data.actions.some((action) => action.id === "create_forecast_snapshot")))
-  const selectedQueue = model.queues.value?.find((queue) => queue.key === queueKey)
+  const quickSections = sections.map((section) => ({ ...section, widgets: section.widgets.filter((widget) => widget.type === "quick-actions",
+      ),
+    })).filter((section) => section.widgets.length)
+  const hasCompanyForecast = quickSections.some((section) => section.widgets.some((widget) => widget.type === "quick-actions" && widget.data.actions.some((action) => action.id === "create_forecast_snapshot",
+        ),
+    ),
+  )
+  const selectedQueue = model.queues.value?.find((queue) => queue.key === queueKey,
+  )
   const shownQueue = selectedQueue ?? model.queues.value?.[0]
-  const trend: AreaChartWidget = { id: sectionId("trend"), title: `${label("trend")} · ${unit}`, type: "area-chart", width: "full", useCard: false, data: { xAxisKey: "month", allowDecimals: model.monetary ? undefined : false, series: [{ name: label("measure"), color: "hsl(var(--chart-1))" }], values: (model.period.value?.months ?? []).map((point) => ({ month: point.label, [label("measure")]: point.value })) } }
-  const breakdown: BarChartWidget = { id: sectionId("states"), title: label("distribution"), type: "bar-chart", width: "full", useCard: false, data: { categoryKey: "state", layout: "horizontal", allowDecimals: false, series: [{ name: t("moduleInsights.records"), color: "hsl(var(--chart-2))" }], values: (model.counts.value?.states ?? []).map((point) => ({ state: status(point.status), [t("moduleInsights.records")]: point.count })) } }
-  const previous = (value: number | null | undefined) => value == null ? null : <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.previous")}: {new Intl.NumberFormat().format(value)}</p>
-  const metric = (key: string, state: ModuleDataState, value: number | undefined, hint: ReactNode, monetary = false) => <div key={key} className="min-w-0 space-y-3 p-4 sm:p-5" data-testid={sectionId(key)}>
+  const trend: AreaChartWidget = { id: sectionId("trend"), title: `${label("trend")} · ${unit}`, type: "area-chart", width: "full", useCard: false, data: { xAxisKey: "month", allowDecimals: model.monetary ? undefined : false, series: [{ name: label("measure"), color: "hsl(var(--chart-1))" }], values: (model.period.value?.months ?? []).map((point) => ({ month: point.label, [label("measure")]: point.value,
+      })),
+    },
+  }
+  const breakdown: BarChartWidget = { id: sectionId("states"), title: label("distribution"), type: "bar-chart", width: "full", useCard: false, data: { categoryKey: "state", layout: "horizontal", allowDecimals: false, series: [{ name: t("moduleInsights.records"), color: "hsl(var(--chart-2))" },
+      ], values: (model.counts.value?.states ?? []).map((point) => ({ state: status(point.status), [t("moduleInsights.records")]: point.count,
+      })),
+    },
+  }
+  const previous = (value: number | null | undefined) => value == null ? null : (
+      <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.previous")}: {new Intl.NumberFormat().format(value)}</p>
+    )
+  const metric = (key: string, state: ModuleDataState, value: number | undefined, hint: ReactNode, monetary = false,
+  ) => (
+    <div key={key} className="min-w-0 space-y-3 p-4 sm:p-5" data-testid={sectionId(key)}>
     <h3 className="text-xs font-medium leading-5 text-muted-foreground">{label(key)}</h3>
-    {state.status === "ready" && value !== undefined ? <><p className={`${workspaceStyles.metricValue} break-words text-xl sm:text-2xl`}>{monetary ? formatValue(value) : new Intl.NumberFormat().format(value)}</p>{hint}</> : <SourceNotice state={state} />}
+    {state.status === "ready" && value !== undefined ? (
+        <><p className={`${workspaceStyles.metricValue} break-words text-xl sm:text-2xl`}>{monetary ? formatValue(value) : new Intl.NumberFormat().format(value)}</p>{hint}</>
+      ) : (
+        <SourceNotice state={state} />
+      )}
   </div>
-  const tableHead = (first: string, second: string) => <thead><tr className="border-b"><th scope="col" className="py-3 pr-3 text-left font-medium">{first}</th><th scope="col" className="py-3 text-right font-medium">{second}</th></tr></thead>
-  const chart = (widget: AreaChartWidget | BarChartWidget, state: ModuleDataState, hint: string, table: ReactNode, current = false) => <section className={`${workspaceStyles.surface} min-w-0 p-4 sm:p-5`} aria-label={widget.title} data-testid={widget.id}>
+  )
+  const tableHead = (first: string, second: string) => (
+    <thead><tr className="border-b"><th scope="col" className="py-3 pr-3 text-left font-medium">{first}</th><th scope="col" className="py-3 text-right font-medium">{second}</th></tr></thead>
+  )
+  const chart = (widget: AreaChartWidget | BarChartWidget, state: ModuleDataState, hint: string, table: ReactNode, current = false,
+  ) => (
+    <section className={`${workspaceStyles.surface} min-w-0 p-4 sm:p-5`} aria-label={widget.title} data-testid={widget.id}>
     <p className="mb-3 text-xs leading-5 text-muted-foreground">{hint}</p>
-    {state.status === "ready" ? <>
-      <DashboardWidgetRenderer widget={widget} widthClass="min-w-0" emptyMessage={t("moduleInsights.zero")} exportProvenance={reportExportSourceProvenance({ organizationId: input.organizationId, companyId: input.companyId, dashboardId: `${input.module}-overview`, widgetId: widget.id, model: model.definition.model, domain: JSON.stringify({ currencyId: model.monetary ? model.selectedId : null, basis: current ? "current-record-states" : "current-eligible-records-by-creation-or-order-date", eligibleStates: current ? model.definition.states : model.definition.eligible, dateField: current ? null : model.definition.dateField, measure: current || !model.monetary ? "count" : input.module === "crm" ? "expectedRevenue" : input.module === "expenses" ? "totalAmount" : "amountTotal" }), groupBy: current ? "state" : model.period.value?.months[0]?.unit, timeZone: model.timeZone, period: current ? undefined : serializeHistoryPeriod(period), dateField: current ? undefined : model.definition.dateField, endExclusive: !current, startMs: current ? model.asOfMs : model.bounds.startMs ?? undefined, endMs: current ? model.asOfMs : model.bounds.endMs ?? undefined })} />
+    {state.status === "ready" ? (
+        <>
+      <DashboardWidgetRenderer widget={widget} widthClass="min-w-0" emptyMessage={t("moduleInsights.zero")} exportProvenance={reportExportSourceProvenance({ organizationId: input.organizationId, companyId: input.companyId, dashboardId: `${input.module}-overview`, widgetId: widget.id, model: model.definition.model, domain: JSON.stringify({ currencyId: model.monetary ? model.selectedId : null, basis: current ? "current-record-states" : "current-eligible-records-by-creation-or-order-date", eligibleStates: current ? model.definition.states : model.definition.eligible, dateField: current ? null : model.definition.dateField, measure: current || !model.monetary ? "count" : input.module === "crm" ? "expectedRevenue" : input.module === "expenses" ? "totalAmount" : "amountTotal",
+              }), groupBy: current ? "state" : model.period.value?.months[0]?.unit, timeZone: model.timeZone, period: current ? undefined : serializeHistoryPeriod(period), dateField: current ? undefined : model.definition.dateField, endExclusive: !current, startMs: current ? model.asOfMs : (model.bounds.startMs ?? undefined), endMs: current ? model.asOfMs : (model.bounds.endMs ?? undefined),
+            })} />
       <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.viewData")}</summary><div className="max-h-80 overflow-auto"><table className="w-full min-w-72 text-xs tabular-nums"><caption className="sr-only">{widget.title}</caption>{table}</table></div></details>
-    </> : <><h3 className={`${workspaceStyles.sectionTitle} mb-3`}>{widget.title}</h3><SourceNotice state={state} /></>}
+    </>
+      ) : (
+        <><h3 className={`${workspaceStyles.sectionTitle} mb-3`}>{widget.title}</h3><SourceNotice state={state} /></>
+      )}
   </section>
+  )
   const browseHref = `/${input.module}?tab=${insightDefinitions[input.module].tab}&period=${encodeURIComponent(serializeHistoryPeriod(period))}&periodTimeZone=${encodeURIComponent(model.timeZone)}&filter=${encodeURIComponent(`companyId:${String(input.companyId)}`)}${model.monetary && model.selectedId ? `&filter=${encodeURIComponent(`${input.module === "crm" ? "companyCurrencyId" : "currencyId"}:${model.selectedId}`)}` : ""}`
   const linkClass = "inline-flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
   const metricCards = [
-    { key: "currentValue", content: metric("currentValue", model.totals.state, model.totals.value?.amount, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>, true) },
-    { key: "currentCount", content: metric("currentCount", model.counts.state, model.counts.value?.current, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>) },
-    { key: "periodValue", content: metric("periodValue", model.period.state, model.period.value?.current, model.period.value && model.period.value.previous != null && <div className="space-y-1 text-xs leading-5 text-muted-foreground"><p>{model.period.value.percent === null ? t("moduleInsights.noBaseline") : `${model.period.value.percent > 0 ? "+" : ""}${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(model.period.value.percent)}% ${t("moduleInsights.vsPrevious")}`}</p><p>{t("moduleInsights.previous")}: {formatValue(model.period.value.previous)}</p></div>, true) },
-    { key: "periodCount", content: metric("periodCount", model.periodCounts.state, model.periodCounts.value?.current, previous(model.periodCounts.value?.previous)) },
+    { key: "currentValue", content: metric("currentValue", model.totals.state, model.totals.value?.amount, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>, true,
+      ),
+    },
+    { key: "currentCount", content: metric("currentCount", model.counts.state, model.counts.value?.current, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>,
+      ),
+    },
+    { key: "periodValue", content: metric("periodValue", model.period.state, model.period.value?.current, model.period.value && model.period.value.previous != null && (
+          <div className="space-y-1 text-xs leading-5 text-muted-foreground"><p>{model.period.value.percent === null ? t("moduleInsights.noBaseline") : `${model.period.value.percent > 0 ? "+" : ""}${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(model.period.value.percent)}% ${t("moduleInsights.vsPrevious")}`}</p><p>{t("moduleInsights.previous")}: {" "}
+              {formatValue(model.period.value.previous)}</p></div>
+        ),
+        true,
+      ),
+    },
+    { key: "periodCount", content: metric("periodCount", model.periodCounts.state, model.periodCounts.value?.current, previous(model.periodCounts.value?.previous),
+      ),
+    },
   ]
-  const trendContent = chart(trend, model.period.state, label("trendHint"), <>{tableHead(t("common.historyPeriod.label", { defaultValue: "Date range" }), label("measure"))}<tbody>{model.period.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{point.label}</th><td className="py-3 text-right">{formatValue(point.value)}</td></tr>)}</tbody></>)
-  const breakdownContent = chart(breakdown, model.counts.state, t("moduleInsights.distributionHint"), <>{tableHead(t("moduleInsights.state"), t("moduleInsights.records"))}<tbody>{model.counts.value?.states.map((point) => <tr key={point.status} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{status(point.status)}</th><td className="py-3 text-right">{point.count}</td></tr>)}</tbody></>, true)
-  const actionsContent = <section aria-labelledby={sectionId("actions")} className="space-y-4"><h2 id={sectionId("actions")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.actions")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.queueHint")}</p>
-      {model.queues.value ? <><div className="grid gap-3 sm:grid-cols-3">{model.queues.value.map((queue) => <button key={queue.key} type="button" aria-pressed={shownQueue?.key === queue.key} className={`${workspaceStyles.surface} flex min-w-0 items-center justify-between gap-3 p-4 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring ${shownQueue?.key === queue.key ? "ring-1 ring-primary" : ""}`} data-testid={sectionId(`queue-${queue.key}`)} onClick={() => setQueueKey(queue.key)}><span className="text-sm">{status(queue.key)}</span><span className="text-xl font-semibold tabular-nums">{queue.records.length}</span></button>)}</div>
-        <div className={`${workspaceStyles.surface} space-y-2 p-4`} aria-label={shownQueue ? status(shownQueue.key) : t("moduleInsights.actions")} data-testid={sectionId("queue-records")}><p className="text-xs text-muted-foreground">{t("moduleInsights.firstFive")}</p>{shownQueue?.records.length ? shownQueue.records.slice(0, 5).map((record) => <Link key={record.id} className={`${linkClass} w-full`} href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><ArrowUpRight className="size-4 shrink-0" aria-hidden="true" /></Link>) : <p className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</p>}</div>
-      </> : <SourceNotice state={model.queues.state} />}
-      <div className="flex flex-wrap gap-2"><Link className={linkClass} href={browseHref}>{model.monetary && !model.selectedId ? t("moduleInsights.browseRecords") : label("browse")}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>{model.definition.more.map((tab) => <Link key={tab} className={linkClass} href={`/${input.module}?tab=${tab}`}>{t(`moduleInsights.workspaces.${tab === "operations" && input.module === "expenses" ? "captureReceipt" : tab}`)}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>)}</div>
-      {input.module === "sales" && <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.moreQueues")}</summary><nav aria-label={t("moduleInsights.moreQueues")} className="flex flex-wrap gap-2 pt-2">{[
+  const trendContent = chart(trend, model.period.state, label("trendHint"), <>{tableHead(t("common.historyPeriod.label", { defaultValue: "Date range" }), label("measure"),
+      )}<tbody>{model.period.value?.months.map((point) => (
+          <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{point.label}</th><td className="py-3 text-right">{formatValue(point.value)}</td></tr>))}</tbody></>,
+  )
+  const breakdownContent = chart(breakdown, model.counts.state, t("moduleInsights.distributionHint"), <>{tableHead(t("moduleInsights.state"), t("moduleInsights.records"))}<tbody>{model.counts.value?.states.map((point) => (
+          <tr key={point.status} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{status(point.status)}</th><td className="py-3 text-right">{point.count}</td></tr>))}</tbody></>, true,
+  )
+  const actionsContent = (
+    <section aria-labelledby={sectionId("actions")} className="space-y-4"><h2 id={sectionId("actions")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.actions")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.queueHint")}</p>
+      {model.queues.value ? (
+        <><div className="grid gap-3 sm:grid-cols-3">{model.queues.value.map((queue) => (
+              <button key={queue.key} type="button" aria-pressed={shownQueue?.key === queue.key} className={`${workspaceStyles.surface} flex min-w-0 items-center justify-between gap-3 p-4 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring ${shownQueue?.key === queue.key ? "ring-1 ring-primary" : ""}`} data-testid={sectionId(`queue-${queue.key}`)} onClick={() => setQueueKey(queue.key)}><span className="text-sm">{status(queue.key)}</span><span className="text-xl font-semibold tabular-nums">{queue.records.length}</span></button>))}</div>
+        <div className={`${workspaceStyles.surface} space-y-2 p-4`} aria-label={shownQueue ? status(shownQueue.key) : t("moduleInsights.actions")} data-testid={sectionId("queue-records")}><p className="text-xs text-muted-foreground">{t("moduleInsights.firstFive")}</p>{shownQueue?.records.length ? (
+              shownQueue.records.slice(0, 5).map((record) => (
+                <Link key={record.id} className={`${linkClass} w-full`} href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><ArrowUpRight className="size-4 shrink-0" aria-hidden="true" /></Link>))
+            ) : (
+              <p className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</p>
+            )}</div>
+      </>
+      ) : (
+        <SourceNotice state={model.queues.state} />
+      )}
+      <div className="flex flex-wrap gap-2"><Link className={linkClass} href={browseHref}>{model.monetary && !model.selectedId ? t("moduleInsights.browseRecords") : label("browse")}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>{model.definition.more.map((tab) => (
+          <Link key={tab} className={linkClass} href={`/${input.module}?tab=${tab}`}>{t(`moduleInsights.workspaces.${tab === "operations" && input.module === "expenses" ? "captureReceipt" : tab}`,
+            )}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>))}</div>
+      {input.module === "sales" && (
+        <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.moreQueues")}</summary><nav aria-label={t("moduleInsights.moreQueues")} className="flex flex-wrap gap-2 pt-2">{[
         ["credit_holds", "creditHolds"], ["returns_receive", "returnsToReceive"], ["open_deliveries", "openDeliveries"],
         ["commissions_to_accrue", "commissionsToAccrue"], ["commissions_accrued", "commissionsAccrued"], ["commissions_settled", "commissionsSettled"],
-      ].map(([queue, key]) => <Link key={queue} className={linkClass} href={`/sales?tab=ops&queue=${queue}`}>{t(`sales.dashboard.queues.${key}`)}<ArrowUpRight aria-hidden="true" className="size-4" /></Link>)}</nav></details>}
-      {hasCompanyForecast && <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.forecastHint")}</p>}
+      ].map(([queue, key]) => (
+              <Link key={queue} className={linkClass} href={`/sales?tab=ops&queue=${queue}`}>{t(`sales.dashboard.queues.${key}`)}<ArrowUpRight aria-hidden="true" className="size-4" /></Link>))}</nav></details>
+      )}
+      {hasCompanyForecast && (
+        <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.forecastHint")}</p>
+      )}
       {quickSections.length > 0 && <DashboardGrid sections={quickSections} />}
     </section>
-  const recentContent = <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? <ul className="divide-y">{model.recent.value.length ? model.recent.value.map((record) => <li key={record.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>) : <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>}</ul> : <SourceNotice state={model.recent.state} />}</section>
+  )
+  const recentContent = (
+    <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? (
+        <ul className="divide-y">{model.recent.value.length ? (
+            model.recent.value.map((record) => (
+              <li key={record.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>))
+          ) : (
+            <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>
+          )}</ul>
+      ) : (
+        <SourceNotice state={model.recent.state} />
+      )}</section>
+  )
   const compositionSections: DashboardSection[] = [
-    ...metricCards.map(({ key, content }) => createPageContentSection({ id: sectionId(key), title: label(key), content: <div className={workspaceStyles.surface}>{content}</div>, width: "1/4" })),
-    createPageContentSection({ id: sectionId("trend"), title: trend.title, content: trendContent, width: "1/2" }),
-    createPageContentSection({ id: sectionId("states"), title: breakdown.title, content: breakdownContent, width: "1/2" }),
-    createPageContentSection({ id: sectionId("actions"), title: t("moduleInsights.actions"), content: actionsContent }),
-    createPageContentSection({ id: sectionId("recent"), title: t("moduleInsights.recent"), content: recentContent }),
+    ...metricCards.map(({ key, content }) => createPageContentSection({ id: sectionId(key), title: label(key), content: <div className={workspaceStyles.surface}>{content}</div>, width: "1/4",
+      }),
+    ),
+    createPageContentSection({ id: sectionId("trend"), title: trend.title, content: trendContent, width: "2/3",
+    }),
+    createPageContentSection({
+      id: sectionId("states"),
+      title: breakdown.title,
+      content: breakdownContent,
+      width: "1/3",
+    }),
+    createPageContentSection({ id: sectionId("recent"), title: t("moduleInsights.recent"),
+      content: recentContent,
+    }),
   ]
-  return <div className="min-w-0 space-y-6 [&_button]:min-h-11 [&_button]:min-w-11" data-testid={`module-insights-${input.module}`}>
+  return (
+    <div className="min-w-0 space-y-6 [&_button]:min-h-11 [&_button]:min-w-11" data-testid={`module-insights-${input.module}`}>
     <section aria-labelledby={sectionId("overview")} className="space-y-4">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div className="space-y-1"><h2 id={sectionId("overview")} className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined aria-hidden="true" className="size-5 text-primary" />{label("title")}</h2><p className={workspaceStyles.sectionDescription}>{label("description")}</p></div>
-        <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><Select
+        <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && (
+              <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><Select
           value={model.selectedId || "__none__"}
           onValueChange={(nextValue) => {
-            setCurrencyId(nextValue === "__none__" ? undefined : nextValue)
+            setCurrencyId(nextValue === "__none__" ? undefined : nextValue,
+                    )
             setQueueKey(undefined)
           }}
         >
@@ -137,38 +254,89 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
               </SelectItem>
             ))}
           </SelectContent>{" "}
-        </Select></label>}
+        </Select></label>
+            )}
           <HistoryPeriodSelect value={period} onChange={setPeriod} timeZone={model.timeZone} label={t("moduleInsights.period")} />
         </div>
       </div>
-      {invalidPeriod && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Choose a valid period to inspect records." })}</p><Button type="button" variant="outline" onClick={() => setPeriod("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}</Button></div>}
+      {invalidPeriod && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Choose a valid period to inspect records.",
+              })}</p><Button type="button" variant="outline" onClick={() => setPeriod("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range",
+              })}</Button></div>
+        )}
       <p className="text-xs leading-5 text-muted-foreground">{model.bounds.startMs == null || model.bounds.endMs == null
         ? t("common.historyPeriod.all", { defaultValue: "All history" })
         : `${date(model.bounds.startMs)} – ${date(model.bounds.endMs - 1)}`}
-        {model.previousBounds?.startMs != null && model.previousBounds.endMs != null && <> · {t("moduleInsights.comparedWith")} {date(model.previousBounds.startMs)} – {date(model.previousBounds.endMs - 1)}</>}
+        {model.previousBounds?.startMs != null && model.previousBounds.endMs != null && (
+              <>
+                {" "}
+                · {t("moduleInsights.comparedWith")} {" "}
+                {date(model.previousBounds.startMs)} – {" "}
+                {date(model.previousBounds.endMs - 1)}</>
+            )}
         {` · ${model.timeZone}`}
       </p>
-      <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status." })} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link></p>
+      <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status.",
+          })}{" "} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history",
+            })}</Link></p>
       <p className="text-xs leading-5 text-muted-foreground">{label("basis")}</p>
     </section>
-    <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}
-      historyBounds={invalidPeriod ? null : model.bounds}
-      savedWidgetScopeNote={t("pageComposition.savedWidgetScope", { defaultValue: "Saved widgets follow the operating company and date range, with their own model, date field and filters. Currency and queue selections above apply to the built-in insights." })}
+    <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "actions", "insights"].map((key) => (
+          <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>))}
+      </nav>
+      {actionsContent}
+      <section aria-labelledby={sectionId("insights")} className="space-y-4">
+        <h2
+          id={sectionId("insights")}
+          className="scroll-mt-24 text-lg font-semibold tracking-tight"
+        >
+          {t("moduleInsights.insights")}
+        </h2>
+        <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}
+          fixedWidgetIds={[sectionId("actions")]}
+          startingLayouts={[
+            {
+              id: "work-review",
+              label: t("pageComposition.starter.workReview", {
+                defaultValue: "Work review",
+              }),
+              widgets: [
+                { widgetId: sectionId("currentValue"), width: 6 },
+                { widgetId: sectionId("currentCount"), width: 6 },
+                { widgetId: sectionId("states"), width: 4 },
+                { widgetId: sectionId("recent"), width: 8 },
+              ],
+            },
+            {
+              id: "period-review",
+              label: t("pageComposition.starter.periodReview", {
+                defaultValue: "Period review",
+              }),
+              widgets: [
+                { widgetId: sectionId("periodValue"), width: 6 },
+                { widgetId: sectionId("periodCount"), width: 6 },
+                { widgetId: sectionId("trend"), width: 12 },
+              ],
+            },
+          ]}
+          historyBounds={invalidPeriod ? null : model.bounds}
+          historyTimeZone={model.timeZone}
+      savedWidgetScopeNote={t("pageComposition.savedWidgetScope", { defaultValue: "Saved widgets follow the operating company and date range, with their own model, date field and filters. Currency and queue selections above apply to the built-in insights.",
+          })}
     >
       <div className="space-y-6">
-        <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "insights", "actions"].map((key) => <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>)}</nav>
         <div className="space-y-4">
           <div className={`${workspaceStyles.surface} grid min-w-0 divide-y sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 [&>div]:sm:border-b [&>div]:xl:border-b-0 [&>div:nth-child(even)]:sm:border-l [&>div:nth-child(3)]:xl:border-l`}>
             {metricCards.map(({ content }) => content)}
           </div>
         </div>
-        <section aria-labelledby={sectionId("insights")} className="space-y-4">
-          <h2 id={sectionId("insights")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.insights")}</h2>
-          <div className="grid min-w-0 gap-5 xl:grid-cols-2">{trendContent}{breakdownContent}</div>
-        </section>
-        {actionsContent}
-        {recentContent}
-      </div>
-    </ModulePageComposition>
-  </div>
+        <div className="grid min-w-0 gap-5 lg:grid-cols-3">
+              <div className="min-w-0 lg:col-span-2">{trendContent}</div>
+              {breakdownContent}</div>
+            {recentContent}
+          </div>
+        </ModulePageComposition>
+      </section>
+    </div>
+  )
 }

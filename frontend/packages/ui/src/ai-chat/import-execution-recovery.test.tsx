@@ -705,3 +705,110 @@ it("saved native receipts link their jobs without claiming full ERP verification
     screen.queryByText("settings.importWorkflow.status.verified"),
   ).toBeNull()
 })
+
+it.each(["verified", "blocked"] as const)(
+  "recovers the exact rollback of a %s opening-balance proposal after a lost reply",
+  async (status) => {
+    const base = proposal()
+    let saved: ImportProposal = {
+      ...base,
+      kind: "opening_balances",
+      configuration: {
+        ...base.configuration,
+        openingBalances: true,
+        amountField: "debit",
+        postingDate: "2026-10-01",
+      },
+      status,
+      canRollback: true,
+      execution: {
+        ...base.execution,
+        phase: status === "verified" ? "complete" : "verification",
+        lineJobId: "91",
+        lineRequestId: "f".repeat(32),
+      },
+      result:
+        status === "verified"
+          ? {
+              companyId: "3",
+              currencyId: "8",
+              verifiedAt: "2026-11-07T01:01:00Z",
+              recordCount: 1,
+              lineCount: 2,
+              totalDebit: "12",
+              totalCredit: "12",
+              recordIds: ["100"],
+              lineIds: ["101", "102"],
+              postedCount: 0,
+            }
+          : null,
+      lastError: null,
+    }
+    controls.fetch.mockImplementation(
+      async (url: string, options?: RequestInit) => {
+        if (options?.method === "POST") {
+          if (url.endsWith("/verify")) {
+            saved = {
+              ...saved,
+              execution: { ...saved.execution, phase: "headers" },
+              lastError: "Native readback still unavailable",
+            }
+            return Response.json(saved)
+          }
+          expect(url).toMatch(/\/proposals\/10\/rollback$/)
+          expect(JSON.parse(String(options.body))).toEqual({
+            companyId: 3,
+            expectedRevision: 1,
+            expectedDigest: base.digest,
+          })
+          saved = {
+            ...saved,
+            status: "rolled_back",
+            canRollback: false,
+            execution: { ...saved.execution, phase: "rolled_back" },
+            result: null,
+          }
+          throw new Error("Lost rollback response")
+        }
+        return Response.json(workflow([saved]))
+      },
+    )
+    mount()
+    if (status === "blocked") {
+      const verify = await screen.findByRole("button", {
+        name: "settings.importWorkflow.verify",
+      })
+      await waitFor(() => expect(verify).toHaveProperty("disabled", false))
+      fireEvent.click(verify)
+      await screen.findByText("Native readback still unavailable")
+    }
+    const trigger = await screen.findByRole("button", {
+      name: "settings.importWorkflow.rollbackDrafts",
+    })
+    await waitFor(() => expect(trigger).toHaveProperty("disabled", false))
+    fireEvent.click(trigger)
+    await screen.findByRole("alertdialog")
+    expect(
+      controls.fetch.mock.calls.filter(
+        ([url, options]) =>
+          String(url).endsWith("/rollback") && options?.method === "POST",
+      ),
+    ).toHaveLength(0)
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "settings.importWorkflow.rollbackConfirm",
+      }),
+    )
+    await screen.findByText("settings.importWorkflow.rollbackComplete")
+    await waitFor(() =>
+      expect(screen.queryByText("Lost rollback response")).toBeNull(),
+    )
+    expect(screen.queryByText("settings.importWorkflow.openRecords")).toBeNull()
+    expect(
+      controls.fetch.mock.calls.filter(
+        ([url, options]) =>
+          String(url).endsWith("/rollback") && options?.method === "POST",
+      ),
+    ).toHaveLength(1)
+  },
+)

@@ -13,6 +13,17 @@ describe("record search", () => {
     expect(normalizeSearchText(null)).toBe("")
   })
 
+  it("searches supported wire scalars without indexing object coercions", () => {
+    expect(normalizeSearchText({ some: " Élodie " })).toBe("elodie")
+    expect(normalizeSearchText({ tag: "Posted" })).toBe("posted")
+    expect(normalizeSearchText(0)).toBe("0")
+    expect(normalizeSearchText(false)).toBe("false")
+    expect(normalizeSearchText({ label: "secret" })).toBe("")
+    expect(normalizeSearchText(["not", "a label"])).toBe("")
+    expect(normalizeSearchText(Number.NaN)).toBe("")
+    expect(scoreSearchMatch("object", { some: { invalid: true } })).toBe(0)
+  })
+
   it("ranks exact above prefix above substring", () => {
     expect(scoreSearchMatch("so001", "SO001")).toBe(3)
     expect(scoreSearchMatch("so0", "SO001")).toBe(2)
@@ -24,6 +35,12 @@ describe("record search", () => {
   it("reads snake_case fallbacks", () => {
     expect(readRowField({ partner_id: 4 }, "partnerId")).toBe(4)
     expect(readRowField({ partnerId: 5, partner_id: 4 }, "partnerId")).toBe(5)
+    expect(
+      readRowField({ partnerId: null, partner_id: 4 }, "partnerId"),
+    ).toBeNull()
+    expect(
+      readRowField(Object.create({ partner_id: 4 }), "partnerId"),
+    ).toBeUndefined()
   })
 
   it("returns the best rows first, capped, with stable ties", () => {
@@ -41,7 +58,10 @@ describe("record search", () => {
   })
 
   it("takes the best score over several fields", () => {
-    const hits = searchRecords([{ a: "zzz", b: "Bob" }], "bob", (r) => [r.a, r.b])
+    const hits = searchRecords([{ a: "zzz", b: "Bob" }], "bob", (r) => [
+      r.a,
+      r.b,
+    ])
     expect(hits[0]?.score).toBe(3)
   })
 

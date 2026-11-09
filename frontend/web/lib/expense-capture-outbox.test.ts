@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  discardExpenseCapture,
   enqueueExpenseCapture,
   listQueuedExpenseCaptures,
   readExpenseCaptureOutbox,
@@ -119,15 +120,78 @@ test("generic request rejects corrupt recovery storage instead of replacing its 
   assert.equal(values.get("lumiere.expense-capture-outbox.9.device"), "{broken")
 }))
 
-test("generic request keeps payload, actor, company and receipt identity immutable", () => local(() => {
-  const item = enqueueExpenseCapture(9, { ...seed, formOrigin: { actorIdentity: "actor", organizationId: "9", pricelistId: "4" } })
-  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, payload: { ...item.payload, unitAmount: 999 } }), /immutable/)
-  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, companyId: "3" }), /immutable/)
-  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, formOrigin: { ...item.formOrigin!, actorIdentity: "another" } }), /immutable/)
-  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, receipt: { ...item.receipt!, clientRequestId: "new-receipt" } }), /immutable/)
-  saveExpenseCaptureCheckpoint(9, "device", { ...item, syncState: "unknown" })
-  const [restored] = readExpenseCaptureOutbox(9, "device", true)
-  assert.equal(restored?.clientRequestId, item.clientRequestId)
-  assert.equal(restored?.receipt?.clientRequestId, item.receipt?.clientRequestId)
-  assert.equal(restored?.syncState, "unknown")
-}))
+test("generic request keeps payload, actor, company and receipt identity immutable", () =>
+  local(() => {
+    const item = enqueueExpenseCapture(9, {
+      ...seed,
+      formOrigin: {
+        actorIdentity: "actor",
+        organizationId: "9",
+        pricelistId: "4",
+      },
+    })
+    assert.throws(
+      () =>
+        saveExpenseCaptureCheckpoint(9, "device", {
+          ...item,
+          payload: { ...item.payload, unitAmount: 999 },
+        }),
+      /immutable/,
+    )
+    assert.throws(
+      () =>
+        saveExpenseCaptureCheckpoint(9, "device", { ...item, companyId: "3" }),
+      /immutable/,
+    )
+    assert.throws(
+      () =>
+        saveExpenseCaptureCheckpoint(9, "device", {
+          ...item,
+          formOrigin: { ...item.formOrigin!, actorIdentity: "another" },
+        }),
+      /immutable/,
+    )
+    assert.throws(
+      () =>
+        saveExpenseCaptureCheckpoint(9, "device", {
+          ...item,
+          receipt: { ...item.receipt!, clientRequestId: "new-receipt" },
+        }),
+      /immutable/,
+    )
+    saveExpenseCaptureCheckpoint(9, "device", { ...item, syncState: "unknown" })
+    const [restored] = readExpenseCaptureOutbox(9, "device", true)
+    assert.equal(restored?.clientRequestId, item.clientRequestId)
+    assert.equal(
+      restored?.receipt?.clientRequestId,
+      item.receipt?.clientRequestId,
+    )
+    assert.equal(restored?.syncState, "unknown")
+  }))
+
+test("owned quick captures cannot be reassigned or discarded after an uncertain dispatch", () =>
+  local(() => {
+    const owner = { actorIdentity: "original", companyId: seed.companyId }
+    const item = enqueueExpenseCapture(9, { ...seed, ...owner })
+    assert.throws(() =>
+      discardExpenseCapture(9, "device", item.clientRequestId, {
+        ...owner,
+        actorIdentity: "other",
+      }),
+    )
+    assert.throws(() =>
+      saveExpenseCaptureCheckpoint(9, "device", { ...item, companyId: "12" }),
+    )
+    saveExpenseCaptureCheckpoint(9, "device", {
+      ...item,
+      syncState: "conflict",
+    })
+    requeueExpenseCapture(9, "device", item.clientRequestId)
+    assert.equal(
+      listQueuedExpenseCaptures(9, "device")[0]?.syncState,
+      "conflict",
+    )
+    assert.throws(() =>
+      discardExpenseCapture(9, "device", item.clientRequestId, owner),
+    )
+  }))

@@ -1,15 +1,19 @@
 "use client"
 
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useMutation, useQueryClient,
+} from "@tanstack/react-query"
 import { decodeOperationDispatch } from "@lumiere/api-client"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
-import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect } from "./operation-effect"
+import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect,
+} from "./operation-effect"
 import { taskIdentityHex } from "./task-assignment"
-import { workBoardQueryKey, workBoardQueryPath, type WorkBoardScope } from "./work-board-model"
+import { workBoardQueryKey, workBoardQueryPath, type WorkBoardScope,
+} from "./work-board-model"
 
-const SOURCE_MODULES = { purchase_order: "purchasing", sale_order: "sales", account_move: "accounting" } as const
+const SOURCE_MODULES = { purchase_order: "purchasing", sale_order: "sales", account_move: "accounting",
+} as const
 export type WorkActivityModel = keyof typeof SOURCE_MODULES
 export interface WorkActivityRow {
   id: number
@@ -30,17 +34,33 @@ export interface WorkActivityRow {
   workActions: Array<"complete">
   workSourceTitle?: string
 }
-export interface WorkActivitiesPage { data: WorkActivityRow[]; nextCursor: string | null }
+export interface WorkActivitiesPage { data: WorkActivityRow[]
+  nextCursor: string | null }
 
-interface WorkActivitiesWirePage { data?: unknown; nextCursor?: unknown }
+interface WorkActivitiesWirePage { data?: unknown
+  nextCursor?: unknown }
 interface WorkActivityWire {
-  id?: unknown; organizationId?: unknown; companyId?: unknown; workModule?: unknown
-  summary?: unknown; resModel?: unknown; resId?: unknown; state?: unknown; isDone?: unknown
-  assignedTo?: unknown; dateDeadline?: unknown; updatedAt?: unknown
-  workAssignedToMe?: unknown; workIsAssigned?: unknown; workTeamRefs?: unknown
-  workActions?: unknown; workSourceTitle?: unknown
+  id?: unknown
+  organizationId?: unknown
+  companyId?: unknown
+  workModule?: unknown
+  summary?: unknown
+  resModel?: unknown
+  resId?: unknown
+  state?: unknown
+  isDone?: unknown
+  assignedTo?: unknown
+  dateDeadline?: unknown
+  updatedAt?: unknown
+  workAssignedToMe?: unknown
+  workIsAssigned?: unknown
+  workTeamRefs?: unknown
+  workActions?: unknown
+  workSourceTitle?: unknown
 }
-interface WorkTeamWire { kind?: unknown; id?: unknown; label?: unknown }
+interface WorkTeamWire { kind?: unknown
+  id?: unknown
+  label?: unknown }
 function object(value: unknown): value is object { return value != null && typeof value === "object" && !Array.isArray(value) }
 function safeId(value: unknown): number | null {
   if (typeof value !== "number" && (typeof value !== "string" || !/^[1-9][0-9]*$/.test(value))) return null
@@ -49,18 +69,22 @@ function safeId(value: unknown): number | null {
 }
 
 export function workActivitiesQueryKey(scope: WorkBoardScope) {
-  return ["activities", "work-board", ...workBoardQueryKey(scope).slice(2)] as const
+  return ["activities", "work-board", ...workBoardQueryKey(scope).slice(2),
+  ] as const
 }
-export function workActivitiesQueryPath(scope: WorkBoardScope, cursor?: string | null, activityId?: number): string {
+export function workActivitiesQueryPath(scope: WorkBoardScope, cursor?: string | null, activityId?: number,
+): string {
   if (scope.team && !scope.team.startsWith("department:")) throw new Error("Record follow-ups support department teams only")
-  const path = workBoardQueryPath(scope, cursor).replace("/api/query/workflow-human-tasks?", "/api/query/activities?")
+  const path = workBoardQueryPath(scope, cursor).replace("/api/query/workflow-human-tasks?", "/api/query/activities?",
+  )
   if (activityId == null) return path
   if (safeId(activityId) == null || cursor) throw new Error("Invalid follow-up identity")
   return `${path}&activityId=${activityId}`
 }
 
 /** Fail the page if a row contradicts its authenticated company, module, or lifecycle. */
-export function parseWorkActivitiesPage(value: unknown, scope: WorkBoardScope): WorkActivitiesPage {
+export function parseWorkActivitiesPage(value: unknown, scope: WorkBoardScope,
+): WorkActivitiesPage {
   if (!object(value)) throw new Error("Invalid follow-up response")
   const envelope = value as WorkActivitiesWirePage
   if (!Array.isArray(envelope.data) || (envelope.nextCursor != null && typeof envelope.nextCursor !== "string")) throw new Error("Invalid follow-up response")
@@ -72,7 +96,8 @@ export function parseWorkActivitiesPage(value: unknown, scope: WorkBoardScope): 
     const org = safeId(value.organizationId)
     const company = safeId(value.companyId)
     const sourceId = safeId(value.resId)
-    const model = typeof value.resModel === "string" && Object.hasOwn(SOURCE_MODULES, value.resModel) ? value.resModel as WorkActivityModel : null
+    const model = typeof value.resModel === "string" && Object.hasOwn(SOURCE_MODULES, value.resModel) ? (value.resModel as WorkActivityModel)
+        : null
     if (id == null || seen.has(id) || org !== scope.organizationId || company !== scope.companyId || sourceId == null || model == null ||
         value.workModule !== SOURCE_MODULES[model] || (scope.scope !== "finance" && value.workModule !== scope.scope) ||
         typeof value.summary !== "string" || typeof value.workAssignedToMe !== "boolean" || typeof value.workIsAssigned !== "boolean" ||
@@ -86,7 +111,8 @@ export function parseWorkActivitiesPage(value: unknown, scope: WorkBoardScope): 
       if (!object(input)) throw new Error("Invalid follow-up department")
       const team = input as WorkTeamWire
       if (team.kind !== "department" || safeId(team.id) == null || (team.label != null && typeof team.label !== "string")) throw new Error("Invalid follow-up department")
-      return { kind: "department" as const, id: String(team.id), ...(typeof team.label === "string" ? { label: team.label } : {}) }
+      return { kind: "department" as const, id: String(team.id), ...(typeof team.label === "string" ? { label: team.label } : {}),
+      }
     })
     if (scope.team && !teams.some((team) => `department:${team.id}` === scope.team)) throw new Error("Follow-up does not match the selected department")
     let assignedTo: string | null | undefined
@@ -113,23 +139,40 @@ export function parseWorkActivitiesPage(value: unknown, scope: WorkBoardScope): 
       ...(typeof value.workSourceTitle === "string" ? { workSourceTitle: value.workSourceTitle } : {}),
     }
   })
-  return { data, nextCursor: typeof envelope.nextCursor === "string" ? envelope.nextCursor : null }
+  return { data, nextCursor: typeof envelope.nextCursor === "string" ? envelope.nextCursor : null,
+  }
 }
 
-export function sameWorkActivity(current: WorkActivityRow, expected: WorkActivityRow): boolean {
-  return current.id === expected.id && current.organizationId === expected.organizationId && current.companyId === expected.companyId && current.resModel === expected.resModel && current.resId === expected.resId && current.workModule === expected.workModule
+export function sameWorkActivity(current: WorkActivityRow, expected: WorkActivityRow,
+): boolean {
+  return (
+    current.id === expected.id && current.organizationId === expected.organizationId && current.companyId === expected.companyId && current.resModel === expected.resModel && current.resId === expected.resId && current.workModule === expected.workModule
+  )
 }
 
-export function requireCurrentWorkActivity(rows: readonly WorkActivityRow[], expected: WorkActivityRow): WorkActivityRow {
+export function requireCurrentWorkActivity(rows: readonly WorkActivityRow[], expected: WorkActivityRow,
+): WorkActivityRow {
   const current = rows.length === 1 ? rows[0] : undefined
-  if (!current || !sameWorkActivity(current, expected)) throw new Error("This follow-up is no longer available in the selected scope. Refresh the board.")
-  if (current.isDone || !current.workActions.includes("complete")) throw new Error("This follow-up can no longer be completed. Refresh the board.")
-  if (expected.updatedAt && current.updatedAt && expected.updatedAt !== current.updatedAt) throw new Error("This follow-up changed. Refresh the board before completing it.")
+  if (!current || !sameWorkActivity(current, expected)) throw new Error("This follow-up is no longer available in the selected scope. Refresh the board.",
+    )
+  if (current.isDone || !current.workActions.includes("complete")) throw new Error("This follow-up can no longer be completed. Refresh the board.",
+    )
+  if (
+    current.updatedAt !== expected.updatedAt ||
+    current.summary !== expected.summary ||
+    current.dateDeadline !== expected.dateDeadline ||
+    current.assignedTo !== expected.assignedTo ||
+    current.workIsAssigned !== expected.workIsAssigned ||
+    current.workAssignedToMe !== expected.workAssignedToMe
+  ) throw new Error("This follow-up changed. Refresh the board before completing it.",
+    )
   return current
 }
 
-async function readPage(scope: WorkBoardScope, cursor?: string | null, activityId?: number, signal?: AbortSignal) {
-  const response = await apiFetch(workActivitiesQueryPath(scope, cursor, activityId), { signal })
+async function readPage(scope: WorkBoardScope, cursor?: string | null, activityId?: number, signal?: AbortSignal,
+) {
+  const response = await apiFetch(workActivitiesQueryPath(scope, cursor, activityId), { signal },
+  )
   if (!response.ok) throw new Error(await responseErrorMessage(response))
   return parseWorkActivitiesPage(await response.json(), scope)
 }
@@ -152,24 +195,47 @@ export function useCompleteWorkActivity(scope: WorkBoardScope) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["activities"] })
   return useMutation({
-    mutationFn: async ({ activity }: { activity: WorkActivityRow }) => {
+    mutationFn: async ({ activity,
+      canDispatch,
+    }: { activity: WorkActivityRow
+      canDispatch?: () => boolean
+    }) => {
       const exactScope = { ...scope, view: "eligible" as const }
-      const preflight = await readPage(exactScope, null, activity.id)
-      requireCurrentWorkActivity(preflight.data, activity)
-      return requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
-        resolveBeforeDispatch: false,
-        dispatch: async () => {
-          const command = stdbBffCommandPost("complete_activity", { activityId: String(activity.id) })
-          return decodeOperationDispatch(await apiFetch(command.urlPath, command.init))
-        },
-        resolveEffect: async () => {
-          const page = await readPage(exactScope, null, activity.id)
-          const saved = page.data.length === 1 ? page.data[0] : undefined
-          return saved && sameWorkActivity(saved, activity) && saved.isDone && saved.state === "done" ? { resource: "activities", id: String(saved.id) } : null
-        },
-        afterDispatch: refresh,
-      }))
+      const readCurrent = async () =>
+        (await readPage(exactScope, null, activity.id)).data
+      const completedRef = (rows: readonly WorkActivityRow[]) => {
+          const saved = rows.length === 1 ? rows[0] : undefined
+          return saved && sameWorkActivity(saved, activity) && saved.isDone
+          ? { resource: "activities", id: String(saved.id) }
+          : null
+      }
+      const rows = await readCurrent()
+      const alreadyComplete = completedRef(rows)
+      if (alreadyComplete)
+        return { kind: "already-applied" as const, ref: alreadyComplete }
+      requireCurrentWorkActivity(rows, activity)
+      if (canDispatch && !canDispatch())
+        throw new Error("The work queue changed. Review the follow-up again.")
+      return requireResolvedOperationEffect(
+        await executeOperationWithCanonicalReadback({
+          resolveBeforeDispatch: false,
+          dispatch: async () => {
+            const command = stdbBffCommandPost("complete_activity", {
+              activityId: String(activity.id),
+            })
+            const headers = new Headers(command.init.headers)
+            headers.set(
+              "x-lumiere-organization-id",
+              String(scope.organizationId),
+            )
+            return decodeOperationDispatch(
+              await apiFetch(command.urlPath, { ...command.init, headers }),
+            )
+          },
+          resolveEffect: async () => completedRef(await readCurrent()),
+        }),
+      )
     },
     onSettled: refresh,
-  })
+      })
 }

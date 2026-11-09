@@ -34,6 +34,7 @@ fn definition(entries: Vec<Entry>) -> Result<Definition> {
     let mut value = Definition {
         kind: KIND.into(),
         configuration: Configuration {
+            opening_balances: false,
             journal_id: "7".into(),
             debit_account_id: "8".into(),
             credit_account_id: "9".into(),

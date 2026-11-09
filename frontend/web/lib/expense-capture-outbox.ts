@@ -4,6 +4,7 @@
  * File bytes stay in the capture tab. Interrupted expense dispatches require exact readback.
  */
 
+import { isCaptureOwnedBy, type CaptureOwner } from "./capture-sync-state"
 import {
   getOrCreateLocalStorageDeviceId,
   readLocalStorageArray,
@@ -43,6 +44,12 @@ export type ExpenseCaptureSyncState =
   | "error"
   | "conflict"
 
+export function isExpenseCaptureReadbackOnly(
+  state: ExpenseCaptureSyncState,
+): boolean {
+  return state === "submitting" || state === "unknown" || state === "conflict"
+}
+
 export interface ExpenseCaptureReceipt {
   state: "queued" | "uploading" | "attached" | "failed"
   clientRequestId: string
@@ -67,13 +74,16 @@ export interface ExpenseCaptureOutboxItem {
   payload: ExpenseCapturePayload
   /** Captured scope is immutable; a company switch must not retarget an offline item. */
   companyId?: string
+  actorIdentity?: string
   receipt?: ExpenseCaptureReceipt
   expenseId?: string
   createdAt: string
   syncState: ExpenseCaptureSyncState
   lastError?: string
   /** Generic form provenance is local recovery context, never server authority. */
-  formOrigin?: { actorIdentity: string; organizationId: string; pricelistId: string }
+  formOrigin?: { actorIdentity: string
+    organizationId: string
+    pricelistId: string }
 }
 
 function storageKey(organizationId: string | number, deviceId: string): string {
@@ -98,11 +108,15 @@ export function readExpenseCaptureOutbox(
 ): ExpenseCaptureOutboxItem[] {
   if (strict) {
     if (typeof window === "undefined") throw new Error("Expense recovery storage is unavailable")
-    const raw = window.localStorage.getItem(storageKey(organizationId, deviceId))
+    const raw = window.localStorage.getItem(storageKey(organizationId, deviceId),
+    )
     if (raw === null) return []
     const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed) || parsed.some((item: unknown) => !item || typeof item !== "object" || !("clientRequestId" in item) || !("deviceId" in item) || item.deviceId !== deviceId || !("syncState" in item) || !["queued", "submitting", "unknown", "rejected", "synced", "error", "conflict"].includes(String(item.syncState)) || !("payload" in item) || !item.payload || typeof item.payload !== "object" || !("employeeId" in item.payload) || !("currencyId" in item.payload) || !("lineKind" in item.payload))) {
-      throw new Error("Expense recovery storage is invalid; no new request was sent")
+    if (!Array.isArray(parsed) || parsed.some((item: unknown) => !item || typeof item !== "object" || !("clientRequestId" in item) || !("deviceId" in item) || item.deviceId !== deviceId || !("syncState" in item) || !["queued", "submitting", "unknown", "rejected", "synced", "error", "conflict",
+          ].includes(String(item.syncState)) || !("payload" in item) || !item.payload || typeof item.payload !== "object" || !("employeeId" in item.payload) || !("currencyId" in item.payload) || !("lineKind" in item.payload),
+      )) {
+      throw new Error("Expense recovery storage is invalid; no new request was sent",
+      )
     }
     return parsed as ExpenseCaptureOutboxItem[]
   }
@@ -123,10 +137,14 @@ export function enqueueExpenseCapture(
   organizationId: string | number,
   item: Omit<ExpenseCaptureOutboxItem, "createdAt" | "syncState">,
 ): ExpenseCaptureOutboxItem {
-  const items = readExpenseCaptureOutbox(organizationId, item.deviceId, Boolean(item.formOrigin))
+  const items = readExpenseCaptureOutbox(organizationId, item.deviceId, Boolean(item.formOrigin || item.actorIdentity),
+  )
   const existing = items.find((i) => i.clientRequestId === item.clientRequestId)
   if (existing) {
-    if (item.formOrigin && (JSON.stringify(existing.payload) !== JSON.stringify(item.payload)
+    if (
+      (item.formOrigin || item.actorIdentity) &&
+      (existing.actorIdentity !== item.actorIdentity ||
+        JSON.stringify(existing.payload) !== JSON.stringify(item.payload)
       || existing.companyId !== item.companyId || JSON.stringify(existing.formOrigin) !== JSON.stringify(item.formOrigin))) {
       throw new Error("The existing expense request does not match this draft")
     }
@@ -166,8 +184,10 @@ export function markExpenseCaptureError(
       ? {
           ...i,
           syncState:
-            i.syncState === "submitting" || i.syncState === "unknown"
-              ? ("unknown" as const)
+            isExpenseCaptureReadbackOnly(i.syncState)
+            ? i.syncState === "conflict"
+              ? ("conflict" as const)
+              : ("unknown" as const)
               : ("error" as const),
           lastError,
         }
@@ -183,8 +203,7 @@ export function requeueExpenseCapture(
 ): void {
   const items = readExpenseCaptureOutbox(organizationId, deviceId).map((i) =>
     i.clientRequestId === clientRequestId &&
-    i.syncState !== "submitting" &&
-    i.syncState !== "unknown"
+    !isExpenseCaptureReadbackOnly(i.syncState)
       ? { ...i, syncState: "queued" as const, lastError: undefined }
       : i,
   )
@@ -195,9 +214,22 @@ export function discardExpenseCapture(
   organizationId: string | number,
   deviceId: string,
   clientRequestId: string,
+  owner: CaptureOwner,
 ): void {
   const existing = readExpenseCaptureOutbox(organizationId, deviceId, true)
-  if (existing.some((item) => item.clientRequestId === clientRequestId && item.formOrigin && item.syncState !== "synced")) throw new Error("Retained expense requests must be resolved before removal")
+  const matches = existing.filter(
+    (item) => item.clientRequestId === clientRequestId,
+  )
+  const match = matches[0]
+  if (
+    matches.length !== 1 ||
+    !match ||
+    !isCaptureOwnedBy(match, owner) ||
+    match.formOrigin ||
+    isExpenseCaptureReadbackOnly(match.syncState)
+  ) {
+    throw new Error("This expense capture cannot be discarded")
+  }
   const items = existing.filter((i) => i.clientRequestId !== clientRequestId)
   writeExpenseCaptureOutbox(organizationId, deviceId, items)
 }
@@ -223,16 +255,24 @@ export function saveExpenseCaptureCheckpoint(
   deviceId: string,
   next: ExpenseCaptureOutboxItem,
 ): void {
-  const items = readExpenseCaptureOutbox(organizationId, deviceId, Boolean(next.formOrigin))
+  const items = readExpenseCaptureOutbox(organizationId, deviceId, Boolean(next.formOrigin || next.actorIdentity),
+  )
   const matches = items.filter(
     (item) => item.clientRequestId === next.clientRequestId,
   )
   if (matches.length !== 1 || next.deviceId !== deviceId)
     throw new Error("The queued capture identity is unavailable or ambiguous")
   const previous = matches[0]!
-  if (previous.formOrigin && JSON.stringify(previous.receipt && [previous.receipt.clientRequestId, previous.receipt.fileName, previous.receipt.fileSize, previous.receipt.mimeType, previous.receipt.lastModified]) !== JSON.stringify(next.receipt && [next.receipt.clientRequestId, next.receipt.fileName, next.receipt.fileSize, next.receipt.mimeType, next.receipt.lastModified])) throw new Error("The saved expense receipt identity is immutable")
-  if (previous.formOrigin && (JSON.stringify(previous.payload) !== JSON.stringify(next.payload)
-    || previous.companyId !== next.companyId || JSON.stringify(previous.formOrigin) !== JSON.stringify(next.formOrigin))) {
+  if (
+    (previous.formOrigin || previous.actorIdentity) && JSON.stringify(previous.receipt && [previous.receipt.clientRequestId, previous.receipt.fileName, previous.receipt.fileSize, previous.receipt.mimeType, previous.receipt.lastModified,
+      ],
+    ) !== JSON.stringify(next.receipt && [next.receipt.clientRequestId, next.receipt.fileName, next.receipt.fileSize, next.receipt.mimeType, next.receipt.lastModified,
+        ],
+      )) throw new Error("The saved expense receipt identity is immutable")
+  if (previous.actorIdentity !== next.actorIdentity ||
+    ((previous.formOrigin || previous.actorIdentity) && (JSON.stringify(previous.payload) !== JSON.stringify(next.payload)
+    || previous.companyId !== next.companyId || JSON.stringify(previous.formOrigin) !== JSON.stringify(next.formOrigin)))
+  ) {
     throw new Error("The saved expense request is immutable")
   }
   writeExpenseCaptureOutbox(

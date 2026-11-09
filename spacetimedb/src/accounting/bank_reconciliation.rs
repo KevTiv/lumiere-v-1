@@ -765,7 +765,16 @@ pub fn update_account_bank_statement(
         .account_bank_statement_line()
         .statement_line_by_statement()
         .filter(&statement_id)
-        .filter(|line| !line.payment_ids.is_empty())
+        .filter(|line| {
+            !line.payment_ids.is_empty()
+                || super::bank_transaction_settlement::has_posted_bank_transaction(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    line.id,
+                    None,
+                )
+        })
         .collect();
     if !settlement_lines.is_empty()
         && (params
@@ -929,6 +938,13 @@ pub fn delete_account_bank_statement(
         .any(|line| {
             !line.payment_ids.is_empty()
                 || line.is_reconciled
+                || super::bank_transaction_settlement::has_posted_bank_transaction(
+                    ctx,
+                    organization_id,
+                    company_id,
+                    line.id,
+                    None,
+                )
                 || super::bank_settlement_lifecycle::has_attempt_history(ctx, line.id)
         })
     {
@@ -1124,7 +1140,15 @@ pub fn update_account_bank_statement_line(
             "bank settlement links and residuals are managed by the settlement action".to_string(),
         );
     }
-    if (!line.payment_ids.is_empty() || line.is_reconciled)
+    if (!line.payment_ids.is_empty()
+        || line.is_reconciled
+        || super::bank_transaction_settlement::has_posted_bank_transaction(
+            ctx,
+            organization_id,
+            company_id,
+            line.id,
+            None,
+        ))
         && (params.date.is_some()
             || params.amount.is_some()
             || params.amount_currency.is_some()
@@ -1290,6 +1314,13 @@ pub fn delete_account_bank_statement_line(
     if statement.state == BankStatementState::Posted
         || !line.payment_ids.is_empty()
         || line.is_reconciled
+        || super::bank_transaction_settlement::has_posted_bank_transaction(
+            ctx,
+            organization_id,
+            company_id,
+            line.id,
+            None,
+        )
         || super::bank_settlement_lifecycle::has_attempt_history(ctx, line.id)
     {
         return Err(
@@ -1360,7 +1391,17 @@ pub fn post_account_bank_statement(
         .account_bank_statement_line()
         .statement_line_by_statement()
         .filter(&statement_id)
-        .any(|line| !line.payment_ids.is_empty() && !line.is_reconciled)
+        .any(|line| {
+            !line.is_reconciled
+                && (!line.payment_ids.is_empty()
+                    || super::bank_transaction_settlement::has_posted_bank_transaction(
+                        ctx,
+                        organization_id,
+                        company_id,
+                        line.id,
+                        None,
+                    ))
+        })
     {
         return Err("complete pending bank settlements before posting the statement".to_string());
     }

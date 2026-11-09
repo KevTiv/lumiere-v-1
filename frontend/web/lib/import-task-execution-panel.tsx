@@ -8,6 +8,17 @@ import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting/accoun
 import { useAccountJournals } from "@lumiere/query-hooks/hooks/accounting/journals"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@lumiere/ui/components/alert-dialog"
 import { sourceReviewHistoryHref } from "@lumiere/query-hooks/hooks/source-review-navigation"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -32,6 +43,7 @@ import {
   type ImportCapability,
   type ImportNativeResult,
   type ImportProposal,
+  type ImportProposalAction,
   type ImportWorkflow,
 } from "./import-workflow"
 import { useImportProposalAttempt } from "./use-import-proposal-attempt"
@@ -127,6 +139,8 @@ function ExecutionPanel({
   const [creditAccountId, setCreditAccountId] = useState("")
   const [amountField, setAmountField] = useState("amount")
   const [dateField, setDateField] = useState("date")
+  const [treatment, setTreatment] = useState("expense")
+  const openingBalances = treatment === "opening_balances"
   const [dateMode, setDateMode] = useState("source")
   const [postingDate, setPostingDate] = useState("")
   const [reason, setReason] = useState("")
@@ -185,9 +199,15 @@ function ExecutionPanel({
         capability.readiness === "native_preview" &&
         capability.targetEntities.includes(review.data.targetEntity),
     )
-  const expenseSource = review.data?.targetEntity === "source_observation"
+  const openingDateFields = fields.filter(
+    (field) =>
+      ["date", "business_date", "as_of", "balance_date"].includes(
+        field.value,
+      ) && field.kind === "date",
+  )
+  const accountingSource = review.data?.targetEntity === "source_observation"
   const canPrepare =
-    !!expenseSource &&
+    !!accountingSource &&
     !review.isError &&
     !workflow.isError &&
     !!journalId &&
@@ -199,10 +219,23 @@ function ExecutionPanel({
     chosenRows.length > 0 &&
     chosenRows.length <= 200 &&
     reason.trim().length >= 3 &&
-    (dateMode === "source" || !!postingDate) &&
+    (openingBalances
+      ? !!postingDate &&
+        openingDateFields.some((field) => field.value === dateField) &&
+        [
+          "debit",
+          "credit",
+          "debit_account_id",
+          "credit_account_id",
+          "currency_id",
+          "observation_kind",
+          "document_reference",
+          "description",
+        ].every((key) => fields.some((field) => field.value === key))
+      : (dateMode === "source" || !!postingDate) &&
     fields.some((field) => field.value === amountField) &&
     (dateMode === "posting" ||
-      fields.some((field) => field.value === dateField)) &&
+      fields.some((field) => field.value === dateField))) &&
     !accountsQuery.isError &&
     !journalsQuery.isError &&
     !companiesQuery.isError
@@ -221,7 +254,7 @@ function ExecutionPanel({
     )
     setSelectedProposalId(next.id)
     setActionError(null)
-    if (next.status === "verified") {
+    if (next.status === "verified" || next.status === "rolled_back") {
       void queryClient.invalidateQueries({
         predicate: (query) =>
           query.queryKey[0] === "stdb" &&
@@ -244,12 +277,22 @@ function ExecutionPanel({
       action,
     }: {
       proposal: ImportProposal
-      action: "approve" | "execute" | "verify"
+      action: ImportProposalAction
     }) => transitionImportProposal(apiFetch, scope, current, action),
     onSuccess: accept,
-    onError: (error: Error) => {
+    onError: async (error: Error, { proposal: attempted, action }) => {
       setActionError(error.message)
-      void workflow.refetch()
+      const fresh = await workflow.refetch()
+      if (action === "rollback" && !fresh.isError) {
+        const recovered = fresh.data?.proposals.find(
+          (current) =>
+            current.id === attempted.id &&
+            current.revision === attempted.revision &&
+            current.digest === attempted.digest &&
+            current.status === "rolled_back",
+        )
+        if (recovered) accept(recovered)
+      }
     },
   })
   const busy = preparation.busy || transition.isPending
@@ -370,21 +413,42 @@ function ExecutionPanel({
               )}
             </div>
           )}
-          {review.data && !expenseSource && !nativeHandoff && (
+          {review.data && !accountingSource && !nativeHandoff && (
             <p>{t("settings.importWorkflow.unsupportedSource")}</p>
           )}
-          {expenseSource && (
+          {accountingSource && (
             <fieldset
               disabled={busy || preparationLocked}
               className="space-y-4 rounded border p-4"
             >
               <legend className="px-1 font-medium">
-                {t("settings.importWorkflow.expenseTreatment")}
+                {t("settings.importWorkflow.accountingTreatment")}
               </legend>
               <p className="text-sm text-muted-foreground">
-                {t("settings.importWorkflow.partialFacts")}
+                {t(
+                  openingBalances
+                    ? "settings.importWorkflow.openingBalanceFacts"
+                    : "settings.importWorkflow.partialFacts",
+                )}
               </p>
               <div className="grid gap-4 md:grid-cols-3">
+                <Choice
+                  label={t("settings.importWorkflow.draftType")}
+                  value={treatment}
+                  onChange={setTreatment}
+                  options={[
+                    {
+                      value: "expense",
+                      label: t("settings.importWorkflow.expenseTreatment"),
+                    },
+                    {
+                      value: "opening_balances",
+                      label: t(
+                        "settings.importWorkflow.openingBalanceTreatment",
+                      ),
+                    },
+                  ]}
+                />
                 <Choice
                   label={t("settings.importWorkflow.journal")}
                   value={journalId}
@@ -392,7 +456,11 @@ function ExecutionPanel({
                   options={journalChoices}
                 />
                 <Choice
-                  label={t("settings.importWorkflow.debitAccount")}
+                  label={t(
+                    openingBalances
+                      ? "settings.importWorkflow.openingDebitAccount"
+                      : "settings.importWorkflow.debitAccount",
+                  )}
                   value={debitAccountId}
                   onChange={setDebitAccountId}
                   options={accountChoices}
@@ -403,37 +471,51 @@ function ExecutionPanel({
                   onChange={setCreditAccountId}
                   options={accountChoices}
                 />
+                {!openingBalances && (
+                  <>
                 <Choice
                   label={t("settings.importWorkflow.amountColumn")}
                   value={amountField}
-                  onChange={setAmountField}
-                  options={fields.filter((field) => field.kind === "decimal")}
-                />
-                <Choice
-                  label={t("settings.importWorkflow.dateTreatment")}
-                  value={dateMode}
-                  onChange={setDateMode}
-                  options={[
-                    {
-                      value: "source",
-                      label: t("settings.importWorkflow.sourceDate"),
-                    },
-                    {
-                      value: "posting",
-                      label: t("settings.importWorkflow.explicitDate"),
-                    },
-                  ]}
-                />
-                {dateMode === "source" ? (
+                      onChange={setAmountField}
+                      options={fields.filter(
+                        (field) => field.kind === "decimal",
+                      )}
+                    />
+                    <Choice
+                    label={t("settings.importWorkflow.dateTreatment")}
+                      value={dateMode}
+                      onChange={setDateMode}
+                      options={[
+                        {
+                          value: "source",
+                          label: t("settings.importWorkflow.sourceDate"),
+                        },
+                        {
+                          value: "posting",
+                          label: t("settings.importWorkflow.explicitDate"),
+                        },
+                      ]}
+                    />
+                  </>
+                )}
+                {(openingBalances || dateMode === "source") && (
                   <Choice
                     label={t("settings.importWorkflow.dateColumn")}
                     value={dateField}
                     onChange={setDateField}
-                    options={fields.filter((field) => field.kind === "date")}
+                    options={
+                      openingBalances
+                        ? openingDateFields
+                        : fields.filter((field) => field.kind === "date")}
                   />
-                ) : (
+                )}
+                {(openingBalances || dateMode === "posting") && (
                   <TextField
-                    label={t("settings.importWorkflow.postingDate")}
+                    label={t(
+                      openingBalances
+                        ? "settings.importWorkflow.cutoverDate"
+                        : "settings.importWorkflow.postingDate",
+                    )}
                     type="date"
                     value={postingDate}
                     onChange={setPostingDate}
@@ -533,9 +615,10 @@ function ExecutionPanel({
                     debitAccountId,
                     creditAccountId,
                     currencyId,
-                    amountField,
+                    amountField: openingBalances ? "debit" : amountField,
                     dateField,
-                    ...(dateMode === "posting" ? { postingDate } : {}),
+                    ...(openingBalances ? { openingBalances: true } : {}),
+                    ...(openingBalances || dateMode === "posting" ? { postingDate } : {}),
                     reason,
                   })
                 }
@@ -821,12 +904,13 @@ function ProposalDetails({
   debit?: string
   credit?: string
   busy: boolean
-  action: (action: "approve" | "execute" | "verify") => void
+  action: (action: ImportProposalAction) => void
   onResolve: (decisions: DistinctExpenseDecision[]) => void
   onReviewSource?: (reviewId: string) => void
 }) {
   const { t } = useTranslation()
   const { summary, result } = proposal
+  const [confirmRollback, setConfirmRollback] = useState(false)
   const [overlapDecisions, setOverlapDecisions] = useState<
     Record<string, { selected: boolean; reason: string }>
   >({})
@@ -867,6 +951,9 @@ function ProposalDetails({
       <h4 className="font-medium">
         {t(`settings.importWorkflow.status.${proposal.status}`)}
       </h4>
+      {proposal.kind === "opening_balances" && (
+        <p>{t("settings.importWorkflow.openingBalanceTreatment")}</p>
+      )}
       <p>
         {t("settings.importWorkflow.previewSummary", {
           records: summary.recordCount,
@@ -881,7 +968,11 @@ function ProposalDetails({
         </dd>
         <dt>{t("settings.importWorkflow.journal")}</dt>
         <dd>{journal ?? t("settings.importWorkflow.referenceUnavailable")}</dd>
-        <dt>{t("settings.importWorkflow.debitAccount")}</dt>
+        <dt>{t(
+            proposal.kind === "opening_balances"
+              ? "settings.importWorkflow.openingDebitAccount"
+              : "settings.importWorkflow.debitAccount",
+          )}</dt>
         <dd>
           {debit ?? t("settings.importWorkflow.referenceUnavailable")} ·{" "}
           {summary.totalDebit} {currency}
@@ -1173,6 +1264,9 @@ function ProposalDetails({
           </div>
         </div>
       )}
+      {proposal.status === "rolled_back" && (
+        <p role="status">{t("settings.importWorkflow.rollbackComplete")}</p>
+      )}
       {result && (
         <div className="space-y-2" role="status">
           <p>
@@ -1211,6 +1305,40 @@ function ProposalDetails({
             </ul>
           </details>
         </div>
+      )}
+      {(proposal.canRollback ?? result !== null) && (
+        <AlertDialog open={confirmRollback} onOpenChange={setConfirmRollback}>
+          <AlertDialogTrigger
+            render={<Button variant="outline" disabled={busy} />}
+          >
+            {t("settings.importWorkflow.rollbackDrafts")}
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("settings.importWorkflow.rollbackDrafts")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("settings.importWorkflow.rollbackDescription", {
+                  count: summary.recordCount,
+                })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={busy}
+                variant="destructive"
+                onClick={() => {
+                  setConfirmRollback(false)
+                  action("rollback")
+                }}
+              >
+                {t("settings.importWorkflow.rollbackConfirm")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </article>
   )

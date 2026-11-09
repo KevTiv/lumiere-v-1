@@ -1,54 +1,98 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import assert from "node:assert/strict"
+import test from "node:test"
 
-import { messageKind, messageRecordHref, messageRecordPageHref, messageTitle, optionalId, repliesTo } from './message-record';
+import { messageKind, messageRecordHref, messageRecordPageHref, messageTitle, optionalId, repliesTo,
+} from "./message-record"
 
-test('a message links to its own page, and to the page of the record it is filed on', () => {
-  assert.equal(messageRecordHref({ id: 5 }), '/messages/5');
-  assert.equal(messageRecordHref({}), undefined);
-  assert.equal(messageRecordPageHref({ model: 'sale_order', resId: 9 }), '/sales/orders/9');
-  assert.equal(messageRecordPageHref({ model: 'lead', resId: 9 }), undefined);
-});
+test("a message links to its own page, and to the page of the record it is filed on", () => {
+  assert.equal(messageRecordHref({ id: 5 }), "/messages/5")
+  assert.equal(messageRecordHref({}), undefined)
+  assert.equal(messageRecordPageHref({ model: "sale_order", resId: 9 }),
+    "/sales/orders/9",
+  )
+  assert.equal(messageRecordPageHref({ model: "lead", resId: 9 }), undefined)
+  assert.equal(
+    messageRecordPageHref({
+      model: { some: "sale_order" },
+      resId: { some: "18446744073709551615" },
+    }),
+    "/sales/orders/18446744073709551615",
+  )
+  assert.equal(
+    messageRecordPageHref({ model: "sale_order", resId: { none: [] } }),
+    undefined,
+  )
+  assert.equal(
+    messageRecordPageHref({ model: "constructor", resId: 9 }),
+    undefined,
+  )
+})
 
-test('optional ids read from numbers, strings and option cells', () => {
-  assert.equal(optionalId(7), '7');
-  assert.equal(optionalId({ some: 7 }), '7');
-  assert.equal(optionalId({ none: [] }), undefined);
-  assert.equal(optionalId(null), undefined);
-  assert.equal(optionalId(''), undefined);
-});
+test("optional ids read from numbers, strings and option cells", () => {
+  assert.equal(optionalId(7), "7")
+  assert.equal(optionalId({ some: 7 }), "7")
+  assert.equal(optionalId({ none: [] }), undefined)
+  assert.equal(optionalId(null), undefined)
+  assert.equal(optionalId(""), undefined)
+})
 
-test('replies are the messages whose parent is this one, oldest first', () => {
+test("replies are the messages whose parent is this one, oldest first", () => {
   const messages = [
-    { id: 3, model: 'account_move', resId: 9, parentId: 1, date: 30 },
-    { id: 2, model: 'account_move', resId: 9, parent_id: { some: 1 }, date: 20 },
-    { id: 4, model: 'account_move', resId: 9, parentId: 2, date: 40 },
-    { id: 1, model: 'account_move', resId: 9, parentId: null, date: 10 },
-    { id: 5, model: 'account_move', resId: 10, parentId: 1, date: 50 },
-    { id: 6, model: 'sale_order', resId: 9, parentId: 1, date: 60 },
-  ];
+    { id: 3, model: "account_move", resId: 9, parentId: 1, date: 30 },
+    { id: 2, model: "account_move", resId: 9, parent_id: { some: 1 }, date: 20,
+    },
+    { id: 4, model: "account_move", resId: 9, parentId: 2, date: 40 },
+    { id: 1, model: "account_move", resId: 9, parentId: null, date: 10 },
+    { id: 5, model: "account_move", resId: 10, parentId: 1, date: 50 },
+    { id: 6, model: "sale_order", resId: 9, parentId: 1, date: 60 },
+  ]
 
-  assert.deepEqual(repliesTo(messages, '1').map((row) => row.id), [2, 3]);
-});
+  assert.deepEqual(repliesTo(messages, "1").map((row) => row.id), [2, 3],
+  )
+})
 
-test('a title is the plain text of the body, shortened', () => {
-  assert.equal(messageTitle({ id: 1, body: '<p>Hello   <b>world</b></p>' }), 'Hello world');
-  assert.equal(messageTitle({ id: 1, body: 'x'.repeat(100) }, 10), `${'x'.repeat(9)}…`);
-  assert.equal(messageTitle({ id: 8, body: '  ' }), '#8');
-});
+test("a title is the plain text of the body, shortened", () => {
+  assert.equal(messageTitle({ id: 1, body: "<p>Hello   <b>world</b></p>" }),
+    "Hello world",
+  )
+  assert.equal(messageTitle({ id: 1, body: "x".repeat(100) }, 10), `${"x".repeat(9)}…`,
+  )
+  assert.equal(messageTitle({ id: 8, body: "  " }), "#8")
+})
 
-test('the message type reads as a lower-case word', () => {
-  assert.equal(messageKind({ messageType: { tag: 'Comment' } }), 'comment');
-  assert.equal(messageKind({}), 'message');
-});
+test("the message type reads as a lower-case word", () => {
+  assert.equal(messageKind({ messageType: { tag: "Comment" } }), "comment")
+  assert.equal(messageKind({}), "message")
+})
 
-import { messageAuthorName } from './message-record';
+import { messageAuthorName } from "./message-record"
 
-test('an author reads as the matching user name, else a short identity', () => {
-  const users = [{ id: 'ABCDEF0123456789', name: 'Ada' }, { id: 'ff00', email: 'bo@x.io' }];
+test("an author reads as the matching user name, else a short identity", () => {
+  const users = [{ id: "ABCDEF0123456789", name: "Ada" },
+    { id: "ff00", email: "bo@x.io" },
+  ]
 
-  assert.equal(messageAuthorName({ authorId: '0xabcdef0123456789' }, users), 'Ada');
-  assert.equal(messageAuthorName({ author_id: 'ff00' }, users), 'bo@x.io');
-  assert.equal(messageAuthorName({ authorId: '1234567890abcdef' }, users), '12345678…');
-  assert.equal(messageAuthorName({}, users), '');
-});
+  assert.equal(messageAuthorName({ authorId: "0xabcdef0123456789" }, users),
+    "Ada",
+  )
+  assert.equal(messageAuthorName({ author_id: "ff00" }, users), "bo@x.io")
+  assert.equal(messageAuthorName({ authorId: "1234567890abcdef" }, users),
+    "12345678…",
+  )
+  assert.equal(messageAuthorName({}, users), "")
+  assert.equal(
+    messageAuthorName({ authorId: "1234567890abcdef" }, users, {
+      showIdentity: false,
+    }),
+    "",
+  )
+  assert.equal(
+    messageAuthorName(
+      { authorId: { some: { __identity__: "0xabcdef0123456789" } } },
+      users,
+      { showIdentity: false },
+    ),
+    "Ada",
+  )
+  assert.equal(messageAuthorName({ authorId: { none: [] } }, users), "")
+})

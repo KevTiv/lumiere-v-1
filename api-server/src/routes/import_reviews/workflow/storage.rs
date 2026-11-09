@@ -5,7 +5,16 @@ use super::super::StorageScope;
 use super::model::*;
 use crate::error::ApiError;
 
-const COLUMNS: &str = "id,request_key,revision,proposal_sha256,definition_json,state,execution_json,verification_json,last_error,created_at::text,approved_at::text";
+// Receipt rows are immutable and keyed by proposal and phase. Read their
+// availability separately from the latest (possibly unsuccessful) ERP readback.
+const COLUMNS: &str = "id,request_key,revision,proposal_sha256,definition_json,state,execution_json,verification_json,last_error,created_at::text,approved_at::text,
+    (SELECT count(*) = 2 FROM lumiere_platform.import_workflow_receipt receipt
+     WHERE receipt.proposal_id=import_workflow_proposal.id
+       AND receipt.organization_id=import_workflow_proposal.organization_id
+       AND receipt.company_id=import_workflow_proposal.company_id
+       AND receipt.receipt_json->>'status'='success'
+       AND receipt.receipt_json->>'errorRows'='0'
+       AND receipt.receipt_json->>'rowsImported'=receipt.receipt_json->>'totalRows') AS has_draft_bundle_receipts";
 
 pub(super) struct SavedProposal {
     pub id: i64,
@@ -19,6 +28,7 @@ pub(super) struct SavedProposal {
     pub last_error: Option<String>,
     pub created_at: String,
     pub approved_at: Option<String>,
+    pub has_draft_bundle_receipts: bool,
 }
 
 impl SavedProposal {
@@ -41,15 +51,23 @@ impl SavedProposal {
             last_error: row.get("last_error"),
             created_at: row.get("created_at"),
             approved_at: row.get("approved_at"),
+            has_draft_bundle_receipts: row.get("has_draft_bundle_receipts"),
         })
     }
 
     pub fn view(&self) -> Value {
+        let status = if matches!(self.execution.phase, Phase::RolledBack) {
+            "rolled_back"
+        } else {
+            self.state.as_str()
+        };
+        let can_rollback =
+            status != "rolled_back" && self.approved_at.is_some() && self.has_draft_bundle_receipts;
         json!({"id":self.id.to_string(),"requestKey":self.request_key,"revision":self.revision,"digest":self.digest,
-            "kind":self.definition.kind,"status":self.state,"createdAt":self.created_at,"approvedAt":self.approved_at,
+            "kind":self.definition.kind,"status":status,"createdAt":self.created_at,"approvedAt":self.approved_at,
             "summary":self.definition.summary,"sources":self.definition.sources,"entries":self.definition.entries,
             "issues":self.definition.issues,"configuration":self.definition.configuration,"execution":self.execution,
-            "result":self.result,"lastError":self.last_error})
+            "result":self.result,"canRollback":can_rollback,"lastError":self.last_error})
     }
 
     pub fn require_approval(&self, body: &ActionBody, company: u64) -> Result<(), ApiError> {
@@ -392,6 +410,24 @@ pub(super) async fn record_receipt(
         ));
     }
     Ok(())
+}
+
+pub(super) async fn saved_receipt(
+    tx: &Transaction<'_>,
+    proposal: i64,
+    phase: &str,
+    request: &str,
+    content_hash: &str,
+) -> Result<Value, ApiError> {
+    let row = tx.query_opt(
+        "SELECT receipt_json FROM lumiere_platform.import_workflow_receipt WHERE proposal_id=$1 AND phase=$2 AND request_id=$3 AND content_sha256=$4",
+        &[&proposal, &phase, &request, &content_hash],
+    ).await.map_err(ApiError::internal)?;
+    row.map(|row| row.get("receipt_json")).ok_or_else(|| {
+        ApiError::Conflict(
+            "Verify both native import stages before removing the imported drafts.".into(),
+        )
+    })
 }
 
 pub(super) async fn release_empty_claims(

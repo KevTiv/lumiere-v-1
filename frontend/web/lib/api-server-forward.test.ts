@@ -1,10 +1,17 @@
 import assert from "node:assert/strict"
 import { describe, it, beforeEach, afterEach } from "node:test"
+import { NextRequest } from "next/server"
 
 import { apiUrl } from "./api-url"
-import { resolveApiServerBaseUrl } from "../lib/api-server-forward"
+import {
+  forwardToApiServerIfEnabled,
+  resolveApiServerBaseUrl,
+} from "./api-server-forward"
 
-function setEnvVar(key: "LUMIERE_API_SERVER_URL" | "NODE_ENV", value: string | undefined) {
+function setEnvVar(
+  key: "LUMIERE_API_SERVER_URL" | "NODE_ENV" | "WORKOS_CLIENT_ID",
+  value: string | undefined,
+) {
   if (value === undefined) {
     Reflect.deleteProperty(process.env, key)
     return
@@ -50,6 +57,70 @@ describe("resolveApiServerBaseUrl", () => {
     setEnvVar("NODE_ENV", "production")
     assert.equal(resolveApiServerBaseUrl(), null)
   })
+})
+
+it("forwards the expected organization only on typed operation posts", async (context) => {
+  const originalUrl = process.env.LUMIERE_API_SERVER_URL
+  const originalWorkOs = process.env.WORKOS_CLIENT_ID
+  context.after(() => {
+    setEnvVar("LUMIERE_API_SERVER_URL", originalUrl)
+    setEnvVar("WORKOS_CLIENT_ID", originalWorkOs)
+  })
+  setEnvVar("LUMIERE_API_SERVER_URL", "https://api.example.test")
+  setEnvVar("WORKOS_CLIENT_ID", undefined)
+  const observed: Array<{
+    url: string
+    organization: string | null
+    company: string | null
+  }> = []
+  context.mock.method(
+    globalThis,
+    "fetch",
+    async (url: string, init: RequestInit) => {
+      const headers = new Headers(init.headers)
+      observed.push({
+        url,
+        organization: headers.get("x-lumiere-organization-id"),
+        company: headers.get("x-lumiere-company-id"),
+      })
+      return Response.json({ ok: true })
+    },
+  )
+
+  const requestHeaders = {
+    "x-lumiere-organization-id": "7",
+    "x-lumiere-company-id": "11",
+  }
+  const operationPath = "/api/operations/erp.complete_activity"
+  for (const [path, method] of [
+    [operationPath, "POST"],
+    [operationPath, "GET"],
+    ["/api/query/activities", "POST"],
+  ]) {
+    await forwardToApiServerIfEnabled(
+      new NextRequest(`https://app.example.test${path}`, {
+        method,
+        headers: requestHeaders,
+      }),
+    )
+  }
+  assert.deepEqual(observed, [
+    {
+      url: "https://api.example.test/v1/operations/erp.complete_activity",
+      organization: "7",
+      company: null,
+    },
+    {
+      url: "https://api.example.test/v1/operations/erp.complete_activity",
+      organization: null,
+      company: null,
+    },
+    {
+      url: "https://api.example.test/v1/query/activities",
+      organization: null,
+      company: null,
+    },
+  ])
 })
 
 describe("authoritative draft readback gateway URL", () => {

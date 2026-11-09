@@ -1,28 +1,30 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { Button } from "../components/button";
+import { useState } from "react"
+import { Button } from "../components/button"
 import type {
   ReconciliationContext,
   ReconciliationDocumentItem,
   ReconciliationIssue,
-} from "./reconciliation-workbench-model";
+} from "./reconciliation-workbench-model"
 
 export type ReconciliationExceptionCopy = (
   key: string,
   defaultValue: string,
   values?: Record<string, string>,
-) => string;
+) => string
 
 interface ExceptionReviewProps {
-  context: ReconciliationContext;
-  bankAmount: string;
-  difference?: string;
-  items?: readonly (ReconciliationDocumentItem & { openAmount?: string })[];
-  foreignCurrencies?: readonly string[];
-  issue: ReconciliationIssue | "foreign_bank_line";
-  canApplyExistingPayment?: boolean;
-  text: ReconciliationExceptionCopy;
+  context: ReconciliationContext
+  bankAmount: string
+  difference?: string
+  items?: readonly (ReconciliationDocumentItem & { openAmount?: string })[]
+  foreignCurrencies?: readonly string[]
+  issue: ReconciliationIssue | "foreign_bank_line"
+  canApplyExistingPayment?: boolean
+  operationalSettlement?: boolean
+  canReviewFx?: boolean
+  text: ReconciliationExceptionCopy
 }
 
 export function ReconciliationExceptionReview({
@@ -33,11 +35,13 @@ export function ReconciliationExceptionReview({
   foreignCurrencies = [],
   issue,
   canApplyExistingPayment,
+  operationalSettlement = false,
+  canReviewFx = false,
   text,
 }: ExceptionReviewProps) {
   const [copyState, setCopyState] = useState<"copied" | "unavailable" | null>(
     null,
-  );
+  )
 
   switch (issue) {
     case "stale_selection":
@@ -48,7 +52,7 @@ export function ReconciliationExceptionReview({
             "A selected item is no longer eligible. Clear the selection and review the current records.",
           )}
         </p>
-      );
+      )
     case "mixed_partners":
       return (
         <p role="status" className="text-sm text-muted-foreground">
@@ -57,7 +61,7 @@ export function ReconciliationExceptionReview({
             "This selection contains more than one partner. Select records for the partner on this bank transaction.",
           )}
         </p>
-      );
+      )
     case "mixed_accounts":
       return (
         <p role="status" className="text-sm text-muted-foreground">
@@ -66,7 +70,7 @@ export function ReconciliationExceptionReview({
             "This selection spans more than one receivable or payable account. An exact settlement requires a single account.",
           )}
         </p>
-      );
+      )
     case "incomplete_document":
       return (
         <p role="status" className="text-sm text-muted-foreground">
@@ -75,7 +79,7 @@ export function ReconciliationExceptionReview({
             "A selected document has other open journal items. Include all its open items before reviewing the amount difference.",
           )}
         </p>
-      );
+      )
     case "unavailable_amount":
       return (
         <p role="status" className="text-sm text-muted-foreground">
@@ -84,23 +88,25 @@ export function ReconciliationExceptionReview({
             "The total cannot be represented at this currency’s precision. Share the bank line and item amounts with an authorized accountant for review.",
           )}
         </p>
-      );
+      )
   }
 
   const isForeign =
-    issue === "foreign_bank_line" || issue === "foreign_document";
-  const isShort = issue === "short_payment";
+    issue === "foreign_bank_line" || issue === "foreign_document"
+  const isShort = issue === "short_payment"
   const singleDocument =
     items.length > 0 && items.every((item) => item.moveId === items[0]?.moveId)
       ? items[0]
-      : undefined;
+      : undefined
   const paymentDocument =
-    isShort && canApplyExistingPayment ? singleDocument : undefined;
+    isShort && canApplyExistingPayment && !operationalSettlement
+      ? singleDocument
+      : undefined
   const heading = isForeign
     ? text("foreignHeading", "FX review required")
     : isShort
       ? text("shortHeading", "Bank amount is below the selected balance")
-      : text("excessHeading", "Bank amount exceeds the selected balance");
+      : text("excessHeading", "Bank amount exceeds the selected balance")
   const bankReference = text(
     "bankReference",
     "{{statement}} (#{{statementId}}) · Bank line #{{lineId}} · Company #{{companyId}}",
@@ -110,10 +116,10 @@ export function ReconciliationExceptionReview({
       lineId: context.lineId,
       companyId: context.companyId,
     },
-  );
+  )
   const bankDetail = [context.lineLabel, context.dateLabel, bankAmount]
     .filter(Boolean)
-    .join(" · ");
+    .join(" · ")
   const currencyDetail =
     foreignCurrencies.length > 0
       ? text(
@@ -121,7 +127,7 @@ export function ReconciliationExceptionReview({
           "Other currencies on this bank line: {{currencies}}",
           { currencies: foreignCurrencies.join(", ") },
         )
-      : null;
+      : null
   const itemRefs = items.map((item) => {
     const reference = text(
       "documentItemRef",
@@ -131,15 +137,15 @@ export function ReconciliationExceptionReview({
         documentId: item.moveId,
         itemId: item.id,
       },
-    );
-    return item.openAmount ? `${reference} · ${item.openAmount}` : reference;
-  });
+    )
+    return item.openAmount ? `${reference} · ${item.openAmount}` : reference
+  })
   const differenceDetail =
     !isForeign && difference
       ? text("differenceDetail", "Difference to review: {{amount}}", {
           amount: difference,
         })
-      : null;
+      : null
   const copyDetails = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -153,12 +159,12 @@ export function ReconciliationExceptionReview({
         ]
           .filter(Boolean)
           .join("\n"),
-      );
-      setCopyState("copied");
+      )
+      setCopyState("copied")
     } catch {
-      setCopyState("unavailable");
+      setCopyState("unavailable")
     }
-  };
+  }
 
   return (
     <section
@@ -174,7 +180,15 @@ export function ReconciliationExceptionReview({
           )}
         </p>
       ) : null}
-      {isShort ? (
+      {operationalSettlement ? (
+        <p className="text-sm">
+          {text(
+            "postedPath",
+            "Use the posted transaction tied to this bank line to review the allocation and any remaining balance.",
+          )}
+        </p>
+      ) : null}
+      {isShort && !operationalSettlement ? (
         <div className="space-y-2 text-sm">
           <p>
             {paymentDocument
@@ -200,7 +214,7 @@ export function ReconciliationExceptionReview({
           </p>
         </div>
       ) : null}
-      {issue === "excess_payment" ? (
+      {issue === "excess_payment" && !operationalSettlement ? (
         <p className="text-sm">
           {text(
             "excessNext",
@@ -224,6 +238,22 @@ export function ReconciliationExceptionReview({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {isForeign && canReviewFx ? (
+          <a
+            href={`/accounting?${new URLSearchParams({
+              tab: "fx-revaluation",
+              bankOrganization: context.organizationId,
+              bankCompany: context.companyId,
+              bankStatement: context.statementId,
+              bankLine: context.lineId,
+            })}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {text("openFxReview", "Open FX review")}
+          </a>
+        ) : null}
         {paymentDocument ? (
           <a
             href={paymentDocument.href}
@@ -256,5 +286,5 @@ export function ReconciliationExceptionReview({
         </p>
       ) : null}
     </section>
-  );
+  )
 }

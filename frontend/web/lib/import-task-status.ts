@@ -76,6 +76,7 @@ const statusSchema = z
             "executing",
             "verified",
             "blocked",
+            "rolled_back",
           ]),
           phase: z.enum([
             "not_started",
@@ -83,6 +84,7 @@ const statusSchema = z
             "lines",
             "verification",
             "complete",
+            "rolled_back",
           ]),
           expectedRecords: count.max(200),
           verifiedResult: z
@@ -122,7 +124,9 @@ const statusSchema = z
       const result = proposal.verifiedResult
       if (
         (proposal.status === "verified") !== (result !== null) ||
-        (proposal.status === "verified") !== (proposal.phase === "complete")
+        (proposal.status === "verified") !== (proposal.phase === "complete") ||
+        (proposal.status === "rolled_back") !==
+          (proposal.phase === "rolled_back")
       )
         issue()
       if (

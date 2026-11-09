@@ -2,6 +2,7 @@
 //! PostgreSQL owns review decisions; native ERP receipts own business effects.
 //! A lost response resumes by the same native request IDs, never by timestamps.
 mod binding;
+mod correction;
 mod model;
 mod native;
 mod overlap;
@@ -184,12 +185,20 @@ async fn run(
     // those locks; the native request receipt remains the recovery authority.
     let mut proposal = storage::load(&tx, scoped, task, id).await?;
     proposal.require_approval(body, scoped.company)?;
+    if matches!(proposal.execution.phase, Phase::RolledBack) {
+        return Ok(proposal.view());
+    }
     if proposal.approved_at.is_none() {
         return Err(ApiError::Conflict(
             "approve this exact proposal before executing it".into(),
         ));
     }
     storage::require_claims(&tx, scoped, &proposal).await?;
+    // A delayed repeat of Execute must not erase a verified outcome after a
+    // source correction. Verify remains the explicit current-record readback.
+    if allow_write && proposal.state == "verified" {
+        return Ok(proposal.view());
+    }
     let outcome = async {
         if allow_write {
             let decimals = native::validate_references(
@@ -307,6 +316,7 @@ async fn execute_steps(
             return Err(error);
         }
     };
+    proposal.has_draft_bundle_receipts = true;
     proposal.execution.phase = Phase::Verification;
     let (moves, lines) = native::read_records(context, scoped.company, &header_ids).await?;
     native::verify_records(
@@ -359,6 +369,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route(
             "/import-tasks/:task/workflow/proposals/:proposal/verify",
             post(verify),
+        )
+        .route(
+            "/import-tasks/:task/workflow/proposals/:proposal/rollback",
+            post(correction::rollback),
         )
         .layer(DefaultBodyLimit::max(500_000))
 }

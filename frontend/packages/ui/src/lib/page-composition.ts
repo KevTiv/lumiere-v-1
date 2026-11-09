@@ -25,10 +25,47 @@ export interface PageWidgetCatalogItem {
   unavailableReason?: string
   configurable?: boolean
   exportProvenance?: ReportExportSourceProvenance
+  scope?: readonly { label: string; value: string }[]
 }
 
 /** Null follows the module template; an empty array is an intentionally empty page. */
 export type PageCompositionValue = readonly PageWidgetPlacement[] | null
+
+export interface PageCompositionStartingLayout {
+  id: string
+  label: string
+  widgets: readonly { widgetId: string; width?: PageWidgetWidth }[]
+}
+
+/** Starting layouts may reference only the built-ins this page already supplies. */
+export function resolvePageStartingLayout(
+  startingLayout: PageCompositionStartingLayout,
+  defaultValue: readonly PageWidgetPlacement[],
+): PageWidgetPlacement[] {
+  const admitted = new Map(
+    defaultValue
+      .filter((item) => item.source === "builtin")
+      .map((item) => [item.widgetId, item]),
+  )
+  return startingLayout.widgets.flatMap(({ widgetId, width }) => {
+    const item = admitted.get(widgetId)
+    if (!item) return []
+    admitted.delete(widgetId)
+    return [{ ...item, width: width ?? item.width }]
+  })
+}
+
+/** Previously movable native sections now render outside the widget grid. */
+export function omitFixedPageWidgets(
+  value: PageCompositionValue,
+  fixedWidgetIds?: readonly string[],
+): PageCompositionValue {
+  if (!value || !fixedWidgetIds?.length) return value
+  return value.filter(
+    (item) =>
+      item.source !== "builtin" || !fixedWidgetIds.includes(item.widgetId),
+  )
+}
 
 export interface PageCompositionRequest {
   id: string
