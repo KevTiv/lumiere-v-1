@@ -55,6 +55,37 @@ const files = [
     updatedAt: 1794096000000,
     modifiedBy: "Synthetic viewer",
   },
+  {
+    id: "5",
+    name: "Season workbook",
+    fileName: "season.xlsx",
+    mimetype:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    size: 100,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
+    id: "6",
+    name: "Delimited records",
+    fileName: "delimited.csv",
+    mimetype: "text/csv",
+    size: 100,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
+    id: "7",
+    name: "Malformed records",
+    fileName: "malformed.csv",
+    mimetype: "text/csv",
+    size: 100,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
 ]
 const actor = {
   id: "document-viewer-fixture",

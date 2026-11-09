@@ -2,6 +2,7 @@
  * Shared RAG-request preparation for the non-streaming and streaming RAG routes.
  */
 import { NextResponse } from "next/server"
+import { z } from "zod"
 
 import { sanitizeRagUiContext } from "@lumiere/erp-shared/ai-ui-context"
 import type { ApiSession } from "@/lib/api-session"
@@ -54,6 +55,38 @@ export function sanitizeIncludeTypes(raw: unknown): string[] | undefined {
   return out.length > 0 ? out : undefined
 }
 
+const sourceId = z.string().regex(/^[1-9][0-9]{0,19}$/)
+const spreadsheetSelection = z
+  .object({
+    documentId: sourceId,
+    versionId: sourceId,
+    current: z.boolean(),
+    checksum: z.string().regex(/^[a-f0-9]{64}$/),
+    sheetName: z.string().min(1).max(255),
+    firstRow: z.number().int().min(1).max(1_048_576),
+    lastRow: z.number().int().min(1).max(1_048_576),
+    firstColumn: z.number().int().min(1).max(16_384),
+    lastColumn: z.number().int().min(1).max(16_384),
+    delimiter: z.enum([",", ";", "\t", "|"]).optional(),
+    encoding: z
+      .enum(["utf-8", "utf-16le", "utf-16be", "windows-1252"])
+      .optional(),
+    headerRow: z.number().int().min(1).max(1_048_576).optional(),
+  })
+  .strict()
+  .refine(({ firstRow, lastRow, firstColumn, lastColumn, headerRow }) => {
+    const rows = lastRow - firstRow + 1
+    const columns = lastColumn - firstColumn + 1
+    return (
+      rows > 0 &&
+      rows <= 200 &&
+      columns > 0 &&
+      columns <= 100 &&
+      rows * columns <= 5000 &&
+      (headerRow === undefined || headerRow <= firstRow)
+    )
+  })
+
 export interface RagPayload extends RagAgentSelection {
   company_id: number
   org_id: number
@@ -65,6 +98,7 @@ export interface RagPayload extends RagAgentSelection {
   ui_context?: unknown
   guide_refs?: RagGuideReference[]
   import_task_refs?: RagImportTaskReference[]
+  spreadsheet_selection?: z.infer<typeof spreadsheetSelection>
   ui_action_offers: RagUiActionOffer[]
 }
 
@@ -103,7 +137,10 @@ export async function prepareRagPayload(params: {
   let agentSelection: RagAgentSelection
   try {
     guideRefs = parseRagGuideReferences(body.guide_refs)
-    importTaskRefs = parseRagImportTaskReferences(body.import_task_refs, companyId)
+    importTaskRefs = parseRagImportTaskReferences(
+      body.import_task_refs,
+      companyId,
+    )
     agentSelection = parseRagAgentSelection(body)
   } catch (error) {
     return {
@@ -120,6 +157,39 @@ export async function prepareRagPayload(params: {
 
   const scopeError = await validateCompanyScope(session, companyId)
   if (scopeError) return { ok: false, response: scopeError }
+
+  if (body.spreadsheet_selection !== undefined) {
+    const selection = spreadsheetSelection.safeParse(body.spreadsheet_selection)
+    if (
+      !selection.success ||
+      ![
+        "Explain the selected spreadsheet cells.",
+        "Check the selected spreadsheet cells for issues.",
+      ].includes(query)
+    ) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Invalid spreadsheet analysis request" },
+          { status: 400 },
+        ),
+      }
+    }
+    return {
+      ok: true,
+      payload: {
+        ...agentSelection,
+        company_id: companyId,
+        org_id: orgId,
+        query,
+        limit: 1,
+        stdb_token: session.stdbToken,
+        identity_hex: session.identityHex,
+        spreadsheet_selection: selection.data,
+        ui_action_offers: [],
+      },
+    }
+  }
 
   const limit = boundedInteger(body.limit, 20, 1, 40)
   const include_types = sanitizeIncludeTypes(body.include_types)

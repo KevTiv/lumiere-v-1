@@ -9,6 +9,7 @@ The process has no ERP credentials, file handles, network, exec or fork authorit
 import csv
 import ctypes
 import datetime
+import decimal
 import encodings.cp437  # ZIP's legacy filename codec must be loaded pre-sandbox.
 import encodings.utf_8_sig
 import errno
@@ -27,6 +28,12 @@ import xml.etree.ElementTree as ET
 import zlib  # Load the extension before filesystem access is removed.
 
 POLICY_VERSION = "xlsx-static-seccomp-v1"
+VIEWER_POLICY_VERSION = "xlsx-viewer-seccomp-v1"
+MAX_VIEWER_SHEETS = 100
+MAX_VIEWER_MERGES = 2_000
+MAX_VIEWER_ROWS = 1_048_576
+MAX_VIEWER_COLUMNS = 16_384
+MAX_VIEWER_OUTPUT = 10_000_000
 MAX_INPUT = 5_000_000
 MAX_ENTRY = 10_000_000
 MAX_EXPANDED = 25_000_000
@@ -169,7 +176,9 @@ def parse_xml(data: bytes) -> ET.Element:
     return root
 
 
-def unpack(data: bytes) -> tuple[dict[str, ET.Element], set[str]]:
+def unpack(data: bytes, *, viewer=False) -> tuple[dict[str, ET.Element], set[str]]:
+    if viewer and data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        raise Rejected("workbook_password_protected_or_legacy_binary")
     if not data or len(data) > MAX_INPUT or not data.startswith(b"PK\x03\x04"):
         raise Rejected("workbook_size_or_signature")
     try:
@@ -227,7 +236,7 @@ def unpack(data: bytes) -> tuple[dict[str, ET.Element], set[str]]:
                 root = parse_xml(raw)
                 for node in root.iter():
                     kind = local_name(node.tag)
-                    if kind in ("f", "formula", "formula1", "formula2", "definedName"):
+                    if not viewer and kind in ("f", "formula", "formula1", "formula2", "definedName"):
                         raise Rejected("workbook_formula_requires_values_only_copy")
                     if kind in ("connection", "queryTable", "externalBook", "oleObject", "control", "webPr"):
                         raise Rejected("workbook_active_or_hidden_content")
@@ -417,6 +426,308 @@ def extract(data: bytes) -> dict[str, str]:
             "policyVersion": POLICY_VERSION}
 
 
+# Number format strings are exposed as source data. Render a subset of common
+# formats server-side and keep the original number when no formatter applies.
+BUILTIN_FORMATS = {
+    0: "General", 1: "0", 2: "0.00", 3: "#,##0", 4: "#,##0.00",
+    5: '"$"#,##0_);("$"#,##0)', 6: '"$"#,##0_);[Red]("$"#,##0)',
+    7: '"$"#,##0.00_);("$"#,##0.00)', 8: '"$"#,##0.00_);[Red]("$"#,##0.00)',
+    9: "0%", 10: "0.00%", 11: "0.00E+00", 12: "# ?/?", 13: "# ??/??",
+    14: "m/d/yy", 15: "d-mmm-yy", 16: "d-mmm", 17: "mmm-yy", 18: "h:mm AM/PM",
+    19: "h:mm:ss AM/PM", 20: "h:mm", 21: "h:mm:ss", 22: "m/d/yy h:mm",
+    37: "#,##0 ;(#,##0)", 38: "#,##0 ;[Red](#,##0)",
+    39: "#,##0.00;(#,##0.00)", 40: "#,##0.00;[Red](#,##0.00)",
+    45: "mm:ss", 46: "[h]:mm:ss", 47: "mmss.0", 48: "##0.0E+0", 49: "@",
+}
+DATE_FORMATS = {
+    14: "%m/%d/%y", 15: "%d-%b-%y", 16: "%d-%b", 17: "%b-%y",
+    18: "%I:%M %p", 19: "%I:%M:%S %p", 20: "%H:%M", 21: "%H:%M:%S",
+    22: "%m/%d/%y %H:%M", 45: "%M:%S", 47: "%M%S",
+}
+
+
+def coordinate(reference: str) -> tuple[int, int]:
+    match = re.fullmatch(r"([A-Z]{1,3})([1-9][0-9]{0,6})", reference)
+    if not match:
+        raise Rejected("cell_coordinate")
+    column = 0
+    for char in match[1]:
+        column = column * 26 + ord(char) - 64
+    row = int(match[2])
+    if row > MAX_VIEWER_ROWS or column > MAX_VIEWER_COLUMNS:
+        raise Rejected("cell_coordinate")
+    return row - 1, column - 1
+
+
+def bounded_metadata(value: str, limit: int = MAX_CELL) -> str:
+    if len(value.encode("utf-8")) > limit or "\x00" in value:
+        raise Rejected("cell_budget")
+    return value
+
+
+def viewer_number_formats(styles: ET.Element | None) -> list[tuple[int, str]]:
+    if styles is None:
+        return [(0, "General")]
+    custom = {
+        int(node.attrib["numFmtId"]): bounded_metadata(node.attrib["formatCode"], 255)
+        for node in styles.findall("s:numFmts/s:numFmt", NS)
+    }
+    return [
+        (number, custom.get(number, BUILTIN_FORMATS.get(number, "")))
+        for node in styles.findall("s:cellXfs/s:xf", NS)
+        for number in [int(node.attrib.get("numFmtId", "0"))]
+    ] or [(0, "General")]
+
+
+CUSTOM_DATE_FORMATS = {
+    "yyyy-mm-dd": "%Y-%m-%d",
+    "yyyy-mm-dd hh:mm": "%Y-%m-%d %H:%M",
+    "yyyy-mm-dd hh:mm:ss": "%Y-%m-%d %H:%M:%S",
+    "mm/dd/yyyy": "%m/%d/%Y",
+    "dd/mm/yyyy": "%d/%m/%Y",
+    "hh:mm": "%H:%M",
+    "hh:mm:ss": "%H:%M:%S",
+}
+
+
+def viewer_number(text: str, number_format: int, code: str, dates1904: bool):
+    # Keep Excel's stored numeric representation separate from display formatting.
+    if not re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", text):
+        raise Rejected("number_cell")
+    number = float(text)
+    if not math.isfinite(number):
+        raise Rejected("number_cell")
+    syntax = re.sub(r'"[^"]*"|\[(?![hms]+\])[^\]]*\]|\\.', "", code).lower()
+    is_date = number_format in DATE_FORMATS or number_format == 46 or (
+        number_format >= 164 and re.search(r"[ymdhs]", syntax)
+    )
+    if is_date:
+        if number_format == 46 and abs(number) < 1e12:
+            total_seconds = round(number * 86400)
+            sign = "-" if total_seconds < 0 else ""
+            hours, seconds = divmod(abs(total_seconds), 3600)
+            return number, "date", f"{sign}{hours}:{seconds // 60:02}:{seconds % 60:02}", False
+        pattern = DATE_FORMATS.get(number_format) or CUSTOM_DATE_FORMATS.get(code.lower())
+        if pattern is None:
+            return number, "date", text, True
+        try:
+            leap_day = not dates1904 and 60 <= number < 61
+            if leap_day:
+                # Use a genuine leap day for the month/day fields, then restore
+                # Excel's fictitious 1900 year after applying the selected format.
+                date = datetime.datetime(2000, 2, 29) + datetime.timedelta(days=number - 60)
+            else:
+                epoch = datetime.datetime(1904, 1, 1) if dates1904 else datetime.datetime(
+                    1899, 12, 31 if number < 60 else 30
+                )
+                date = epoch + datetime.timedelta(days=number)
+        except OverflowError:
+            return number, "date", text, True
+        display = date.strftime(pattern)
+        if leap_day:
+            display = display.replace("2000", "1900")
+        if number_format in (14, 22):
+            display = re.sub(r"(?<![0-9])0([0-9])(?=/)", r"\1", display)
+        elif number_format in (18, 19, 20, 21):
+            display = display.removeprefix("0")
+        elif number_format in (15, 16):
+            display = display.removeprefix("0")
+        elif number_format == 47:
+            display += f".{date.microsecond // 100_000}"
+        return number, "date", display, False
+
+    if number_format == 0 or code.lower() == "general":
+        return number, "number", text, False
+    if number_format == 11 and abs(number) < 1e100:
+        return number, "number", format(number, ".2E"), False
+
+    # Render only sections whose literals, grouping, signs and precision are
+    # understood. Other Excel format syntax remains available as raw metadata.
+    sections = code.split(";")
+    if len(sections) > 2:
+        return number, "number", text, True
+    negative_section = number < 0 and len(sections) == 2
+    primary = sections[1 if negative_section else 0].strip()
+    primary = re.sub(r"^\[Red\]", "", primary, flags=re.I).removesuffix("_)")
+    parentheses = primary.startswith("(") and primary.endswith(")")
+    if parentheses:
+        primary = primary[1:-1]
+    simple = re.fullmatch(r'(?:"([$€£¥])"|([$€£¥]))?((?:#,##)?0+)(?:\.(0+))?(%)?', primary)
+    if not simple:
+        return number, "number", text, True
+    prefix = simple[1] or simple[2] or ""
+    digits, decimals, percent = simple[3], len(simple[4] or ""), bool(simple[5])
+    scaled = abs(number) * (100 if percent else 1)
+    if not math.isfinite(scaled) or decimals > 15 or scaled >= 1e21:
+        return number, "number", text, True
+    grouping = "," if "," in digits else ""
+    with decimal.localcontext() as context:
+        context.prec = 50
+        amount = abs(decimal.Decimal(text)) * (100 if percent else 1)
+        rounded = amount.quantize(decimal.Decimal(1).scaleb(-decimals), rounding=decimal.ROUND_HALF_UP)
+    display = format(rounded, f"{grouping}.{decimals}f")
+    integer, dot, fraction = display.partition(".")
+    if not grouping:
+        integer = integer.zfill(len(digits))
+    display = prefix + integer + dot + fraction + ("%" if percent else "")
+    if parentheses:
+        display = f"({display})"
+    elif number < 0 and not negative_section:
+        display = "-" + display
+    return number, "number", display, False
+
+
+NS = {"s": SHEET_NS}
+
+
+def viewer_cell(node, strings, formats, dates1904):
+    values = node.findall("s:v", NS)
+    formulas = node.findall("s:f", NS)
+    inline = node.findall("s:is", NS)
+    if len(values) > 1 or len(formulas) > 1 or len(inline) > 1:
+        raise Rejected("workbook_cell_structure")
+    raw = bounded_metadata((values[0].text or "") if values else "")
+    cell_type = node.attrib.get("t", "n")
+    style = int(node.attrib.get("s", "0"))
+    if not 0 <= style < len(formats):
+        raise Rejected("workbook_style_reference")
+    format_id, format_code = formats[style]
+    value, kind, display, raw_format = None, "blank", "", False
+    if cell_type == "inlineStr":
+        if values or formulas:
+            raise Rejected("workbook_string_structure")
+        if inline:
+            value = display = bounded_text(inline[0])
+            kind = "text"
+    elif inline:
+        raise Rejected("workbook_string_structure")
+    elif values and (raw or cell_type == "str"):
+        if cell_type == "s":
+            if not raw.isascii() or not raw.isdecimal() or int(raw) >= len(strings):
+                raise Rejected("shared_string_reference")
+            value = display = strings[int(raw)]
+            kind = "text"
+        elif cell_type == "b" and raw in ("0", "1"):
+            value, kind, display = raw == "1", "boolean", "TRUE" if raw == "1" else "FALSE"
+        elif cell_type in ("str", "e", "d"):
+            value = display = raw
+            kind = {"str": "text", "e": "error", "d": "date"}[cell_type]
+        elif cell_type == "n":
+            value, kind, display, raw_format = viewer_number(raw, format_id, format_code, dates1904)
+        else:
+            raise Rejected("unsupported_cell_type")
+    elif cell_type not in ("n", "str", "b", "d", "e", "s"):
+        raise Rejected("unsupported_cell_type")
+    row, column = coordinate(node.attrib.get("r", ""))
+    cell = {"row": row, "column": column, "value": value, "kind": kind, "displayValue": display}
+    if raw_format:
+        cell["formatStatus"] = "raw"
+    if format_id != 0:
+        cell["numberFormatId"] = format_id
+        if format_code:
+            cell["numberFormat"] = format_code
+    if formulas:
+        formula = formulas[0]
+        if formula.text:
+            cell["formula"] = "=" + bounded_metadata(formula.text, MAX_CELL - 1)
+        cell["formulaStatus"] = "missing" if kind == "blank" else "cached"
+        for attribute, field in (("t", "formulaType"), ("ref", "formulaRef"), ("si", "formulaSharedIndex")):
+            if attribute in formula.attrib:
+                cell[field] = bounded_metadata(formula.attrib[attribute], 64)
+    return cell
+
+
+def extract_viewer(data: bytes) -> dict:
+    documents, seen = unpack(data, viewer=True)
+    workbook = documents.get("xl/workbook.xml")
+    relationships = documents.get("xl/_rels/workbook.xml.rels")
+    if ("[content_types].xml" not in seen or workbook is None or relationships is None
+            or workbook.tag != f"{{{SHEET_NS}}}workbook"
+            or relationships.tag != f"{{{REL_NS}}}Relationships"):
+        raise Rejected("workbook_required_parts")
+    refs = {}
+    for relation in relationships:
+        rel_id = relation.attrib.get("Id")
+        if not rel_id or rel_id in refs:
+            raise Rejected("workbook_sheet_relationship")
+        refs[rel_id] = relation
+    sheets = workbook.findall("s:sheets/s:sheet", NS)
+    if not 0 < len(sheets) <= MAX_VIEWER_SHEETS:
+        raise Rejected("workbook_sheet_budget")
+    strings_root = documents.get("xl/sharedStrings.xml")
+    if strings_root is not None and (
+        strings_root.tag != f"{{{SHEET_NS}}}sst" or len(strings_root) > MAX_CELLS
+    ):
+        raise Rejected("shared_strings_budget")
+    strings = [] if strings_root is None else [bounded_text(node) for node in strings_root]
+    formats = viewer_number_formats(documents.get("xl/styles.xml"))
+    properties = workbook.find("s:workbookPr", NS)
+    dates1904 = properties is not None and properties.attrib.get("date1904") in ("1", "true")
+    parsed = []
+    cell_count = merge_count = output_size = 0
+    targets = set()
+    for index, sheet in enumerate(sheets):
+        relation = refs.get(sheet.attrib.get(f"{{{RID_NS}}}id"))
+        if relation is None or relation.attrib.get("Type") != f"{RID_NS}/worksheet":
+            raise Rejected("workbook_sheet_relationship")
+        target = relation.attrib.get("Target", "")
+        target = target[1:] if target.startswith("/") else "xl/" + target
+        if target in targets or not re.fullmatch(r"xl/worksheets/[^/]+\.xml", target):
+            raise Rejected("workbook_sheet_relationship")
+        targets.add(target)
+        root = documents.get(target)
+        if root is None or root.tag != f"{{{SHEET_NS}}}worksheet":
+            raise Rejected("workbook_sheet_structure")
+        data_nodes = root.findall("s:sheetData", NS)
+        if len(data_nodes) != 1:
+            raise Rejected("workbook_sheet_structure")
+        name = bounded_metadata(sheet.attrib.get("name", ""), 255)
+        visibility = sheet.attrib.get("state", "visible")
+        if not name or visibility not in ("visible", "hidden", "veryHidden"):
+            raise Rejected("workbook_sheet_structure")
+        cells = []
+        positions = set()
+        rows = columns = 0
+        for row in data_nodes[0]:
+            if row.tag != f"{{{SHEET_NS}}}row":
+                raise Rejected("workbook_sheet_structure")
+            for node in row:
+                if node.tag != f"{{{SHEET_NS}}}c":
+                    continue
+                cell_count += 1
+                if cell_count > MAX_CELLS:
+                    raise Rejected("cell_count_budget")
+                cell = viewer_cell(node, strings, formats, dates1904)
+                position = cell["row"], cell["column"]
+                if position in positions or (row.get("r") is not None and int(row.get("r")) != position[0] + 1):
+                    raise Rejected("cell_coordinate")
+                positions.add(position)
+                rows = max(rows, position[0] + 1)
+                columns = max(columns, position[1] + 1)
+                output_size += len(json.dumps(cell, ensure_ascii=True, separators=(",", ":"))) + 1
+                if output_size > MAX_VIEWER_OUTPUT:
+                    raise Rejected("workbook_output_budget")
+                cells.append(cell)
+        merges = []
+        for node in root.findall("s:mergeCells/s:mergeCell", NS):
+            merge_count += 1
+            if merge_count > MAX_VIEWER_MERGES:
+                raise Rejected("workbook_merge_budget")
+            start, _, end = node.get("ref", "").partition(":")
+            row, column = coordinate(start)
+            bottom, right = coordinate(end)
+            if bottom < row or right < column:
+                raise Rejected("workbook_merge_range")
+            merges.append({"rowStart": row, "columnStart": column,
+                           "rowCount": bottom - row + 1, "columnCount": right - column + 1})
+            rows, columns = max(rows, bottom + 1), max(columns, right + 1)
+        cells.sort(key=lambda cell: (cell["row"], cell["column"]))
+        parsed.append({"id": str(index), "name": name, "visibility": visibility,
+                       "rowCount": rows, "columnCount": columns, "cells": cells, "merges": merges})
+    return {"sheets": parsed, "dateSystem": "1904" if dates1904 else "1900",
+            "sourceSha256": hashlib.sha256(data).hexdigest(), "policyVersion": VIEWER_POLICY_VERSION}
+
+
 def probe() -> dict[str, bool]:
     """Verify actual kernel denials in a disposable test process."""
     results = {}
@@ -450,6 +761,8 @@ def main() -> int:
             result = probe()
             if not all(result.values()):
                 raise RuntimeError("isolation probe failed")
+        elif sys.argv[1:] == ["--viewer"]:
+            result = extract_viewer(sys.stdin.buffer.read(MAX_INPUT + 1))
         elif sys.argv[1:]:
             raise Rejected("invalid_protocol")
         else:

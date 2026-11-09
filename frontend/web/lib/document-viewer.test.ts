@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import test from "node:test"
 import {
+  DocumentCsvError,
   DocumentViewerError,
   documentPreview,
   parseDocumentCsv,
@@ -299,6 +300,120 @@ test("the viewer bounds streamed bodies even without Content-Length", async () =
     errorCode("unavailable"),
   )
   assert.equal(requested, false)
+})
+
+test("CSV preview detects logical records with titles, decimal commas and quoted separators", () => {
+  const source = new TextEncoder().encode(
+    "Summary\r\n".repeat(70) +
+      '\r\nID;Amount;Notes\r\n0007;12,34;"line 1; x\r\nline 2"\r\n0008;1,20\r\n',
+  )
+  const preview = documentPreview("text/csv", source)
+  assert.equal(preview.kind, "csv")
+  assert.equal(preview.delimiter, ";")
+  assert.deepEqual(preview.rows.slice(-4), [
+    [""],
+    ["ID", "Amount", "Notes"],
+    ["0007", "12,34", "line 1; x\r\nline 2"],
+    ["0008", "1,20"],
+  ])
+  assert.deepEqual(preview.diagnostics, [])
+  assert.deepEqual(
+    documentPreview(
+      "application/csv",
+      new TextEncoder().encode('ID\tNote\n0001\t"a,b;c"'),
+    ),
+    {
+      kind: "csv",
+      delimiter: "\t",
+      encoding: "utf-8",
+      diagnostics: [],
+      rows: [
+        ["ID", "Note"],
+        ["0001", "a,b;c"],
+      ],
+      columns: 2,
+    },
+  )
+})
+
+test("ambiguous CSV warns and can be reparsed with the selected delimiter", () => {
+  const source = new TextEncoder().encode("A,B;C\n0001,0002;0003")
+  const detected = documentPreview("text/csv", source)
+  assert.equal(detected.kind, "csv")
+  assert.equal(detected.delimiter, ",")
+  assert.deepEqual(detected.diagnostics, [
+    { code: "ambiguousDelimiter", candidates: [",", ";"] },
+  ])
+  const manual = documentPreview("text/csv", source, { delimiter: ";" })
+  assert.equal(manual.kind, "csv")
+  assert.deepEqual(manual.rows, [
+    ["A,B", "C"],
+    ["0001,0002", "0003"],
+  ])
+  assert.deepEqual(manual.diagnostics, [])
+})
+
+test("CSV preview reads UTF BOMs and requires an explicit legacy encoding", () => {
+  const text = "Item;Cost\nCafé;€"
+  const utf8 = new TextEncoder().encode("\uFEFF" + text)
+  const utf16le = new Uint8Array(Buffer.from("\uFEFF" + text, "utf16le"))
+  const utf16be = new Uint8Array(Buffer.from(utf16le).swap16())
+  for (const [source, encoding] of [
+    [utf8, "utf-8"],
+    [utf16le, "utf-16le"],
+    [utf16be, "utf-16be"],
+  ] as const) {
+    const preview = documentPreview("text/csv", source)
+    assert.equal(preview.kind, "csv")
+    assert.equal(preview.encoding, encoding)
+    assert.deepEqual(preview.rows, [
+      ["Item", "Cost"],
+      ["Café", "€"],
+    ])
+  }
+  const legacy = Uint8Array.from(
+    Buffer.from("Item;Cost\nCaf\xe9;\x80", "latin1"),
+  )
+  assert.throws(
+    () => documentPreview("text/csv", legacy),
+    (error: unknown) =>
+      error instanceof DocumentCsvError &&
+      error.diagnostic.code === "unknownEncoding",
+  )
+  const preview = documentPreview("text/csv", legacy, {
+    encoding: "windows-1252",
+  })
+  assert.equal(preview.kind, "csv")
+  assert.deepEqual(preview.rows, [
+    ["Item", "Cost"],
+    ["Café", "€"],
+  ])
+  assert.throws(
+    () => documentPreview("text/csv", utf16le, { encoding: "windows-1252" }),
+    (error: unknown) =>
+      error instanceof DocumentCsvError &&
+      error.diagnostic.code === "invalidEncoding",
+  )
+})
+
+test("CSV diagnostics report a malformed field's logical record and column", () => {
+  assert.throws(
+    () =>
+      documentPreview(
+        "text/csv",
+        new TextEncoder().encode('x;y\n"1\n2";"open'),
+        { delimiter: ";" },
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof DocumentCsvError)
+      assert.deepEqual(error.diagnostic, {
+        code: "unterminatedQuote",
+        row: 2,
+        column: 2,
+      })
+      return true
+    },
+  )
 })
 
 test("a revoked request or an aborted scope cannot return file bytes", async () => {

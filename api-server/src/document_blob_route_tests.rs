@@ -304,7 +304,7 @@ impl Fixture {
         config.document_blob_store = DocumentBlobStoreConfig::Local { root: root.clone() };
         let state = Arc::new(AppState::new(config));
         let app = Router::new()
-            .nest("/v1", blob_router())
+            .nest("/v1", crate::routes::domain_router())
             .layer(CookieManagerLayer::new())
             .with_state(state.clone());
         Self {
@@ -457,6 +457,76 @@ async fn upload_accepts_three_mib_and_presign_rejects_the_declared_size_above_th
         )
         .await
         .expect_status(StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn spreadsheet_routes_reauthorize_warmed_ranges_and_bind_exact_versions() {
+    let fixture = Fixture::new().await;
+    let slot = fixture
+        .completed("document", "text/csv", b"ID,Name\n0007,Acme\n")
+        .await;
+    let mut parent = slot.document(ACTOR);
+    parent["current_version_id"] = json!(31);
+    {
+        let mut rows = fixture.rows.lock().unwrap();
+        rows.documents.push(parent);
+        rows.versions.push(json!({
+            "id":31,"organization_id":7,"document_id":21,
+            "url":slot.url,"checksum":slot.checksum,"created_by":ACTOR
+        }));
+    }
+
+    let base = "/api/documents/spreadsheet/21";
+    let range = format!(
+        "{base}/current/range?companyId=3&sheetId=0&rowStart=1&rowCount=10&columnStart=0&columnCount=4&checksum={}",
+        slot.checksum
+    );
+    let response = fixture
+        .get("actor-token", &range)
+        .await
+        .expect_status(StatusCode::OK);
+    assert_eq!(response.headers[header::CACHE_CONTROL], "private, no-store");
+    let result = response.json();
+    assert_eq!(result["versionId"], "31");
+    assert_eq!(result["cells"][0]["displayValue"], "0007");
+    fixture
+        .get("actor-token", &format!("{base}/31?companyId=3"))
+        .await
+        .expect_status(StatusCode::OK);
+    fixture
+        .get("actor-token", &format!("{base}/32?companyId=3"))
+        .await
+        .expect_status(StatusCode::NOT_FOUND);
+    fixture
+        .get("other-token", &range)
+        .await
+        .expect_status(StatusCode::NOT_FOUND);
+    fixture
+        .get("actor-token", &format!("{base}/current?companyId=4"))
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+    fixture
+        .get(
+            "actor-token",
+            &format!("{base}/current?companyId=3&checksum={}", "f".repeat(64)),
+        )
+        .await
+        .expect_status(StatusCode::CONFLICT);
+
+    fixture.rows.lock().unwrap().actor_permissions = vec!["document:read".into()];
+    fixture
+        .get("actor-token", &range)
+        .await
+        .expect_status(StatusCode::OK);
+    fixture
+        .get("actor-token", &format!("{base}/31?companyId=3"))
+        .await
+        .expect_status(StatusCode::FORBIDDEN);
+    fixture.rows.lock().unwrap().documents[0]["is_deleted"] = json!(true);
+    fixture
+        .get("actor-token", &range)
+        .await
+        .expect_status(StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]

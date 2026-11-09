@@ -188,14 +188,49 @@ function fileRulesObject() {
 }
 export const importPreparationRulesSchema =
   fileRulesObject().superRefine(validateFileRules)
+export const managedImportSelectionSchema = z
+  .object({
+    documentId: positiveId,
+    versionId: positiveId,
+    current: z.boolean(),
+    sheetName: text(255),
+    firstRow: z.number().int().min(1).max(1_048_576),
+    lastRow: z.number().int().min(1).max(1_048_576),
+    firstColumn: columnNumber,
+    lastColumn: columnNumber,
+    encoding: z
+      .enum(["utf-8", "utf-16le", "utf-16be", "windows-1252"])
+      .optional(),
+    headerRow: z.number().int().min(1).max(1_048_576).optional(),
+  })
+  .strict()
+  .refine(
+    ({ firstRow, lastRow, firstColumn, lastColumn, headerRow }) =>
+      firstRow <= lastRow &&
+      firstColumn <= lastColumn &&
+      (lastRow - firstRow + 1) * (lastColumn - firstColumn + 1) <= 5000 &&
+      (headerRow === undefined || headerRow <= firstRow),
+  )
+
 export const importPreparationFileSchema = z
   .object({
     fileName: filename,
     sourceSha256: sha256,
+    managedSelection: managedImportSelectionSchema.optional(),
     ...fileRuleShape,
   })
   .strict()
-  .superRefine(validateFileRules)
+  .superRefine((options, context) => {
+    validateFileRules(options, context)
+    if (
+      options.managedSelection &&
+      (options.sections?.length || options.expectedLayoutSha256)
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Use the original document selection for preparation.",
+      })
+  })
 
 export const importRecipeReferenceSchema = z
   .object({

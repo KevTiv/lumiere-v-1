@@ -25,6 +25,7 @@ use crate::error::ApiError;
 use crate::evidence_ingestion::{configured_network_hosts, validate_network_url};
 use crate::query_exec::{execute_resource_query_for_company, resolve_membership_company_id};
 use crate::session::ApiSession;
+use crate::spreadsheet;
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session, OrgSession};
@@ -599,6 +600,243 @@ pub(crate) async fn read_authorized_document_blob(
         source_url: meta.source_url,
         bytes,
         inspection,
+    })
+}
+
+/// Authorize the exact parent and version on every request, including cache hits.
+pub(crate) async fn read_authorized_spreadsheet(
+    state: &AppState,
+    session: &ApiSession,
+    requested_company_id: Option<u64>,
+    document_id: u64,
+    version_id: Option<u64>,
+    pinned_checksum: Option<&str>,
+) -> Result<(spreadsheet::Source, Arc<spreadsheet::Workbook>), ApiError> {
+    let read = authorize_spreadsheet(
+        state,
+        session,
+        requested_company_id,
+        document_id,
+        version_id,
+        pinned_checksum,
+    )
+    .await?;
+    let cache_key = spreadsheet::CacheKey {
+        organization_id: read.context.organization_id(),
+        company_id: read.meta.company_id,
+        document_id,
+        version_id: read.exact_version_id,
+        object_key: read.meta.object_key.clone(),
+        checksum: read.source.checksum.clone(),
+        content_type: read.meta.content_type.clone(),
+    };
+    read.context
+        .require_current_placement(&state.organization_placements)?;
+    if let Some(workbook) = spreadsheet::cached(&cache_key) {
+        return Ok((read.source, workbook));
+    }
+
+    let mut read = read;
+    let (bytes, _) = read.load_bytes(state).await?;
+    let workbook = Arc::new(spreadsheet::Workbook::read(&read.meta.content_type, bytes).await?);
+    read.revalidate(state, requested_company_id, document_id, version_id)
+        .await?;
+    spreadsheet::cache(cache_key, Arc::clone(&workbook));
+    Ok((read.source, workbook))
+}
+
+/// Read the authorized immutable source bytes before applying a caller's
+/// narrower processing policy, such as strict values-only workbook import.
+pub(crate) async fn read_authorized_spreadsheet_source(
+    state: &AppState,
+    session: &ApiSession,
+    requested_company_id: Option<u64>,
+    document_id: u64,
+    version_id: Option<u64>,
+    pinned_checksum: Option<&str>,
+) -> Result<(spreadsheet::Source, CompletedBlob), ApiError> {
+    let mut read = authorize_spreadsheet(
+        state,
+        session,
+        requested_company_id,
+        document_id,
+        version_id,
+        pinned_checksum,
+    )
+    .await?;
+    let (bytes, inspection) = read.load_bytes(state).await?;
+    read.revalidate(state, requested_company_id, document_id, version_id)
+        .await?;
+    let blob = CompletedBlob {
+        object_key: read.meta.object_key,
+        content_type: read.meta.content_type,
+        checksum: read.source.checksum.clone(),
+        source_url: read.meta.source_url,
+        bytes,
+        inspection,
+    };
+    Ok((read.source, blob))
+}
+
+struct SpreadsheetRead {
+    context: TrustedOperationContext,
+    parent: serde_json::Value,
+    version: Option<serde_json::Value>,
+    exact_version_id: u64,
+    source: spreadsheet::Source,
+    meta: BlobMeta,
+    meta_path: String,
+    bin_path: String,
+    limit: u64,
+}
+
+impl SpreadsheetRead {
+    async fn load_bytes(
+        &mut self,
+        state: &AppState,
+    ) -> Result<(Vec<u8>, BlobInspectionReceipt), ApiError> {
+        let store = &state.config.document_blob_store;
+        let bytes = storage::read(store, &self.bin_path, self.limit)
+            .await?
+            .ok_or_else(|| ApiError::NotFound("Spreadsheet bytes not found".into()))?;
+        verify_pinned_download(
+            &self.meta,
+            &bytes,
+            self.context.organization_id(),
+            &self.source.checksum,
+        )?;
+        let inspection =
+            ensure_inspected_blob(store, &self.meta_path, &mut self.meta, &bytes).await?;
+        Ok((bytes, inspection))
+    }
+
+    async fn revalidate(
+        &self,
+        state: &AppState,
+        requested_company_id: Option<u64>,
+        document_id: u64,
+        version_id: Option<u64>,
+    ) -> Result<(), ApiError> {
+        let (parent, version) = crate::query_exec::read_spreadsheet_document_rows(
+            &self.context,
+            requested_company_id,
+            document_id,
+            version_id,
+        )
+        .await?;
+        if parent != self.parent || version != self.version {
+            return Err(ApiError::Conflict("Spreadsheet version has changed".into()));
+        }
+        self.context
+            .require_current_placement(&state.organization_placements)
+    }
+}
+
+async fn authorize_spreadsheet(
+    state: &AppState,
+    session: &ApiSession,
+    requested_company_id: Option<u64>,
+    document_id: u64,
+    version_id: Option<u64>,
+    pinned_checksum: Option<&str>,
+) -> Result<SpreadsheetRead, ApiError> {
+    let context = TrustedOperationContext::for_resource_read(state, session)?;
+    let organization_id = context.organization_id();
+    if let Some(checksum) = pinned_checksum {
+        validate_pinned_checksum(checksum)?;
+    }
+    let (parent, version) = crate::query_exec::read_spreadsheet_document_rows(
+        &context,
+        requested_company_id,
+        document_id,
+        version_id,
+    )
+    .await?;
+    let source_row = version.as_ref().unwrap_or(&parent);
+    let exact_version_id = match version_id {
+        Some(version_id) => version_id,
+        None => crate::query_exec::row_u64(&parent, "currentVersionId", "current_version_id")
+            .ok()
+            .flatten()
+            .filter(|id| *id != 0)
+            .ok_or_else(|| ApiError::NotFound("Current spreadsheet version not found".into()))?,
+    };
+    let object_url = source_row
+        .get("url")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| ApiError::Unprocessable("Spreadsheet has no managed source".into()))?;
+    let checksum = source_row
+        .get("checksum")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| ApiError::Conflict("Spreadsheet checksum is unavailable".into()))?;
+    validate_pinned_checksum(checksum)?;
+    if pinned_checksum.is_some_and(|pinned| pinned != checksum) {
+        return Err(ApiError::Conflict("Spreadsheet version has changed".into()));
+    }
+    let key = completed_blob_key(object_url)?;
+    let (key_organization_id, residency, object_id) = parse_object_key(&key)?;
+    if key_organization_id != organization_id {
+        return Err(ApiError::NotFound("Spreadsheet not found".into()));
+    }
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(organization_id, &object_id, &residency);
+    let meta = read_meta(store, &meta_path).await?;
+    let company_id = crate::query_exec::row_u64(&parent, "companyId", "company_id")
+        .map_err(ApiError::Internal)?;
+    let scope = DocumentBlobScope {
+        organization_id,
+        company_id,
+        creator_identity: meta.creator_identity(),
+        url: object_url,
+        checksum,
+    };
+    if !meta.completed
+        || meta.organization_id != organization_id
+        || meta.company_id != company_id
+        || meta.object_key != key
+        || meta.purpose != BlobPurpose::Document
+        || meta.actual_checksum.as_deref() != Some(checksum)
+        || !document_blob_is_visible(
+            &scope,
+            Some(context.field_access()),
+            std::slice::from_ref(&parent),
+            version.as_slice(),
+        )
+    {
+        return Err(ApiError::NotFound("Spreadsheet not found".into()));
+    }
+    if !matches!(
+        meta.content_type.as_str(),
+        "text/csv" | "application/csv" | spreadsheet::XLSX_CONTENT_TYPE
+    ) {
+        return Err(ApiError::UnsupportedMediaType(
+            "File is not a supported spreadsheet".into(),
+        ));
+    }
+    let limit = maximum_profile_bytes(&meta.content_type);
+    if !meta
+        .actual_size
+        .is_some_and(|size| size > 0 && size <= limit)
+    {
+        return Err(ApiError::Unprocessable(
+            "Spreadsheet exceeds its file size limit".into(),
+        ));
+    }
+    let source = spreadsheet::Source {
+        document_id: document_id.to_string(),
+        version_id: exact_version_id.to_string(),
+        checksum: checksum.to_owned(),
+    };
+    Ok(SpreadsheetRead {
+        context,
+        parent,
+        version,
+        exact_version_id,
+        source,
+        meta,
+        meta_path,
+        bin_path,
+        limit,
     })
 }
 

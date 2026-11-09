@@ -29,6 +29,8 @@ pub enum ApiError {
     #[error("{0}")]
     Unprocessable(String),
     #[error("{0}")]
+    UnsupportedMediaType(String),
+    #[error("{0}")]
     Unavailable(String),
     #[error("service temporarily unavailable")]
     UnavailableSource(#[source] anyhow::Error),
@@ -68,6 +70,7 @@ impl IntoResponse for ApiError {
             ApiError::Gone(m) => (StatusCode::GONE, m),
             ApiError::NotFound(m) => (StatusCode::NOT_FOUND, m),
             ApiError::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, m),
+            ApiError::UnsupportedMediaType(m) => (StatusCode::UNSUPPORTED_MEDIA_TYPE, m),
             ApiError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m),
             ApiError::UnavailableSource(source) => {
                 error!(error = ?source, "api dependency unavailable");

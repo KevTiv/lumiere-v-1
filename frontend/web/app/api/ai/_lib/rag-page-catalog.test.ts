@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
 import ts from "typescript"
+import { z } from "zod"
 
 import type { QueryResourceState } from "@lumiere/api-client"
 import * as uiContext from "@lumiere/erp-shared/ai-ui-context"
@@ -239,6 +240,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
     "./rag-request.ts",
     {
       "next/server": { NextResponse: Response },
+      zod: { z },
       "@lumiere/erp-shared/ai-ui-context": uiContext,
       "./route-helpers": {
         positiveInteger,
@@ -329,4 +331,59 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   assert.equal(rejected.response.status, 403)
   assert.deepEqual(scopeChecks, [12, 13])
   assert.equal(requests.length, 1)
+
+  const spreadsheetSelection = {
+    documentId: "9007199254740993",
+    versionId: "15",
+    current: false,
+    checksum: "a".repeat(64),
+    sheetName: "CSV",
+    firstRow: 2,
+    lastRow: 3,
+    firstColumn: 1,
+    lastColumn: 1,
+    delimiter: ";",
+    encoding: "windows-1252",
+    headerRow: 1,
+  }
+  const spreadsheetBody = {
+    ...body,
+    query: "Check the selected spreadsheet cells for issues.",
+    spreadsheet_selection: spreadsheetSelection,
+  }
+  const prepared = await request.prepareRagPayload({
+    body: spreadsheetBody,
+    session,
+    orgId: 7,
+  })
+  assert.ok(prepared.ok)
+  assert.deepEqual(
+    plain(prepared.payload.spreadsheet_selection),
+    spreadsheetSelection,
+  )
+  assert.deepEqual(plain(prepared.payload.ui_action_offers), [])
+  assert.equal(prepared.payload.ui_context, undefined)
+  assert.equal(prepared.payload.import_task_refs, undefined)
+  assert.equal(requests.length, 1)
+
+  for (const badBody of [
+    { ...spreadsheetBody, query: "Create a product." },
+    {
+      ...spreadsheetBody,
+      spreadsheet_selection: { ...spreadsheetSelection, cells: [["forged"]] },
+    },
+    {
+      ...spreadsheetBody,
+      spreadsheet_selection: { ...spreadsheetSelection, lastRow: 250 },
+    },
+  ]) {
+    const invalid = await request.prepareRagPayload({
+      body: badBody,
+      session,
+      orgId: 7,
+    })
+    assert.equal(invalid.ok, false)
+    if (invalid.ok) throw new Error("Expected an invalid spreadsheet selection")
+    assert.equal(invalid.response.status, 400)
+  }
 })

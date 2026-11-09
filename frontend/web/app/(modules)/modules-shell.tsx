@@ -76,6 +76,17 @@ import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, read
 import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
 import { useChatImportTasks } from "@/lib/chat-import-tasks"
+import {
+  DocumentSelectionActionsContext, documentSelectionAnalysisReference,
+  documentSelectionMatchesScope, documentSelectionPreparation,
+  documentSelectionQuestion, readDocumentSelectionFile,
+  type DocumentSelectionAction, type DocumentSelection, type DocumentSelectionDraft,
+} from "@/lib/document-selection-actions"
+import { DocumentViewerDialog } from "../../components/document-viewer-dialog"
+import type { ImportPreparation } from "@/lib/import-preparation"
+
+type SelectionImportHandler = (files: File[], preparation: ImportPreparation) => Promise<void>
+
 import { recordPageHref } from "@/lib/record-page-href"
 import { scopedImportTaskStatuses } from "@/lib/import-task-status"
 import { assistantPresentationReply, modelNativeChatActions, parseNativeChatActions, withNativeActionsMetadata } from "@/lib/assistant-native-actions"
@@ -140,8 +151,14 @@ function dateFromStored(raw: unknown): Date {
 
 function ErpAiChatPanel({
   firstOrgProfile,
+  selectionDraft,
+  registerSelectionImport,
   ...props
-}: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context"> & { firstOrgProfile: boolean }) {
+}: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context"> & {
+  firstOrgProfile: boolean
+  selectionDraft: DocumentSelectionDraft | null
+  registerSelectionImport: (handler?: SelectionImportHandler) => () => void
+}) {
   const { organizationId, identity } = useErpSession()
   const { route, module, activeTab, selection } = useErpAiRouteContext()
   const orgId = organizationId ?? 0
@@ -200,6 +217,9 @@ function ErpAiChatPanel({
   const messagesQuery = useAiChatMessages(orgId, sessionKey, orgReady && operatingCompanyId != null)
   const companiesQuery = useCompanies(orgId, orgReady)
   const importTasks = useChatImportTasks({ identity, organizationId: orgId, companyId: operatingCompanyId, conversationKey: sessionKey })
+  useEffect(() => registerSelectionImport(importTasks.onImportFiles), [importTasks.onImportFiles, registerSelectionImport])
+  const [sourcePreview, setSourcePreview] = useState<{ scope: string; documentId: string; versionId: string } | null>(null)
+  const scopedSelectionDraft = selectionDraft?.scope === actorHistoryScope ? selectionDraft : null
   const importCompany = companiesQuery.data?.find(company => String(company.id) === String(operatingCompanyId))
 
   useEffect(() => {
@@ -439,6 +459,12 @@ function ErpAiChatPanel({
         if (changesPage && navigationGuard) navigationGuard.proceed(open)
         else open()
       },
+      onOpenDocumentSource: (source: ChatMessageSourceRef) => {
+        if (!actorHistoryScope || source.source_kind !== "managed_document_selection" ||
+          !source.entity_id || !source.source_version ||
+          !/^[1-9]\d*$/.test(source.entity_id) || !/^[1-9]\d*$/.test(source.source_version)) return
+        setSourcePreview({ scope: actorHistoryScope, documentId: source.entity_id, versionId: source.source_version })
+      },
       onCiteSource: async ({ messageId, source }: { messageId: string; source: ChatMessageSourceRef }) => {
         if (!sessionKey || operatingCompanyId == null || operatingCompanyId <= 0 || source.passage_id == null) {
           throw new Error("Chat session or passage reference is not ready")
@@ -486,6 +512,27 @@ function ErpAiChatPanel({
       const started = performance.now()
       const requestScope = historyScope
       const isCurrent = () => currentHistoryScope.current === requestScope
+      const selectedDocument = !questionGuide && scopedSelectionDraft && userText.includes(scopedSelectionDraft.text)
+        ? scopedSelectionDraft
+        : null
+      if (selectedDocument) {
+        if (!documentSelectionMatchesScope(selectedDocument.selection, orgId, operatingCompanyId)) {
+          throw new Error("The company changed. Reopen the file before asking.")
+        }
+        if (selectedAgent !== "default" && requestedAgentId == null) {
+          throw new Error("The selected AI agent is no longer available. Choose another agent.")
+        }
+        const answer = await rag.mutateAsync({
+          query: selectedDocument.action === "explain"
+            ? "Explain the selected spreadsheet cells."
+            : "Check the selected spreadsheet cells for issues.",
+          companyId: operatingCompanyId,
+          spreadsheet_selection: documentSelectionAnalysisReference(selectedDocument.selection),
+          ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
+        })
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        return { content: answer.answer, sources: answer.sources.map(mapRagSourceToChatSource), runId: answer.run_id }
+      }
       const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
       const turnPage = !questionGuide && workspaceScope.usesCurrentPage && pageComposition?.page?.moduleId === module ? pageComposition.page : undefined
       const focusedImport = importTasks.focusedTask
@@ -565,7 +612,7 @@ function ErpAiChatPanel({
       })
       return { content, runId: out?.run_id, sources, guides, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
-    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask],
+    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
@@ -619,7 +666,7 @@ function ErpAiChatPanel({
       config={chatConfig}
       context={chatContext}
       initialMessages={initialMessages}
-      composerRequest={errorQuestion}
+      composerRequest={errorQuestion ?? scopedSelectionDraft}
       modal={Boolean(errorQuestion)}
       historySaveFailed={failedHistoryScope === historyScope}
       contextOptions={AI_WORKSPACE_SCOPES}
@@ -643,6 +690,10 @@ function ErpAiChatPanel({
       importCompanyLabel={importCompany?.name ?? (operatingCompanyId ? `Company ${operatingCompanyId}` : undefined)}
       importScopeKey={JSON.stringify([identity, organizationId, operatingCompanyId, sessionKey])}
     />
+    {sourcePreview?.scope === actorHistoryScope && organizationId ? (
+      <DocumentViewerDialog organizationId={BigInt(organizationId)} documentId={sourcePreview.documentId}
+        versionId={sourcePreview.versionId} onOpenChange={open => { if (!open) setSourcePreview(null) }} />
+    ) : null}
     <AssistantGuideHost request={guideRequestInScope(openGuide, actorHistoryScope)} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
       onClose={() => setOpenGuide(null)} onSaved={onGuideSaved} onAsk={askAboutGuide} />
   </>
@@ -715,8 +766,47 @@ function ModulesContent({
     setIsAIChatOpen(true)
   }, [])
 
+  const [selectionDraft, setSelectionDraft] = useState<DocumentSelectionDraft | null>(null)
+  const selectionImport = useRef<SelectionImportHandler | undefined>(undefined)
+  const currentSelectionScope = useRef({ scope: nativeFormScope })
+  if (currentSelectionScope.current.scope !== nativeFormScope) currentSelectionScope.current = { scope: nativeFormScope }
+  useEffect(() => setSelectionDraft(current => current?.scope === nativeFormScope ? current : null), [nativeFormScope])
+  const registerSelectionImport = useCallback((handler?: SelectionImportHandler) => {
+    selectionImport.current = handler
+    return () => { if (selectionImport.current === handler) selectionImport.current = undefined }
+  }, [])
+  const onDocumentSelectionAction = useCallback(async (
+    action: DocumentSelectionAction, selection: DocumentSelection, signal?: AbortSignal,
+  ) => {
+    signal?.throwIfAborted()
+    const currentScope = currentSelectionScope.current
+    if (!nativeFormScope || currentScope.scope !== nativeFormScope ||
+      !documentSelectionMatchesScope(selection, organizationId, operatingCompanyId)) {
+      throw new Error("Open the file in the current company to continue.")
+    }
+    if (!selection.source.versionId) throw new Error("The selected file has no saved version.")
+    if (action === "prepare") {
+      const handler = selectionImport.current
+      if (!handler) throw new Error("Check your access to saved imports in the current company.")
+      const preparation = documentSelectionPreparation(selection)
+      const timeout = AbortSignal.timeout(20_000)
+      const blob = await readDocumentSelectionFile(selection, signal ? AbortSignal.any([signal, timeout]) : timeout)
+      signal?.throwIfAborted()
+      if (currentSelectionScope.current !== currentScope || selectionImport.current !== handler)
+        throw new Error("The import session changed. Reopen the file and try again.")
+      await handler([new File([blob], selection.source.fileName, { type: selection.source.mimeType })], preparation)
+      if (currentSelectionScope.current !== currentScope) throw new Error("The company changed while saving the import.")
+    } else {
+      const text = documentSelectionQuestion(action, selection)
+      documentSelectionAnalysisReference(selection)
+      setSelectionDraft({ scope: nativeFormScope, action, selection, id: crypto.randomUUID(), text })
+    }
+    openAiChat()
+  }, [nativeFormScope, organizationId, operatingCompanyId, openAiChat])
+
   return (
     <AssistantNativeFormProvider value={nativeForms}>
+    <DocumentSelectionActionsContext.Provider value={onDocumentSelectionAction}>
     <ErpAiChatControllerProvider open={openAiChat}>
       <DashboardWorkspace
         forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
@@ -739,6 +829,8 @@ function ModulesContent({
           <>
             <ErpAiChatPanel
               firstOrgProfile={firstOrgProfile}
+              selectionDraft={selectionDraft}
+              registerSelectionImport={registerSelectionImport}
               open={isAIChatOpen}
               onClose={() => {
                 setIsAIChatOpen(false)
@@ -780,6 +872,7 @@ function ModulesContent({
         {children}
       </DashboardWorkspace>
     </ErpAiChatControllerProvider>
+    </DocumentSelectionActionsContext.Provider>
     </AssistantNativeFormProvider>
   )
 }
