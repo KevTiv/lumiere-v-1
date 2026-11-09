@@ -505,7 +505,7 @@
     },
     {
       "path": "api-server/src/routes/import.rs",
-      "sha256": "ca4fa95c353a60a4ac5efb9d9eb7ad8e18883c050cd76a595c699890b7f79cf0"
+      "sha256": "a59c2dec7597be1d71c7acef0278c021b876b879b01f5b43db314ba0e4c1f7a8"
     },
     {
       "path": "api-server/src/routes/import_reviews/import_binding.rs",
@@ -1566,7 +1566,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import.rs",
       "function": "read_exact_outcome",
-      "line": 1102,
+      "line": 1124,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
