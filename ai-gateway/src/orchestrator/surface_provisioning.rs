@@ -393,7 +393,9 @@ mod tests {
             }
             return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}},{"name":{"some":"company_id"}},{"name":{"some":"allowed_actions"}}]},"rows":[[42,null,["chat"]]]}])).into_response();
         }
-        if statement.contains("skill_key = 'rag_generation'") {
+        if statement.starts_with("SELECT id, is_active FROM ai_skill ")
+            && statement.contains("skill_key = 'rag_generation'")
+        {
             return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}},{"name":{"some":"is_active"}}]},"rows":[[66,true]]}])).into_response();
         }
         if statement.contains("skill_key = 'report_analysis'") {

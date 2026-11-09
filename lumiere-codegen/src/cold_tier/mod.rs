@@ -273,7 +273,7 @@ pub fn run(paths: &Paths) -> Result<()> {
 /// sponsorship cap history or replace its deployment-local template pin.
 /// Do not infer exclusions from a missing organization_id: unknown tables must
 /// continue to fail C0 ownership validation.
-fn platform_control_table_names(module_schema: &Value) -> Result<BTreeSet<String>> {
+pub(crate) fn platform_control_table_names(module_schema: &Value) -> Result<BTreeSet<String>> {
     const PLATFORM_CONTROL_TABLES: [&str; 3] = [
         "ai_platform_default",
         "ai_platform_template",
