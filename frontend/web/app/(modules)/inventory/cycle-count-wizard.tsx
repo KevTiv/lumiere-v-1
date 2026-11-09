@@ -34,7 +34,7 @@ import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import type { QueryRows } from "@/lib/query-fetch"
 import { ChevronRight, MapPin, Package } from "lucide-react"
 import { OperationRequestError } from "@lumiere/api-client"
-import { CaptureSyncBadge } from "@/components/capture/capture-sync-badge"
+import { CaptureSyncBadge } from "../../../components/capture/capture-sync-badge"
 import { useBrowserOnline } from "@/hooks/use-browser-online"
 
 type ScalarId = bigint | number | string

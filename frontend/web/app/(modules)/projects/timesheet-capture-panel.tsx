@@ -5,7 +5,7 @@ import Link from "next/link"
 import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
-import { CaptureSyncBadge } from "@/components/capture/capture-sync-badge"
+import { CaptureSyncBadge } from "../../../components/capture/capture-sync-badge"
 import {
   getOrCreateTimesheetCaptureDeviceId,
   listTimesheetCaptures,
@@ -93,15 +93,16 @@ export function TimesheetCapturePanel({ organizationId,
               {!syncing ? (
                 <div className="flex flex-wrap items-center gap-2">
                   {!failed ? (
-                    <Button asChild variant="outline" size="sm">
-                      <Link
-                        href={projectTimesheetsHref(item.payload.projectId)}
-                        onClick={onReview}
-                      >
-                        {t("captureSync.openTimesheets", {
-                          defaultValue: "Open Timesheets",
-                        })}
-                      </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={<Link href={projectTimesheetsHref(item.payload.projectId)} />}
+                      nativeButton={false}
+                      onClick={onReview}
+                    >
+                      {t("captureSync.openTimesheets", {
+                        defaultValue: "Open Timesheets",
+                      })}
                     </Button>
                   ) : null}
                   <Button

@@ -18,7 +18,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import type { WarehouseSyncIntent } from "@lumiere/stdb/types"
 import { identityToHex } from "@lumiere/ui/lib/identity-label"
-import { CaptureSyncBadge } from "@/components/capture/capture-sync-badge"
+import { CaptureSyncBadge } from "../../../components/capture/capture-sync-badge"
 import { useBrowserOnline } from "@/hooks/use-browser-online"
 import {
   getOrCreateDeviceId,

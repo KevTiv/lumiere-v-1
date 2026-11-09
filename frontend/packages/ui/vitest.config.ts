@@ -12,6 +12,7 @@ export default defineConfig({
       { find: /^@\/hooks\/use-stored-dashboard-data-sources$/, replacement: fileURLToPath(new URL("../../web/hooks/use-stored-dashboard-data-sources.ts", import.meta.url)) },
       // Shared navigation tests exercise the web URL hook with its real helper.
       { find: /^@\/lib\/module-tab-navigation$/, replacement: fileURLToPath(new URL("../../web/lib/module-tab-navigation.ts", import.meta.url)) },
+      { find: /^@\/lib\/owner-queues$/, replacement: fileURLToPath(new URL("../../web/lib/owner-queues.ts", import.meta.url)) },
       { find: /^@\/lib\/api-fetch$/, replacement: fileURLToPath(new URL("../../web/lib/api-fetch.ts", import.meta.url)) },
       // Guide host regressions mount the production modal and dedicated-page owners.
       { find: /^@\/lib\/assistant-guide-context$/, replacement: fileURLToPath(new URL("../../web/lib/assistant-guide-context.tsx", import.meta.url)) },

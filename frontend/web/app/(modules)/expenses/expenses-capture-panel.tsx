@@ -71,7 +71,7 @@ import { CaptureAttachmentPreview } from "./capture-attachment-preview"
 import { DatePicker } from "@lumiere/ui/components/date-picker"
 import { useExplainErpError } from "@/lib/erp-ai-context"
 
-import { CaptureSyncBadge } from "@/components/capture/capture-sync-badge"
+import { CaptureSyncBadge } from "../../../components/capture/capture-sync-badge"
 import { useBrowserOnline } from "@/hooks/use-browser-online"
 import { isCaptureOwnedBy } from "@/lib/capture-sync-state"
 
