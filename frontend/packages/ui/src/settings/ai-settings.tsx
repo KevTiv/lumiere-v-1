@@ -25,6 +25,7 @@ import {
   useDismissAiInsight,
   useRecordAiSpend,
   useSetAiAgentActive,
+  useSetAiAgentAction,
   useUpdateAiAgent,
 } from "@lumiere/query-hooks/hooks/ai-agents"
 import {
@@ -58,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Bot, Database, Loader2, Plus, RefreshCw, Shield, Sparkles, Trash2, Coins } from "lucide-react"
+import { hasCompleteAiAgentConfiguration } from "./ai-agent-configuration"
 
 type Row = Record<string, unknown>
 
@@ -80,15 +82,6 @@ function agentAllowedActions(row: Row): string[] {
   const raw = row.allowedActions ?? row.allowed_actions
   if (!Array.isArray(raw)) return []
   return raw.map((item) => String(item))
-}
-
-function buildAgentUpdateParams(row: Row, allowedActions: string[]): Record<string, unknown> {
-  return {
-    temperature: Number(row.temperature ?? 0.7),
-    maxTokens: num(row.maxTokens),
-    rateLimitPerMinute: num(row.rateLimitPerMinute),
-    allowedActions,
-  }
 }
 
 function numFromForm(v: unknown): number {
@@ -173,6 +166,7 @@ export function AiSettings() {
   const createAgentMutation = useCreateAiAgent(orgId)
   const updateAgentMutation = useUpdateAiAgent(orgId)
   const setActiveMutation = useSetAiAgentActive(orgId)
+  const setActionMutation = useSetAiAgentAction(orgId)
   const createTeamMemberMutation = useCreateAiTeamMember(orgId)
   const dismissInsightMutation = useDismissAiInsight(orgId)
   const createInsightMutation = useCreateAiInsight(orgId)
@@ -380,19 +374,13 @@ export function AiSettings() {
 
   const handleToggleAgentAction = async (
     agent: Row,
-    action: "analytics_read" | "analytics_run" | "web_search",
+    action: "chat" | "analytics_read" | "analytics_run" | "web_search",
     enabled: boolean,
   ) => {
     if (!orgId) return
     const id = num(agent.id)
-    const next = new Set(agentAllowedActions(agent))
-    if (enabled) next.add(action)
-    else next.delete(action)
     try {
-      await updateAgentMutation.mutateAsync({
-        agentId: id,
-        params: buildAgentUpdateParams(agent, Array.from(next)),
-      })
+      await setActionMutation.mutateAsync({ agentId: id, action, enabled })
       toast({
         title: enabled ? "Action enabled" : "Action disabled",
         description: action.replace(/_/g, " "),
@@ -442,7 +430,7 @@ export function AiSettings() {
 
   const listLoading = loading || agentsQuery.isLoading || allowlistQuery.isLoading
   const agentOpsPending =
-    createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending
+    createAgentMutation.isPending || updateAgentMutation.isPending || setActiveMutation.isPending || setActionMutation.isPending
   const allowlistPending =
     createAllowlistMutation.isPending ||
     deleteAllowlistMutation.isPending ||
@@ -810,6 +798,17 @@ export function AiSettings() {
                       <div className="mt-2 flex flex-wrap gap-4">
                         <div className="flex items-center gap-2">
                           <Switch
+                            checked={agentAllowedActions(a).includes("chat")}
+                            onCheckedChange={(checked) => {
+                              void handleToggleAgentAction(a, "chat", checked)
+                            }}
+                            disabled={mutating || agentOpsPending}
+                            aria-label="Allow this agent to answer chat"
+                          />
+                          <span className="text-xs text-muted-foreground">Chat</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
                             checked={agentAllowedActions(a).includes("analytics_read")}
                             onCheckedChange={(checked) => {
                               void handleToggleAgentAction(a, "analytics_read", checked)
@@ -866,7 +865,13 @@ export function AiSettings() {
                         />
                         <span className="text-sm text-muted-foreground">{t("settings.ai.active")}</span>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => setEditAgent(a)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditAgent(a)}
+                        disabled={mutating || agentOpsPending || !hasCompleteAiAgentConfiguration(a)}
+                        title={!hasCompleteAiAgentConfiguration(a) ? "Full agent settings are unavailable. You can still change individual action bindings." : undefined}
+                      >
                         {t("settings.ai.edit")}
                       </Button>
                       <div className="flex items-center gap-2">
@@ -1035,6 +1040,10 @@ export function AiSettings() {
           onSubmit={async (data) => {
             setEditAgentError(null)
             if (!orgId) return
+            if (!hasCompleteAiAgentConfiguration(editAgent)) {
+              setEditAgentError("Full agent settings are unavailable. Reopen settings with access to the complete configuration.")
+              return
+            }
             const aid = Number.parseInt(String(data.agentId), 10)
             if (!Number.isFinite(aid)) {
               setEditAgentError(t("settings.ai.mutationError"))

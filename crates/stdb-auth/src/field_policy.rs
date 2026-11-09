@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::resource_registry::registry_get;
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FieldAccessContext {
     pub organization_id: u64,
@@ -23,7 +23,7 @@ pub struct FieldAccessContext {
     pub org_permissions: Vec<ActionPermission>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionPermission {
     pub resource: String,
@@ -2965,6 +2965,12 @@ mod tests {
     fn ai_agent_projection_keeps_company_binding_in_default_and_selective_reads() {
         let default = resolve_http_sql_columns("ai-agents", None).expect("agent projection");
         assert!(default.iter().any(|column| column == "company_id"));
+        for field in ["allowed_actions", "allowed_models"] {
+            assert!(default.iter().any(|column| column == field));
+        }
+        for field in ["system_prompt", "api_key_reference"] {
+            assert!(!default.iter().any(|column| column == field));
+        }
         let mut access = field_access(&["ai-agents:read"]);
         access.field_permissions.push(FieldPermissionLike {
             id: Some(1),
@@ -2982,6 +2988,8 @@ mod tests {
             assert!(restricted.iter().any(|column| column == field));
         }
         assert!(!restricted.iter().any(|column| column == "monthly_spend"));
+        assert!(!restricted.iter().any(|column| column == "allowed_actions"));
+        assert!(!restricted.iter().any(|column| column == "allowed_models"));
     }
 
     #[test]

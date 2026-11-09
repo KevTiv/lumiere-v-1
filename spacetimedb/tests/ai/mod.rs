@@ -16,6 +16,7 @@ use spacetimedb::ReducerContext;
 
 #[spacetimedb::reducer]
 pub fn run_ai_owner_configuration_tests(ctx: &ReducerContext) -> Result<(), String> {
+    owner_configuration_test::test_agent_action_preserves_configuration(ctx)?;
     owner_configuration_test::test_owner_configuration(ctx)?;
     owner_configuration_test::test_legacy_missing_period_and_recovery(ctx)
 }

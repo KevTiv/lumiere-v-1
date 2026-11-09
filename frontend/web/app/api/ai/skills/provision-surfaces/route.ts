@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Scope and credentials come only from the verified session. The gateway
-  // uses this actor for catalog reads and the permission-checked create reducer.
+  // registers skills through the API's authenticated session bridge.
   return proxyAiGateway("/v1/skills/provision-surfaces", {
     org_id: orgId,
     stdb_token: session.stdbToken,

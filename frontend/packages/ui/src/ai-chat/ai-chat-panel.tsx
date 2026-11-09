@@ -72,6 +72,10 @@ interface AIChatPanelProps {
   contextOptions?: readonly { value: string; label: string; group: string }[]
   selectedContext?: string
   onContextChange?: (value: string) => void
+  /** An explicit selection is checked again for company and model policy by the gateway. */
+  agentOptions?: readonly { value: string; label: string }[]
+  selectedAgent?: string
+  onAgentChange?: (value: string) => void
   config?: Partial<AIChatConfig>
   context?: ChatContext
   initialMessages?: ChatMessage[]
@@ -161,6 +165,9 @@ export function AIChatPanel({
   contextOptions,
   selectedContext,
   onContextChange,
+  agentOptions,
+  selectedAgent,
+  onAgentChange,
   config,
   context,
   initialMessages,
@@ -1116,6 +1123,26 @@ export function AIChatPanel({
             </div>
           </div>
           <div className="mx-2 flex max-w-[790px] flex-wrap items-center gap-1 rounded-b-xl bg-muted/60 px-2 py-1">
+          {agentOptions && agentOptions.length > 0 && onAgentChange ? (
+            <div className="flex min-w-0 items-center gap-1">
+              <User className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <Select value={selectedAgent ?? "default"} onValueChange={onAgentChange}>
+                <SelectTrigger
+                  data-testid="erp-ai-chat-agent"
+                  className="h-9 max-w-[12rem] border-transparent bg-transparent text-xs"
+                  aria-label="AI agent"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Organization default</SelectItem>
+                  {agentOptions.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           {contextOptions && contextOptions.length > 0 && onContextChange ? (
             <div className="flex min-w-0 items-center gap-1">
               <Layers3 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
