@@ -101,7 +101,7 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     await expect(panel).toBeVisible()
     await expect(panel).toContainText("Unuploaded file bytes stay in this capture panel only")
     const file = panel.getByTestId("expenses-capture-file")
-    await expect(file).toHaveAttribute("accept", "image/*,application/pdf")
+    await expect(file).toHaveAttribute("accept", ".pdf,.png,.jpg,.jpeg,.webp")
     await file.setInputFiles({
       name: "receipt-preview.png",
       mimeType: "image/png",

@@ -15,19 +15,37 @@ target_container="$test_name-target"
 source_volume="$test_name-source-data"
 target_volume="$test_name-target-data"
 backup_volume="$test_name-backups"
+bucket_container="$test_name-s3"
+backup_network="$test_name-backup-network"
+bucket_name="lumiere-backups"
+bucket_endpoint="http://s3.test:9000"
+# Public ECR mirror of MinIO RELEASE.2025-09-07T16-13-09Z, pinned for the synthetic drill.
+bucket_image="public.ecr.aws/y9w4h2u9/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
 pinned_image="local/lumiere-stdb-recovery@$image_id"
 module_revision="$(printf '%040d' 1)"
 host="http://127.0.0.1:3000"
 database="lumiere-physical-recovery-test"
 cli=(spacetime --config-path /tmp/test-cli.toml)
+bucket_env=(
+  --env RCLONE_CONFIG_BACKUP_TYPE=s3
+  --env RCLONE_CONFIG_BACKUP_PROVIDER=Other
+  --env "RCLONE_CONFIG_BACKUP_ENDPOINT=$bucket_endpoint"
+  --env RCLONE_CONFIG_BACKUP_REGION=us-east-1
+  --env RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID=fixture-access
+  --env RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY=fixture-secret
+  --env RCLONE_CONFIG_BACKUP_FORCE_PATH_STYLE=false
+)
+destination="backup:$bucket_name/production"
 
 cleanup() {
   if [[ "$?" -ne 0 ]]; then
     docker logs "$source_container" >&2 || true
     docker logs "$target_container" >&2 || true
+    docker logs "$bucket_container" >&2 || true
   fi
-  docker rm --force "$source_container" "$target_container" >/dev/null 2>&1 || true
+  docker rm --force "$source_container" "$target_container" "$bucket_container" >/dev/null 2>&1 || true
   docker volume rm "$source_volume" "$target_volume" "$backup_volume" >/dev/null 2>&1 || true
+  docker network rm "$backup_network" >/dev/null 2>&1 || true
   rmdir "$test_dir"
 }
 trap cleanup EXIT
@@ -38,11 +56,29 @@ docker run --rm --network none --mount "$backup_mount" \
 recipient="$(docker run --rm --network none --mount "$backup_mount,readonly" \
   --entrypoint age-keygen "$image_id" -y /backup/test-identity)"
 
-docker run --detach --network none --name "$source_container" \
+docker network create --internal "$backup_network" >/dev/null
+docker run --detach --name "$bucket_container" --network "$backup_network" \
+  --network-alias s3.test --network-alias "$bucket_name.s3.test" \
+  --env MINIO_DOMAIN=s3.test --env MINIO_ROOT_USER=fixture-access \
+  --env MINIO_ROOT_PASSWORD=fixture-secret \
+  "$bucket_image" server /data >/dev/null
+docker run --rm --network "$backup_network" "${bucket_env[@]}" \
+  --entrypoint /bin/sh "$image_id" -ceu '
+    for attempt in $(seq 1 30); do
+      if curl -fsS --max-time 1 "$1/minio/health/ready" >/dev/null 2>&1; then
+        exec rclone mkdir "backup:$2"
+      fi
+      sleep 1
+    done
+    echo "Synthetic backup bucket did not become ready" >&2
+    exit 1
+  ' bucket "$bucket_endpoint" "$bucket_name"
+
+docker run --detach --network "$backup_network" --name "$source_container" \
   --mount "type=volume,src=$source_volume,dst=/data" \
-  --mount "$backup_mount" \
   --mount "type=bind,src=$fixture,dst=/fixture.wasm,readonly" \
-  --env STDB_BACKUP_DESTINATION=/backup \
+  "${bucket_env[@]}" --env RCLONE_CONFIG_BACKUP_NO_CHECK_BUCKET=true \
+  --env "STDB_BACKUP_DESTINATION=$destination" \
   --env "STDB_BACKUP_AGE_RECIPIENT=$recipient" \
   --env "STDB_BACKUP_IMAGE=$pinned_image" \
   "$image_id" >/dev/null
@@ -95,8 +131,11 @@ done
 "$capture_completed"
 wait_ready "$source_container"
 [[ "$(query_fixture "$source_container")" == "$before" ]]
-manifest="$(docker exec "$source_container" find /backup/physical -name manifest.json -print -quit)"
-[[ -n "$manifest" ]]
+docker run --rm --network "$backup_network" "${bucket_env[@]}" \
+  --mount "$backup_mount" --entrypoint rclone "$image_id" copy "$destination/physical" /backup/physical
+manifest="$(docker run --rm --network none --mount "$backup_mount,readonly" \
+  --entrypoint find "$image_id" /backup/physical -name manifest.json -print -quit)"
+[[ "$manifest" == /backup/physical/*/manifest.json ]]
 archive="${manifest%/*}/data.tar.gz.age"
 
 docker run --rm --network none \
@@ -116,4 +155,4 @@ docker run --detach --network none --name "$target_container" \
   "$image_id" >/dev/null
 wait_ready "$target_container"
 [[ "$(query_fixture "$target_container")" == "$before" ]]
-echo "Verified the restarted source and the recovered SpacetimeDB fixture row"
+echo "Verified S3 capture, the restarted source, and the recovered SpacetimeDB fixture row"
