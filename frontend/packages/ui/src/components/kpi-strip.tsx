@@ -45,22 +45,23 @@ export function KpiStrip({ tiles, loading = false, className }: KpiStripProps) {
       {tiles.map((tile) => {
         const body = (
           <>
-            <span className="truncate text-xs font-medium text-muted-foreground">{tile.label}</span>
+            <span title={tile.label} className="max-w-full truncate text-xs font-medium text-muted-foreground">{tile.label}</span>
             {loading ? (
-              <Skeleton className="mt-1 h-6 w-16" data-testid={`kpi-tile-${tile.key}-loading`} />
+              <Skeleton className="mt-1 h-6 w-16 max-w-full" data-testid={`kpi-tile-${tile.key}-loading`} />
             ) : (
               <span
                 className={cn(
                   workspaceStyles.metricValue,
-                  "mt-1 truncate text-xl",
+                  "mt-1 max-w-full truncate text-xl",
                   toneValueClass[tile.tone ?? "default"],
                 )}
+                title={String(tile.value)}
                 data-testid={`kpi-tile-${tile.key}-value`}
               >
                 {tile.value}
               </span>
             )}
-            {tile.hint ? <span className="mt-0.5 truncate text-xs text-muted-foreground">{tile.hint}</span> : null}
+            {tile.hint ? <span title={tile.hint} className="mt-0.5 max-w-full truncate text-xs text-muted-foreground">{tile.hint}</span> : null}
           </>
         )
         const base =

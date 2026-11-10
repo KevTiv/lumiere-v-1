@@ -27,6 +27,7 @@ import { ActivityRingWidget } from "./widgets/activity-ring-widget"
 import { CountdownWidget } from "./widgets/countdown-widget"
 import { IosTileWidget } from "./widgets/ios-tile-widget"
 import { QuickActionsWidget } from "./widgets/quick-actions-widget"
+import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
 import { TabbedTableWidget } from "./widgets/tabbed-table-widget"
 import { ComboTrendChart } from "../charts/combo-trend-chart"
@@ -237,9 +238,9 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
 
   if (!useCard) {
     return (
-      <div className={widthClass} data-testid={testId}>
+      <div className={cn("min-w-0 max-w-full [overflow-wrap:anywhere]", widthClass)} data-testid={testId}>
         {widget.title || isChart || canExportCsv ? (
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-2">
             {widget.title ? (
               <h3 className={workspaceStyles.sectionTitle}>{widget.title}</h3>
             ) : (
@@ -256,9 +257,9 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
   }
 
   return (
-    <div className={widthClass} data-testid={testId}>
+    <div className={cn("min-w-0 max-w-full [overflow-wrap:anywhere]", widthClass)} data-testid={testId}>
       <Card className="h-full">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-1">
           <CardTitle className={workspaceStyles.sectionTitle}>{widget.title}</CardTitle>
           {isChart || canExportCsv ? (
             <div className="flex shrink-0 items-center gap-1">{exportButtons}</div>

@@ -35,6 +35,39 @@ async function openFixture(page: Page, width: number) {
   await expect(page.getByTestId("entity-action-Create")).toBeVisible()
 }
 
+for (const scenario of [
+  { viewport: 320, panel: "240", fontSize: "100%" },
+  { viewport: 390, panel: "320", fontSize: "100%" },
+  { viewport: 1280, panel: "560", fontSize: "100%" },
+  { viewport: 1280, panel: "240", fontSize: "200%" },
+]) {
+  test(`card content fits ${scenario.panel}px panels at ${scenario.fontSize} text on ${scenario.viewport}px screens`, { tag: "@card-fit" }, async ({ page }) => {
+    await openFixture(page, scenario.viewport)
+    await page.getByLabel("Panel width").selectOption(scenario.panel)
+    await page.evaluate((size) => { document.documentElement.style.fontSize = size }, scenario.fontSize)
+    const sample = page.getByTestId("card-stress-sample")
+    // Check descendants too: overflow-hidden on a parent must not conceal a broken layout.
+    for (const owner of await sample.locator('[data-slot="card"], [data-slot="card-header"], [data-slot="card-action"], [data-slot="card-content"], [data-slot="card-footer"], [data-testid^="stress-"], [data-testid="kpi-tile-stress"], [data-testid^="kanban-card-"]').all()) {
+      await expectContained(owner, owner.locator("p, h4, button, [data-slot=badge]"))
+    }
+    for (const text of await sample.locator("p:not(.truncate), h4, [data-slot=card-title], [data-slot=card-description], [data-slot=empty-title], [data-slot=empty-description]").all()) {
+      await expectContained(text)
+    }
+    const label = page.getByTestId("kpi-tile-stress").locator("span").first()
+    await expect(label).toHaveAttribute("title", /unbroken/)
+    expect(await label.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("ellipsis")
+    expect(await label.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+    await expect(sample.locator('[data-slot=card-description]')).toHaveText(/unbroken/)
+    const description = sample.locator('[data-slot=card-description]')
+    expect(await description.evaluate((el) => el.clientHeight > parseFloat(getComputedStyle(el).lineHeight))).toBe(true)
+    await page.getByTestId("stress-card").getByRole("button").press("Enter")
+    await expect(page.getByTestId("last-action")).toHaveText("card-action")
+    await page.getByTestId("kpi-tile-stress").press("Enter")
+    await expect(page.getByTestId("last-action")).toHaveText("kpi-tile")
+    await sample.screenshot({ path: test.info().outputPath("card-content.png") })
+  })
+}
+
 for (const width of [320, 390, 768, 1280]) {
   test(`shared layouts contain long content at ${width}px`, async ({ page }) => {
     await openFixture(page, width)
